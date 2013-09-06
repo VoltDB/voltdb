@@ -91,7 +91,7 @@ PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetS
     m_partitionColumn(partitionColumn),
     stats_(this),
     m_failedCompactionCount(0),
-    m_tuplesPendingDeleteCount(0)
+    m_invisibleTuplesPendingDeleteCount(0)
 {
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
@@ -292,6 +292,7 @@ void PersistentTable::insertTupleForUndo(char *tuple)
     target.move(tuple);
     target.setPendingDeleteOnUndoReleaseFalse();
     m_tuplesPinnedByUndo--;
+    --m_invisibleTuplesPendingDeleteCount;
 
     /*
      * The only thing to do is reinsert the tuple into the indexes. It was never moved,
@@ -329,8 +330,9 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         if ( ! checkUpdateOnUniqueIndexes(targetTupleToUpdate,
                                           sourceTupleWithNewValues,
                                           indexesToUpdate)) {
-            throw ConstraintFailureException(this, targetTupleToUpdate,
+            throw ConstraintFailureException(this,
                                              sourceTupleWithNewValues,
+                                             targetTupleToUpdate,
                                              CONSTRAINT_TYPE_UNIQUE);
         }
 
@@ -338,8 +340,9 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
          * Check for null constraint violations. Assumes source tuple is fully fleshed out.
          */
         FAIL_IF(!checkNulls(sourceTupleWithNewValues)) {
-            throw ConstraintFailureException(this, targetTupleToUpdate,
+            throw ConstraintFailureException(this,
                                              sourceTupleWithNewValues,
+                                             targetTupleToUpdate,
                                              CONSTRAINT_TYPE_NOT_NULL);
         }
 
@@ -534,6 +537,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
         if (uq) {
             target.setPendingDeleteOnUndoReleaseTrue();
             m_tuplesPinnedByUndo++;
+            ++m_invisibleTuplesPendingDeleteCount;
             // Create and register an undo action.
             uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), this), this);
             return true;
@@ -555,6 +559,7 @@ void PersistentTable::deleteTupleRelease(char* tupleData)
     target.move(tupleData);
     target.setPendingDeleteOnUndoReleaseFalse();
     m_tuplesPinnedByUndo--;
+    --m_invisibleTuplesPendingDeleteCount;
     deleteTupleFinalize(target);
 }
 
@@ -585,9 +590,8 @@ void PersistentTable::deleteTupleFinalize(TableTuple &target)
             return;
         }
 
+        ++m_invisibleTuplesPendingDeleteCount;
         target.setPendingDeleteTrue();
-        // This count is a testability feature not intended for use in product logic.
-        ++m_tuplesPendingDeleteCount;
         return;
     }
 
@@ -757,8 +761,6 @@ PersistentTable::segregateMaterializedViews(std::map<std::string, catalog::Mater
                                             std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & end,
                                             std::vector< catalog::MaterializedViewInfo*> &survivingInfosOut,
                                             std::vector<MaterializedViewMetadata*> &survivingViewsOut,
-                                            std::vector<catalog::MaterializedViewInfo*> &changingInfosOut,
-                                            std::vector<MaterializedViewMetadata*> &changingViewsOut,
                                             std::vector<MaterializedViewMetadata*> &obsoleteViewsOut)
 {
     //////////////////////////////////////////////////////////
@@ -898,6 +900,11 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple,
                                              CONSTRAINT_TYPE_UNIQUE);
         }
     }
+    UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+    if (uq) {
+        char* tupleData = uq->allocatePooledCopy(tuple.address(), tuple.tupleLength());
+        uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, this));
+    }
 
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
@@ -916,7 +923,6 @@ bool PersistentTable::activateStream(
     int32_t partitionId,
     CatalogId tableId,
     ReferenceSerializeInput &serializeIn) {
-
     return activateStreamInternal(
         tableId,
         boost::shared_ptr<TableStreamer>(
@@ -986,7 +992,7 @@ int64_t PersistentTable::streamMore(TupleOutputStreamProcessor &outputStreams,
 void PersistentTable::processRecoveryMessage(RecoveryProtoMsg* message, Pool *pool) {
     switch (message->msgType()) {
     case RECOVERY_MSG_TYPE_SCAN_TUPLES: {
-        if (activeTupleCount() == 0) {
+        if (isPersistentTableEmpty()) {
             uint32_t tupleCount = message->totalTupleCount();
             BOOST_FOREACH(TableIndex *index, m_indexes) {
                 index->ensureCapacity(tupleCount);

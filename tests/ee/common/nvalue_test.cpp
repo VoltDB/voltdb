@@ -37,68 +37,116 @@
 using namespace std;
 using namespace voltdb;
 
+static const int64_t scale = 1000000000000;
+static const double floatDelta = 0.000000000001;
+
 class NValueTest : public Test {
     ThreadLocalPool m_pool;
-};
-
-void deserDecHelper(NValue nv, ValueType &vt,
-                    TTInt &value, string &str) {
-    vt    = ValuePeeker::peekValueType(nv);
-    value = ValuePeeker::peekDecimal(nv);
-    str   = ValuePeeker::peekDecimalString(nv);
-}
-
-TEST_F(NValueTest, DeserializeDecimal)
-{
-    int64_t scale = 1000000000000;
+public:
     string str;
-
     ValueType vt;
     TTInt value;
     NValue nv;
+    int64_t scaledValue;
+    int64_t scaledDirect;
+    NValue viaDouble;
+    NValue lower;
+    NValue upper;
+
+    void deserDecHelper()
+    {
+        vt    = ValuePeeker::peekValueType(nv);
+        value = ValuePeeker::peekDecimal(nv);
+        str   = ValuePeeker::peekDecimalString(nv);
+    }
+
+    void deserDecValidator(const char* textValue)
+    {
+        nv = ValueFactory::getDecimalValueFromString(textValue);
+        deserDecHelper();
+        NValue floatEquivalent = nv.castAs(VALUE_TYPE_DOUBLE);
+        double floatValue = ValuePeeker::peekDouble(floatEquivalent);
+        floatValue *= scale;
+        scaledValue = (int64_t)floatValue;
+        double floatDirect = atof(textValue);
+        viaDouble = ValueFactory::getDoubleValue(floatDirect).castAs(VALUE_TYPE_DECIMAL);
+        lower = ValueFactory::getDoubleValue(floatDirect - floatDelta);
+        upper = ValueFactory::getDoubleValue(floatDirect + floatDelta);
+        scaledDirect = (int64_t)(floatDirect * scale);
+    }
 
 
-    nv = ValueFactory::getDecimalValueFromString("6.0000000");
-    deserDecHelper(nv, vt, value, str);
+};
+
+TEST_F(NValueTest, DeserializeDecimal)
+{
+    deserDecValidator("6.0000000");
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_TRUE(viaDouble.compare(nv) == 0);
+    ASSERT_TRUE(lower.compare(nv) < 0);
+    ASSERT_TRUE(nv.compare(lower) > 0);
+    ASSERT_TRUE(upper.compare(nv) > 0);
+    ASSERT_TRUE(nv.compare(upper) < 0);
+    ASSERT_EQ(scaledValue, scaledDirect);
     ASSERT_EQ(value, TTInt("6000000000000"));
     ASSERT_EQ(str, "6.000000000000");
 
-    nv = ValueFactory::getDecimalValueFromString("-0");
-    deserDecHelper(nv, vt, value, str);
+    deserDecValidator("-0");
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_TRUE(viaDouble.compare(nv) == 0);
+    ASSERT_TRUE(lower.compare(nv) < 0);
+    ASSERT_TRUE(nv.compare(lower) > 0);
+    ASSERT_TRUE(upper.compare(nv) > 0);
+    ASSERT_TRUE(nv.compare(upper) < 0);
+    ASSERT_EQ(scaledValue, scaledDirect);
     ASSERT_EQ(value, TTInt(0));
     // Decimals in Volt are currently hardwired with 12 fractional
     // decimal places.
     ASSERT_EQ(str, "0.000000000000");
 
-    nv = ValueFactory::getDecimalValueFromString("0");
-    deserDecHelper(nv, vt, value, str);
+    deserDecValidator("0");
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_TRUE(viaDouble.compare(nv) == 0);
+    ASSERT_TRUE(lower.compare(nv) < 0);
+    ASSERT_TRUE(nv.compare(lower) > 0);
+    ASSERT_TRUE(upper.compare(nv) > 0);
+    ASSERT_TRUE(nv.compare(upper) < 0);
     ASSERT_EQ(value, TTInt(0));
     ASSERT_EQ(str, "0.000000000000");
 
-    nv = ValueFactory::getDecimalValueFromString("0.0");
-    deserDecHelper(nv, vt, value, str);
+    deserDecValidator("0.0");
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_TRUE(viaDouble.compare(nv) == 0);
+    ASSERT_TRUE(lower.compare(nv) < 0);
+    ASSERT_TRUE(nv.compare(lower) > 0);
+    ASSERT_TRUE(upper.compare(nv) > 0);
+    ASSERT_TRUE(nv.compare(upper) < 0);
     ASSERT_EQ(value, TTInt(0));
     ASSERT_EQ(str, "0.000000000000");
 
-    nv = ValueFactory::getDecimalValueFromString("1");
-    deserDecHelper(nv, vt, value, str);
+    deserDecValidator("1");
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_TRUE(viaDouble.compare(nv) == 0);
+    ASSERT_TRUE(lower.compare(nv) < 0);
+    ASSERT_TRUE(nv.compare(lower) > 0);
+    ASSERT_TRUE(upper.compare(nv) > 0);
+    ASSERT_TRUE(nv.compare(upper) < 0);
     ASSERT_EQ(value, TTInt("1000000000000"));
     ASSERT_EQ(str, "1.000000000000");
 
-    nv = ValueFactory::getDecimalValueFromString("-1");
-    deserDecHelper(nv, vt, value, str);
+    deserDecValidator("-1");
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_TRUE(viaDouble.compare(nv) == 0);
+    ASSERT_TRUE(lower.compare(nv) < 0);
+    ASSERT_TRUE(nv.compare(lower) > 0);
+    ASSERT_TRUE(upper.compare(nv) > 0);
+    ASSERT_TRUE(nv.compare(upper) < 0);
     ASSERT_EQ(value, TTInt("-1000000000000"));
     ASSERT_EQ(str, "-1.000000000000");
 
@@ -107,7 +155,7 @@ TEST_F(NValueTest, DeserializeDecimal)
                                        "9999999999"   //20 digits
                                        "999999.9999"   //30 digits
                                        "99999999");   //38 digits
-    deserDecHelper(nv, vt, value, str);
+    deserDecHelper();
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
     ASSERT_EQ(value, TTInt("-9999999999"  //10 digits
@@ -124,7 +172,7 @@ TEST_F(NValueTest, DeserializeDecimal)
             "9999999999"   //20 digits
             "999999.9999"   //30 digits
             "99999999");
-    deserDecHelper(nv, vt, value, str);
+    deserDecHelper();
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
     ASSERT_EQ(value, TTInt("9999999999"  //10 digits
@@ -136,31 +184,47 @@ TEST_F(NValueTest, DeserializeDecimal)
             "999999.9999"   //30 digits
             "99999999"));
 
-    nv = ValueFactory::getDecimalValueFromString("1234");
-    deserDecHelper(nv, vt, value, str);
+    deserDecValidator("1234");
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_TRUE(viaDouble.compare(nv) == 0);
+    ASSERT_TRUE(lower.compare(nv) < 0);
+    ASSERT_TRUE(nv.compare(lower) > 0);
+    ASSERT_TRUE(upper.compare(nv) > 0);
+    ASSERT_TRUE(nv.compare(upper) < 0);
     ASSERT_EQ(value, TTInt(1234 * scale));
     ASSERT_EQ(str, "1234.000000000000");
 
-    nv = ValueFactory::getDecimalValueFromString("12.34");
-    deserDecHelper(nv, vt, value, str);
+    deserDecValidator("12.34");
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_TRUE(viaDouble.compare(nv) == 0);
+    ASSERT_TRUE(lower.compare(nv) < 0);
+    ASSERT_TRUE(nv.compare(lower) > 0);
+    ASSERT_TRUE(upper.compare(nv) > 0);
+    ASSERT_TRUE(nv.compare(upper) < 0);
     ASSERT_EQ(value, TTInt(static_cast<int64_t>(12340000000000)));
     ASSERT_EQ(str, "12.340000000000");
 
-    nv = ValueFactory::getDecimalValueFromString("-1234");
-    deserDecHelper(nv, vt, value, str);
+    deserDecValidator("-1234");
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_TRUE(viaDouble.compare(nv) == 0);
+    ASSERT_TRUE(lower.compare(nv) < 0);
+    ASSERT_TRUE(nv.compare(lower) > 0);
+    ASSERT_TRUE(upper.compare(nv) > 0);
+    ASSERT_TRUE(nv.compare(upper) < 0);
     ASSERT_EQ(value, TTInt(-1234 * scale));
     ASSERT_EQ(str, "-1234.000000000000");
 
-    nv = ValueFactory::getDecimalValueFromString("-12.34");
-    deserDecHelper(nv, vt, value, str);
+    deserDecValidator("-12.34");
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_TRUE(viaDouble.compare(nv) == 0);
+    ASSERT_TRUE(lower.compare(nv) < 0);
+    ASSERT_TRUE(nv.compare(lower) > 0);
+    ASSERT_TRUE(upper.compare(nv) > 0);
+    ASSERT_TRUE(nv.compare(upper) < 0);
     ASSERT_EQ(value, TTInt(static_cast<int64_t>(-12340000000000)));
     ASSERT_EQ(str, "-12.340000000000");
 
@@ -212,8 +276,6 @@ TEST_F(NValueTest, DeserializeDecimal)
     }
     catch (SerializableEEException &e) {
     }
-
-    ASSERT_EQ(1,1);
 }
 
 TEST_F(NValueTest, TestCastToBigInt) {
@@ -2103,44 +2165,123 @@ TEST_F(NValueTest, TestExtract)
     NValue result;
     NValue midSeptember = ValueFactory::getTimestampValue(1000000000000000);
 
-    const int EXPECTED_YEAR = 2001;
+    int EXPECTED_YEAR = 2001;
     result = midSeptember.callUnary<FUNC_EXTRACT_YEAR>();
     EXPECT_EQ(0, result.compare(ValueFactory::getIntegerValue(EXPECTED_YEAR)));
 
-    const int EXPECTED_MONTH = 9;
+    int8_t EXPECTED_MONTH = 9;
     result = midSeptember.callUnary<FUNC_EXTRACT_MONTH>();
     EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_MONTH)));
 
-    const int EXPECTED_DAY = 9;
+    int8_t EXPECTED_DAY = 9;
     result = midSeptember.callUnary<FUNC_EXTRACT_DAY>();
     EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_DAY)));
 
-    const int EXPECTED_DOW = 1;
+    int8_t EXPECTED_DOW = 1;
     result = midSeptember.callUnary<FUNC_EXTRACT_DAY_OF_WEEK>();
     EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_DOW)));
 
-    const int EXPECTED_DOY = 252;
+    int16_t EXPECTED_DOY = 252;
     result = midSeptember.callUnary<FUNC_EXTRACT_DAY_OF_YEAR>();
     EXPECT_EQ(0, result.compare(ValueFactory::getSmallIntValue(EXPECTED_DOY)));
 
-    const int EXPECTED_WOY = 36;
+    int8_t EXPECTED_WOY = 36;
     result = midSeptember.callUnary<FUNC_EXTRACT_WEEK_OF_YEAR>();
     EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_WOY)));
 
-    const int EXPECTED_QUARTER = 3;
+    int8_t EXPECTED_QUARTER = 3;
     result = midSeptember.callUnary<FUNC_EXTRACT_QUARTER>();
     EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_QUARTER)));
 
-    const int EXPECTED_HOUR = 1;
+    int8_t EXPECTED_HOUR = 1;
     result = midSeptember.callUnary<FUNC_EXTRACT_HOUR>();
     EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_HOUR)));
 
-    const int EXPECTED_MINUTE = 46;
+    int8_t EXPECTED_MINUTE = 46;
     result = midSeptember.callUnary<FUNC_EXTRACT_MINUTE>();
     EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_MINUTE)));
 
-    const std::string EXPECTED_SECONDS = "40";
+    std::string EXPECTED_SECONDS = "40";
     result = midSeptember.callUnary<FUNC_EXTRACT_SECOND>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getDecimalValueFromString(EXPECTED_SECONDS)));
+
+    // test time before epoch, Thu, 18 Nov 1948 16:32:03 GMT
+    NValue beforeEpoch = ValueFactory::getTimestampValue(-666430077000000);
+
+    EXPECTED_YEAR = 1948;
+    result = beforeEpoch.callUnary<FUNC_EXTRACT_YEAR>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getIntegerValue(EXPECTED_YEAR)));
+
+    EXPECTED_MONTH = 11;
+    result = beforeEpoch.callUnary<FUNC_EXTRACT_MONTH>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_MONTH)));
+
+    EXPECTED_DAY = 18;
+    result = beforeEpoch.callUnary<FUNC_EXTRACT_DAY>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_DAY)));
+
+    EXPECTED_DOW = 5;
+    result = beforeEpoch.callUnary<FUNC_EXTRACT_DAY_OF_WEEK>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_DOW)));
+
+    EXPECTED_DOY = 323;
+    result = beforeEpoch.callUnary<FUNC_EXTRACT_DAY_OF_YEAR>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getSmallIntValue(EXPECTED_DOY)));
+
+    EXPECTED_QUARTER = 4;
+    result = beforeEpoch.callUnary<FUNC_EXTRACT_QUARTER>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_QUARTER)));
+
+    EXPECTED_HOUR = 16;
+    result = beforeEpoch.callUnary<FUNC_EXTRACT_HOUR>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_HOUR)));
+
+    EXPECTED_MINUTE = 32;
+    result = beforeEpoch.callUnary<FUNC_EXTRACT_MINUTE>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_MINUTE)));
+
+    EXPECTED_SECONDS = "3";
+    result = beforeEpoch.callUnary<FUNC_EXTRACT_SECOND>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getDecimalValueFromString(EXPECTED_SECONDS)));
+
+
+    // test time before epoch, Human time (GMT): Fri, 05 Jul 1658 14:22:28 GMT
+    NValue longAgo = ValueFactory::getTimestampValue(-9829676252000000);
+
+    EXPECTED_YEAR = 1658;
+    result = longAgo.callUnary<FUNC_EXTRACT_YEAR>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getIntegerValue(EXPECTED_YEAR)));
+
+    EXPECTED_MONTH = 7;
+    result = longAgo.callUnary<FUNC_EXTRACT_MONTH>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_MONTH)));
+
+    EXPECTED_DAY = 5;
+    result = longAgo.callUnary<FUNC_EXTRACT_DAY>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_DAY)));
+
+    EXPECTED_DOW = 6;
+    result = longAgo.callUnary<FUNC_EXTRACT_DAY_OF_WEEK>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_DOW)));
+
+    EXPECTED_DOY = 186;
+    result = longAgo.callUnary<FUNC_EXTRACT_DAY_OF_YEAR>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getSmallIntValue(EXPECTED_DOY)));
+
+    EXPECTED_QUARTER = 3;
+    result = longAgo.callUnary<FUNC_EXTRACT_QUARTER>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_QUARTER)));
+
+    EXPECTED_HOUR = 14;
+    result = longAgo.callUnary<FUNC_EXTRACT_HOUR>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_HOUR)));
+
+    EXPECTED_MINUTE = 22;
+    result = longAgo.callUnary<FUNC_EXTRACT_MINUTE>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_MINUTE)));
+
+    EXPECTED_SECONDS = "28";
+    result = longAgo.callUnary<FUNC_EXTRACT_SECOND>();
     EXPECT_EQ(0, result.compare(ValueFactory::getDecimalValueFromString(EXPECTED_SECONDS)));
 
     delete poolHolder;

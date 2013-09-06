@@ -19,8 +19,9 @@ package org.voltcore.messaging;
 
 public enum Subject {
     DEFAULT,                 // All original message types are in the default subject
-    FAILURE_SITE_UPDATE,     // Execution site data exchange when processing post-failure
-    FAILURE;                 // Notification of node failures
+    SITE_FAILURE_UPDATE,     // Execution site data exchange when processing post-failure
+    FAILURE,                 // Notification of node failures
+    SITE_FAILURE_FORWARD;    // Agreement site forwards for failures detected on other sites
 
     private final byte m_id;
 

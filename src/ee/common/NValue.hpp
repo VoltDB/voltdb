@@ -31,7 +31,7 @@
 #include <vector>
 
 #include "boost/scoped_ptr.hpp"
-#include "boost/unordered_map.hpp"
+#include "boost/functional/hash.hpp"
 #include "ttmath/ttmathint.h"
 
 #include "common/ExportSerializeIo.h"
@@ -291,17 +291,19 @@ class NValue {
     void serializeToExport(ExportSerializeOutput&) const;
 
     // See comment with inlined body, below.
-    void allocatePersistentObjectFromInlineValue();
+    void allocateObjectFromInlinedValue(Pool* stringPool = NULL);
 
     /* Check if the value represents SQL NULL */
     bool isNull() const;
+
+    /* Check if the value represents IEEE 754 NaN */
+    bool isNaN() const;
 
     /* For boolean NValues, convert to bool */
     bool isTrue() const;
     bool isFalse() const;
 
     /* For number values, check the number line. */
-    bool isNegative() const;
     bool isZero() const;
 
     /* For boolean NValues only, logical operators */
@@ -311,7 +313,8 @@ class NValue {
 
     /* Evaluate the ordering relation against two NValues. Promotes
        exact types to allow disparate type comparison. See also the
-       op_ functions which return boolean NValues. */
+       op_ functions which return boolean NValues.
+     */
     int compare(const NValue rhs) const;
 
     /* Return a boolean NValue with the comparison result */
@@ -528,34 +531,6 @@ class NValue {
     // The array size is predetermined in allocateANewNValueList.
     void setArrayElements(std::vector<NValue> &args) const;
 
-  private:
-    /*
-     * Private methods are private for a reason. Don't expose the raw
-     * data so that it can be operated on directly.
-     */
-
-    // Function declarations for NValue.cpp definitions.
-    void createDecimalFromString(const std::string &txt);
-    std::string createStringFromDecimal() const;
-    NValue opDivideDecimals(const NValue lhs, const NValue rhs) const;
-    NValue opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const;
-
-    // Helpers for inList.
-    // These are purposely not inlines to avoid exposure of NValueList details.
-    void deserializeIntoANewNValueList(SerializeInput &input, Pool *dataPool);
-    void allocateANewNValueList(size_t elementCount, ValueType elementType);
-
-    // Promotion Rules. Initialized in NValue.cpp
-    static ValueType s_intPromotionTable[];
-    static ValueType s_decimalPromotionTable[];
-    static ValueType s_doublePromotionTable[];
-    static TTInt s_maxDecimalValue;
-    static TTInt s_minDecimalValue;
-    // These initializers give the unique double values that are
-    // closest but not equal to +/-1E26 within the accuracy of a double.
-    static const double s_gtMaxDecimalAsDouble;
-    static const double s_ltMinDecimalAsDouble;
-
     static ValueType promoteForOp(ValueType vta, ValueType vtb) {
         ValueType rt;
         switch (vta) {
@@ -592,6 +567,34 @@ class NValue {
         // assert(rt != VALUE_TYPE_INVALID);
         return rt;
     }
+
+  private:
+    /*
+     * Private methods are private for a reason. Don't expose the raw
+     * data so that it can be operated on directly.
+     */
+
+    // Function declarations for NValue.cpp definitions.
+    void createDecimalFromString(const std::string &txt);
+    std::string createStringFromDecimal() const;
+    NValue opDivideDecimals(const NValue lhs, const NValue rhs) const;
+    NValue opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const;
+
+    // Helpers for inList.
+    // These are purposely not inlines to avoid exposure of NValueList details.
+    void deserializeIntoANewNValueList(SerializeInput &input, Pool *dataPool);
+    void allocateANewNValueList(size_t elementCount, ValueType elementType);
+
+    // Promotion Rules. Initialized in NValue.cpp
+    static ValueType s_intPromotionTable[];
+    static ValueType s_decimalPromotionTable[];
+    static ValueType s_doublePromotionTable[];
+    static TTInt s_maxDecimalValue;
+    static TTInt s_minDecimalValue;
+    // These initializers give the unique double values that are
+    // closest but not equal to +/-1E26 within the accuracy of a double.
+    static const double s_gtMaxDecimalAsDouble;
+    static const double s_ltMinDecimalAsDouble;
 
     /**
      * 16 bytes of storage for NValue data.
@@ -1498,6 +1501,9 @@ class NValue {
         else {
             const int32_t objectLength = getObjectLength();
             if (objectLength > maxLength) {
+                if (maxLength == 0) {
+                    throwFatalLogicErrorStreamed("Zero maxLength for object type " << valueToString(getValueType()));
+                }
                 char msg[1024];
                 snprintf(msg, 1024,
                          "In NValue::inlineCopyObject, Object exceeds specified size. Size is %d and max is %d",
@@ -1555,54 +1561,59 @@ class NValue {
     }
 
     int compareDoubleValue (const NValue rhs) const {
+        const double lhsValue = getDouble();
+        double rhsValue;
+
         switch (rhs.getValueType()) {
-          case VALUE_TYPE_DOUBLE: {
-              const double lhsValue = getDouble();
-              const double rhsValue = rhs.getDouble();
-              if (lhsValue == rhsValue) {
-                  return VALUE_COMPARE_EQUAL;
-              } else if (lhsValue > rhsValue) {
-                  return VALUE_COMPARE_GREATERTHAN;
-              } else {
-                  return VALUE_COMPARE_LESSTHAN;
-              }
-          }
-          case VALUE_TYPE_TINYINT:
-          case VALUE_TYPE_SMALLINT:
-          case VALUE_TYPE_INTEGER:
-          case VALUE_TYPE_BIGINT:
-          case VALUE_TYPE_TIMESTAMP: {
-              const double lhsValue = getDouble();
-              const double rhsValue = rhs.castAsDouble().getDouble();
-              if (lhsValue == rhsValue) {
-                  return VALUE_COMPARE_EQUAL;
-              } else if (lhsValue > rhsValue) {
-                  return VALUE_COMPARE_GREATERTHAN;
-              } else {
-                  return VALUE_COMPARE_LESSTHAN;
-              }
-          }
-          case VALUE_TYPE_DECIMAL:
-          {
-              double val = rhs.castAsDoubleAndGetValue();
-              if (rhs.isNegative()) {
-                  val *= -1;
-              }
-              return ((getDouble() > val) - (getDouble() < val));
-          }
-          default:
-          {
-              char message[128];
-              snprintf(message, 128,
-                       "Type %s cannot be cast for comparison to type %s",
-                       valueToString(rhs.getValueType()).c_str(),
-                       valueToString(getValueType()).c_str());
-              throw SQLException(SQLException::
-                                 data_exception_most_specific_type_mismatch,
-                                 message);
-              // Not reached
-              return 0;
-          }
+            case VALUE_TYPE_DOUBLE:
+                rhsValue = rhs.getDouble();
+                break;
+            case VALUE_TYPE_TINYINT:
+            case VALUE_TYPE_SMALLINT:
+            case VALUE_TYPE_INTEGER:
+            case VALUE_TYPE_BIGINT:
+            case VALUE_TYPE_TIMESTAMP:
+                rhsValue = rhs.castAsDouble().getDouble();
+                break;
+            case VALUE_TYPE_DECIMAL:
+                rhsValue = rhs.castAsDoubleAndGetValue();
+                break;
+            default:
+                char message[128];
+                snprintf(message, 128,
+                         "Type %s cannot be cast for comparison to type %s",
+                         valueToString(rhs.getValueType()).c_str(),
+                         valueToString(getValueType()).c_str());
+                throw SQLException(SQLException::
+                                   data_exception_most_specific_type_mismatch,
+                                   message);
+                // Not reached
+                return 0;
+        }
+
+        // Add null type comparison
+        if (isNull()) {
+            return rhs.isNull() ? VALUE_COMPARE_EQUAL : VALUE_COMPARE_LESSTHAN;
+        }
+        else if (rhs.isNull()) {
+            return VALUE_COMPARE_GREATERTHAN;
+        }
+        // Treat NaN values as equals and also make them smaller than neagtive infinity.
+        // This breaks IEEE754 for expressions slightly.
+        else if (std::isnan(lhsValue)) {
+            return std::isnan(rhsValue) ? VALUE_COMPARE_EQUAL : VALUE_COMPARE_LESSTHAN;
+        }
+        else if (std::isnan(rhsValue)) {
+            return VALUE_COMPARE_GREATERTHAN;
+        }
+        else if (lhsValue > rhsValue) {
+            return VALUE_COMPARE_GREATERTHAN;
+        }
+        else if (lhsValue < rhsValue) {
+            return VALUE_COMPARE_LESSTHAN;
+        }
+        else {
+            return VALUE_COMPARE_EQUAL;
         }
     }
 
@@ -2101,29 +2112,6 @@ inline bool NValue::isFalse() const {
     return !getBoolean();
 }
 
-inline bool NValue::isNegative() const {
-        const ValueType type = getValueType();
-        switch (type) {
-        case VALUE_TYPE_TINYINT:
-            return getTinyInt() < 0;
-        case VALUE_TYPE_SMALLINT:
-            return getSmallInt() < 0;
-        case VALUE_TYPE_INTEGER:
-            return getInteger() < 0;
-        case VALUE_TYPE_BIGINT:
-            return getBigInt() < 0;
-        case VALUE_TYPE_TIMESTAMP:
-            return getTimestamp() < 0;
-        case VALUE_TYPE_DOUBLE:
-            return getDouble() < 0;
-        case VALUE_TYPE_DECIMAL:
-            return getDecimal().IsSign();
-        default: {
-            throwDynamicSQLException( "Invalid value type '%s' for checking negativity", getValueTypeString().c_str());
-        }
-        }
-    }
-
 /**
  * Logical and operation for NValues
  */
@@ -2358,7 +2346,7 @@ inline const NValue NValue::deserializeFromTupleStorage(const void *storage,
     }
     default:
         throwDynamicSQLException(
-                "NValue::getLength() unrecognized type '%s'",
+                "NValue::deserializeFromTupleStorage() unrecognized type '%s'",
                 getTypeName(type).c_str());
     }
     return retval;
@@ -2761,8 +2749,8 @@ inline void NValue::serializeToExport(ExportSerializeOutput &io) const
 }
 
 /** Reformat an object-typed value from its inlined form to its allocated out-of-line form,
- *  for use with a widened tuple column. **/
-inline void NValue::allocatePersistentObjectFromInlineValue()
+ *  for use with a wider/widened tuple column, either persistent (stringPool==NULL) or temp **/
+inline void NValue::allocateObjectFromInlinedValue(Pool* stringPool)
 {
     if (m_valueType == VALUE_TYPE_NULL || m_valueType == VALUE_TYPE_INVALID) {
         return;
@@ -2785,11 +2773,6 @@ inline void NValue::allocatePersistentObjectFromInlineValue()
         return;
     }
 
-    // A future version/variant of this function may take an optional Pool argument,
-    // so that it could be used for temp values/tables.
-    // The default persistent string pool specified by NULL works fine here and now.
-    Pool* stringPool = NULL;
-
     // When an object is inlined, m_data is a direct pointer into a tuple's inline storage area.
     char* source = *reinterpret_cast<char**>(m_data);
 
@@ -2808,35 +2791,43 @@ inline void NValue::allocatePersistentObjectFromInlineValue()
 
 inline bool NValue::isNull() const {
     switch (getValueType()) {
-      case VALUE_TYPE_NULL:
-      case VALUE_TYPE_INVALID:
-        return true;
-      case VALUE_TYPE_TINYINT:
-        return getTinyInt() == INT8_NULL;
-      case VALUE_TYPE_SMALLINT:
-        return getSmallInt() == INT16_NULL;
-      case VALUE_TYPE_INTEGER:
-        return getInteger() == INT32_NULL;
-      case VALUE_TYPE_TIMESTAMP:
-      case VALUE_TYPE_BIGINT:
-        return getBigInt() == INT64_NULL;
-      case VALUE_TYPE_ADDRESS:
-        return *reinterpret_cast<void* const*>(m_data) == NULL;
-      case VALUE_TYPE_DOUBLE:
-        return getDouble() <= DOUBLE_NULL;
-      case VALUE_TYPE_VARCHAR:
-      case VALUE_TYPE_VARBINARY:
-        return *reinterpret_cast<void* const*>(m_data) == NULL ||
-          *reinterpret_cast<const int32_t*>(&m_data[8]) == OBJECTLENGTH_NULL;
-      case VALUE_TYPE_DECIMAL: {
-          TTInt min;
-          min.SetMin();
-          return getDecimal() == min;
-      }
-      default:
-          throwDynamicSQLException(
-                  "NValue::isNull() called with unknown ValueType '%s'",
-                  getValueTypeString().c_str());
+        case VALUE_TYPE_NULL:
+        case VALUE_TYPE_INVALID:
+            return true;
+        case VALUE_TYPE_TINYINT:
+            return getTinyInt() == INT8_NULL;
+        case VALUE_TYPE_SMALLINT:
+            return getSmallInt() == INT16_NULL;
+        case VALUE_TYPE_INTEGER:
+            return getInteger() == INT32_NULL;
+        case VALUE_TYPE_TIMESTAMP:
+        case VALUE_TYPE_BIGINT:
+            return getBigInt() == INT64_NULL;
+        case VALUE_TYPE_ADDRESS:
+            return *reinterpret_cast<void* const*>(m_data) == NULL;
+        case VALUE_TYPE_DOUBLE:
+            return getDouble() <= DOUBLE_NULL;
+        case VALUE_TYPE_VARCHAR:
+        case VALUE_TYPE_VARBINARY:
+            return *reinterpret_cast<void* const*>(m_data) == NULL ||
+            *reinterpret_cast<const int32_t*>(&m_data[8]) == OBJECTLENGTH_NULL;
+        case VALUE_TYPE_DECIMAL: {
+            TTInt min;
+            min.SetMin();
+            return getDecimal() == min;
+        }
+        case VALUE_TYPE_ARRAY:
+            return false;
+        default:
+            throwDynamicSQLException("NValue::isNull() called with unknown ValueType '%s'",
+                                     getValueTypeString().c_str());
+    }
+    return false;
+}
+
+inline bool NValue::isNaN() const {
+    if (getValueType() == VALUE_TYPE_DOUBLE) {
+        return std::isnan(getDouble());
     }
     return false;
 }
@@ -2902,7 +2893,20 @@ inline void NValue::hashCombine(std::size_t &seed) const {
       case VALUE_TYPE_TIMESTAMP:
         boost::hash_combine( seed, getBigInt()); break;
       case VALUE_TYPE_DOUBLE:
+        // This method was observed to fail on Centos 5 / GCC 4.1.2, returning different hashes
+        // for identical inputs, so the conditional was added,
+        // mutated from the one in boost/type_traits/intrinsics.hpp,
+        // and the broken overload for "double" was by-passed in favor of the more reliable
+        // one for int64 -- even if this may give sub-optimal hashes for typical collections of double.
+        // This conditional can be dropped when Centos 5 support is dropped.
+#if defined(__GNUC__) && ((__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 2) && !defined(__GCCXML__))) && !defined(BOOST_CLANG)
         boost::hash_combine( seed, getDouble()); break;
+#else
+        {
+        const int64_t proxyForDouble =  *reinterpret_cast<const int64_t*>(m_data);
+        boost::hash_combine( seed, proxyForDouble); break;
+        }
+#endif
       case VALUE_TYPE_VARCHAR: {
         if (getObjectValue() == NULL) {
             boost::hash_combine( seed, std::string(""));

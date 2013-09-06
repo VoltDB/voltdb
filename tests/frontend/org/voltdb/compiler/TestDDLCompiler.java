@@ -79,12 +79,12 @@ public class TestDDLCompiler extends TestCase {
         fail();
     }
 
-    /**
-     * Note, this should succeed as HSQL doesn't have a hard limit
-     * on the number of columns. The test in TestVoltCompiler will
-     * fail on 1025 columns.
-     * @throws HSQLParseException
-     */
+    //
+    // Note, this should succeed as HSQL doesn't have a hard limit
+    // on the number of columns. The test in TestVoltCompiler will
+    // fail on 1025 columns.
+    // @throws HSQLParseException
+    //
     public void testTooManyColumnTable() throws IOException, HSQLParseException {
         String schemaPath = "";
         URL url = TestVoltCompiler.class.getResource("toowidetable-ddl.sql");
@@ -107,14 +107,14 @@ public class TestDDLCompiler extends TestCase {
 
     }
 
-    /**
-     * Before the fix for ENG-912, the following schema would work:
-     *  create table tmc (name varchar(32), user varchar(32));
-     * but this wouldn't:
-     *  create table tmc (name varchar(32), user varchar(32), primary key (name, user));
-     *
-     * Changes in HSQL's ParserDQL and ParserBase make this more consistent
-     */
+    //
+    // Before the fix for ENG-912, the following schema would work:
+    //  create table tmc (name varchar(32), user varchar(32));
+    // but this wouldn't:
+    //  create table tmc (name varchar(32), user varchar(32), primary key (name, user));
+    //
+    // Changes in HSQL's ParserDQL and ParserBase make this more consistent
+    //
     public void testENG_912() throws HSQLParseException {
         String schema = "create table tmc (name varchar(32), user varchar(32), primary key (name, user));";
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
@@ -126,10 +126,10 @@ public class TestDDLCompiler extends TestCase {
 
     }
 
-    /**
-     * Before fixing ENG-2345, the VIEW definition wouldn't compile if it were
-     * containing single quote characters.
-     */
+    //
+    // Before fixing ENG-2345, the VIEW definition wouldn't compile if it were
+    // containing single quote characters.
+    //
     public void testENG_2345() throws HSQLParseException {
         String table = "create table tmc (name varchar(32), user varchar(32), primary key (name, user));";
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
@@ -144,11 +144,115 @@ public class TestDDLCompiler extends TestCase {
 
     }
 
-    /**
-     * ENG-2643: Ensure VoltDB can compile DDL with check and fk constrants,
-     * but warn the user, rather than silently ignoring the stuff VoltDB
-     * doesn't support.
-     */
+    //
+    // ENG-4865
+    // @throws HSQLParseException
+    //
+    public void testUniqueIndexGiveWarnings() throws HSQLParseException {
+        // ensure the test cleans up
+        File jarOut = new File("checkCompilerWarnings.jar");
+        jarOut.deleteOnExit();
+
+        // boilerplate for making a project
+        final String simpleProject =
+                "<?xml version=\"1.0\"?>\n" +
+                "<project><database><schemas>" +
+                "<schema path='%s' />" +
+                "</schemas></database></project>";
+
+        // A unique index on the non-primary key for replicated table gets no warning.
+        String schema0 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "CREATE UNIQUE INDEX user_index0 ON t0 (name) ;";
+
+        // A unique index on the partitioning key ( no primary key) gets no warning.
+        String schema1 = "create table t0 (id bigint not null, name varchar(32) not null, age integer);\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index1 ON t0 (id) ;";
+
+        // A unique index on the partitioning key ( also primary key) gets no warning.
+        String schema2 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index2 ON t0 (id) ;";
+
+        // A unique compound index on the partitioning key and another column gets no warning.
+        String schema3 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index3 ON t0 (id, age) ;";
+
+        // A unique index on the partitioning key and an expression like abs(age) gets no warning.
+        String schema4 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index4 ON t0 (id, abs(age)) ;";
+
+
+        // A unique index on the partitioning key ( non-primary key) gets one warning.
+        String schema6 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN name;\n" +
+                "CREATE UNIQUE INDEX user_index6 ON t0 (name) ;";
+
+        // A unique index on the partitioning key ( no primary key) gets one warning.
+        String schema7 = "create table t0 (id bigint not null, name varchar(32) not null, age integer);\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index7 ON t0 (name) ;";
+
+        // A unique index on the non-partitioning key gets one warning.
+        String schema8 = "create table t0 (id bigint not null, name varchar(32), age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index8 ON t0 (name) ;";
+
+        // A unique index on an unrelated expression like abs(age) gets a warning.
+        String schema9 = "create table t0 (id bigint not null, name varchar(32), age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index9 ON t0 (abs(age)) ;";
+
+
+        // A unique index on an expression of the partitioning key like substr(1, 2, name) gets two warnings.
+        String schema10 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN name;\n" +
+                "CREATE UNIQUE INDEX user_index10 ON t0 (substr(name, 1, 2 )) ;";
+
+        // A unique index on the non-partitioning key, non-partitioned column gets two warnings.
+        String schema12 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN name;\n" +
+                "CREATE UNIQUE INDEX user_index12 ON t0 (age) ;";
+
+
+        String[] schemas = {schema0, schema1, schema2, schema3, schema4, schema6, schema7, schema8, schema9, schema10, schema12};
+        int[] expected =   {   0   ,    0   ,    0   ,    0   ,    0   ,    1   ,    1   ,    1   ,     1,      2   ,     2    };
+
+        for (int i =0; i< schemas.length; i++) {
+            String schema = schemas[i];
+            // RUN EXPECTING WARNINGS
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
+            String schemaPath = schemaFile.getPath();
+
+            File projectFile = VoltProjectBuilder.writeStringToTempFile(
+                    String.format(simpleProject, schemaPath));
+            String projectPath = projectFile.getPath();
+
+            // compile successfully (but with a warning hopefully)
+            VoltCompiler compiler = new VoltCompiler();
+            boolean success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
+            assertTrue(success);
+
+            // verify the warnings exist
+            int foundWarnings = 0;
+            for (VoltCompiler.Feedback f : compiler.m_warnings) {
+                if (f.message.toLowerCase().contains("does not include the partitioning column")) {
+                    foundWarnings++;
+                }
+            }
+            assertEquals(expected[i], foundWarnings);
+            // cleanup after the test
+            jarOut.delete();
+        }
+    }
+
+    //
+    // ENG-2643: Ensure VoltDB can compile DDL with check and fk constrants,
+    // but warn the user, rather than silently ignoring the stuff VoltDB
+    // doesn't support.
+    //
     public void testFKsAndChecksGiveWarnings() throws HSQLParseException {
         // ensure the test cleans up
         File jarOut = new File("checkCompilerWarnings.jar");
@@ -219,5 +323,34 @@ public class TestDDLCompiler extends TestCase {
 
         // cleanup after the test
         jarOut.delete();
+    }
+
+    boolean checkImportValidity(String importStmt) {
+        File jarOut = new File("checkImportValidity.jar");
+        jarOut.deleteOnExit();
+
+        String schema = String.format("IMPORT CLASS %s;", importStmt);
+
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
+        schemaFile.deleteOnExit();
+
+        // compile and fail on bad import
+        VoltCompiler compiler = new VoltCompiler();
+        return compiler.compileFromDDL(jarOut.getPath(), schemaFile.getPath());
+    }
+
+    public void testExtraClasses() {
+        assertFalse(checkImportValidity("org.1oltdb.**"));
+        assertTrue(checkImportValidity("org.voltdb.V**"));
+        assertFalse(checkImportValidity("$.1oltdb.**"));
+        assertFalse(checkImportValidity("org.voltdb.** org.bolt"));
+        assertTrue(checkImportValidity("org.voltdb.V*"));
+        assertTrue(checkImportValidity("你rg.voltdb.V*"));
+        assertTrue(checkImportValidity("org.我不爱你.V*"));
+        assertFalse(checkImportValidity("org.1我不爱你.V*"));
+        assertTrue(checkImportValidity("org"));
+        assertTrue(checkImportValidity("*org"));
+        assertTrue(checkImportValidity("org.**.RealVoltDB"));
+        assertTrue(checkImportValidity("org.vol*db.RealVoltDB"));
     }
 }

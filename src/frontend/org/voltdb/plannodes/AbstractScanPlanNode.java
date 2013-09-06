@@ -18,6 +18,7 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 
@@ -54,6 +55,14 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
     protected AbstractScanPlanNode() {
         super();
+    }
+
+    @Override
+    public void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tableUpdated,
+                                    Collection<String> indexes)
+    {
+        assert(m_targetTableName.length() > 0);
+        tablesRead.add(m_targetTableName);
     }
 
     @Override

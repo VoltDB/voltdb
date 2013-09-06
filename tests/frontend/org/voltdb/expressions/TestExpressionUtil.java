@@ -455,18 +455,15 @@ public class TestExpressionUtil extends TestCase {
         cve.setValue("4000000000");
         cve.setValueSize(8);
         cve.setValueType(VoltType.BIGINT);
-        HashMap<Integer, VoltType> override_map = new HashMap<Integer, VoltType>();
-        ExpressionUtil.setOutputTypeForInsertExpression(cve, VoltType.TIMESTAMP, 8, override_map);
+        cve.refineValueType(VoltType.TIMESTAMP, 8);
         assertEquals(VoltType.TIMESTAMP, cve.getValueType());
         assertEquals(8, cve.getValueSize());
-        System.out.println(override_map);
 
         cve = new ConstantValueExpression();
         cve.setValue("400000000");
         cve.setValueSize(4);
         cve.setValueType(VoltType.INTEGER);
-        override_map = new HashMap<Integer, VoltType>();
-        ExpressionUtil.setOutputTypeForInsertExpression(cve, VoltType.TIMESTAMP, 8, override_map);
+        cve.refineValueType(VoltType.TIMESTAMP, 8);
         assertEquals(VoltType.TIMESTAMP, cve.getValueType());
         assertEquals(8, cve.getValueSize());
 
@@ -474,8 +471,7 @@ public class TestExpressionUtil extends TestCase {
         cve.setValue("4000");
         cve.setValueSize(2);
         cve.setValueType(VoltType.SMALLINT);
-        override_map = new HashMap<Integer, VoltType>();
-        ExpressionUtil.setOutputTypeForInsertExpression(cve, VoltType.TIMESTAMP, 8, override_map);
+        cve.refineValueType(VoltType.TIMESTAMP, 8);
         assertEquals(VoltType.TIMESTAMP, cve.getValueType());
         assertEquals(8, cve.getValueSize());
 
@@ -483,8 +479,7 @@ public class TestExpressionUtil extends TestCase {
         cve.setValue("40");
         cve.setValueSize(1);
         cve.setValueType(VoltType.TINYINT);
-        override_map = new HashMap<Integer, VoltType>();
-        ExpressionUtil.setOutputTypeForInsertExpression(cve, VoltType.TIMESTAMP, 8, override_map);
+        cve.refineValueType(VoltType.TIMESTAMP, 8);
         assertEquals(VoltType.TIMESTAMP, cve.getValueType());
         assertEquals(8, cve.getValueSize());
     }
@@ -496,8 +491,7 @@ public class TestExpressionUtil extends TestCase {
         cve.setValue(ts.toString());
         cve.setValueType(VoltType.STRING);
         cve.setValueSize(ts.toString().length());
-        HashMap<Integer, VoltType> override_map = new HashMap<Integer, VoltType>();
-        ExpressionUtil.setOutputTypeForInsertExpression(cve, VoltType.TIMESTAMP, 8, override_map);
+        cve.refineValueType(VoltType.TIMESTAMP, 8);
         assertEquals(VoltType.TIMESTAMP, cve.getValueType());
         assertEquals("999999999", cve.m_value);
     }
@@ -825,6 +819,21 @@ public class TestExpressionUtil extends TestCase {
             assertTrue(ExpressionUtil.isNullRejectingExpression(expr, "T1"));
             // Wrong table
             assertTrue(!ExpressionUtil.isNullRejectingExpression(expr, "T"));
+        }
+
+        {
+            // Test "T1.C IN (1,2)" is NULL-rejecting
+            TupleValueExpression tve1 = new TupleValueExpression();
+            tve1.setTableName("T1");
+            tve1.setColumnName("C");
+            VectorValueExpression vve = new VectorValueExpression();
+
+            InComparisonExpression ine = new InComparisonExpression();
+            ine.m_left = tve1;
+            ine.m_right = vve;
+            assertTrue(ExpressionUtil.isNullRejectingExpression(ine, "T1"));
+            // Wrong table
+            assertTrue(!ExpressionUtil.isNullRejectingExpression(ine, "T"));
         }
 
         {

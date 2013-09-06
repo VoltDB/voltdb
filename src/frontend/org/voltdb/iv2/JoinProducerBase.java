@@ -33,6 +33,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.rejoin.TaskLog;
+import org.voltdb.utils.CachedByteBufferAllocator;
 import org.voltdb.utils.MiscUtils;
 
 import com.google.common.util.concurrent.SettableFuture;
@@ -43,6 +44,7 @@ public abstract class JoinProducerBase extends SiteTasker {
     protected final int m_partitionId;
     protected final String m_whoami;
     protected final SiteTaskerQueue m_taskQueue;
+    protected final CachedByteBufferAllocator m_snapshotBufferAllocator;
     protected InitiatorMailbox m_mailbox = null;
     protected long m_coordinatorHsId = Long.MIN_VALUE;
     protected JoinCompletionAction m_completionAction = null;
@@ -116,6 +118,7 @@ public abstract class JoinProducerBase extends SiteTasker {
         m_partitionId = partitionId;
         m_whoami = whoami;
         m_taskQueue = taskQueue;
+        m_snapshotBufferAllocator = new CachedByteBufferAllocator();
     }
 
     public void setMailbox(InitiatorMailbox mailbox)
@@ -156,8 +159,10 @@ public abstract class JoinProducerBase extends SiteTasker {
                 buffer.duplicate(), true);
 
         // Currently, only export cares about this TXN ID.  Since we don't have one handy, and IV2
-        // doesn't yet care about export, just use Long.MIN_VALUE
-        siteConnection.loadTable(Long.MIN_VALUE, tableId, table, false);
+        // doesn't yet care about export, just use Long.MIN_VALUE. Long.MAX_VALUE is a no-op
+        // don't track undo token
+
+        siteConnection.loadTable(Long.MIN_VALUE, tableId, table, false, Long.MAX_VALUE);
     }
 
     // Completed all criteria: Kill the watchdog and inform the site.

@@ -25,6 +25,7 @@ import java.util.List;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -49,6 +50,9 @@ public class RepairLog
 
     // is this a partition leader?
     boolean m_isLeader = false;
+
+    // The HSID of this initiator, for logging purposes
+    long m_HSId = Long.MIN_VALUE;
 
     // want voltmessage as payload with message-independent metadata.
     static class Item
@@ -99,6 +103,12 @@ public class RepairLog
         m_log = new ArrayList<Item>();
     }
 
+    // get the HSID for dump logging
+    void setHSId(long HSId)
+    {
+        m_HSId = HSId;
+    }
+
     // leaders log differently
     void setLeaderState(boolean isLeader)
     {
@@ -126,26 +136,36 @@ public class RepairLog
             }
         } else if (msg instanceof FragmentTaskMessage) {
             final TransactionInfoBaseMessage m = (TransactionInfoBaseMessage)msg;
-            truncate(m.getTruncationHandle(), Long.MIN_VALUE);
-            // only log the first fragment of a procedure (and handle 1st case)
-            if (m.getTxnId() > m_lastMpHandle || m_lastMpHandle == Long.MAX_VALUE) {
-                m_log.add(new Item(IS_MP, m, m.getSpHandle(), m.getTxnId()));
-                m_lastMpHandle = m.getTxnId();
-                m_lastSpHandle = m.getSpHandle();
+            if (!m.isReadOnly()) {
+                truncate(m.getTruncationHandle(), Long.MIN_VALUE);
+                // only log the first fragment of a procedure (and handle 1st case)
+                if (m.getTxnId() > m_lastMpHandle || m_lastMpHandle == Long.MAX_VALUE) {
+                    m_log.add(new Item(IS_MP, m, m.getSpHandle(), m.getTxnId()));
+                    m_lastMpHandle = m.getTxnId();
+                    m_lastSpHandle = m.getSpHandle();
+                }
             }
         }
         else if (msg instanceof CompleteTransactionMessage) {
             // a CompleteTransactionMessage which indicates restart is not the end of the
             // transaction.  We don't want to log it in the repair log.
-            if (!((CompleteTransactionMessage)msg).isRestart()) {
-                final TransactionInfoBaseMessage m = (TransactionInfoBaseMessage)msg;
-                truncate(m.getTruncationHandle(), Long.MIN_VALUE);
-                m_log.add(new Item(IS_MP, m, m.getSpHandle(), m.getTxnId()));
+            CompleteTransactionMessage ctm = (CompleteTransactionMessage)msg;
+            if (!ctm.isReadOnly() && !ctm.isRestart()) {
+                truncate(ctm.getTruncationHandle(), Long.MIN_VALUE);
+                m_log.add(new Item(IS_MP, ctm, ctm.getSpHandle(), ctm.getTxnId()));
                 //Restore will send a complete transaction message with a lower mp transaction id because
                 //the restore transaction precedes the loading of the right mp transaction id from the snapshot
                 //Hence Math.max
-                m_lastMpHandle = Math.max(m_lastMpHandle, m.getTxnId());
-                m_lastSpHandle = m.getSpHandle();
+                m_lastMpHandle = Math.max(m_lastMpHandle, ctm.getTxnId());
+                m_lastSpHandle = ctm.getSpHandle();
+            }
+        }
+        else if (msg instanceof DumpMessage) {
+            String who = CoreUtils.hsIdToString(m_HSId);
+            tmLog.warn("Repair log dump for site: " + who + ", isLeader: " + m_isLeader);
+            tmLog.warn("" + who + ": lastSpHandle: " + m_lastSpHandle + ", lastMpHandle: " + m_lastMpHandle);
+            for (Iv2RepairLogResponseMessage il : contents(0l, false)) {
+               tmLog.warn("" + who + ": msg: " + il);
             }
         }
     }

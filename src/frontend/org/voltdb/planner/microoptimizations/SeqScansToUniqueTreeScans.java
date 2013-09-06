@@ -24,15 +24,13 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DeterminismMode;
-import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
-import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SeqScanPlanNode;
-import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.SortDirectionType;
+import org.voltdb.utils.CatalogUtil;
 
 /// An end-stage plan rewriter that replaces a plan that uses sequential scans
 /// with a slightly less efficient one that uses deterministic (unique)
@@ -88,8 +86,8 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
             if (newChild == child) {
                 continue;
             }
-            child.removeFromGraph();
-            plan.addAndLinkChild(newChild);
+            boolean replaced = plan.replaceChild(child, newChild);
+            assert(true == replaced);
         }
 
         // skip the meat if this isn't a scan node
@@ -125,7 +123,7 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
                     indexToScan = index;
                 }
                 else {
-                    if (indexToScan.getColumns().size() > index.getColumns().size()) {
+                    if (CatalogUtil.getCatalogIndexSize(indexToScan) > CatalogUtil.getCatalogIndexSize(index)) {
                         indexToScan = index;
                     }
                 }
@@ -137,23 +135,9 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
         }
 
         // make an index node from the scan node
-        IndexScanPlanNode indexScanNode = new IndexScanPlanNode();
-        indexScanNode.setTargetTableName(scanNode.getTargetTableName());
-        indexScanNode.setTargetTableAlias(scanNode.getTargetTableAlias());
-        indexScanNode.setEndExpression(null);
-        indexScanNode.setScanColumns(new ArrayList<SchemaColumn>());
-        indexScanNode.setCatalogIndex(indexToScan);
+        IndexScanPlanNode indexScanNode = new IndexScanPlanNode(scanNode, null, indexToScan, SortDirectionType.ASC);
         indexScanNode.setKeyIterate(true);
-        indexScanNode.setTargetIndexName(indexToScan.getTypeName());
-        indexScanNode.setLookupType(IndexLookupType.GTE);
-        indexScanNode.setSortDirection(SortDirectionType.ASC);
-        indexScanNode.setPredicate(scanNode.getPredicate());
         indexScanNode.setForDeterminismOnly();
-        for (AbstractPlanNode inlineNode : scanNode.getInlinePlanNodes().values()) {
-            indexScanNode.addInlinePlanNode(inlineNode);
-        }
-        indexScanNode.generateOutputSchema(db);
-        indexScanNode.setBindings(new ArrayList<AbstractExpression>());
 
         return indexScanNode;
     }

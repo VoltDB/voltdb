@@ -46,7 +46,7 @@ public class VoltNetworkPool {
 
     public VoltNetworkPool(int numThreads, Queue<String> coreBindIds) {
         if (numThreads < 1) {
-            throw new IllegalArgumentException("Must specify a postive number of threads");
+            throw new IllegalArgumentException("Must specify a positive number of threads");
         }
         if (coreBindIds == null || coreBindIds.isEmpty()) {
             m_networks = new VoltNetwork[numThreads];
@@ -77,15 +77,16 @@ public class VoltNetworkPool {
     public Connection registerChannel(
             final SocketChannel channel,
             final InputHandler handler) throws IOException {
-        return registerChannel( channel, handler, SelectionKey.OP_READ);
+        return registerChannel( channel, handler, SelectionKey.OP_READ, ReverseDNSPolicy.ASYNCHRONOUS);
     }
 
     public Connection registerChannel(
             final SocketChannel channel,
             final InputHandler handler,
-            final int interestOps) throws IOException {
+            final int interestOps,
+            final ReverseDNSPolicy dns) throws IOException {
         VoltNetwork vn = m_networks[(int)(m_nextWorkerSelection.incrementAndGet() % m_networks.length)];
-        return vn.registerChannel(channel, handler, interestOps);
+        return vn.registerChannel(channel, handler, interestOps, dns);
     }
 
     public List<Long> getThreadIds() {

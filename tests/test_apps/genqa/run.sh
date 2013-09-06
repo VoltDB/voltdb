@@ -37,6 +37,7 @@ CLIENTLOG="clientlog"
 # remove build artifacts
 function clean() {
     rm -rf obj debugoutput $APPNAME.jar $APPNAME2.jar voltdbroot voltdbroot
+    rm -f $VOLTDB_LIB/extension/customexport.jar
 }
 
 # compile the source code for procedures and the client
@@ -47,6 +48,8 @@ function srccompile() {
         src/$APPNAME/procedures/*.java
     javac -classpath $CLASSPATH -d obj \
         src/$APPNAME2/procedures/*.java
+    javac -classpath $CLASSPATH -d obj \
+        src/customexport/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -79,6 +82,19 @@ function server-legacy() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create catalog $APPNAME.jar deployment deployment_legacy.xml \
+        license $LICENSE host $HOST
+}
+
+function server-custom() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # Get custom class in jar
+    cd obj
+    jar cvf ../customexport.jar customexport/*
+    cd ..
+    cp customexport.jar $VOLTDB_LIB/extension/customexport.jar
+    # run the server
+    $VOLTDB create catalog $APPNAME.jar deployment deployment_custom.xml \
         license $LICENSE host $HOST
 }
 

@@ -57,7 +57,7 @@
 #include <boost/scoped_array.hpp>
 
 #include "harness.h"
-#include "json_spirit/json_spirit.h"
+#include "jsoncpp/jsoncpp.h"
 
 #include "expressions/abstractexpression.h"
 #include "expressions/expressions.h"
@@ -103,23 +103,23 @@ class AE {
         delete right;
     }
 
-    virtual json_spirit::Object serializeValue() {
-        json_spirit::Object json;
+    virtual Json::Value serializeValue() {
+        Json::Value json;
         serialize(json);
         return json;
     }
 
     /* this is how java serializes.. note derived class data follows
        the serialization of children */
-    virtual void serialize(json_spirit::Object &json) {
-        json.push_back(json_spirit::Pair("TYPE", json_spirit::Value(expressionToString(m_type))));
-        json.push_back(json_spirit::Pair("VALUE_TYPE", json_spirit::Value(valueToString(m_valueType))));
-        json.push_back(json_spirit::Pair("VALUE_SIZE", json_spirit::Value(m_valueSize)));
+    virtual void serialize(Json::Value &json) {
+        json["TYPE"] = expressionToString(m_type);
+        json["VALUE_TYPE"] = valueToString(m_valueType);
+        json["VALUE_SIZE"] = m_valueSize;
 
         if (left)
-            json.push_back(json_spirit::Pair("LEFT", left->serializeValue()));
+            json["LEFT"] = left->serializeValue();
         if (right)
-            json.push_back(json_spirit::Pair("RIGHT", right->serializeValue()));
+            json["RIGHT"] = right->serializeValue();
     }
 
     ExpressionType m_type;  // TYPE
@@ -160,15 +160,15 @@ class CV : public AE {
     ~CV() {
     }
 
-    virtual void serialize(json_spirit::Object &json) {
+    virtual void serialize(Json::Value &json) {
         AE::serialize(json);
         if (m_jsontype == 0)
-            json.push_back(json_spirit::Pair("VALUE", json_spirit::Value(m_stringValue)));
+            json["VALUE"] = m_stringValue;
         else if (m_jsontype == 1)
-            json.push_back(json_spirit::Pair("VALUE", json_spirit::Value(m_intValue)));
+            json["VALUE"] = static_cast<Json::Int64>(m_intValue);
         else if (m_jsontype == 2)
-            json.push_back(json_spirit::Pair("VALUE", json_spirit::Value(m_doubleValue)));
-        json.push_back(json_spirit::Pair("ISNULL", json_spirit::Value(false)));
+            json["VALUE"] = m_doubleValue;
+        json["ISNULL"] = false;
     }
 
     int m_jsontype;  // 0 = string, 1 = int64_t, 2 = double
@@ -186,9 +186,9 @@ class PV : public AE {
     PV(ExpressionType et, ValueType vt, int vs, int pi) :
         AE(et, vt, vs), m_paramIdx(pi) {}
 
-    virtual void serialize(json_spirit::Object &json) {
+    virtual void serialize(Json::Value &json) {
         AE::serialize(json);
-        json.push_back(json_spirit::Pair("PARAM_IDX", json_spirit::Value(m_paramIdx)));
+        json["PARAM_IDX"] = m_paramIdx;
     }
 
     int m_paramIdx;  // PARAM_IDX
@@ -210,12 +210,12 @@ class TV  : public AE {
         delete m_colAlias;
     }
 
-    virtual void serialize(json_spirit::Object &json) {
+    virtual void serialize(Json::Value &json) {
         AE::serialize(json);
-        json.push_back(json_spirit::Pair("COLUMN_IDX", json_spirit::Value(m_columnIdx)));
-        json.push_back(json_spirit::Pair("TABLE_NAME", json_spirit::Value(m_tableName)));
-        json.push_back(json_spirit::Pair("COLUMN_NAME", json_spirit::Value(m_colName)));
-        json.push_back(json_spirit::Pair("COLUMN_ALIAS", json_spirit::Value(m_colAlias)));
+        json["COLUMN_IDX"] = m_columnIdx;
+        json["TABLE_NAME"] = m_tableName;
+        json["COLUMN_NAME"] = m_colName;
+        json["COLUMN_ALIAS"] = m_colAlias;
     }
 
     int m_columnIdx;      // COLUMN_IDX
@@ -237,17 +237,17 @@ public:
 
     }
 
-    virtual void serialize(json_spirit::Object &json) {
+    virtual void serialize(Json::Value &json) {
         AE::serialize(json);
-        json.push_back(json_spirit::Pair("HASH_COLUMN", json_spirit::Value(m_hashColumn)));
-        json_spirit::Array array;
+        json["HASH_COLUMN"] = m_hashColumn;
+        Json::Value array;
         for (int ii = 0; ii < m_numRanges; ii++) {
-            json_spirit::Object range;
-            range.push_back(json_spirit::Pair("RANGE_START", m_ranges[ii][0]));
-            range.push_back(json_spirit::Pair("RANGE_END", m_ranges[ii][1]));
-            array.push_back(range);
+            Json::Value range;
+            range["RANGE_START"] = static_cast<Json::Int64>(m_ranges[ii][0]);
+            range["RANGE_END"] = static_cast<Json::Int64>(m_ranges[ii][1]);
+            array.append(range);
         }
-        json.push_back(json_spirit::Pair("RANGES", array));
+        json["RANGES"] = array;
     }
 
     const int m_hashColumn;
@@ -293,8 +293,9 @@ AE * makeTree(AE *tree, queue<AE*> &q) {
    is emptied by the tree building process) */
 AbstractExpression * convertToExpression(queue<AE*> &e) {
     AE *tree = makeTree(NULL, e);
-    json_spirit::Object json = tree->serializeValue();
-    std::string jsonText = json_spirit::write(json);
+    Json::Value json = tree->serializeValue();
+    Json::FastWriter writer;
+    std::string jsonText = writer.write(json);
 
     PlannerDomRoot domRoot(jsonText.c_str());
 
@@ -377,8 +378,9 @@ TEST_F(ExpressionTest, HashRange) {
     };
 
     auto_ptr<AE> ae(new HR(1, ranges, 3));
-    json_spirit::Object json = ae->serializeValue();
-    std::string jsonText = json_spirit::write(json);
+    Json::Value json = ae->serializeValue();
+    Json::FastWriter writer;
+    std::string jsonText = writer.write(json);
     PlannerDomRoot domRoot(jsonText.c_str());
     auto_ptr<AbstractExpression> e1(AbstractExpression::buildExpressionTree(domRoot.rootObject()));
 
@@ -426,6 +428,32 @@ TEST_F(ExpressionTest, HashRange) {
         }
     }
     TupleSchema::freeTupleSchema(schema);
+}
+
+TEST_F(ExpressionTest, Timestamp) {
+    int64_t epoch_micros = -8881540068000000; // timestamp from "1688-07-21 09:32:12"
+    boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros);
+    boost::gregorian::date as_date = input_ptime.date();
+    ASSERT_EQ(as_date.year(), 1688);
+    ASSERT_EQ(as_date.month(), 7);
+    ASSERT_EQ(as_date.day(), 21);
+    boost::posix_time::time_duration as_time = input_ptime.time_of_day();
+    ASSERT_EQ(as_time.hours(), 9);
+    ASSERT_EQ(as_time.minutes(), 32);
+    ASSERT_EQ(as_time.seconds(), 12);
+
+    // test loweset timestamp to support
+    epoch_micros = GREGORIAN_EPOCH;
+    input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros);
+    as_date = input_ptime.date();
+    ASSERT_EQ(as_date.year(), 1583);
+    ASSERT_EQ(as_date.month(), 1);
+    ASSERT_EQ(as_date.day(), 1);
+    as_time = input_ptime.time_of_day();
+    ASSERT_EQ(as_time.hours(), 0);
+    ASSERT_EQ(as_time.minutes(), 0);
+    ASSERT_EQ(as_time.seconds(), 0);
+
 }
 
 int main() {

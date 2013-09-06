@@ -25,13 +25,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Queue;
 
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.utils.BandwidthMonitor;
-import org.voltcore.utils.Pair;
 
 /**
  * Manage the connection to a single server's export port
@@ -125,12 +125,19 @@ public class ExportConnection {
     }
 
     public void closeExportConnection() {
-        if (m_socket != null) {;
-        if (m_socket.isConnected()) {
+        if (m_socket != null) {
+            if (m_socket.isConnected()) {
                 try {
-            m_socket.close();
+                    m_socket.close();
                 } catch (IOException e) {
                     e.printStackTrace();
+                }
+            } else {
+                try {
+                    m_socket.close();
+                } catch (IOException e) {}
+                finally {
+                    m_socket = null;
                 }
             }
         }
@@ -267,6 +274,7 @@ public class ExportConnection {
         while (lengthBuffer.hasRemaining() && bytes_read > 0);
 
         if (bytes_read < 0) {
+            m_logger.trace("Length prefix bytes read (" + bytes_read + ") socket " + m_socket.socket().getLocalSocketAddress() + "<->" + m_socket.socket().getRemoteSocketAddress());
             // Socket closed, try to bail out
             m_state = CLOSING;
             return null;
@@ -281,12 +289,14 @@ public class ExportConnection {
                 while (lengthBuffer.hasRemaining() && bytes_read >= 0);
 
                 if (bytes_read < 0) {
+                    m_logger.trace("Length prefix2 bytes read (" + bytes_read + ") socket " + m_socket.socket().getLocalSocketAddress() + "<->" + m_socket.socket().getRemoteSocketAddress());
                     //  Socket closed, try to bail out
                     m_state = CLOSING;
                     return null;
                 }
             }
             else {
+                m_logger.trace("Bailing in non-blocking bytes read (" + bytes_read + ") socket " + m_socket.socket().getLocalSocketAddress() + "<->" + m_socket.socket().getRemoteSocketAddress());
                 // non-blocking case
                 return null;
             }
@@ -301,6 +311,7 @@ public class ExportConnection {
         while (messageBuf.remaining() > 0 && bytes_read >= 0);
 
         if (bytes_read < 0) {
+            m_logger.trace("Payload bytes read (" + bytes_read + ") socket " + m_socket.socket().getLocalSocketAddress() + "<->" + m_socket.socket().getRemoteSocketAddress());
             //  Socket closed, try to bail out
             m_state = CLOSING;
             return null;

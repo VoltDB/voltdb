@@ -1161,12 +1161,10 @@ final class RangeVariable {
         Index        index;
         Index        primaryIndex;
         int[]        primaryKey;
-        boolean      isSeqScan;
 
         index        = rangeIndex;
         primaryIndex = rangeTable.getPrimaryIndex();
         primaryKey   = rangeTable.getPrimaryKey();
-        isSeqScan    = indexCondition == null;
 
         if (rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
             throw new HSQLParseException("VoltDB does not support subqueries, consider using views instead");
@@ -1176,10 +1174,6 @@ final class RangeVariable {
         // note: ignored if scan if full table scan
         if (index == null)
             index = primaryIndex;
-
-        // check if this is a sequential scan
-        if (index == primaryIndex && primaryKey.length == 0)
-            isSeqScan = true;
 
         // output open tag
         VoltXMLElement scan = new VoltXMLElement("tablescan");
@@ -1201,36 +1195,62 @@ final class RangeVariable {
             scan.attributes.put("jointype", "inner");
         }
 
-        // start with the indexCondition
-        Expression cond = indexCondition;
-        // then go to the indexEndCondition
-        if (indexEndCondition != null) {
-            if (cond != null) {
-                cond = new ExpressionLogical(OpTypes.AND, cond, indexEndCondition);
-            } else {
-                cond = indexEndCondition;
+        Expression joinCond = null;
+        Expression whereCond = null;
+        // if isJoinIndex and indexCondition are set then indexCondition is join condition
+        // else if indexCondition is set then it is where condition
+        if (isJoinIndex == true) {
+            joinCond = indexCondition;
+            if (indexEndCondition != null) {
+                if (joinCond != null) {
+                    joinCond = new ExpressionLogical(OpTypes.AND, joinCond, indexEndCondition);
+                } else {
+                    joinCond = indexEndCondition;
+                }
             }
-        }
-        // then go to the nonIndexJoinCondition
-        if (nonIndexJoinCondition != null) {
-            if (cond != null) {
-                cond = new ExpressionLogical(OpTypes.AND, cond, nonIndexJoinCondition);
-            } else {
-                cond = nonIndexJoinCondition;
+            // then go to the nonIndexJoinCondition
+            if (nonIndexJoinCondition != null) {
+                if (joinCond != null) {
+                    joinCond = new ExpressionLogical(OpTypes.AND, joinCond, nonIndexJoinCondition);
+                } else {
+                    joinCond = nonIndexJoinCondition;
+                }
             }
+            // then go to the nonIndexWhereCondition
+            whereCond = nonIndexWhereCondition;
+        } else {
+            joinCond = nonIndexJoinCondition;
+            
+            whereCond = indexCondition;
+            if (indexEndCondition != null) {
+                if (whereCond != null) {
+                    whereCond = new ExpressionLogical(OpTypes.AND, whereCond, indexEndCondition);
+                } else {
+                    whereCond = indexEndCondition;
+                }
+            }
+            // then go to the nonIndexWhereCondition
+            if (nonIndexWhereCondition != null) {
+                if (whereCond != null) {
+                    whereCond = new ExpressionLogical(OpTypes.AND, whereCond, nonIndexWhereCondition);
+                } else {
+                    whereCond = nonIndexWhereCondition;
+                }
+            }
+            
         }
-        if (cond != null) {
-            cond = cond.eliminateDuplicates(session);
-            VoltXMLElement joinCond = new VoltXMLElement("joincond");
-            joinCond.children.add(cond.voltGetXML(session));
-            scan.children.add(joinCond);
+        if (joinCond != null) {
+            joinCond = joinCond.eliminateDuplicates(session);
+            VoltXMLElement joinCondEl = new VoltXMLElement("joincond");
+            joinCondEl.children.add(joinCond.voltGetXML(session));
+            scan.children.add(joinCondEl);
         }
 
-        // then go to the nonIndexWhereCondition
-        if (nonIndexWhereCondition != null) {
-            VoltXMLElement whereCond = new VoltXMLElement("wherecond");
-            whereCond.children.add(nonIndexWhereCondition.voltGetXML(session));
-            scan.children.add(whereCond);
+        if (whereCond != null) {
+            whereCond = whereCond.eliminateDuplicates(session);
+            VoltXMLElement whereCondEl = new VoltXMLElement("wherecond");
+            whereCondEl.children.add(whereCond.voltGetXML(session));
+            scan.children.add(whereCondEl);
         }
 
         return scan;

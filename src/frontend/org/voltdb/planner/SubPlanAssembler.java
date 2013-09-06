@@ -31,10 +31,10 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
-import org.voltdb.planner.JoinTree.TablePair;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -61,6 +61,13 @@ public abstract class SubPlanAssembler {
 
     /** Describes the specified and inferred partition context. */
     final PartitioningForStatement m_partitioning;
+
+    /**
+     * A description of a possible error condition that is considered recoverable/recovered
+     * by the act of generating a viable alternative plan. The error should only be acknowledged
+     * if it contributed to the complete failure to plan the statement.
+     */
+    String m_recentErrorMsg;
 
     // This cached value saves work on the assumption that it is only used to return
     // final "leaf node" bindingLists that are never updated "in place",
@@ -97,36 +104,6 @@ public abstract class SubPlanAssembler {
     abstract AbstractPlanNode nextPlan();
 
     /**
-     * Given a table (and optionally the next table in the join order), using the
-     * set of predicate expressions, figure out all the possible ways to get at
-     * the data we want. One way will always be the naive sequential scan.
-     *
-     * @param table
-     *     The table to get the data from.
-     * @param nextTable
-     *     The next tables in the join order or an empty array if there
-     *     are none.
-     * @return A list of access paths to access the data in the table.
-     */
-    protected ArrayList<AccessPath> getRelevantAccessPathsForTable(Table table, Table nextTables[]) {
-        List<AbstractExpression> filterExprs = m_parsedStmt.joinTree.m_tableFilterList.get(table);
-        List<AbstractExpression> joinExprs = new ArrayList<AbstractExpression>();
-        for (int ii = 0; ii < nextTables.length; ii++) {
-            final Table nextTable = nextTables[ii];
-            // create a key to search the TablePair->Clause map
-            TablePair pair = new TablePair();
-            pair.t1 = table;
-            pair.t2 = nextTable;
-            List<AbstractExpression> pairExprs = m_parsedStmt.joinTree.m_joinSelectionList.get(pair);
-            if (pairExprs != null) {
-                joinExprs.addAll(pairExprs);
-            }
-        }
-        // do the actual work
-        return getRelevantAccessPathsForTable(table, joinExprs, filterExprs, null);
-    }
-
-    /**
      * Generate all possible access paths for given sets of join and filter expressions for a table.
      * The list includes the naive (scan) pass and possible index scans
      *
@@ -155,7 +132,7 @@ public abstract class SubPlanAssembler {
             allExprs.addAll(filterExprs);
         }
 
-        AccessPath naivePath = getRelevantNaivePathForTable(allJoinExprs, filterExprs);
+        AccessPath naivePath = getRelevantNaivePath(allJoinExprs, filterExprs);
         paths.add(naivePath);
 
         CatalogMap<Index> indexes = table.getIndexes();
@@ -174,14 +151,13 @@ public abstract class SubPlanAssembler {
     }
 
     /**
-     * Generate the naive (scan) pass for the table
+     * Generate the naive (scan) pass given a join and filter expressions
      *
-     * @param table Table to generate naive pass for
-     * @param joinExprs join expressions this table is part of
-     * @param filterExprs filter expressions this table is part of
+     * @param joinExprs join expressions
+     * @param filterExprs filter expressions
      * @return Naive access path
      */
-    protected AccessPath getRelevantNaivePathForTable(List<AbstractExpression> joinExprs, List<AbstractExpression> filterExprs) {
+    protected AccessPath getRelevantNaivePath(List<AbstractExpression> joinExprs, List<AbstractExpression> filterExprs) {
         AccessPath naivePath = new AccessPath();
 
         if (filterExprs != null) {
@@ -501,19 +477,6 @@ public abstract class SubPlanAssembler {
             }
         }
 
-        // Upper and lower bounds get handled differently for scans that produce descending order.
-        if (retval.sortDirection == SortDirectionType.DESC) {
-            // Descending order is not supported if there are any kind of upper bounds.
-            // So, fall back to an order-indeterminate scan result which will get an explicit sort.
-            if ((endingBoundExpr != null) || ( ! retval.endExprs.isEmpty())) {
-                retval.sortDirection = SortDirectionType.INVALID;
-            } else {
-                // For a reverse scan, swap the start and end bounds.
-                endingBoundExpr = startingBoundExpr;
-                startingBoundExpr = null; // = the original endingBoundExpr, known to be null
-            }
-        }
-
         if (startingBoundExpr != null) {
             AbstractExpression comparator = startingBoundExpr.getFilter();
             retval.indexExprs.add(comparator);
@@ -527,17 +490,66 @@ public abstract class SubPlanAssembler {
             retval.use = IndexUseType.INDEX_SCAN;
         }
 
-        if (endingBoundExpr != null) {
+        if (endingBoundExpr == null) {
+            if (retval.sortDirection == SortDirectionType.DESC) {
+                if (retval.endExprs.size() == 0) { // no prefix equality filters
+                    if (startingBoundExpr != null) {
+                        retval.indexExprs.clear();
+                        AbstractExpression comparator = startingBoundExpr.getFilter();
+                        retval.endExprs.add(comparator);
+                    }
+                }
+                else { // there are prefix equality filters -- settle for a forward scan?
+                    retval.sortDirection = SortDirectionType.INVALID;
+                }
+            }
+        }
+        else {
             AbstractExpression comparator = endingBoundExpr.getFilter();
-            retval.endExprs.add(comparator);
-            retval.bindings.addAll(endingBoundExpr.getBindings());
             retval.use = IndexUseType.INDEX_SCAN;
-            if (retval.lookupType == IndexLookupType.EQ) {
-                // This does not need to be that accurate;
-                // anything OTHER than IndexLookupType.EQ is enough to enable a multi-key scan.
-                //TODO: work out whether there is any possible use for more precise settings of
-                // retval.lookupType, including for descending order cases ???
-                retval.lookupType = IndexLookupType.GTE;
+            retval.bindings.addAll(endingBoundExpr.getBindings());
+
+            // if we already have a lower bound, or the sorting direction is already determined
+            // do not do the reverse scan optimization
+            if (retval.sortDirection != SortDirectionType.DESC &&
+                (startingBoundExpr != null || retval.sortDirection == SortDirectionType.ASC)) {
+                retval.endExprs.add(comparator);
+                if (retval.lookupType == IndexLookupType.EQ) {
+                    retval.lookupType = IndexLookupType.GTE;
+                }
+            } else {
+                // only do reverse scan optimization when no startingBoundExpr and lookup type is
+                // either < or <=, so do not optimize BETWEEN.
+                if (comparator.getExpressionType() == ExpressionType.COMPARE_LESSTHAN) {
+                    retval.lookupType = IndexLookupType.LT;
+                } else {
+                    assert comparator.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO;
+                    retval.lookupType = IndexLookupType.LTE;
+                }
+                // optimizable
+                // add to indexExprs because it will be used as part of searchKey
+                retval.indexExprs.add(comparator);
+                // put it to post-filter as well
+                retval.otherExprs.add(comparator);
+                // Unlike a lower bound, an upper bound does not automatically filter out nulls
+                // as required by the comparison filter, so construct a NOT NULL comparator and
+                // add to post-filter
+                // TODO: Implement an abstract isNullable() method on AbstractExpression and use
+                // that here to optimize out the "NOT NULL" comparator for NOT NULL columns
+                if (startingBoundExpr == null) {
+                    AbstractExpression newComparator = new OperatorExpression(ExpressionType.OPERATOR_NOT,
+                            new OperatorExpression(ExpressionType.OPERATOR_IS_NULL), null);
+                    newComparator.getLeft().setLeft(comparator.getLeft());
+                    newComparator.finalizeValueTypes();
+                    retval.otherExprs.add(newComparator);
+                } else {
+                    AbstractExpression startComparator = startingBoundExpr.getFilter();
+                    retval.endExprs.add(startComparator);
+                }
+
+                // initialExpr is set for both cases
+                // but will be used for LTE and only when overflow case of LT
+                retval.initialExpr.addAll(retval.indexExprs);
             }
         }
 
@@ -558,7 +570,15 @@ public abstract class SubPlanAssembler {
             // unfiltered components -- assuming that any value is considered >= null.
             if (retval.use == IndexUseType.COVERING_UNIQUE_EQUALITY) {
                 retval.use = IndexUseType.INDEX_SCAN;
-                retval.lookupType = IndexLookupType.GTE;
+                // With no key, the lookup type will be ignored and the sort direction will
+                // determine the scan direction; With prefix key and explicit DESC order by,
+                // tell the EE to do reverse scan.
+                if (retval.sortDirection == SortDirectionType.DESC && retval.indexExprs.size() > 0) {
+                    retval.lookupType = IndexLookupType.LTE;
+                    retval.initialExpr.addAll(retval.indexExprs);
+                } else {
+                    retval.lookupType = IndexLookupType.GTE;
+                }
             }
             // GTE scans can have any number of null key components appended without changing
             // the effective value. So, that leaves GT scans.
@@ -576,8 +596,6 @@ public abstract class SubPlanAssembler {
                 //  - adding the GT condition as a special "initialExpr" post-condition
                 //    that disables itself as soon as it evaluates to true for any row
                 //    -- it would be expected to always evaluate to true after that.
-                // Restoring the original form of the filter to otherExprs simplifies later
-                // coverage checks that influence the form of parent joins (NLJ vs. NLIJ).
                 AbstractExpression comparator = startingBoundExpr.getOriginalFilter();
                 retval.otherExprs.add(comparator);
             }
@@ -1097,8 +1115,6 @@ public abstract class SubPlanAssembler {
         ReceivePlanNode recvNode = new ReceivePlanNode();
         recvNode.addAndLinkChild(sendNode);
 
-        // receive node requires the schema of its output table
-        recvNode.generateOutputSchema(m_db);
         return recvNode;
     }
 
@@ -1124,7 +1140,6 @@ public abstract class SubPlanAssembler {
         {
             scanNode = getIndexAccessPlanForTable(table, path);
         }
-        scanNode.generateOutputSchema(m_db);
         return scanNode;
     }
 
@@ -1174,6 +1189,9 @@ public abstract class SubPlanAssembler {
         Index index = path.index;
         IndexScanPlanNode scanNode = new IndexScanPlanNode();
         AbstractPlanNode resultNode = scanNode;
+
+        // set sortDirection here becase it might be used for IN list
+        scanNode.setSortDirection(path.sortDirection);
         // Build the list of search-keys for the index in question
         // They are the rhs expressions of the normalized indexExpr comparisons.
         for (AbstractExpression expr : path.indexExprs) {
@@ -1198,10 +1216,9 @@ public abstract class SubPlanAssembler {
         scanNode.setKeyIterate(path.keyIterate);
         scanNode.setLookupType(path.lookupType);
         scanNode.setBindings(path.bindings);
-        scanNode.setSortDirection(path.sortDirection);
         scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
         scanNode.setPredicate(ExpressionUtil.combine(path.otherExprs));
-
+        scanNode.setInitialExpression(ExpressionUtil.combine(path.initialExpr));
         scanNode.setTargetTableName(table.getTypeName());
         //TODO: push scan column identification into "setTargetTableName"
         // (on the way to enabling it for DML plans).
@@ -1219,13 +1236,16 @@ public abstract class SubPlanAssembler {
                                                                    IndexScanPlanNode scanNode)
     {
         MaterializedScanPlanNode matScan = new MaterializedScanPlanNode();
-        assert(listElements instanceof VectorValueExpression);
+        assert(listElements instanceof VectorValueExpression || listElements instanceof ParameterValueExpression);
         matScan.setRowData(listElements);
+        matScan.setSortDirection(scanNode.getSortDirection());
 
         NestLoopIndexPlanNode nlijNode = new NestLoopIndexPlanNode();
         nlijNode.setJoinType(JoinType.INNER);
         nlijNode.addInlinePlanNode(scanNode);
         nlijNode.addAndLinkChild(matScan);
+        // resolve the sort direction
+        nlijNode.resolveSortDirection();
         return nlijNode;
     }
 
@@ -1249,83 +1269,4 @@ public abstract class SubPlanAssembler {
             }
         }
     }
-
-    /**
-     * For a multi-fragment plan that contains a join,
-     * is it better to send partitioned tuples and join them on the coordinator
-     * or is it better to join them before sending?
-     * If bandwidth (or capacity of the receiving temp table) were the primary concern,
-     * a decision could be based on
-     * A) how much wider the joined rows are than the pre-joined rows.
-     * B) the expected yield of the join filtering -- does each pre-joined row typically
-     * match and get joined with multiple partner rows or does it typically fail to match
-     * any row.
-     * The statistics required to determine "B" are not generally available.
-     * In any case, there are two over-arching concerns.
-     * One is the correct handling of a special case
-     * -- a join of more than one partitioned table on their partition keys.
-     * In this case, the join MUST happen on each partition prior to sending any tuples.
-     * This restriction stems directly from the way fragments always produce a single
-     * (intermediate or final) result table and there can only be two fragments in a plan,
-     * including the "coordinator" that receives (one) intermediate result table and produces
-     * the final result table.
-     * The second over-arching consideration is that there is an optimization available to the
-     * transaction processer for the special case in which a coordinator fragment operates
-     * without accessing any persistent local data (I learned this second hand from Izzy. --paul).
-     * This provides further motivation to do all scanning and joining in the other fragment
-     * prior to sending tuples.
-     *
-     * TODO: It has been proposed that these two considerations SHOULD override all others,
-     * so that all multi-partition plans only "send after all joins", regardless of bandwidth/capacity
-     * considerations, but there remain some edge cases in which the current simple legacy
-     * implementation decides otherwise. That's where the following function comes into play.
-     *
-     * TODO: Weighing in on the other side, motivating multi-partition plans that
-     * "send before (some?) joins" are some OUTER JOINS between partitioned and replicated tables.
-     * Of particular concern are cases in which a partitioned table is on the INNER side of a join,
-     * e.g. the right operand of a LEFT OUTER JOIN,
-     *
-     * SELECT * FROM replicated R LEFT JOIN partitioned P
-     * ON R.key == P.non_partition_key;
-     *
-     * The usual approach of calculating a local (partial) join result on each partition,
-     * then sending and merging them with other partial results does not ensure correct answers
-     * for such queries. They require a "global view" of that partitioned working set.
-     * Many such queries impractically require redistribution and caching of a considerable
-     * subset of a partitioned table in preparation for a "coordinated" join.
-     * Yet, there may be useful cases with sufficient constant-based partitioned table filtering
-     * in the "ON clause" to keep the distributed working set size under control.
-     * SELECT * FROM replicated R LEFT JOIN partitioned P
-     * ON R.key == P.non_partition_key AND P.non_partition_key BETWEEN ? and ?;
-     *
-     * These OUTER JOIN queries need to be prohibited by the planner if it can not guarantee the
-     * correct results that require a "send before join" plan
-     * -- in direct contrast to the general trend suggested by the above "TODO".
-     *
-     * This function enables the legacy feature (pre-dating OUTER JOINs) of enabling mid-plan
-     * "send" nodes potentially resulting in "send before join" plans whenever it returns false.
-     * Its sole purpose is to maintain a "status quo", to continue to support "send before join"
-     * in certain edge cases where it has historically been supported -- perhaps with no good reason.
-     *
-     * This function is called very selectively -- the caller does most of the work of weeding out
-     * cases in which a "send" is most assuredly NOT required. Its role in these "questionable" cases
-     * is to determine whether the query taken as a whole dictates that a "send" is NEVER required
-     * except perhaps after all joins.
-     * That is, all multi-partition plans get an additional opportunity to "send after all joins"
-     * which does NOT consult this function but rather complements its effects
-     * -- to finally implement the "send" that this function may have "defered".
-     * This function would have no place in a pure "send after all joins" scheme.
-     * Yet, it may (in some form) still have some limited use if called even more selectively,
-     * specifically in support of the OUTER JOIN edge case described above.
-     *
-     * @return true if the plan is single-partition OR has more than one partitoned table
-     * that must be joined prior to sending tuples to the coordinator
-     * both for efficiency and to satisfy the two-fragment limitation.
-     * false otherwise
-     */
-    protected boolean canDeferSendReceivePairForNode() {
-        return m_partitioning.getCountOfPartitionedTables() > 1 || !m_partitioning.requiresTwoFragments();
-    }
-
-
 }

@@ -407,15 +407,12 @@ void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & vie
                   std::map<std::string, CatalogDelegate*> const &delegatesByName)
 {
     std::vector<catalog::MaterializedViewInfo*> survivingInfos;
-    std::vector<catalog::MaterializedViewInfo*> changingInfos;
     std::vector<MaterializedViewMetadata*> survivingViews;
-    std::vector<MaterializedViewMetadata*> changingViews;
     std::vector<MaterializedViewMetadata*> obsoleteViews;
 
     // Now, it's safe to transfer the wholesale state of the surviving dependent materialized views.
     existingTable->segregateMaterializedViews(views.begin(), views.end(),
                                               survivingInfos, survivingViews,
-                                              changingInfos, changingViews,
                                               obsoleteViews);
 
     // This process temporarily duplicates the materialized view definitions and their
@@ -503,7 +500,7 @@ TableCatalogDelegate::migrateChangedTuples(catalog::Table const &catalogTable,
     int64_t existingTupleCount = existingTable->activeTupleCount();
 
     // remove all indexes from the existing table
-    vector<TableIndex*> currentIndexes = existingTable->allIndexes();
+    const vector<TableIndex*> currentIndexes = existingTable->allIndexes();
     for (int i = 0; i < currentIndexes.size(); i++) {
         existingTable->removeIndex(currentIndexes[i]);
     }
@@ -587,7 +584,7 @@ TableCatalogDelegate::migrateChangedTuples(catalog::Table const &catalogTable,
                 if (columnSourceMap[i] >= 0) {
                     NValue value = scannedTuple.getNValue(columnSourceMap[i]);
                     if (columnExploded[i]) {
-                        value.allocatePersistentObjectFromInlineValue();
+                        value.allocateObjectFromInlinedValue();
                     }
                     tupleToInsert.setNValue(i, value);
                 }

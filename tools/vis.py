@@ -33,7 +33,7 @@ def get_branches(hostname, port, days):
 
     mydate = datetime.datetime.today()-datetime.timedelta(days=days)
 
-    query = "select distinct branch, count(*) from app_stats where ts >= '%s' group by branch order by 2 desc" % \
+    query = "select branch, count(*) from app_stats where ts >= '%s' group by branch order by 2 desc" % \
                     mydate.strftime('%Y-%m-%d 00:00:00')
 
     conn = FastSerializer(hostname, port)
@@ -223,7 +223,7 @@ def main():
 
     prefix = sys.argv[2]
     path = os.path.join(sys.argv[1], sys.argv[2])
-    ndays = 1000
+    ndays = 2000
     if len(sys.argv) >=4:
         ndays = int(sys.argv[3])
     width = None
@@ -235,6 +235,9 @@ def main():
 
     # show all the history
     branches = get_branches(STATS_SERVER, 21212, ndays)
+    if 'master' in branches:
+        branches.remove('master')
+        branches.insert(0,'master')
     root_path = path
     filenames = []              # (appname, latency, throughput)
     iorder = 0

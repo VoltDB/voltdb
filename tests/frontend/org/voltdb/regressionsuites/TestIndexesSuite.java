@@ -24,6 +24,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.TreeSet;
 
 import org.voltdb.BackendTarget;
@@ -117,12 +118,40 @@ public class TestIndexesSuite extends RegressionSuite {
             client.callProcedure("Insert", table, 7, "g", 300, 7, 18.5);
             client.callProcedure("Insert", table, 8, "h", 300, 8, 19.5);
             client.callProcedure("Insert", table, 9, "h", 300, 8, 19.5);
-            VoltTable results =
-                client.callProcedure(
-                        "@AdHoc",
-                        "select R1.ID, MIN(R1.ID) from R1 group by R1.ID order by R1.ID limit 4").getResults()[0];
+
+            String sql = String.format("select T.ID, MIN(T.ID) from %s T group by T.ID order by T.ID limit 4",
+                    table);
+            VoltTable results = client.callProcedure("@AdHoc", sql).getResults()[0];
             System.out.println(results);
         }
+    }
+
+    public void testNaNInIndexes() throws Exception {
+        // current hsql seems to fail on null handling
+        if (isHSQL()) return;
+
+        Client client = getClient();
+
+        int i = 0;
+        for (int j = 0; j < 20; j++) {
+            client.callProcedure("R1IX.insert", i++, "a", 100 * i, 0.0 / 0.0);
+            client.callProcedure("R1IX.insert", i++, "b", 100 * i, 16.5);
+            client.callProcedure("R1IX.insert", i++, "c", 100 * i, 119.5);
+            client.callProcedure("R1IX.insert", i++, "d", 100 * i, 9.5);
+            client.callProcedure("R1IX.insert", i++, "e", 100 * i, 1.0 / 0.0);
+            client.callProcedure("R1IX.insert", i++, "f", 100 * i, -14.5);
+            client.callProcedure("R1IX.insert", i++, "g", 100 * i, 0.0 / 0.0);
+            client.callProcedure("R1IX.insert", i++, "h", 100 * i, 14.5);
+            client.callProcedure("R1IX.insert", i++, "i", 100 * i, 14.5);
+            client.callProcedure("R1IX.insert", i++, "j", 100 * i, 1.0 / 0.0);
+            client.callProcedure("R1IX.insert", i++, "k", 100 * i, 14.5);
+            client.callProcedure("R1IX.insert", i++, "l", 100 * i, 0.0 / 0.0);
+            client.callProcedure("R1IX.insert", i++, "m", 100 * i, 11.5);
+            client.callProcedure("R1IX.insert", i++, "n", 100 * i, 10.5);
+        }
+
+        VoltTable results = client.callProcedure("@AdHoc", "delete from R1IX;").getResults()[0];
+        System.out.println(results);
     }
 
     public void testOrderedUniqueOneColumnIntIndex()
@@ -305,10 +334,34 @@ public class TestIndexesSuite extends RegressionSuite {
         assertEquals(4, result.getRowCount());
     }
 
+    private void compareTable(VoltTable vt, Object [][] expected) {
+        int len = expected.length;
+        assertEquals(len, vt.getRowCount());
+        for (int i=0; i < len; i++) {
+            compareRow(vt, expected[i]);
+        }
+    }
+
+    private void compareRow(VoltTable vt, Object [] expected) {
+        assertTrue(vt.advanceRow());
+        assertEquals( ((Integer)expected[0]).intValue(), vt.getLong(0));
+        assertEquals( ((String)expected[1]), vt.getString(1));
+        assertEquals( ((Integer)expected[2]).intValue(), vt.getLong(2));
+        assertEquals( ((Integer)expected[3]).intValue(), vt.getLong(3));
+        assertEquals( ((Double)expected[4]).doubleValue(), vt.getDouble(4), 0.001);
+    }
+
     public void testInList()
             throws IOException, ProcCallException
     {
         String[] tables = {"P3", "R3"};
+        Object [] line1 = new Object[] {1, "a", 100, 1, 14.5};
+        Object [] line2 = new Object[] {2, "b", 100, 2, 15.5};
+        Object [] line3 = new Object[] {3, "c", 200, 3, 16.5};
+        Object [] line6 = new Object[] {6, "f", 200, 6, 17.5};
+        Object [] line7 = new Object[] {7, "g", 300, 7, 18.5};
+        Object [] line8 = new Object[] {8, "h", 300, 8, 19.5};
+
         Client client = getClient();
         String query;
         VoltTable[] results;
@@ -319,20 +372,22 @@ public class TestIndexesSuite extends RegressionSuite {
             client.callProcedure("Insert", table, 6, "f", 200, 6, 17.5);
             client.callProcedure("Insert", table, 7, "g", 300, 7, 18.5);
             client.callProcedure("Insert", table, 8, "h", 300, 8, 19.5);
-            query = String.format("select * from %s T where T.NUM IN (200, 300)", table);
-            results = client.callProcedure("@AdHoc", query).getResults();
-            assertEquals(4, results[0].getRowCount());
-            query = String.format("select * from %s T where T.NUM IN (10, 200, 300, -1)", table);
-            results = client.callProcedure("@AdHoc", query).getResults();
-            assertEquals(4, results[0].getRowCount());
 
-            query = String.format("select * from %s T where T.NUM IN (10, 200, 300, -1, 200)", table);
+            query = String.format("select * from %s T where T.NUM IN (200, 300) ORDER BY T.ID", table);
             results = client.callProcedure("@AdHoc", query).getResults();
-            assertEquals(4, results[0].getRowCount());
+            compareTable(results[0], new Object [][] {line3,line6,line7,line8});
 
-            query = String.format("select * from %s T where T.NUM IN (200)", table);
+            query = String.format("select * from %s T where T.NUM IN (10, 200, 300, -1) ORDER BY T.ID", table);
             results = client.callProcedure("@AdHoc", query).getResults();
-            assertEquals(2, results[0].getRowCount());
+            compareTable(results[0], new Object [][] {line3,line6,line7,line8});
+
+            query = String.format("select * from %s T where T.NUM IN (10, 200, 300, -1, 200) ORDER BY T.ID", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            compareTable(results[0], new Object [][] {line3,line6,line7,line8});
+
+            query = String.format("select * from %s T where T.NUM IN (200) ORDER BY T.ID", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            compareTable(results[0], new Object [][] {line3,line6});
 
             query = String.format("select * from %s T where T.NUM IN (10)", table);
             results = client.callProcedure("@AdHoc", query).getResults();
@@ -342,22 +397,31 @@ public class TestIndexesSuite extends RegressionSuite {
             //results = client.callProcedure("@AdHoc", query).getResults();
             //assertEquals(0, results[0].getRowCount());
 
-            query = String.format("select * from %s T where T.DESC IN ('c', 'f', 'g', 'h')", table);
+            query = String.format("select * from %s T where T.DESC IN ('c', 'f', 'g', 'h') ORDER BY T.ID", table);
             results = client.callProcedure("@AdHoc", query).getResults();
-            assertEquals(4, results[0].getRowCount());
+            compareTable(results[0], new Object [][] {line3,line6,line7,line8});
+
             query = String.format("select * from %s T where T.DESC IN ('', 'c', 'f', 'g', 'h', " +
                 "'a value with some length to it in case there are object allocation issues'" +
-                ")", table);
+                ") ORDER BY T.ID", table);
             results = client.callProcedure("@AdHoc", query).getResults();
-            assertEquals(4, results[0].getRowCount());
+            compareTable(results[0], new Object [][] {line3,line6,line7,line8});
 
-            query = String.format("select * from %s T where T.DESC IN ('', 'c', 'f', 'g', 'h', 'f')", table);
+
+            query = String.format("select * from %s T where T.DESC " +
+                    "IN ('', 'c', 'f', 'g', 'h', 'f') ORDER BY T.ID", table);
             results = client.callProcedure("@AdHoc", query).getResults();
-            assertEquals(4, results[0].getRowCount());
+            compareTable(results[0], new Object [][] {line3,line6,line7,line8});
+
+            query = String.format("select * from %s T where T.DESC IN ('a')", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(1, results[0].getRowCount());
+            compareRow(results[0], line1);
 
             query = String.format("select * from %s T where T.DESC IN ('b')", table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(1, results[0].getRowCount());
+            compareRow(results[0], line2);
 
             query = String.format("select * from %s T where T.DESC IN ('')", table);
             results = client.callProcedure("@AdHoc", query).getResults();
@@ -365,50 +429,241 @@ public class TestIndexesSuite extends RegressionSuite {
 
 
             query = String.format("select * from %s T where T.DESC IN ('c', 'f', 'g', 'h')" +
-                " and T.NUM IN (200, 300)", table);
+                " and T.NUM IN (200, 300) ORDER BY T.ID", table);
             results = client.callProcedure("@AdHoc", query).getResults();
-            assertEquals(4, results[0].getRowCount());
+            compareTable(results[0], new Object [][] {line3,line6,line7,line8});
+
             query = String.format("select * from %s T where T.DESC IN ('', 'c', 'f', 'g', 'h', " +
                 "'a value with some length to it in case there are object allocation issues'" +
                 ")" +
-                " and T.NUM IN (10, 200, 300, -1)", table);
+                " and T.NUM IN (10, 200, 300, -1) ORDER BY T.ID", table);
             results = client.callProcedure("@AdHoc", query).getResults();
-            assertEquals(4, results[0].getRowCount());
+            compareTable(results[0], new Object [][] {line3,line6,line7,line8});
 
             query = String.format("select * from %s T where T.DESC IN ('', 'c', 'f', 'g', 'h', 'f')" +
-                " and T.NUM IN (10, 200, 300, -1, 200)", table);
+                " and T.NUM IN (10, 200, 300, -1, 200) ORDER BY T.ID", table);
             results = client.callProcedure("@AdHoc", query).getResults();
-            assertEquals(4, results[0].getRowCount());
+            compareTable(results[0], new Object [][] {line3,line6,line7,line8});
+
+            query = String.format("select * from %s T where T.DESC IN ('a')" +
+                    " and T.NUM IN (100)", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(1, results[0].getRowCount());
+            compareRow(results[0], line1);
 
             query = String.format("select * from %s T where T.DESC IN ('b')" +
                 " and T.NUM IN (100)", table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(1, results[0].getRowCount());
+            compareRow(results[0], line2);
 
             query = String.format("select * from %s T where T.DESC IN ('')" +
                  " and T.NUM IN (10)", table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(0, results[0].getRowCount());
+
+//            Current table is P3, results:
+//                header size: 46
+//                status code: -128 column count: 5
+//                cols (ID:INTEGER), (DESC:STRING), (NUM:INTEGER), (NUM2:INTEGER), (RATIO:FLOAT),
+//                rows -
+//                 3,c,200,3,16.5
+//                 6,f,200,6,17.5
+//                 1,a,100,1,14.5
+//                 7,g,300,7,18.5
+//                 2,b,100,2,15.5
+//                 8,h,300,8,19.5
+
+            // try some DML -- but try not to actually update values except to themselves
+            // -- that just makes it harder to profile expected results down the line
+            query = String.format("delete from %s where DESC IN ('')" +
+                    " and NUM IN (111,112)", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            System.out.println("Delete results:" + results[0]);
+            assertEquals(1, results[0].getRowCount());
+            results[0].advanceRow();
+            assertEquals(0, results[0].getLong(0));
+
+            query = String.format("select * from %s T ORDER BY T.ID", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            compareTable(results[0], new Object [][] {line1,line2,line3,line6,line7,line8});
+
+            // Try delete with in
+            query = String.format("delete from %s where DESC IN ('x','y', 'b','z')" +
+                    " and NUM IN (119,100)", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(1, results[0].getRowCount());
+            results[0].advanceRow();
+            assertEquals(1, results[0].getLong(0));
+
+            query = String.format("select * from %s T ORDER BY T.ID", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(5, results[0].getRowCount());
+            compareTable(results[0], new Object [][] {line1,line3,line6,line7,line8});
+
+            results = client.callProcedure("Insert", table, 2, "b", 100, 2, 15.5).getResults();
+            assertEquals(1, results[0].getRowCount());
+            results[0].advanceRow();
+            assertEquals(1, results[0].getLong(0));
+
+            // Test update with IN
+            query = String.format("update %s set num2 = 10 where DESC IN ('x', 'y', 'z', 'c')", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(1, results[0].getRowCount());
+            results[0].advanceRow();
+            assertEquals(1, results[0].getLong(0));
+
+            query = String.format("select id, desc from %s where num2 = 10 ", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(1, results[0].getRowCount());
+            results[0].advanceRow();
+            assertEquals(3, results[0].getLong(0));
+            assertEquals("c", results[0].getString(1));
+
+            query = String.format("update %s set num2 = 3 where DESC = 'c'", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(1, results[0].getRowCount());
+            results[0].advanceRow();
+            assertEquals(1, results[0].getLong(0));
+
+            query = String.format("select * from %s T ORDER BY T.ID", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            compareTable(results[0], new Object [][] {line1,line2,line3,line6,line7,line8});
+
         }
 
+        // Flag whether CompiledInLists needs to tiptoe around lack of "col IN ?" support
+        // in the HSQL backend that doesn't support it.
+        int hsql = isHSQL() ? 1 : 0;
         String[] fewdescs = new String[] { "", "b", "no match", "this either",
         "and last but not least the obligatory longish value to test object allocation" };
         int[] fewnums = new int[] { 10, 100, 100, 100, -1 };
-        results = client.callProcedure("CompiledInLists", fewdescs, fewnums).getResults();
-        assertEquals(4, results.length);
+        results = client.callProcedure("CompiledInLists", fewdescs, fewnums, hsql).getResults();
+        assertEquals(6, results.length);
         assertEquals(1, results[0].getRowCount());
         assertEquals(1, results[1].getRowCount());
-        assertEquals(2, results[2].getRowCount());
+        assertEquals(1, results[2].getRowCount());
         assertEquals(2, results[3].getRowCount());
+        assertEquals(2, results[4].getRowCount());
+        assertEquals(2, results[5].getRowCount());
 
         String[] manydescs = new String[] { "b", "c", "f", "g", "h" };
         int[] manynums = new int[] { 100, 200, 300, 200, 100 };
-        results = client.callProcedure("CompiledInLists", manydescs, manynums).getResults();
-        assertEquals(4, results.length);
+        results = client.callProcedure("CompiledInLists", manydescs, manynums, hsql).getResults();
+        assertEquals(6, results.length);
         assertEquals(5, results[0].getRowCount());
         assertEquals(5, results[1].getRowCount());
-        assertEquals(4, results[2].getRowCount());
+        assertEquals(5, results[2].getRowCount());
         assertEquals(4, results[3].getRowCount());
+        assertEquals(4, results[4].getRowCount());
+        assertEquals(4, results[5].getRowCount());
+
+        Integer fewObjNums[] = new Integer[fewnums.length];
+        for (int ii = 0; ii < fewnums.length; ++ii) {
+            fewObjNums[ii] = new Integer(fewnums[ii]);
+        }
+
+        Integer manyObjNums[] = new Integer[manynums.length];
+        for (int ii = 0; ii < manynums.length; ++ii) {
+            manyObjNums[ii] = new Integer(manynums[ii]);
+        }
+
+        results = client.callProcedure("InlinedInListP3with5DESCs", (Object[])fewdescs).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
+        results = client.callProcedure("InlinedInListR3with5DESCs", (Object[])fewdescs).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
+        if ( ! isHSQL()) {
+            results = client.callProcedure("InlinedInListP3withDESCs", (Object)fewdescs).getResults();
+            assertEquals(1, results.length);
+            assertEquals(1, results[0].getRowCount());
+        }
+        results = client.callProcedure("InlinedInListP3with5NUMs",  (Object[])fewObjNums).getResults();
+        assertEquals(1, results.length);
+        assertEquals(2, results[0].getRowCount());
+        results = client.callProcedure("InlinedInListR3with5NUMs",  (Object[])fewObjNums).getResults();
+        assertEquals(1, results.length);
+        assertEquals(2, results[0].getRowCount());
+        // Passing Object vectors as single parameters is not allowed.
+        // if ( ! isHSQL()) {
+        //     results = client.callProcedure("InlinedInListP3withNUMs", (Object)fewObjNums).getResults();
+        //     assertEquals(1, results.length);
+        //     assertEquals(2, results[0].getRowCount());
+        // }
+        //TODO: test as type failure:
+        //results = client.callProcedure("InlinedInListP3with5NUMs", fewnums).getResults();
+        //TODO: test as type failure:
+        //results = client.callProcedure("InlinedInListR3with5NUMs", fewnums).getResults();
+        if ( ! isHSQL()) {
+            results = client.callProcedure("InlinedInListP3withNUMs", fewnums).getResults();
+            assertEquals(1, results.length);
+            assertEquals(2, results[0].getRowCount());
+        }
+
+        results = client.callProcedure("InlinedInListP3with5DESCs", (Object[])manydescs).getResults();
+        assertEquals(1, results.length);
+        assertEquals(5, results[0].getRowCount());
+        results = client.callProcedure("InlinedInListR3with5DESCs", (Object[])manydescs).getResults();
+        assertEquals(1, results.length);
+        assertEquals(5, results[0].getRowCount());
+        if ( ! isHSQL()) {
+            results = client.callProcedure("InlinedInListP3withDESCs", (Object)manydescs).getResults();
+            assertEquals(1, results.length);
+            assertEquals(5, results[0].getRowCount());
+        }
+        results = client.callProcedure("InlinedInListP3with5NUMs",  (Object[])manyObjNums).getResults();
+        assertEquals(1, results.length);
+        assertEquals(4, results[0].getRowCount());
+        results = client.callProcedure("InlinedInListR3with5NUMs",  (Object[])manyObjNums).getResults();
+        assertEquals(1, results.length);
+        assertEquals(4, results[0].getRowCount());
+        // Passing Object vectors as single parameters is not allowed.
+        // if ( ! isHSQL()) {
+        //     results = client.callProcedure("InlinedInListP3withNUMs", (Object)manyObjNums).getResults();
+        //     assertEquals(1, results.length);
+        //     assertEquals(4, results[0].getRowCount());
+        //        }
+        //TODO: test as type failure:
+        //results = client.callProcedure("InlinedInListP3with5NUMs", manynums).getResults();
+        //TODO: test as type failure:
+        //results = client.callProcedure("InlinedInListR3with5NUMs", manynums).getResults();
+        if ( ! isHSQL()) {
+            results = client.callProcedure("InlinedInListP3withNUMs", manynums).getResults();
+            assertEquals(1, results.length);
+            assertEquals(4, results[0].getRowCount());
+        }
+
+        // Confirm that filters get the expected number of rows before trying the DML that uses them.
+        results = client.callProcedure("@AdHoc", "select count(*) from R3 where DESC IN ('x', 'y', 'z', 'a')" +
+                                                 " and NUM IN (1010, 1020, 1030, -1040, 100)").getResults();
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
+        results[0].advanceRow();
+        assertEquals(1, results[0].getLong(0));
+
+        results = client.callProcedure("@AdHoc", "select count(*) from P3 where DESC IN ('x', 'y', 'z', 'b')" +
+                                                 " and NUM IN (1010, 1020, 1030, -1040, 100)").getResults();
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
+        results[0].advanceRow();
+        assertEquals(1, results[0].getLong(0));
+
+        // Test IN LIST DML interaction ENG-4909 -- this is a plan correctness test --
+        results = client.callProcedure("@AdHoc", "update R3 set NUM = (1000) where DESC IN ('x', 'y', 'z', 'a')" +
+                                                 " and NUM IN (1010, 1020, 1030, -1040, 100)").getResults();
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
+        results[0].advanceRow();
+        assertEquals(1, results[0].getLong(0));
+
+        results = client.callProcedure("@AdHoc", "delete from P3 where DESC IN ('x', 'y', 'z', 'b')" +
+                                                 " and NUM IN (1010, 1020, 1030, -1040, 100)").getResults();
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
+        results[0].advanceRow();
+        assertEquals(1, results[0].getLong(0));
+
     }
 
     public void testTicket195()
@@ -536,17 +791,35 @@ public class TestIndexesSuite extends RegressionSuite {
         tableI++;
         rowI = 0;
         assertEquals( 3, results[tableI].getRowCount());
+        // after adding reserve scan, JNI and HSQL will report
+        // tuples in different order
+        // so, add them to a set and ignore the order instead
         final VoltTableRow rowLTE0 = results[tableI].fetchRow(rowI++);
-        assertEquals( -1, rowLTE0.getLong(0));
-        assertEquals( 0, rowLTE0.getLong(1));
-
         final VoltTableRow rowLTE1 = results[tableI].fetchRow(rowI++);
-        assertEquals( 0, rowLTE1.getLong(0));
-        assertEquals( 0, rowLTE1.getLong(1));
-
         final VoltTableRow rowLTE2 = results[tableI].fetchRow(rowI++);
-        assertEquals( 0, rowLTE2.getLong(0));
-        assertEquals( 1, rowLTE2.getLong(1));
+        HashSet<Long> TID = new HashSet<Long>();
+
+        HashSet<Long> BID = new HashSet<Long>();
+        HashSet<Long> expectedTID = new HashSet<Long>();
+        HashSet<Long> expectedBID = new HashSet<Long>();
+
+        expectedTID.add(-1L);
+        expectedTID.add(0L);
+        expectedTID.add(0L);
+
+        expectedBID.add(0L);
+        expectedBID.add(0L);
+        expectedBID.add(1L);
+
+        TID.add(rowLTE0.getLong(0));
+        TID.add(rowLTE1.getLong(0));
+        TID.add(rowLTE2.getLong(0));
+        BID.add(rowLTE0.getLong(1));
+        BID.add(rowLTE1.getLong(1));
+        BID.add(rowLTE2.getLong(1));
+
+        assertTrue(TID.equals(expectedTID));
+        assertTrue(BID.equals(expectedBID));
 
         // Test 10 -- LT first component of compound key
         tableI++;
@@ -591,6 +864,12 @@ public class TestIndexesSuite extends RegressionSuite {
         callHelper(client, "InsertR1IX", 985, "XtQOuGWNzVKtrpnMj", 32677, 6.78465381526806687873e-01);
         callHelper(client, "InsertR1IX", 988, "XtQOuGWNzVKtrpnMj", 32677, 3.98623510723492113783e-01);
         callHelper(client, "InsertR1IX", 989, "XtQOuGWNzVKtrpnMj", 32677, 3.98623510723492113783e-01);
+
+        // add NaN for fun
+        if (!isHSQL()) {
+            callHelper(client, "InsertR1IX", 974, "XtQOuGWNzVKtrpnMj", 32677, 0.0 / 0.0);
+        }
+
         callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 44 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID<45)");
         callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 44 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID<43)");
         callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 66 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID<86)");
@@ -782,12 +1061,25 @@ public class TestIndexesSuite extends RegressionSuite {
         VoltTable result = results[0];
         long modified = result.fetchRow(0).getLong(0);
         System.out.printf("Update statement modified %d rows.\n", modified);
-        assertEquals(16, modified);
+
+        if (isHSQL()) {
+            assertEquals(16, modified);
+        }
+        else {
+            // extra NaN row got added if not HSQL
+            // for now, this query includes the NaN value, but it shouldn't forever
+            assertEquals(17, modified);
+        }
+
+        // check we can clear out with a NaN involved
+        results = client.callProcedure("@AdHoc", "delete from R1IX").getResults();
     }
 
     public void testKeyCastingOverflow() throws NoConnectionsException, IOException, ProcCallException {
         Client client = getClient();
-        ClientResponseImpl cr = (ClientResponseImpl) client.callProcedure("@AdHoc", "select * from P1 where ID = 6000000000;", 0);
+        ClientResponseImpl cr =
+               (ClientResponseImpl) client.callProcedure("@AdHoc",
+                                                         "select * from P1 where ID = 6000000000;", 0);
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
     }
 
@@ -812,8 +1104,46 @@ public class TestIndexesSuite extends RegressionSuite {
         project.addStmtProcedure("Eng397LimitIndexR2", "select * from R2 where R2.ID > 2 Limit ?");
         project.addStmtProcedure("Eng397LimitIndexP2", "select * from P2 where P2.ID > 2 Limit ?");
         project.addStmtProcedure("Eng2914BigKeyP1", "select * from P1 where ID < 600000000000");
-        project.addStmtProcedure("Eng506UpdateRange", "UPDATE R1IX SET NUM = ? WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.NUM>?)");
+        project.addStmtProcedure("Eng506UpdateRange",
+                                 "UPDATE R1IX SET NUM = ? WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.NUM>?)");
         project.addStmtProcedure("InsertR1IX", "insert into R1IX values (?, ?, ?, ?);");
+
+        project.addStmtProcedure("InlinedInListP3with5DESCs",
+                                 "select * from P3 T where T.DESC IN (?, ?, ?, ?, ?)" +
+                                 " and T.NUM IN (100, 200, 300, 400, 500)");
+
+        project.addStmtProcedure("InlinedInListR3with5DESCs",
+                                 "select * from R3 T where T.DESC IN (?, ?, ?, ?, ?)" +
+                                 " and T.NUM IN (100, 200, 300, 400, 500)");
+
+        project.addStmtProcedure("InlinedInListP3withDESCs",
+                                 "select * from P3 T where T.DESC IN ?" +
+                                 " and T.NUM IN (100, 200, 300, 400, 500)");
+
+
+        project.addStmtProcedure("InlinedInListP3with5NUMs",
+                                 "select * from P3 T where T.DESC IN ('a', 'b', 'c', 'g', " +
+                                 "'this here is a longish string to force a permanent object allocation'" +
+                                 ")" +
+                                 " and T.NUM IN (?, ?, ?, ?, ?)");
+
+        project.addStmtProcedure("InlinedInListR3with5NUMs",
+                                 "select * from R3 T where T.DESC IN ('a', 'b', 'c', 'g', " +
+                                 "'this here is a longish string to force a permanent object allocation'" +
+                                 ")" +
+                                 " and T.NUM IN (?, ?, ?, ?, ?)");
+
+        project.addStmtProcedure("InlinedInListP3withNUMs",
+                                 "select * from P3 T where T.DESC IN ('a', 'b', 'c', 'g', " +
+                                 "'this here is a longish string to force a permanent object allocation'" +
+                                 ")" +
+                                 " and T.NUM IN ?");
+
+        //project.addStmtProcedure("InlinedUpdateInListP3with5NUMs",
+        //        "update P3 set NUM = 0 where DESC IN ('a', 'b', 'c', 'g', " +
+        //        "'this here is a longish string to force a permanent object allocation'" +
+        //        ")" +
+        //        " and NUM IN (111,222,333,444,555)");
 
         boolean success;
 

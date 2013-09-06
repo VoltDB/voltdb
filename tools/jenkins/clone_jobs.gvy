@@ -1,3 +1,6 @@
+import jenkins.*
+import jenkins.model.*
+import hudson.*
 import hudson.model.*
 import hudson.plugins.cloneworkspace.*
 import hudson.tasks.Mailer
@@ -5,32 +8,44 @@ import hudson.tasks.Mailer
 def str_nextrelease = "nextrelease"
 def str_search_1 = "system-test-" + str_nextrelease
 def str_search_2 = "performance-" + str_nextrelease
+def str_search_3 = "endurance-" + str_nextrelease
 def str_oldbranch = "master"
 
-def str_branch = "start_heap"
-boolean enable_performance = true
+def str_branch = "stream-refactor"
+boolean enable_performance = false
 boolean enable_systemtest = false
 
 def workspace_name = str_search_1.replace("nextrelease", str_branch)
 //whitespace separated list of email addresses
-def recipientlist = "qa@voltdb.com"
+def recipientlist = "prosegay@voltdb.com"
 
 AbstractProject kit = null
 downstream = ""
 
-for(item in Hudson.instance.items)
-{
-  if ( ! item.disabled && (item.getName().contains(str_search_1) || item.getName().contains(str_search_2))) {
+alljobs = []
 
+for (item in Hudson.instance.items) {
+   if (! item.disabled && (item.getName().contains(str_search_1) ||
+                item.getName().contains(str_search_2) ||
+                           item.getName().contains(str_search_3))) {
+                  
+    if (item.getName().contains("kit-"))
+      alljobs.add(0, item)
+    else
+      alljobs.add(item)
+   }
+}
+
+for(item in alljobs)
+{
       println("\n\nprocessing JOB : "+item.name)
 
       //create the new project name
       newName = item.getName().replace(str_nextrelease, str_branch)
 
       // delete existing job with new name
-      nj = Hudson.instance.getJob(newName)
-      if (nj)
-            nj.delete()
+      if (Hudson.instance.getJob(newName))
+            Hudson.instance.getJob(newName).delete()
 
       // copy the job, disable and save it
       def job = Hudson.instance.copy(item, newName)
@@ -62,15 +77,17 @@ for(item in Hudson.instance.items)
 
     // option to remove cron triggers and trigger everthing from the kit build
     if (true) {
-        t = job.getTrigger(triggers.TimerTrigger.class)
-        //println t.getSpec() // crontab specification as string ie. "0 22 * * *"
-        // to create a new trigger use addTrigger(new Trigger("0 22 * * *"))
-        if (t != null)
-          job.removeTrigger(t.getDescriptor())
-        if (project != kit) {
-          // make a list of all jobs for a BuildTrigger for the kit build job
-          downstream = downstream + "," + project.getName() // make a list of downstream projects
-        }
+        try {
+            t = job.getTrigger(triggers.TimerTrigger)
+            //println t.getSpec() // crontab specification as string ie. "0 22 * * *"
+            // to create a new trigger use addTrigger(new Trigger("0 22 * * *"))
+            if (t != null)
+              job.removeTrigger(t.getDescriptor())
+            if (project != kit) {
+              // make a list of all jobs for a BuildTrigger for the kit build job
+              downstream = downstream + "," + project.getName() // make a list of downstream projects
+            }
+        catch(e) { println "no Timer Trigger found" }
     }
 
     // option to modify build timeout
@@ -99,7 +116,6 @@ for(item in Hudson.instance.items)
       project.save()
 
       println(" $item.name copied as $newName")
-  }
 }
 
 if (downstream.length() > 0) {

@@ -30,6 +30,7 @@ import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.DistinctPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
+import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
@@ -75,9 +76,15 @@ public class TestPushDownAggregates extends PlannerTestCase {
 
     public void testAvgOnPartitionedTable() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT AVG(A1) from T1");
+        for (AbstractPlanNode apn: pn) {
+            System.out.println(apn.toExplainPlanString());
+        }
         checkPushedDown(pn, true,
-                        new ExpressionType[] {ExpressionType.AGGREGATE_AVG},
-                        null);
+                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_COUNT},
+                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_SUM},
+                        true);
     }
 
     public void testCountStarWithGroupBy() {
@@ -117,18 +124,69 @@ public class TestPushDownAggregates extends PlannerTestCase {
     public void testAllAggregates() {
         List<AbstractPlanNode> pn =
             compileToFragments("SELECT count(*), count(PKEY), sum(PKEY), min(PKEY), max(PKEY), avg(PKEY) FROM T1");
+        for (AbstractPlanNode apn: pn) {
+            System.out.println(apn.toExplainPlanString());
+        }
         checkPushedDown(pn, true,
                         new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR,
                                               ExpressionType.AGGREGATE_COUNT,
                                               ExpressionType.AGGREGATE_SUM,
                                               ExpressionType.AGGREGATE_MIN,
+                                              ExpressionType.AGGREGATE_MAX},
+                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_MIN,
+                                              ExpressionType.AGGREGATE_MAX},
+                        true);
+    }
+
+    public void testAllAggregatesAVG1() {
+        List<AbstractPlanNode> pn =
+            compileToFragments("SELECT count(*), count(PKEY), min(PKEY), max(PKEY), avg(PKEY) FROM T1");
+        for (AbstractPlanNode apn: pn) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        checkPushedDown(pn, true,
+                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR,
+                                              ExpressionType.AGGREGATE_COUNT,
+                                              ExpressionType.AGGREGATE_MIN,
                                               ExpressionType.AGGREGATE_MAX,
-                                              ExpressionType.AGGREGATE_AVG},
-                        null);
+                                              ExpressionType.AGGREGATE_SUM},
+                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_MIN,
+                                              ExpressionType.AGGREGATE_MAX,
+                                              ExpressionType.AGGREGATE_SUM},
+                        true);
+    }
+
+    public void testAllAggregatesAVG2() {
+        List<AbstractPlanNode> pn =
+            compileToFragments("SELECT count(*), min(PKEY), max(PKEY), avg(PKEY) FROM T1");
+        for (AbstractPlanNode apn: pn) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        checkPushedDown(pn, true,
+                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR,
+                                              ExpressionType.AGGREGATE_MIN,
+                                              ExpressionType.AGGREGATE_MAX,
+                                              ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_COUNT},
+                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_MIN,
+                                              ExpressionType.AGGREGATE_MAX,
+                                              ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_SUM},
+                        true);
     }
 
     public void testGroupByNotInDisplayColumn() {
-        failToCompile("SELECT count(A1) FROM T1 GROUP BY A1", "display column");
+        List<AbstractPlanNode> pn = compileToFragments ("SELECT count(A1) FROM T1 GROUP BY A1");
+        checkPushedDown(pn, true,
+                new ExpressionType[] {ExpressionType.AGGREGATE_COUNT},
+                new ExpressionType[] {ExpressionType.AGGREGATE_SUM}, true);
+
     }
 
     public void testGroupByWithoutAggregates() {
@@ -236,9 +294,19 @@ public class TestPushDownAggregates extends PlannerTestCase {
      */
     private void checkPushedDown(List<AbstractPlanNode> pn, boolean isMultiPart,
                                  ExpressionType[] aggTypes, ExpressionType[] pushDownTypes) {
+        checkPushedDown(pn, isMultiPart, aggTypes, pushDownTypes, false);
+    }
+
+    private void checkPushedDown(List<AbstractPlanNode> pn, boolean isMultiPart,
+            ExpressionType[] aggTypes, ExpressionType[] pushDownTypes, boolean hasProjectionNode) {
         assertTrue(pn.size() > 0);
 
-        AbstractPlanNode p = pn.get(0).getChild(0);
+        AbstractPlanNode p = pn.get(0).getChild(0);;
+        if (hasProjectionNode) {
+            assertTrue(p instanceof ProjectionPlanNode);
+            p = p.getChild(0);
+        }
+
         assertTrue(p instanceof AggregatePlanNode);
         String fragmentString = p.toJSONString();
         ExpressionType[] topTypes = (pushDownTypes != null) ? pushDownTypes : aggTypes;

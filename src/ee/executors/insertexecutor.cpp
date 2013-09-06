@@ -117,13 +117,13 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     // This should probably just be a warning in the future when we are
     // running in a distributed cluster
     //
-    if (m_inputTable->activeTupleCount() == 0) {
+    if (m_inputTable->isTempTableEmpty()) {
         VOLT_ERROR("No tuples were found in our input table '%s'",
                    m_inputTable->name().c_str());
         return false;
     }
 #endif
-    assert (m_inputTable->activeTupleCount() > 0);
+    assert ( ! m_inputTable->isTempTableEmpty());
 
     // count the number of successful inserts
     int modifiedTuples = 0;

@@ -30,7 +30,6 @@ import org.voltdb.plannodes.IndexCountPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.TableCountPlanNode;
-import org.voltdb.types.SortDirectionType;
 
 public class ReplaceWithIndexCounter extends MicroOptimization {
 
@@ -68,8 +67,8 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
             if (newChild == child) {
                 continue;
             }
-            child.removeFromGraph();
-            plan.addAndLinkChild(newChild);
+            boolean replaced = plan.replaceChild(child, newChild);
+            assert(true == replaced);
         }
 
         // check for an aggregation of the right form
@@ -97,8 +96,9 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
 
         IndexScanPlanNode isp = (IndexScanPlanNode)child;
 
-        // An index count or table count can replace an index scan only if it has no (post-)predicates.
-        if (isp.getPredicate() != null) {
+        // An index count or table count can replace an index scan only if it has no (post-)predicates
+        // except those (post-)predicates are artifact predicates we added for reverse scan purpose only
+        if (isp.getPredicate() != null && !isp.isPredicatesOptimizableForAggregate()) {
             return plan;
         }
 
@@ -109,14 +109,6 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
             // "select count(*) from table order by index_key;"
             // meets a naive planner that doesn't just cull the no-op ORDER BY. Who, us?
             return new TableCountPlanNode(isp, aggplan);
-        }
-
-        // Eliminate one last bizarre edge case - a reverse scan like
-        // "select count(*) from table where index_key > ? order by index_key DESC;".
-        // This time, hold out for the planner to develop the smarts to cull the ORDER BY
-        // -- the alternative would be the code clutter of trying to swap start and end keys.
-        if (isp.getSortDirection() == SortDirectionType.DESC) {
-            return plan;
         }
 
         // check for the index's support for counting

@@ -39,53 +39,53 @@ public enum VoltType {
      * Used for uninitialized types in some places. Not a valid value
      * for actual user data.
      */
-    INVALID   ((byte)0, -1, null, new Class[] {}, '0'),
+    INVALID   ((byte)0, -1, null, new Class[] {}, null, '0'),
 
     /**
      * Used to type java null values that have no type. Not a valid value
      * for actual user data.
      */
-    NULL      ((byte)1, -1, null, new Class[] {}, '0'),
+    NULL      ((byte)1, -1, null, new Class[] {}, null, '0'),
 
     /**
      * Used for some literal constants parsed by our SQL parser. Not a
      * valid value for actual user data. See {@link #DECIMAL} for decimal
      * type.
      */
-    NUMERIC   ((byte)2, 0, null, new Class[] {}, '0'),
+    NUMERIC   ((byte)2, 0, null, new Class[] {}, null, '0'),
 
     /**
      * 1-byte signed 2s-compliment byte.
      * Lowest value means NULL in the database.
      */
-    TINYINT   ((byte)3, 1, "tinyint", new Class[] {byte.class, Byte.class}, 't'),
+    TINYINT   ((byte)3, 1, "tinyint", new Class[] {byte.class, Byte.class}, byte[].class, 't'),
 
     /**
      * 2-byte signed 2s-compliment short.
      * Lowest value means NULL in the database.
      */
-    SMALLINT  ((byte)4, 2, "smallint", new Class[] {short.class, Short.class}, 's'),
+    SMALLINT  ((byte)4, 2, "smallint", new Class[] {short.class, Short.class}, short[].class, 's'),
 
     /**
      * 4-byte signed 2s-compliment integer.
      * Lowest value means NULL in the database.
      */
     INTEGER   ((byte)5, 4, "integer",
-               new Class[] {int.class, Integer.class, AtomicInteger.class}, 'i'),
+               new Class[] {int.class, Integer.class, AtomicInteger.class}, int[].class, 'i'),
 
     /**
      * 8-byte signed 2s-compliment long.
      * Lowest value means NULL in the database.
      */
     BIGINT    ((byte)6, 8, "bigint",
-               new Class[] {long.class, Long.class, AtomicLong.class}, 'b'),
+               new Class[] {long.class, Long.class, AtomicLong.class}, long[].class, 'b'),
 
     /**
      * 8-bytes in IEEE 754 "double format".
      * Some NaN values may represent NULL in the database (TBD).
      */
     FLOAT     ((byte)8, 8, "float",
-            new Class[] {double.class, Double.class, float.class, Float.class}, 'f'),
+            new Class[] {double.class, Double.class, float.class, Float.class}, double[].class, 'f'),
 
     /**
      * 8-byte long value representing microseconds after the epoch.
@@ -93,34 +93,37 @@ public enum VoltType {
      * time before the epoch. This covers roughly 4000BC to 8000AD.
      */
     TIMESTAMP ((byte)11, 8, "timestamp",
-            new Class[] {TimestampType.class, java.util.Date.class, java.sql.Date.class, java.sql.Timestamp.class}, 'p'),
+            new Class[] {TimestampType.class,
+                         java.util.Date.class,
+                         java.sql.Date.class,
+                         java.sql.Timestamp.class}, TimestampType[].class, 'p'),
 
     /**
      * UTF-8 string with up to 32K chars.
      * The database supports char arrays and varchars
      * but the API uses strings.
      */
-    STRING    ((byte)9, -1, "varchar", new Class[] {String.class}, 'v'),
+    STRING    ((byte)9, -1, "varchar", new Class[] {String.class}, String[].class, 'v'),
 
     /**
      * VoltTable type for Procedure parameters
      */
-    VOLTTABLE ((byte)21, -1, null, new Class[] {VoltTable.class}, '0'),
+    VOLTTABLE ((byte)21, -1, null, new Class[] {VoltTable.class}, VoltTable[].class, '0'),
 
     /**
      * Fixed precision=38, scale=12 storing sign and null-status in a preceding byte
      */
-    DECIMAL  ((byte)22, 16, "decimal", new Class[] {BigDecimal.class}, 'd'),
+    DECIMAL  ((byte)22, 16, "decimal", new Class[] {BigDecimal.class}, BigDecimal[].class, 'd'),
 
     /**
      * Fixed precision=38, scale=12 string representation of a decimal
      */
-    DECIMAL_STRING  ((byte)23, 9, "decimal", new Class[] {}, '0'),
+    DECIMAL_STRING  ((byte)23, 9, "decimal", new Class[] {}, null, '0'),
 
     /**
      * Array of bytes of variable length
      */
-    VARBINARY    ((byte)25, -1, "varbinary", new Class[] { byte[].class, Byte[].class }, 'l');
+    VARBINARY    ((byte)25, -1, "varbinary", new Class[] { byte[].class, Byte[].class }, byte[][].class, 'l');
 
     /**
      * Size in bytes of the maximum length for a VoltDB field value, presumably a
@@ -140,15 +143,17 @@ public enum VoltType {
     private final int m_lengthInBytes;
     private final String m_sqlString;
     private final Class<?>[] m_classes;
+    private final Class<?> m_vectorClass;
     private final char m_signatureChar;
 
-    private VoltType(byte val, int lengthInBytes,
-            String sqlString, Class<?>[] classes,
-            char signatureChar) {
+    private VoltType(byte val, int lengthInBytes, String sqlString,
+                     Class<?>[] classes, Class<?> vectorClass, char signatureChar)
+    {
         m_val = val;
         m_lengthInBytes = lengthInBytes;
         m_sqlString = sqlString;
         m_classes = classes;
+        m_vectorClass = vectorClass;
         m_signatureChar = signatureChar;
     }
 
@@ -195,6 +200,20 @@ public enum VoltType {
             throw new RuntimeException("Unsupported type " + this);
         }
         return m_classes[0];
+    }
+
+    /**
+     * Return the java class that is matched to a given <tt>VoltType</tt>.
+     * @return A java class object.
+     * @throws RuntimeException if a type doesn't have an associated class,
+     * such as {@link #INVALID}.
+     * @see #typeFromClass
+     */
+    public Class<?> vectorClassFromType() {
+        if (m_vectorClass == null) {
+            throw new RuntimeException("Unsupported type " + this);
+        }
+        return m_vectorClass;
     }
 
     /**
@@ -499,6 +518,35 @@ public enum VoltType {
         }
     }
 
+    public boolean isMaxValuePaddable() {
+        switch (this) {
+        case TINYINT:
+        case SMALLINT:
+        case INTEGER:
+        case BIGINT:
+        case TIMESTAMP:
+        case FLOAT:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    public static Object getPaddedMaxTypeValue(VoltType type) {
+        switch (type) {
+        case TINYINT: return new Byte(Byte.MAX_VALUE);
+        case SMALLINT: return new Short(Short.MAX_VALUE);
+        case INTEGER: return new Integer(Integer.MAX_VALUE);
+        case BIGINT:
+        case TIMESTAMP:
+            return new Long(Long.MAX_VALUE);
+        case FLOAT:
+            return new Float(Float.MAX_VALUE);
+        default:
+            return null;
+        }
+    }
+
     public boolean isNumber() {
         switch (this) {
             case TINYINT:
@@ -506,6 +554,22 @@ public enum VoltType {
             case INTEGER:
             case BIGINT:
             case FLOAT:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    // Used by TheHashinator.getPartitionForParameter() to determine if the
+    // type of the partition parameter is one that we can coerce from a string
+    // value.  isInteger includes TIMESTAMP, which is bad, and isNumber
+    // includes FLOAT, which is also bad, hence the creation of this method.
+    public boolean isPartitionableNumber() {
+        switch (this) {
+            case TINYINT:
+            case SMALLINT:
+            case INTEGER:
+            case BIGINT:
                 return true;
             default:
                 return false;

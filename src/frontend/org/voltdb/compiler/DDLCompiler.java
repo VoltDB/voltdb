@@ -51,10 +51,12 @@ import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
+import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
+import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
@@ -222,6 +224,32 @@ public class DDLCompiler {
             );
 
     /**
+     * IMPORT CLASS with pattern for matching classfiles in
+     * the current classpath.
+     */
+    static final Pattern importClassPattern = Pattern.compile(
+            "(?i)" +                                // (ignore case)
+            "\\A" +                                 // (start statement)
+            "IMPORT\\s+CLASS\\s+" +                 // IMPORT CLASS
+            "([^;]+)" +                             // (1) class matching pattern
+            ";\\z"                                  // (end statement)
+            );
+
+    /**
+     * Check that the classname pattern from import class is valid.
+     */
+    static final Pattern validClassMatcherWildcardPattern = Pattern.compile(
+            "\\A" +                                 // (start statement)
+            "[\\p{L}\\*]+" +                        // (first part starts with char or *)
+            "[\\p{L}\\d\\*]*" +                     // (followed by any number of word chars or *)
+            "(\\." +                                // (optionally repeat with . separators)
+            "[\\p{L}\\*]+" +                        //  (first part starts with char or *)
+            "[\\p{L}\\d\\*]*" +                     //  (followed by any number of word chars or *)
+            ")*" +                                  // (end repeat)
+            "\\z"                                   // (end statement)
+            );
+
+    /**
      * Regex to parse the CREATE ROLE statement with optional WITH clause.
      * Leave the WITH clause argument as a single group because regexes
      * aren't capable of producing a variable number of groups.
@@ -236,6 +264,21 @@ public class DDLCompiler {
                 "(\\w+(?:\\s*,\\s*\\w+)*)" +    //   (2) <comma-separated argument string>
             ")?" +                              // (end optional WITH clause block)
             ";\\z"                              // (end statement)
+            );
+
+    /**
+     * Regex to match CREATE TABLE or CREATE VIEW statements.
+     * Unlike the other matchers, this is just designed to pull out the
+     * name of the table or view, not the whole statement.
+     * It's used to preserve as-entered schema for each table/view
+     * for the catalog report generator for the moment.
+     * Capture group (1) is ignored, but (2) is used.
+     */
+    static final Pattern createTablePattern = Pattern.compile(
+            "(?i)" +                            // (ignore case)
+            "\\A" +                             // (start statement)
+            "CREATE\\s+(TABLE|VIEW)\\s+" +      // (1) CREATE TABLE
+            "([\\w.$]+)"                        // (2) <table name>
             );
 
     /**
@@ -301,7 +344,8 @@ public class DDLCompiler {
      * </pre>
      */
     static final Pattern voltdbStatementPrefixPattern = Pattern.compile(
-            "(?i)((?<=\\ACREATE\\s{0,1024})(?:PROCEDURE|ROLE)|\\APARTITION|\\AREPLICATE|\\AEXPORT)\\s"
+            "(?i)((?<=\\ACREATE\\s{0,1024})" +
+            "(?:PROCEDURE|ROLE)|\\APARTITION|\\AREPLICATE|\\AEXPORT|\\AIMPORT)\\s"
             );
 
     static final String TABLE = "TABLE";
@@ -327,12 +371,21 @@ public class DDLCompiler {
     String m_fullDDL = "";
     int m_currLineNo = 1;
 
-    /// Partition descriptors parsed from DDL PARTITION or REPLICATE statements.
+    // Partition descriptors parsed from DDL PARTITION or REPLICATE statements.
     final VoltDDLElementTracker m_tracker;
+
+    // used to match imported class with those in the classpath
+    ClassMatcher m_classMatcher = new ClassMatcher();
 
     HashMap<String, Column> columnMap = new HashMap<String, Column>();
     HashMap<String, Index> indexMap = new HashMap<String, Index>();
     HashMap<Table, String> matViewMap = new HashMap<Table, String>();
+
+    // Track the original CREATE TABLE statement for each table
+    // Currently used for catalog report generation.
+    // There's specifically no cleanup here because I don't think
+    // any is needed.
+    Map<String, String> m_tableNameToDDL = new TreeMap<String, String>();
 
     private class DDLStatement {
         public DDLStatement() {
@@ -393,6 +446,16 @@ public class DDLCompiler {
             }
             if (!processed) {
                 try {
+                    // Check for CREATE TABLE or CREATE VIEW.
+                    // We sometimes choke at parsing statements with newlines, so
+                    // check against a newline free version of the stmt.
+                    String oneLinerStmt = stmt.statement.replace("\n", " ");
+                    Matcher tableMatcher = createTablePattern.matcher(oneLinerStmt);
+                    if (tableMatcher.find()) {
+                        String tableName = tableMatcher.group(2);
+                        m_tableNameToDDL.put(tableName.toUpperCase(), stmt.statement);
+                    }
+
                     // kind of ugly.  We hex-encode each statement so we can
                     // avoid embedded newlines so we can delimit statements
                     // with newline.
@@ -411,6 +474,11 @@ public class DDLCompiler {
         } catch (IOException e) {
             throw m_compiler.new VoltCompilerException("Error closing schema file");
         }
+
+        // process extra classes
+        m_tracker.addExtraClasses(m_classMatcher.getMatchedClassList());
+        // possibly save some memory
+        m_classMatcher.clear();
     }
 
     /**
@@ -588,6 +656,23 @@ public class DDLCompiler {
             return true;
         }
 
+        // match IMPORT CLASS statements
+        statementMatcher = importClassPattern.matcher(statement);
+        if (statementMatcher.matches()) {
+            String classNameStr = statementMatcher.group(1);
+
+            // check that the match pattern is a valid match pattern
+            Matcher wildcardMatcher = validClassMatcherWildcardPattern.matcher(classNameStr);
+            if (!wildcardMatcher.matches()) {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "Invalid IMPORT CLASS match expression: '%s'",
+                        classNameStr)); // remove trailing semicolon
+            }
+
+            m_classMatcher.addPattern(classNameStr);
+            return true;
+        }
+
         // matches if it is CREATE ROLE [WITH <permission> [, <permission> ...]]
         // group 1 is role name
         // group 2 is comma-separated permission list or null if there is no WITH clause
@@ -707,7 +792,7 @@ public class DDLCompiler {
         }
 
         // output the xml catalog to disk
-        BuildDirectoryUtils.writeFile("schema-xml", "hsql-catalog-output.xml", xmlCatalog.toString());
+        BuildDirectoryUtils.writeFile("schema-xml", "hsql-catalog-output.xml", xmlCatalog.toString(), true);
 
         // build the local catalog from the xml catalog
         fillCatalogFromXML(db, xmlCatalog);
@@ -940,7 +1025,13 @@ public class DDLCompiler {
 
         String name = node.attributes.get("name");
 
+        // create a table node in the catalog
         Table table = db.getTables().add(name);
+
+        // add the original DDL to the table (or null if it's not there)
+        TableAnnotation annotation = new TableAnnotation();
+        table.setAnnotation(annotation);
+        annotation.ddl = m_tableNameToDDL.get(name.toUpperCase());
 
         // handle the case where this is a materialized view
         String query = node.attributes.get("query");
@@ -981,7 +1072,7 @@ public class DDLCompiler {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
                     if (indexName.startsWith("SYS_IDX_SYS_") == false) {
-                        addIndexToCatalog(table, indexNode, indexReplacementMap);
+                        addIndexToCatalog(db, table, indexNode, indexReplacementMap);
                     }
                 }
 
@@ -990,7 +1081,7 @@ public class DDLCompiler {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
                     if (indexName.startsWith("SYS_IDX_SYS_") == true) {
-                        addIndexToCatalog(table, indexNode, indexReplacementMap);
+                        addIndexToCatalog(db, table, indexNode, indexReplacementMap);
                     }
                 }
             }
@@ -1059,6 +1150,9 @@ public class DDLCompiler {
             defaultvalue = null;
         if (defaulttype != null) {
             // fyi: Historically, VoltType class initialization errors get reported on this line (?).
+            if (defaultvalue == null) {
+                defaulttype = "NULL";
+            }
             defaulttype = Integer.toString(VoltType.typeFromString(defaulttype).getValue());
         }
 
@@ -1071,14 +1165,6 @@ public class DDLCompiler {
         // fyi: Historically, VoltType class initialization errors get reported on this line (?).
         VoltType type = VoltType.typeFromString(typename);
         columnTypes.add(type);
-        int size = Integer.parseInt(sizeString);
-        // check valid length if varchar
-        if (type == VoltType.STRING) {
-            if ((size == 0) || (size > VoltType.MAX_VALUE_LENGTH)) {
-                String msg = "VARCHAR Column " + name + " in table " + table.getTypeName() + " has unsupported length " + sizeString;
-                throw m_compiler.new VoltCompilerException(msg);
-            }
-        }
         if (defaultvalue != null && (type == VoltType.DECIMAL || type == VoltType.NUMERIC))
         {
             // Until we support deserializing scientific notation in the EE, we'll
@@ -1094,6 +1180,15 @@ public class DDLCompiler {
 
         column.setType(type.getValue());
         column.setNullable(nullable.toLowerCase().startsWith("t") ? true : false);
+        int size = type.getMaxLengthInBytes();
+        // Require a valid length if variable length is supported for a type
+        if (type == VoltType.STRING || type == VoltType.VARBINARY) {
+            size = Integer.parseInt(sizeString);
+            if ((size == 0) || (size > VoltType.MAX_VALUE_LENGTH)) {
+                String msg = type.toSQLString() + " column " + name + " in table " + table.getTypeName() + " has unsupported length " + sizeString;
+                throw m_compiler.new VoltCompilerException(msg);
+            }
+        }
         column.setSize(size);
 
         column.setDefaultvalue(defaultvalue);
@@ -1155,25 +1250,25 @@ public class DDLCompiler {
         return Arrays.equals(idx1baseTableOrder, idx2baseTableOrder);
     }
 
-    void addIndexToCatalog(Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
+    void addIndexToCatalog(Database db, Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
             throws VoltCompilerException
     {
         assert node.name.equals("index");
 
         String name = node.attributes.get("name");
         boolean unique = Boolean.parseBoolean(node.attributes.get("unique"));
+        AbstractParsedStmt dummy = new ParsedSelectStmt(null, db);
+        dummy.setTable(table);
 
         // "parse" the expression trees for an expression-based index (vs. a simple column value index)
-        AbstractExpression[] exprs = null;
+        List<AbstractExpression> exprs = null;
         for (VoltXMLElement subNode : node.children) {
             if (subNode.name.equals("exprs")) {
-                exprs = new AbstractExpression[subNode.children.size()];
-                int j = 0;
+                exprs = new ArrayList<AbstractExpression>();
                 for (VoltXMLElement exprNode : subNode.children) {
-                    exprs[j] = AbstractParsedStmt.parseExpressionTree(null, exprNode);
-                    exprs[j].resolveForTable(table);
-                    exprs[j].finalizeValueTypes();
-                    ++j;
+                    exprs.add( dummy.parseExpressionTree(exprNode) );
+                    exprs.get(exprs.size()-1).resolveForTable(table);
+                    exprs.get(exprs.size()-1).finalizeValueTypes();
                 }
             }
         }
@@ -1310,7 +1405,7 @@ public class DDLCompiler {
         indexMap.put(name, index);
     }
 
-    private static String convertToJSONArray(AbstractExpression[] exprs) throws JSONException {
+    private static String convertToJSONArray(List<AbstractExpression> exprs) throws JSONException {
         JSONStringer stringer = new JSONStringer();
         stringer.array();
         for (AbstractExpression abstractExpression : exprs) {
@@ -1419,14 +1514,26 @@ public class DDLCompiler {
             }
             assert(stmt != null);
 
+            String viewName = destTable.getTypeName();
             // throw an error if the view isn't within voltdb's limited worldview
-            checkViewMeetsSpec(destTable.getTypeName(), stmt);
+            checkViewMeetsSpec(viewName, stmt);
+
+            // Allow only non-unique indexes other than the primary key index.
+            // The primary key index is yet to be defined (below).
+            for (Index destIndex : destTable.getIndexes()) {
+                if (destIndex.getUnique()) {
+                    String msg = "A UNIQUE index is not allowed on a materialized view. " +
+                            "Remove the qualifier \"UNIQUE\" from the index " + destIndex.getTypeName() +
+                            "defined on the materialized view \"" + viewName + "\".";
+                    throw m_compiler.new VoltCompilerException(msg);
+                }
+            }
 
             // create the materializedviewinfo catalog node for the source table
             Table srcTable = stmt.tableList.get(0);
-            MaterializedViewInfo matviewinfo = srcTable.getViews().add(destTable.getTypeName());
+            MaterializedViewInfo matviewinfo = srcTable.getViews().add(viewName);
             matviewinfo.setDest(destTable);
-            AbstractExpression where = stmt.getCombinedFilterExpression();
+            AbstractExpression where = stmt.getSingleTableFilterExpression();
             if (where != null) {
                 String hex = Encoder.hexEncode(where.toJSONString());
                 matviewinfo.setPredicate(hex);
@@ -1437,24 +1544,52 @@ public class DDLCompiler {
 
             List<Column> srcColumnArray = CatalogUtil.getSortedCatalogItems(srcTable.getColumns(), "index");
             List<Column> destColumnArray = CatalogUtil.getSortedCatalogItems(destTable.getColumns(), "index");
+            List<AbstractExpression> groupbyExprs = null;
 
-            // add the group by columns from the src table
-            for (int i = 0; i < stmt.groupByColumns.size(); i++) {
-                ParsedSelectStmt.ParsedColInfo gbcol = stmt.groupByColumns.get(i);
-                Column srcCol = srcColumnArray.get(gbcol.index);
-                ColumnRef cref = matviewinfo.getGroupbycols().add(srcCol.getTypeName());
-                // groupByColumns is iterating in order of groups. Store that grouping order
-                // in the column ref index. When the catalog is serialized, it will, naturally,
-                // scramble this order like a two year playing dominos, presenting the data
-                // in a meaningless sequence.
-                cref.setIndex(i);           // the column offset in the view's grouping order
-                cref.setColumn(srcCol);     // the source column from the base (non-view) table
+            if (stmt.hasComplexGroupby()) {
+                groupbyExprs = new ArrayList<AbstractExpression>();
+                for (ParsedColInfo col: stmt.groupByColumns) {
+                    groupbyExprs.add(col.expression);
+                }
+                // Parse group by expressions to json string
+                String groupbyExprsJson = null;
+                try {
+                    groupbyExprsJson = convertToJSONArray(groupbyExprs);
+                } catch (JSONException e) {
+                    throw m_compiler.new VoltCompilerException ("Unexpected error serializing non-column " +
+                            "expressions for group by expressions: " + e.toString());
+                }
+                matviewinfo.setGroupbyexpressionsjson(groupbyExprsJson);
+
+            } else {
+                // add the group by columns from the src table
+                for (int i = 0; i < stmt.groupByColumns.size(); i++) {
+                    ParsedSelectStmt.ParsedColInfo gbcol = stmt.groupByColumns.get(i);
+                    Column srcCol = srcColumnArray.get(gbcol.index);
+                    ColumnRef cref = matviewinfo.getGroupbycols().add(srcCol.getTypeName());
+                    // groupByColumns is iterating in order of groups. Store that grouping order
+                    // in the column ref index. When the catalog is serialized, it will, naturally,
+                    // scramble this order like a two year playing dominos, presenting the data
+                    // in a meaningless sequence.
+                    cref.setIndex(i);           // the column offset in the view's grouping order
+                    cref.setColumn(srcCol);     // the source column from the base (non-view) table
+                }
+
+                // parse out the group by columns into the dest table
+                for (int i = 0; i < stmt.groupByColumns.size(); i++) {
+                    ParsedSelectStmt.ParsedColInfo col = stmt.displayColumns.get(i);
+                    Column destColumn = destColumnArray.get(i);
+                    processMaterializedViewColumn(matviewinfo, srcTable, destColumn,
+                            ExpressionType.VALUE_TUPLE, (TupleValueExpression)col.expression);
+                }
             }
 
+            // Set up COUNT(*) column
             ParsedSelectStmt.ParsedColInfo countCol = stmt.displayColumns.get(stmt.groupByColumns.size());
             assert(countCol.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR);
             assert(countCol.expression.getLeft() == null);
-            processMaterializedViewColumn(matviewinfo, srcTable, destTable, destColumnArray.get(stmt.groupByColumns.size()),
+            processMaterializedViewColumn(matviewinfo, srcTable,
+                    destColumnArray.get(stmt.groupByColumns.size()),
                     ExpressionType.AGGREGATE_COUNT_STAR, null);
 
             // create an index and constraint for the table
@@ -1472,13 +1607,28 @@ public class DDLCompiler {
             pkConstraint.setType(ConstraintType.PRIMARY_KEY.getValue());
             pkConstraint.setIndex(pkIndex);
 
-            // parse out the group by columns into the dest table
-            for (int i = 0; i < stmt.groupByColumns.size(); i++) {
+            // prepare info for aggregation columns.
+            List<AbstractExpression> aggregationExprs = new ArrayList<AbstractExpression>();
+            boolean hasAggregationExprs = false;
+            for (int i = stmt.groupByColumns.size() + 1; i < stmt.displayColumns.size(); i++) {
                 ParsedSelectStmt.ParsedColInfo col = stmt.displayColumns.get(i);
-                Column destColumn = destColumnArray.get(i);
+                AbstractExpression aggExpr = col.expression.getLeft();
+                if (aggExpr.getExpressionType() != ExpressionType.VALUE_TUPLE) {
+                    hasAggregationExprs = true;
+                }
+                aggregationExprs.add(aggExpr);
+            }
 
-                processMaterializedViewColumn(matviewinfo, srcTable, destTable, destColumn,
-                        ExpressionType.VALUE_TUPLE, (TupleValueExpression)col.expression);
+            // set Aggregation Expressions.
+            if (hasAggregationExprs) {
+                String aggregationExprsJson = null;
+                try {
+                    aggregationExprsJson = convertToJSONArray(aggregationExprs);
+                } catch (JSONException e) {
+                    throw m_compiler.new VoltCompilerException ("Unexpected error serializing non-column " +
+                            "expressions for aggregation expressions: " + e.toString());
+                }
+                matviewinfo.setAggregationexpressionsjson(aggregationExprsJson);
             }
 
             // parse out the aggregation columns into the dest table
@@ -1487,9 +1637,12 @@ public class DDLCompiler {
                 Column destColumn = destColumnArray.get(i);
 
                 AbstractExpression colExpr = col.expression.getLeft();
-                assert(colExpr.getExpressionType() == ExpressionType.VALUE_TUPLE);
-                processMaterializedViewColumn(matviewinfo, srcTable, destTable, destColumn,
-                        col.expression.getExpressionType(), (TupleValueExpression)colExpr);
+                TupleValueExpression tve = null;
+                if (colExpr.getExpressionType() == ExpressionType.VALUE_TUPLE) {
+                    tve = (TupleValueExpression)colExpr;
+                }
+                processMaterializedViewColumn(matviewinfo, srcTable, destColumn,
+                        col.expression.getExpressionType(), tve);
 
                 // Correctly set the type of the column so that it's consistent.
                 // Otherwise HSQLDB might promote types differently than Volt.
@@ -1523,19 +1676,20 @@ public class DDLCompiler {
             throw m_compiler.new VoltCompilerException(msg);
         }
 
+        if (stmt.hasComplexAgg()) {
+            msg += "contains an expression involving an aggregate function. " +
+                    "Expressions with aggregate functions are not currently supported in views.";
+            throw m_compiler.new VoltCompilerException(msg);
+        }
+
+
         int i;
         for (i = 0; i < groupColCount; i++) {
             ParsedSelectStmt.ParsedColInfo gbcol = stmt.groupByColumns.get(i);
             ParsedSelectStmt.ParsedColInfo outcol = stmt.displayColumns.get(i);
 
-            if (outcol.expression.getExpressionType() != ExpressionType.VALUE_TUPLE) {
-                msg += "must have column at index " + String.valueOf(i) + " be " + gbcol.alias;
-                throw m_compiler.new VoltCompilerException(msg);
-            }
-
-            TupleValueExpression expr = (TupleValueExpression) outcol.expression;
-            if (expr.getColumnIndex() != gbcol.index) {
-                msg += "must have column at index " + String.valueOf(i) + " be " + gbcol.alias;
+            if (!outcol.expression.equals(gbcol.expression)) {
+                msg += "must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.";
                 throw m_compiler.new VoltCompilerException(msg);
             }
         }
@@ -1553,14 +1707,10 @@ public class DDLCompiler {
                 msg += "must have non-group by columns aggregated by sum or count.";
                 throw m_compiler.new VoltCompilerException(msg);
             }
-            if (outcol.expression.getLeft().getExpressionType() != ExpressionType.VALUE_TUPLE) {
-                msg += "must have non-group by columns use only one level of aggregation.";
-                throw m_compiler.new VoltCompilerException(msg);
-            }
         }
     }
 
-    void processMaterializedViewColumn(MaterializedViewInfo info, Table srcTable, Table destTable,
+    void processMaterializedViewColumn(MaterializedViewInfo info, Table srcTable,
             Column destColumn, ExpressionType type, TupleValueExpression colExpr)
             throws VoltCompiler.VoltCompilerException {
 

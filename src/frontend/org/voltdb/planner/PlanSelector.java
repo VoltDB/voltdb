@@ -28,6 +28,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.ScalarValueHints;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
@@ -69,7 +70,7 @@ public class PlanSelector implements Cloneable {
     final DeterminismMode m_detMode;
     /** Parameters to drive the output */
     boolean m_quietPlanner;
-    boolean m_fullDebug = System.getProperties().contains("compilerdebug");
+    boolean m_fullDebug = VoltCompiler.DEBUG_MODE;
 
     /**
      * Initialize plan processor.
@@ -89,7 +90,7 @@ public class PlanSelector implements Cloneable {
     public PlanSelector(Cluster cluster, Database db, DatabaseEstimates estimates,
             String stmtName, String procName, String sql,
             AbstractCostModel costModel, ScalarValueHints[] paramHints,
-            DeterminismMode detMode, boolean quietPlanner, boolean fullDebug)
+            DeterminismMode detMode, boolean quietPlanner)
     {
         m_cluster = cluster;
         m_db = db;
@@ -101,7 +102,6 @@ public class PlanSelector implements Cloneable {
         m_paramHints = paramHints;
         m_detMode = detMode;
         m_quietPlanner = quietPlanner;
-        m_fullDebug = fullDebug;
     }
 
     /**
@@ -111,7 +111,7 @@ public class PlanSelector implements Cloneable {
     @Override
     public Object clone() {
         return new PlanSelector(m_cluster, m_db, m_estimates, m_stmtName, m_procName, m_sql,
-                m_costModel, m_paramHints, m_detMode, m_quietPlanner, m_fullDebug);
+                m_costModel, m_paramHints, m_detMode, m_quietPlanner);
     }
 
     /**
@@ -119,8 +119,9 @@ public class PlanSelector implements Cloneable {
      */
     public void outputParsedStatement(AbstractParsedStmt parsedStmt) {
         // output a description of the parsed stmt
-        if (!m_quietPlanner && m_fullDebug) {
-            BuildDirectoryUtils.writeFile("statement-parsed", m_procName + "_" + m_stmtName + ".txt", parsedStmt.toString());
+        if (!m_quietPlanner) {
+            BuildDirectoryUtils.writeFile("statement-parsed", m_procName + "_" + m_stmtName + ".txt",
+                    parsedStmt.toString(), true);
         }
     }
 
@@ -128,9 +129,10 @@ public class PlanSelector implements Cloneable {
      * @param xmlSQL
      */
     public void outputCompiledStatement(VoltXMLElement xmlSQL) {
-        if (!m_quietPlanner && m_fullDebug) {
+        if (!m_quietPlanner) {
             // output the xml from hsql to disk for debugging
-            BuildDirectoryUtils.writeFile("statement-hsql-xml", m_procName + "_" + m_stmtName + ".xml", xmlSQL.toString());
+            BuildDirectoryUtils.writeFile("statement-hsql-xml", m_procName + "_" + m_stmtName + ".xml",
+                    xmlSQL.toString(), true);
         }
     }
 
@@ -138,7 +140,8 @@ public class PlanSelector implements Cloneable {
     public void outputParameterizedCompiledStatement(VoltXMLElement parameterizedXmlSQL) {
         if (!m_quietPlanner && m_fullDebug) {
             // output the xml from hsql to disk for debugging
-            BuildDirectoryUtils.writeFile("statement-hsql-xml", m_procName + "_" + m_stmtName + "-parameterized.xml", parameterizedXmlSQL.toString());
+            BuildDirectoryUtils.writeFile("statement-hsql-xml", m_procName + "_" + m_stmtName + "-parameterized.xml",
+                    parameterizedXmlSQL.toString(), true);
         }
     }
 
@@ -155,9 +158,6 @@ public class PlanSelector implements Cloneable {
 
             // add in the sql to the plan
             plan.sql = m_sql;
-
-            // this plan is final, resolve all the column index references
-            plan.rootPlanGraph.resolveColumnIndexes();
 
             // compute resource usage using the single stats collector
             m_stats = new PlanStatistics();
@@ -191,7 +191,7 @@ public class PlanSelector implements Cloneable {
 
         // find out where debugging is going
         String prefix = BuildDirectoryUtils.getBuildDirectoryPath() +
-                "/" + BuildDirectoryUtils.rootPath + "statement-all-plans/" +
+                "/" + BuildDirectoryUtils.debugRootPrefix + "statement-all-plans/" +
                 m_procName + "_" + m_stmtName + "/";
         String winnerFilename, winnerFilenameRenamed;
 
@@ -215,7 +215,8 @@ public class PlanSelector implements Cloneable {
 
         if (m_fullDebug) {
             // output the plan statistics to disk for debugging
-            BuildDirectoryUtils.writeFile("statement-stats", m_procName + "_" + m_stmtName + ".txt", m_stats.toString());
+            BuildDirectoryUtils.writeFile("statement-stats", m_procName + "_" + m_stmtName + ".txt",
+                    m_stats.toString(), true);
         }
     }
 
@@ -243,7 +244,8 @@ public class PlanSelector implements Cloneable {
     private void outputExplainedPlan(CompiledPlan plan, String filename) {
         BuildDirectoryUtils.writeFile("statement-all-plans/" + m_procName + "_" + m_stmtName,
                                       filename + ".txt",
-                                      plan.explainedPlan);
+                                      plan.explainedPlan,
+                                      true);
     }
 
     /**
@@ -289,12 +291,14 @@ public class PlanSelector implements Cloneable {
         // write json to disk
         BuildDirectoryUtils.writeFile("statement-all-plans/" + m_procName + "_" + m_stmtName,
                                       filename + "-json.txt",
-                                      json);
+                                      json,
+                                      true);
 
         // create a graph friendly version
         BuildDirectoryUtils.writeFile("statement-all-plans/" + m_procName + "_" + m_stmtName,
                                       filename + ".dot",
-                                      nodeList.toDOTString("name"));
+                                      nodeList.toDOTString("name"),
+                                      true);
         return null;
     }
 
