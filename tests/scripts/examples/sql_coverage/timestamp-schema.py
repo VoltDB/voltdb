@@ -23,7 +23,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 {
-    "P1": {
+    "P_TIMESTAMP": {
         "columns": (("PAST", FastSerializer.VOLTTYPE_TIMESTAMP),
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("FUTURE", FastSerializer.VOLTTYPE_TIMESTAMP),
@@ -31,7 +31,7 @@
         "partitions": (),
         "indexes": ("ID")
         },
-    "R1": {
+    "R_TIMESTAMP": {
         "columns": (("PAST", FastSerializer.VOLTTYPE_TIMESTAMP),
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("FUTURE", FastSerializer.VOLTTYPE_TIMESTAMP),
