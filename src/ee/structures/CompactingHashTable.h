@@ -607,7 +607,7 @@ namespace voltdb {
 
     template<class K, class T, class H, class EK, class ET>
     void CompactingHashTable<K, T, H, EK, ET>::resize(int newSizeIndex) {
-        //std::cout << "SIZING BUFFER" << std::endl;
+        /**/std::cout << "DEBUG SIZING BUFFER" << newSizeIndex << std::endl;
         //std::cout.flush();
 
         // create new double size buffer

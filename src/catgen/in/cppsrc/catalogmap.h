@@ -24,6 +24,7 @@
 
 #include <map>
 #include <string>
+#include <boost/algorithm/string.hpp> // for boost::to_lower(std::string)
 
 namespace catalog {
 
@@ -102,9 +103,11 @@ CatalogMap<T>::CatalogMap(Catalog *globalCatalog, CatalogType *parent, const std
 
 template <class T>
 T * CatalogMap<T>::add(const std::string &name) {
-    std::string newPath = m_path + "[" + name + "]";
-    T *retval = new T(m_catalog, m_parent, newPath, name);
-    m_items[name] = retval;
+    std::string childPath = m_path + "[" + name + "]";
+    T *retval = new T(m_catalog, m_parent, childPath, name);
+    std::string mapKey = name;
+    boost::to_lower(mapKey);
+    m_items[mapKey] = retval;
 
     // assign all the children of this map a relative index
     int index = 1;
@@ -117,8 +120,9 @@ T * CatalogMap<T>::add(const std::string &name) {
 
 template <class T>
 bool CatalogMap<T>::remove(const std::string &name) {
-    typename std::map<std::string, T*>::iterator iter;
-    iter = m_items.find(name);
+    std::string mapKey = name;
+    boost::to_lower(mapKey);
+    typename std::map<std::string, T*>::iterator iter = m_items.find(mapKey);
     if (iter == m_items.end()) {
         return false;
     }
@@ -136,7 +140,10 @@ bool CatalogMap<T>::remove(const std::string &name) {
 
 template <class T>
 T * CatalogMap<T>::get(const std::string &name) const {
-    return (m_items.find(name) == m_items.end() ? NULL : m_items.find(name)->second);
+    std::string mapKey = name;
+    boost::to_lower(mapKey);
+    const typename std::map<std::string, T*>::const_iterator found = m_items.find(mapKey);
+    return (found == m_items.end()) ? NULL : found->second;
 }
 
 template <class T>
