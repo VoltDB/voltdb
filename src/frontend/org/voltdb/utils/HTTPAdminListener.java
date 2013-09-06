@@ -226,39 +226,6 @@ public class HTTPAdminListener {
      */
     void handleMemoryPage(Request baseRequest, HttpServletResponse response) {
         try {
-            // handle the basic info page below this
-            SiteTracker st = VoltDB.instance().getSiteTrackerForSnapshot();
-
-            // get the cluster info
-            String clusterinfo = st.getAllHosts().size() + " hosts ";
-            clusterinfo += " with " + st.getAllSites().size() + " sites ";
-            clusterinfo += " (" + st.getAllSites().size() / st.getAllHosts().size();
-            clusterinfo += " per host)";
-
-            // get the start time
-            long t = SystemStatsCollector.getStartTime();
-            Date date = new Date(t);
-            long duration = System.currentTimeMillis() - t;
-            long minutes = duration / 60000;
-            long hours = minutes / 60; minutes -= hours * 60;
-            long days = hours / 24; hours -= days * 24;
-            String starttime = String.format("%s (%dd %dh %dm)",
-                    date.toString(), days, hours, minutes);
-
-            // get the hostname, but fail gracefully
-            String hostname = "&lt;unknownhost&gt;";
-            try {
-                InetAddress addr = InetAddress.getLocalHost();
-                hostname = addr.getHostName();
-            }
-            catch (Exception e) {
-                try {
-                    InetAddress addr = InetAddress.getLocalHost();
-                    hostname = addr.getHostAddress();
-                }
-                catch (Exception e2) {}
-            }
-
             // get memory usage
             SystemStatsCollector.Datum d = SystemStatsCollector.getRecentSample();
             double totalmemory = SystemStatsCollector.memorysize;
@@ -268,20 +235,9 @@ public class HTTPAdminListener {
             double javaunused = SystemStatsCollector.javamaxheapmem - d.javatotalheapmem;
             double risk = (d.rss + javaunused) / (SystemStatsCollector.memorysize * 1024 * 1024);
 
-            // get csvfilename
-            String csvFilename = String.format("memstats-%s-%s.csv", hostname, new Date(System.currentTimeMillis()).toString());
-
-            // just print voltdb version for now
             Map<String,String> params = new HashMap<String,String>();
 
-            params.put("hostname", hostname);
-            params.put("version", VoltDB.instance().getVersionString());
-            params.put("buildstring", VoltDB.instance().getBuildString());
-            params.put("cluster", clusterinfo);
-            params.put("starttime", starttime);
-            params.put("csvfilename", csvFilename);
-
-            params.put("2mincharturl", SystemStatsCollector.getGoogleChartURL(2, 320, 240, "-2min"));
+            params.put("2mincharturl", SystemStatsCollector.getGoogleChartURL(2, 640, 240, "-2min"));
             params.put("30mincharturl", SystemStatsCollector.getGoogleChartURL(30, 640, 240, "-30min"));
             params.put("24hrcharturl", SystemStatsCollector.getGoogleChartURL(1440, 640, 240, "-24hrs"));
 
