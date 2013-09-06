@@ -80,30 +80,83 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
 
         client.callProcedure("R1.insert", 1,  10,  -1 );
         compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, 1, 10}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_add", new long [][]{{-1, 1, 11}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_multiply", new long [][]{{-1, 1, 10}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_combine", new long [][]{{1, 1, 11}}, orderbyStmt);
+
 
         client.callProcedure("R1.insert", 2,  20,  1 );
         compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, 2, 30}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_add",
+                new long [][]{{-1, 1, 11},{1, 1, 22}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_multiply",
+                new long [][]{{-1, 1, 10}, {1, 1, 40}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_combine", new long [][]{{1, 2, 33}}, orderbyStmt);
 
         client.callProcedure("R1.insert", 4,  40,  2 );
         compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, 2, 30}, {2, 1, 40}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_add",
+                new long [][]{{-1, 1, 11},{1, 1, 22}, {2, 1, 44}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_multiply",
+                new long [][]{{-1, 1, 10},{1, 1, 40}, {2, 1, 160}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_combine",
+                new long [][]{{1, 2, 33}, {2, 1, 44}}, orderbyStmt);
 
         client.callProcedure("R1.insert", 3,  30,  1 );
         compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, 3, 60}, {2, 1, 40}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_add",
+                new long [][]{{-1, 1, 11},{1, 2, 55}, {2, 1, 44}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_multiply",
+                new long [][]{{-1, 1, 10},{1, 2, 130}, {2, 1, 160}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_combine",
+                new long [][]{{1, 3, 66}, {2, 1, 44}}, orderbyStmt);
 
         client.callProcedure("R1.insert", 5,  50,  2 );
         compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, 3, 60}, {2, 2, 90}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_add",
+                new long [][]{{-1, 1, 11},{1, 2, 55}, {2, 2, 99}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_multiply",
+                new long [][]{{-1, 1, 10},{1, 2, 130}, {2, 2, 410}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_combine",
+                new long [][]{{1, 3, 66}, {2, 2, 99}}, orderbyStmt);
 
+        // Start to delete
         client.callProcedure("R1.delete", 5);
         compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, 3, 60}, {2, 1, 40}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_add",
+                new long [][]{{-1, 1, 11},{1, 2, 55}, {2, 1, 44}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_multiply",
+                new long [][]{{-1, 1, 10},{1, 2, 130}, {2, 1, 160}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_combine",
+                new long [][]{{1, 3, 66}, {2, 1, 44}}, orderbyStmt);
 
         client.callProcedure("R1.delete", 3);
         compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, 2, 30}, {2, 1, 40}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, 2, 30}, {2, 1, 40}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_add",
+                new long [][]{{-1, 1, 11},{1, 1, 22}, {2, 1, 44}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_multiply",
+                new long [][]{{-1, 1, 10},{1, 1, 40}, {2, 1, 160}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_combine",
+                new long [][]{{1, 2, 33}, {2, 1, 44}}, orderbyStmt);
 
         client.callProcedure("R1.delete", 1);
         compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, 1, 20}, {2, 1, 40}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_add",
+                new long [][]{{1, 1, 22}, {2, 1, 44}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_multiply",
+                new long [][]{{1, 1, 40}, {2, 1, 160}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_combine",
+                new long [][]{{1, 1, 22}, {2, 1, 44}}, orderbyStmt);
 
         client.callProcedure("R1.delete", 2);
         compareMVcontentsOfLongs(client, mvTable, new long [][]{{2, 1, 40}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_add",
+                new long [][]{{2, 1, 44}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_multiply",
+                new long [][]{{2, 1, 160}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_combine",
+                new long [][]{{2, 1, 44}}, orderbyStmt);
 
         client.callProcedure("R1.delete", 4);
         compareMVcontentsOfLongs(client, mvTable, null, orderbyStmt);
@@ -114,7 +167,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
 
         Client client = this.getClient();
         String tb = "R1.insert";
-        client.callProcedure(tb, 1,  10,  1 );
+        client.callProcedure(tb, 1,  10,  -1 );
         client.callProcedure(tb, 2,  20,  1 );
         client.callProcedure(tb, 3,  30,  1 );
         client.callProcedure(tb, 4,  40,  2 );
@@ -125,17 +178,49 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         // ID, wage, dept
         // SELECT ABS(dept), count(*), SUM(wage) FROM R1 GROUP BY ABS(dept)
 
+        // Check the current contents in MVs
+        compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, 3, 60}, {2, 2, 90}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_add",
+                new long [][]{{-1, 1, 11},{1, 2, 55}, {2, 2, 99}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_multiply",
+                new long [][]{{-1, 1, 10},{1, 2, 130}, {2, 2, 410}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_combine",
+                new long [][]{{1, 3, 66}, {2, 2, 99}}, orderbyStmt);
+
+        // Test update
         client.callProcedure("R1.update", 2, 19, 1, 2);
         compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, 3, 59}, {2, 2, 90}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_add",
+                new long [][]{{-1, 1, 11},{1, 2, 54}, {2, 2, 99}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_multiply",
+                new long [][]{{-1, 1, 10},{1, 2, 128}, {2, 2, 410}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_combine",
+                new long [][]{{1, 3, 65}, {2, 2, 99}}, orderbyStmt);
 
         client.callProcedure("R1.update", 4, 41, -1, 4);
         compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, 4, 100}, {2, 1, 50}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_add",
+                new long [][]{{-1, 2, 56},{1, 2, 54}, {2, 1, 55}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_multiply",
+                new long [][]{{-1, 2, 174},{1, 2, 128}, {2, 1, 250}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_combine",
+                new long [][]{{1, 4, 110}, {2, 1, 55}}, orderbyStmt);
 
         client.callProcedure("R1.update", 5, 55, 1, 5);
         compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, 5, 155}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_add",
+                new long [][]{{-1, 2, 56},{1, 3, 114} }, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_multiply",
+                new long [][]{{-1, 2, 174},{1, 3, 403}}, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_combine",
+                new long [][]{{1, 5, 170}}, orderbyStmt);
 
         client.callProcedure("@AdHoc","Delete from R1");
         compareMVcontentsOfLongs(client, mvTable, null, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_add", null, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_multiply", null, orderbyStmt);
+        compareMVcontentsOfLongs(client, mvTable+"_combine", null, orderbyStmt);
+
     }
 
 
@@ -513,6 +598,15 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
 
                 "CREATE VIEW V_R1 (V_R1_G1, V_R1_CNT, V_R1_sum_wage) " +
                 "AS SELECT ABS(dept), count(*), SUM(wage) FROM R1 GROUP BY ABS(dept);" +
+
+                "CREATE VIEW V_R1_add (V_R1_G1, V_R1_CNT, V_R1_sum_wage) " +
+                "AS SELECT dept, count(*), SUM(wage+id) FROM R1 GROUP BY dept;" +
+
+                "CREATE VIEW V_R1_multiply (V_R1_G1, V_R1_CNT, V_R1_sum_wage) " +
+                "AS SELECT dept, count(*), SUM(wage*id) FROM R1 GROUP BY dept;" +
+
+                "CREATE VIEW V_R1_combine (V_R1_G1, V_R1_CNT, V_R1_sum_wage) " +
+                "AS SELECT ABS(dept), count(*), SUM(wage+id) FROM R1 GROUP BY ABS(dept);" +
 
                 "CREATE TABLE R2 ( " +
                 "id INTEGER DEFAULT '0' NOT NULL, " +
