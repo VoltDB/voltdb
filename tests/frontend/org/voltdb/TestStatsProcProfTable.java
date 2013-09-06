@@ -97,16 +97,13 @@ public class TestStatsProcProfTable {
             System.out.printf("%s: validating row %d\n", testname, ii);
             assertEquals(data[ii].timestamp, vt.getLong("TIMESTAMP"));
             assertEquals(data[ii].procedure, vt.getString("PROCEDURE"));
-            long l = vt.getLong("WEIGHTED_PERC");
-            assertEquals(data[ii].weighted_perc, l);
+            assertEquals(data[ii].weighted_perc, vt.getLong("WEIGHTED_PERC"));
             assertEquals(data[ii].invocations, vt.getLong("INVOCATIONS"));
             assertEquals(data[ii].avg, vt.getLong("AVG"));
             assertEquals(data[ii].min, vt.getLong("MIN"));
             assertEquals(data[ii].max, vt.getLong("MAX"));
-            l = vt.getLong("ABORTS");
-            assertEquals(data[ii].aborts, l);
-            l = vt.getLong("FAILURES");
-            assertEquals(data[ii].failures, l);
+            assertEquals(data[ii].aborts, vt.getLong("ABORTS"));
+            assertEquals(data[ii].failures, vt.getLong("FAILURES"));
             ++ii;
         }
     }
