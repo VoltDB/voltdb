@@ -66,6 +66,7 @@ private:
     void parsePredicate(catalog::MaterializedViewInfo *mvInfo);
 
     void parseComplexGroupby(catalog::MaterializedViewInfo *mvInfo);
+    void parseComplexAggregation(catalog::MaterializedViewInfo *mvInfo);
 
     /**
      * build a search key based on the src table value
@@ -94,8 +95,8 @@ private:
     // part of the aggregation in the materialized view
     AbstractExpression *m_filterPredicate;
 
-    bool m_hasComplexGroupby;
     std::vector<AbstractExpression *> m_groupbyExprs;
+    std::vector<AbstractExpression *> m_aggregationExprs;
 
     // how many columns is the view aggregated on
     int32_t m_groupByColumnCount;
