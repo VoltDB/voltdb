@@ -23,7 +23,9 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltDB;
@@ -42,11 +44,13 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.catalog.Table;
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.PlatformProperties;
+import org.voltdb.utils.SystemStatsCollector;
 
 import com.google.common.base.Charsets;
 import com.google.common.io.Resources;
@@ -629,7 +633,7 @@ public class ReportMaker {
      * Generate the HTML catalog report from a newly compiled VoltDB catalog
      */
     public static String report(Catalog catalog) throws IOException {
-        // asyncronously get platform properties
+        // asynchronously get platform properties
         new Thread() {
             @Override
             public void run() {
@@ -669,6 +673,40 @@ public class ReportMaker {
         return contents;
     }
 
+    public static String getLiveSystemOverview()
+    {
+        // get the start time
+        long t = SystemStatsCollector.getStartTime();
+        Date date = new Date(t);
+        long duration = System.currentTimeMillis() - t;
+        long minutes = duration / 60000;
+        long hours = minutes / 60; minutes -= hours * 60;
+        long days = hours / 24; hours -= days * 24;
+        String starttime = String.format("%s (%dd %dh %dm)",
+                date.toString(), days, hours, minutes);
+
+        // handle the basic info page below this
+        SiteTracker st = VoltDB.instance().getSiteTrackerForSnapshot();
+
+        // get the cluster info
+        String clusterinfo = st.getAllHosts().size() + " hosts ";
+        clusterinfo += " with " + st.getAllSites().size() + " sites ";
+        clusterinfo += " (" + st.getAllSites().size() / st.getAllHosts().size();
+        clusterinfo += " per host)";
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("<table class='table table-condensed'>\n");
+        sb.append("<tr><td>Mode                     </td><td>" + VoltDB.instance().getMode().toString() + "</td><td>\n");
+        sb.append("<tr><td>VoltDB Version           </td><td>" + VoltDB.instance().getVersionString() + "</td><td>\n");
+        sb.append("<tr><td>Buildstring              </td><td>" + VoltDB.instance().getBuildString() + "</td><td>\n");
+        sb.append("<tr><td>Cluster Composition      </td><td>" + clusterinfo + "</td><td>\n");
+        sb.append("<tr><td>Running Since            </td><td>" + starttime + "</td><td>\n");
+
+        sb.append("</table>\n");
+
+        return sb.toString();
+    }
+
     /**
      * Find the pre-compild catalog report in the jarfile, and modify it for use in the
      * the built-in web portal.
@@ -680,6 +718,10 @@ public class ReportMaker {
         // remove commented out code
         report = report.replace("<!--##RESOURCES", "");
         report = report.replace("##RESOURCES-->", "");
+
+        // inject the cluster overview
+        String clusterStr = "<h4>System Overview</h4>\n<p>" + getLiveSystemOverview() + "</p><br/>\n";
+        report = report.replace("<!--##CLUSTER##-->", clusterStr);
 
         // inject the running system platform properties
         PlatformProperties pp = PlatformProperties.getPlatformProperties();
