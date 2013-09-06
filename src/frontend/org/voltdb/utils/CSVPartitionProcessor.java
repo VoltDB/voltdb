@@ -113,7 +113,7 @@ class CSVPartitionProcessor implements Runnable {
         String procName = (isMP ? "@LoadMultipartitionTable" : (isLoadTable ? "@LoadPartitionData" : "@LoadSinglepartitionTable"));
         if (config.ping) {
             procName = "@Ping";
-        } else if (config.legacy) {
+        } else if (config.useSuppliedProcedure) {
             procName = insertProcedure;
         }
 
@@ -135,7 +135,7 @@ class CSVPartitionProcessor implements Runnable {
                     break;
                 }
                 if (lineList == dummy) {
-                    if (config.legacy) {
+                    if (config.useSuppliedProcedure) {
                         end = true;
                         break;
                     }
@@ -158,7 +158,7 @@ class CSVPartitionProcessor implements Runnable {
                     break;
                 }
                 lastLine = lineList.line;
-                if (!config.legacy) {
+                if (!config.useSuppliedProcedure) {
                     try {
                         VoltTableUtil.toVoltTableFromLine(table, lineList.line, columnTypes);
                     } catch (Exception ex) {

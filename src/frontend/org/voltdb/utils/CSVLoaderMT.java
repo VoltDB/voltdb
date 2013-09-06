@@ -126,8 +126,6 @@ public class CSVLoaderMT {
         String password = "";
         @Option(desc = "port to use when connecting to database (default: 21212)")
         int port = Client.VOLTDB_SERVER_PORT;
-        @Option(desc = "Use Legacy Insert CRUD method.")
-        boolean legacy = false;
         @Option(desc = "Use @Ping")
         boolean ping = false;
         @Option(desc = "Batch Size for processing.")
@@ -136,6 +134,7 @@ public class CSVLoaderMT {
         public boolean loadTable = false;
         @AdditionalArgs(desc = "insert the data into database by TABLENAME.insert procedure by default")
         public String table = "";
+        boolean useSuppliedProcedure = false;
 
         @Override
         public void validate() {
@@ -162,6 +161,9 @@ public class CSVLoaderMT {
                     || blank.equalsIgnoreCase("null")
                     || blank.equalsIgnoreCase("empty")) == false) {
                 exitWithMessageAndUsage("blank configuration specified must be one of {error|null|empty}");
+            }
+            if ((procedure != null) && (procedure.trim().length() > 0)) {
+                useSuppliedProcedure = true;
             }
         }
 
