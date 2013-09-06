@@ -85,15 +85,6 @@ function server-legacy() {
         license $LICENSE host $HOST
 }
 
-function server-legacy-recover() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB recover catalog $APPNAME.jar deployment deployment_legacy.xml \
-        license $LICENSE host $HOST
-}
-
-
 function server-custom() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi

@@ -66,10 +66,7 @@ import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.network.WriteStream;
-import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.DeferredSerialization;
-import org.voltcore.utils.EstTime;
-import org.voltcore.utils.Pair;
+import org.voltcore.utils.*;
 import org.voltdb.ClientInterfaceHandleManager.Iv2InFlight;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
@@ -1894,7 +1891,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         if (catProc == null) {
             String errorMessage = "Procedure " + task.procName + " was not found";
-            authLog.l7dlog( Level.WARN, LogKeys.auth_ClientInterface_ProcedureNotFound.name(), new Object[] { task.procName }, null);
+            RateLimitedLogger.tryLogForMessage(
+                            errorMessage + ". This message is rate limited to once every 60 seconds.",
+                            System.currentTimeMillis(),
+                            1000 * 60,
+                            authLog,
+                            Level.WARN);
             return new ClientResponseImpl(
                     ClientResponseImpl.UNEXPECTED_FAILURE,
                     new VoltTable[0], errorMessage, task.clientHandle);
