@@ -69,16 +69,21 @@ public class StatsProcOutputTable
         }
 
         // Augment this ProcOutputRow with a new input row
-        void updateWith(ProcOutputRow in)
-        {
+        // dedup flag indicates if we should dedup data based on partition for proc.
+        void updateWith(boolean dedup, ProcOutputRow in)        {
             this.avgOUT = calculateAverage(this.avgOUT, this.invocations,
                 in.avgOUT, in.invocations);
             this.minOUT = Math.min(this.minOUT, in.minOUT);
             this.maxOUT = Math.max(this.maxOUT, in.maxOUT);
 
-            if (!seenPartitions.contains(in.partition)) {
+            if (!dedup) {
+                //Not deduping so add up all values.
                 this.invocations += in.invocations;
-                seenPartitions.add(in.partition);
+            } else {
+                if (!seenPartitions.contains(in.partition)) {
+                    this.invocations += in.invocations;
+                    seenPartitions.add(in.partition);
+                }
             }
         }
     }
@@ -124,15 +129,15 @@ public class StatsProcOutputTable
         }
     }
 
-    // Add or update the corresponding row.
-    public void updateTable(String procedure, long partition, long timestamp,
-        long invocations, long minOUT, long maxOUT, long avgOUT)
+    // Add or update the corresponding row. dedup flag indicates if we should dedup data based on partition for proc.
+    public void updateTable(boolean dedup, String procedure, long partition, long timestamp,
+            long invocations, long minOUT, long maxOUT, long avgOUT)
     {
         ProcOutputRow in = new ProcOutputRow(procedure, partition, timestamp,
             invocations, minOUT, maxOUT, avgOUT);
         ProcOutputRow exists = m_rowsTable.ceiling(in);
         if (exists != null && in.procedure.equals(exists.procedure)) {
-            exists.updateWith(in);
+            exists.updateWith(dedup, in);
         } else {
             m_rowsTable.add(in);
         }
