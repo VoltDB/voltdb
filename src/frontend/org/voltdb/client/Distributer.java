@@ -42,6 +42,7 @@ import jsr166y.ThreadLocalRandom;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltNetworkPool;
@@ -65,6 +66,7 @@ import org.voltdb.iv2.MpInitiator;
  */
 class Distributer {
 
+    private static final VoltLogger clientLog = new VoltLogger("CLIENT");
     static final long PING_HANDLE = Long.MAX_VALUE;
 
     // handles used internally are negative and decrement for each call
@@ -190,6 +192,7 @@ class Distributer {
                             // memoize why it's closing
                             c.m_closeCause = DisconnectCause.TIMEOUT;
                             // this should trigger NodeConnection.stopping(..)
+                            clientLog.info("Timeout detected for connection: " + c.m_hostname);
                             c.m_connection.unregister();
                         }
 
@@ -271,6 +274,8 @@ class Distributer {
         private String m_hostname;
         private int m_port;
         private boolean m_isConnected = true;
+        private long m_timeoutSeq = 0;
+        private AtomicLong m_concurrentStops = new AtomicLong(0l);
 
         long m_lastResponseTime = System.currentTimeMillis();
         boolean m_outstandingPing = false;
@@ -281,6 +286,11 @@ class Distributer {
 
             m_callbacks = new HashMap<Long, CallbackBookeeping>();
             m_socketAddress = socketAddress;
+        }
+
+        @Override
+        public String toString() {
+            return m_hostname;
         }
 
         public void createWork(long handle, String name, ByteBuffer c,
@@ -294,12 +304,16 @@ class Distributer {
                     final ClientResponse r = new ClientResponseImpl(
                             ClientResponse.CONNECTION_LOST, new VoltTable[0],
                             "Connection to database host (" + m_hostname +
-                    ") was lost before a response was received");
+                    ") was lost before a response was received, seq: " + m_timeoutSeq +
+                    ", timestamp: " + System.currentTimeMillis());
+                    m_timeoutSeq++;
                     try {
                         callback.clientCallback(r);
                     } catch (Exception e) {
                         uncaughtException(callback, r, e);
                     }
+                    clientLog.info("Timed out transaction name: " + name + " due to queueing on " +
+                            " dead connection to host: " + m_hostname);
                     // for bookkeeping, but it feels dishonest to call this here
                     m_rateLimiter.transactionResponseReceived(now, -1);
                     return;
@@ -438,7 +452,11 @@ class Distributer {
             super.stopping(c);
             synchronized (this) {
                 //Prevent queueing of new work to this connection
+                Map<Integer, NodeConnection[]> replicaCopy = new HashMap<Integer, NodeConnection[]>();
+                Map<Integer, NodeConnection> masterCopy = new HashMap<Integer, NodeConnection>();
                 synchronized (Distributer.this) {
+                    clientLog.info("Stopping NodeConnection to: " + m_hostname + ", entry: " +
+                            m_concurrentStops.incrementAndGet());
                     /*
                      * Repair all cluster topology data with the node connection removed
                      */
@@ -487,22 +505,46 @@ class Distributer {
                     for (ClientStatusListenerExt s : m_listeners) {
                         s.connectionLost(m_hostname, m_port, m_connections.size(), m_closeCause);
                     }
+                    replicaCopy.putAll(m_partitionReplicas);
+                    masterCopy.putAll(m_partitionMasters);
+                    clientLog.info("Completed updating topology after failure of hostname: " + m_hostname +
+                            ", entry: " + m_concurrentStops.getAndDecrement());
                 }
                 m_isConnected = false;
-
+                clientLog.info("Remaining connections: " + m_connections);
+                for (Entry<Integer, NodeConnection[]> e : replicaCopy.entrySet()) {
+                    int partition = e.getKey();
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("Partition replicas for partition: " + partition + ": ");
+                    NodeConnection[] nodes = e.getValue();
+                    for (int ii = 0; ii < nodes.length; ii++) {
+                        sb.append(nodes[ii].m_hostname + ", ");
+                    }
+                    clientLog.info(sb.toString());
+                    String master = "NONE";
+                    if (masterCopy.get(partition) != null) {
+                        master = masterCopy.get(partition).m_hostname;
+                    }
+                    clientLog.info("Partition master for partition: " + partition + ": " +
+                            master);
+                }
                 //Invoke callbacks for all queued invocations with a failure response
-                final ClientResponse r =
-                    new ClientResponseImpl(
-                            ClientResponse.CONNECTION_LOST, new VoltTable[0],
-                            "Connection to database host (" + m_socketAddress +
-                    ") was lost before a response was received");
                 for (final CallbackBookeeping callBk : m_callbacks.values()) {
+                    ClientResponse r =
+                        new ClientResponseImpl(
+                                ClientResponse.CONNECTION_LOST, new VoltTable[0],
+                                "Connection to database host (" + m_socketAddress +
+                                ") was lost before a response was received, seq: " + m_timeoutSeq +
+                                ", timestamp: " + System.currentTimeMillis());
+                    m_timeoutSeq++;
                     try {
                         callBk.callback.clientCallback(r);
                     }
                     catch (Exception e) {
                         uncaughtException(callBk.callback, r, e);
                     }
+                    clientLog.info("Timed out transaction name: " + callBk.name + " after millis: " +
+                            (System.currentTimeMillis() - callBk.timestamp));
                     m_rateLimiter.transactionResponseReceived(System.currentTimeMillis(), -1);
                     m_callbacksToInvoke.decrementAndGet();
                 }
@@ -730,6 +772,10 @@ class Distributer {
                     }
                 }
             }
+            if (cxn != null && !cxn.m_isConnected) {
+                clientLog.warn("Client affinity chose a connection which is not connected, to hostname " +
+                        cxn.m_hostname);
+            }
             if (cxn == null) {
                 for (int i=0; i < totalConnections; ++i) {
                     cxn = m_connections.get(Math.abs(++m_nextConnection % totalConnections));
@@ -740,7 +786,9 @@ class Distributer {
                     }
                 }
             }
-
+            if (cxn == null) {
+                clientLog.warn("Client Distributer was unable to find a live connection to which to send an invocation");
+            }
             if (backpressure) {
                 cxn = null;
                 for (ClientStatusListenerExt s : m_listeners) {
@@ -921,11 +969,25 @@ class Distributer {
                 }
             }
             m_partitionReplicas.put(partition, connections.toArray(new NodeConnection[0]));
+            StringBuilder sb = new StringBuilder();
+            sb.append("Partition replicas for partition: " + partition + ": ");
+            NodeConnection[] nodes = m_partitionReplicas.get(partition);
+            for (int i = 0; i < nodes.length; i++) {
+                sb.append(nodes[i].m_hostname + ", ");
+            }
+            clientLog.info(sb.toString());
 
             Integer leaderHostId = Integer.valueOf(vt.getString("Leader").split(":")[0]);
             if (m_hostIdToConnection.containsKey(leaderHostId)) {
                 m_partitionMasters.put(partition, m_hostIdToConnection.get(leaderHostId));
             }
+            String master = "NONE";
+            if (m_partitionMasters.get(partition) != null) {
+                master = m_partitionMasters.get(partition).m_hostname;
+            }
+            clientLog.info("Partition master for partition: " + partition + ": " +
+                    master);
+
         }
     }
 
