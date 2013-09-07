@@ -338,7 +338,7 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     for (index_iterator = index_map.begin(); index_iterator != index_map.end();
          index_iterator++) {
         // Exclude the primary key
-        if (index_iterator->first.compare(pkey_index_id) == 0) {
+        if (index_iterator->second.name.compare(pkey_index_id) == 0) {
             pkey_index_scheme = index_iterator->second;
         // Just add it to the list
         } else {
@@ -538,7 +538,7 @@ TableCatalogDelegate::migrateChangedTuples(catalog::Table const &catalogTable,
          colIter != catalogTable.columns().end();
          colIter++)
     {
-        std::string colName = colIter->first;
+        std::string colName = colIter->second->name();
         catalog::Column *column = colIter->second;
         int newIndex = column->index();
 
