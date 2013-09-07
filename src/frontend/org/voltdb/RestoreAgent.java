@@ -200,8 +200,7 @@ SnapshotCompletionInterest
                             jsObj.put(SnapshotRestore.JSON_DUPLICATES_PATH, m_voltdbrootPath);
                         }
                         Object[] params = new Object[] { jsObj.toString() };
-                        initSnapshotWork(RESTORE_TXNID,
-                                Pair.of("@SnapshotRestore", params));
+                        initSnapshotWork(RESTORE_TXNID, params);
                     }
                     m_restoreHeartbeatThread.start();
 
@@ -1107,15 +1106,16 @@ SnapshotCompletionInterest
      * Restore a snapshot. An arbitrarily early transaction is provided if command
      * log replay follows to maintain txnid sequence constraints (with simple dtxn).
      */
-    private void initSnapshotWork(Long txnId, final Pair<String, Object[]> invocation) {
-        Config restore = SystemProcedureCatalog.listing.get(invocation.getFirst());
+    private void initSnapshotWork(Long txnId, final Object[] procParams) {
+        final String procedureName = "@SnapshotRestore";
+        Config restore = SystemProcedureCatalog.listing.get(procedureName);
         Procedure restoreProc = restore.asCatalogProcedure();
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
-        spi.procName = invocation.getFirst();
+        spi.procName = procedureName;
         spi.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
             @Override
             public ParameterSet call() throws Exception {
-                ParameterSet params = ParameterSet.fromArrayWithCopy(invocation.getSecond());
+                ParameterSet params = ParameterSet.fromArrayWithCopy(procParams);
                 return params;
             }
         });
@@ -1135,7 +1135,7 @@ SnapshotCompletionInterest
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
                                           restoreProc.getEverysite(),
-                                          m_allPartitions,
+                                          0,//Can provide anything for multi-part
                                           0,
                                           EstTime.currentTimeMillis());
         } else {
@@ -1144,7 +1144,7 @@ SnapshotCompletionInterest
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
                                           restoreProc.getEverysite(),
-                                          m_allPartitions,
+                                          0,//Can provide anything for multi-part
                                           0,
                                           EstTime.currentTimeMillis());
         }

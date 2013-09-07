@@ -32,7 +32,7 @@ public interface TransactionCreator
             boolean isReadOnly,
             boolean isSinglePartition,
             boolean isEverySite,
-            int partitions[],
+            int partition,
             int messageSize,
             long now);
 
@@ -45,7 +45,7 @@ public interface TransactionCreator
             boolean isReadOnly,
             boolean isSinglePartition,
             boolean isEverySite,
-            int partitions[],
+            int partition,
             int messageSize,
             long now);
 
