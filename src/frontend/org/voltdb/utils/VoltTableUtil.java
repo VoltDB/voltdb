@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.TimeZone;
 
 import org.voltcore.utils.Pair;
@@ -119,14 +120,14 @@ public class VoltTableUtil {
     }
 
     /**
-     * Add rows data to VoltTable.
+     * Add rows data to VoltTable given fields values and column Types;
      *
      * @param table
      * @param fields
      * @param columnTypes
      * @return
      */
-    public static VoltTable toVoltTableFromLine(VoltTable table, String fields[], ArrayList<VoltType> columnTypes) {
+    public static VoltTable toVoltTableFromLine(VoltTable table, String fields[], Map<Integer, VoltType> columnTypes) {
 
         if (fields == null || fields.length <= 0) {
             return table;

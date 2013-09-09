@@ -16,8 +16,11 @@
  */
 package org.voltdb.utils;
 
+import java.util.List;
+
 public class CSVLineWithMetaData {
 
     public String[] line;
+    public List<String> rawLineData;
     public int lineNumber;
 }

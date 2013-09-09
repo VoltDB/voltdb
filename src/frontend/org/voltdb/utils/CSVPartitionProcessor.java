@@ -48,7 +48,7 @@ class CSVPartitionProcessor implements Runnable {
     public static String insertProcedure = "";
     public String tableName;
     public String name;
-    public static ArrayList<VoltType> columnTypes;
+    public static Map<Integer, VoltType> columnTypes;
     public static VoltTable.ColumnInfo colInfo[];
     public static boolean isMP = false;
     long partitionProcessedCount = 0;
@@ -70,17 +70,14 @@ class CSVPartitionProcessor implements Runnable {
 
     public static final class PartitionProcedureCallback implements ProcedureCallback {
 
-        private int m_batchCount;
-        private final long m_lineNum = 0;
-        private final String[] m_rowdata;
         private static int lastMultiple = 0;
         protected static final VoltLogger m_log = new VoltLogger("CONSOLE");
-        protected CSVPartitionProcessor pprocessor;
+        protected CSVPartitionProcessor m_processor;
+        public List<CSVLineWithMetaData> m_batchList;
 
-        public PartitionProcedureCallback(int batchCount, String[] rowData, CSVPartitionProcessor pp) {
-            m_batchCount = batchCount;
-            m_rowdata = rowData;
-            pprocessor = pp;
+        public PartitionProcedureCallback(List<CSVLineWithMetaData> batchList, CSVPartitionProcessor pp) {
+            m_processor = pp;
+            m_batchList = batchList;
         }
 
         @Override
@@ -88,18 +85,19 @@ class CSVPartitionProcessor implements Runnable {
             int reportEveryNRows = 10000;
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 m_log.error(response.getStatusString());
-                long executed = response.getResults()[0].asScalarLong();
-                String[] info = {m_rowdata.toString(), response.getStatusString()};
-                if (synchronizeErrorInfo(m_lineNum, info)) {
-                    pprocessor.errored = true;
+                CSVLineWithMetaData lineData = m_batchList.get((int) 0);
+                String[] info = {lineData.rawLineData.toString(), response.getStatusString()};
+                if (synchronizeErrorInfo(lineData.lineNumber, info)) {
+                    m_processor.errored = true;
                 }
                 return;
             }
-            long currentCount = pprocessor.partitionAcknowledgedCount.addAndGet(m_batchCount);
+            long executed = response.getResults()[0].asScalarLong();
+            long currentCount = m_processor.partitionAcknowledgedCount.addAndGet(executed);
             int newMultiple = (int) currentCount / reportEveryNRows;
             if (newMultiple != lastMultiple) {
                 lastMultiple = newMultiple;
-                m_log.info(pprocessor.name + " Inserted " + currentCount + " rows");
+                m_log.info(m_processor.name + " Inserted " + currentCount + " rows");
             }
         }
     }
@@ -107,23 +105,19 @@ class CSVPartitionProcessor implements Runnable {
     @Override
     public void run() {
 
-        Client lcsvClient = csvClient;
         VoltTable table = new VoltTable(colInfo);
         String procName = (isMP ? "@LoadMultipartitionTable" : "@LoadSinglepartitionTable");
-        if (config.ping) {
-            procName = "@Ping";
-        } else if (config.useSuppliedProcedure) {
+        if (config.useSuppliedProcedure) {
             procName = insertProcedure;
         }
 
-        m_log.info("Using Procedure: " + procName);
         Object partitionParam = null;
         if (!isMP) {
             partitionParam = TheHashinator.valueToBytes(partitionId);
         }
-        String lastLine[] = null;
         while (true) {
             List<CSVLineWithMetaData> mlineList = new ArrayList<CSVLineWithMetaData>();
+            List<CSVLineWithMetaData> batchList = new ArrayList<CSVLineWithMetaData>();
             lineq.drainTo(mlineList);
             boolean end = false;
             for (CSVLineWithMetaData lineList : mlineList) {
@@ -138,54 +132,63 @@ class CSVPartitionProcessor implements Runnable {
                     }
                     //Process anything that we didnt process.
                     if (table.getRowCount() > 0) {
-                        PartitionProcedureCallback cbmt = new PartitionProcedureCallback(table.getRowCount(), lastLine, this);
+                        PartitionProcedureCallback cbmt = new PartitionProcedureCallback(batchList, this);
                         try {
                             if (!isMP) {
-                                lcsvClient.callProcedure(cbmt, procName, partitionParam, tableName, table);
+                                csvClient.callProcedure(cbmt, procName, partitionParam, tableName, table);
                             } else {
-                                lcsvClient.callProcedure(cbmt, procName, tableName, table);
+                                csvClient.callProcedure(cbmt, procName, tableName, table);
                             }
                             partitionProcessedCount += table.getRowCount();
                         } catch (IOException ex) {
-                            errored = synchronizeErrorInfo(lineList.lineNumber, lineList.line);
+                            String[] info = {lineList.rawLineData.toString(), ex.toString()};
+                            errored = synchronizeErrorInfo(lineList.lineNumber, info);
                             break;
                         }
                     }
                     end = true;
                     break;
                 }
-                lastLine = lineList.line;
                 if (!config.useSuppliedProcedure) {
                     try {
                         VoltTableUtil.toVoltTableFromLine(table, lineList.line, columnTypes);
+                        batchList.add(lineList);
                     } catch (Exception ex) {
                         //Failed to add row....
-                        errored = synchronizeErrorInfo(lineList.lineNumber, lineList.line);
+                        String[] info = {lineList.rawLineData.toString(), ex.toString()};
+                        errored = synchronizeErrorInfo(lineList.lineNumber, info);
                         continue;
                     }
                     if (table.getRowCount() > config.batch) {
                         try {
-                            PartitionProcedureCallback cbmt = new PartitionProcedureCallback(table.getRowCount(), lineList.line, this);
+                            batchList.add(lineList);
+                            PartitionProcedureCallback cbmt = new PartitionProcedureCallback(batchList, this);
                             if (!isMP) {
-                                lcsvClient.callProcedure(cbmt, procName, partitionParam, tableName, table);
+                                csvClient.callProcedure(cbmt, procName, partitionParam, tableName, table);
                             } else {
-                                lcsvClient.callProcedure(cbmt, procName, tableName, table);
+                                csvClient.callProcedure(cbmt, procName, tableName, table);
                             }
                             partitionProcessedCount += table.getRowCount();
                             table.clearRowData();
+                            batchList.clear();
+                            batchList = new ArrayList<CSVLineWithMetaData>();
                         } catch (IOException ex) {
                             table.clearRowData();
-                            errored = synchronizeErrorInfo(lineList.lineNumber, lineList.line);
+                            String[] info = {lineList.rawLineData.toString(), ex.toString()};
+                            errored = synchronizeErrorInfo(lineList.lineNumber, info);
                             break;
                         }
                     }
                 } else {
                     try {
-                        PartitionProcedureCallback cbmt = new PartitionProcedureCallback(1, lineList.line, this);
+                        batchList.add(lineList);
+                        PartitionProcedureCallback cbmt = new PartitionProcedureCallback(batchList, this);
                         csvClient.callProcedure(cbmt, procName, (Object[]) lineList.line);
                         partitionProcessedCount++;
+                        batchList = new ArrayList<CSVLineWithMetaData>();
                     } catch (IOException ex) {
-                        errored = synchronizeErrorInfo(lineList.lineNumber, lineList.line);
+                        String[] info = {lineList.rawLineData.toString(), ex.toString()};
+                        errored = synchronizeErrorInfo(lineList.lineNumber, info);
                         break;
                     }
                 }
@@ -195,7 +198,7 @@ class CSVPartitionProcessor implements Runnable {
             }
         }
         try {
-            lcsvClient.drain();
+            csvClient.drain();
         } catch (NoConnectionsException ex) {
             m_log.warn("Failed to Drain the client: ", ex);
         } catch (InterruptedException ex) {

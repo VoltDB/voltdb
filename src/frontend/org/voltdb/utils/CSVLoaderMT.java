@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
@@ -126,12 +127,8 @@ public class CSVLoaderMT {
         String password = "";
         @Option(desc = "port to use when connecting to database (default: 21212)")
         int port = Client.VOLTDB_SERVER_PORT;
-        @Option(desc = "Use @Ping")
-        boolean ping = false;
         @Option(desc = "Batch Size for processing.")
         public long batch = 200;
-        @Option(desc = "Use Load Table?")
-        public boolean loadTable = false;
         @AdditionalArgs(desc = "insert the data into database by TABLENAME.insert procedure by default")
         public String table = "";
         boolean useSuppliedProcedure = false;
@@ -157,6 +154,9 @@ public class CSVLoaderMT {
             if (port < 0) {
                 exitWithMessageAndUsage("port number must be >= 0");
             }
+            if (batch < 0) {
+                exitWithMessageAndUsage("batch size number must be >= 0");
+            }
             if ((blank.equalsIgnoreCase("error")
                     || blank.equalsIgnoreCase("null")
                     || blank.equalsIgnoreCase("empty")) == false) {
@@ -175,23 +175,6 @@ public class CSVLoaderMT {
                     .println("       csvloader [args] -p procedurename");
             super.printUsage();
         }
-    }
-
-    private static boolean isProcedureMp(Client csvClient)
-            throws IOException, org.voltdb.client.ProcCallException {
-        boolean procedure_is_mp = false;
-        VoltTable procInfo = csvClient.callProcedure("@SystemCatalog",
-                "PROCEDURES").getResults()[0];
-        while (procInfo.advanceRow()) {
-            if (insertProcedure.matches(procInfo.getString("PROCEDURE_NAME"))) {
-                String remarks = procInfo.getString("REMARKS");
-                if (remarks.contains("\"singlePartition\":false")) {
-                    procedure_is_mp = true;
-                }
-                break;
-            }
-        }
-        return procedure_is_mp;
     }
 
     public static void main(String[] args) throws IOException,
@@ -243,19 +226,24 @@ public class CSVLoaderMT {
         int partitionedColumnIndex = -1;
         VoltType partitionColumnType = VoltType.NULL;
         try {
-            int columnCnt = 0;
             VoltTable procInfo;
             boolean isProcExist = false;
             try {
-                procInfo = csvClient.callProcedure("@SystemCatalog",
-                        "PROCEDURECOLUMNS").getResults()[0];
-                while (procInfo.advanceRow()) {
-                    if (insertProcedure.matches((String) procInfo.get(
-                            "PROCEDURE_NAME", VoltType.STRING))) {
-                        columnCnt++;
-                        isProcExist = true;
-                        String typeStr = (String) procInfo.get("TYPE_NAME", VoltType.STRING);
-                        typeList.add(VoltType.typeFromString(typeStr));
+                if (config.useSuppliedProcedure) {
+                    procInfo = csvClient.callProcedure("@SystemCatalog",
+                            "PROCEDURECOLUMNS").getResults()[0];
+                    while (procInfo.advanceRow()) {
+                        if (insertProcedure.matches((String) procInfo.get(
+                                "PROCEDURE_NAME", VoltType.STRING))) {
+                            isProcExist = true;
+                            String typeStr = (String) procInfo.get("TYPE_NAME", VoltType.STRING);
+                            typeList.add(VoltType.typeFromString(typeStr));
+                        }
+                    }
+                    if (isProcExist == false) {
+                        m_log.error("No matching insert procedure available");
+                        close_cleanup();
+                        System.exit(-1);
                     }
                 }
             } catch (Exception e) {
@@ -263,32 +251,33 @@ public class CSVLoaderMT {
                 close_cleanup();
                 System.exit(-1);
             }
-            if (isProcExist == false) {
-                m_log.error("No matching insert procedure available");
-                close_cleanup();
-                System.exit(-1);
-            }
 
-            ArrayList<VoltType> columnTypes = new ArrayList<VoltType>();
-            ArrayList<String> colNames = new ArrayList<String>();
             procInfo = csvClient.callProcedure("@SystemCatalog",
                     "COLUMNS").getResults()[0];
+            Map<Integer, VoltType> columnTypes = new TreeMap<Integer, VoltType>();
+            Map<Integer, String> colNames = new TreeMap<Integer, String>();
             while (procInfo.advanceRow()) {
                 String table = procInfo.getString("TABLE_NAME");
                 if (config.table.equalsIgnoreCase(table)) {
                     VoltType vtype = VoltType.typeFromString(procInfo.getString("TYPE_NAME"));
-                    columnTypes.add(vtype);
-                    colNames.add(procInfo.getString("COLUMN_NAME"));
+                    int idx = (int) procInfo.getLong("ORDINAL_POSITION") - 1;
+                    columnTypes.put(idx, vtype);
+                    colNames.put(idx, procInfo.getString("COLUMN_NAME"));
                     String remarks = procInfo.getString("REMARKS");
                     if (remarks != null && remarks.equalsIgnoreCase("PARTITION_COLUMN")) {
-                        partitionedColumnIndex = (int) procInfo.getLong("ORDINAL_POSITION");
                         partitionColumnType = vtype;
-                        System.out.println("Partition Column Name is: " + procInfo.getString("COLUMN_NAME"));
-                        System.out.println("Partition Column Type is: " + vtype.toString());
+                        partitionedColumnIndex = idx;
+                        m_log.info("Table " + config.table + " Partition Column Name is: " + procInfo.getString("COLUMN_NAME"));
+                        m_log.info("Table " + config.table + " Partition Column Type is: " + vtype.toString());
                     }
                 }
             }
 
+            if (columnTypes.isEmpty()) {
+                m_log.error("Table " + config.table + " Not found");
+                close_cleanup();
+                System.exit(-1);
+            }
             VoltTable.ColumnInfo colInfo[] = new VoltTable.ColumnInfo[columnTypes.size()];
             for (int i = 0; i < columnTypes.size(); i++) {
                 VoltType type = columnTypes.get(i);
@@ -315,21 +304,24 @@ public class CSVLoaderMT {
                     kfactor = Integer.parseInt(procInfo.getString("VALUE"));
                 }
             }
-            numPartitions = (hostcount * sitesPerHost) / (kfactor + 1);
-            System.out.println("Number of Partitions: " + numPartitions);
-            System.out.println("Batch Size is: " + config.batch);
+            boolean isMP = (partitionedColumnIndex == -1 ? true : false);
+            if (!isMP) {
+                numPartitions = (hostcount * sitesPerHost) / (kfactor + 1);
+                m_log.info("Number of Partitions: " + numPartitions);
+                m_log.info("Batch Size is: " + config.batch);
 
-            TheHashinator.initialize(LegacyHashinator.class, LegacyHashinator.getConfigureBytes(numPartitions));
+                TheHashinator.initialize(LegacyHashinator.class, LegacyHashinator.getConfigureBytes(numPartitions));
+            } else {
+                m_log.warn("Using a multi-partitioned procedure to load data will be slow. "
+                        + "If loading a partitioned table, use a single-partitioned procedure "
+                        + "for best performance.");
+                numPartitions = 1;
+            }
 
             CSVPartitionProcessor.colInfo = colInfo;
             CSVPartitionProcessor.columnTypes = columnTypes;
             CSVPartitionProcessor.insertProcedure = insertProcedure;
-            CSVPartitionProcessor.isMP = (partitionedColumnIndex == -1 ? true : false);
-            if (CSVPartitionProcessor.isMP) {
-                m_log.warn("Using a multi-partitioned procedure to load data will be slow. "
-                        + "If loading a partitioned table, use a single-partitioned procedure "
-                        + "for best performance.");
-            }
+            CSVPartitionProcessor.isMP = isMP;
             CSVPartitionProcessor.config = config;
 
             List<Thread> spawned = new ArrayList<Thread>(numPartitions);
@@ -345,7 +337,7 @@ public class CSVLoaderMT {
                 pp.csvClient = csvClient;
                 pp.partitionId = i;
                 pp.tableName = config.table;
-                pp.columnCnt = columnCnt;
+                pp.columnCnt = columnTypes.size();
                 pp.lineq = q;
                 pp.dummy = dummy;
                 pp.name = "PartitionProcessor-" + i;
@@ -356,7 +348,7 @@ public class CSVLoaderMT {
             CSVPartitionProcessor.pcount = pcount;
 
             CSVFileReader.config = config;
-            CSVFileReader.columnCnt = columnCnt;
+            CSVFileReader.columnCnt = columnTypes.size();
             CSVFileReader.listReader = listReader;
             CSVFileReader.partitionedColumnIndex = partitionedColumnIndex;
             CSVFileReader.partitionColumnType = partitionColumnType;
@@ -486,6 +478,26 @@ public class CSVLoaderMT {
                     out_logfile.flush();
                 }
             }
+
+            //Print all processor errors
+            errorInfo = CSVPartitionProcessor.errorInfo;
+            for (Long irow : errorInfo.keySet()) {
+                String info[] = errorInfo.get(irow);
+                if (info.length != 2) {
+                    System.out
+                            .println("internal error, information is not enough");
+                }
+                linect++;
+                out_invaliderowfile.write(info[0] + "\n");
+                String message = "Invalid input on line " + irow + ".\n  Contents:" + info[0];
+                m_log.error(message);
+                out_logfile.write(message + "\n  " + info[1] + "\n");
+                if (linect % bulkflush == 0) {
+                    out_invaliderowfile.flush();
+                    out_logfile.flush();
+                }
+            }
+
             // Get elapsed time in seconds
             float elapsedTimeSec = latency / 1000F;
             out_reportfile.write("CSVLoader elaspsed: " + elapsedTimeSec

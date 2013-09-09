@@ -17,26 +17,20 @@
 
 package org.voltdb.sysprocs;
 
-import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
-import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
-import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
-import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
-import org.voltdb.messaging.FastDeserializer;
 
 /**
  * Given as input a VoltTable with a schema corresponding to a persistent table,
@@ -139,10 +133,12 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
             voltQueueSQL(stmt, params);
             ++queued;
 
-            // every 100 statements, exec the batch
-            // 100 is an arbitrary number
-            if ((i % 100) == 0) {
+            // every 200 statements, exec the batch
+            // 200 is an arbitrary number, but is tied to CSVloading and procedure runner fastPath
+            if ((i % 200) == 0) {
                 executed += executeSQL();
+                //Reset queued
+                queued = 0;
             }
         }
         // execute any leftover batched statements

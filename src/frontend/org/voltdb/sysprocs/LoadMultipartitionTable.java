@@ -203,8 +203,10 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
 
                 // every 100 statements, exec the batch
                 // 100 is an arbitrary number
-                if ((i % 100) == 0) {
+                if ((i % 200) == 0) {
                     executed += executeSQL();
+                    //Reset queued
+                    queued = 0;
                 }
             }
             // execute any leftover batched statements

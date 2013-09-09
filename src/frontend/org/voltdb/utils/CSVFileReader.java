@@ -105,10 +105,11 @@ class CSVFileReader implements Runnable {
 
                 CSVLineWithMetaData lineData = new CSVLineWithMetaData();
                 lineData.line = correctedLine;
+                lineData.rawLineData = lineList;
                 lineData.lineNumber = listReader.getLineNumber();
                 int partitionId = 0;
                 if (!CSVPartitionProcessor.isMP) {
-                    partitionId = TheHashinator.getPartitionForParameter(partitionColumnType.getValue(), (Object) lineData.line[partitionedColumnIndex - 1]);
+                    partitionId = TheHashinator.getPartitionForParameter(partitionColumnType.getValue(), (Object) lineData.line[partitionedColumnIndex]);
                 }
                 BlockingQueue<CSVLineWithMetaData> q = lineq.get(partitionId);
                 if (!q.offer(lineData)) {
