@@ -131,34 +131,6 @@ public class ElasticHashinator extends TheHashinator {
     }
 
     /**
-     * Given an existing elastic hashinator, add a set of new partitions to the existing hash ring
-     * with calculated ranges.
-     * @param oldHashinator An elastic hashinator
-     * @param partitionsAndRanges A set of new partitions and their associated ranges
-     * @return The config bytes of the new hash ring
-     */
-    public static byte[] addPartitions(TheHashinator oldHashinator,
-                                       Map<Long, Integer> tokensToPartitions) {
-        Preconditions.checkArgument(oldHashinator instanceof ElasticHashinator);
-        ElasticHashinator oldElasticHashinator = (ElasticHashinator) oldHashinator;
-        Map<Long, Integer> newConfig = new HashMap<Long, Integer>(oldElasticHashinator.tokens);
-        Set<Integer> existingPartitions = new HashSet<Integer>(oldElasticHashinator.tokens.values());
-
-        for (Map.Entry<Long, Integer> entry : tokensToPartitions.entrySet()) {
-            long token = entry.getKey();
-            int pid = entry.getValue();
-
-            Integer oldPartition = newConfig.put(token, pid);
-            if (oldPartition != null && oldPartition != pid) {
-                throw new RuntimeException("Token " + token + " used to map to partition " +
-                                               oldPartition + " but now maps to " + pid);
-            }
-        }
-
-        return new ElasticHashinator(newConfig).toBytes();
-    }
-
-    /**
      * Convenience method for generating a deterministic token distribution for the ring based
      * on a given partition count and tokens per partition. Each partition will have N tokens
      * placed randomly on the ring.
