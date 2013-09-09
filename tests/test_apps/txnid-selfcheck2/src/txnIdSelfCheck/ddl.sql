@@ -99,6 +99,7 @@ CREATE TABLE export_skinny_partitioned_table
 );
 
 PARTITION TABLE export_skinny_partitioned_table ON COLUMN rowid;
+EXPORT TABLE export_skinny_partitioned_table;
 
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
