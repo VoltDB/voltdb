@@ -112,9 +112,7 @@ class CSVFileReader implements Runnable {
                     partitionId = TheHashinator.getPartitionForParameter(partitionColumnType.getValue(), (Object) lineData.line[partitionedColumnIndex]);
                 }
                 BlockingQueue<CSVLineWithMetaData> q = lineq.get(partitionId);
-                if (!q.offer(lineData)) {
-                    q.put(lineData);
-                }
+                q.offer(lineData);
             } catch (SuperCsvException e) {
                 //Catch rows that can not be read by superCSV listReader. E.g. items without quotes when strictquotes is enabled.
                 e.printStackTrace();
@@ -126,8 +124,6 @@ class CSVFileReader implements Runnable {
             } catch (IOException ioex) {
                 ioex.printStackTrace();
                 break;
-            } catch (InterruptedException ex) {
-                break;
             }
         }
         try {
@@ -136,14 +132,10 @@ class CSVFileReader implements Runnable {
             m_log.error("Error cloging Reader: " + ex);
         } finally {
             for (BlockingQueue<CSVLineWithMetaData> q : lineq.values()) {
-                try {
-                    if (errored) {
-                        q.clear();
-                    }
-                    q.put(dummy);
-                } catch (InterruptedException ex) {
-                    ;
+                if (errored) {
+                    q.clear();
                 }
+                q.offer(dummy);
             }
             m_log.info("Rows Queued by Reader: " + totalRowCount.get());
         }

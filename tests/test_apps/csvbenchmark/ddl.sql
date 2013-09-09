@@ -6,6 +6,7 @@ create table text_all_with_idx (
     , e varchar(1024)
 );
 PARTITION TABLE text_all_with_idx ON COLUMN a;
+CREATE UNIQUE INDEX idx_col_u ON text_all_with_idx(a);
 CREATE INDEX idx_col_one ON text_all_with_idx(a,c);
 CREATE INDEX idx_col_two ON text_all_with_idx(a,b);
 CREATE INDEX idx_col_three ON text_all_with_idx(a,d);

@@ -86,7 +86,7 @@ class CSVPartitionProcessor implements Runnable {
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 m_log.error(response.getStatusString());
                 CSVLineWithMetaData lineData = m_batchList.get((int) 0);
-                String[] info = {lineData.rawLineData.toString(), response.getStatusString()};
+                String[] info = {lineData.rawLineData.toString(), response.getException().getMessage()};
                 if (synchronizeErrorInfo(lineData.lineNumber, info)) {
                     m_processor.errored = true;
                 }
@@ -170,7 +170,6 @@ class CSVPartitionProcessor implements Runnable {
                             }
                             partitionProcessedCount += table.getRowCount();
                             table.clearRowData();
-                            batchList.clear();
                             batchList = new ArrayList<CSVLineWithMetaData>();
                         } catch (IOException ex) {
                             table.clearRowData();

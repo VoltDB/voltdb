@@ -361,7 +361,7 @@ public class CSVLoaderMT {
 
             CSVFileReader rdr = new CSVFileReader();
             Thread th = new Thread(rdr);
-            th.setName("CSVReader");
+            th.setName("CSVReader-MT");
             th.setDaemon(true);
 
             for (Thread th2 : spawned) {
