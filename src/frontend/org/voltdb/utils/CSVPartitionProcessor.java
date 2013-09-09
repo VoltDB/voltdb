@@ -88,6 +88,7 @@ class CSVPartitionProcessor implements Runnable {
             int reportEveryNRows = 10000;
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 m_log.error(response.getStatusString());
+                long executed = response.getResults()[0].asScalarLong();
                 String[] info = {m_rowdata.toString(), response.getStatusString()};
                 if (synchronizeErrorInfo(m_lineNum, info)) {
                     pprocessor.errored = true;
