@@ -24,6 +24,8 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
@@ -32,6 +34,7 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
 import org.voltdb.messaging.LocalMailbox;
 
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -46,6 +49,7 @@ public class AsyncCompilerAgent {
 
     // accept work via this mailbox
     Mailbox m_mailbox;
+    ZooKeeper m_zk;
 
     // do work in this executor service
     final ListeningExecutorService m_es =
@@ -81,18 +85,23 @@ public class AsyncCompilerAgent {
                 } catch (RejectedExecutionException rejected) {
                     final LocalObjectMessage wrapper = (LocalObjectMessage)message;
                     AsyncCompilerWork work = (AsyncCompilerWork)(wrapper.payload);
-                    AsyncCompilerResult retval = new AsyncCompilerResult();
-                    retval.clientHandle = work.clientHandle;
-                    retval.errorMsg = "Ad Hoc Planner is not available. Try again.";
-                    retval.connectionId = work.connectionId;
-                    retval.hostname = work.hostname;
-                    retval.adminConnection = work.adminConnection;
-                    retval.clientData = work.clientData;
-                    work.completionHandler.onCompletion(retval);
+                    generateErrorResult("Ad Hoc Planner is not available. Try again.", work);
                 }
             }
         };
+        m_zk = hostMessenger.getZK();
         hostMessenger.createMailbox(hsId, m_mailbox);
+    }
+
+    void generateErrorResult(String errorMsg, AsyncCompilerWork work) {
+        AsyncCompilerResult retval = new AsyncCompilerResult();
+        retval.clientHandle = work.clientHandle;
+        retval.errorMsg = "Ad Hoc Planner is not available. Try again.";
+        retval.connectionId = work.connectionId;
+        retval.hostname = work.hostname;
+        retval.adminConnection = work.adminConnection;
+        retval.clientData = work.clientData;
+        work.completionHandler.onCompletion(retval);
     }
 
     void handleMailboxMessage(final VoltMessage message) {
@@ -106,6 +115,9 @@ public class AsyncCompilerAgent {
             final CatalogChangeWork w = (CatalogChangeWork)(wrapper.payload);
             if (VoltDB.instance().getConfig().m_isEnterprise) {
                 try {
+                    if (checkForCatalogUpdateBlockers(w)) {
+                        return;
+                    }
                     Class<?> acahClz = getClass().getClassLoader().loadClass("org.voltdb.compiler.AsyncCompilerAgentHelper");
                     Object acah = acahClz.newInstance();
                     Method acahPrepareMethod = acahClz.getMethod(
@@ -123,6 +135,15 @@ public class AsyncCompilerAgent {
             }
             assert(false); // shouldn't get here in community edition
         }
+    }
+
+    private boolean checkForCatalogUpdateBlockers(CatalogChangeWork w) throws KeeperException, InterruptedException {
+        boolean haveBlockers = !m_zk.getChildren(VoltZK.catalogUpdateBlockers, false).isEmpty();
+
+        if (haveBlockers) {
+            generateErrorResult("Can't do a catalog update while an elastic join is active", w);
+        }
+        return haveBlockers;
     }
 
     public void compileAdHocPlanForProcedure(final AdHocPlannerWork apw) {

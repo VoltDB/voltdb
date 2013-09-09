@@ -53,6 +53,11 @@ public class VoltZK {
     public static final String operationMode = "/db/operation_mode";
     public static final String exportGenerations = "/db/export_generations";
 
+    /*
+     * Processes that want to block catalog updates create children here
+     */
+    public static final String catalogUpdateBlockers = "/db/export_generations";
+
     // configuration (ports, interfaces, ...)
     public static final String cluster_metadata = "/db/cluster_metadata";
 
@@ -105,7 +110,8 @@ public class VoltZK {
             leaders,
             leaders_initiators,
             leaders_globalservice,
-            lastKnownLiveNodes
+            lastKnownLiveNodes,
+            catalogUpdateBlockers
     };
 
     /**
