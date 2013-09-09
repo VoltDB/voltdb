@@ -48,6 +48,7 @@ public class VoltDB {
     public static final int DEFAULT_ADMIN_PORT = 21211;
     public static final int DEFAULT_INTERNAL_PORT = 3021;
     public static final int DEFAULT_ZK_PORT = 2181;
+    public static final int DEFAULT_IPC_PORT = 10000;
     public static final String DEFAULT_EXTERNAL_INTERFACE = "";
     public static final String DEFAULT_INTERNAL_INTERFACE = "";
     public static final int DEFAULT_DR_PORT = 5555;
@@ -128,7 +129,7 @@ public class VoltDB {
     /** Encapsulates VoltDB configuration parameters */
     public static class Configuration {
 
-        public int m_ipcPort = 10000;
+        public int m_ipcPort = DEFAULT_IPC_PORT;
 
         protected static final VoltLogger hostLog = new VoltLogger("HOST");
 

@@ -30,7 +30,6 @@ import java.util.Map;
 import java.util.Random;
 
 import org.voltcore.logging.VoltLogger;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.ReplicationRole;
 import org.voltdb.ServerThread;
@@ -970,7 +969,7 @@ public class LocalCluster implements VoltServerConfig {
             }
         }
 
-        /*if (templateCmdLine.target() == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
+        if (templateCmdLine.target() == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
             if (!EEProcess.m_valgrindErrors.isEmpty()) {
                 String failString = "";
                 for (final String error : EEProcess.m_valgrindErrors) {
@@ -978,7 +977,7 @@ public class LocalCluster implements VoltServerConfig {
                 }
                 org.junit.Assert.fail(failString);
             }
-        }*/
+        }
 
         m_eeProcs.clear();
     }

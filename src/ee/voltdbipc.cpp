@@ -1280,7 +1280,7 @@ int main(int argc, char **argv) {
 
     boost::shared_array<pthread_t> eeThreads(new pthread_t[eecount]);
 
-    // allow caller to override port with the first argument
+    // allow caller to override port with the second argument
     if (argc == 3) {
         char *portStr = argv[2];
         assert(portStr);
@@ -1324,6 +1324,7 @@ int main(int argc, char **argv) {
     printf("listening\n");
     fflush(stdout);
 
+    // connect to each Site from Java over a new socket
     for (int ee = 0; ee < eecount; ee++) {
         struct sockaddr_in client_addr;
         socklen_t addr_size = sizeof(struct sockaddr_in);
