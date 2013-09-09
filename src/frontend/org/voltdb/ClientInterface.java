@@ -831,7 +831,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private class ClientResponseWork implements DeferredSerialization {
         private final ClientInterfaceHandleManager cihm;
         private final InitiateResponseMessage response;
-        private final StoredProcedureInvocation invocation;
         private final Procedure catProc;
         private ClientResponseImpl clientResponse;
 
@@ -841,7 +840,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         {
             this.response = response;
             this.clientResponse = response.getClientResponseData();
-            this.invocation = response.getInvocation();
             this.cihm = cihm;
             this.catProc = catProc;
         }
@@ -909,17 +907,30 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         {
             if (response.isMispartitioned()) {
                 // Restart a mis-partitioned transaction
-                assert(invocation != null);
+                assert response.getInvocation() != null;
+                assert response.getCurrentHashinatorConfig() != null;
                 assert(catProc != null);
+
+                // before rehashing, update the hashinator
+                TheHashinator.updateHashinator(TheHashinator.getConfiguredHashinatorClass(),
+                                               response.getCurrentHashinatorConfig().getFirst(), // version
+                                               response.getCurrentHashinatorConfig().getSecond()); // config bytes
+
+                // if we are recovering, the mispartitioned txn must come from the log,
+                // don't restart it. The correct txn will be replayed by another node.
+                if (VoltDB.instance().getMode() == OperationMode.INITIALIZING) {
+                    return false;
+                }
+
                 int partitionParamIndex = catProc.getPartitionparameter();
                 int partitionParamType = catProc.getPartitioncolumn().getType();
                 boolean isReadonly = catProc.getReadonly();
 
                 try {
                     int partition = getPartitionForProcedure(partitionParamIndex,
-                            partitionParamType, invocation);
+                            partitionParamType, response.getInvocation());
                     createTransaction(cihm.connection.connectionId(),
-                            null, false, invocation,
+                            null, false, response.getInvocation(),
                             isReadonly,
                             true, // Only SP could be mis-partitioned
                             false, // Only SP could be mis-partitioned
