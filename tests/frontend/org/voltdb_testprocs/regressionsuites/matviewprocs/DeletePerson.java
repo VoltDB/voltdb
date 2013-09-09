@@ -40,7 +40,7 @@ public class DeletePerson extends VoltProcedure {
     {
         voltQueueSQL(delete, id);
         if (set2sabotage == 2) {
-            throw new VoltAbortException("this is an explicit user-definedabort condition");
+            throw new VoltAbortException("this is an explicit user-defined abort condition");
         }
         return voltExecuteSQL();
     }
