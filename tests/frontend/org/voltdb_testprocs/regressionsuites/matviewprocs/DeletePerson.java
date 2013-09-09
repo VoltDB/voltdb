@@ -23,7 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.matviewprocs;
 
-import org.voltdb.*;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
 @ProcInfo (
     partitionInfo = "PEOPLE.PARTITION: 0",
@@ -32,8 +35,13 @@ import org.voltdb.*;
 public class DeletePerson extends VoltProcedure {
     public final SQLStmt delete = new SQLStmt("DELETE FROM PEOPLE WHERE ID = ?;");
 
-    public VoltTable[] run(int partition, long id) {
+    public VoltTable[] run(int partition, long id, int set2sabotage)
+    throws VoltAbortException
+    {
         voltQueueSQL(delete, id);
+        if (set2sabotage == 2) {
+            throw new VoltAbortException("this is an explicit user-defined abort condition");
+        }
         return voltExecuteSQL();
     }
 }

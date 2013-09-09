@@ -23,7 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.matviewprocs;
 
-import org.voltdb.*;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
 @ProcInfo (
     partitionInfo = "PEOPLE.PARTITION: 0",
@@ -32,8 +35,13 @@ import org.voltdb.*;
 public class AddPerson extends VoltProcedure {
     public final SQLStmt insert = new SQLStmt("INSERT INTO PEOPLE VALUES (?, ?, ?, ?, ?);");
 
-    public VoltTable[] run(int partition, long id, long age, double salary, long children) {
+    public VoltTable[] run(int partition, long id, long age, double salary, long children, int set2sabotage) {
         voltQueueSQL(insert, partition, id, age, salary, children);
+        if (set2sabotage == 2) {
+            // The point here is to get the duplicate primary key on the base table
+            // to abort both inserts and any side effects on the matview table.
+            voltQueueSQL(insert, partition, id, age, salary, children);
+        }
         return voltExecuteSQL();
     }
 }
