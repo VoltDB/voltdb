@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
@@ -47,6 +48,7 @@ public class InitiateResponseMessage extends VoltMessage {
     // Mis-partitioned invocation needs to send the invocation back to ClientInterface for restart
     private boolean m_mispartitioned;
     private StoredProcedureInvocation m_invocation;
+    private Pair<Long, byte[]> m_currentHashinatorConfig;
 
     /** Empty constructor for de-serialization */
     public InitiateResponseMessage()
@@ -149,9 +151,15 @@ public class InitiateResponseMessage extends VoltMessage {
         return m_invocation;
     }
 
-    public void setMispartitioned(boolean mispartitioned, StoredProcedureInvocation invocation) {
+    public Pair<Long, byte[]> getCurrentHashinatorConfig() {
+        return m_currentHashinatorConfig;
+    }
+
+    public void setMispartitioned(boolean mispartitioned, StoredProcedureInvocation invocation,
+                                  Pair<Long, byte[]> currentHashinatorConfig) {
         m_mispartitioned = mispartitioned;
         m_invocation = invocation;
+        m_currentHashinatorConfig = currentHashinatorConfig;
         m_commit = false;
         m_response = new ClientResponseImpl(ClientResponse.TXN_RESTART, new VoltTable[]{}, "Mispartitioned");
     }
@@ -184,7 +192,10 @@ public class InitiateResponseMessage extends VoltMessage {
             + 1; // mispartitioned invocation
 
         if (m_mispartitioned) {
-            msgsize += m_invocation.getSerializedSize();
+            msgsize += m_invocation.getSerializedSize()
+                       + 8 // current hashinator version
+                       + 4 // hashinator config length
+                       + m_currentHashinatorConfig.getSecond().length; // hashinator config
         } else {
             msgsize += m_response.getSerializedSize();
         }
@@ -207,6 +218,9 @@ public class InitiateResponseMessage extends VoltMessage {
         buf.put((byte) (m_mispartitioned == true ? 1 : 0));
         if (m_mispartitioned) {
             m_invocation.flattenToBuffer(buf);
+            buf.putLong(m_currentHashinatorConfig.getFirst());
+            buf.putInt(m_currentHashinatorConfig.getSecond().length);
+            buf.put(m_currentHashinatorConfig.getSecond());
         } else {
             m_response.flattenToBuffer(buf);
         }
@@ -229,6 +243,10 @@ public class InitiateResponseMessage extends VoltMessage {
         if (m_mispartitioned) {
             m_invocation = new StoredProcedureInvocation();
             m_invocation.initFromBuffer(buf);
+            long hashinatorVersion = buf.getLong();
+            byte[] hashinatorBytes = new byte[buf.getInt()];
+            buf.get(hashinatorBytes);
+            m_currentHashinatorConfig = Pair.of(hashinatorVersion, hashinatorBytes);
             m_commit = false;
         } else {
             m_response = new ClientResponseImpl();
