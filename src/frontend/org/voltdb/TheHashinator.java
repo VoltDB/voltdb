@@ -381,4 +381,10 @@ public abstract class TheHashinator {
     public static Map<Long, Long> getRanges(int partition) {
         return instance.get().getSecond().pGetRanges(partition);
     }
+
+    public static Pair<Long, byte[]> getCurrentVersionedConfig()
+    {
+        Pair<Long, ? extends TheHashinator> currentHashinator = instance.get();
+        return Pair.of(currentHashinator.getFirst(), currentHashinator.getSecond().pGetCurrentConfig().getSecond());
+    }
 }
