@@ -268,17 +268,6 @@ public class CSVLoaderMT {
                 close_cleanup();
                 System.exit(-1);
             }
-            try {
-                if (isProcedureMp(csvClient)) {
-                    m_log.warn("Using a multi-partitioned procedure to load data will be slow. "
-                            + "If loading a partitioned table, use a single-partitioned procedure "
-                            + "for best performance.");
-                }
-            } catch (Exception e) {
-                m_log.fatal(e.getMessage(), e);
-                close_cleanup();
-                System.exit(-1);
-            }
 
             ArrayList<VoltType> columnTypes = new ArrayList<VoltType>();
             ArrayList<String> colNames = new ArrayList<String>();
@@ -336,7 +325,11 @@ public class CSVLoaderMT {
             CSVPartitionProcessor.columnTypes = columnTypes;
             CSVPartitionProcessor.insertProcedure = insertProcedure;
             CSVPartitionProcessor.isMP = (partitionedColumnIndex == -1 ? true : false);
-            CSVPartitionProcessor.isLoadTable = config.loadTable;
+            if (CSVPartitionProcessor.isMP) {
+                m_log.warn("Using a multi-partitioned procedure to load data will be slow. "
+                        + "If loading a partitioned table, use a single-partitioned procedure "
+                        + "for best performance.");
+            }
             CSVPartitionProcessor.config = config;
 
             List<Thread> spawned = new ArrayList<Thread>(numPartitions);
@@ -345,7 +338,7 @@ public class CSVLoaderMT {
             CountDownLatch pcount = new CountDownLatch(numPartitions);
             List<CSVPartitionProcessor> processors = new ArrayList<CSVPartitionProcessor>(numPartitions);
             for (int i = 0; i < numPartitions; i++) {
-                ArrayBlockingQueue<CSVLineWithMetaData> q = new ArrayBlockingQueue<CSVLineWithMetaData>((int) config.batch * 2);
+                ArrayBlockingQueue<CSVLineWithMetaData> q = new ArrayBlockingQueue<CSVLineWithMetaData>((int) config.batch);
                 lineq.put(i, q);
                 CSVPartitionProcessor pp = new CSVPartitionProcessor();
                 processors.add(pp);
@@ -355,8 +348,9 @@ public class CSVLoaderMT {
                 pp.columnCnt = columnCnt;
                 pp.lineq = q;
                 pp.dummy = dummy;
+                pp.name = "PartitionProcessor-" + i;
                 Thread th = new Thread(pp);
-                th.setName("PartitionProcessor-" + 0);
+                th.setName(pp.name);
                 spawned.add(th);
             }
             CSVPartitionProcessor.pcount = pcount;
@@ -377,12 +371,11 @@ public class CSVLoaderMT {
             Thread th = new Thread(rdr);
             th.setName("CSVReader");
             th.setDaemon(true);
-            th.start();
 
             for (Thread th2 : spawned) {
                 th2.start();
             }
-
+            th.start();
             th.join();
 
             long readerTime = 0;

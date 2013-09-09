@@ -24,8 +24,6 @@ import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
@@ -49,10 +47,10 @@ class CSVPartitionProcessor implements Runnable {
     int partitionId;
     public static String insertProcedure = "";
     public String tableName;
+    public String name;
     public static ArrayList<VoltType> columnTypes;
     public static VoltTable.ColumnInfo colInfo[];
     public static boolean isMP = false;
-    public static boolean isLoadTable = false;
     long partitionProcessedCount = 0;
     AtomicLong partitionAcknowledgedCount = new AtomicLong(0);
     protected static final VoltLogger m_log = new VoltLogger("CONSOLE");
@@ -100,7 +98,7 @@ class CSVPartitionProcessor implements Runnable {
             int newMultiple = (int) currentCount / reportEveryNRows;
             if (newMultiple != lastMultiple) {
                 lastMultiple = newMultiple;
-                m_log.info("Inserted " + currentCount + " rows");
+                m_log.info(pprocessor.name + " Inserted " + currentCount + " rows");
             }
         }
     }
@@ -110,7 +108,7 @@ class CSVPartitionProcessor implements Runnable {
 
         Client lcsvClient = csvClient;
         VoltTable table = new VoltTable(colInfo);
-        String procName = (isMP ? "@LoadMultipartitionTable" : (isLoadTable ? "@LoadPartitionData" : "@LoadSinglepartitionTable"));
+        String procName = (isMP ? "@LoadMultipartitionTable" : "@LoadSinglepartitionTable");
         if (config.ping) {
             procName = "@Ping";
         } else if (config.useSuppliedProcedure) {
@@ -118,10 +116,8 @@ class CSVPartitionProcessor implements Runnable {
         }
 
         m_log.info("Using Procedure: " + procName);
-        Object partitionParam;
-        if (isLoadTable) {
-            partitionParam = partitionId;
-        } else {
+        Object partitionParam = null;
+        if (!isMP) {
             partitionParam = TheHashinator.valueToBytes(partitionId);
         }
         String lastLine[] = null;
@@ -200,11 +196,11 @@ class CSVPartitionProcessor implements Runnable {
         try {
             lcsvClient.drain();
         } catch (NoConnectionsException ex) {
-            Logger.getLogger(CSVPartitionProcessor.class.getName()).log(Level.SEVERE, null, ex);
+            m_log.warn("Failed to Drain the client: ", ex);
         } catch (InterruptedException ex) {
-            Logger.getLogger(CSVPartitionProcessor.class.getName()).log(Level.SEVERE, null, ex);
+            m_log.warn("Failed to Drain the client: ", ex);
         }
         CSVPartitionProcessor.pcount.countDown();
-        System.out.println("Done Processing partition: " + partitionId + " Processed: " + partitionProcessedCount);
+        m_log.info("Done Processing partition: " + partitionId + " Processed: " + partitionProcessedCount);
     }
 }

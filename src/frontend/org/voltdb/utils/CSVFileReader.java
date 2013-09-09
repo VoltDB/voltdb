@@ -47,8 +47,8 @@ class CSVFileReader implements Runnable {
     static CSVLineWithMetaData dummy;
     static int batchmax = 200;
     static String tableName;
-    static long parsingTimeSt = System.nanoTime();
-    static long parsingTimeEnd = System.nanoTime();
+    long parsingTimeSt = System.nanoTime();
+    long parsingTimeEnd = System.nanoTime();
     static CountDownLatch pcount;
     static boolean errored = false;
 
