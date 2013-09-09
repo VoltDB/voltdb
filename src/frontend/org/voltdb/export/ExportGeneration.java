@@ -697,7 +697,10 @@ public class ExportGeneration {
 
     }
 
-    public void truncateExportToTxnId(long txnId, long[] perPartitionTxnIds) {
+    /*
+     * Returns true if the generatino was completely truncated away
+     */
+    public boolean truncateExportToTxnId(long txnId, long[] perPartitionTxnIds) {
         // create an easy partitionId:txnId lookup.
         HashMap<Integer, Long> partitionToTxnId = new HashMap<Integer, Long>();
         for (long tid : perPartitionTxnIds) {
@@ -726,6 +729,7 @@ public class ExportGeneration {
                 }
             }
         }
+
         try {
             Futures.allAsList(tasks).get();
         } catch (Exception e) {
@@ -733,6 +737,8 @@ public class ExportGeneration {
                                     "You can back up export overflow data and start the " +
                                     "DB without it to get past this error", true, e);
         }
+
+        return m_drainedSources.get() == m_numSources;
     }
 
     public void close() {

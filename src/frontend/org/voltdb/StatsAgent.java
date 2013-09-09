@@ -18,12 +18,14 @@ package org.voltdb;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 
 import org.json_voltpatches.JSONObject;
 import org.voltcore.network.Connection;
 import org.voltcore.utils.Pair;
 
 import org.voltdb.TheHashinator.HashinatorType;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 
 /**
@@ -64,6 +66,30 @@ public class StatsAgent extends OpsAgent
         default:
         }
     }
+    private Map<String, Boolean> m_procInfo = null;
+    /**
+     * Check if proc is readonly?
+     *
+     * @param pname
+     * @return
+     */
+    private boolean isReadOnlyProcedure(String pname) {
+        synchronized (this) {
+            if (m_procInfo == null) {
+                Map<String, Boolean> mm = new HashMap<String, Boolean>();
+                CatalogContext ctx = VoltDB.instance().getCatalogContext();
+                for (Procedure p : ctx.procedures) {
+                    mm.put(p.getClassname(), p.getReadonly());
+                }
+                m_procInfo = mm;
+            }
+        }
+        final Boolean b = m_procInfo.get(pname);
+        if (b == null) {
+            return false;
+        }
+        return b;
+    }
 
     /**
      * Produce PROCEDUREPROFILE aggregation of PROCEDURE subselector
@@ -77,9 +103,11 @@ public class StatsAgent extends OpsAgent
         StatsProcProfTable timeTable = new StatsProcProfTable();
         baseStats[0].resetRowPosition();
         while (baseStats[0].advanceRow()) {
-            timeTable.updateTable(
+            String pname = baseStats[0].getString("PROCEDURE");
+
+            timeTable.updateTable(!isReadOnlyProcedure(pname),
                     baseStats[0].getLong("TIMESTAMP"),
-                    baseStats[0].getString("PROCEDURE"),
+                    pname,
                     baseStats[0].getLong("PARTITION_ID"),
                     baseStats[0].getLong("INVOCATIONS"),
                     baseStats[0].getLong("MIN_EXECUTION_TIME"),
@@ -102,8 +130,9 @@ public class StatsAgent extends OpsAgent
         StatsProcInputTable timeTable = new StatsProcInputTable();
         baseStats[0].resetRowPosition();
         while (baseStats[0].advanceRow()) {
-            timeTable.updateTable(
-                    baseStats[0].getString("PROCEDURE"),
+            String pname = baseStats[0].getString("PROCEDURE");
+            timeTable.updateTable(!isReadOnlyProcedure(pname),
+                    pname,
                     baseStats[0].getLong("PARTITION_ID"),
                     baseStats[0].getLong("TIMESTAMP"),
                     baseStats[0].getLong("INVOCATIONS"),
@@ -128,8 +157,9 @@ public class StatsAgent extends OpsAgent
         StatsProcOutputTable timeTable = new StatsProcOutputTable();
         baseStats[0].resetRowPosition();
         while (baseStats[0].advanceRow()) {
-            timeTable.updateTable(
-                    baseStats[0].getString("PROCEDURE"),
+            String pname = baseStats[0].getString("PROCEDURE");
+            timeTable.updateTable(!isReadOnlyProcedure(pname),
+                    pname,
                     baseStats[0].getLong("PARTITION_ID"),
                     baseStats[0].getLong("TIMESTAMP"),
                     baseStats[0].getLong("INVOCATIONS"),

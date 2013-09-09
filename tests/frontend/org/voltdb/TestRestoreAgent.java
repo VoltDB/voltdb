@@ -209,12 +209,12 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                       boolean isReadOnly,
                                       boolean isSinglePartition,
                                       boolean isEverySite,
-                                      int[] partitions,
+                                      int partition,
                                       int messageSize,
                                       long now) {
             createTransaction(connectionId,
                               0, 0, invocation, isReadOnly, isSinglePartition,
-                              isEverySite, partitions,
+                              isEverySite, partition,
                               messageSize, now);
             return true;
         }
@@ -227,7 +227,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                       boolean isReadOnly,
                                       boolean isSinglePartition,
                                       boolean isEverySite,
-                                      int[] partitions,
+                                      int partition,
                                       int messageSize,
                                       long now) {
             String procName = invocation.procName;
