@@ -378,7 +378,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             //Cheesy hack for now where we serve info about old
             //data sources from previous generations. In reality accessing
             //this generation is something of an error
-            if (hitEndOfStreamWithNoRunnable) {
+            if (hitEndOfStreamWithNoRunnable && message.isPoll()) {
                 ByteBuffer buf = ByteBuffer.allocate(4);
                 buf.putInt(0).flip();
                 result.pollResponse(m_firstUnpolledUso, buf);
@@ -558,7 +558,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     m_onDrain.run();
                 }
             } else {
-                exportLog.info("EOS for " + m_tableName + " partition " + m_partitionId);
+                exportLog.info("EOS for " + m_tableName + " partition " + m_partitionId +
+                        " with first unpolled uso " + m_firstUnpolledUso + " and remaining bytes " +
+                        m_committedBuffers.sizeInBytes());
             }
             return;
         }

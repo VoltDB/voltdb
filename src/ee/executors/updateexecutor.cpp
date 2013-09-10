@@ -133,8 +133,8 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
 
     // determine which indices are updated by this executor
     // iterate through all target table indices and see if they contain
-    //  tables mutated by this executor
-    std::vector<TableIndex*> allIndexes = m_targetTable->allIndexes();
+    // columns mutated by this executor
+    const std::vector<TableIndex*>& allIndexes = m_targetTable->allIndexes();
     BOOST_FOREACH(TableIndex *index, allIndexes) {
         bool indexKeyUpdated = false;
         BOOST_FOREACH(int colIndex, index->getColumnIndices()) {
@@ -215,7 +215,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
     }
 
     TableTuple& count_tuple = m_node->getOutputTable()->tempTuple();
-    count_tuple.setNValue(0, ValueFactory::getBigIntValue(m_inputTable->activeTupleCount()));
+    count_tuple.setNValue(0, ValueFactory::getBigIntValue(m_inputTable->tempTableTupleCount()));
     // try to put the tuple into the output table
     if (!m_node->getOutputTable()->insertTuple(count_tuple)) {
         VOLT_ERROR("Failed to insert tuple count (%ld) into"
@@ -230,7 +230,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
     // delete/insert
 
     // add to the planfragments count of modified tuples
-    m_engine->m_tuplesModified += m_inputTable->activeTupleCount();
+    m_engine->m_tuplesModified += m_inputTable->tempTableTupleCount();
 
     return true;
 }

@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
+import java.math.RoundingMode;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
@@ -226,23 +227,20 @@ public class VoltDecimalHelper {
             return null;
         }
         BigDecimal bd = new BigDecimal(decimal);
-        // enforce scale 12 to make the precision check right
-        if (bd.scale() < 12) {
-            bd.setScale(12);
-        }
         // if the scale is too large, check for trailing zeros
-        if (bd.scale() > 12) {
+        if (bd.scale() > kDefaultScale) {
             bd = bd.stripTrailingZeros();
-            if (bd.scale() > 12) {
-                throw new IOException("Decimal " + bd + " has more then 12 digits of scale");
+            if (bd.scale() > kDefaultScale) {
+                throw new IOException("Decimal " + bd + " has more than " + kDefaultScale + " digits of scale");
             }
-            // enforce scale 12 to make the precision check right
-            if (bd.scale() < 12) {
-                bd.setScale(12);
-            }
+        }
+        // enforce scale 12 to make the precision check right
+        if (bd.scale() < kDefaultScale) {
+            bd = bd.setScale(kDefaultScale);
         }
         if (bd.precision() > 38) {
-            throw new RuntimeException("Decimal " + bd + " has more than  38 digits of precision.");
+            throw new RuntimeException(
+                    "Decimal " + bd + " has more than " + kDefaultPrecision + " digits of precision.");
         }
         return bd;
     }
@@ -333,5 +331,10 @@ public class VoltDecimalHelper {
                         kDefaultScale, context));
 
         System.out.println(deserializeBigDecimal(ByteBuffer.wrap(NULL_INDICATOR)));
+    }
+
+    public static BigDecimal setDefaultScale(BigDecimal bd) {
+        // TODO Auto-generated method stub
+        return bd.setScale(kDefaultScale, RoundingMode.HALF_EVEN);
     }
 }

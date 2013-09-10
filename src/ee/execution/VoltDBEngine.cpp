@@ -485,6 +485,8 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
 
     assert(m_catalog != NULL);
     VOLT_DEBUG("Loading catalog...");
+
+    VOLT_TRACE("Catalog string contents:\n%s\n",catalogPayload.c_str());
     m_catalog->execute(catalogPayload);
 
 
@@ -719,7 +721,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
             // find all of the indexes to add
             //////////////////////////////////////////
 
-            vector<TableIndex*> currentIndexes = persistenttable->allIndexes();
+            const vector<TableIndex*> currentIndexes = persistenttable->allIndexes();
 
             // iterate over indexes for this table in the catalog
             map<string, catalog::Index*>::const_iterator indexIter;
@@ -727,7 +729,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                  indexIter != catalogTable->indexes().end();
                  indexIter++)
             {
-                std::string indexName = indexIter->first;
+                std::string indexName = indexIter->second->name();
                 std::string catalogIndexId = TableCatalogDelegate::getIndexIdString(*indexIter->second);
 
                 // Look for an index on the table to match the catalog index
@@ -967,7 +969,7 @@ void VoltDBEngine::rebuildTableCollections()
                                                   tcd->getTable()->getTableStats());
 
             // add all of the indexes to the stats source
-            std::vector<TableIndex*> tindexes = tcd->getTable()->allIndexes();
+            const std::vector<TableIndex*>& tindexes = tcd->getTable()->allIndexes();
             for (int i = 0; i < tindexes.size(); i++) {
                 TableIndex *index = tindexes[i];
                 getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
@@ -1434,8 +1436,8 @@ int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
                 results.writeInt(*ipos);
             }
         }
-        VOLT_DEBUG("tableStreamSerializeMore: deserialized %d buffers, %lld remaining",
-                   (int)positions.size(), remaining);
+        VOLT_DEBUG("tableStreamSerializeMore: deserialized %d buffers, %ld remaining",
+                   (int)positions.size(), (long)remaining);
     }
     catch (SerializableEEException &e) {
         resetReusedResultOutputBuffer();

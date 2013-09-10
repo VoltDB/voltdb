@@ -121,8 +121,7 @@ public class SnapshotSaveAPI
     {
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotSave.constructNodeResultsTable();
-        final SiteTracker st = context.getSiteTrackerForSnapshot();
-        final int numLocalSites = st.getLocalSites().length;
+        final int numLocalSites = context.getCluster().getDeployment().get("deployment").getSitesperhost();
 
         // One site wins the race to create the snapshot targets, populating
         // m_taskListsForSites for the other sites and creating an appropriate
@@ -166,7 +165,7 @@ public class SnapshotSaveAPI
                             hostname,
                             result,
                             exportSequenceNumbers,
-                            st,
+                            context.getSiteTrackerForSnapshot(),
                             timestamp);
                 }
             });
@@ -231,7 +230,7 @@ public class SnapshotSaveAPI
                                 taskList,
                                 targetList,
                                 multiPartTxnId,
-                                context.getSiteTrackerForSnapshot().getAllHosts().size(),
+                                VoltDB.instance().getHostMessenger().getLiveHostIds().size(),
                                 exportSequenceNumbers);
                     }
                 }

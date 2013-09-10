@@ -28,6 +28,7 @@ import java.util.logging.Logger;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
 import org.voltdb.types.TimestampType;
+import org.voltdb.types.VoltDecimalHelper;
 
 public abstract class VoltTypeUtil {
     private static final Logger LOG = Logger.getLogger(VoltTypeUtil.class.getName());
@@ -124,7 +125,7 @@ public abstract class VoltTypeUtil {
             // --------------------------------
             case DECIMAL: {
                 BigDecimal bd = new BigDecimal(r.nextDouble());
-                ret = bd.setScale(12, BigDecimal.ROUND_HALF_EVEN);
+                ret = VoltDecimalHelper.setDefaultScale(bd);
                 break;
             }
             // --------------------------------

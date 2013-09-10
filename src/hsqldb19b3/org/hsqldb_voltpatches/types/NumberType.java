@@ -1478,7 +1478,13 @@ public final class NumberType extends Type {
                 BigDecimal abd = (BigDecimal) a;
                 BigDecimal bbd = (BigDecimal) b;
 
-                return abd.multiply(bbd);
+                // VOLTDB changed for fixed decimal scale ... return abd.multiply(bbd);
+                BigDecimal cbd = abd.multiply(bbd);
+                // This replicates VoltDecimalHelper.setDefaultScale(cbd);
+                // without the library dependency.
+                return cbd.setScale(12 /* == VoltDecimalHelper.kDefaultScale*/,
+                                    java.math.RoundingMode.HALF_EVEN);
+                // ... VOLTDB changed
             }
             case Types.TINYINT :
             case Types.SQL_SMALLINT :

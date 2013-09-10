@@ -291,7 +291,7 @@ class NValue {
     void serializeToExport(ExportSerializeOutput&) const;
 
     // See comment with inlined body, below.
-    void allocatePersistentObjectFromInlineValue();
+    void allocateObjectFromInlinedValue(Pool* stringPool = NULL);
 
     /* Check if the value represents SQL NULL */
     bool isNull() const;
@@ -304,7 +304,6 @@ class NValue {
     bool isFalse() const;
 
     /* For number values, check the number line. */
-    bool isNegative() const;
     bool isZero() const;
 
     /* For boolean NValues only, logical operators */
@@ -1578,9 +1577,6 @@ class NValue {
                 break;
             case VALUE_TYPE_DECIMAL:
                 rhsValue = rhs.castAsDoubleAndGetValue();
-                if (rhs.isNegative()) {
-                    rhsValue *= -1;
-                }
                 break;
             default:
                 char message[128];
@@ -1595,9 +1591,16 @@ class NValue {
                 return 0;
         }
 
+        // Add null type comparison
+        if (isNull()) {
+            return rhs.isNull() ? VALUE_COMPARE_EQUAL : VALUE_COMPARE_LESSTHAN;
+        }
+        else if (rhs.isNull()) {
+            return VALUE_COMPARE_GREATERTHAN;
+        }
         // Treat NaN values as equals and also make them smaller than neagtive infinity.
         // This breaks IEEE754 for expressions slightly.
-        if (std::isnan(lhsValue)) {
+        else if (std::isnan(lhsValue)) {
             return std::isnan(rhsValue) ? VALUE_COMPARE_EQUAL : VALUE_COMPARE_LESSTHAN;
         }
         else if (std::isnan(rhsValue)) {
@@ -2109,29 +2112,6 @@ inline bool NValue::isFalse() const {
     return !getBoolean();
 }
 
-inline bool NValue::isNegative() const {
-        const ValueType type = getValueType();
-        switch (type) {
-        case VALUE_TYPE_TINYINT:
-            return getTinyInt() < 0;
-        case VALUE_TYPE_SMALLINT:
-            return getSmallInt() < 0;
-        case VALUE_TYPE_INTEGER:
-            return getInteger() < 0;
-        case VALUE_TYPE_BIGINT:
-            return getBigInt() < 0;
-        case VALUE_TYPE_TIMESTAMP:
-            return getTimestamp() < 0;
-        case VALUE_TYPE_DOUBLE:
-            return getDouble() < 0;
-        case VALUE_TYPE_DECIMAL:
-            return getDecimal().IsSign();
-        default: {
-            throwDynamicSQLException( "Invalid value type '%s' for checking negativity", getValueTypeString().c_str());
-        }
-        }
-    }
-
 /**
  * Logical and operation for NValues
  */
@@ -2366,7 +2346,7 @@ inline const NValue NValue::deserializeFromTupleStorage(const void *storage,
     }
     default:
         throwDynamicSQLException(
-                "NValue::getLength() unrecognized type '%s'",
+                "NValue::deserializeFromTupleStorage() unrecognized type '%s'",
                 getTypeName(type).c_str());
     }
     return retval;
@@ -2769,8 +2749,8 @@ inline void NValue::serializeToExport(ExportSerializeOutput &io) const
 }
 
 /** Reformat an object-typed value from its inlined form to its allocated out-of-line form,
- *  for use with a widened tuple column. **/
-inline void NValue::allocatePersistentObjectFromInlineValue()
+ *  for use with a wider/widened tuple column, either persistent (stringPool==NULL) or temp **/
+inline void NValue::allocateObjectFromInlinedValue(Pool* stringPool)
 {
     if (m_valueType == VALUE_TYPE_NULL || m_valueType == VALUE_TYPE_INVALID) {
         return;
@@ -2792,11 +2772,6 @@ inline void NValue::allocatePersistentObjectFromInlineValue()
         setSourceInlined(false);
         return;
     }
-
-    // A future version/variant of this function may take an optional Pool argument,
-    // so that it could be used for temp values/tables.
-    // The default persistent string pool specified by NULL works fine here and now.
-    Pool* stringPool = NULL;
 
     // When an object is inlined, m_data is a direct pointer into a tuple's inline storage area.
     char* source = *reinterpret_cast<char**>(m_data);

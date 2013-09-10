@@ -303,6 +303,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * Called to compute cost estimates and statistics on a plan graph. Computing of the costs
      * should be idempotent, but updating the PlanStatistics instance isn't, so this should
      * be called once per finished graph, and once per PlanStatistics instance.
+     * TODO(XIN): It takes at least 14% planner CPU. Optimize it.
      */
     public final void computeEstimatesRecursively(PlanStatistics stats,
                                                   Cluster cluster,

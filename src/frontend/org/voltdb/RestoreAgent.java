@@ -114,11 +114,6 @@ SnapshotCompletionInterest
 
     private final RestoreAdapter m_restoreAdapter = new RestoreAdapter(m_changeStateFunctor);
 
-    // RealVoltDB needs this to connect the ClientInterface and the Adapter.
-    RestoreAdapter getAdapter() {
-        return m_restoreAdapter;
-    }
-
     private final ZooKeeper m_zk;
     private final SnapshotCompletionMonitor m_snapshotMonitor;
     private final Callback m_callback;
@@ -205,8 +200,7 @@ SnapshotCompletionInterest
                             jsObj.put(SnapshotRestore.JSON_DUPLICATES_PATH, m_voltdbrootPath);
                         }
                         Object[] params = new Object[] { jsObj.toString() };
-                        initSnapshotWork(RESTORE_TXNID,
-                                Pair.of("@SnapshotRestore", params));
+                        initSnapshotWork(RESTORE_TXNID, params);
                     }
                     m_restoreHeartbeatThread.start();
 
@@ -451,6 +445,7 @@ SnapshotCompletionInterest
 
     public void setInitiator(TransactionCreator initiator) {
         m_initiator = initiator;
+        m_initiator.bindAdapter(m_restoreAdapter);
         if (m_replayAgent != null) {
             m_replayAgent.setInitiator(initiator);
         }
@@ -1111,15 +1106,16 @@ SnapshotCompletionInterest
      * Restore a snapshot. An arbitrarily early transaction is provided if command
      * log replay follows to maintain txnid sequence constraints (with simple dtxn).
      */
-    private void initSnapshotWork(Long txnId, final Pair<String, Object[]> invocation) {
-        Config restore = SystemProcedureCatalog.listing.get(invocation.getFirst());
+    private void initSnapshotWork(Long txnId, final Object[] procParams) {
+        final String procedureName = "@SnapshotRestore";
+        Config restore = SystemProcedureCatalog.listing.get(procedureName);
         Procedure restoreProc = restore.asCatalogProcedure();
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
-        spi.procName = invocation.getFirst();
+        spi.procName = procedureName;
         spi.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
             @Override
             public ParameterSet call() throws Exception {
-                ParameterSet params = ParameterSet.fromArrayWithCopy(invocation.getSecond());
+                ParameterSet params = ParameterSet.fromArrayWithCopy(procParams);
                 return params;
             }
         });
@@ -1135,21 +1131,21 @@ SnapshotCompletionInterest
         }
 
         if (txnId == null) {
-            m_initiator.createTransaction(m_restoreAdapter.connectionId(), "CommandLog", true, spi,
+            m_initiator.createTransaction(m_restoreAdapter.connectionId(), spi,
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
                                           restoreProc.getEverysite(),
-                                          m_allPartitions,
-                                          m_restoreAdapter, 0,
+                                          0,//Can provide anything for multi-part
+                                          0,
                                           EstTime.currentTimeMillis());
         } else {
-            m_initiator.createTransaction(m_restoreAdapter.connectionId(), "CommandLog", true,
+            m_initiator.createTransaction(m_restoreAdapter.connectionId(),
                                           txnId, System.currentTimeMillis(), spi,
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
                                           restoreProc.getEverysite(),
-                                          m_allPartitions,
-                                          m_restoreAdapter, 0,
+                                          0,//Can provide anything for multi-part
+                                          0,
                                           EstTime.currentTimeMillis());
         }
     }

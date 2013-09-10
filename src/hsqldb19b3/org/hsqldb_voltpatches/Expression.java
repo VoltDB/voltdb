@@ -1544,6 +1544,12 @@ public class Expression {
         return voltGetXML(session, null, null, -1);
     }
 
+    VoltXMLElement voltGetXML(Session session, List<Expression> displayCols,
+            java.util.Set<Integer> ignoredDisplayColIndexes, int startKey) throws HSQLParseException
+    {
+        return voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey, null);
+    }
+
     /**
      * VoltDB added method to get a non-catalog-dependent
      * representation of this HSQLDB object.
@@ -1552,7 +1558,8 @@ public class Expression {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    VoltXMLElement voltGetXML(Session session, List<Expression> displayCols, java.util.Set<Integer> ignoredDisplayColIndexes, int startKey) throws HSQLParseException
+    VoltXMLElement voltGetXML(Session session, List<Expression> displayCols,
+            java.util.Set<Integer> ignoredDisplayColIndexes, int startKey, String realAlias) throws HSQLParseException
     {
         // The voltXML representations of expressions tends to be driven much more by the expression's opType
         // than its Expression class.
@@ -1580,7 +1587,7 @@ public class Expression {
                     // serialize the column this simple column stands-in for.
                     // Prepare to skip displayCols that are the referent of a SIMPLE_COLUMN."
                     // quit seeking simple_column's replacement.
-                    return otherCol.voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey);
+                    return otherCol.voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey, getAlias());
                 }
             }
             assert(false);
@@ -1599,7 +1606,9 @@ public class Expression {
         exp = exp.duplicate();
         exp.attributes.put("id", this.getUniqueId(session));
 
-        if ((alias != null) && (getAlias().length() > 0)) {
+        if (realAlias != null) {
+            exp.attributes.put("alias", realAlias);
+        } else if ((alias != null) && (getAlias().length() > 0)) {
             exp.attributes.put("alias", getAlias());
         }
 
@@ -1622,9 +1631,12 @@ public class Expression {
             // Apparently at this stage, all valid non-NULL values must have a type determined by HSQL.
             // I'm not sure why this must be the case --paul.
             // if the actual value is null, make sure the type is null as well
-            if ((dataType == null) || (valueData == null)) {
-                exp.attributes.put("valuetype", "NULL");
-                exp.attributes.put("value", "NULL");
+            if (valueData == null) {
+                if (dataType == null) {
+                    exp.attributes.put("valuetype", "NULL");
+                    return exp;
+                }
+                exp.attributes.put("valuetype", Types.getTypeName(dataType.typeCode));
                 return exp;
             }
 

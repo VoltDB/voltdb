@@ -560,6 +560,22 @@ public enum VoltType {
         }
     }
 
+    // Used by TheHashinator.getPartitionForParameter() to determine if the
+    // type of the partition parameter is one that we can coerce from a string
+    // value.  isInteger includes TIMESTAMP, which is bad, and isNumber
+    // includes FLOAT, which is also bad, hence the creation of this method.
+    public boolean isPartitionableNumber() {
+        switch (this) {
+            case TINYINT:
+            case SMALLINT:
+            case INTEGER:
+            case BIGINT:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     /* Indicate whether a value can be assigned to this type without loss of range or precision,
      * important for index key and partition key initialization. */
     public boolean canExactlyRepresentAnyValueOf(VoltType otherType) {

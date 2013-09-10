@@ -22,6 +22,7 @@
  */
 package org.voltcore.network;
 
+import java.net.InetSocketAddress;
 import java.util.concurrent.Future;
 
 public class MockConnection implements Connection {
@@ -47,7 +48,22 @@ public class MockConnection implements Connection {
     }
 
     @Override
+    public String getHostnameAndIPAndPort() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public String getHostnameOrIP() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public int getRemotePort() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public InetSocketAddress getRemoteSocketAddress() {
         throw new UnsupportedOperationException();
     }
 

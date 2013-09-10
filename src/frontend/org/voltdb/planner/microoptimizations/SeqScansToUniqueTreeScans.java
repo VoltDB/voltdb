@@ -138,7 +138,6 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
         IndexScanPlanNode indexScanNode = new IndexScanPlanNode(scanNode, null, indexToScan, SortDirectionType.ASC);
         indexScanNode.setKeyIterate(true);
         indexScanNode.setForDeterminismOnly();
-        indexScanNode.generateOutputSchema(db);
 
         return indexScanNode;
     }

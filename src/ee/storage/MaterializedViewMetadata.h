@@ -39,7 +39,7 @@ class TableIndex;
 class MaterializedViewMetadata {
 public:
 
-    MaterializedViewMetadata(PersistentTable *srcTable, PersistentTable *destTable, catalog::MaterializedViewInfo *metadata);
+    MaterializedViewMetadata(PersistentTable *srcTable, PersistentTable *destTable, catalog::MaterializedViewInfo *mvInfo);
     ~MaterializedViewMetadata();
 
     /**
@@ -63,7 +63,10 @@ private:
     void allocateBackedTuples();
 
     /** load a predicate from the catalog structure if it's there */
-    void parsePredicate(catalog::MaterializedViewInfo *metadata);
+    void parsePredicate(catalog::MaterializedViewInfo *mvInfo);
+
+    void parseComplexGroupby(catalog::MaterializedViewInfo *mvInfo);
+    void parseComplexAggregation(catalog::MaterializedViewInfo *mvInfo);
 
     /**
      * build a search key based on the src table value
@@ -92,6 +95,9 @@ private:
     // part of the aggregation in the materialized view
     AbstractExpression *m_filterPredicate;
 
+    std::vector<AbstractExpression *> m_groupbyExprs;
+    std::vector<AbstractExpression *> m_aggregationExprs;
+
     // how many columns is the view aggregated on
     int32_t m_groupByColumnCount;
     // which columns in the source table
@@ -105,8 +111,11 @@ private:
     // what are the aggregates for each column in the view table
     ExpressionType *m_outputColumnAggTypes;
 
-    // empty vector to tell the target table not to update indexes
-    std::vector<TableIndex*> m_emptyIndexUpdateList;
+    // vector of target table indexes to update.
+    // Ideally, these should be a subset of the target table indexes that depend on the count and/or
+    // aggregated columns, but there might be some other mostly harmless ones in there that are based
+    // solely on the immutable primary key (GROUP BY columns).
+    std::vector<TableIndex*> m_updatableIndexList;
 };
 
 } // namespace voltdb
