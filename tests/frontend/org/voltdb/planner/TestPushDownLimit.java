@@ -39,32 +39,45 @@ public class TestPushDownLimit extends PlannerTestCase {
                     "testpushdownlimit", false);
     }
 
-    @Override
-    protected void tearDown() throws Exception {
-        super.tearDown();
+    public void testPushDownIntoScan() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT B1 FROM R1 WHERE A1 = ? LIMIT 1");
+        checkPushedDownLimit(pn, false, true, false, false);
+        pn = compileToFragments("SELECT B1 FROM R1 WHERE PKEY = ? LIMIT 1");
+        checkPushedDownLimit(pn, false, true, false, false);
+    }
+
+    public void testPushDownIntoScanMultiPart() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT F_D1 FROM F LIMIT 1");
+        checkPushedDownLimit(pn, true, true, false, false);
     }
 
     public void testPushDownIntoJoin() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT * FROM D1, D2 WHERE D1.D1_PKEY = D2.D2_PKEY LIMIT 2");
+        List<AbstractPlanNode> pn = compileToFragments("SELECT D1.D1_PKEY FROM D1, D2 WHERE D1.D1_PKEY = D2.D2_PKEY LIMIT 2");
+        checkPushedDownLimit(pn, false, false, true, false);
+        pn = compileToFragments("SELECT D1.D1_NAME FROM D1, D2 WHERE D1.D1_PKEY = D2.D2_PKEY LIMIT 2");
         checkPushedDownLimit(pn, false, false, true, false);
     }
 
     public void testPushDownIntoJoinMultiPart() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT * FROM T1, T2 WHERE T1.PKEY = T2.PKEY LIMIT 2");
+        List<AbstractPlanNode> pn = compileToFragments("SELECT T2.PKEY FROM T1, T2 WHERE T1.PKEY = T2.PKEY LIMIT 2");
+        checkPushedDownLimit(pn, true, false, true, false);
+        pn = compileToFragments("SELECT T2.I FROM T1, T2 WHERE T1.PKEY = T2.PKEY LIMIT 2");
         checkPushedDownLimit(pn, true, false, true, false);
     }
 
     public void testPushDownIntoLeftJoin() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT * FROM D1 LEFT JOIN D2 ON D1.D1_PKEY = D2.D2_PKEY LIMIT 2");
+        List<AbstractPlanNode> pn = compileToFragments("SELECT D1.D1_PKEY FROM D1 LEFT JOIN D2 ON D1.D1_PKEY = D2.D2_PKEY LIMIT 2");
+        checkPushedDownLimit(pn, false, false, true, true);
+        pn = compileToFragments("SELECT D1.D1_NAME FROM D1 LEFT JOIN D2 ON D1.D1_PKEY = D2.D2_PKEY LIMIT 2");
         checkPushedDownLimit(pn, false, false, true, true);
     }
 
     public void testPushDownIntoLeftJoinMultiPart() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT * FROM T1 LEFT JOIN T2 ON T1.PKEY = T2.PKEY LIMIT 2");
+        List<AbstractPlanNode> pn = compileToFragments("SELECT T1.PKEY FROM T1 LEFT JOIN T2 ON T1.PKEY = T2.PKEY LIMIT 2");
+        checkPushedDownLimit(pn, true, false, true, true);
+        pn = compileToFragments("SELECT T1.A1 FROM T1 LEFT JOIN T2 ON T1.PKEY = T2.PKEY LIMIT 2");
         checkPushedDownLimit(pn, true, false, true, true);
     }
-
-
 
     /**
      * Check if the limit node is pushed-down in the given plan.
@@ -89,12 +102,17 @@ public class TestPushDownLimit extends PlannerTestCase {
 
         if (isMultiPart) {
             assertTrue(pn.size() == 2);
-            AbstractPlanNode p = pn.get(0).getChild(0);
+            AbstractPlanNode p = pn.get(0).getChild(0).getChild(0);
             assertTrue(p instanceof LimitPlanNode);
             assertTrue(p.toJSONString().contains("\"LIMIT\""));
             checkPushedDownLimit(pn.get(1).getChild(0), downIntoScan, downIntoJoin, isLeftJoin);
         } else {
-            checkPushedDownLimit(pn.get(0).getChild(0).getChild(0), downIntoScan, downIntoJoin, isLeftJoin);
+            if (downIntoScan) {
+                checkPushedDownLimit(pn.get(0).getChild(0), true, false, false);
+            }
+            if (downIntoJoin) {
+                checkPushedDownLimit(pn.get(0).getChild(0).getChild(0), false, true, isLeftJoin);
+            }
         }
     }
 

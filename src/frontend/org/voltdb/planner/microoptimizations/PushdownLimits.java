@@ -77,11 +77,11 @@ public class PushdownLimits extends MicroOptimization {
             plan.clearChildren();
             child.clearParents();
             child.addInlinePlanNode(plan);
-            return child;
+            return recursivelyApply(child);
         }
 
-        // push down to Projection for JOINs, it will get further pushed down into JOINs in next iteration
-        if (child instanceof ProjectionPlanNode && child.getChild(0) instanceof AbstractJoinPlanNode) {
+        // push down to Projection
+        if (child instanceof ProjectionPlanNode) {
             assert (child.getChildCount() == 1);
             AbstractPlanNode leaf = child.getChild(0);
             leaf.clearParents();
@@ -101,7 +101,7 @@ public class PushdownLimits extends MicroOptimization {
             if (((AbstractJoinPlanNode)child).getJoinType() == JoinType.LEFT) {
                 // for LEFT OUTER, also need to push down to the left child (OUTER table)
                 AbstractPlanNode leaf = child.getChild(0);
-                LimitPlanNode copy = new LimitPlanNode(plan);
+                LimitPlanNode copy = new LimitPlanNode((LimitPlanNode)plan);
                 leaf.clearChildren();
                 leaf.clearParents();
                 copy.addAndLinkChild(leaf);
