@@ -171,7 +171,8 @@ if len(sys.argv) == 3:
     createCandidate = False
     voltdbTreeish = sys.argv[1]
     proTreeish = sys.argv[2]
-    oneOff = True               #force on-off behavior
+    if voltdbTreeish != proTreeish:
+        oneOff = True     #force oneoff when not same tag/branch
 
 print "Building with pro: %s and voltdb: %s" % (proTreeish, voltdbTreeish)
 
