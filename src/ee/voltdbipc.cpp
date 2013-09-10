@@ -1257,6 +1257,85 @@ void VoltDBIPC::executeTask(struct ipc_command *cmd) {
     writeOrDie(m_fd, (unsigned char*)resultsBuffer, responseLength);
 }
 
+void *eethread(void *ptr) {
+    int fd = (int)(*(int*)ptr);
+
+    /* max message size that can be read from java */
+    int max_ipc_message_size = (1024 * 1024 * 2);
+
+    // requests larger than this will cause havoc.
+    // cry havoc and let loose the dogs of war
+    boost::shared_array<char> data(new char[max_ipc_message_size]);
+    memset(data.get(), 0, max_ipc_message_size);
+
+    // instantiate voltdbipc to interface to EE.
+    boost::shared_ptr<VoltDBIPC> voltipc(new VoltDBIPC(fd));
+    int more = 1;
+    while (more) {
+        size_t bytesread = 0;
+
+        // read the header
+        while (bytesread < 4) {
+            std::size_t b = read(fd, data.get() + bytesread, 4 - bytesread);
+            if (b == 0) {
+                printf("client eof\n");
+                close(fd);
+                return NULL;
+            } else if (b == -1) {
+                printf("client error\n");
+                close(fd);
+                return NULL;
+            }
+            bytesread += b;
+        }
+
+        // read the message body in to the same data buffer
+        int msg_size = ntohl(((struct ipc_command*) data.get())->msgsize);
+        //printf("Received message size %d\n", msg_size);
+        if (msg_size > max_ipc_message_size) {
+            max_ipc_message_size = msg_size;
+            char* newdata = (char*) malloc(max_ipc_message_size);
+            memset(newdata, 0, max_ipc_message_size);
+            memcpy(newdata, data.get(), 4);
+            data.reset(newdata);
+        }
+
+        while (bytesread < msg_size) {
+            std::size_t b = read(fd, data.get() + bytesread, msg_size - bytesread);
+            if (b == 0) {
+                printf("client eof\n");
+                close(fd);
+                return NULL;
+            } else if (b == -1) {
+                printf("client error\n");
+                close(fd);
+                return NULL;
+            }
+            bytesread += b;
+        }
+
+        // dispatch the request
+        struct ipc_command *cmd = (struct ipc_command*) data.get();
+
+        // size at least length + command
+        if (ntohl(cmd->msgsize) < sizeof(struct ipc_command)) {
+            printf("bytesread=%zx cmd=%d msgsize=%d\n",
+                   bytesread, cmd->command, ntohl(cmd->msgsize));
+            for (int ii = 0; ii < bytesread; ++ii) {
+                printf("%x ", data[ii]);
+            }
+            assert(ntohl(cmd->msgsize) >= sizeof(struct ipc_command));
+        }
+        bool terminate = voltipc->execute(cmd);
+        if (terminate) {
+            close(fd);
+            return NULL;
+        }
+    }
+    
+    return NULL;
+}
+
 int main(int argc, char **argv) {
     //Create a pool ref to init the thread local in case a poll message comes early
     voltdb::ThreadLocalPool poolRef;
@@ -1352,7 +1431,10 @@ int main(int argc, char **argv) {
     // wait for all of the EEs to finish
     for (int ee = 0; ee < eecount; ee++) {
         int code = pthread_join(eeThreads[ee], NULL);
-        assert(code == 0);
+        // stupid if to avoid compiler warning
+        if (code != 0) {
+            assert(code == 0);
+        }
     }
 
     fflush(stdout);
