@@ -1224,8 +1224,7 @@ public class PlanAssembler {
             // a compatible index scan, even when one would not be motivated by a WHERE or ORDER BY clause.
             if (m_parsedSelect.isGrouped() &&
                 (root.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
-                 ((IndexScanPlanNode) root).getSortDirection() == SortDirectionType.INVALID ||
-                 !((IndexScanPlanNode) root).getCatalogIndex().getUnique())) {
+                 ((IndexScanPlanNode) root).getSortDirection() == SortDirectionType.INVALID )) {
                 aggNode = new HashAggregatePlanNode();
                 topAggNode = new HashAggregatePlanNode();
             } else {

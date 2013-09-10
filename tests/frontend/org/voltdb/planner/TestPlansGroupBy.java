@@ -92,21 +92,21 @@ public class TestPlansGroupBy extends PlannerTestCase {
         for (AbstractPlanNode apn: pns) {
             System.out.println(apn.toExplainPlanString());
         }
-        assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+        assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.AGGREGATE);
         assertTrue(pns.get(0).getChild(0).getChild(0).getPlanNodeType() == PlanNodeType.INDEXSCAN);
 
         pns = compileToFragments("SELECT F_D1, COUNT(*) FROM RF GROUP BY F_D1");
         for (AbstractPlanNode apn: pns) {
             System.out.println(apn.toExplainPlanString());
         }
-        assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+        assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.AGGREGATE);
         assertTrue(pns.get(0).getChild(0).getChild(0).getPlanNodeType() == PlanNodeType.INDEXSCAN);
 
         pns = compileToFragments("SELECT F_VAL1, SUM(F_VAL2) FROM RF GROUP BY F_VAL1");
         for (AbstractPlanNode apn: pns) {
             System.out.println(apn.toExplainPlanString());
         }
-        assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+        assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.AGGREGATE);
         assertTrue(pns.get(0).getChild(0).getChild(0).getPlanNodeType() == PlanNodeType.INDEXSCAN);
 
         pns = compileToFragments("SELECT F_D1 + F_D2, COUNT(*) FROM RF GROUP BY F_D1 + F_D2");
@@ -120,7 +120,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         for (AbstractPlanNode apn: pns) {
             System.out.println(apn.toExplainPlanString());
         }
-        assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+        assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.AGGREGATE);
         assertTrue(pns.get(0).getChild(0).getChild(0).getPlanNodeType() == PlanNodeType.INDEXSCAN);
 
         // unoptimized case, but will be replaced in SeqScanToIndexScan optimization for deterministic reason
