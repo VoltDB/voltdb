@@ -62,6 +62,7 @@ import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.types.IndexType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 import org.voltdb.utils.CatalogUtil;
@@ -1186,6 +1187,8 @@ public class PlanAssembler {
         /* Check if any aggregate expressions are present */
         boolean containsAggregateExpression = m_parsedSelect.hasAggregateExpression();
 
+        root = indexAccessForGroupByExprs(root);
+
         /*
          * "Select A from T group by A" is grouped but has no aggregate operator
          * expressions. Catch that case by checking the grouped flag
@@ -1214,7 +1217,8 @@ public class PlanAssembler {
             // a compatible index scan, even when one would not be motivated by a WHERE or ORDER BY clause.
             if (m_parsedSelect.isGrouped() &&
                 (root.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
-                 ((IndexScanPlanNode) root).getSortDirection() == SortDirectionType.INVALID)) {
+                 ((IndexScanPlanNode) root).getSortDirection() == SortDirectionType.INVALID ||
+                 !((IndexScanPlanNode) root).getCatalogIndex().getUnique())) {
                 aggNode = new HashAggregatePlanNode();
                 topAggNode = new HashAggregatePlanNode();
             } else {
@@ -1375,6 +1379,67 @@ public class PlanAssembler {
 
         // Handle DISTINCT if it is not redundant with aggregation/grouping.
         return handleDistinct(root);
+    }
+
+    AbstractPlanNode indexAccessForGroupByExprs(AbstractPlanNode root) {
+        if (root.getPlanNodeType() == PlanNodeType.SEQSCAN && m_parsedSelect.isGrouped()) {
+            Table targetTable = m_catalogDb.getTables().get(((SeqScanPlanNode)root).getTargetTableName());
+            CatalogMap<Index> allIndexes = targetTable.getIndexes();
+            ArrayList<AbstractExpression> groupByExprs = new ArrayList<AbstractExpression>();
+            groupByExprs.addAll(m_parsedSelect.groupByExpressions.values());
+            for (Index index : allIndexes) {
+                if (!IndexType.isScannable(index.getType())) {
+                    continue;
+                }
+
+                boolean replacable = true;
+                String exprsjson = index.getExpressionsjson();
+                if (exprsjson.isEmpty()) {
+                    List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
+                    if (groupByExprs.size() > indexedColRefs.size()) {
+                        continue;
+                    }
+                    for (int i = 0; i < groupByExprs.size(); i++) {
+                        // don't use column idx to compare here, becase resolveColumnIndex is not yet called
+                        if (groupByExprs.get(i).getExpressionType() != ExpressionType.VALUE_TUPLE ||
+                                !indexedColRefs.get(i).getColumn().getName().equals(((TupleValueExpression)groupByExprs.get(i)).getColumnName())) {
+                            replacable  = false;
+                            break;
+                        }
+                    }
+                    if (replacable) {
+                        IndexScanPlanNode indexScanNode = new IndexScanPlanNode((SeqScanPlanNode)root, null, index, SortDirectionType.ASC);
+                        indexScanNode.setKeyIterate(true);
+                        return indexScanNode;
+                    }
+                } else {
+                    // either pure expression index or mix of expressions and simple columns
+                    List<AbstractExpression> indexedExprs = null;
+                    try {
+                        indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, null);
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                        assert(false);
+                        return root;
+                    }
+                    if (groupByExprs.size() > indexedExprs.size()) {
+                        continue;
+                    }
+                    for (int i = 0; i < groupByExprs.size(); i++) {
+                        if (!groupByExprs.get(i).equals(indexedExprs.get(i))) {
+                            replacable = false;
+                            break;
+                        }
+                    }
+                    if (replacable) {
+                        IndexScanPlanNode indexScanNode = new IndexScanPlanNode((SeqScanPlanNode)root, null, index, SortDirectionType.ASC);
+                        indexScanNode.setKeyIterate(true);
+                        return indexScanNode;
+                    }
+                }
+            }
+        }
+        return root;
     }
 
     /**
