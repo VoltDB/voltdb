@@ -48,6 +48,19 @@ public class LimitPlanNode extends AbstractPlanNode {
         super();
     }
 
+    public LimitPlanNode(AbstractPlanNode origin) {
+        super();
+        assert (origin.getPlanNodeType() == PlanNodeType.LIMIT);
+        LimitPlanNode limit = (LimitPlanNode)origin;
+        m_offset = limit.getOffset();
+        m_limit =limit.getLimit();
+        m_limitParameterId = limit.getLimitParameterIndex();
+        m_offsetParameterId = limit.getOffsetParameterIndex();
+        if (limit.getLimitExpression() != null) {
+            m_limitExpression = (AbstractExpression)limit.getLimitExpression().clone();
+        }
+    }
+
     @Override
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.LIMIT;
@@ -134,6 +147,14 @@ public class LimitPlanNode extends AbstractPlanNode {
 
     public void setOffsetParameterIndex(long offsetParameterId) {
         m_offsetParameterId = offsetParameterId;
+    }
+
+    public long getLimitParameterIndex() {
+        return m_limitParameterId;
+    }
+
+    public long getOffsetParameterIndex() {
+        return m_offsetParameterId;
     }
 
     @Override

@@ -29,7 +29,7 @@ public class MicroOptimizationRunner {
     // list all of the micro optimizations here
     static ArrayList<MicroOptimization> optimizations = new ArrayList<MicroOptimization>();
     static {
-        optimizations.add(new PushdownLimitsIntoScans());
+        optimizations.add(new PushdownLimits());
         optimizations.add(new ReplaceWithIndexCounter());
         optimizations.add(new SeqScansToUniqueTreeScans());
         optimizations.add(new ReplaceWithIndexLimit());
