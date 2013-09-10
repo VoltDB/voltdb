@@ -56,7 +56,7 @@ public class VoltZK {
     /*
      * Processes that want to block catalog updates create children here
      */
-    public static final String catalogUpdateBlockers = "/db/export_generations";
+    public static final String catalogUpdateBlockers = "/db/catalog_update_blockers";
 
     // configuration (ports, interfaces, ...)
     public static final String cluster_metadata = "/db/cluster_metadata";
