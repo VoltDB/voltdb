@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import com.google.common.collect.Maps;
 import org.apache.cassandra_voltpatches.MurmurHash3;
 import org.voltcore.utils.Pair;
 
@@ -152,7 +153,7 @@ public class ElasticHashinator extends TheHashinator {
      * Serializes the configuration into bytes, also updates the currently cached m_configBytes.
      * @return The byte[] of the current configuration.
      */
-    private byte[] toBytes() {
+    public byte[] toBytes() {
         ByteBuffer buf = ByteBuffer.allocate(4 + (tokens.size() * 12));//long and an int per
         buf.putInt(tokens.size());
 
@@ -194,6 +195,19 @@ public class ElasticHashinator extends TheHashinator {
     public ImmutableSortedMap<Long, Integer> getTokens()
     {
         return tokens;
+    }
+
+    /**
+     * Add the given token to the ring and generate the new hashinator. The current hashinator is not changed.
+     * @param token        The new token
+     * @param partition    The partition associated with the new token
+     * @return The new hashinator
+     */
+    public ElasticHashinator addToken(long token, int partition)
+    {
+        HashMap<Long, Integer> newTokens = Maps.newHashMap(tokens);
+        newTokens.put(token, partition);
+        return new ElasticHashinator(newTokens);
     }
 
     @Override
