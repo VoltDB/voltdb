@@ -85,7 +85,7 @@ public class AsyncCompilerAgent {
                 } catch (RejectedExecutionException rejected) {
                     final LocalObjectMessage wrapper = (LocalObjectMessage)message;
                     AsyncCompilerWork work = (AsyncCompilerWork)(wrapper.payload);
-                    generateErrorResult("Ad Hoc Planner is not available. Try again.", work);
+                    generateErrorResult("Ad Hoc Planner task queue is full. Try again.", work);
                 }
             }
         };
@@ -96,7 +96,7 @@ public class AsyncCompilerAgent {
     void generateErrorResult(String errorMsg, AsyncCompilerWork work) {
         AsyncCompilerResult retval = new AsyncCompilerResult();
         retval.clientHandle = work.clientHandle;
-        retval.errorMsg = "Ad Hoc Planner is not available. Try again.";
+        retval.errorMsg = errorMsg;
         retval.connectionId = work.connectionId;
         retval.hostname = work.hostname;
         retval.adminConnection = work.adminConnection;
