@@ -48,8 +48,8 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
             vt = client.callProcedure("@AdHoc",
                     "select * from " + mvTable + " ORDER BY " + orderbyStmt).getResults()[0];
         } catch (Exception e) {
-            fail();
             e.printStackTrace();
+            fail();
         }
 
         if (vt.getRowCount() != 0) {
@@ -506,6 +506,41 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         }
     }
 
+
+    public void testMaterializedViewUpdateR4() throws IOException, ProcCallException {
+        System.out.println("Test R4 update...");
+
+        Client client = this.getClient();
+        String tb = "R4.insert";
+        client.callProcedure(tb, 1,  10,  -1 );
+        client.callProcedure(tb, 2,  20,  1 );
+        client.callProcedure(tb, 3,  30,  1 );
+        client.callProcedure(tb, 4,  40,  2 );
+        client.callProcedure(tb, 5,  50,  2 );
+
+        String mvTable = "V_R4";
+        String orderbyStmt = mvTable+"_G1";
+        // ID, wage, dept
+        // SELECT dept*dept, dept+dept, count(*), SUM(wage) FROM R4 GROUP BY dept*dept, dept+dept
+
+        // Check the current contents in MVs
+        compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, -2, 1, 10}, {1, 2, 2, 50}, {4, 4, 2, 90}}, orderbyStmt);
+
+        // Test update
+        client.callProcedure("R4.update", 2, 19, 1, 2);
+        compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, -2, 1, 10}, {1, 2, 2, 49}, {4, 4, 2, 90}}, orderbyStmt);
+
+        client.callProcedure("R4.update", 4, 41, -1, 4);
+        compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, -2, 2, 51}, {1, 2, 2, 49}, {4, 4, 1, 50}}, orderbyStmt);
+
+        client.callProcedure("R4.update", 5, 55, 1, 5);
+        compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, -2, 2, 51}, {1, 2, 3, 104}}, orderbyStmt);
+
+        client.callProcedure("@AdHoc","Delete from R4");
+        compareMVcontentsOfLongs(client, mvTable, null, orderbyStmt);
+    }
+
+
     //
     // Suite builder boilerplate
     //
@@ -515,7 +550,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
     }
 
     static public junit.framework.Test suite() throws Exception {
-        VoltServerConfig config = null;
+        LocalCluster config = null;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
                 TestPlansGroupByComplexMaterializedViewSuite.class);
         String literalSchema = null;
@@ -644,28 +679,47 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "AS SELECT vlong || '" + longStr + "', " +
                 "count(*), SUM(wage) " +
                 "FROM R3 GROUP BY vlong || '" + longStr + "';" +
-                ""
-                ;
+
+                // R4 mv tests bigint math result type
+                "CREATE TABLE R4 ( " +
+                "id INTEGER DEFAULT '0' NOT NULL, " +
+                "wage BIGINT, " +
+                "dept BIGINT, " +
+                "PRIMARY KEY (ID) );" +
+
+                "CREATE VIEW V_R4 (V_R4_G1, V_R4_G2, V_R4_CNT, V_R4_sum_wage) " +
+                "AS SELECT dept*dept, dept+dept, count(*), SUM(wage) " +
+                "FROM R4 GROUP BY dept*dept, dept+dept;" +
+
+                "";
         try {
             project.addLiteralSchema(literalSchema);
         } catch (IOException e) {
             assertFalse(true);
         }
+        //* Single-server configuration  -- please do not remove or corrupt this structured comment
         config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
+        // End single-server configuration  -- please do not remove or corrupt this structured comment */
 
+        //* HSQL backend server configuration  -- please do not remove or corrupt this structured comment
         config = new LocalCluster("plansgroupby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
+        // End HSQL backend server configuration  -- please do not remove or corrupt this structured comment */
 
-        // Cluster
+        //* Multi-server configuration  -- please do not remove or corrupt this structured comment
         config = new LocalCluster("plansgroupby-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        // Disable hasLocalServer -- with hasLocalServer enabled,
+        // multi-server pro configs mysteriously hang at startup under eclipse.
+        config.setHasLocalServer(false);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
+        // End multi-server configuration  -- please do not remove or corrupt this structured comment */
 
         return builder;
     }
