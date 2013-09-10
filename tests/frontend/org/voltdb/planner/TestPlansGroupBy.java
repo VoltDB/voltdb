@@ -33,6 +33,7 @@ import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
+import org.voltdb.types.PlanNodeType;
 
 public class TestPlansGroupBy extends PlannerTestCase {
     @Override
@@ -82,6 +83,117 @@ public class TestPlansGroupBy extends PlannerTestCase {
         for (AbstractPlanNode apn: pns) {
             System.out.println(apn.toExplainPlanString());
         }
+    }
+
+
+    public void testGroupByOnly() {
+        // Replicated Table
+        pns = compileToFragments("SELECT F_D1 FROM RF GROUP BY F_D1");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+        assertTrue(pns.get(0).getChild(0).getChild(0).getPlanNodeType() == PlanNodeType.INDEXSCAN);
+
+        pns = compileToFragments("SELECT F_D1, COUNT(*) FROM RF GROUP BY F_D1");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+        assertTrue(pns.get(0).getChild(0).getChild(0).getPlanNodeType() == PlanNodeType.INDEXSCAN);
+
+        pns = compileToFragments("SELECT F_VAL1, SUM(F_VAL2) FROM RF GROUP BY F_VAL1");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+        assertTrue(pns.get(0).getChild(0).getChild(0).getPlanNodeType() == PlanNodeType.INDEXSCAN);
+
+        pns = compileToFragments("SELECT F_D1 + F_D2, COUNT(*) FROM RF GROUP BY F_D1 + F_D2");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.AGGREGATE);
+        assertTrue(pns.get(0).getChild(0).getChild(0).getPlanNodeType() == PlanNodeType.INDEXSCAN);
+
+        pns = compileToFragments("SELECT ABS(F_D1), COUNT(*) FROM RF GROUP BY ABS(F_D1)");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+        assertTrue(pns.get(0).getChild(0).getChild(0).getPlanNodeType() == PlanNodeType.INDEXSCAN);
+
+        // unoptimized case, but will be replaced in SeqScanToIndexScan optimization for deterministic reason
+        // use EXPR_RF_TREE1 not EXPR_RF_TREE2
+        pns = compileToFragments("SELECT F_D2 - F_D3, COUNT(*) FROM RF GROUP BY F_D2 - F_D3");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+            System.out.println(apn.toJSONString());
+            while (apn.getChildCount() > 0) {
+                apn = apn.getChild(0);
+                System.out.println(apn.toJSONString());
+            }
+        }
+        assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+        assertTrue(pns.get(0).getChild(0).getChild(0).getPlanNodeType() == PlanNodeType.INDEXSCAN);
+
+        // Partitioned Table
+        pns = compileToFragments("SELECT F_D1 FROM F GROUP BY F_D1");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+        assertTrue(pns.get(1).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+        assertTrue(pns.get(1).getChild(0).getChild(0).getPlanNodeType() == PlanNodeType.INDEXSCAN);
+
+        pns = compileToFragments("SELECT F_D1, COUNT(*) FROM F GROUP BY F_D1");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+        assertTrue(pns.get(1).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+        assertTrue(pns.get(1).getChild(0).getChild(0).getPlanNodeType() == PlanNodeType.INDEXSCAN);
+
+        pns = compileToFragments("SELECT F_VAL1, SUM(F_VAL2) FROM F GROUP BY F_VAL1");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+        assertTrue(pns.get(1).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+        assertTrue(pns.get(1).getChild(0).getChild(0).getPlanNodeType() == PlanNodeType.INDEXSCAN);
+
+        pns = compileToFragments("SELECT F_D1 + F_D2, COUNT(*) FROM F GROUP BY F_D1 + F_D2");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        // though the index is unique, but 2 fragments prevent to take advantage of this unreliable "unique"
+        assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+        assertTrue(pns.get(1).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+        assertTrue(pns.get(1).getChild(0).getChild(0).getPlanNodeType() == PlanNodeType.INDEXSCAN);
+
+        pns = compileToFragments("SELECT ABS(F_D1), COUNT(*) FROM F GROUP BY ABS(F_D1)");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+        assertTrue(pns.get(1).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+        assertTrue(pns.get(1).getChild(0).getChild(0).getPlanNodeType() == PlanNodeType.INDEXSCAN);
+
+        // unoptimized case, but will be replaced in SeqScanToIndexScan optimization for deterministic reason
+        // use EXPR_F_TREE1 not EXPR_F_TREE2
+        pns = compileToFragments("SELECT F_D2 - F_D3, COUNT(*) FROM F GROUP BY F_D2 - F_D3");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+            System.out.println(apn.toJSONString());
+            while (apn.getChildCount() > 0) {
+                apn = apn.getChild(0);
+                System.out.println(apn.toJSONString());
+            }
+        }
+        assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+        assertTrue(pns.get(1).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+        assertTrue(pns.get(1).getChild(0).getChild(0).getPlanNodeType() == PlanNodeType.INDEXSCAN);
+
     }
 
     public void testEdgeComplexRelatedCases() {

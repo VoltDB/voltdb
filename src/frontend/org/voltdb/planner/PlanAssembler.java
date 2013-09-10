@@ -41,6 +41,7 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -1187,8 +1188,14 @@ public class PlanAssembler {
         /* Check if any aggregate expressions are present */
         boolean containsAggregateExpression = m_parsedSelect.hasAggregateExpression();
 
-        root = indexAccessForGroupByExprs(root);
-
+        if (m_partitioning.requiresTwoFragments()) {
+            AbstractPlanNode candidate = root.getChild(0).getChild(0);
+            candidate.clearParents();
+            root.getChild(0).clearChildren();
+            root.getChild(0).addAndLinkChild(indexAccessForGroupByExprs(candidate));
+        } else {
+            root = indexAccessForGroupByExprs(root);
+        }
         /*
          * "Select A from T group by A" is grouped but has no aggregate operator
          * expressions. Catch that case by checking the grouped flag
@@ -1385,8 +1392,8 @@ public class PlanAssembler {
         if (root.getPlanNodeType() == PlanNodeType.SEQSCAN && m_parsedSelect.isGrouped()) {
             Table targetTable = m_catalogDb.getTables().get(((SeqScanPlanNode)root).getTargetTableName());
             CatalogMap<Index> allIndexes = targetTable.getIndexes();
-            ArrayList<AbstractExpression> groupByExprs = new ArrayList<AbstractExpression>();
-            groupByExprs.addAll(m_parsedSelect.groupByExpressions.values());
+            ArrayList<ParsedColInfo> groupBys = m_parsedSelect.groupByColumns;
+
             for (Index index : allIndexes) {
                 if (!IndexType.isScannable(index.getType())) {
                     continue;
@@ -1396,13 +1403,13 @@ public class PlanAssembler {
                 String exprsjson = index.getExpressionsjson();
                 if (exprsjson.isEmpty()) {
                     List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
-                    if (groupByExprs.size() > indexedColRefs.size()) {
+                    if (groupBys.size() > indexedColRefs.size()) {
                         continue;
                     }
-                    for (int i = 0; i < groupByExprs.size(); i++) {
+                    for (int i = 0; i < groupBys.size(); i++) {
                         // don't use column idx to compare here, becase resolveColumnIndex is not yet called
-                        if (groupByExprs.get(i).getExpressionType() != ExpressionType.VALUE_TUPLE ||
-                                !indexedColRefs.get(i).getColumn().getName().equals(((TupleValueExpression)groupByExprs.get(i)).getColumnName())) {
+                        if (groupBys.get(i).expression.getExpressionType() != ExpressionType.VALUE_TUPLE ||
+                                !indexedColRefs.get(i).getColumn().getName().equals(groupBys.get(i).columnName)) {
                             replacable  = false;
                             break;
                         }
@@ -1422,11 +1429,11 @@ public class PlanAssembler {
                         assert(false);
                         return root;
                     }
-                    if (groupByExprs.size() > indexedExprs.size()) {
+                    if (groupBys.size() > indexedExprs.size()) {
                         continue;
                     }
-                    for (int i = 0; i < groupByExprs.size(); i++) {
-                        if (!groupByExprs.get(i).equals(indexedExprs.get(i))) {
+                    for (int i = 0; i < groupBys.size(); i++) {
+                        if (!groupBys.get(i).expression.equals(indexedExprs.get(i))) {
                             replacable = false;
                             break;
                         }

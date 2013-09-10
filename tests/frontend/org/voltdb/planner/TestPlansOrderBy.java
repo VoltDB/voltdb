@@ -158,7 +158,7 @@ public class TestPlansOrderBy extends PlannerTestCase {
     //-- but we're keeping the test because, well, at least the query compiles to SOME kind of plan?
     //When ENG-4096 is addressed, the validation will be quite different.
     public void testOrderByCountStar() {
-        validatePlan("SELECT T_D0, COUNT(*) AS FOO FROM T GROUP BY T_D0 ORDER BY FOO", true, false, true, true);
+        validatePlan("SELECT T_D0, COUNT(*) AS FOO FROM T GROUP BY T_D0 ORDER BY FOO", true, false, true, false);
         validatePlan("SELECT T_D0, COUNT(*) AS FOO FROM Tnokey GROUP BY T_D0 ORDER BY FOO", false, true, true, true);
         //Expected ENG-4096 effect:
         //validatePlan("SELECT T_D0, COUNT(*) AS FOO FROM T GROUP BY T_D0 ORDER BY FOO");
