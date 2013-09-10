@@ -17,12 +17,13 @@
 package org.voltdb;
 
 import java.nio.ByteBuffer;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -31,6 +32,7 @@ import com.google.common.collect.Maps;
 import org.apache.cassandra_voltpatches.MurmurHash3;
 import org.voltcore.utils.Pair;
 
+import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.UnmodifiableIterator;
@@ -42,6 +44,11 @@ import com.google.common.collect.UnmodifiableIterator;
 public class ElasticHashinator extends TheHashinator {
     public static int DEFAULT_TOKENS_PER_PARTITION =
         Integer.parseInt(System.getProperty("ELASTIC_TOKENS_PER_PARTITION", "256"));
+
+    static final String SECURE_RANDOM_ALGORITHM = "SHA1PRNG";
+    static final byte [] SECURE_RANDON_SEED = "Festina Lente".getBytes(Charsets.UTF_8);
+
+    public final static long TOKEN_MASK = 0xFFFFFFFF00000000L;
 
     /**
      * Tokens on the ring. A value hashes to a token if the token is the first value <=
@@ -105,7 +112,15 @@ public class ElasticHashinator extends TheHashinator {
                                        int tokensPerPartition) {
         Preconditions.checkArgument(oldHashinator instanceof ElasticHashinator);
         ElasticHashinator oldElasticHashinator = (ElasticHashinator) oldHashinator;
-        Random r = new Random(0);
+
+        SecureRandom sr;
+        try {
+            sr = SecureRandom.getInstance(SECURE_RANDOM_ALGORITHM);
+            sr.setSeed(SECURE_RANDON_SEED);
+        } catch (NoSuchAlgorithmException ex) {
+            throw new RuntimeException("Unable to initialize secure random generator", ex);
+        }
+
         Map<Long, Integer> newConfig = new HashMap<Long, Integer>(oldElasticHashinator.tokens);
         Set<Integer> existingPartitions = new HashSet<Integer>(oldElasticHashinator.tokens.values());
         Set<Long> checkSet = new HashSet<Long>(oldElasticHashinator.tokens.keySet());
@@ -118,7 +133,7 @@ public class ElasticHashinator extends TheHashinator {
 
             for (int i = 0; i < tokensPerPartition; i++) {
                 while (true) {
-                    long candidateToken = MurmurHash3.hash3_x64_128(r.nextLong());
+                    long candidateToken = sr.nextLong() & TOKEN_MASK;
                     if (!checkSet.add(candidateToken)) {
                         continue;
                     }
@@ -128,7 +143,7 @@ public class ElasticHashinator extends TheHashinator {
             }
         }
 
-        return new ElasticHashinator(newConfig).toBytes();
+        return new ElasticHashinator(newConfig).m_configBytes;
     }
 
     /**
