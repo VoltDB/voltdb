@@ -49,7 +49,6 @@ public class AsyncCompilerAgent {
 
     // accept work via this mailbox
     Mailbox m_mailbox;
-    ZooKeeper m_zk;
 
     // do work in this executor service
     final ListeningExecutorService m_es =
@@ -89,7 +88,6 @@ public class AsyncCompilerAgent {
                 }
             }
         };
-        m_zk = hostMessenger.getZK();
         hostMessenger.createMailbox(hsId, m_mailbox);
     }
 
@@ -115,9 +113,6 @@ public class AsyncCompilerAgent {
             final CatalogChangeWork w = (CatalogChangeWork)(wrapper.payload);
             if (VoltDB.instance().getConfig().m_isEnterprise) {
                 try {
-                    if (checkForCatalogUpdateBlockers(w)) {
-                        return;
-                    }
                     Class<?> acahClz = getClass().getClassLoader().loadClass("org.voltdb.compiler.AsyncCompilerAgentHelper");
                     Object acah = acahClz.newInstance();
                     Method acahPrepareMethod = acahClz.getMethod(
@@ -135,15 +130,6 @@ public class AsyncCompilerAgent {
             }
             assert(false); // shouldn't get here in community edition
         }
-    }
-
-    private boolean checkForCatalogUpdateBlockers(CatalogChangeWork w) throws KeeperException, InterruptedException {
-        boolean haveBlockers = !m_zk.getChildren(VoltZK.catalogUpdateBlockers, false).isEmpty();
-
-        if (haveBlockers) {
-            generateErrorResult("Can't do a catalog update while an elastic join is active", w);
-        }
-        return haveBlockers;
     }
 
     public void compileAdHocPlanForProcedure(final AdHocPlannerWork apw) {
