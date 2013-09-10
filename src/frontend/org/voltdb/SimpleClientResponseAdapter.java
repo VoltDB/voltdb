@@ -25,6 +25,7 @@ import org.voltdb.client.ClientResponse;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.Exchanger;
 import java.util.concurrent.Future;
 
 /**
@@ -34,6 +35,25 @@ import java.util.concurrent.Future;
 public class SimpleClientResponseAdapter implements Connection, WriteStream {
     public static interface Callback {
         public void handleResponse(ClientResponse response);
+    }
+
+    public static final class SyncCallback implements Callback {
+        private final Exchanger<ClientResponse> m_responseExchanger = new Exchanger<ClientResponse>();
+
+        public ClientResponse getResponse() throws InterruptedException
+        {
+            return m_responseExchanger.exchange(null);
+        }
+
+        @Override
+        public void handleResponse(ClientResponse response)
+        {
+            try {
+                m_responseExchanger.exchange(response);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     private final long m_connectionId;
