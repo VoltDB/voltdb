@@ -171,6 +171,23 @@ public class CSVLoader {
         }
     }
 
+    private static boolean isProcedureMp(Client csvClient)
+            throws IOException, org.voltdb.client.ProcCallException {
+        boolean procedure_is_mp = false;
+        VoltTable procInfo = csvClient.callProcedure("@SystemCatalog",
+                "PROCEDURES").getResults()[0];
+        while (procInfo.advanceRow()) {
+            if (insertProcedure.matches(procInfo.getString("PROCEDURE_NAME"))) {
+                String remarks = procInfo.getString("REMARKS");
+                if (remarks.contains("\"singlePartition\":false")) {
+                    procedure_is_mp = true;
+                }
+                break;
+            }
+        }
+        return procedure_is_mp;
+    }
+
     public static void main(String[] args) throws IOException,
             InterruptedException {
         start = System.currentTimeMillis();
@@ -218,6 +235,7 @@ public class CSVLoader {
         assert (csvClient != null);
 
         int partitionedColumnIndex = -1;
+        int columnCnt = 0;
         VoltType partitionColumnType = VoltType.NULL;
         try {
             VoltTable procInfo;
@@ -229,6 +247,7 @@ public class CSVLoader {
                     while (procInfo.advanceRow()) {
                         if (insertProcedure.matches((String) procInfo.get(
                                 "PROCEDURE_NAME", VoltType.STRING))) {
+                            columnCnt++;
                             isProcExist = true;
                             String typeStr = (String) procInfo.get("TYPE_NAME", VoltType.STRING);
                             typeList.add(VoltType.typeFromString(typeStr));
@@ -238,6 +257,11 @@ public class CSVLoader {
                         m_log.error("No matching insert procedure available");
                         close_cleanup();
                         System.exit(-1);
+                    }
+                    if (isProcedureMp(csvClient)) {
+                        m_log.warn("Using a multi-partitioned procedure to load data will be slow. "
+                                + "If loading a partitioned table, use a single-partitioned procedure "
+                                + "for best performance.");
                     }
                 }
             } catch (Exception e) {
@@ -267,7 +291,7 @@ public class CSVLoader {
                 }
             }
 
-            if (columnTypes.isEmpty()) {
+            if (!config.useSuppliedProcedure && columnTypes.isEmpty()) {
                 m_log.error("Table " + config.table + " Not found");
                 close_cleanup();
                 System.exit(-1);
@@ -306,9 +330,11 @@ public class CSVLoader {
 
                 TheHashinator.initialize(LegacyHashinator.class, LegacyHashinator.getConfigureBytes(numProcessors));
             } else {
-                m_log.warn("Using a multi-partitioned procedure to load data will be slow. "
-                        + "If loading a partitioned table, use a single-partitioned procedure "
-                        + "for best performance.");
+                if (!config.useSuppliedProcedure) {
+                    m_log.warn("Using a multi-partitioned procedure to load data will be slow. "
+                            + "If loading a partitioned table, use a single-partitioned procedure "
+                            + "for best performance.");
+                } //User supplied proc so use 1 processor.
                 numProcessors = 1;
             }
 
@@ -340,7 +366,12 @@ public class CSVLoader {
             }
 
             CSVFileReader.config = config;
-            CSVFileReader.columnCnt = columnTypes.size();
+
+            if (config.useSuppliedProcedure) {
+                CSVFileReader.columnCnt = columnCnt;
+            } else {
+                CSVFileReader.columnCnt = columnTypes.size();
+            }
             CSVFileReader.listReader = listReader;
             CSVFileReader.partitionedColumnIndex = partitionedColumnIndex;
             CSVFileReader.partitionColumnType = partitionColumnType;

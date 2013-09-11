@@ -196,8 +196,7 @@ class CSVPartitionProcessor implements Runnable {
             m_partitionQueue.drainTo(mlineList, config.batch);
             for (CSVLineWithMetaData lineList : mlineList) {
                 if (lineList == endOfData) {
-                    //Process anything that we didnt process. User supplied will not build anything in table
-                    //so for -p options this will just skip and return.
+                    //Process anything that we didnt process.
                     if (table.getRowCount() > 0) {
                         PartitionProcedureCallback cbmt = new PartitionProcedureCallback(batchList, this, failedQueue);
                         try {
@@ -215,52 +214,67 @@ class CSVPartitionProcessor implements Runnable {
                     return;
                 }
                 //Build table or just call one proc at a time.
-                if (!config.useSuppliedProcedure) {
-                    try {
-                        if (VoltTableUtil.addRowToVoltTableFromLine(table, lineList.correctedLine, columnTypes)) {
-                            batchList.add(lineList);
-                        } else {
-                            String[] info = {lineList.rawLine.toString(), "Missing or Invalid Data in Row."};
-                            m_errored = synchronizeErrorInfo(lineList.lineNumber, info);
-                            continue;
-                        }
-                    } catch (Exception ex) {
-                        //Failed to add row....things like larger than supported row size
-                        String[] info = {lineList.rawLine.toString(), ex.toString()};
+                try {
+                    if (VoltTableUtil.addRowToVoltTableFromLine(table, lineList.correctedLine, columnTypes)) {
+                        batchList.add(lineList);
+                    } else {
+                        String[] info = {lineList.rawLine.toString(), "Missing or Invalid Data in Row."};
                         m_errored = synchronizeErrorInfo(lineList.lineNumber, info);
                         continue;
                     }
-                    //If our batch is complete submit it.
-                    if (table.getRowCount() >= config.batch) {
-                        try {
-                            PartitionProcedureCallback cbmt = new PartitionProcedureCallback(batchList, this, failedQueue);
-                            if (!isMP) {
-                                csvClient.callProcedure(cbmt, procName, partitionParam, tableName, table);
-                            } else {
-                                csvClient.callProcedure(cbmt, procName, tableName, table);
-                            }
-                            m_partitionProcessedCount.addAndGet(table.getRowCount());
-                            //Clear table data as we start building new table with new rows.
-                            table.clearRowData();
-                        } catch (IOException ex) {
-                            table.clearRowData();
-                            String[] info = {lineList.rawLine.toString(), ex.toString()};
-                            m_errored = synchronizeErrorInfo(lineList.lineNumber, info);
-                            return;
-                        }
-                        batchList = new ArrayList<CSVLineWithMetaData>();
-                    }
-                } else {
-                    // submit a traditional/legacy insert
+                } catch (Exception ex) {
+                    //Failed to add row....things like larger than supported row size
+                    String[] info = {lineList.rawLine.toString(), ex.toString()};
+                    m_errored = synchronizeErrorInfo(lineList.lineNumber, info);
+                    continue;
+                }
+                //If our batch is complete submit it.
+                if (table.getRowCount() >= config.batch) {
                     try {
-                        PartitionSingleExecuteProcedureCallback cbmt = new PartitionSingleExecuteProcedureCallback(lineList, this);
-                        csvClient.callProcedure(cbmt, procName, (Object[]) lineList.correctedLine);
-                        m_partitionProcessedCount.incrementAndGet();
+                        PartitionProcedureCallback cbmt = new PartitionProcedureCallback(batchList, this, failedQueue);
+                        if (!isMP) {
+                            csvClient.callProcedure(cbmt, procName, partitionParam, tableName, table);
+                        } else {
+                            csvClient.callProcedure(cbmt, procName, tableName, table);
+                        }
+                        m_partitionProcessedCount.addAndGet(table.getRowCount());
+                        //Clear table data as we start building new table with new rows.
+                        table.clearRowData();
                     } catch (IOException ex) {
+                        table.clearRowData();
                         String[] info = {lineList.rawLine.toString(), ex.toString()};
                         m_errored = synchronizeErrorInfo(lineList.lineNumber, info);
                         return;
                     }
+                    batchList = new ArrayList<CSVLineWithMetaData>();
+                }
+            }
+        }
+    }
+
+    // while there are rows and endOfData not seen batch and call procedure for insert.
+    private void processUserSuppliedProcedure(String procName) {
+        while (true) {
+            if (m_errored) {
+                //Let file reader know not to read any more. All Partition Processors will quit processing.
+                CSVFileReader.errored = true;
+                return;
+            }
+            List<CSVLineWithMetaData> mlineList = new ArrayList<CSVLineWithMetaData>();
+            m_partitionQueue.drainTo(mlineList, config.batch);
+            for (CSVLineWithMetaData lineList : mlineList) {
+                if (lineList == endOfData) {
+                    return;
+                }
+                // submit a traditional/legacy insert
+                try {
+                    PartitionSingleExecuteProcedureCallback cbmt = new PartitionSingleExecuteProcedureCallback(lineList, this);
+                    csvClient.callProcedure(cbmt, procName, (Object[]) lineList.correctedLine);
+                    m_partitionProcessedCount.incrementAndGet();
+                } catch (IOException ex) {
+                    String[] info = {lineList.rawLine.toString(), ex.toString()};
+                    m_errored = synchronizeErrorInfo(lineList.lineNumber, info);
+                    return;
                 }
             }
         }
@@ -269,32 +283,34 @@ class CSVPartitionProcessor implements Runnable {
     @Override
     public void run() {
 
-        //Pick the procedure.
-        VoltTable table = new VoltTable(colInfo);
-        String procName = (isMP ? "@LoadMultipartitionTable" : "@LoadSinglepartitionTable");
-        if (config.useSuppliedProcedure) {
-            procName = insertProcedure;
-        }
-
-        //If SP get partition param from Hashinator.
-        Object partitionParam = null;
-        if (!isMP) {
-            partitionParam = TheHashinator.valueToBytes(m_partitionId);
-        }
-
-        //Launch failureProcessor
-        FailedBatchProcessor failureProcessor = new FailedBatchProcessor(this, procName, tableName, partitionParam);
-        failureProcessor.start();
-
+        FailedBatchProcessor failureProcessor = null;
         //Process the Partition queue.
-        process(table, procName, partitionParam);
+        if (config.useSuppliedProcedure) {
+            processUserSuppliedProcedure(insertProcedure);
+        } else {
+            //If SP get partition param from Hashinator.
+            Object partitionParam = null;
+            if (!isMP) {
+                partitionParam = TheHashinator.valueToBytes(m_partitionId);
+            }
+
+            VoltTable table = new VoltTable(colInfo);
+            String procName = (isMP ? "@LoadMultipartitionTable" : "@LoadSinglepartitionTable");
+            //Launch failureProcessor
+            failureProcessor = new FailedBatchProcessor(this, procName, tableName, partitionParam);
+            failureProcessor.start();
+
+            process(table, procName, partitionParam);
+        }
         m_partitionQueue.clear();
 
         //Let partition processor drain and put any failures on failure processing.
         try {
             csvClient.drain();
             failedQueue.put(endOfData);
-            failureProcessor.join();
+            if (failureProcessor != null) {
+                failureProcessor.join();
+            }
             //Drain again for failure callbacks to finish.
             csvClient.drain();
         } catch (NoConnectionsException ex) {
