@@ -122,7 +122,7 @@ public class CSVLoader {
         @Option(desc = "port to use when connecting to database (default: 21212)")
         int port = Client.VOLTDB_SERVER_PORT;
         @Option(desc = "Batch Size for processing.")
-        public long batch = 200;
+        public int batch = 200;
         @AdditionalArgs(desc = "insert the data into database by TABLENAME.insert procedure by default")
         public String table = "";
         boolean useSuppliedProcedure = false;
@@ -312,35 +312,32 @@ public class CSVLoader {
                 numProcessors = 1;
             }
 
+            CountDownLatch processor_cdl = new CountDownLatch(numProcessors);
+            CSVPartitionProcessor.processor_cdl = processor_cdl;
             CSVPartitionProcessor.colInfo = colInfo;
             CSVPartitionProcessor.columnTypes = columnTypes;
             CSVPartitionProcessor.insertProcedure = insertProcedure;
             CSVPartitionProcessor.isMP = isMP;
             CSVPartitionProcessor.config = config;
+            CSVPartitionProcessor.tableName = config.table;
 
             //Create a launch processor threads. If Multipartitioned onle 1 processor is launched.
             List<Thread> spawned = new ArrayList<Thread>(numProcessors);
-            CSVLineWithMetaData dummy = new CSVLineWithMetaData();
+            CSVLineWithMetaData endOfData = new CSVLineWithMetaData(null, null, -1);
+
             Map<Integer, BlockingQueue<CSVLineWithMetaData>> lineq = new HashMap<Integer, BlockingQueue<CSVLineWithMetaData>>(numProcessors);
-            CountDownLatch processor_cdl = new CountDownLatch(numProcessors);
             List<CSVPartitionProcessor> processors = new ArrayList<CSVPartitionProcessor>(numProcessors);
             for (int i = 0; i < numProcessors; i++) {
-                LinkedBlockingQueue<CSVLineWithMetaData> q = new LinkedBlockingQueue<CSVLineWithMetaData>((int) config.batch);
-                lineq.put(i, q);
-                CSVPartitionProcessor pp = new CSVPartitionProcessor();
-                processors.add(pp);
-                pp.csvClient = csvClient;
-                pp.m_partitionId = i;
-                pp.m_tableName = config.table;
-                pp.m_columnCnt = columnTypes.size();
-                pp.lineq = q;
-                pp.endOfData = dummy;
-                pp.m_processorName = "PartitionProcessor-" + i;
-                Thread th = new Thread(pp);
-                th.setName(pp.m_processorName);
+                LinkedBlockingQueue<CSVLineWithMetaData> partitionQueue = new LinkedBlockingQueue<CSVLineWithMetaData>((int) config.batch);
+                lineq.put(i, partitionQueue);
+                CSVPartitionProcessor processor = new CSVPartitionProcessor(csvClient, i, partitionedColumnIndex,
+                        partitionQueue, endOfData);
+                processors.add(processor);
+
+                Thread th = new Thread(processor);
+                th.setName(processor.m_processorName);
                 spawned.add(th);
             }
-            CSVPartitionProcessor.processor_cdl = processor_cdl;
 
             CSVFileReader.config = config;
             CSVFileReader.columnCnt = columnTypes.size();
@@ -351,12 +348,12 @@ public class CSVLoader {
             CSVFileReader.typeList = typeList;
             CSVFileReader.csvClient = csvClient;
             CSVFileReader.processorQueues = lineq;
-            CSVFileReader.endOfData = dummy;
+            CSVFileReader.endOfData = endOfData;
             CSVFileReader.processor_cdl = processor_cdl;
 
             CSVFileReader rdr = new CSVFileReader();
             Thread th = new Thread(rdr);
-            th.setName("CSVReader-MT");
+            th.setName("CSVFileReader");
             th.setDaemon(true);
 
             for (Thread th2 : spawned) {
@@ -369,12 +366,6 @@ public class CSVLoader {
             readerTime += (rdr.m_parsingTimeEnd - rdr.m_parsingTimeSt);
             readerTime = readerTime / 1000000;
 
-            for (Thread th2 : spawned) {
-                try {
-                    th2.join();
-                } catch (InterruptedException ex) {
-                }
-            }
             insertTimeEnd = System.currentTimeMillis();
 
             csvClient.drain();
@@ -382,8 +373,8 @@ public class CSVLoader {
             long insertCount = 0, ackCount = 0;
             for (CSVPartitionProcessor pp : processors) {
                 insertCount += pp.m_partitionProcessedCount.get();
-                ackCount += pp.m_partitionAcknowledgedCount.get();
             }
+            ackCount = CSVPartitionProcessor.partitionAcknowledgedCount.get();
             m_log.info("Parsing CSV file took " + readerTime + " milliseconds.");
             m_log.info("Inserting Data took " + ((insertTimeEnd - insertTimeStart) - readerTime) + " milliseconds.");
             m_log.info("Inserted " + insertCount + " and acknowledged "
@@ -451,8 +442,8 @@ public class CSVLoader {
     private static void produceFiles(long ackCount, long insertCount) {
         Map<Long, String[]> errorInfo = CSVFileReader.errorInfo;
         latency = System.currentTimeMillis() - start;
-        m_log.info("CSVLoader elapsed: " + latency
-                + " milliseconds");
+        m_log.info("CSVLoader elapsed: " + latency / 1000F
+                + " seconds");
 
         int bulkflush = 300; // by default right now
         try {

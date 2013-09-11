@@ -108,16 +108,15 @@ class CSVFileReader implements Runnable {
                     continue;
                 }
 
-                CSVLineWithMetaData lineData = new CSVLineWithMetaData();
-                lineData.line = correctedLine;
-                lineData.rawLineData = lineList;
-                lineData.lineNumber = listReader.getLineNumber();
+                CSVLineWithMetaData lineData = new CSVLineWithMetaData(correctedLine, lineList, listReader.getLineNumber());
                 int partitionId = 0;
+                //Find partiton to send this line to and put on correct partition processor queue.
                 if (!CSVPartitionProcessor.isMP) {
-                    partitionId = TheHashinator.getPartitionForParameter(partitionColumnType.getValue(), (Object) lineData.line[partitionedColumnIndex]);
+                    partitionId = TheHashinator.getPartitionForParameter(partitionColumnType.getValue(),
+                            (Object) lineData.correctedLine[partitionedColumnIndex]);
                 }
                 BlockingQueue<CSVLineWithMetaData> q = processorQueues.get(partitionId);
-                q.offer(lineData);
+                q.put(lineData);
             } catch (SuperCsvException e) {
                 //Catch rows that can not be read by superCSV listReader. E.g. items without quotes when strictquotes is enabled.
                 e.printStackTrace();
@@ -128,7 +127,15 @@ class CSVFileReader implements Runnable {
             } catch (IOException ioex) {
                 ioex.printStackTrace();
                 break;
+            } catch (InterruptedException ex) {
+                m_log.error("Failed to add lines for partition processor queues: " + ex);
             }
+        }
+
+        //Did we hit the maxerror ceiling?
+        if (errorInfo.size() >= config.maxerrors) {
+            m_log.info("The number of Failure row data exceeds "
+                    + config.maxerrors);
         }
 
         //Close the reader and push endOfData lines to indicate Partition Processor to wind down.
@@ -141,7 +148,11 @@ class CSVFileReader implements Runnable {
                 if (errored) {
                     q.clear();
                 }
-                q.offer(endOfData);
+                try {
+                    q.put(endOfData);
+                } catch (InterruptedException ex) {
+                    m_log.error("Failed to add endOfData for Partition Processor. " + ex);
+                }
             }
             m_log.info("Rows Queued by Reader: " + totalRowCount.get());
         }
@@ -163,13 +174,12 @@ class CSVFileReader implements Runnable {
      */
     public static boolean synchronizeErrorInfo(long errLineNum, String[] info) {
         synchronized (errorInfo) {
+            //Dont collect more than we want to report.
+            if (errorInfo.size() >= config.maxerrors) {
+                return true;
+            }
             if (!errorInfo.containsKey(errLineNum)) {
                 errorInfo.put(errLineNum, info);
-            }
-            if (errorInfo.size() >= config.maxerrors) {
-                m_log.error("The number of Failure row data exceeds "
-                        + config.maxerrors);
-                return true;
             }
             return false;
         }
@@ -189,7 +199,7 @@ class CSVFileReader implements Runnable {
                     slot[i] = blankValues.get(typeList.get(i));
                 }
                 //else config.blank == null which is already the case
-            } // trim white space in this line. SuperCSV preserves all the whitespace by default
+            } // trim white space in this correctedLine. SuperCSV preserves all the whitespace by default
             else {
                 if (config.nowhitespace
                         && (slot[i].charAt(0) == ' ' || slot[i].charAt(slot[i].length() - 1) == ' ')) {

@@ -18,9 +18,16 @@ package org.voltdb.utils;
 
 import java.util.List;
 
+//Processor queue to keep track of line data and number and such.
 public class CSVLineWithMetaData {
 
-    public String[] line;
-    public List<String> rawLineData;
-    public int lineNumber;
+    final public String[] correctedLine;
+    final public List<String> rawLine;
+    final public int lineNumber;
+
+    public CSVLineWithMetaData(String correctedLine[], List<String> rawLine, int ln) {
+        this.correctedLine = correctedLine;
+        this.rawLine = rawLine;
+        lineNumber = ln;
+    }
 }
