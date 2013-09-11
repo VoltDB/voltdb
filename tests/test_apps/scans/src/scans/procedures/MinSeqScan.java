@@ -21,22 +21,18 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.sqlgenerator;
+package scans.procedures;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "P1.ID: 0",
-    singlePartition = true
-)
+public class MinSeqScan extends VoltProcedure
+{
+    public final SQLStmt sql = new SQLStmt("select * from narrow_p where val < 0;");
 
-public class StubProcedure extends VoltProcedure {
-    public final SQLStmt getInfo = new SQLStmt(
-            "SELECT * FROM P1;"
-    );
-
-    public VoltTable[] run(int id) {
-        voltQueueSQL(getInfo, id);
+    public VoltTable[] run() {
+        voltQueueSQL(sql);
         return voltExecuteSQL();
     }
 }

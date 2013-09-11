@@ -250,7 +250,7 @@ public class StatementQuery extends StatementDMQL {
             }
             try {
                 // read offset. it may be a parameter token.
-                if (limitCondition.nodes[0].isParam() == false) {
+                if (limitCondition.nodes[0].isParam == false) {
                     Integer offset = (Integer)limitCondition.nodes[0].getValue(session);
                     if (offset > 0) {
                         query.attributes.put("offset", offset.toString());
@@ -261,7 +261,7 @@ public class StatementQuery extends StatementDMQL {
                 }
 
                 // read limit. it may be a parameter token.
-                if (limitCondition.nodes[1].isParam() == false) {
+                if (limitCondition.nodes[1].isParam == false) {
                     Integer limit = (Integer)limitCondition.nodes[1].getValue(session);
                     query.attributes.put("limit", limit.toString());
                 }

@@ -24,7 +24,7 @@
 #include "common/ValueFactory.hpp"
 #include "expressions/abstractexpression.h"
 #include "plannodes/tablecountnode.h"
-#include "storage/table.h"
+#include "storage/persistenttable.h"
 #include "storage/temptable.h"
 #include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
@@ -53,20 +53,21 @@ bool TableCountExecutor::p_execute(const NValueArray &params) {
     assert(output_table);
     assert ((int)output_table->columnCount() == 1);
 
-    Table* target_table = dynamic_cast<Table*>(node->getTargetTable());
-    assert(target_table);
-    VOLT_TRACE("Table Count table :\n %s",
-               target_table->debug().c_str());
-    VOLT_DEBUG("Table Count table : %s which has %d active, %d"
-               " allocated",
+    PersistentTable* target_table = dynamic_cast<PersistentTable*>(node->getTargetTable());
+    if ( ! target_table) {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "May not iterate a streamed table.");
+    }
+    VOLT_DEBUG("Table Count table : %s which has %d active, %d visible, %d allocated",
                target_table->name().c_str(),
                (int)target_table->activeTupleCount(),
+               (int)target_table->visibleTupleCount(),
                (int)target_table->allocatedTupleCount());
 
     assert (node->getPredicate() == NULL);
 
     TableTuple& tmptup = output_table->tempTuple();
-    tmptup.setNValue(0, ValueFactory::getBigIntValue( target_table->activeTupleCount() ));
+    tmptup.setNValue(0, ValueFactory::getBigIntValue(target_table->visibleTupleCount()));
     output_table->insertTuple(tmptup);
 
 

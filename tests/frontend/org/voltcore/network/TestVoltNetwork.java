@@ -24,6 +24,9 @@
 package org.voltcore.network;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
@@ -38,8 +41,8 @@ public class TestVoltNetwork extends TestCase {
 
 
     private static class MockVoltPort extends VoltPort {
-        MockVoltPort(VoltNetwork vn, InputHandler handler) {
-            super (vn, handler, "", vn.m_pool);
+        MockVoltPort(VoltNetwork vn, InputHandler handler) throws UnknownHostException {
+            super (vn, handler, new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 21212), vn.m_pool);
         }
 
         @Override
@@ -231,7 +234,7 @@ public class TestVoltNetwork extends TestCase {
         }
     }
 
-    public void testInstallInterests() throws InterruptedException {
+    public void testInstallInterests() throws Exception {
         new MockSelector();
         VoltNetwork vn = new VoltNetwork( 0, null);
         MockVoltPort vp = new MockVoltPort(vn, new MockInputHandler());
@@ -258,7 +261,7 @@ public class TestVoltNetwork extends TestCase {
         assertEquals(selectionKey.interestOps(), vp.interestOps());
     }
 
-    public void testInvokeCallbacks() throws InterruptedException{
+    public void testInvokeCallbacks() throws Exception{
         MockSelector selector = new MockSelector();
         VoltNetwork vn = new VoltNetwork(selector);               // network with fake selector
         MockVoltPort vp = new MockVoltPort(vn, new MockInputHandler());             // implement abstract run()

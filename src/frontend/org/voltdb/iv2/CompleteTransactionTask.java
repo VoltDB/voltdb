@@ -55,7 +55,7 @@ public class CompleteTransactionTask extends TransactionTask
             siteConnection.truncateUndoLog(m_completeMsg.isRollback(),
                     m_txnState.getBeginUndoToken(),
                     m_txnState.txnId,
-                    m_txnState.spHandle);
+                    m_txnState.m_spHandle);
         }
         if (!m_completeMsg.isRestart()) {
             doCommonSPICompleteActions();
@@ -105,7 +105,7 @@ public class CompleteTransactionTask extends TransactionTask
             siteConnection.truncateUndoLog(m_completeMsg.isRollback(),
                     m_txnState.getBeginUndoToken(),
                     m_txnState.txnId,
-                    m_txnState.spHandle);
+                    m_txnState.m_spHandle);
         }
         if (!m_completeMsg.isRestart()) {
             // this call does the right thing with a null TransactionTaskQueue
@@ -127,7 +127,7 @@ public class CompleteTransactionTask extends TransactionTask
             Iv2InitiateTaskMessage initiateTask = fragment.getInitiateTask();
             assert(initiateTask != null);
             StoredProcedureInvocation invocation = initiateTask.getStoredProcedureInvocation().getShallowCopy();
-            m_drGateway.onSuccessfulMPCall(m_txnState.spHandle,
+            m_drGateway.onSuccessfulMPCall(m_txnState.m_spHandle,
                     m_txnState.txnId,
                     m_txnState.uniqueId,
                     m_completeMsg.getHash(),

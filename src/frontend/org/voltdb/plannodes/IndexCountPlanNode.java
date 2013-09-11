@@ -18,8 +18,8 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
-import java.util.SortedSet;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -40,8 +40,6 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.PlanNodeType;
-import org.voltdb.utils.CatalogUtil;
-import org.voltdb.types.SortDirectionType;
 import org.voltdb.utils.CatalogUtil;
 
 public class IndexCountPlanNode extends AbstractScanPlanNode {
@@ -109,7 +107,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_outputSchema = apn.getOutputSchema().clone();
         m_hasSignificantOutputSchema = true;
 
-        if (isp.getSortDirection() != SortDirectionType.DESC) {
+        if (!isp.isReverseScan()) {
             m_lookupType = isp.m_lookupType;
             m_searchkeyExpressions = isp.m_searchkeyExpressions;
 
@@ -183,7 +181,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
         // decide whether to pad last endKey to solve
         // SELECT COUNT(*) FROM T WHERE C1 = ? AND C2 > / >= ?
-        if (isp.getSortDirection() != SortDirectionType.DESC &&
+        if (!isp.isReverseScan() &&
                 endType == IndexLookupType.EQ &&
                 endKeys.size() > 0 &&
                 endKeys.size() == indexSize - 1 &&
@@ -233,7 +231,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
         // Avoid the cases that would cause undercounts for prefix matches.
         // A prefix-only key exists and does not use LT.
-        if (isp.getSortDirection() != SortDirectionType.DESC &&
+        if (!isp.isReverseScan() &&
             (endType != IndexLookupType.LT) &&
             (endKeys.size() > 0) &&
             (endKeys.size() < indexSize)) {
@@ -249,10 +247,14 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    protected void getThisNodesTablesAndIndexes(SortedSet<String> tablesRead, SortedSet<String> tablesUpdated, SortedSet<String> indexes) {
-        super.getThisNodesTablesAndIndexes(tablesRead, tablesUpdated, indexes);
-        assert(m_targetIndexName.length() > 0);
-        indexes.add(m_targetIndexName);
+    public void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tableUpdated,
+                                    Collection<String> indexes)
+    {
+        super.getTablesAndIndexes(tablesRead, tableUpdated, indexes);
+        if (indexes != null) {
+            assert(m_targetIndexName.length() > 0);
+            indexes.add(m_targetIndexName);
+        }
     }
 
     @Override

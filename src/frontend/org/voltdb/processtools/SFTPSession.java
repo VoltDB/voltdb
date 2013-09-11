@@ -56,11 +56,15 @@ public class SFTPSession {
     /**
      * default logger
      */
-    protected static final VoltLogger sftpLog = new VoltLogger(SFTPSession.class.getName());
+    protected static final VoltLogger sftpLog = new VoltLogger("HOST");
     /*
      * regular expression that matches file names ending in jar, so, and jnilib
      */
     private final static Pattern ARTIFACT_REGEXP = Pattern.compile("\\.(?:jar|so|jnilib)\\Z");
+    /*
+     * JSCH session
+     */
+    private Session m_session;
     /*
      * JSch SFTP channel
      */
@@ -80,6 +84,7 @@ public class SFTPSession {
      * @param user SFTP connection user name
      * @param key SFTP connection private key
      * @param host SFTP remote host name
+     * @param password SFTP connection password
      * @param port SFTP port
      * @param log logger
      *
@@ -87,7 +92,7 @@ public class SFTPSession {
      *   session
      */
     public SFTPSession(
-            final String user, final String key, final String host,
+            final String user, final String password, final String key, final String host,
             int port, final VoltLogger log) {
         Preconditions.checkArgument(
                 user != null && !user.trim().isEmpty(),
@@ -116,25 +121,28 @@ public class SFTPSession {
             }
         }
 
-        Session session;
         try {
-            session = jsch.getSession(user, host, port);
-            session.setTimeout(15000);
-            session.setConfig("StrictHostKeyChecking", "no");
-            session.setDaemonThread(true);
+            m_session = jsch.getSession(user, host, port);
+            m_session.setTimeout(15000);
+            m_session.setConfig("StrictHostKeyChecking", "no");
+            m_session.setDaemonThread(true);
+
+            if (password != null && !password.trim().isEmpty()) {
+                m_session.setPassword(password);
+            }
         } catch (JSchException jsex) {
             throw new SFTPException("create a JSch session", jsex);
         }
 
         try {
-            session.connect();
+            m_session.connect();
         } catch (JSchException jsex) {
             throw new SFTPException("connect a JSch session", jsex);
         }
 
         ChannelSftp channel;
         try {
-            channel = (ChannelSftp)session.openChannel("sftp");
+            channel = (ChannelSftp)m_session.openChannel("sftp");
         } catch (JSchException jsex) {
             throw new SFTPException("create an SFTP channel", jsex);
         }
@@ -147,13 +155,24 @@ public class SFTPSession {
         m_channel = channel;
     }
 
+    public SFTPSession( final String user, final String password, final String key,
+            final String host, final VoltLogger log) {
+        this(user, password, key, host, 22, log);
+    }
+
+    public SFTPSession(
+            final String user, final String key, final String host,
+            int port, final VoltLogger log) {
+        this(user, null, key, host, 22, null);
+    }
+
     public SFTPSession( final String user, final String key, final String host) {
-        this(user, key, host, 22, null);
+        this(user, null, key, host, 22, null);
     }
 
     public SFTPSession( final String user, final String key,
             final String host, final VoltLogger log) {
-        this(user, key, host, 22, log);
+        this(user, null, key, host, 22, log);
     }
 
     /**
@@ -637,6 +656,115 @@ public class SFTPSession {
             directories.add( new DirectoryEntry(level, directory));
         }
         return level + 1;
+    }
+
+    public String exec(String command) {
+        return exec(command, 5000);
+    }
+
+    public String exec(String command, int timeout) {
+        ChannelExec channel = null;
+        BufferedReader outStrBufRdr = null;
+        BufferedReader errStrBufRdr = null;
+
+        StringBuilder result = new StringBuilder(2048);
+
+        try {
+            try {
+                channel = (ChannelExec)m_session.openChannel("exec");
+            } catch (JSchException jex) {
+                throw new SSHException("opening ssh exec channel", jex);
+            }
+
+            // Direct stdout output of command
+            try {
+                InputStream out = channel.getInputStream();
+                InputStreamReader outStrRdr = new InputStreamReader(out, "UTF-8");
+                outStrBufRdr = new BufferedReader(outStrRdr);
+            } catch (IOException ioex) {
+                throw new SSHException("geting exec channel input stream", ioex);
+            }
+
+            // Direct stderr output of command
+            try {
+                InputStream err = channel.getErrStream();
+                InputStreamReader errStrRdr = new InputStreamReader(err, "UTF-8");
+                errStrBufRdr = new BufferedReader(errStrRdr);
+            } catch (IOException ioex) {
+                throw new SSHException("getting exec channel error stream", ioex);
+            }
+            channel.setCommand(command);
+
+            StringBuffer stdout = new StringBuffer();
+            StringBuffer stderr = new StringBuffer();
+
+            try {
+                channel.connect(timeout);
+                int retries = timeout / 100;
+                while (!channel.isClosed() && retries-- > 0) {
+                    // Read from both streams here so that they are not blocked,
+                    // if they are blocked because the buffer is full, channel.isClosed() will never
+                    // be true.
+                    int ch;
+                    try {
+                        while (outStrBufRdr.ready() && (ch = outStrBufRdr.read()) > -1) {
+                            stdout.append((char) ch);
+                        }
+                    } catch (IOException ioex) {
+                        throw new SSHException("capturing '" + command + "' output", ioex);
+                    }
+                    try {
+                        while (errStrBufRdr.ready() && (ch = errStrBufRdr.read()) > -1) {
+                            stderr.append((char) ch);
+                        }
+                    } catch (IOException ioex) {
+                        throw new SSHException("capturing '" + command + "' error", ioex);
+                    }
+
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException ignoreIt) {}
+                }
+                if (retries < 0) {
+                    throw new SSHException("'" + command + "' timed out");
+                }
+            } catch (JSchException jex) {
+                throw new SSHException("executing '" + command + "'", jex);
+            }
+
+            // In case there's still some more stuff in the buffers, read them
+            int ch;
+            try {
+                while ((ch = outStrBufRdr.read()) > -1) {
+                    stdout.append((char) ch);
+                }
+            } catch (IOException ioex) {
+                throw new SSHException("capturing '" + command + "' output", ioex);
+            }
+            try {
+                while ((ch = errStrBufRdr.read()) > -1) {
+                    stderr.append((char) ch);
+                }
+            } catch (IOException ioex) {
+                throw new SSHException("capturing '" + command + "' error", ioex);
+            }
+            if (stderr.length() > 0) {
+                throw new SSHException(stderr.toString());
+            }
+
+            result.append(stdout.toString());
+            result.append(stderr.toString());
+        } finally {
+            if (outStrBufRdr != null) try { outStrBufRdr.close(); } catch (Exception ignoreIt) {}
+            if (errStrBufRdr != null) try { errStrBufRdr.close(); } catch (Exception ignoreIt) {}
+
+            if (channel != null && channel.isConnected()) {
+                // Shutdown the connection
+                channel.disconnect();
+            }
+        }
+
+        return result.toString();
     }
 
     /**

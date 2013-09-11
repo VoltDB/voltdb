@@ -150,7 +150,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
     }
 
     /** select A1 from T1 group by A1 */
-    public void testSelectAGroubyA() throws IOException, ProcCallException {
+    public void testSelectAGroupbyA() throws IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable vt;
 
@@ -182,7 +182,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
     }
 
     /** select B_VAL1 from B group by B_VAL1 */
-    public void testSelectGroubyVarbinary() throws IOException, ProcCallException {
+    public void testSelectGroupbyVarbinary() throws IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable vt;
 
@@ -349,13 +349,26 @@ public class TestPlansGroupBySuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc", qs).getResults()[0];
         System.out.println("testDistributedSum result: " + vt);
         assertTrue(vt.getRowCount() == 1);
-        while (vt.advanceRow()) {
-            Integer sum1 = (Integer) vt.get(0, VoltType.INTEGER);
-            assertEquals(2000, sum1.intValue());
-            Integer sum2 = (Integer) vt.get(1, VoltType.INTEGER);
-            assertEquals(4995000, sum2.intValue());
-            Integer sum3 = (Integer) vt.get(2, VoltType.INTEGER);
-            assertEquals(500, sum3.intValue());
+        vt.advanceRow();
+        Integer sum1 = (Integer) vt.get(0, VoltType.INTEGER);
+        assertEquals(2000, sum1.intValue());
+        Integer sum2 = (Integer) vt.get(1, VoltType.INTEGER);
+        assertEquals(4995000, sum2.intValue());
+        Integer sum3 = (Integer) vt.get(2, VoltType.INTEGER);
+        assertEquals(500, sum3.intValue());
+
+        // Also, regression test ENG-199 -- duplicate aggregation column.
+        vt = client.callProcedure("@AdHoc", "select sum(F_VAL1), sum(F_VAL1) from F").getResults()[0];
+        System.out.println("testDistributedSum result: " + vt);
+        assertTrue(vt.getRowCount() == 1);
+        vt.advanceRow();
+        sum1 = (Integer) vt.get(0, VoltType.INTEGER);
+        assertEquals(2000, sum1.intValue());
+        try {
+            sum2 = (Integer) vt.get(1, VoltType.INTEGER);
+            assertEquals(2000, sum2.intValue());
+        } catch ( Exception exc ) {
+            fail("Apparently failing like ENG-199 with: " + exc);
         }
     }
 

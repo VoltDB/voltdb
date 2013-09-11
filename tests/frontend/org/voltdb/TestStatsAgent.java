@@ -214,12 +214,12 @@ public class TestStatsAgent {
         /*
          * Generate a bunch of requests, should get backpressure on some of them
          */
-        for (int ii = 0; ii < 12; ii++) {
+        for (int ii = 0; ii < 30; ii++) {
             m_mvoltdb.getStatsAgent().performOpsAction(m_mockConnection, 32, OpsSelector.STATISTICS, subselect("DR", 0));
         }
 
         boolean hadBackpressure = false;
-        for (int ii = 0; ii < 12; ii++) {
+        for (int ii = 0; ii < 30; ii++) {
             ClientResponseImpl response = responses.take();
 
             if (response.getStatus() == ClientResponse.GRACEFUL_FAILURE) {

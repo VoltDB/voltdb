@@ -29,6 +29,7 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
@@ -109,6 +110,7 @@ import org.voltdb.iv2.SpInitiator;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
+import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.rejoin.Iv2RejoinCoordinator;
 import org.voltdb.rejoin.JoinCoordinator;
 import org.voltdb.utils.CLibrary;
@@ -152,7 +154,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    private static final String m_defaultVersionString = "3.5";
+    private static final String m_defaultVersionString = "3.6";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
@@ -345,6 +347,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_pathToStartupCatalog = m_config.m_pathToCatalog;
             m_replicationActive = false;
             m_configLogger = null;
+            ActivePlanRepository.clear();
 
             // set up site structure
             m_localSites = new COWMap<Long, ExecutionSite>();
@@ -745,13 +748,61 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // set additional restore agent stuff
             if (m_restoreAgent != null) {
-                ci.bindAdapter(m_restoreAgent.getAdapter());
                 m_restoreAgent.setCatalogContext(m_catalogContext);
                 m_restoreAgent.setInitiator(new Iv2TransactionCreator(m_clientInterfaces.get(0)));
             }
 
             m_configLogger = new Thread(new ConfigLogging());
             m_configLogger.start();
+
+            DailyRollingFileAppender dailyAppender = null;
+            Enumeration appenders = Logger.getRootLogger().getAllAppenders();
+            while (appenders.hasMoreElements()) {
+                Appender appender = (Appender) appenders.nextElement();
+                if (appender instanceof DailyRollingFileAppender){
+                    dailyAppender = (DailyRollingFileAppender) appender;
+                }
+            }
+            final DailyRollingFileAppender dailyRollingFileAppender = dailyAppender;
+
+            Field field = null;
+            if (dailyRollingFileAppender != null) {
+                try {
+                    field = dailyRollingFileAppender.getClass().getDeclaredField("nextCheck");
+                    field.setAccessible(true);
+                } catch (NoSuchFieldException e) {
+                    hostLog.error("Failed to set daily system info logging: " + e.getMessage());
+                }
+            }
+            final Field nextCheckField = field;
+
+            class DailyLogTask implements Runnable {
+                @Override
+                public void run() {
+                    try {
+                        m_myHostId = m_messenger.getHostId();
+                        hostLog.info(String.format("Host id of this node is: %d", m_myHostId));
+                        hostLog.info("URL of deployment info: " + m_config.m_pathToDeployment);
+                        logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
+
+                        long nextCheck = nextCheckField.getLong(dailyRollingFileAppender);
+                        scheduleWork(new DailyLogTask(),
+                                nextCheck - System.currentTimeMillis() + 30 * 1000, 0, TimeUnit.MILLISECONDS);
+                    } catch (IllegalAccessException e) {
+                        hostLog.error("Failed to set daily system info logging: " + e.getMessage());
+                    }
+                }
+            }
+
+            if (dailyRollingFileAppender != null && nextCheckField != null) {
+                try {
+                    long nextCheck = nextCheckField.getLong(dailyRollingFileAppender);
+                    scheduleWork(new DailyLogTask(),
+                            nextCheck - System.currentTimeMillis() + 30 * 1000, 0, TimeUnit.MILLISECONDS);
+                } catch (IllegalAccessException e) {
+                    hostLog.error("Failed to set daily system info logging: " + e.getMessage());
+                }
+            }
         }
     }
 

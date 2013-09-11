@@ -1152,14 +1152,14 @@ public class ParserDQL extends ParserBase {
 
         boolean valid = true;
 
-        if (e1.isParam()) {
+        if (e1.isParam) {
             e1.setDataType(session, Type.SQL_INTEGER);
         } else {
             valid = (e1.getDataType().typeCode == Types.SQL_INTEGER
                      && ((Integer) e1.getValue(null)).intValue() >= 0);
         }
 
-        if (e2.isParam()) {
+        if (e2.isParam) {
             e2.setDataType(session, Type.SQL_INTEGER);
         } else {
             valid &= (e2.getDataType().typeCode == Types.SQL_INTEGER
@@ -1236,14 +1236,14 @@ public class ParserDQL extends ParserBase {
 
         boolean valid = true;
 
-        if (e1.isParam()) {
+        if (e1.isParam) {
             e1.setDataType(session, Type.SQL_INTEGER);
         } else {
             valid = (e1.getDataType().typeCode == Types.SQL_INTEGER
                      && ((Integer) e1.getValue(null)).intValue() >= 0);
         }
 
-        if (e2.isParam()) {
+        if (e2.isParam) {
             e2.setDataType(session, Type.SQL_INTEGER);
         } else {
             valid &= (e2.getDataType().typeCode == Types.SQL_INTEGER
@@ -2852,11 +2852,11 @@ public class ParserDQL extends ParserBase {
 
         Expression right = XreadRowValuePredicand();
 
-        if (a.isParam() && left.isParam()) {
+        if (a.isParam && left.isParam) {
             throw Error.error(ErrorCode.X_42567);
         }
 
-        if (a.isParam() && right.isParam()) {
+        if (a.isParam && right.isParam) {
             throw Error.error(ErrorCode.X_42567);
         }
 
@@ -3780,7 +3780,7 @@ public class ParserDQL extends ParserBase {
 
         Type typeObject = readTypeDefinition(true);
 
-        if (l.isParam()) {
+        if (l.isParam) {
             l.setDataType(session, typeObject);
         }
 

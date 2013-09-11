@@ -36,7 +36,6 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
@@ -1539,9 +1538,9 @@ public abstract class CatalogUtil {
                                               AbstractPlanNode topPlan,
                                               AbstractPlanNode bottomPlan)
     {
-        SortedSet<String> tablesRead = new TreeSet<String>();
-        SortedSet<String> tablesUpdated = new TreeSet<String>();
-        SortedSet<String> indexes = new TreeSet<String>();
+        Collection<String> tablesRead = new TreeSet<String>();
+        Collection<String> tablesUpdated = new TreeSet<String>();
+        Collection<String> indexes = new TreeSet<String>();
         if (topPlan != null) {
             topPlan.getTablesAndIndexes(tablesRead, tablesUpdated, indexes);
         }

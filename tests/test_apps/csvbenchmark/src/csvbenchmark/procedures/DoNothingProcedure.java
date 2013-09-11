@@ -20,32 +20,23 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+package csvbenchmark.procedures;
 
-package org.voltdb.sqlgenerator;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
 
-import org.voltdb.compiler.VoltProjectBuilder;
+@ProcInfo(
+        partitionInfo = "narrow_long_ix.a:0",
+        singlePartition = true)
 
+public class DoNothingProcedure extends VoltProcedure {
 
-public class SimpleProjectBuilder extends VoltProjectBuilder {
-    public static final Class<?> PROCEDURES[] = new Class<?>[] {
-        StubProcedure.class
-    };
+    // Inserts an area code/state mapping
+    //public final SQLStmt insertACSStmt = new SQLStmt("INSERT INTO narrow_short_noix (a,b,c,d,e) VALUES (?,?,?,?,?);");
+    public final SQLStmt insertACSStmt = new SQLStmt("INSERT INTO narrow_long_noix (a,b,c,d,e) VALUES (?,?,?,?,?);");
 
-    private String m_filename = null;
-
-    public SimpleProjectBuilder(String filename) {
-        m_filename = filename;
-    }
-
-    public void addDefaultProcedures() {
-        addProcedures(PROCEDURES);
-    }
-
-    public void addDefaultPartitioning() {
-        addPartitionInfo("P1", "ID");
-    }
-
-    public void addDefaultSchema() {
-        addSchema(getClass().getResource(m_filename));
+    public long run(int a, int b, int c, long d, String e) {
+        return 0;
     }
 }

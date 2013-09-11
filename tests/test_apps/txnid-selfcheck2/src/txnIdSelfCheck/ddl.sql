@@ -83,6 +83,24 @@ CREATE TABLE bigp
 );
 PARTITION TABLE bigp ON COLUMN p;
 
+CREATE TABLE forDroppedProcedure
+(
+  p          integer             NOT NULL
+, id         bigint             NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_forDroppedProcedure PRIMARY KEY (p,id)
+);
+PARTITION TABLE forDroppedProcedure ON COLUMN p;
+
+CREATE TABLE export_skinny_partitioned_table
+(
+  txnid                     BIGINT        NOT NULL
+, rowid                     BIGINT        NOT NULL
+);
+
+PARTITION TABLE export_skinny_partitioned_table ON COLUMN rowid;
+EXPORT TABLE export_skinny_partitioned_table;
+
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReplicatedUpdateBaseProc;

@@ -28,14 +28,16 @@
  *
  * While asynchronous processing is (marginally) more convoluted to work
  * with and not adapted to all workloads, it is the preferred interaction
- * model to VoltDB as it guarantees blazing performance.
+ * model to VoltDB as it allows a single client with a small amount of
+ * threads to flood VoltDB with requests, guaranteeing blazing throughput
+ * performance.
  *
- * Because there is a risk of 'firehosing' a database cluster (if the
- * cluster is too slow (slow or too few CPUs), this sample performs
- * auto-tuning to target a specific latency (5ms by default).
- * This tuning process, as demonstrated here, is important and should be
- * part of your pre-launch evaluation so you can adequately provision your
- * VoltDB cluster with the number of servers required for your needs.
+ * Note that this benchmark focuses on throughput performance and
+ * not low latency performance.  This benchmark will likely 'firehose'
+ * the database cluster (if the cluster is too slow or has too few CPUs)
+ * and as a result, queue a significant amount of requests on the server
+ * to maximize throughput measurement. To test VoltDB latency, run the
+ * SyncBenchmark client, also found in the voter sample directory.
  */
 
 package voter;

@@ -129,9 +129,11 @@ begin Table                   "A table (relation) in the database"
 end
 
 begin MaterializedViewInfo "Information used to build and update a materialized view"
-  Table? dest              "The table which will be updated when the source table is updated"
-  ColumnRef* groupbycols   "The columns involved in the group by of the aggregation"
-  string predicate         "A filtering predicate"
+  Table? dest                       "The table which will be updated when the source table is updated"
+  ColumnRef* groupbycols            "The columns involved in the group by of the aggregation"
+  string predicate                  "A filtering predicate"
+  string groupbyExpressionsJson     "A serialized representation of the groupby expression trees"
+  string aggregationExpressionsJson "A serialized representation of the aggregation expression trees"
 end
 
 begin AuthProgram "The name of a program with access to a specific procedure. This is effectively a weak reference to a 'program'"

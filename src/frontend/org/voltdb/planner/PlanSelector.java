@@ -159,9 +159,6 @@ public class PlanSelector implements Cloneable {
             // add in the sql to the plan
             plan.sql = m_sql;
 
-            // this plan is final, resolve all the column index references
-            plan.rootPlanGraph.resolveColumnIndexes();
-
             // compute resource usage using the single stats collector
             m_stats = new PlanStatistics();
             AbstractPlanNode planGraph = plan.rootPlanGraph;

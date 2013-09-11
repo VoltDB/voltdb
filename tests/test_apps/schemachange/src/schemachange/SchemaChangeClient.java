@@ -279,6 +279,8 @@ public class SchemaChangeClient {
             case ClientResponse.GRACEFUL_FAILURE:
             case ClientResponse.USER_ABORT:
                 // should never happen
+                log.error(_F("USER_ABORT in procedure call for Catalog update"));
+                log.error(((ClientResponseImpl)cr).toJSONString());
                 assert(false);
                 System.exit(-1);
             }
