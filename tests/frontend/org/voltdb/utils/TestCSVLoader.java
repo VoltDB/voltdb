@@ -146,7 +146,7 @@ public class TestCSVLoader extends TestCase {
                     "BLAH"
             };
             prepare();
-            CSVLoader.main( my_options );
+            CSVLoaderSP.main( my_options );
             File file = new File( String.format("/tmp/%s-BLAH-host_0.csv", dbName) );
             file.delete();
 
@@ -787,7 +787,7 @@ public class TestCSVLoader extends TestCase {
             client.createConnection("localhost");
 
             prepare();
-            CSVLoader.main( my_options );
+            CSVLoaderSP.main( my_options );
             // do the test
 
             VoltTable modCount;
@@ -795,7 +795,7 @@ public class TestCSVLoader extends TestCase {
             System.out.println("data inserted to table BLAH:\n" + modCount);
             int rowct = modCount.getRowCount();
 
-            BufferedReader csvreport = new BufferedReader(new FileReader(CSVLoader.pathReportfile));
+            BufferedReader csvreport = new BufferedReader(new FileReader(CSVLoaderSP.pathReportfile));
             int lineCount = 0;
             String line = "";
             String promptMsg = "Number of rows successfully inserted:";

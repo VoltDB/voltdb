@@ -31,27 +31,30 @@ import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
-import static org.voltdb.utils.CSVLoaderMT.m_log;
+import static org.voltdb.utils.CSVLoader.m_log;
 
+/**
+ * This is a single thread reader which feeds the lines after validating syntax to correct Partition Processors.
+ *
+ */
 class CSVFileReader implements Runnable {
 
-    public static AtomicLong totalRowCount = new AtomicLong(0);
-    public static AtomicLong totalLineCount = new AtomicLong(0);
-    static CSVLoaderMT.CSVConfig config;
+    static AtomicLong totalRowCount = new AtomicLong(0);
+    static AtomicLong totalLineCount = new AtomicLong(0);
+    static CSVLoader.CSVConfig config;
     static int columnCnt;
     static ICsvListReader listReader;
     static Client csvClient;
-    static Map<Integer, BlockingQueue<CSVLineWithMetaData>> lineq;
+    static Map<Integer, BlockingQueue<CSVLineWithMetaData>> processorQueues;
     static int partitionedColumnIndex;
     static VoltType partitionColumnType;
-    static CSVLineWithMetaData dummy;
+    static CSVLineWithMetaData endOfData;
     static int batchmax = 200;
     static String tableName;
-    long parsingTimeSt = System.nanoTime();
-    long parsingTimeEnd = System.nanoTime();
-    static CountDownLatch pcount;
+    static CountDownLatch processor_cdl;
     static boolean errored = false;
-
+    long m_parsingTimeSt = System.nanoTime();
+    long m_parsingTimeEnd = System.nanoTime();
     private static Map<VoltType, String> blankValues = new EnumMap<VoltType, String>(VoltType.class);
     static {
         blankValues.put(VoltType.NUMERIC, "0");
@@ -71,6 +74,9 @@ class CSVFileReader implements Runnable {
     @Override
     public void run() {
         while ((config.limitrows-- > 0)) {
+            if (errored) {
+                break;
+            }
             try {
                 //Initial setting of totalLineCount
                 if (listReader.getLineNumber() == 0) {
@@ -81,7 +87,7 @@ class CSVFileReader implements Runnable {
                 long st = System.nanoTime();
                 List<String> lineList = listReader.read();
                 long end = System.nanoTime();
-                parsingTimeEnd += (end - st);
+                m_parsingTimeEnd += (end - st);
                 if (lineList == null) {
                     if (totalLineCount.get() > listReader.getLineNumber()) {
                         totalLineCount.set(listReader.getLineNumber());
@@ -98,7 +104,6 @@ class CSVFileReader implements Runnable {
                     String[] info = {lineList.toString(), lineCheckResult};
                     if (synchronizeErrorInfo(totalLineCount.get() + 1, info)) {
                         errored = true;
-                        break;
                     }
                     continue;
                 }
@@ -111,14 +116,13 @@ class CSVFileReader implements Runnable {
                 if (!CSVPartitionProcessor.isMP) {
                     partitionId = TheHashinator.getPartitionForParameter(partitionColumnType.getValue(), (Object) lineData.line[partitionedColumnIndex]);
                 }
-                BlockingQueue<CSVLineWithMetaData> q = lineq.get(partitionId);
+                BlockingQueue<CSVLineWithMetaData> q = processorQueues.get(partitionId);
                 q.offer(lineData);
             } catch (SuperCsvException e) {
                 //Catch rows that can not be read by superCSV listReader. E.g. items without quotes when strictquotes is enabled.
                 e.printStackTrace();
                 String[] info = {e.getMessage(), ""};
                 if (synchronizeErrorInfo(totalLineCount.get() + 1, info)) {
-                    errored = true;
                     break;
                 }
             } catch (IOException ioex) {
@@ -126,22 +130,24 @@ class CSVFileReader implements Runnable {
                 break;
             }
         }
+
+        //Close the reader and push endOfData lines to indicate Partition Processor to wind down.
         try {
             listReader.close();
         } catch (IOException ex) {
             m_log.error("Error cloging Reader: " + ex);
         } finally {
-            for (BlockingQueue<CSVLineWithMetaData> q : lineq.values()) {
+            for (BlockingQueue<CSVLineWithMetaData> q : processorQueues.values()) {
                 if (errored) {
                     q.clear();
                 }
-                q.offer(dummy);
+                q.offer(endOfData);
             }
             m_log.info("Rows Queued by Reader: " + totalRowCount.get());
         }
         try {
             m_log.info("Waiting for partition processors to finish.");
-            pcount.await();
+            processor_cdl.await();
             m_log.info("Partition Processors Done.");
         } catch (InterruptedException ex) {
             ;

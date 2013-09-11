@@ -127,44 +127,41 @@ public class VoltTableUtil {
      * @param columnTypes
      * @return
      */
-    public static VoltTable toVoltTableFromLine(VoltTable table, String fields[], Map<Integer, VoltType> columnTypes) {
+    public static boolean addRowToVoltTableFromLine(VoltTable table, String fields[], Map<Integer, VoltType> columnTypes) {
 
         if (fields == null || fields.length <= 0) {
-            return table;
+            return false;
         }
         Object row_args[] = new Object[fields.length];
-
+        boolean rowComplete = true;
         for (int i = 0; i < fields.length; i++) {
             final VoltType type = columnTypes.get(i);
-            Object obj;
             if (type == VoltType.BIGINT
                     || type == VoltType.INTEGER
                     || type == VoltType.SMALLINT
                     || type == VoltType.TINYINT) {
-                Long l = Long.parseLong(fields[i]);
-                obj = l;
+                row_args[i] = Long.parseLong(fields[i]);
             } else if (type == VoltType.FLOAT) {
                 Double l = Double.parseDouble(fields[i]);
-                obj = l;
+                row_args[i] = l;
             } else if (type == VoltType.DECIMAL) {
                 BigDecimal l = new BigDecimal(fields[i]);
-                obj = l;
+                row_args[i] = l;
             } else if (type == VoltType.STRING) {
-                obj = fields[i];
+                row_args[i] = fields[i];
             } else if (type == VoltType.TIMESTAMP) {
                 TimestampType ts = new TimestampType(fields[i]);
-                obj = ts;
+                row_args[i] = ts;
             } else if (type == VoltType.VARBINARY) {
-                obj = fields[i].getBytes();
+                row_args[i] = fields[i].getBytes();
             } else {
-                obj = null;
-            }
-            if (obj != null) {
-                row_args[i] = obj;
+                rowComplete = false;
             }
         }
-        table.addRow(row_args);
-        return table;
+        if (rowComplete) {
+            table.addRow(row_args);
+        }
+        return rowComplete;
     }
 
     public static void toCSVWriter(CSVWriter csv, VoltTable vt, ArrayList<VoltType> columnTypes) throws IOException {
