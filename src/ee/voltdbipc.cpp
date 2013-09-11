@@ -1295,7 +1295,7 @@ void *eethread(void *ptr) {
         //printf("Received message size %d\n", msg_size);
         if (msg_size > max_ipc_message_size) {
             max_ipc_message_size = msg_size;
-            char* newdata = (char*) malloc(max_ipc_message_size);
+            char* newdata = new char[max_ipc_message_size];
             memset(newdata, 0, max_ipc_message_size);
             memcpy(newdata, data.get(), 4);
             data.reset(newdata);
