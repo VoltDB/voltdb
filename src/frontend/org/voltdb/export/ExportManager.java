@@ -140,37 +140,52 @@ public class ExportManager
             proc.queueWork(new Runnable() {
                 @Override
                 public void run() {
+                    try {
 
-                    ExportGeneration oldGeneration = m_generations.firstEntry().getValue();
-                    ExportDataProcessor newProcessor = null;
-                    ExportDataProcessor oldProcessor = null;
-                    synchronized (ExportManager.this) {
+                    } catch (RuntimeException e) {
+                        exportLog.error("Error rolling to next export generation", e);
+                    } catch (Exception e) {
+                        exportLog.error("Error rolling to next export generation", e);
+                    } finally {
+                        m_onGenerationDrainedForTruncation.release();
+                    }
+                }
 
-                        m_generationGhosts.add(m_generations.remove(m_generations.firstEntry().getKey()).m_timestamp);
-                        exportLog.info("Finished draining generation " + oldGeneration.m_timestamp);
+            });
+        }
+    };
 
-                        try {
-                            if (m_loaderClass != null && !m_generations.isEmpty()) {
-                                exportLog.info("Creating connector " + m_loaderClass);
-                                final Class<?> loaderClass = Class.forName(m_loaderClass);
-                                //Make it so
-                                ExportGeneration nextGeneration = m_generations.firstEntry().getValue();
-                                newProcessor = (ExportDataProcessor)loaderClass.newInstance();
-                                newProcessor.addLogger(exportLog);
-                                newProcessor.setExportGeneration(nextGeneration);
-                                newProcessor.setProcessorConfig(m_processorConfig);
-                                newProcessor.readyForData();
+    private void rollToNextGeneration() throws Exception {
+        ExportGeneration oldGeneration = m_generations.firstEntry().getValue();
+        ExportDataProcessor newProcessor = null;
+        ExportDataProcessor oldProcessor = null;
+        synchronized (ExportManager.this) {
 
-                                if (!m_loaderClass.equals(RawProcessor.class.getName())) {
-                                    if (nextGeneration.isDiskBased()) {
+            m_generationGhosts.add(m_generations.remove(m_generations.firstEntry().getKey()).m_timestamp);
+            exportLog.info("Finished draining generation " + oldGeneration.m_timestamp);
+
+            try {
+                if (m_loaderClass != null && !m_generations.isEmpty()) {
+                    exportLog.info("Creating connector " + m_loaderClass);
+                    final Class<?> loaderClass = Class.forName(m_loaderClass);
+                    //Make it so
+                    ExportGeneration nextGeneration = m_generations.firstEntry().getValue();
+                    newProcessor = (ExportDataProcessor)loaderClass.newInstance();
+                    newProcessor.addLogger(exportLog);
+                    newProcessor.setExportGeneration(nextGeneration);
+                    newProcessor.setProcessorConfig(m_processorConfig);
+                    newProcessor.readyForData();
+
+                    if (!m_loaderClass.equals(RawProcessor.class.getName())) {
+                        if (nextGeneration.isDiskBased()) {
                                         /*
                                          * Changes in partition count can make the load balancing strategy not capture
                                          * all partitions for data that was from a previously larger cluster.
                                          * For those use a naive leader election strategy that is implemented
                                          * by export generation.
                                          */
-                                        nextGeneration.kickOffLeaderElection();
-                                    } else {
+                            nextGeneration.kickOffLeaderElection();
+                        } else {
                                         /*
                                          * This strategy is the one that piggy backs on
                                          * regular partition mastership distribution to determine
@@ -178,34 +193,30 @@ public class ExportManager
                                          * We stashed away all the ones we have mastership of
                                          * in m_masterOfPartitions
                                          */
-                                        for( Integer partitionId: m_masterOfPartitions) {
-                                            nextGeneration.acceptMastershipTask(partitionId);
-                                        }
-                                    }
-                                }
+                            for( Integer partitionId: m_masterOfPartitions) {
+                                nextGeneration.acceptMastershipTask(partitionId);
                             }
-                        } catch (Exception e) {
-                            VoltDB.crashLocalVoltDB("Error creating next export processor", true, e);
                         }
-                        oldProcessor = m_processor.getAndSet(newProcessor);
                     }
+                }
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Error creating next export processor", true, e);
+            }
+            oldProcessor = m_processor.getAndSet(newProcessor);
+        }
 
                     /*
                      * The old processor should not be null since this shutdown task
                      * is running for this processor
                      */
-                    oldProcessor.shutdown();
-                    try {
-                        oldGeneration.closeAndDelete();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                        exportLog.error(e);
-                    }
-                    m_onGenerationDrainedForTruncation.release();
-                }
-            });
+        oldProcessor.shutdown();
+        try {
+            oldGeneration.closeAndDelete();
+        } catch (IOException e) {
+            e.printStackTrace();
+            exportLog.error(e);
         }
-    };
+    }
 
     /**
      * Construct ExportManager using catalog.
@@ -334,7 +345,6 @@ public class ExportManager
             ExportDataProcessor newProcessor = null;
             final Class<?> loaderClass = Class.forName(m_loaderClass);
             newProcessor = (ExportDataProcessor)loaderClass.newInstance();
-            m_processor.set(newProcessor);
             newProcessor.addLogger(exportLog);
             File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
 
@@ -367,6 +377,7 @@ public class ExportManager
             newProcessor.setExportGeneration(nextGeneration);
             newProcessor.setProcessorConfig(m_processorConfig);
             newProcessor.readyForData();
+            m_processor.set(newProcessor);
 
             if (startup) {
                 /*
