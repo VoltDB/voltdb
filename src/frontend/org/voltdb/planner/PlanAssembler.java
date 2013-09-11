@@ -1188,20 +1188,23 @@ public class PlanAssembler {
         /* Check if any aggregate expressions are present */
         boolean containsAggregateExpression = m_parsedSelect.hasAggregateExpression();
 
-        if (m_partitioning.requiresTwoFragments()) {
-            AbstractPlanNode candidate = root.getChild(0).getChild(0);
-            candidate.clearParents();
-            root.getChild(0).clearChildren();
-            root.getChild(0).addAndLinkChild(indexAccessForGroupByExprs(candidate));
-        } else {
-            root = indexAccessForGroupByExprs(root);
-        }
         /*
          * "Select A from T group by A" is grouped but has no aggregate operator
          * expressions. Catch that case by checking the grouped flag
          */
         if (containsAggregateExpression || m_parsedSelect.isGrouped()) {
             AggregatePlanNode topAggNode;
+            if (m_partitioning.requiresTwoFragments()) {
+                AbstractPlanNode candidate = root.getChild(0).getChild(0);
+                candidate = indexAccessForGroupByExprs(candidate);
+                if (candidate.getPlanNodeType() == PlanNodeType.INDEXSCAN) {
+                    candidate.clearParents();
+                    root.getChild(0).clearChildren();
+                    root.getChild(0).addAndLinkChild(candidate);
+                }
+            } else {
+                root = indexAccessForGroupByExprs(root);
+            }
             // A hash is required to build up per-group aggregates in parallel vs.
             // when there is only one aggregation over the entire table OR when the
             // per-group aggregates are being built serially from the ordered output
