@@ -113,6 +113,8 @@ public class EEProcess {
                                                                                m_eeProcess.getInputStream()));
         try {
             boolean failure = false;
+
+            // expecting "==NUMBER==" to be line 1, where NUMBER is the C++ process's PID
             String pidString = stdout.readLine();
             if (pidString == null) {
                 failure = true;
@@ -125,6 +127,7 @@ public class EEProcess {
                 m_eePID = pidString;
             }
 
+            // expecting "==NUMBER==" to be line 2, where NUMBER is expected EE threads
             String siteCountString = stdout.readLine();
             if (siteCountString == null) {
                 failure = true;
@@ -138,6 +141,7 @@ public class EEProcess {
                 assert(siteCount2 == siteCount);
             }
 
+            // expecting "==NUMBER==" to be line 3, where NUMBER is listening port
             String portString = stdout.readLine();
             if (portString == null) {
                 failure = true;

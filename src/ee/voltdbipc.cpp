@@ -1270,8 +1270,9 @@ void *eethread(void *ptr) {
 
     // instantiate voltdbipc to interface to EE.
     boost::shared_ptr<VoltDBIPC> voltipc(new VoltDBIPC(fd));
-    int more = 1;
-    while (more) {
+
+    // loop until the terminate/shutdown command is seen
+    while (true) {
         size_t bytesread = 0;
 
         // read the header
