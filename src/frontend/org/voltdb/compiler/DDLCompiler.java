@@ -777,8 +777,9 @@ public class DDLCompiler {
     }
 
     public void compileToCatalog(Database db) throws VoltCompilerException {
-        String hexDDL = Encoder.hexEncode(m_fullDDL);
-        db.getCatalog().execute("set " + db.getPath() + " schema \"" + hexDDL + "\"");
+        // note this will need to be decompressed to be used
+        String binDDL = Encoder.compressAndBase64Encode(m_fullDDL);
+        db.setSchema(binDDL);
 
         VoltXMLElement xmlCatalog;
         try

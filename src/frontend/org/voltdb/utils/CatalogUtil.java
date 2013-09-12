@@ -124,7 +124,7 @@ public abstract class CatalogUtil {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     // The minimum version of catalog that's compatible with this version of Volt
-    public static final int[] minCompatibleVersion = {3, 2};
+    public static final int[] minCompatibleVersion = {3, 6, 1};
 
     public static final String CATALOG_FILENAME = "catalog.txt";
     public static final String CATALOG_BUILDINFO_FILENAME = "buildinfo.txt";
