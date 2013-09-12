@@ -506,6 +506,38 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         }
     }
 
+   public void testMVUpdateP1() throws Exception {
+        System.out.println("Test MV partition...");
+
+        VoltTable vt = null;
+        Client client = this.getClient();
+        String tb = "P1.insert";
+        client.callProcedure(tb, 1,  10,  1 );
+        client.callProcedure(tb, 2,  20,  3 );
+        client.callProcedure(tb, 6,  40,  3 );
+        client.callProcedure(tb, 4,  40,  1 );
+        client.callProcedure(tb, 5,  50,  1 );
+
+//        "CREATE VIEW V_P1 (V_P1_G1, V_P1_CNT, V_P1_sum_wage) " +
+//        "AS SELECT dept, count(*), SUM(wage) FROM P1 GROUP BY dept;" +
+
+        vt = client.callProcedure("@AdHoc", "Select * from V_P1 ORDER BY V_P1_G1").getResults()[0];
+        validateTableOfLongs(vt, new long[][]{{1,3,100},{3,2,60}});
+
+        vt = client.callProcedure("@AdHoc",
+                "Select V_P1_sum_wage from V_P1 ORDER BY V_P1_sum_wage").getResults()[0];
+        validateTableOfLongs(vt, new long[][]{{60},{100}});
+
+        vt = client.callProcedure("@AdHoc", "Select V_P1_sum_wage as tag, sum(V_P1_CNT) " +
+                "from V_P1 group by V_P1_sum_wage order by tag").getResults()[0];
+        validateTableOfLongs(vt, new long[][]{{60,2},{100,3}});
+
+        vt = client.callProcedure("@AdHoc", "Select V_P1_G1, V_P1_sum_wage, sum(V_P1_CNT) " +
+                "from V_P1 group by V_P1_G1, V_P1_sum_wage order by V_P1_G1 desc, V_P1_sum_wage").getResults()[0];
+        validateTableOfLongs(vt, new long[][]{{3,60,2},{1,100,3}});
+
+    }
+
     //
     // Suite builder boilerplate
     //
@@ -644,6 +676,17 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "AS SELECT vlong || '" + longStr + "', " +
                 "count(*), SUM(wage) " +
                 "FROM R3 GROUP BY vlong || '" + longStr + "';" +
+
+
+                "CREATE TABLE P1 ( " +
+                "id INTEGER DEFAULT '0' NOT NULL, " +
+                "wage INTEGER, " +
+                "dept INTEGER, " +
+                "PRIMARY KEY (id) );" +
+                "PARTITION TABLE P1 ON COLUMN id;" +
+
+                "CREATE VIEW V_P1 (V_P1_G1, V_P1_CNT, V_P1_sum_wage) " +
+                "AS SELECT dept, count(*), SUM(wage) FROM P1 GROUP BY dept;" +
                 ""
                 ;
         try {
