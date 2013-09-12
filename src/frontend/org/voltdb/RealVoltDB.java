@@ -524,15 +524,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             Inits inits = new Inits(this, 1);
             inits.doInitializationWork();
 
-            if (config.m_backend.isIPC) {
-                int eeCount = clusterConfig.getSitesPerHost();
-                if (config.m_ipcPorts.size() != eeCount) {
-                    hostLog.fatal("Specified an IPC backend but only supplied " + config.m_ipcPorts.size() +
-                            " backend ports when " + eeCount + " are required");
-                    System.exit(-1);
-                }
-            }
-
             collectLocalNetworkMetadata();
 
             /*
