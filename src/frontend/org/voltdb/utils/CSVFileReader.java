@@ -119,7 +119,7 @@ class CSVFileReader implements Runnable {
             } catch (SuperCsvException e) {
                 //Catch rows that can not be read by superCSV listReader. E.g. items without quotes when strictquotes is enabled.
                 e.printStackTrace();
-                String[] info = {lineList.toString(), e.toString()};
+                String[] info = {e.getMessage(), ""};
                 if (synchronizeErrorInfo(totalLineCount.get() + 1, info)) {
                     break;
                 }

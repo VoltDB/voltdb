@@ -142,7 +142,7 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
             }
         }
         // execute any leftover batched statements
-        if (queued > executed) {
+        if (queued > 0) {
             executed += executeSQL();
         }
 

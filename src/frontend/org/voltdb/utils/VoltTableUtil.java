@@ -21,6 +21,8 @@ import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.math.BigDecimal;
+import java.text.NumberFormat;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +35,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
+import org.voltdb.types.VoltDecimalHelper;
 
 
 /*
@@ -127,41 +130,67 @@ public class VoltTableUtil {
      * @param columnTypes
      * @return
      */
-    public static boolean addRowToVoltTableFromLine(VoltTable table, String fields[], Map<Integer, VoltType> columnTypes) {
+    public static boolean addRowToVoltTableFromLine(VoltTable table, String fields[], Map<Integer, VoltType> columnTypes) throws ParseException, IOException {
 
         if (fields == null || fields.length <= 0) {
             return false;
         }
         Object row_args[] = new Object[fields.length];
-        boolean rowComplete = true;
+        int parsedCnt = 0;
         for (int i = 0; i < fields.length; i++) {
             final VoltType type = columnTypes.get(i);
             if (type == VoltType.BIGINT
                     || type == VoltType.INTEGER
                     || type == VoltType.SMALLINT
                     || type == VoltType.TINYINT) {
-                row_args[i] = Long.parseLong(fields[i]);
+                if (fields[i] != null) {
+                    NumberFormat nf = NumberFormat.getInstance();
+                    Number n = nf.parse(fields[i]);
+                    row_args[i] = n;
+                } else {
+                    row_args[i] = 0L;
+                }
+                parsedCnt++;
             } else if (type == VoltType.FLOAT) {
-                Double l = Double.parseDouble(fields[i]);
-                row_args[i] = l;
+                if (fields[i] != null) {
+                    Double l = Double.parseDouble(fields[i]);
+                    row_args[i] = l;
+                } else {
+                    row_args[i] = 0.0;
+                }
+                parsedCnt++;
             } else if (type == VoltType.DECIMAL) {
-                BigDecimal l = new BigDecimal(fields[i]);
-                row_args[i] = l;
+                if (fields[i] != null) {
+                    row_args[i] = VoltDecimalHelper.deserializeBigDecimalFromString(fields[i]);
+                } else {
+                    row_args[i] = new BigDecimal(0.0);
+                }
+                parsedCnt++;
             } else if (type == VoltType.STRING) {
-                row_args[i] = fields[i];
+                if (fields[i] != null) {
+                    row_args[i] = fields[i];
+                } else {
+                    row_args[i] = "";
+                }
+                parsedCnt++;
             } else if (type == VoltType.TIMESTAMP) {
-                TimestampType ts = new TimestampType(fields[i]);
-                row_args[i] = ts;
+                if (fields[i] != null) {
+                    TimestampType ts = new TimestampType(fields[i]);
+                    row_args[i] = ts;
+                    parsedCnt++;
+                }
             } else if (type == VoltType.VARBINARY) {
-                row_args[i] = fields[i].getBytes();
-            } else {
-                rowComplete = false;
+                if (fields[i] != null) {
+                    row_args[i] = fields[i].getBytes();
+                    parsedCnt++;
+                }
             }
         }
-        if (rowComplete) {
+        if (parsedCnt == fields.length) {
             table.addRow(row_args);
+            return true;
         }
-        return rowComplete;
+        return false;
     }
 
     public static void toCSVWriter(CSVWriter csv, VoltTable vt, ArrayList<VoltType> columnTypes) throws IOException {

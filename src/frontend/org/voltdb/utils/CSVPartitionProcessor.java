@@ -127,7 +127,12 @@ class CSVPartitionProcessor implements Runnable {
                     try {
                         VoltTable table = new VoltTable(colInfo);
                         //No need to check error here if a correctedLine has come here it was previously successful.
-                        VoltTableUtil.addRowToVoltTableFromLine(table, lineList.correctedLine, columnTypes);
+                        try {
+                            VoltTableUtil.addRowToVoltTableFromLine(table, lineList.correctedLine, columnTypes);
+                        } catch (Exception ex) {
+                            continue;
+                        }
+
                         PartitionSingleExecuteProcedureCallback cbmt = new PartitionSingleExecuteProcedureCallback(lineList, m_processor);
                         if (!CSVPartitionProcessor.isMP) {
                             csvClient.callProcedure(cbmt, m_procName, m_partitionParam, m_tableName, table);
@@ -304,7 +309,6 @@ class CSVPartitionProcessor implements Runnable {
 
             processLoadTable(table, procName, partitionParam);
         }
-        m_partitionQueue.clear();
 
         //Let partition processor drain and put any failures on failure processing.
         try {
