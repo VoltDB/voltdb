@@ -130,8 +130,33 @@ public class Encoder {
         }
     }
 
+    public static String compressAndBase64Encode(byte[] bytes) {
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream(bytes.length);
+            DeflaterOutputStream dos = new DeflaterOutputStream(baos);
+            dos.write(bytes);
+            dos.close();
+            byte[] outBytes = baos.toByteArray();
+            return Base64.encodeToString(outBytes, false);
+        }
+        catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public static String decodeBase64AndDecompress(String string) {
+        if (string.length() == 0) {
+            return "";
+        }
+        byte bytes[] = decodeBase64AndDecompressToBytes(string);
+        return new String(bytes, Charsets.UTF_8);
+    }
+
+    public static byte[] decodeBase64AndDecompressToBytes(String string) {
         byte bytes[] = Base64.decodeFast(string);
+        if (string.length() == 0) {
+            return new byte[0];
+        }
         ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
         InflaterInputStream dis = new InflaterInputStream(bais);
 
@@ -145,7 +170,7 @@ public class Encoder {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-        return new String(baos.toByteArray(), Charsets.UTF_8);
+        return baos.toByteArray();
     }
 
     public static String base64Encode(String string) {
