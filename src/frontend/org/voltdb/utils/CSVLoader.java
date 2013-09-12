@@ -60,7 +60,8 @@ import org.voltdb.client.ProcCallException;
  * @LoadMultipartitionTable
  *
  * The maxerror indicates maximum number of errors it can tolerate. Its a threshold but since processors are processing
- * in parallel you may process and get additional errors.
+ * in parallel we may process rows beyond maxerror and additional errors may occur. Only first maxerror indicated errors
+ * will be reported.
  */
 public class CSVLoader {
 
