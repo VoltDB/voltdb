@@ -141,7 +141,7 @@ public class ExportManager
                 @Override
                 public void run() {
                     try {
-
+                        rollToNextGeneration();
                     } catch (RuntimeException e) {
                         exportLog.error("Error rolling to next export generation", e);
                     } catch (Exception e) {
@@ -156,10 +156,11 @@ public class ExportManager
     };
 
     private void rollToNextGeneration() throws Exception {
-        ExportGeneration oldGeneration = m_generations.firstEntry().getValue();
         ExportDataProcessor newProcessor = null;
         ExportDataProcessor oldProcessor = null;
+        ExportGeneration oldGeneration = null;
         synchronized (ExportManager.this) {
+             oldGeneration = m_generations.firstEntry().getValue();
 
             m_generationGhosts.add(m_generations.remove(m_generations.firstEntry().getKey()).m_timestamp);
             exportLog.info("Finished draining generation " + oldGeneration.m_timestamp);
@@ -211,7 +212,8 @@ public class ExportManager
                      */
         oldProcessor.shutdown();
         try {
-            oldGeneration.closeAndDelete();
+            if (oldGeneration != null)
+                oldGeneration.closeAndDelete();
         } catch (IOException e) {
             e.printStackTrace();
             exportLog.error(e);
@@ -241,6 +243,7 @@ public class ExportManager
         }
         ExportManager tmp = new ExportManager(myHostId, catalogContext, messenger, partitions);
         m_self = tmp;
+        tmp.createInitialExportProcessor(catalogContext, getConnector(catalogContext), true, partitions);
     }
 
     /**
@@ -299,6 +302,13 @@ public class ExportManager
         m_messenger = null;
     }
 
+    private static Connector getConnector(CatalogContext catalogContext) {
+        final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
+        final Database db = cluster.getDatabases().get("database");
+        final Connector conn= db.getConnectors().get("0");
+        return conn;
+    }
+
     /**
      * Read the catalog to setup manager and loader(s)
      * @param siteTracker
@@ -313,8 +323,7 @@ public class ExportManager
         m_hostId = myHostId;
         m_messenger = messenger;
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
-        final Database db = cluster.getDatabases().get("database");
-        final Connector conn= db.getConnectors().get("0");
+        final Connector conn = getConnector(catalogContext);
 
         if (conn == null) {
             exportLog.info("System is not using any export functionality.");
@@ -331,11 +340,9 @@ public class ExportManager
         exportLog.info(String.format("Export is enabled and can overflow to %s.", cluster.getExportoverflow()));
 
         m_loaderClass = conn.getLoaderclass();
-
-        createInitialExportProcessor(catalogContext, conn, true, partitions);
     }
 
-    private void createInitialExportProcessor(
+    private synchronized void createInitialExportProcessor(
             CatalogContext catalogContext,
             final Connector conn,
             boolean startup,
@@ -346,6 +353,9 @@ public class ExportManager
             final Class<?> loaderClass = Class.forName(m_loaderClass);
             newProcessor = (ExportDataProcessor)loaderClass.newInstance();
             newProcessor.addLogger(exportLog);
+            newProcessor.setProcessorConfig(m_processorConfig);
+            m_processor.set(newProcessor);
+
             File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
 
             /*
@@ -375,9 +385,7 @@ public class ExportManager
              * For the newly constructed processor, provide it the oldest known generation
              */
             newProcessor.setExportGeneration(nextGeneration);
-            newProcessor.setProcessorConfig(m_processorConfig);
             newProcessor.readyForData();
-            m_processor.set(newProcessor);
 
             if (startup) {
                 /*
