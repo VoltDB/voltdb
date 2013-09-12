@@ -1227,9 +1227,16 @@ public class PlanAssembler {
             // a compatible index scan, even when one would not be motivated by a WHERE or ORDER BY clause.
             if (m_parsedSelect.isGrouped() &&
                 (root.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
-                 ((IndexScanPlanNode) root).getSortDirection() == SortDirectionType.INVALID )) {
-                aggNode = new HashAggregatePlanNode();
+                 ((IndexScanPlanNode) root).getSortDirection() == SortDirectionType.INVALID)) {
                 topAggNode = new HashAggregatePlanNode();
+                if (!m_partitioning.requiresTwoFragments() ||
+                        m_parsedSelect.isGrouped() &&
+                        (root.getChild(0).getChild(0).getPlanNodeType() != PlanNodeType.INDEXSCAN ||
+                         ((IndexScanPlanNode) root.getChild(0).getChild(0)).getSortDirection() == SortDirectionType.INVALID)) {
+                    aggNode = new HashAggregatePlanNode();
+                } else {
+                    aggNode = new AggregatePlanNode();
+                }
             } else {
                 aggNode = new AggregatePlanNode();
                 topAggNode = new AggregatePlanNode();
@@ -1409,16 +1416,26 @@ public class PlanAssembler {
                         continue;
                     }
                     for (int i = 0; i < groupBys.size(); i++) {
-                        // don't use column idx to compare here, becase resolveColumnIndex is not yet called
-                        if (groupBys.get(i).expression.getExpressionType() != ExpressionType.VALUE_TUPLE ||
-                                !indexedColRefs.get(i).getColumn().getName().equals(groupBys.get(i).columnName)) {
-                            replacable  = false;
+                        // don't compare column idx here, because resolveColumnIndex is not yet called
+                        if (groupBys.get(i).expression.getExpressionType() != ExpressionType.VALUE_TUPLE) {
+                            replacable = false;
+                            break;
+                        }
+                        // ignore order of keys in GROUP BY expr
+                        boolean foundMatch = false;
+                        for (int j = 0; j < groupBys.size(); j++) {
+                            if (indexedColRefs.get(i).getColumn().getName().equals(groupBys.get(i).columnName)) {
+                                foundMatch = true;
+                                break;
+                            }
+                        }
+                        if (!foundMatch) {
+                            replacable = false;
                             break;
                         }
                     }
                     if (replacable) {
                         IndexScanPlanNode indexScanNode = new IndexScanPlanNode((SeqScanPlanNode)root, null, index, SortDirectionType.ASC);
-                        indexScanNode.setKeyIterate(true);
                         return indexScanNode;
                     }
                 } else {
@@ -1435,14 +1452,21 @@ public class PlanAssembler {
                         continue;
                     }
                     for (int i = 0; i < groupBys.size(); i++) {
-                        if (!groupBys.get(i).expression.equals(indexedExprs.get(i))) {
+                        // ignore order of keys in GROUP BY expr
+                        boolean foundMatch = false;
+                        for (int j = 0; j < groupBys.size(); j++) {
+                            if (groupBys.get(i).expression.equals(indexedExprs.get(j))) {
+                                foundMatch = true;
+                                break;
+                            }
+                        }
+                        if (!foundMatch) {
                             replacable = false;
                             break;
                         }
                     }
                     if (replacable) {
                         IndexScanPlanNode indexScanNode = new IndexScanPlanNode((SeqScanPlanNode)root, null, index, SortDirectionType.ASC);
-                        indexScanNode.setKeyIterate(true);
                         return indexScanNode;
                     }
                 }
