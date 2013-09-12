@@ -49,8 +49,6 @@ class CSVFileReader implements Runnable {
     static int partitionedColumnIndex;
     static VoltType partitionColumnType;
     static CSVLineWithMetaData endOfData;
-    static int batchmax = 200;
-    static String tableName;
     static CountDownLatch processor_cdl;
     static boolean errored = false;
     long m_parsingTimeSt = System.nanoTime();
@@ -73,6 +71,7 @@ class CSVFileReader implements Runnable {
 
     @Override
     public void run() {
+        List<String> lineList = null;
         while ((config.limitrows-- > 0)) {
             if (errored) {
                 break;
@@ -85,7 +84,7 @@ class CSVFileReader implements Runnable {
                     totalLineCount.set(listReader.getLineNumber());
                 }
                 long st = System.nanoTime();
-                List<String> lineList = listReader.read();
+                lineList = listReader.read();
                 long end = System.nanoTime();
                 m_parsingTimeEnd += (end - st);
                 if (lineList == null) {
@@ -96,9 +95,9 @@ class CSVFileReader implements Runnable {
                 }
                 totalRowCount.incrementAndGet();
 
-                String lineCheckResult;
                 String[] correctedLine = lineList.toArray(new String[0]);
 
+                String lineCheckResult;
                 if ((lineCheckResult = checkparams_trimspace(correctedLine,
                         columnCnt)) != null) {
                     String[] info = {lineList.toString(), lineCheckResult};
@@ -120,7 +119,7 @@ class CSVFileReader implements Runnable {
             } catch (SuperCsvException e) {
                 //Catch rows that can not be read by superCSV listReader. E.g. items without quotes when strictquotes is enabled.
                 e.printStackTrace();
-                String[] info = {e.getMessage(), ""};
+                String[] info = {lineList.toString(), e.toString()};
                 if (synchronizeErrorInfo(totalLineCount.get() + 1, info)) {
                     break;
                 }
@@ -145,9 +144,6 @@ class CSVFileReader implements Runnable {
             m_log.error("Error cloging Reader: " + ex);
         } finally {
             for (BlockingQueue<CSVLineWithMetaData> q : processorQueues.values()) {
-                if (errored) {
-                    q.clear();
-                }
                 try {
                     q.put(endOfData);
                 } catch (InterruptedException ex) {

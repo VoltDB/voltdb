@@ -370,34 +370,30 @@ public class CSVLoader {
             }
 
             CSVFileReader.config = config;
-
-            if (config.useSuppliedProcedure) {
-                CSVFileReader.columnCnt = columnCnt;
-            } else {
-                CSVFileReader.columnCnt = columnTypes.size();
-            }
             CSVFileReader.listReader = listReader;
             CSVFileReader.partitionedColumnIndex = partitionedColumnIndex;
             CSVFileReader.partitionColumnType = partitionColumnType;
-            CSVFileReader.tableName = config.table;
             CSVFileReader.typeList = typeList;
             CSVFileReader.csvClient = csvClient;
             CSVFileReader.processorQueues = lineq;
             CSVFileReader.endOfData = endOfData;
             CSVFileReader.processor_cdl = processor_cdl;
 
-            CSVFileReader rdr = new CSVFileReader();
-            Thread th = new Thread(rdr);
+            CSVFileReader csvReader = new CSVFileReader();
+            Thread th = new Thread(csvReader);
             th.setName("CSVFileReader");
             th.setDaemon(true);
 
+            //Start the processor threads.
             for (Thread th2 : spawned) {
                 th2.start();
             }
+
+            //Wait for reader to finish it count downs the procesors.
             th.start();
             th.join();
 
-            long readerTime = (rdr.m_parsingTimeEnd - rdr.m_parsingTimeSt) / 1000000;
+            long readerTime = (csvReader.m_parsingTimeEnd - csvReader.m_parsingTimeSt) / 1000000;
 
             insertTimeEnd = System.currentTimeMillis();
 
