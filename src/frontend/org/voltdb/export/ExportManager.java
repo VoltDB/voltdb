@@ -241,9 +241,13 @@ public class ExportManager
         if (isRejoin) {
             deleteExportOverflowData(catalogContext);
         }
-        ExportManager tmp = new ExportManager(myHostId, catalogContext, messenger, partitions);
-        m_self = tmp;
-        tmp.createInitialExportProcessor(catalogContext, getConnector(catalogContext), true, partitions);
+        ExportManager em = new ExportManager(myHostId, catalogContext, messenger, partitions);
+        Connector connector = getConnector(catalogContext);
+
+        m_self = em;
+        if (connector != null && connector.getEnabled() == true) {
+            em.createInitialExportProcessor(catalogContext, connector, true, partitions);
+        }
     }
 
     /**
