@@ -74,6 +74,8 @@ private:
      */
     bool findExistingTuple(TableTuple &oldTuple, bool expected = false);
 
+    // the source persistent table
+    PersistentTable *m_srcTable;
     // the materialized view table
     PersistentTable *m_target;
     // space to hold the search key for the view table
