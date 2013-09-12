@@ -374,6 +374,7 @@ public class CSVLoader {
             CSVFileReader.partitionedColumnIndex = partitionedColumnIndex;
             CSVFileReader.partitionColumnType = partitionColumnType;
             CSVFileReader.typeList = typeList;
+            CSVFileReader.columnCnt = columnCnt;
             CSVFileReader.csvClient = csvClient;
             CSVFileReader.processorQueues = lineq;
             CSVFileReader.endOfData = endOfData;
