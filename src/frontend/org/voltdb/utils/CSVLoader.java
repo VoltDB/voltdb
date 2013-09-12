@@ -32,6 +32,7 @@ import java.util.TreeMap;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.supercsv.io.CsvListReader;
 import org.supercsv.io.ICsvListReader;
@@ -542,6 +543,12 @@ public class CSVLoader {
 
     private static void close_cleanup() throws IOException,
             InterruptedException {
+        CSVFileReader.errorInfo.clear();
+        CSVFileReader.errored = false;
+        CSVFileReader.totalLineCount = new AtomicLong(0);
+        CSVFileReader.totalRowCount = new AtomicLong(0);
+
+        CSVPartitionProcessor.partitionAcknowledgedCount = new AtomicLong(0);
         out_invaliderowfile.close();
         out_logfile.close();
         out_reportfile.close();

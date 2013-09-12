@@ -61,7 +61,7 @@ class CSVFileReader implements Runnable {
         blankValues.put(VoltType.INTEGER, "0");
         blankValues.put(VoltType.BIGINT, "0");
         blankValues.put(VoltType.FLOAT, "0.0");
-        blankValues.put(VoltType.TIMESTAMP, "0");
+        blankValues.put(VoltType.TIMESTAMP, null);
         blankValues.put(VoltType.STRING, "");
         blankValues.put(VoltType.DECIMAL, "0");
         blankValues.put(VoltType.VARBINARY, "");

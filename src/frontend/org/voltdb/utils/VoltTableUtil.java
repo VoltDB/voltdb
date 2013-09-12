@@ -130,7 +130,9 @@ public class VoltTableUtil {
      * @param columnTypes
      * @return
      */
-    public static boolean addRowToVoltTableFromLine(VoltTable table, String fields[], Map<Integer, VoltType> columnTypes) throws ParseException, IOException {
+    public static boolean addRowToVoltTableFromLine(VoltTable table, String fields[],
+            Map<Integer, VoltType> columnTypes)
+            throws ParseException, IOException {
 
         if (fields == null || fields.length <= 0) {
             return false;
@@ -145,16 +147,14 @@ public class VoltTableUtil {
                     || type == VoltType.TINYINT) {
                 if (fields[i] != null) {
                     NumberFormat nf = NumberFormat.getInstance();
-                    Number n = nf.parse(fields[i]);
-                    row_args[i] = n;
+                    row_args[i] = nf.parse(fields[i]);
                 } else {
                     row_args[i] = 0L;
                 }
                 parsedCnt++;
             } else if (type == VoltType.FLOAT) {
                 if (fields[i] != null) {
-                    Double l = Double.parseDouble(fields[i]);
-                    row_args[i] = l;
+                    row_args[i] = Double.parseDouble(fields[i]);
                 } else {
                     row_args[i] = 0.0;
                 }
@@ -177,13 +177,17 @@ public class VoltTableUtil {
                 if (fields[i] != null) {
                     TimestampType ts = new TimestampType(fields[i]);
                     row_args[i] = ts;
-                    parsedCnt++;
+                } else {
+                    row_args[i] = null;
                 }
+                parsedCnt++;
             } else if (type == VoltType.VARBINARY) {
                 if (fields[i] != null) {
                     row_args[i] = fields[i].getBytes();
-                    parsedCnt++;
+                } else {
+                    row_args[i] = new byte[0];
                 }
+                parsedCnt++;
             }
         }
         if (parsedCnt == fields.length) {
