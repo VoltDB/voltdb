@@ -28,6 +28,7 @@ import java.util.List;
 
 import junit.framework.TestCase;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -40,11 +41,15 @@ public class PlannerTestCase extends TestCase {
     protected void failToCompile(String sql, String... patterns)
     {
         int paramCount = 0;
-        for (int ii = 0; ii < sql.length(); ii++) {
+        int skip = 0;
+        while(true) {
             // Yes, we ARE assuming that test queries don't contain quoted question marks.
-            if (sql.charAt(ii) == '?') {
-                paramCount++;
+            skip = sql.indexOf('?', skip);
+            if (skip == -1) {
+                break;
             }
+            skip++;
+            paramCount++;
         }
         try {
             m_aide.compile(sql, paramCount, m_byDefaultPlanForSinglePartition, null);
@@ -79,24 +84,32 @@ public class PlannerTestCase extends TestCase {
     }
 
     final int paramCount = 0;
-    final boolean planForSinglePartition = true;
     String noJoinOrder = null;
     /** A helper here where the junit test can assert success */
     protected List<AbstractPlanNode> compileSinglePartitionToFragments(String sql)
     {
         boolean planForSinglePartitionTrue = true;
-        return compileToFragments(sql, planForSinglePartitionTrue);
+        return compileWithJoinOrderToFragments(sql, planForSinglePartitionTrue, noJoinOrder);
     }
 
     /** A helper here where the junit test can assert success */
     protected List<AbstractPlanNode> compileToFragments(String sql)
     {
         boolean planForSinglePartitionFalse = false;
-        return compileToFragments(sql, planForSinglePartitionFalse);
+        return compileWithJoinOrderToFragments(sql, planForSinglePartitionFalse, noJoinOrder);
     }
 
-        /** A helper here where the junit test can assert success */
-    private List<AbstractPlanNode> compileToFragments(String sql, boolean planForSinglePartitionFalse)
+    /** A helper here where the junit test can assert success */
+    protected List<AbstractPlanNode> compileWithJoinOrderToFragments(String sql, String joinOrder)
+    {
+        boolean planForSinglePartitionFalse = false;
+        return compileWithJoinOrderToFragments(sql, planForSinglePartitionFalse, joinOrder);
+    }
+
+    /** A helper here where the junit test can assert success */
+    private List<AbstractPlanNode> compileWithJoinOrderToFragments(String sql,
+                                                                   boolean planForSinglePartition,
+                                                                   String joinOrder)
     {
         int paramCount = 0;
         for (int ii = 0; ii < sql.length(); ii++) {
@@ -105,13 +118,13 @@ public class PlannerTestCase extends TestCase {
                 paramCount++;
             }
         }
-        return compileWithJoinOrderToFragments(sql, paramCount, planForSinglePartitionFalse, null);
+        return compileWithJoinOrderToFragments(sql, paramCount, planForSinglePartition, joinOrder);
     }
 
     /** A helper here where the junit test can assert success */
-    protected List<AbstractPlanNode> compileWithJoinOrderToFragments(String sql, int paramCount,
-                                                                     boolean planForSinglePartition,
-                                                                     String joinOrder)
+    private List<AbstractPlanNode> compileWithJoinOrderToFragments(String sql, int paramCount,
+                                                                   boolean planForSinglePartition,
+                                                                   String joinOrder)
     {
         List<AbstractPlanNode> pn = m_aide.compile(sql, paramCount, planForSinglePartition, joinOrder);
         assertTrue(pn != null);
@@ -166,13 +179,8 @@ public class PlannerTestCase extends TestCase {
     /** A helper here where the junit test can assert success */
     protected AbstractPlanNode compile(String sql)
     {
-        int paramCount = 0;
-        for (int ii = 0; ii < sql.length(); ii++) {
-            // Yes, we ARE assuming that test queries don't contain quoted question marks.
-            if (sql.charAt(ii) == '?') {
-                paramCount++;
-            }
-        }
+        // Yes, we ARE assuming that test queries don't contain quoted question marks.
+        int paramCount = StringUtils.countMatches(sql, "?");
         return compile(sql, paramCount);
     }
 
@@ -202,4 +210,5 @@ public class PlannerTestCase extends TestCase {
     Database getDatabase() {
         return m_aide.getDatabase();
     }
+
 }

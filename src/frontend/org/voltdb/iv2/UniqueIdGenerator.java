@@ -137,9 +137,10 @@ public class UniqueIdGenerator {
     public void updateMostRecentlyGeneratedUniqueId(long uniqueId) {
         final long partitionId = UniqueIdGenerator.getPartitionIdFromUniqueId(uniqueId);
         if (this.partitionId != partitionId) {
-            VoltDB.crashLocalVoltDB(
+            String msg =
                     "UniqueIdGenerator for partition " + this.partitionId +
-                    " received a unique id from partition " + partitionId, true, null);
+                    " received a unique id from partition " + partitionId;
+            throw new RuntimeException(msg);
         }
         lastUniqueId = Math.max(lastUniqueId, uniqueId);
         counterValue = UniqueIdGenerator.getSequenceNumberFromUniqueId(lastUniqueId);

@@ -63,4 +63,13 @@ public class ConjunctionExpression extends AbstractExpression {
         m_valueType = VoltType.BIGINT;
         m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
     }
+
+    @Override
+    public String explain(String impliedTableName) {
+        ExpressionType type = getExpressionType();
+        return "(" + m_left.explain(impliedTableName) +
+            " " + type.symbol() + " " +
+            m_right.explain(impliedTableName) + ")";
+    }
+
 }

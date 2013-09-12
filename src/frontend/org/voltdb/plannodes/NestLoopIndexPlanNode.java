@@ -21,6 +21,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeMap;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
@@ -29,6 +32,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SortDirectionType;
 
 public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
 
@@ -101,6 +105,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
             // this double-schema search is somewhat common, maybe it
             // can find a static home in NodeSchema or something --izzy
             int index = outer_schema.getIndexOfTve(tve);
+            int tableIdx = 0;   // 0 for outer table
             if (index == -1)
             {
                 index = index_schema.getIndexOfTve(tve);
@@ -109,8 +114,10 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
                     throw new RuntimeException("Unable to find index for nestloopindexscan TVE: " +
                                                tve.toString());
                 }
+                tableIdx = 1;   // 1 for inner table
             }
             tve.setColumnIndex(index);
+            tve.setTableIndex(tableIdx);
         }
 
         //  get the end expression and search key expressions
@@ -124,6 +131,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         for (TupleValueExpression tve : index_tves)
         {
             int index = outer_schema.getIndexOfTve(tve);
+            int tableIdx = 0;   // 0 for outer table
             if (index == -1)
             {
                 index = index_schema.getIndexOfTve(tve);
@@ -132,8 +140,10 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
                     throw new RuntimeException("Unable to find index for nestloopindexscan TVE: " +
                                                tve.toString());
                 }
+                tableIdx = 1;   // 1 for inner table
             }
             tve.setColumnIndex(index);
+            tve.setTableIndex(tableIdx);
         }
 
         // need to resolve the indexes of the output schema and
@@ -146,6 +156,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
             assert(col.getExpression() instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
             int index = outer_schema.getIndexOfTve(tve);
+            int tableIdx = 0;   // 0 for outer table
             if (index == -1)
             {
                 index = index_schema.getIndexOfTve(tve);
@@ -155,12 +166,14 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
                                                col.toString());
                 }
                 sort_cols.put(index + outer_schema.size(), col);
+                tableIdx = 1;   // 1 for inner table
             }
             else
             {
                 sort_cols.put(index, col);
             }
             tve.setColumnIndex(index);
+            tve.setTableIndex(tableIdx);
         }
         // rebuild the output schema from the tree-sorted columns
         NodeSchema new_output_schema = new NodeSchema();
@@ -170,6 +183,23 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         }
         m_outputSchema = new_output_schema;
         m_hasSignificantOutputSchema = true;
+
+        // resolve other predicates
+        resolvePredicate(m_preJoinPredicate, outer_schema, index_schema);
+        resolvePredicate(m_joinPredicate, outer_schema, index_schema);
+        resolvePredicate(m_wherePredicate, outer_schema, index_schema);
+    }
+
+    public void resolveSortDirection() {
+        super.resolveSortDirection();
+        // special treatment for NLIJ, when the outer table is a materialized scan node
+        // the sort direction from the outer table should be the same as the that in the inner table
+        // (because we set when building this NLIJ)
+        if (m_children.get(0).getPlanNodeType() == PlanNodeType.MATERIALIZEDSCAN) {
+            IndexScanPlanNode ispn = (IndexScanPlanNode) m_inlineNodes.get(PlanNodeType.INDEXSCAN);
+            assert (((MaterializedScanPlanNode)(m_children.get(0))).getSortDirection() == ispn.getSortDirection());
+            m_sortDirection = ispn.getSortDirection();
+        }
     }
 
     @Override
@@ -222,6 +252,24 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
 
     @Override
     protected String explainPlanForNode(String indent) {
-        return "NESTLOOP INDEX " + this.m_joinType.toString() + " JOIN";
+        return "NESTLOOP INDEX " + this.m_joinType.toString() + " JOIN" +
+                (m_sortDirection == SortDirectionType.INVALID ? "" : " (" + m_sortDirection + ")") +
+                explainFilters(indent);
+    }
+
+    public void toJSONString(JSONStringer stringer) throws JSONException
+    {
+        super.toJSONString(stringer);
+        if (m_sortDirection != SortDirectionType.INVALID) {
+            stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirection.toString());
+        }
+    }
+
+    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException
+    {
+        super.loadFromJSONObject(jobj, db);
+        if (!jobj.isNull(Members.SORT_DIRECTION.name())) {
+            m_sortDirection = SortDirectionType.get( jobj.getString( Members.SORT_DIRECTION.name() ) );
+        }
     }
 }

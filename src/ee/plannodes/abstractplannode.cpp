@@ -156,7 +156,7 @@ AbstractPlanNode::getInlinePlanNode(PlanNodeType type) const
     else
     {
         VOLT_TRACE("No internal PlanNode with type '%s' is available for '%s'",
-                   plannodeutil::getTypeName(type).c_str(),
+                   planNodeToString(type).c_str(),
                    this->debug().c_str());
     }
     return ret;
@@ -415,7 +415,7 @@ string
 AbstractPlanNode::debug() const
 {
     ostringstream buffer;
-    buffer << plannodeutil::getTypeName(this->getPlanNodeType())
+    buffer << planNodeToString(this->getPlanNodeType())
            << "[" << this->getPlanNodeId() << "]";
     return buffer.str();
 }
@@ -445,7 +445,7 @@ AbstractPlanNode::debug(const string& spacer) const
         for (it = m_inlineNodes.begin(); it != m_inlineNodes.end(); it++)
         {
             buffer << info_spacer << "Inline "
-                   << plannodeutil::getTypeName(it->second->getPlanNodeType())
+                   << planNodeToString(it->second->getPlanNodeType())
                    << ":\n";
             buffer << it->second->debugInfo(internal_spacer);
         }

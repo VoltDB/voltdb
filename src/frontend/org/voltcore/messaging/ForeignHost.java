@@ -23,11 +23,13 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
+import org.voltcore.network.ReverseDNSPolicy;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
@@ -57,6 +59,8 @@ public class ForeignHost {
     private long m_deadHostTimeout;
     private final AtomicLong m_lastMessageMillis = new AtomicLong(Long.MAX_VALUE);
 
+    private AtomicInteger m_deadReportsCount = new AtomicInteger(0);
+
     /** ForeignHost's implementation of InputHandler */
     public class FHInputHandler extends VoltProtocolHandler {
 
@@ -76,8 +80,8 @@ public class ForeignHost {
             m_isUp = false;
             if (!m_closing)
             {
-                VoltDB.dropStackTrace("Received remote hangup from foreign host " + hostname());
-                hostLog.warn("Received remote hangup from foreign host " + hostname());
+                VoltDB.dropStackTrace("Received remote hangup from foreign host " + hostnameAndIPAndPort());
+                hostLog.warn("Received remote hangup from foreign host " + hostnameAndIPAndPort());
                 m_hostMessenger.reportForeignHostFailed(m_hostId);
             }
         }
@@ -121,7 +125,7 @@ public class ForeignHost {
     }
 
     public void register(HostMessenger host) throws IOException {
-        m_connection = host.getNetwork().registerChannel( m_sc, m_handler, 0);
+        m_connection = host.getNetwork().registerChannel( m_sc, m_handler, 0, ReverseDNSPolicy.SYNCHRONOUS);
     }
 
     public void enableRead() {
@@ -221,7 +225,7 @@ public class ForeignHost {
         if (current_delta > 10 * 1000) {
             rateLimitedLogger.log(
                     "Have not received a message from host "
-                        + hostname() + " for " + (current_delta / 1000.0) + " seconds",
+                        + hostnameAndIPAndPort() + " for " + (current_delta / 1000.0) + " seconds",
                         current_time);
         }
         // NodeFailureFault no longer immediately trips FHInputHandler to
@@ -230,16 +234,22 @@ public class ForeignHost {
         if ((!m_closing && m_isUp) &&
             (current_delta > m_deadHostTimeout))
         {
-            hostLog.error("DEAD HOST DETECTED, hostname: " + hostname());
-            hostLog.info("\tcurrent time: " + current_time);
-            hostLog.info("\tlast message: " + m_lastMessageMillis);
-            hostLog.info("\tdelta (millis): " + current_delta);
-            hostLog.info("\ttimeout value (millis): " + m_deadHostTimeout);
-            VoltDB.dropStackTrace("Timed out foreign host " + hostname() + " with delta " + current_delta);
+            if (m_deadReportsCount.getAndIncrement() == 0) {
+                hostLog.error("DEAD HOST DETECTED, hostname: " + hostnameAndIPAndPort());
+                hostLog.info("\tcurrent time: " + current_time);
+                hostLog.info("\tlast message: " + m_lastMessageMillis);
+                hostLog.info("\tdelta (millis): " + current_delta);
+                hostLog.info("\ttimeout value (millis): " + m_deadHostTimeout);
+                VoltDB.dropStackTrace("Timed out foreign host " + hostnameAndIPAndPort() + " with delta " + current_delta);
+            }
             m_hostMessenger.reportForeignHostFailed(m_hostId);
         }
     }
 
+
+    String hostnameAndIPAndPort() {
+        return m_connection.getHostnameAndIPAndPort();
+    }
 
     String hostname() {
         return m_connection.getHostnameOrIP();
@@ -294,7 +304,7 @@ public class ForeignHost {
             in.get(messageBytes);
             String message = new String(messageBytes, "UTF-8");
             message = String.format("Fatal error from id,hostname(%d,%s): %s",
-                    m_hostId, hostname(), message);
+                    m_hostId, hostnameAndIPAndPort(), message);
             org.voltdb.VoltDB.crashLocalVoltDB(message, false, null);
         }
 
@@ -306,6 +316,18 @@ public class ForeignHost {
         final VoltMessage message =
             m_hostMessenger.getMessageFactory().createMessageFromBuffer(in, sourceHSId);
 
+        // ENG-1608.  We sniff for SiteFailureMessage here so
+        // that a node will participate in the failure resolution protocol
+        // even if it hasn't directly witnessed a node fault.
+        if (   message instanceof SiteFailureMessage
+                && !(message instanceof SiteFailureForwardMessage))
+        {
+            SiteFailureMessage sfm = (SiteFailureMessage)message;
+            for (FaultMessage fm: sfm.asFaultMessages()) {
+                m_hostMessenger.relayForeignHostFailed(fm);
+            }
+        }
+
         for (int i = 0; i < destCount; i++) {
             deliverMessage( recvDests[i], message);
         }
@@ -313,15 +335,6 @@ public class ForeignHost {
         //m_lastMessageMillis = System.currentTimeMillis();
         m_lastMessageMillis.lazySet(EstTime.currentTimeMillis());
 
-        // ENG-1608.  We sniff for FailureSiteUpdateMessages here so
-        // that a node will participate in the failure resolution protocol
-        // even if it hasn't directly witnessed a node fault.
-        if (message instanceof FailureSiteUpdateMessage)
-        {
-            for (long failedHostId : ((FailureSiteUpdateMessage)message).m_failedHSIds) {
-                m_hostMessenger.reportForeignHostFailed((int)failedHostId);
-            }
-        }
     }
 
     public void sendPoisonPill(String err) {

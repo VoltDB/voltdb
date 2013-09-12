@@ -17,6 +17,7 @@
 
 package org.voltdb.expressions;
 
+import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltType;
@@ -41,6 +42,24 @@ public class AggregateExpression extends AbstractExpression {
 
     public void setDistinct() { m_distinct = true; }
     public boolean isDistinct() { return m_distinct;  }
+
+    @Override
+    public boolean equals(Object obj) {
+        if(super.equals(obj) == false) return false;
+
+        if (obj instanceof AggregateExpression == false) return false;
+        AggregateExpression expr = (AggregateExpression) obj;
+        if (m_distinct != expr.isDistinct()) return false;
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        // based on implementation of equals
+        int result = super.hashCode();
+        result += new HashCodeBuilder(17, 31).append(m_distinct).toHashCode();
+        return result;
+    }
 
 
     @Override
@@ -83,6 +102,16 @@ public class AggregateExpression extends AbstractExpression {
         default:
             throw new RuntimeException("ERROR: Invalid Expression type '" + type + "' for Expression '" + this + "'");
         }
+    }
+
+    @Override
+    public String explain(String impliedTableName) {
+        ExpressionType type = getExpressionType();
+        if (type == ExpressionType.AGGREGATE_COUNT_STAR) {
+            return "COUNT(*)";
+        }
+        return type.symbol() + ( m_distinct ? " DISTINCT(" : "(" ) +
+            m_left.explain(impliedTableName) + ")";
     }
 
 }

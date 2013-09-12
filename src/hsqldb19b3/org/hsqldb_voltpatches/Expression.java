@@ -66,6 +66,7 @@
 
 package org.hsqldb_voltpatches;
 
+import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -1460,8 +1461,8 @@ public class Expression {
         prototypes.put(OpTypes.SCALAR_SUBQUERY,null); // not yet supported subquery feature, query based row/table
         prototypes.put(OpTypes.ROW_SUBQUERY,  null); // not yet supported subquery feature
         prototypes.put(OpTypes.TABLE_SUBQUERY,null); // not yet supported subquery feature
-        prototypes.put(OpTypes.ROW,           null); // not yet supported subquery feature    // rows
-        prototypes.put(OpTypes.TABLE,         null); // not yet supported subquery feature
+        prototypes.put(OpTypes.ROW,           new VoltXMLElement("row")); // rows
+        prototypes.put(OpTypes.TABLE,         new VoltXMLElement("table")); // not yet supported subquery feature, but needed for "in"
         prototypes.put(OpTypes.FUNCTION,      null); // not used (HSQL user-defined functions).
         prototypes.put(OpTypes.SQL_FUNCTION,  new VoltXMLElement("function"));
         prototypes.put(OpTypes.ROUTINE_FUNCTION, null); // not used
@@ -1533,6 +1534,23 @@ public class Expression {
     }
 
     /**
+     * DONE(Xin): add a new function to do operator overloading
+     * @param session
+     * @return
+     * @throws HSQLParseException
+     */
+    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
+    {
+        return voltGetXML(session, null, null, -1);
+    }
+
+    VoltXMLElement voltGetXML(Session session, List<Expression> displayCols,
+            java.util.Set<Integer> ignoredDisplayColIndexes, int startKey) throws HSQLParseException
+    {
+        return voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey, null);
+    }
+
+    /**
      * VoltDB added method to get a non-catalog-dependent
      * representation of this HSQLDB object.
      * @param session The current Session object may be needed to resolve
@@ -1540,7 +1558,8 @@ public class Expression {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
+    VoltXMLElement voltGetXML(Session session, List<Expression> displayCols,
+            java.util.Set<Integer> ignoredDisplayColIndexes, int startKey, String realAlias) throws HSQLParseException
     {
         // The voltXML representations of expressions tends to be driven much more by the expression's opType
         // than its Expression class.
@@ -1556,9 +1575,22 @@ public class Expression {
         // The prototypes dictionary is set up to handle a SIMPLE_COLUMN of any class EXCEPT ExpressionColumn.
         // A SIMPLE_COLUMN ExpressionColumn can be treated as a normal "COLUMN" ExpressionColumn.
         // That case gets explicitly enabled here by fudging the opType from SIMPLE_COLUMN to COLUMN.
-        if ((exprOp == OpTypes.SIMPLE_COLUMN) && (this instanceof ExpressionColumn)) {
-            // Completely override the OpType value to handle it as a normal COLUMN.
-            exprOp = OpTypes.COLUMN;
+        if (exprOp == OpTypes.SIMPLE_COLUMN) {
+            // find the substitue from displayCols list
+            for (int ii=startKey+1; ii < displayCols.size(); ++ii)
+            {
+                Expression otherCol = displayCols.get(ii);
+                if (otherCol != null && (otherCol.opType != OpTypes.SIMPLE_COLUMN) &&
+                         (otherCol.columnIndex == this.columnIndex))
+                {
+                    ignoredDisplayColIndexes.add(ii);
+                    // serialize the column this simple column stands-in for.
+                    // Prepare to skip displayCols that are the referent of a SIMPLE_COLUMN."
+                    // quit seeking simple_column's replacement.
+                    return otherCol.voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey, getAlias());
+                }
+            }
+            assert(false);
         }
 
         // Use the opType to find a pre-initialized prototype VoltXMLElement with the correct
@@ -1574,13 +1606,15 @@ public class Expression {
         exp = exp.duplicate();
         exp.attributes.put("id", this.getUniqueId(session));
 
-        if ((alias != null) && (getAlias().length() > 0)) {
+        if (realAlias != null) {
+            exp.attributes.put("alias", realAlias);
+        } else if ((alias != null) && (getAlias().length() > 0)) {
             exp.attributes.put("alias", getAlias());
         }
 
         for (Expression expr : nodes) {
             if (expr != null) {
-                VoltXMLElement vxmle = expr.voltGetXML(session);
+                VoltXMLElement vxmle = expr.voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey);
                 exp.children.add(vxmle);
                 assert(vxmle != null);
             }
@@ -1597,9 +1631,12 @@ public class Expression {
             // Apparently at this stage, all valid non-NULL values must have a type determined by HSQL.
             // I'm not sure why this must be the case --paul.
             // if the actual value is null, make sure the type is null as well
-            if ((dataType == null) || (valueData == null)) {
-                exp.attributes.put("valuetype", "NULL");
-                exp.attributes.put("value", "NULL");
+            if (valueData == null) {
+                if (dataType == null) {
+                    exp.attributes.put("valuetype", "NULL");
+                    return exp;
+                }
+                exp.attributes.put("valuetype", Types.getTypeName(dataType.typeCode));
                 return exp;
             }
 
@@ -1646,14 +1683,6 @@ public class Expression {
             exp.attributes.put("value", valueData.toString());
             return exp;
 
-        case OpTypes.DYNAMIC_PARAM:
-            // This eliminates a NullPointerException which MAY be a sign of insufficient type inference,
-            // but there MAY be cases where a parameter type can't legitimately be inferred, so let it go.
-            if (dataType != null) {
-                exp.attributes.put("valuetype", Types.getTypeName(dataType.typeCode));
-            }
-            return exp;
-
         case OpTypes.COLUMN:
         case OpTypes.COALESCE:
             ExpressionColumn ec = (ExpressionColumn)this;
@@ -1687,7 +1716,6 @@ public class Expression {
         default:
             return exp;
         }
-
     }
 
     private static final int caseDiff = ('a' - 'A');
@@ -1892,5 +1920,41 @@ public class Expression {
             array_element.setAttributesAsColumn(column, false);
 
         }
+    }
+
+    /**
+     * This ugly code is never called by HSQL or VoltDB
+     * explicitly, but it does make debugging in eclipse
+     * easier because it makes expressions display their
+     * type when you mouse over them.
+     */
+    @Override
+    public String toString() {
+        String type = null;
+
+        // iterate through all optypes, looking for
+        // a match...
+        // sadly do this with reflection
+        Field[] fields = OpTypes.class.getFields();
+        for (Field f : fields) {
+            if (f.getType() != int.class) continue;
+            int value = 0;
+            try {
+                value = f.getInt(null);
+            } catch (Exception e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+
+            // found a match
+            if (value == opType) {
+                type = f.getName();
+                break;
+            }
+        }
+        assert(type != null);
+
+        // return the original default impl + the type
+        return super.toString() + ": " + type;
     }
 }

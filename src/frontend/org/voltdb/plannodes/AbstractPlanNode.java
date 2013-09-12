@@ -19,6 +19,7 @@ package org.voltdb.plannodes;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -221,6 +222,38 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     /**
+     * Recursively build a set of tables read by the (sub)plan or (sub)plan fragment
+     * {@see AbstractPlanNode#getTablesAndIndexes(Collection, Collection, Collection, boolean)}
+     *
+     * @param tablesRead Set of tables read potentially added to at each recursive level.
+     */
+    public final void getTablesReadByFragment(Collection<String> tablesRead)
+    {
+        getTablesAndIndexes(tablesRead, null, null);
+    }
+    /**
+     * Recursively build sets of read and updated tables, as well as used indexes.
+     *
+     * @param tablesRead Set of tables read potentially added to at each recursive level.
+     * @param tablesUpdated Set of tables updated/inserted into/deleted
+     * potentially added to at each recursive level.
+     * @param indexes Set of indexes potentially added to at each recursive level.
+     * @boolean acrossFragments Controls whether any ReceivePlanNode should be traversed
+     * so that the sets will reflect the plan's other fragment.
+     * Only the current fragment is of interest when called from the PlanAssembler.
+     */
+    public void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tablesUpdated,
+                                    Collection<String> indexes)
+    {
+        for (AbstractPlanNode node : m_inlineNodes.values()) {
+            node.getTablesAndIndexes(tablesRead, tablesUpdated, indexes);
+        }
+        for (AbstractPlanNode node : m_children) {
+            node.getTablesAndIndexes(tablesRead, tablesUpdated, indexes);
+        }
+    }
+
+    /**
      * Does the (sub)plan guarantee an identical result/effect when "replayed"
      * against the same database state, such as during replication or CL recovery.
      * @return
@@ -270,6 +303,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * Called to compute cost estimates and statistics on a plan graph. Computing of the costs
      * should be idempotent, but updating the PlanStatistics instance isn't, so this should
      * be called once per finished graph, and once per PlanStatistics instance.
+     * TODO(XIN): It takes at least 14% planner CPU. Optimize it.
      */
     public final void computeEstimatesRecursively(PlanStatistics stats,
                                                   Cluster cluster,
@@ -366,6 +400,30 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         m_children.remove(child);
         child.m_parents.remove(this);
     }
+
+    /**
+     * Replace an existing child with a new one preserving the child's position.
+     * @param oldChild The node to replace.
+     * @param newChild The new node.
+     * @return true if the child was replaced
+     */
+    public boolean replaceChild(AbstractPlanNode oldChild, AbstractPlanNode newChild) {
+        int idx = 0;
+        for (AbstractPlanNode child : m_children) {
+            if (child.equals(oldChild)) {
+                break;
+            }
+            ++idx;
+        }
+        if (idx == m_children.size()) {
+            return false;
+        }
+        oldChild.removeFromGraph();
+        m_children.add(idx, newChild);
+        newChild.m_parents.add(this);
+        return true;
+    }
+
 
     /**
      * Gets the children.
@@ -724,9 +782,9 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             // don't bother with inlined projections
             if (inlineNode.getPlanNodeType() == PlanNodeType.PROJECTION)
                 continue;
-            sb.append(indent + "inline (");
+            sb.append(indent + "inline ");
             sb.append(inlineNode.explainPlanForNode(indent));
-            sb.append(")\n");
+            sb.append("\n");
         }
 
         for (AbstractPlanNode node : m_children) {

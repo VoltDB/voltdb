@@ -17,6 +17,8 @@
 
 package org.voltdb.plannodes;
 
+import java.util.Collection;
+
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -35,6 +37,14 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
 
     protected AbstractOperationPlanNode() {
         super();
+    }
+
+    @Override
+    public final void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tableUpdated,
+                                          Collection<String> indexes)
+    {
+        assert(m_targetTableName.length() > 0);
+        tableUpdated.add(m_targetTableName);
     }
 
     protected String debugInfo(String spacer) {

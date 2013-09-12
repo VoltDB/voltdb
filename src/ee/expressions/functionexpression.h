@@ -206,6 +206,28 @@ static const int FUNC_DECODE                           = 20001;
 static const int FUNC_VOLT_FIELD                       = 20002;
 static const int FUNC_VOLT_ARRAY_ELEMENT               = 20003;
 static const int FUNC_VOLT_ARRAY_LENGTH                = 20004;
+static const int FUNC_SINCE_EPOCH                      = 20005;
+static const int FUNC_SINCE_EPOCH_SECOND               = 20006;
+static const int FUNC_SINCE_EPOCH_MILLISECOND          = 20007;
+static const int FUNC_SINCE_EPOCH_MICROSECOND          = 20008;
+static const int FUNC_TO_TIMESTAMP                     = 20009;
+static const int FUNC_TO_TIMESTAMP_SECOND              = 20010;
+static const int FUNC_TO_TIMESTAMP_MILLISECOND         = 20011;
+static const int FUNC_TO_TIMESTAMP_MICROSECOND         = 20012;
+
+// VoltDB truncate timestamp function
+static const int FUNC_TRUNCATE_TIMESTAMP               = 20013; // FUNC_TRUNCATE is defined as 80 already
+static const int FUNC_TRUNCATE_YEAR                    = 20014;
+static const int FUNC_TRUNCATE_QUARTER                 = 20015;
+static const int FUNC_TRUNCATE_MONTH                   = 20016;
+static const int FUNC_TRUNCATE_DAY                     = 20017;
+static const int FUNC_TRUNCATE_HOUR                    = 20018;
+static const int FUNC_TRUNCATE_MINUTE                  = 20019;
+static const int FUNC_TRUNCATE_SECOND                  = 20020;
+static const int FUNC_TRUNCATE_MILLISECOND             = 20021;
+static const int FUNC_TRUNCATE_MICROSECOND             = 20022;
+
+static const int FUNC_VOLT_FROM_UNIXTIME               = 20023;
 }
 
 // All of these "...functions.h" files need to be included AFTER the above definitions

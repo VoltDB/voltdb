@@ -28,6 +28,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.Level;
@@ -116,6 +117,15 @@ public class ExportManager
 
     private volatile Properties m_processorConfig = new Properties();
 
+    /*
+     * Issue a permit when a generation is drained so that when we are truncating if a generation
+     * is completely truncated we can wait for the on generation drained task to finish.
+     *
+     * This eliminates a race with CL replay where it may do catalog updates and such while truncation
+     * is still running on generation drained.
+     */
+    private final Semaphore m_onGenerationDrainedForTruncation = new Semaphore(0);
+
     private final Runnable m_onGenerationDrained = new Runnable() {
         @Override
         public void run() {
@@ -191,6 +201,7 @@ public class ExportManager
                         e.printStackTrace();
                         exportLog.error(e);
                     }
+                    m_onGenerationDrainedForTruncation.release();
                 }
             });
         }
@@ -591,17 +602,39 @@ public class ExportManager
                 return;
             }
 
+            /*
+             * Due to issues double freeing and using after free,
+             * copy the buffer onto the heap and rely on GC.
+             *
+             * This should buy enough time to diagnose the root cause.
+             */
+            if (buffer != null) {
+                ByteBuffer buf = ByteBuffer.allocate(buffer.remaining());
+                buf.put(buffer);
+                buf.flip();
+                DBBPool.deleteCharArrayMemory(bufferPtr);
+                buffer = buf;
+                bufferPtr = 0;
+            }
             generation.pushExportBuffer(partitionId, signature, uso, bufferPtr, buffer, sync, endOfStream);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
-            exportLog.error(e);
+            exportLog.error("Error pushing export buffer", e);
         }
     }
 
     public void truncateExportToTxnId(long snapshotTxnId, long[] perPartitionTxnIds) {
         exportLog.info("Truncating export data after txnId " + snapshotTxnId);
         for (ExportGeneration generation : m_generations.values()) {
-            generation.truncateExportToTxnId(snapshotTxnId, perPartitionTxnIds);
+            //If the generation was completely drained, wait for the task to finish running
+            //by waiting for the permit that will be generated
+            if (generation.truncateExportToTxnId(snapshotTxnId, perPartitionTxnIds)) {
+                try {
+                    m_onGenerationDrainedForTruncation.acquire();
+                } catch (InterruptedException e) {
+                    VoltDB.crashLocalVoltDB("Interrupted truncating export data", true, e);
+                }
+            }
         }
     }
 }

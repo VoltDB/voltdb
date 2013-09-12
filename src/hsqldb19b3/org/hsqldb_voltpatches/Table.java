@@ -2700,4 +2700,12 @@ public class Table extends TableBase implements SchemaObject {
 
         return table;
     }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+        return super.toString() + ":" + getName().name;
+    }
 }

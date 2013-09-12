@@ -18,6 +18,7 @@
 package org.voltdb.dtxn;
 
 import org.voltdb.StoredProcedureInvocation;
+import org.voltcore.network.Connection;
 
 /**
  * Provide an interface that both Iv2 and simple dtxn can implement.
@@ -27,30 +28,24 @@ public interface TransactionCreator
     // create a new transaction.
     public boolean createTransaction(
             long connectionId,
-            final String connectionHostname,
-            boolean adminConnection,
             StoredProcedureInvocation invocation,
             boolean isReadOnly,
             boolean isSinglePartition,
             boolean isEverySite,
-            int partitions[],
-            Object clientData,
+            int partition,
             int messageSize,
             long now);
 
     // Create a transaction using the provided txnId.
     public boolean createTransaction(
             long connectionId,
-            final String connectionHostname,
-            boolean adminConnection,
             long txnId,
             long uniqueId,
             StoredProcedureInvocation invocation,
             boolean isReadOnly,
             boolean isSinglePartition,
             boolean isEverySite,
-            int partitions[],
-            Object clientData,
+            int partition,
             int messageSize,
             long now);
 
@@ -78,4 +73,6 @@ public interface TransactionCreator
      * @return
      */
     public abstract boolean isOnBackPressure();
+
+    public abstract void bindAdapter(Connection adapter);
 }

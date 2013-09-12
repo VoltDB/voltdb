@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -96,7 +97,8 @@ public class SnapshotUtil {
         Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
         Map<Integer, Long> partitionTransactionIds,
         InstanceId instanceId,
-        long timestamp)
+        long timestamp,
+        int newPartitionCount)
     throws IOException
     {
         final File f = new VoltFile(path, constructDigestFilenameForNonce(nonce, hostId));
@@ -116,6 +118,7 @@ public class SnapshotUtil {
                 stringer.key("txnId").value(txnId);
                 stringer.key("timestamp").value(timestamp);
                 stringer.key("timestampString").value(SnapshotUtil.formatHumanReadableDate(timestamp));
+                stringer.key("newPartitionCount").value(newPartitionCount);
                 stringer.key("tables").array();
                 for (int ii = 0; ii < tables.size(); ii++) {
                     stringer.value(tables.get(ii).getTypeName());
@@ -1117,7 +1120,22 @@ public class SnapshotUtil {
             }
 
             @Override
+            public String getHostnameAndIPAndPort() {
+                return "Snapshot Util Adapter";
+            }
+
+            @Override
             public String getHostnameOrIP() {
+                return "Snapshot Util Adapter";
+            }
+
+            @Override
+            public int getRemotePort() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public InetSocketAddress getRemoteSocketAddress() {
                 throw new UnsupportedOperationException();
             }
 

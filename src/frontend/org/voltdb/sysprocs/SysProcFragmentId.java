@@ -96,21 +96,19 @@ public class SysProcFragmentId
     // @SnapshotRestore
     public static final long PF_restoreScan = 60;
     public static final long PF_restoreScanResults = 61;
-    public static final long PF_restoreLoadReplicatedTable = 62;
-    public static final long PF_restoreLoadReplicatedTableResults = 63;
-    public static final long PF_restoreDistributeReplicatedTable = 64;
-    public static final long PF_restoreDistributePartitionedTable = 65;
-    public static final long PF_restoreDistributePartitionedTableResults = 66;
-    public static final long PF_restoreSendReplicatedTable = 67;
-    public static final long PF_restoreSendReplicatedTableResults = 68;
-    public static final long PF_restoreSendPartitionedTable = 69;
-    public static final long PF_restoreSendPartitionedTableResults = 70;
-    public static final long PF_restoreDigestScan = 71;
-    public static final long PF_restoreDigestScanResults = 72;
-    public static final long PF_restoreDistributeExportAndPartitionSequenceNumbers = 73;
-    public static final long PF_restoreDistributeExportAndPartitionSequenceNumbersResults = 74;
-    public static final long PF_restoreAsyncRunLoop = 75;
-    public static final long PF_restoreAsyncRunLoopResults = 76;
+    public static final long PF_restoreDigestScan = 62;
+    public static final long PF_restoreDigestScanResults = 63;
+    public static final long PF_restoreDistributeExportAndPartitionSequenceNumbers = 64;
+    public static final long PF_restoreDistributeExportAndPartitionSequenceNumbersResults = 65;
+    public static final long PF_restoreAsyncRunLoop = 66;
+    public static final long PF_restoreAsyncRunLoopResults = 67;
+    public static final long PF_restoreLoadTable = 70;                                  // called by 4 distribute cases, to load received table
+    public static final long PF_restoreReceiveResultTables = 71;                        // union received result tables
+    public static final long PF_restoreLoadReplicatedTable = 72;                        // special case for replicated-to-replicated
+    public static final long PF_restoreDistributeReplicatedTableAsReplicated = 73;      // replicated to replicated
+    public static final long PF_restoreDistributePartitionedTableAsPartitioned = 74;    // partitioned to partitioned
+    public static final long PF_restoreDistributePartitionedTableAsReplicated = 75;     // partitioned to replicated
+    public static final long PF_restoreDistributeReplicatedTableAsPartitioned = 76;     // replicated to replicated
 
     // @StartSampler
     public static final long PF_startSampler = 80;
@@ -163,4 +161,7 @@ public class SysProcFragmentId
     // @Update topology
     public static final long PF_updateTopology = 230;
     public static final long PF_updateTopologyAggregate = 231;
+
+    public static final long PF_validatePartitioning = 240;
+    public static final long PF_validatePartitioningResults = 241;
 }

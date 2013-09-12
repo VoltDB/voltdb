@@ -23,15 +23,13 @@
 
 package org.voltdb.types;
 
-import org.voltdb.expressions.*;
+import junit.framework.TestCase;
 
-import junit.framework.*;
+import org.voltdb.expressions.InComparisonExpression;
 
 public class TestExpressionType extends TestCase {
     public void testGetExpressionClass() {
         // these are the cases that are not covered by other tests
-        assertEquals(NullValueExpression.class,
-                     ExpressionType.VALUE_NULL.getExpressionClass());
         assertEquals(InComparisonExpression.class,
                      ExpressionType.COMPARE_IN.getExpressionClass());
         assertNull(ExpressionType.INVALID.getExpressionClass());

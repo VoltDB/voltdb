@@ -35,6 +35,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.PriorityBlockingQueue;
 
+import com.google.common.collect.ImmutableSet;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -44,6 +45,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
+
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.export.ExportManager;
@@ -55,8 +57,6 @@ import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
-
-import com.google.common.collect.ImmutableSet;
 
 /**
  * This breaks up VoltDB initialization tasks into discrete units.
@@ -215,7 +215,7 @@ public class Inits {
         SetupAdminMode
         StartHTTPServer
         InitHashinator
-        InitStatsAgent
+        InitAsyncCompilerAgent
         SetupReplicationRole
         CreateRestoreAgentAndPlan
         DistributeCatalog <- CreateRestoreAgentAndPlan
@@ -467,15 +467,16 @@ public class Inits {
                     } catch (Exception e1) {}
                 }
                 if (httpPort == 8081)
-                    m_rvdb.m_httpPortExtraLogMessage = "HTTP admin console unable to bind to port 8080";
+                    m_rvdb.m_httpPortExtraLogMessage = "HTTP service unable to bind to port 8080";
                 else if (httpPort > 8081)
-                    m_rvdb.m_httpPortExtraLogMessage = "HTTP admin console unable to bind to ports 8080 through " + String.valueOf(httpPort - 1);
+                    m_rvdb.m_httpPortExtraLogMessage = "HTTP service unable to bind to ports 8080 through "
+                            + String.valueOf(httpPort - 1);
             }
             else if (httpPort != -1) {
                 try {
                     m_rvdb.m_adminListener = new HTTPAdminListener(m_rvdb.m_jsonEnabled, httpPort);
                 } catch (Exception e1) {
-                    hostLog.fatal("HTTP admin console unable to bind to port " + httpPort + ". Exiting.");
+                    hostLog.fatal("HTTP service unable to bind to port " + httpPort + ". Exiting.");
                     System.exit(-1);
                 }
             }
@@ -627,30 +628,13 @@ public class Inits {
         }
     }
 
-    class InitStatsAgent extends InitWork {
-        InitStatsAgent() {
+    class InitAsyncCompilerAgent extends InitWork {
+        InitAsyncCompilerAgent() {
         }
 
         @Override
         public void run() {
             try {
-                // TODO: CLEAN ME UP
-                final long statsAgentHSId =
-                    m_rvdb.getHostMessenger().getHSIdForLocalSite(HostMessenger.STATS_SITE_ID);
-                m_rvdb.getStatsAgent().registerMailbox(
-                            VoltDB.instance().getHostMessenger(),
-                            statsAgentHSId);
-                final long catalogAgentHSId =
-                    m_rvdb.getHostMessenger().getHSIdForLocalSite(HostMessenger.SYSCATALOG_SITE_ID);
-                m_rvdb.getSystemCatalogAgent().registerMailbox(
-                            VoltDB.instance().getHostMessenger(),
-                            catalogAgentHSId);
-                final long sysInfoAgentHSId =
-                    m_rvdb.getHostMessenger().getHSIdForLocalSite(HostMessenger.SYSINFO_SITE_ID);
-                m_rvdb.getSystemInformationAgent().registerMailbox(
-                            VoltDB.instance().getHostMessenger(),
-                            sysInfoAgentHSId);
-
                 m_rvdb.getAsyncCompilerAgent().createMailbox(
                             VoltDB.instance().getHostMessenger(),
                             m_rvdb.getHostMessenger().getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID));
@@ -692,7 +676,8 @@ public class Inits {
                                                       cl.getInternalsnapshotpath(),
                                                       snapshotPath,
                                                       allPartitions,
-                                                      ImmutableSet.copyOf(m_rvdb.m_messenger.getLiveHostIds()));
+                                                      ImmutableSet.copyOf(m_rvdb.m_messenger.getLiveHostIds()),
+                                                      CatalogUtil.getVoltDbRoot(m_deployment.getPaths()).getAbsolutePath());
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Unable to establish a ZooKeeper connection: " +
                             e.getMessage(), false, e);

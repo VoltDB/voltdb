@@ -27,11 +27,12 @@ import org.voltdb.ParameterSet;
 import org.voltdb.SQLStmt;
 import org.voltdb.SQLStmtAdHocHelper;
 import org.voltdb.SystemProcedureExecutionContext;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
+import org.voltdb.planner.ActivePlanRepository;
 
 /**
  * Base class for @AdHoc... system procedures.
@@ -93,15 +94,15 @@ public abstract class AdHocBase extends VoltSystemProcedure {
                 String msg = String.format("AdHoc transaction %d wasn't planned " +
                         "against the current catalog version. Statement: %s",
                         ctx.getCurrentTxnId(),
-                        new String(statement.sql, VoltDB.UTF8ENCODING));
+                        new String(statement.sql, Constants.UTF8ENCODING));
                 throw new VoltAbortException(msg);
             }
 
-            long aggFragId = m_site.loadOrAddRefPlanFragment(
+            long aggFragId = ActivePlanRepository.loadOrAddRefPlanFragment(
                     statement.core.aggregatorHash, statement.core.aggregatorFragment);
             long collectorFragId = 0;
             if (statement.core.collectorFragment != null) {
-                collectorFragId = m_site.loadOrAddRefPlanFragment(
+                collectorFragId = ActivePlanRepository.loadOrAddRefPlanFragment(
                         statement.core.collectorHash, statement.core.collectorFragment);
             }
 

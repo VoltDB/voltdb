@@ -33,26 +33,59 @@ import org.voltdb.expressions.TupleValueExpression;
 /**
  * Represents the partitioning of the data underlying a statement.
  * In the simplest case, this is pre-determined by the single-partition context of the statement
- * from a stored procedure annotation or a single-statement procedure attribute,
- * or implied by the presence of a partition key value for an ad hoc query.
- * In the more interesting case, a user can specify that a statement be run on all partitions,
+ * from a stored procedure annotation or a single-statement procedure attribute.
+ * In the more interesting ad hoc case, a user can specify that a statement be run on all partitions,
  * but the semantics of the statement may indicate that the same result could be produced more optimally
- * by running it on a single partition based on some partition key, whether a statement parameter or a constant in the
- * text of the statement.
+ * by running it on a single partition selected based on the hash of some partition key value,
+ * whether a statement parameter or a constant in the text of the statement.
  * These cases arise both in queries and in (partitioned table) DML.
- * As a multi-partition statement is analyzed in the planner, this object is filled in with details regarding its
- * suitability for running correctly on a single partition.
+ * As a multi-partition statement is analyzed in the planner, this object is filled in with details
+ * regarding its suitability for running correctly on a single partition.
+ *
+ * For a multi-fragment plan that contains a join,
+ * is it better to send partitioned tuples and join them on the coordinator
+ * or is it better to join them before sending?
+ * If bandwidth (or capacity of the receiving temp table) were the primary concern,
+ * a decision could be based on
+ * A) how much wider the joined rows are than the pre-joined rows.
+ * B) the expected yield of the join filtering -- does each pre-joined row typically
+ *    match and get joined with multiple partner rows or does it typically fail to match
+ *    any row.
+ * The statistics required to determine "B" are not generally available.
+ * In any case, there are two over-arching concerns.
+ * One is the correct handling of a special case
+ * -- a join of partitioned tables on their partition keys.
+ * In this case, the join MUST happen on each partition prior to sending any tuples.
+ * This restriction stems directly from the limitation that there can only be two fragments in a plan,
+ * and that a fragment produces a single (intermediate or final) result table.
+ * The "coordinator" receives the (one) intermediate result table and produces
+ * the final result table. It can not receive tuples from two different partitioned tables.
+ * The second over-arching consideration is that there is an optimization available to the
+ * transaction processor for the special case in which a coordinator fragment does not need to
+ * access any persistent local data (I learned this second hand from Izzy. --paul).
+ * This provides further motivation to do all scanning and joining in the collector fragment
+ * prior to sending tuples.
+ *
+ * These two considerations normally override all others,
+ * so that all multi-partition plans only "send after all joins", regardless of bandwidth/capacity
+ * considerations, but there remains some edge cases in which the decision MUST go the other way,
+ * that is, sending tuples prior to joining on the coordinator.
+ * This occurs for some OUTER JOINS between a replicated OUTER table and a partitioned INNER table as in:
+ *
+ * SELECT * FROM replicated R LEFT JOIN partitioned P ON ...;
+ *
+ * See the comment in SelectSubPlanAssembler.getSelectSubPlanForJoin
  */
 public class PartitioningForStatement implements Cloneable{
 
     /**
      * This value can be provided any non-null value to force single-partition statement planning and
-     * (at least currently) disabling any kind of analysis of single-partition suitability
-     * (except to forbid single-partition execution of replicated table DML.
-     * Currently most of these cases are taken at face value -- the only case where such single partitioning is second-guessed
-     * is in DML for replicated tables where a single-partition write would corrupt the replication.
-     * This is flagged as an error.  Otherwise, no attempt is made to validate that a single partition statement would
-     * have the same result as the same query run on all partitions. That is for the caller to decide.
+     * (at least currently) the disabling of any kind of analysis of single-partition suitability --
+     * except to forbid single-partition execution of replicated table DML.
+     * Since that would corrupt the replication, it is flagged as an error.
+     * Otherwise, no attempt is made to validate that a single partition statement would
+     * have the same result as the same query run on all partitions.
+     * It is up to the caller to decide whether that is an issue.
      */
     private final Object m_specifiedValue;
     /**
@@ -60,7 +93,7 @@ public class PartitioningForStatement implements Cloneable{
      * to not only analyze whether the statement CAN be run single-partition,
      * but also to decide that it WILL and to alter the plan accordingly.
      * If initialized to false, the analysis is considered to be for advisory purposes only,
-     * so the planner may not commit to plan changes specific to single-partition execution.
+     * so the planner may not commit to plan changes that are specific to single-partition execution.
      */
     private final boolean m_lockIn;
     /**
@@ -86,7 +119,7 @@ public class PartitioningForStatement implements Cloneable{
      * The actual number of partitioned table scans in the query (when supported, self-joins should count as multiple).
      */
     private int m_countOfPartitionedTables = -1;
-    private Map<String, String> m_partitionColumnByTable = null;
+    private final Map<String, String> m_partitionColumnByTable = new HashMap<String, String>();
     /*
      * The number of independently partitioned table scans in the query. This is initially the same as
      * m_countOfPartitionedTables, but gets reduced by 1 each time a partitioned table (scan)'s partitioning column
@@ -123,6 +156,7 @@ public class PartitioningForStatement implements Cloneable{
     /**
      * @return deep copy of self
      */
+    @Override
     public Object clone() {
         return new PartitioningForStatement(m_specifiedValue, m_lockIn, m_inferSP);
     }
@@ -185,17 +219,6 @@ public class PartitioningForStatement implements Cloneable{
     }
 
     /**
-     * @param countOfPartitionedTables actually, the number of table scans, if there are self-joins
-     * @param countOfPartitionedTables2
-     */
-    public void setPartitionedTables(Map<String,String> partitionColumnByTable, int countOfPartitionedTables) {
-        m_partitionColumnByTable = partitionColumnByTable;
-        m_countOfPartitionedTables = countOfPartitionedTables;
-        m_countOfIndependentlyPartitionedTables = countOfPartitionedTables; // Initial guess -- as if no equality filters.
-
-    }
-
-    /**
      * accessor
      */
     public int getCountOfPartitionedTables() {
@@ -213,7 +236,7 @@ public class PartitioningForStatement implements Cloneable{
     }
 
     /**
-     * Returns the discovered single partition expression (if exists), unless the
+     * Returns the discovered single partition expression (if it exists), unless the
      * user gave a partitioning a-priori, and then it will return null.
      */
     public AbstractExpression effectivePartitioningExpression() {
@@ -273,13 +296,6 @@ public class PartitioningForStatement implements Cloneable{
     }
 
     /**
-     * smart accessor
-     */
-    public boolean hasPartitioningConstantLockedIn() {
-        return m_lockIn && (m_inferredValue != null);
-    }
-
-    /**
      * accessor
      * @param partitioncolumn
      */
@@ -309,8 +325,13 @@ public class PartitioningForStatement implements Cloneable{
      *
      * @param tableList The tables.
      * @param valueEquivalence Their column equality filters
+     * @return the number of independently partitioned tables
+     *         -- partitioned tables that aren't joined or filtered by the same value.
+     *         The caller can raise an alarm if there is more than one.
      */
-    public void analyzeForMultiPartitionAccess(ArrayList<Table> tableList, HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence) {
+    public int analyzeForMultiPartitionAccess(ArrayList<Table> tableList,
+            HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence)
+    {
         TupleValueExpression tokenPartitionKey = null;
         Set< Set<AbstractExpression> > eqSets = new HashSet< Set<AbstractExpression> >();
         int unfilteredPartitionKeyCount = 0;
@@ -364,5 +385,44 @@ public class PartitioningForStatement implements Cloneable{
                 }
             }
         }
+
+        return m_countOfIndependentlyPartitionedTables;
     }
+
+    /**
+     * @param parsedStmt
+     * @throws PlanningErrorException
+     */
+    void analyzeTablePartitioning(ArrayList<Table> tableList)
+            throws PlanningErrorException
+    {
+        // Do we have a need for a distributed scan at all?
+        // Iterate over the tables to collect partition columns.
+        for (Table table : tableList) {
+            if (table.getIsreplicated()) {
+                continue;
+            }
+            String colName = null;
+            Column partitionCol = table.getPartitioncolumn();
+            // "(partitionCol != null)" tests around an obscure edge case.
+            // The table is declared non-replicated yet specifies no partitioning column.
+            // This can occur legitimately when views based on partitioned tables neglect to group by the partition column.
+            // The interpretation of this edge case is that the table has "randomly distributed data".
+            // In such a case, the table is valid for use by MP queries only and can only be joined with replicated tables
+            // because it has no recognized partitioning join key.
+            if (partitionCol != null) {
+                colName = partitionCol.getTypeName(); // Note getTypeName gets the column name -- go figure.
+            }
+
+            //TODO: This map really wants to be indexed by table "alias" (the in-query table scan identifier)
+            // so self-joins can be supported without ambiguity.
+            String partitionedTable = table.getTypeName();
+            m_partitionColumnByTable.put(partitionedTable, colName);
+        }
+        m_countOfPartitionedTables = m_partitionColumnByTable.keySet().size();
+        // Initial guess -- as if no equality filters.
+        m_countOfIndependentlyPartitionedTables = m_countOfPartitionedTables;
+    }
+
+
 }

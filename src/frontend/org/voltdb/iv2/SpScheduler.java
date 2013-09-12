@@ -17,6 +17,8 @@
 
 package org.voltdb.iv2;
 
+import com.google.common.primitives.Longs;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -25,38 +27,33 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-
-import org.voltdb.client.ClientResponse;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
-
-import org.voltdb.messaging.DumpMessage;
-import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2LogFaultMessage;
-
-import org.voltdb.VoltTable;
-
-import com.google.common.primitives.Longs;
+import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
 public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 {
@@ -130,6 +127,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         new HashMap<Long, TransactionState>();
     private final Map<DuplicateCounterKey, DuplicateCounter> m_duplicateCounters =
         new HashMap<DuplicateCounterKey, DuplicateCounter>();
+    // MP fragment tasks or completion tasks pending durability
+    private final Map<Long, Queue<TransactionTask>> m_mpsPendingDurability =
+        new HashMap<Long, Queue<TransactionTask>>();
     private CommandLog m_cl;
     private PartitionDRGateway m_drGateway = new PartitionDRGateway(true);
     private final SnapshotCompletionMonitor m_snapMonitor;
@@ -154,6 +154,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 synchronized (m_lock) {
                     for (Object o : durableThings) {
                         m_pendingTasks.offer((TransactionTask)o);
+
+                        // Make sure all queued tasks for this MP txn are released
+                        if (!((TransactionTask) o).getTransactionState().isSinglePartition()) {
+                            offerPendingMPTasks(((TransactionTask) o).getTxnId());
+                        }
                     }
                 }
             }
@@ -407,7 +412,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
              */
             if (message.isForReplay()) {
                 uniqueId = message.getUniqueId();
-                m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(uniqueId);
+                try {
+                    m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(uniqueId);
+                }
+                catch (Exception e) {
+                    hostLog.fatal(e.getMessage());
+                    hostLog.fatal("Invocation: " + message);
+                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                }
             } else if (message.isForDR()) {
                 uniqueId = message.getStoredProcedureInvocation().getOriginalUniqueId();
                 // @LoadSinglepartitionTable does not have a valid uid
@@ -488,13 +500,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             msg.isForReplay());
                 // Update the handle in the copy since the constructor doesn't set it
                 replmsg.setSpHandle(newSpHandle);
-                for (long hsId : m_sendToHSIds) {
-                    m_mailbox.send(hsId,
-                            replmsg);
-                }
+                m_mailbox.send(m_sendToHSIds, replmsg);
                 DuplicateCounter counter = new DuplicateCounter(
                         msg.getInitiatorHSId(),
-                        msg.getTxnId(), m_replicaHSIds);
+                        msg.getTxnId(), m_replicaHSIds, msg.getStoredProcedureName());
                 m_duplicateCounters.put(new DuplicateCounterKey(msg.getTxnId(), newSpHandle), counter);
             }
         }
@@ -565,7 +574,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         List<Long> expectedHSIds = new ArrayList<Long>(needsRepair);
         DuplicateCounter counter = new DuplicateCounter(
                 HostMessenger.VALHALLA,
-                message.getTxnId(), expectedHSIds);
+                message.getTxnId(), expectedHSIds, message.getStoredProcedureName());
         m_duplicateCounters.put(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()), counter);
 
         m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getUniqueId());
@@ -595,7 +604,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         List<Long> expectedHSIds = new ArrayList<Long>(needsRepair);
         DuplicateCounter counter = new DuplicateCounter(
                 message.getCoordinatorHSId(), // Assume that the MPI's HSID hasn't changed
-                message.getTxnId(), expectedHSIds);
+                message.getTxnId(), expectedHSIds, "MP_DETERMINISM_ERROR");
         m_duplicateCounters.put(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()), counter);
 
         // is local repair necessary?
@@ -737,15 +746,20 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_mailbox.send(m_sendToHSIds,
                         replmsg);
                 DuplicateCounter counter;
+                /*
+                 * Non-determinism should be impossible to happen with MP fragments.
+                 * if you see "MP_DETERMINISM_ERROR" as procedure name in the crash logs
+                 * something has horribly gone wrong.
+                 */
                 if (message.getFragmentTaskType() != FragmentTaskMessage.SYS_PROC_PER_SITE) {
                     counter = new DuplicateCounter(
                             msg.getCoordinatorHSId(),
-                            msg.getTxnId(), m_replicaHSIds);
+                            msg.getTxnId(), m_replicaHSIds, "MP_DETERMINISM_ERROR");
                 }
                 else {
                     counter = new SysProcDuplicateCounter(
                             msg.getCoordinatorHSId(),
-                            msg.getTxnId(), m_replicaHSIds);
+                            msg.getTxnId(), m_replicaHSIds, "MP_DETERMINISM_ERROR");
                 }
                 m_duplicateCounters.put(new DuplicateCounterKey(msg.getTxnId(), newSpHandle), counter);
             }
@@ -804,7 +818,53 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (logThis) {
             if (!m_cl.log(msg.getInitiateTask(), msg.getSpHandle(), m_durabilityListener, task)) {
                 m_pendingTasks.offer(task);
+            } else {
+                /* Getting here means that the task is the first fragment of an MP txn and
+                 * synchronous command logging is on, so create a backlog for future tasks of
+                 * this MP arrived before it's marked durable.
+                 *
+                 * This is important for synchronous command logging and MP txn restart. Without
+                 * this, a restarted MP txn may not be gated by logging of the first fragment.
+                 */
+                assert !m_mpsPendingDurability.containsKey(task.getTxnId());
+                m_mpsPendingDurability.put(task.getTxnId(), new ArrayDeque<TransactionTask>());
             }
+        } else {
+            queueOrOfferMPTask(task);
+        }
+    }
+
+    /**
+     * Offer all fragment tasks and complete transaction tasks queued for durability for the given
+     * MP transaction, and remove the entry from the pending map so that future ones won't be
+     * queued.
+     *
+     * @param txnId    The MP transaction ID.
+     */
+    private void offerPendingMPTasks(long txnId)
+    {
+        Queue<TransactionTask> pendingTasks = m_mpsPendingDurability.get(txnId);
+        if (pendingTasks != null) {
+            for (TransactionTask task : pendingTasks) {
+                m_pendingTasks.offer(task);
+            }
+            m_mpsPendingDurability.remove(txnId);
+        }
+    }
+
+    /**
+     * Check if the MP task has to be queued because the first fragment is still being logged
+     * synchronously to the command log. If not, offer it to the transaction task queue.
+     *
+     * @param task    A fragment task or a complete transaction task
+     */
+    private void queueOrOfferMPTask(TransactionTask task)
+    {
+        // The pending map will only have an entry for the transaction if the first fragment is
+        // still pending durability.
+        Queue<TransactionTask> pendingTasks = m_mpsPendingDurability.get(task.getTxnId());
+        if (pendingTasks != null) {
+            pendingTasks.offer(task);
         } else {
             m_pendingTasks.offer(task);
         }
@@ -844,6 +904,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             CompleteTransactionMessage replmsg = new CompleteTransactionMessage(message);
             // Set the spHandle so that on repair the new master will set the max seen spHandle
             // correctly
+            advanceTxnEgo();
             replmsg.setSpHandle(getCurrentTxnId());
             if (m_sendToHSIds.length > 0) {
                 m_mailbox.send(m_sendToHSIds, replmsg);
@@ -860,7 +921,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             Iv2Trace.logCompleteTransactionMessage(message, m_mailbox.getHSId());
             final CompleteTransactionTask task =
                 new CompleteTransactionTask(txn, m_pendingTasks, message, m_drGateway);
-            m_pendingTasks.offer(task);
+            queueOrOfferMPTask(task);
             // If this is a restart, then we need to leave the transaction state around
             if (!message.isRestart()) {
                 m_outstandingTxns.remove(message.getTxnId());
@@ -946,7 +1007,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event)
     {
         if (event.truncationSnapshot) {
-            writeIv2ViableReplayEntry();
+            synchronized(m_lock) {
+                writeIv2ViableReplayEntry();
+            }
         }
         return new CountDownLatch(0);
     }

@@ -153,11 +153,10 @@ public class SchemaChangeClient {
                     try { Thread.sleep(30 * 1000); } catch (Exception e) {}
                     break;
                 case ClientResponse.GRACEFUL_FAILURE:
-                    log.error(_F("GRACEFUL_FAILURE response in procedure call for: %s", procName));
-                    log.error(((ClientResponseImpl)cr).toJSONString());
-                    logStackTrace(new Throwable());
-                    // caller should always check return status
-                    return cr;
+                    //log.error(_F("GRACEFUL_FAILURE response in procedure call for: %s", procName));
+                    //log.error(((ClientResponseImpl)cr).toJSONString());
+                    //logStackTrace(new Throwable());
+                    return cr; // caller should always check return status
                 case ClientResponse.UNEXPECTED_FAILURE:
                 case ClientResponse.USER_ABORT:
                     log.error(_F("Error in procedure call for: %s", procName));
@@ -280,6 +279,8 @@ public class SchemaChangeClient {
             case ClientResponse.GRACEFUL_FAILURE:
             case ClientResponse.USER_ABORT:
                 // should never happen
+                log.error(_F("USER_ABORT in procedure call for Catalog update"));
+                log.error(((ClientResponseImpl)cr).toJSONString());
                 assert(false);
                 System.exit(-1);
             }
@@ -288,23 +289,23 @@ public class SchemaChangeClient {
         // don't actually trust the call... manually verify
         int obsCatVersion = verifyAndGetSchemaVersion();
 
-        if (success == true) {
-            if (obsCatVersion != schemaVersionNo+1) {
+        if (obsCatVersion == schemaVersionNo) {
+            if (success == true) {
                 log.error(_F("Catalog update was reported to be successful but did not pass verification: expected V%d, observed V%d", schemaVersionNo+1, obsCatVersion));
-            assert(false);
-            System.exit(-1);
+                assert(false);
+                System.exit(-1);
             }
-        } else if (obsCatVersion == schemaVersionNo)
-                // UAC didn't work
-                return null;
+
+            // UAC didn't work
+            return null;
+        }
+
+        // UAC worked
+        if (obsCatVersion == schemaVersionNo+1) schemaVersionNo++;
         else {
             assert(false);
             System.exit(-1);
         }
-
-        // if UAC was observed successful, update the count
-        if (obsCatVersion == schemaVersionNo+1)
-                schemaVersionNo++;
 
         long end = System.nanoTime();
         double seconds = (end - start) / 1000000000.0;
@@ -377,6 +378,7 @@ public class SchemaChangeClient {
                 System.exit(-1);
             }
         }
+        //log.info(_F("detected catalog version is: %d", version));
         return version;
     }
 

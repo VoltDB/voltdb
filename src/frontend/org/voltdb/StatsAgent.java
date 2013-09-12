@@ -18,12 +18,14 @@ package org.voltdb;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 
 import org.json_voltpatches.JSONObject;
 import org.voltcore.network.Connection;
 import org.voltcore.utils.Pair;
 
 import org.voltdb.TheHashinator.HashinatorType;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 
 /**
@@ -32,7 +34,7 @@ import org.voltdb.client.ClientResponse;
 public class StatsAgent extends OpsAgent
 {
     private final HashMap<StatsSelector, HashMap<Long, ArrayList<StatsSource>>> registeredStatsSources =
-        new HashMap<StatsSelector, HashMap<Long, ArrayList<StatsSource>>>();
+            new HashMap<StatsSelector, HashMap<Long, ArrayList<StatsSource>>>();
 
     public StatsAgent()
     {
@@ -48,12 +50,45 @@ public class StatsAgent extends OpsAgent
     {
         StatsSelector subselector = StatsSelector.valueOf(request.subselector);
         switch (subselector) {
-            case PROCEDUREPROFILE:
-                request.aggregateTables =
-                    aggregateProcedureProfileStats(request.aggregateTables);
-                break;
-            default:
+        case PROCEDUREPROFILE:
+            request.aggregateTables =
+            aggregateProcedureProfileStats(request.aggregateTables);
+            break;
+        case PROCEDUREINPUT:
+            request.aggregateTables =
+            aggregateProcedureInputStats(request.aggregateTables);
+            break;
+        case PROCEDUREOUTPUT:
+            request.aggregateTables =
+            aggregateProcedureOutputStats(request.aggregateTables);
+            break;
+
+        default:
         }
+    }
+    private Map<String, Boolean> m_procInfo = null;
+    /**
+     * Check if proc is readonly?
+     *
+     * @param pname
+     * @return
+     */
+    private boolean isReadOnlyProcedure(String pname) {
+        synchronized (this) {
+            if (m_procInfo == null) {
+                Map<String, Boolean> mm = new HashMap<String, Boolean>();
+                CatalogContext ctx = VoltDB.instance().getCatalogContext();
+                for (Procedure p : ctx.procedures) {
+                    mm.put(p.getClassname(), p.getReadonly());
+                }
+                m_procInfo = mm;
+            }
+        }
+        final Boolean b = m_procInfo.get(pname);
+        if (b == null) {
+            return false;
+        }
+        return b;
     }
 
     /**
@@ -62,16 +97,18 @@ public class StatsAgent extends OpsAgent
     private VoltTable[] aggregateProcedureProfileStats(VoltTable[] baseStats)
     {
         if (baseStats == null || baseStats.length != 1) {
-           return baseStats;
+            return baseStats;
         }
 
         StatsProcProfTable timeTable = new StatsProcProfTable();
         baseStats[0].resetRowPosition();
         while (baseStats[0].advanceRow()) {
-            timeTable.updateTable(
-                    baseStats[0].getString("PROCEDURE"),
+            String pname = baseStats[0].getString("PROCEDURE");
+
+            timeTable.updateTable(!isReadOnlyProcedure(pname),
+                    baseStats[0].getLong("TIMESTAMP"),
+                    pname,
                     baseStats[0].getLong("PARTITION_ID"),
-                    baseStats[0].getLong("TIMED_INVOCATIONS"),
                     baseStats[0].getLong("INVOCATIONS"),
                     baseStats[0].getLong("MIN_EXECUTION_TIME"),
                     baseStats[0].getLong("MAX_EXECUTION_TIME"),
@@ -81,6 +118,59 @@ public class StatsAgent extends OpsAgent
         }
         return new VoltTable[] { timeTable.sortByAverage("EXECUTION_TIME") };
     }
+    /**
+     * Produce PROCEDUREINPUT aggregation of PROCEDURE subselector
+     */
+    private VoltTable[] aggregateProcedureInputStats(VoltTable[] baseStats)
+    {
+        if (baseStats == null || baseStats.length != 1) {
+            return baseStats;
+        }
+
+        StatsProcInputTable timeTable = new StatsProcInputTable();
+        baseStats[0].resetRowPosition();
+        while (baseStats[0].advanceRow()) {
+            String pname = baseStats[0].getString("PROCEDURE");
+            timeTable.updateTable(!isReadOnlyProcedure(pname),
+                    pname,
+                    baseStats[0].getLong("PARTITION_ID"),
+                    baseStats[0].getLong("TIMESTAMP"),
+                    baseStats[0].getLong("INVOCATIONS"),
+                    baseStats[0].getLong("MIN_PARAMETER_SET_SIZE"),
+                    baseStats[0].getLong("MAX_PARAMETER_SET_SIZE"),
+                    baseStats[0].getLong("AVG_PARAMETER_SET_SIZE")
+                    );
+        }
+        return new VoltTable[] { timeTable.sortByInput("PROCEDURE_INPUT") };
+    }
+
+    /**
+     * Produce PROCEDUREOUTPUT aggregation of PROCEDURE subselector
+     */
+
+    private VoltTable[] aggregateProcedureOutputStats(VoltTable[] baseStats)
+    {
+        if (baseStats == null || baseStats.length != 1) {
+            return baseStats;
+        }
+
+        StatsProcOutputTable timeTable = new StatsProcOutputTable();
+        baseStats[0].resetRowPosition();
+        while (baseStats[0].advanceRow()) {
+            String pname = baseStats[0].getString("PROCEDURE");
+            timeTable.updateTable(!isReadOnlyProcedure(pname),
+                    pname,
+                    baseStats[0].getLong("PARTITION_ID"),
+                    baseStats[0].getLong("TIMESTAMP"),
+                    baseStats[0].getLong("INVOCATIONS"),
+                    baseStats[0].getLong("MIN_RESULT_SIZE"),
+                    baseStats[0].getLong("MAX_RESULT_SIZE"),
+                    baseStats[0].getLong("AVG_RESULT_SIZE")
+                    );
+        }
+        return new VoltTable[] { timeTable.sortByOutput("PROCEDURE_OUTPUT") };
+    }
+
 
     /**
      * Need to release references to catalog related stats sources
@@ -88,14 +178,14 @@ public class StatsAgent extends OpsAgent
      */
     public synchronized void notifyOfCatalogUpdate() {
         final HashMap<Long, ArrayList<StatsSource>> siteIdToStatsSources =
-            registeredStatsSources.get(StatsSelector.PROCEDURE);
+                registeredStatsSources.get(StatsSelector.PROCEDURE);
         siteIdToStatsSources.clear();
     }
 
     @Override
     protected void collectStatsImpl(Connection c, long clientHandle, OpsSelector selector,
             ParameterSet params) throws Exception
-    {
+            {
         JSONObject obj = new JSONObject();
         obj.put("selector", "STATISTICS");
         // parseParamsForStatistics has a clumsy contract, see definition
@@ -116,34 +206,34 @@ public class StatsAgent extends OpsAgent
         // Intercept them and respond before doing the distributed stuff.
         if (subselector.equalsIgnoreCase("TOPO")) {
             PendingOpsRequest psr = new PendingOpsRequest(
-                selector,
-                subselector,
-                c,
-                clientHandle,
-                System.currentTimeMillis());
-            collectTopoStats(psr);
-            return;
-        }
-        else if (subselector.equalsIgnoreCase("PARTITIONCOUNT")) {
-            PendingOpsRequest psr = new PendingOpsRequest(
-                selector,
-                subselector,
-                c,
-                clientHandle,
-                System.currentTimeMillis());
-            collectPartitionCount(psr);
-            return;
-        }
-
-        PendingOpsRequest psr =
-            new PendingOpsRequest(
                     selector,
                     subselector,
                     c,
                     clientHandle,
                     System.currentTimeMillis());
+            collectTopoStats(psr);
+            return;
+        }
+        else if (subselector.equalsIgnoreCase("PARTITIONCOUNT")) {
+            PendingOpsRequest psr = new PendingOpsRequest(
+                    selector,
+                    subselector,
+                    c,
+                    clientHandle,
+                    System.currentTimeMillis());
+            collectPartitionCount(psr);
+            return;
+        }
+
+        PendingOpsRequest psr =
+                new PendingOpsRequest(
+                        selector,
+                        subselector,
+                        c,
+                        clientHandle,
+                        System.currentTimeMillis());
         distributeOpsWork(psr, obj);
-    }
+            }
 
     // Parse the provided parameter set object and fill in subselector and interval into
     // the provided JSONObject.  If there's an error, return that in the String, otherwise
@@ -202,9 +292,9 @@ public class StatsAgent extends OpsAgent
             tables = new VoltTable[2];
             tables[0] = topoStats;
             VoltTable vt =
-                new VoltTable(
-                        new VoltTable.ColumnInfo("HASHTYPE", VoltType.STRING),
-                        new VoltTable.ColumnInfo("HASHCONFIG", VoltType.VARBINARY));
+                    new VoltTable(
+                            new VoltTable.ColumnInfo("HASHTYPE", VoltType.STRING),
+                            new VoltTable.ColumnInfo("HASHCONFIG", VoltType.VARBINARY));
             tables[1] = vt;
             Pair<HashinatorType, byte[]> hashConfig = TheHashinator.getCurrentConfig();
             vt.addRow(hashConfig.getFirst().toString(), hashConfig.getSecond());
@@ -243,58 +333,60 @@ public class StatsAgent extends OpsAgent
         boolean interval = obj.getBoolean("interval");
         StatsSelector subselector = StatsSelector.valueOf(subselectorString);
         switch (subselector) {
-            case DR:
-                stats = collectDRStats();
-                break;
-            case DRNODE:
-                stats = collectDRNodeStats();
-                break;
-            case DRPARTITION:
-                stats = collectDRPartitionStats();
-                break;
-            case SNAPSHOTSTATUS:
-                stats = collectSnapshotStatusStats();
-                break;
-            case MEMORY:
-                stats = collectMemoryStats(interval);
-                break;
-            case IOSTATS:
-                stats = collectIOStats(interval);
-                break;
-            case INITIATOR:
-                stats = collectInitiatorStats(interval);
-                break;
-            case TABLE:
-                stats = collectTableStats(interval);
-                break;
-            case INDEX:
-                stats = collectIndexStats(interval);
-                break;
-            case PROCEDURE:
-            case PROCEDUREPROFILE:
-                stats = collectProcedureStats(interval);
-                break;
-            case STARVATION:
-                stats = collectStarvationStats(interval);
-                break;
-            case PLANNER:
-                stats = collectPlannerStats(interval);
-                break;
-            case LIVECLIENTS:
-                stats = collectLiveClientsStats(interval);
-                break;
-            case LATENCY:
-                stats = collectLatencyStats(interval);
-                break;
-            case MANAGEMENT:
-                stats = collectManagementStats(interval);
-                break;
-            default:
-                // Should have been successfully groomed in collectStatsImpl().  Log something
-                // for our information but let the null check below return harmlessly
-                hostLog.warn("Received unknown stats selector in StatsAgent: " + subselector.name() +
-                        ", this should be impossible.");
-                stats = null;
+        case DR:
+            stats = collectDRStats();
+            break;
+        case DRNODE:
+            stats = collectDRNodeStats();
+            break;
+        case DRPARTITION:
+            stats = collectDRPartitionStats();
+            break;
+        case SNAPSHOTSTATUS:
+            stats = collectSnapshotStatusStats();
+            break;
+        case MEMORY:
+            stats = collectMemoryStats(interval);
+            break;
+        case IOSTATS:
+            stats = collectIOStats(interval);
+            break;
+        case INITIATOR:
+            stats = collectInitiatorStats(interval);
+            break;
+        case TABLE:
+            stats = collectTableStats(interval);
+            break;
+        case INDEX:
+            stats = collectIndexStats(interval);
+            break;
+        case PROCEDURE:
+        case PROCEDUREINPUT:
+        case PROCEDUREOUTPUT:
+        case PROCEDUREPROFILE:
+            stats = collectProcedureStats(interval);
+            break;
+        case STARVATION:
+            stats = collectStarvationStats(interval);
+            break;
+        case PLANNER:
+            stats = collectPlannerStats(interval);
+            break;
+        case LIVECLIENTS:
+            stats = collectLiveClientsStats(interval);
+            break;
+        case LATENCY:
+            stats = collectLatencyStats(interval);
+            break;
+        case MANAGEMENT:
+            stats = collectManagementStats(interval);
+            break;
+        default:
+            // Should have been successfully groomed in collectStatsImpl().  Log something
+            // for our information but let the null check below return harmlessly
+            hostLog.warn("Received unknown stats selector in StatsAgent: " + subselector.name() +
+                    ", this should be impossible.");
+            stats = null;
         }
 
         return stats;
@@ -431,7 +523,6 @@ public class StatsAgent extends OpsAgent
         return stats;
     }
 
-
     private VoltTable[] collectStarvationStats(boolean interval)
     {
         Long now = System.currentTimeMillis();
@@ -502,8 +593,8 @@ public class StatsAgent extends OpsAgent
         // we're missing any of the tables so that we
         // don't screw up the aggregation in handleStatsResponse (see my rant there)
         if (mStats == null || iStats == null || pStats == null ||
-            ioStats == null || tStats == null || indStats == null ||
-            sStats == null)
+                ioStats == null || tStats == null || indStats == null ||
+                sStats == null)
         {
             return null;
         }
@@ -582,10 +673,10 @@ public class StatsAgent extends OpsAgent
             columns = new VoltTable.ColumnInfo[table.getColumnCount()];
             for (int i = 0; i < columns.length; i++)
                 columns[i] = new VoltTable.ColumnInfo(table.getColumnName(i),
-                                                      table.getColumnType(i));
+                        table.getColumnType(i));
         }
 
-         // Append to previous results if provided.
+        // Append to previous results if provided.
         final VoltTable resultTable = prevResults != null ? prevResults : new VoltTable(columns);
 
         for (ArrayList<StatsSource> statsSources : siteIdToStatsSources.values()) {

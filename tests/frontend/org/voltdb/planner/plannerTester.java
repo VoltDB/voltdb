@@ -62,6 +62,7 @@ public class plannerTester {
     private static boolean m_isSave = false;
     private static boolean m_isDiff = false;
     private static boolean m_reportExplainedPlan = false;
+    private static boolean m_reportDiffExplainedPlan = false;
     private static boolean m_reportSQLStatement = false;
     private static ArrayList<String> m_config = new ArrayList<String>();
 
@@ -148,7 +149,7 @@ public class plannerTester {
             else if( str.equals("-dv") ) {
                 m_isCompile = true;
                 m_isDiff = true;
-                m_reportExplainedPlan = true;
+                m_reportDiffExplainedPlan = true;
                 m_reportSQLStatement = true;
             }
             else if( str.startsWith("-r=") ){
@@ -160,6 +161,7 @@ public class plannerTester {
             }
             else if( str.equals("-re") ){
                 m_reportExplainedPlan = true;
+                m_reportDiffExplainedPlan = true;
             }
             else if( str.equals("-rs") ){
                 m_reportSQLStatement = true;
@@ -282,6 +284,12 @@ public class plannerTester {
                     if (line.length() <= 6 ) {
                         break;
                     }
+                    if( line.startsWith("JOIN:") ) {
+                        // These lines have three parts JOIN:<joinOrder>:<query>
+                        if ( line.split(":").length != 3 ) {
+                            System.err.println("Config file syntax error : ignoring line: " + line);
+                        }
+                    }
                     m_stmts.add( line );
                 }
                 if (atEof) {
@@ -402,7 +410,14 @@ public class plannerTester {
         }
         int size = m_stmts.size();
         for( int i = 0; i < size; i++ ) {
-            List<AbstractPlanNode> pnList = s_singleton.compileToFragments(m_stmts.get(i));
+            String query = m_stmts.get(i);
+            String joinOrder = null;
+            if( query.startsWith("JOIN:") ) {
+                String[] splitLine = query.split(":");
+                joinOrder = splitLine[1];
+                query = splitLine[2];
+            }
+            List<AbstractPlanNode> pnList = s_singleton.compileWithJoinOrderToFragments(query, joinOrder);
             AbstractPlanNode pn = pnList.get(0);
             if( pnList.size() == 2 ){//multi partition query plan
                 assert( pnList.get(1) instanceof SendPlanNode );
@@ -467,6 +482,10 @@ public class plannerTester {
 
             if( diff( pn1, pn2, false ) ) {
                 m_numPass++;
+                if( m_reportExplainedPlan ) {
+                    m_reportWriter.write( "SQL statement:\n"+m_stmts.get(i)+"\n");
+                    m_reportWriter.write("\nExplained plan:\n"+pn2.toExplainPlanString()+"\n");
+                }
             } else {
                 m_numFail++;
                 m_reportWriter.write( "Statement "+i+" of "+config+": \n" );
@@ -495,7 +514,7 @@ public class plannerTester {
                     m_reportWriter.write( "SQL statement:\n"+baseStmt+"\n==>\n"+m_stmts.get(i)+"\n");
                 }
 
-                if( m_reportExplainedPlan ) {
+                if( m_reportDiffExplainedPlan ) {
                     m_reportWriter.write("\nExplained plan:\n"+pn1.toExplainPlanString()+"\n==>\n"+pn2.toExplainPlanString()+"\n");
                 }
 

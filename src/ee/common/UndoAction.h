@@ -19,6 +19,8 @@
 #ifndef UNDOACTION_H_
 #define UNDOACTION_H_
 
+#include <cstdlib>
+
 namespace voltdb {
 class UndoQuantum;
 

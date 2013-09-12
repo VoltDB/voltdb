@@ -48,16 +48,36 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     Catalog m_catalog;
     int m_relativeIndex;
 
+    // Annotation where additional non-runtime info can be squirreled away
+    // Used by the compiler report generator for now
+    Object m_annotation = null;
+
     /**
-     * Get the parent of this CatalogType instance
-     * @return The parent of this CatalogType instance
+     * Gets any annotation added to this instance.
+     * @return Annotation object or null.
+     */
+    public Object getAnnotation() {
+        return m_annotation;
+    }
+
+    /**
+     * Sets the annotation object for this instance.
+     * @param annotation Annotation object or null.
+     */
+    public void setAnnotation(Object annotation) {
+        m_annotation = annotation;
+    }
+
+    /**
+     * Get the full catalog path of this CatalogType instance
+     * @return The full catalog path of this CatalogType instance
      */
     public String getPath() {
         return m_path;
     }
 
     /**
-     * Get the parent of this CatalogType instance
+     * Get the name of this CatalogType instance
      * @return The name of this CatalogType instance
      */
     public String getTypeName() {
@@ -349,6 +369,10 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         if ((obj == null) || (obj.getClass().equals(getClass()) == false))
             return false;
 
+        // Do the identity check
+        if (obj == this)
+            return true;
+
         // this is safe because of the class check
         // it is also known that the childCollections var will be the same
         //  from the class check
@@ -379,6 +403,16 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         }
 
         return true;
+    }
+
+    @Override
+    public int hashCode()
+    {
+        int result = 1;
+        // Generate something reasonably unique but consistent for this element
+        result = 37 * result + m_path.hashCode();
+        result = 31 * result + m_typename.hashCode();
+        return result;
     }
 
     /**

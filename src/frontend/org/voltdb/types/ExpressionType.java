@@ -29,84 +29,84 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.HashRangeExpression;
 import org.voltdb.expressions.InComparisonExpression;
-import org.voltdb.expressions.NullValueExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.expressions.VectorValueExpression;
 
 /**
  *
  */
 public enum ExpressionType {
-    INVALID                                            (null,  0),
+    INVALID                                            (null,  0, "<invalid>"),
 
     // ----------------------------
     // Arthimetic Operators
     // ----------------------------
-    OPERATOR_PLUS                  (OperatorExpression.class,  1),
+    OPERATOR_PLUS                  (OperatorExpression.class,  1, "+"),
         // left + right (both must be number. implicitly casted)
-    OPERATOR_MINUS                 (OperatorExpression.class,  2),
+    OPERATOR_MINUS                 (OperatorExpression.class,  2, "-"),
         // left - right (both must be number. implicitly casted)
-    OPERATOR_MULTIPLY              (OperatorExpression.class,  3),
+    OPERATOR_MULTIPLY              (OperatorExpression.class,  3, "*"),
         // left * right (both must be number. implicitly casted)
-    OPERATOR_DIVIDE                (OperatorExpression.class,  4),
+    OPERATOR_DIVIDE                (OperatorExpression.class,  4, "/"),
         // left / right (both must be number. implicitly casted)
-    OPERATOR_CONCAT                (OperatorExpression.class,  5),
+    OPERATOR_CONCAT                (OperatorExpression.class,  5, "||"),
         // left || right (both must be char/varchar)
-    OPERATOR_MOD                   (OperatorExpression.class,  6),
+    OPERATOR_MOD                   (OperatorExpression.class,  6, "%"),
         // left % right (both must be integer)
-    OPERATOR_CAST                  (OperatorExpression.class,  7),
+    OPERATOR_CAST                  (OperatorExpression.class,  7, "<cast>"),
         // explicitly cast left as right (right is integer in ValueType enum)
-    OPERATOR_NOT                   (OperatorExpression.class,  8),
+    OPERATOR_NOT                   (OperatorExpression.class,  8, "NOT"),
         // logical not
-    OPERATOR_IS_NULL               (OperatorExpression.class, 9),
+    OPERATOR_IS_NULL               (OperatorExpression.class, 9, "IS NULL"),
         // unary null evaluation
 
     // ----------------------------
     // Binary Comparison
     // ----------------------------
-    COMPARE_EQUAL                (ComparisonExpression.class, 10),
+    COMPARE_EQUAL                (ComparisonExpression.class, 10, "="),
         // equal operator between left and right
-    COMPARE_NOTEQUAL             (ComparisonExpression.class, 11),
+    COMPARE_NOTEQUAL             (ComparisonExpression.class, 11, "<>"),
         // inequal operator between left and right
-    COMPARE_LESSTHAN             (ComparisonExpression.class, 12),
+    COMPARE_LESSTHAN             (ComparisonExpression.class, 12, "<"),
         // less than operator between left and right
-    COMPARE_GREATERTHAN          (ComparisonExpression.class, 13),
+    COMPARE_GREATERTHAN          (ComparisonExpression.class, 13, ">"),
         // greater than operator between left and right
-    COMPARE_LESSTHANOREQUALTO    (ComparisonExpression.class, 14),
+    COMPARE_LESSTHANOREQUALTO    (ComparisonExpression.class, 14, "<="),
         // less than equal operator between left and right
-    COMPARE_GREATERTHANOREQUALTO (ComparisonExpression.class, 15),
+    COMPARE_GREATERTHANOREQUALTO (ComparisonExpression.class, 15, ">="),
         // greater than equal operator between left and right
-    COMPARE_LIKE                 (ComparisonExpression.class, 16),
+    COMPARE_LIKE                 (ComparisonExpression.class, 16, "LIKE"),
         // LIKE operator (left LIKE right). both children must be string.
-    COMPARE_IN                 (InComparisonExpression.class, 17),
+    COMPARE_IN                 (InComparisonExpression.class, 17, "IN"),
         // IN operator. left IN right. right must be VectorValue
 
     // ----------------------------
     // Conjunction Operator
     // ----------------------------
-    CONJUNCTION_AND             (ConjunctionExpression.class, 20),
-    CONJUNCTION_OR              (ConjunctionExpression.class, 21),
+    CONJUNCTION_AND             (ConjunctionExpression.class, 20, "AND"),
+    CONJUNCTION_OR              (ConjunctionExpression.class, 21, "OR"),
 
     // ----------------------------
     // Values
     // ----------------------------
-    VALUE_CONSTANT            (ConstantValueExpression.class, 30),
-    VALUE_PARAMETER          (ParameterValueExpression.class, 31),
-    VALUE_TUPLE                  (TupleValueExpression.class, 32),
-    VALUE_TUPLE_ADDRESS        (TupleAddressExpression.class, 33),
-    VALUE_NULL                    (NullValueExpression.class, 34),
+    VALUE_CONSTANT            (ConstantValueExpression.class, 30, "<constant>"),
+    VALUE_PARAMETER          (ParameterValueExpression.class, 31, "<parameter>"),
+    VALUE_TUPLE                  (TupleValueExpression.class, 32, "<column>"),
+    VALUE_TUPLE_ADDRESS        (TupleAddressExpression.class, 33, "<address>"),
+    VALUE_VECTOR                (VectorValueExpression.class, 35, "<vector>"),
 
     // ----------------------------
     // Aggregate
     // ----------------------------
-    AGGREGATE_COUNT               (AggregateExpression.class, 40),
-    AGGREGATE_COUNT_STAR          (AggregateExpression.class, 41),
-    AGGREGATE_SUM                 (AggregateExpression.class, 42),
-    AGGREGATE_MIN                 (AggregateExpression.class, 43),
-    AGGREGATE_MAX                 (AggregateExpression.class, 44),
-    AGGREGATE_AVG                 (AggregateExpression.class, 45),
+    AGGREGATE_COUNT               (AggregateExpression.class, 40, "COUNT"),
+    AGGREGATE_COUNT_STAR          (AggregateExpression.class, 41, "COUNT(*)"),
+    AGGREGATE_SUM                 (AggregateExpression.class, 42, "SUM"),
+    AGGREGATE_MIN                 (AggregateExpression.class, 43, "MIN"),
+    AGGREGATE_MAX                 (AggregateExpression.class, 44, "MAX"),
+    AGGREGATE_AVG                 (AggregateExpression.class, 45, "AVG"),
 
     // ----------------------------
     // Function
@@ -114,25 +114,27 @@ public enum ExpressionType {
     //TODO: Should there be multiple classes for function expressions
     // maybe based on their support for optimization methods?
     //TODO: Should there be multiple FunctionExpression ExpressionTypes?
-    FUNCTION                      (FunctionExpression.class,  100),
+    FUNCTION                      (FunctionExpression.class,  100, "<function>"),
 
     // -----------------------------
     // Internals added for Elastic
     // -----------------------------
-    HASH_RANGE    (HashRangeExpression.class, 200)
+    HASH_RANGE    (HashRangeExpression.class, 200, "#")
     ;
 
-    private final int val;
-    private final Class<? extends AbstractExpression> expressionClass;
+    private final int m_value;
+    private final String m_symbol;
+    private final Class<? extends AbstractExpression> m_expressionClass;
 
     ExpressionType(Class<? extends AbstractExpression> expressionClass,
-                   int val) {
-        this.val = val;
-        this.expressionClass = expressionClass;
+                   int val, String symbol) {
+        m_value = val;
+        m_symbol = symbol;
+        m_expressionClass = expressionClass;
     }
 
     public Class<? extends AbstractExpression> getExpressionClass() {
-        return this.expressionClass;
+        return m_expressionClass;
     }
 
     private static final Map<Integer, ExpressionType> idx_lookup =
@@ -142,7 +144,7 @@ public enum ExpressionType {
 
     static {
         for (ExpressionType vt : EnumSet.allOf(ExpressionType.class)) {
-            ExpressionType.idx_lookup.put(vt.val, vt);
+            ExpressionType.idx_lookup.put(vt.m_value, vt);
             String name = vt.name().toLowerCase();
             ExpressionType.name_lookup.put(name.intern(), vt);
             //
@@ -164,7 +166,7 @@ public enum ExpressionType {
     }
 
     public int getValue() {
-        return val;
+        return m_value;
     }
 
     public static ExpressionType get(Integer idx) {
@@ -173,9 +175,14 @@ public enum ExpressionType {
     }
 
     public static ExpressionType get(String name) {
+        // TODO(XIN): intern function seems to take up 1.5% CPU of Planner.
         ExpressionType ret =
             ExpressionType.name_lookup.get(name.toLowerCase().intern());
         return (ret == null ? ExpressionType.INVALID : ret);
+    }
+
+    public String symbol() {
+        return m_symbol;
     }
 
 }

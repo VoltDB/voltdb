@@ -59,18 +59,31 @@ import org.voltdb.VoltTable;
  */
 public class NativeSnapshotWritePlan extends SnapshotWritePlan
 {
+    protected boolean createSetupInternal(String file_path, String file_nonce,
+                                          long txnId, Map<Integer, Long> partitionTransactionIds,
+                                          JSONObject jsData, SystemProcedureExecutionContext context,
+                                          String hostname, final VoltTable result,
+                                          Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+                                          SiteTracker tracker, long timestamp) throws IOException
+    {
+        return createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds, jsData,
+                                   context, hostname, result, exportSequenceNumbers, tracker,
+                                   timestamp, context.getNumberOfPartitions());
+    }
+
     protected boolean createSetupInternal(
             String file_path, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
             JSONObject jsData, SystemProcedureExecutionContext context,
             String hostname, final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            SiteTracker tracker, long timestamp) throws IOException
+            SiteTracker tracker, long timestamp, int newPartitionCount) throws IOException
     {
         assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty());
 
         NativeSnapshotWritePlan.createFileBasedCompletionTasks(file_path, file_nonce,
-                txnId, partitionTransactionIds, context, exportSequenceNumbers, timestamp);
+                txnId, partitionTransactionIds, context, exportSequenceNumbers, timestamp,
+                newPartitionCount);
 
         final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
         final AtomicInteger numTables = new AtomicInteger(tables.size());
@@ -108,7 +121,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                             saveFilePath,
                             table,
                             context.getHostId(),
-                            tracker.m_numberOfPartitions,
+                            context.getNumberOfPartitions(),
                             txnId,
                             timestamp,
                             tracker.getPartitionsForHost(context.getHostId()));
@@ -190,7 +203,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             long txnId, Map<Integer, Long> partitionTransactionIds,
             SystemProcedureExecutionContext context,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            long timestamp) throws IOException
+            long timestamp, int newPartitionCount) throws IOException
     {
         final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
         Runnable completionTask = SnapshotUtil.writeSnapshotDigest(
@@ -203,7 +216,8 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 exportSequenceNumbers,
                 partitionTransactionIds,
                 VoltDB.instance().getHostMessenger().getInstanceId(),
-                timestamp);
+                timestamp,
+                newPartitionCount);
         if (completionTask != null) {
             SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
         }

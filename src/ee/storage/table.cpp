@@ -362,8 +362,8 @@ bool Table::equals(voltdb::Table *other) {
     if (!(name() == other->name())) return false;
     if (!(tableType() == other->tableType())) return false;
 
-    std::vector<voltdb::TableIndex*> indexes = allIndexes();
-    std::vector<voltdb::TableIndex*> otherIndexes = other->allIndexes();
+    const std::vector<voltdb::TableIndex*>& indexes = allIndexes();
+    const std::vector<voltdb::TableIndex*>& otherIndexes = other->allIndexes();
     if (!(indexes.size() == indexes.size())) return false;
     for (std::size_t ii = 0; ii < indexes.size(); ii++) {
         if (!(indexes[ii]->equals(otherIndexes[ii]))) return false;
@@ -384,11 +384,21 @@ bool Table::equals(voltdb::Table *other) {
 }
 
 void Table::loadTuplesFromNoHeader(SerializeInput &serialize_io,
-                                   Pool *stringPool) {
+                                   Pool *stringPool,
+                                   ReferenceSerializeOutput *uniqueViolationOutput) {
     int tupleCount = serialize_io.readInt();
     assert(tupleCount >= 0);
 
     TableTuple target(m_schema);
+
+    //Reserve space for a length prefix for rows that violate unique constraints
+    //If there is no output supplied it will just throw
+    size_t lengthPosition = 0;
+    int32_t serializedTupleCount = 0;
+    size_t tupleCountPosition = 0;
+    if (uniqueViolationOutput != NULL) {
+        lengthPosition = uniqueViolationOutput->reserveBytes(4);
+    }
 
     for (int i = 0; i < tupleCount; ++i) {
         nextFreeTuple(&target);
@@ -396,14 +406,28 @@ void Table::loadTuplesFromNoHeader(SerializeInput &serialize_io,
         target.setDirtyFalse();
         target.setPendingDeleteFalse();
         target.setPendingDeleteOnUndoReleaseFalse();
+
         target.deserializeFrom(serialize_io, stringPool);
 
-        processLoadedTuple(target);
+        processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition);
+    }
+
+    //If unique constraints are being handled, write the length/size of constraints that occured
+    if (uniqueViolationOutput != NULL) {
+        if (serializedTupleCount == 0) {
+            uniqueViolationOutput->writeIntAt(lengthPosition, 0);
+        } else {
+            uniqueViolationOutput->writeIntAt(lengthPosition,
+                                              static_cast<int32_t>(uniqueViolationOutput->position() - lengthPosition - sizeof(int32_t)));
+            uniqueViolationOutput->writeIntAt(tupleCountPosition,
+                                              serializedTupleCount);
+        }
     }
 }
 
 void Table::loadTuplesFrom(SerializeInput &serialize_io,
-                           Pool *stringPool) {
+                           Pool *stringPool,
+                           ReferenceSerializeOutput *uniqueViolationOutput) {
     /*
      * directly receives a VoltTable buffer.
      * [00 01]   [02 03]   [04 .. 0x]
@@ -460,7 +484,7 @@ void Table::loadTuplesFrom(SerializeInput &serialize_io,
                                       message.str().c_str());
     }
 
-    loadTuplesFromNoHeader(serialize_io, stringPool);
+    loadTuplesFromNoHeader(serialize_io, stringPool, uniqueViolationOutput);
 }
 
 bool isExistingTableIndex(std::vector<TableIndex*> &indexes, TableIndex* index) {

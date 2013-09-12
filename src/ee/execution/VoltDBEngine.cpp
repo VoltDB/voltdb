@@ -78,7 +78,6 @@
 #include "logging/LogManager.h"
 #include "plannodes/abstractplannode.h"
 #include "plannodes/abstractscannode.h"
-#include "plannodes/nodes.h"
 #include "plannodes/plannodeutil.h"
 #include "plannodes/plannodefragment.h"
 #include "executors/executorutil.h"
@@ -168,6 +167,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
 {
     // Be explicit about running in the standard C locale for now.
     locale::global(locale("C"));
+    setenv("TZ", "UTC", 0); // set timezone as "UTC" in EE level
     m_clusterIndex = clusterIndex;
     m_siteId = siteId;
     m_partitionId = partitionId;
@@ -485,6 +485,8 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
 
     assert(m_catalog != NULL);
     VOLT_DEBUG("Loading catalog...");
+
+    VOLT_TRACE("Catalog string contents:\n%s\n",catalogPayload.c_str());
     m_catalog->execute(catalogPayload);
 
 
@@ -540,6 +542,8 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp )
     m_catalog->getDeletedPaths(deletions);
 
     BOOST_FOREACH(string path, deletions) {
+        VOLT_TRACE("delete path:");
+
         map<string, CatalogDelegate*>::iterator pos = m_catalogDelegates.find(path);
         if (pos == m_catalogDelegates.end()) {
            continue;
@@ -629,8 +633,8 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
     {
         // get the catalog's table object
         catalog::Table *catalogTable = catTableIter->second;
-
         if (addAll || catalogTable->wasAdded()) {
+            VOLT_TRACE("add a completely new table...");
 
             //////////////////////////////////////////
             // add a completely new table
@@ -717,7 +721,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
             // find all of the indexes to add
             //////////////////////////////////////////
 
-            vector<TableIndex*> currentIndexes = persistenttable->allIndexes();
+            const vector<TableIndex*> currentIndexes = persistenttable->allIndexes();
 
             // iterate over indexes for this table in the catalog
             map<string, catalog::Index*>::const_iterator indexIter;
@@ -725,7 +729,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                  indexIter != catalogTable->indexes().end();
                  indexIter++)
             {
-                std::string indexName = indexIter->first;
+                std::string indexName = indexIter->second->name();
                 std::string catalogIndexId = TableCatalogDelegate::getIndexIdString(*indexIter->second);
 
                 // Look for an index on the table to match the catalog index
@@ -741,6 +745,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                 }
 
                 if (!found) {
+                    VOLT_TRACE("create and add the index...");
                     // create and add the index
                     TableIndexScheme scheme;
                     bool success = TableCatalogDelegate::getIndexScheme(*catalogTable,
@@ -801,20 +806,13 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
             ///////////////////////////////////////////////////
 
             vector<catalog::MaterializedViewInfo*> survivingInfos;
-            vector<catalog::MaterializedViewInfo*> changingInfos;
             vector<MaterializedViewMetadata*> survivingViews;
-            vector<MaterializedViewMetadata*> changingViews;
             vector<MaterializedViewMetadata*> obsoleteViews;
 
             const catalog::CatalogMap<catalog::MaterializedViewInfo> & views = catalogTable->views();
             persistenttable->segregateMaterializedViews(views.begin(), views.end(),
                                                         survivingInfos, survivingViews,
-                                                        changingInfos, changingViews,
                                                         obsoleteViews);
-
-            BOOST_FOREACH(MaterializedViewMetadata * toDrop, obsoleteViews) {
-                persistenttable->dropMaterializedView(toDrop);
-            }
 
             // This process temporarily duplicates the materialized view definitions and their
             // target table reference counts for all the right materialized view tables,
@@ -850,6 +848,11 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                 // This is not a leak -- the view metadata is self-installing into the new table.
                 // Also, it guards its targetTable from accidental deletion with a refcount bump.
                 new MaterializedViewMetadata(persistenttable, targetTable, currInfo);
+                obsoleteViews.push_back(survivingViews[ii]);
+            }
+
+            BOOST_FOREACH(MaterializedViewMetadata * toDrop, obsoleteViews) {
+                persistenttable->dropMaterializedView(toDrop);
             }
         }
     }
@@ -902,7 +905,8 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const string &catalogPayloa
 bool
 VoltDBEngine::loadTable(int32_t tableId,
                         ReferenceSerializeInput &serializeIn,
-                        int64_t spHandle, int64_t lastCommittedSpHandle)
+                        int64_t spHandle, int64_t lastCommittedSpHandle,
+                        bool returnUniqueViolations)
 {
     //Not going to thread the unique id through.
     //The spHandle and lastCommittedSpHandle aren't really used in load table
@@ -929,7 +933,7 @@ VoltDBEngine::loadTable(int32_t tableId,
     }
 
     try {
-        table->loadTuplesFrom(serializeIn);
+        table->loadTuplesFrom(serializeIn, NULL, returnUniqueViolations ? getResultOutputSerializer() : NULL);
     } catch (const SerializableEEException &e) {
         throwFatalException("%s", e.message().c_str());
     }
@@ -965,7 +969,7 @@ void VoltDBEngine::rebuildTableCollections()
                                                   tcd->getTable()->getTableStats());
 
             // add all of the indexes to the stats source
-            std::vector<TableIndex*> tindexes = tcd->getTable()->allIndexes();
+            const std::vector<TableIndex*>& tindexes = tcd->getTable()->allIndexes();
             for (int i = 0; i < tindexes.size(); i++) {
                 TableIndex *index = tindexes[i];
                 getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
@@ -1433,7 +1437,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
             }
         }
         VOLT_DEBUG("tableStreamSerializeMore: deserialized %d buffers, %ld remaining",
-                   (int)positions.size(), remaining);
+                   (int)positions.size(), (long)remaining);
     }
     catch (SerializableEEException &e) {
         resetReusedResultOutputBuffer();
@@ -1607,5 +1611,58 @@ void VoltDBEngine::updateHashinator(HashinatorType type, const char *config) {
         break;
     }
 }
+
+void VoltDBEngine::dispatchValidatePartitioningTask(const char *taskParams) {
+    ReferenceSerializeInput taskInfo(taskParams, std::numeric_limits<std::size_t>::max());
+    std::vector<CatalogId> tableIds;
+    const int32_t numTables = taskInfo.readInt();
+    for (int ii = 0; ii < numTables; ii++) {
+        tableIds.push_back(static_cast<int32_t>(taskInfo.readLong()));
+    }
+
+    HashinatorType type = static_cast<HashinatorType>(taskInfo.readInt());
+    const char *config = taskParams + (sizeof(int32_t) * 2) +  (sizeof(int64_t) * tableIds.size());
+    boost::scoped_ptr<TheHashinator> hashinator;
+    switch(type) {
+        case HASHINATOR_LEGACY:
+            hashinator.reset(LegacyHashinator::newInstance(config));
+            break;
+        case HASHINATOR_ELASTIC:
+            hashinator.reset(ElasticHashinator::newInstance(config));
+            break;
+        default:
+            throwFatalException("Unknown hashinator type %d", type);
+            break;
+    }
+
+    std::vector<int64_t> mispartitionedRowCounts;
+
+    BOOST_FOREACH( CatalogId tableId, tableIds) {
+        std::map<CatalogId, Table*>::iterator table = m_tables.find(tableId);
+        if (table == m_tables.end()) {
+            throwFatalException("Unknown table id %d", tableId);
+        } else {
+            mispartitionedRowCounts.push_back(m_tables[tableId]->validatePartitioning(hashinator.get(), m_partitionId));
+        }
+    }
+
+    ReferenceSerializeOutput *output = getResultOutputSerializer();
+    output->writeInt(static_cast<int32_t>(sizeof(int64_t) * numTables));
+
+    BOOST_FOREACH( int64_t mispartitionedRowCount, mispartitionedRowCounts) {
+        output->writeLong(mispartitionedRowCount);
+    }
+}
+
+void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
+    switch (taskType) {
+    case TASK_TYPE_VALIDATE_PARTITIONING:
+        dispatchValidatePartitioningTask(taskParams);
+        break;
+    default:
+        throwFatalException("Unknown task type %d", taskType);
+    }
+}
+
 
 }

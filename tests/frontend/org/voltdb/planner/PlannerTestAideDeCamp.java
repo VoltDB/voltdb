@@ -44,6 +44,7 @@ import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.plannodes.SchemaColumn;
@@ -89,44 +90,26 @@ public class PlannerTestAideDeCamp {
     /**
      * Compile a statement and return the head of the plan.
      * @param sql
-     */
-    public CompiledPlan compileAdHocPlan(String sql)
-    {
-        compile(sql, 0, null, null, true, false);
-        return m_currentPlan;
-    }
-
-    /**
-     * Compile a statement and return the head of the plan.
-     * @param sql
      * @param detMode
      */
-    public CompiledPlan compileAdHocPlan(String sql, DeterminismMode detMode)
+    CompiledPlan compileAdHocPlan(String sql, DeterminismMode detMode)
     {
-        compile(sql, 0, null, null, true, false, detMode);
+        compile(sql, 0, null, null, detMode);
         return m_currentPlan;
     }
 
-    public List<AbstractPlanNode> compile(String sql, int paramCount, boolean singlePartition) {
-        return compile(sql, paramCount, singlePartition, null);
-    }
-
-    public List<AbstractPlanNode> compile(String sql, int paramCount, boolean singlePartition, String joinOrder) {
-        Object partitionBy = null;
+    List<AbstractPlanNode> compile(String sql, int paramCount, boolean singlePartition, String joinOrder) {
+        Object partitionParameter = null;
         if (singlePartition) {
-            partitionBy = "Forced single partitioning";
+            partitionParameter = "Forced single partitioning";
         }
-        return compile(sql, paramCount, joinOrder, partitionBy, true, false);
-    }
-
-    public List<AbstractPlanNode> compile(String sql, int paramCount, String joinOrder, Object partitionParameter, boolean inferSP, boolean lockInSP) {
-        return compile(sql, paramCount, joinOrder, partitionParameter, inferSP, lockInSP, DeterminismMode.SAFER);
+        return compile(sql, paramCount, joinOrder, partitionParameter, DeterminismMode.SAFER);
     }
 
     /**
      * Compile and cache the statement and plan and return the final plan graph.
      */
-    public List<AbstractPlanNode> compile(String sql, int paramCount, String joinOrder, Object partitionParameter, boolean inferSP, boolean lockInSP, DeterminismMode detMode)
+    private List<AbstractPlanNode> compile(String sql, int paramCount, String joinOrder, Object partitionParameter, DeterminismMode detMode)
     {
         Statement catalogStmt = proc.getStatements().add("stmt-" + String.valueOf(compileCounter++));
         catalogStmt.setSqltext(sql);
@@ -155,7 +138,7 @@ public class PlannerTestAideDeCamp {
 
         DatabaseEstimates estimates = new DatabaseEstimates();
         TrivialCostModel costModel = new TrivialCostModel();
-        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, inferSP, lockInSP);
+        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, true, true);
         QueryPlanner planner =
             new QueryPlanner(catalogStmt.getSqltext(), catalogStmt.getTypeName(),
                     catalogStmt.getParent().getTypeName(), catalog.getClusters().get("cluster"),
@@ -172,7 +155,9 @@ public class PlannerTestAideDeCamp {
         // If this is an adhoc query then there won't be any parameters
         for (int i = 0; i < plan.parameters.length; ++i) {
             StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(i));
-            catalogParam.setJavatype(plan.parameters[i].getValue());
+            ParameterValueExpression pve = plan.parameters[i];
+            catalogParam.setJavatype(pve.getValueType().getValue());
+            catalogParam.setIsarray(pve.getParamIsVector());
             catalogParam.setIndex(i);
         }
 
@@ -198,7 +183,8 @@ public class PlannerTestAideDeCamp {
         //Store the list of parameters types and indexes in the plan node list.
         List<Pair<Integer, VoltType>> parameters = nodeLists.get(0).getParameters();
         for (int i = 0; i < plan.parameters.length; ++i) {
-            Pair<Integer, VoltType> parameter = new Pair<Integer, VoltType>(i, plan.parameters[i]);
+            ParameterValueExpression pve = plan.parameters[i];
+            Pair<Integer, VoltType> parameter = new Pair<Integer, VoltType>(i, pve.getValueType());
             parameters.add(parameter);
         }
 
@@ -220,8 +206,8 @@ public class PlannerTestAideDeCamp {
         // We then stick a serialized version of PlanNodeTree into a PlanFragment
         //
         try {
-            BuildDirectoryUtils.writeFile("statement-plans", name + "_json.txt", json);
-            BuildDirectoryUtils.writeFile("statement-plans", name + ".dot", nodeLists.get(0).toDOTString("name"));
+            BuildDirectoryUtils.writeFile("statement-plans", name + "_json.txt", json, true);
+            BuildDirectoryUtils.writeFile("statement-plans", name + ".dot", nodeLists.get(0).toDOTString("name"), true);
         } catch (Exception e) {
             e.printStackTrace();
         }

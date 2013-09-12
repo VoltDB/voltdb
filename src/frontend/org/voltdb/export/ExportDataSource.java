@@ -45,6 +45,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
+import org.voltdb.common.Constants;
 import org.voltdb.export.processors.RawProcessor;
 import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
 import org.voltdb.utils.CatalogUtil;
@@ -141,7 +142,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
          * catalog updates that add or drop tables.
          */
         m_signature = signature;
-        m_signatureBytes = m_signature.getBytes(VoltDB.UTF8ENCODING);
+        m_signatureBytes = m_signature.getBytes(Constants.UTF8ENCODING);
         m_partitionId = partitionId;
         m_HSId = HSId;
 
@@ -238,7 +239,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             m_generation = jsObj.getLong("generation");
             m_partitionId = jsObj.getInt("partitionId");
             m_signature = jsObj.getString("signature");
-            m_signatureBytes = m_signature.getBytes(VoltDB.UTF8ENCODING);
+            m_signatureBytes = m_signature.getBytes(Constants.UTF8ENCODING);
             m_tableName = jsObj.getString("tableName");
             JSONArray columns = jsObj.getJSONArray("columns");
             for (int ii = 0; ii < columns.length(); ii++) {
@@ -377,7 +378,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             //Cheesy hack for now where we serve info about old
             //data sources from previous generations. In reality accessing
             //this generation is something of an error
-            if (hitEndOfStreamWithNoRunnable) {
+            if (hitEndOfStreamWithNoRunnable && message.isPoll()) {
                 ByteBuffer buf = ByteBuffer.allocate(4);
                 buf.putInt(0).flip();
                 result.pollResponse(m_firstUnpolledUso, buf);
@@ -557,7 +558,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     m_onDrain.run();
                 }
             } else {
-                exportLog.info("EOS for " + m_tableName + " partition " + m_partitionId);
+                exportLog.info("EOS for " + m_tableName + " partition " + m_partitionId +
+                        " with first unpolled uso " + m_firstUnpolledUso + " and remaining bytes " +
+                        m_committedBuffers.sizeInBytes());
             }
             return;
         }

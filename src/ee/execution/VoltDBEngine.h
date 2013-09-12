@@ -53,8 +53,10 @@
 #include <cassert>
 
 #include <boost/ptr_container/ptr_vector.hpp>
-#include "json_spirit/json_spirit.h"
 #include "boost/shared_ptr.hpp"
+// The next #define limits the number of features pulled into the build
+// We don't use those features.
+#define BOOST_MULTI_INDEX_DISABLE_SERIALIZATION
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/member.hpp>
@@ -195,7 +197,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         */
         bool loadTable(int32_t tableId,
                        ReferenceSerializeInput &serializeIn,
-                       int64_t spHandle, int64_t lastCommittedSpHandle);
+                       int64_t spHandle, int64_t lastCommittedSpHandle,
+                       bool returnUniqueViolations);
 
         void resetReusedResultOutputBuffer(const size_t headerSize = 0);
         inline ReferenceSerializeOutput* getResultOutputSerializer() { return &m_resultOutput; }
@@ -390,7 +393,17 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void updateHashinator(HashinatorType type, const char *config);
 
+        /*
+         * Execute an arbitrary task represented by the task id and serialized parameters.
+         * Returns serialized representation of the results
+         */
+        void executeTask(TaskType taskType, const char* taskParams);
     private:
+
+        /*
+         * Tasks dispatched by executeTask
+         */
+        void dispatchValidatePartitioningTask(const char *taskParams);
 
         void setCurrentUndoQuantum(voltdb::UndoQuantum* undoQuantum);
 

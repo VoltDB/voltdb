@@ -68,7 +68,7 @@ public abstract class TheHashinator {
 
     /**
      * Helper method to do the reflection boilerplate to call the constructor
-     * of the selected hashinator and convert the exceptions to runtime excetions.
+     * of the selected hashinator and convert the exceptions to runtime exceptions.
      */
     public static TheHashinator
         constructHashinator(
@@ -129,10 +129,9 @@ public abstract class TheHashinator {
 
     /**
      * Given an object, map it to a partition.
-     * @param obj The object to be mapped to a partition.
-     * @return The id of the partition desired.
+     * DON'T EVER MAKE ME PUBLIC
      */
-    public static int hashToPartition(Object obj) {
+    private static int hashToPartition(Object obj) {
         HashinatorType type = getConfiguredHashinatorType();
         if (type == HashinatorType.LEGACY) {
             // Annoying, legacy hashes numbers and bytes differently, need to preserve that.
@@ -191,27 +190,75 @@ public abstract class TheHashinator {
     }
 
     /**
+     * Converts a byte array with type back to the original partition value.
+     * This is the inverse of {@see TheHashinator#valueToBytes(Object)}.
+     * @param type VoltType of partition parameter.
+     * @param value Byte array representation of partition parameter.
+     * @return Java object of the correct type.
+     */
+    private static Object bytesToValue(VoltType type, byte[] value) {
+        if ((type == VoltType.NULL) || (value == null)) {
+            return null;
+        }
+
+        ByteBuffer buf = ByteBuffer.wrap(value);
+        buf.order(ByteOrder.LITTLE_ENDIAN);
+
+        switch (type) {
+        case BIGINT:
+            return buf.getLong();
+        case STRING:
+            return new String(value, Charsets.UTF_8);
+        case INTEGER:
+            return buf.getInt();
+        case SMALLINT:
+            return buf.getShort();
+        case TINYINT:
+            return buf.get();
+        case VARBINARY:
+            return value;
+        default:
+            throw new RuntimeException(
+                    "TheHashinator#bytesToValue failed to convert a non-partitionable type.");
+        }
+    }
+
+    /**
      * Given the type of the targeting partition parameter and an object,
      * coerce the object to the correct type and hash it.
+     * NOTE NOTE NOTE NOTE!  THIS SHOULD BE THE ONLY WAY THAT YOU FIGURE OUT THE PARTITIONING
+     * FOR A PARAMETER!
      * @return The partition best set up to execute the procedure.
-     * @throws Exception
+     * @throws VoltTypeException
      */
     public static int getPartitionForParameter(int partitionType, Object invocationParameter)
-            throws Exception
+        throws VoltTypeException
     {
         final VoltType partitionParamType = VoltType.get((byte)partitionType);
 
-        // Special case: if the user supplied a string for a number column,
+        // Special cases:
+        // 1) if the user supplied a string for a number column,
         // try to do the conversion. This makes it substantially easier to
         // load CSV data or other untyped inputs that match DDL without
         // requiring the loader to know precise the schema.
-        if ((invocationParameter != null) &&
-                (invocationParameter.getClass() == String.class) &&
-                (partitionParamType.isNumber()))
-        {
-            invocationParameter = ParameterConverter.stringToLong(
-                    invocationParameter,
-                    partitionParamType.classFromType());
+        // 2) For legacy hashinators, if we have a numeric column but the param is in a byte
+        // array, convert the byte array back to the numeric value
+        if (invocationParameter != null && partitionParamType.isPartitionableNumber()) {
+            if (invocationParameter.getClass() == String.class) {
+                {
+                    Object tempParam = ParameterConverter.stringToLong(
+                            invocationParameter,
+                            partitionParamType.classFromType());
+                    // Just in case someone managed to feed us a non integer
+                    if (tempParam != null) {
+                        invocationParameter = tempParam;
+                    }
+                }
+            }
+            else if (getConfiguredHashinatorType() == HashinatorType.LEGACY &&
+                     invocationParameter.getClass() == byte[].class) {
+                invocationParameter = bytesToValue(partitionParamType, (byte[])invocationParameter);
+            }
         }
 
         return hashToPartition(invocationParameter);

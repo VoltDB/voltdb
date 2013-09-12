@@ -26,7 +26,6 @@ package org.voltdb.planner;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
-import java.util.ArrayList;
 import java.util.Map.Entry;
 
 import junit.framework.TestCase;
@@ -38,8 +37,6 @@ import org.voltdb.AllTpccSQL;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
-import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.utils.BuildDirectoryUtils;
 
 public class TestParsedStatements extends TestCase {
@@ -83,26 +80,18 @@ public class TestParsedStatements extends TestCase {
             assertTrue(false);
         }
         // output the xml from hsql to disk for debugging
-        BuildDirectoryUtils.writeFile("statement-hsql-xml", stmtName + ".xml", xmlSQL.toString());
+        BuildDirectoryUtils.writeFile("statement-hsql-xml", stmtName + ".xml", xmlSQL.toString(), true);
 
         // get a parsed statement from the xml
         AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(stmtSQL, xmlSQL, null, m_db, null);
         // analyze expressions
-        parsedStmt.analyzeTreeExpressions(parsedStmt.joinTree);
+        parsedStmt.analyzeJoinExpressions(parsedStmt.joinTree);
         // output a description of the parsed stmt
-        BuildDirectoryUtils.writeFile("statement-hsql-parsed", stmtName + ".txt", parsedStmt.toString());
+        BuildDirectoryUtils.writeFile("statement-hsql-parsed", stmtName + ".txt", parsedStmt.toString(), true);
 
-        int clausesFound = 0;
-        clausesFound += parsedStmt.noTableSelectionList.size();
-        for (Entry<Table, ArrayList<AbstractExpression>> pair : parsedStmt.joinTree.m_tableFilterList.entrySet())
-            clausesFound += pair.getValue().size();
-        for (Entry<JoinTree.TablePair, ArrayList<AbstractExpression>> pair : parsedStmt.joinTree.m_joinSelectionList.entrySet())
-            clausesFound += pair.getValue().size();
-        clausesFound += parsedStmt.multiTableSelectionList.size();
+        assertTrue(parsedStmt.noTableSelectionList.isEmpty());
 
         System.out.println(parsedStmt.toString());
-
-        assertEquals(clausesFound, parsedStmt.joinTree.getAllExpressions().size());
     }
 
     public void testParsedInsertStatements() {
@@ -127,5 +116,16 @@ public class TestParsedStatements extends TestCase {
         for (Entry<String, String> entry : m_allSQL.updates.entrySet()) {
             runSQLTest(entry.getKey(), entry.getValue());
         }
+    }
+
+    public void testParsedInStatements() {
+        runSQLTest("1", "select * from new_order where no_w_id in (5,7);");
+        runSQLTest("2", "select * from new_order where no_w_id in (?);");
+        runSQLTest("3", "select * from new_order where no_w_id in (?,5,3,?);");
+        runSQLTest("4", "select * from new_order where no_w_id not in (?,5,3,?);");
+        runSQLTest("5", "select * from warehouse where w_name not in (?, 'foo');");
+        runSQLTest("6", "select * from new_order where no_w_id in (no_d_id, no_o_id, ?, 7);");
+        runSQLTest("7", "select * from new_order where no_w_id in (abs(-1), ?, 17761776);");
+        runSQLTest("8", "select * from new_order where no_w_id in (abs(17761776), ?, 17761776) and no_d_id in (abs(-1), ?, 17761776);");
     }
 }

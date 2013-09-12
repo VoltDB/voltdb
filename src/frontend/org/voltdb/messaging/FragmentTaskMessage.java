@@ -31,6 +31,7 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
+import org.voltdb.common.Constants;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
@@ -57,7 +58,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             e.printStackTrace();
             System.exit(-1); // this means the jvm is broke
         }
-        md.update("".getBytes(VoltDB.UTF8ENCODING));
+        md.update("".getBytes(Constants.UTF8ENCODING));
         EMPTY_HASH = md.digest();
     }
 
@@ -314,7 +315,17 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     // fragment with the provided outputDepId
     public void setEmptyForRestart(int outputDepId) {
         m_emptyForRestart = true;
-        addFragment(EMPTY_HASH, outputDepId, ByteBuffer.allocate(0));
+        ParameterSet blank = ParameterSet.emptyParameterSet();
+        ByteBuffer mt = ByteBuffer.allocate(blank.getSerializedSize());
+        try {
+            blank.flattenToBuffer(mt);
+        }
+        catch (IOException ioe) {
+            // Shouldn't ever happen, just bail out to not-obviously equivalent behavior
+            mt = ByteBuffer.allocate(2);
+            mt.putShort((short)0);
+        }
+        addFragment(EMPTY_HASH, outputDepId, mt);
     }
 
     public boolean isEmptyForRestart() {
@@ -708,9 +719,15 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             sb.append("  WRITE, COORD ");
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
 
-        for (FragmentData item : m_items) {
+        if (!m_emptyForRestart) {
+            for (FragmentData item : m_items) {
+                sb.append("\n=====\n");
+                sb.append(item.toString());
+            }
+        }
+        else {
             sb.append("\n=====\n");
-            sb.append(item.toString());
+            sb.append("  FRAGMENT EMPTY FOR RESTART SERIALIZATION");
         }
 
         if (m_isFinal)

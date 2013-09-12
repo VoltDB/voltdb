@@ -28,6 +28,7 @@ import java.util.logging.Logger;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
 import org.voltdb.types.TimestampType;
+import org.voltdb.types.VoltDecimalHelper;
 
 public abstract class VoltTypeUtil {
     private static final Logger LOG = Logger.getLogger(VoltTypeUtil.class.getName());
@@ -124,7 +125,7 @@ public abstract class VoltTypeUtil {
             // --------------------------------
             case DECIMAL: {
                 BigDecimal bd = new BigDecimal(r.nextDouble());
-                ret = bd.setScale(12, BigDecimal.ROUND_HALF_EVEN);
+                ret = VoltDecimalHelper.setDefaultScale(bd);
                 break;
             }
             // --------------------------------
@@ -299,5 +300,21 @@ public abstract class VoltTypeUtil {
             sb.append(t.getSignatureChar());
         }
         return sb.toString();
+    }
+
+    public static long getHashableLongFromObject(Object obj) {
+        if (obj == null || VoltType.isNullVoltType(obj)) {
+            return 0;
+        } else if (obj instanceof Long) {
+            return ((Long) obj).longValue();
+        } else if (obj instanceof Integer) {
+            return ((Integer)obj).intValue();
+        } else if (obj instanceof Short) {
+            return ((Short)obj).shortValue();
+        } else if (obj instanceof Byte) {
+            return ((Byte)obj).byteValue();
+        } else {
+            throw new RuntimeException(obj + " cannot be casted to a long");
+        }
     }
 }

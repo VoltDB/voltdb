@@ -18,6 +18,7 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 
@@ -54,6 +55,14 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
     protected AbstractScanPlanNode() {
         super();
+    }
+
+    @Override
+    public void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tableUpdated,
+                                    Collection<String> indexes)
+    {
+        assert(m_targetTableName.length() > 0);
+        tablesRead.add(m_targetTableName);
     }
 
     @Override
@@ -146,6 +155,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             // so that the resolveColumnIndexes results
             // don't get bashed by other nodes or subsequent planner runs
             m_predicate = (AbstractExpression) predicate.clone();
+        } else {
+            m_predicate = null;
         }
     }
 
@@ -346,4 +357,13 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         visited.add(this);
         collected.add(this);
     }
+
+    protected String explainPredicate(String prefix) {
+        // TODO Auto-generated method stub
+        if (m_predicate != null) {
+            return prefix + m_predicate.explain(m_targetTableName);
+        }
+        return "";
+    }
+
 }

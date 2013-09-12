@@ -51,6 +51,9 @@
 package org.voltcore.network;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.SelectionKey;
@@ -69,8 +72,8 @@ public class TestNIOWriteStream extends TestCase {
             return null;
         }
 
-        public MockPort() {
-            super(null, null, "", pool);
+        public MockPort() throws UnknownHostException {
+            super(null, null, new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 21212), pool);
         }
 
         @Override
@@ -367,7 +370,6 @@ public class TestNIOWriteStream extends TestCase {
         wstream.swapAndSerializeQueuedWrites(pool);
         wstream.drainTo( channel );
         assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
-
         wstream.shutdown();
     }
 

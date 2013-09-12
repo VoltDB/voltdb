@@ -44,6 +44,8 @@ import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicLongArray;
 
 import org.voltdb.CLIConfig;
+import org.voltdb.client.ClientStats;
+import org.voltdb.client.ClientStatsContext;
 import org.voltdb.jdbc.IVoltDBConnection;
 
 public class JDBCBenchmark
@@ -243,6 +245,10 @@ public class JDBCBenchmark
                         sleep += sleep;
                 }
             }
+
+            // Statistics manager objects from the connection, used to generate latency histogram
+            ClientStatsContext fullStatsContext = ((IVoltDBConnection) Con).createStatsContext();
+
             System.out.println("Connected.  Starting benchmark.");
 
             // Get a payload generator to create random Key-Value pairs to store in the database and process (uncompress) pairs retrieved from the database.
@@ -265,6 +271,9 @@ public class JDBCBenchmark
                 }
                 System.out.println(" Done.");
             }
+
+            // start the stats
+            fullStatsContext.fetchAndResetBaseline();
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -305,6 +314,9 @@ public class JDBCBenchmark
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
             // Now print application results:
+
+            // stop and fetch the stats
+            ClientStats stats = fullStatsContext.fetch().getStats();
 
             // 1. Store statistics as tracked by the application (ops counts, payload traffic)
             System.out.printf(
@@ -352,6 +364,32 @@ public class JDBCBenchmark
             + " Detailed Statistics\n"
             + "-------------------------------------------------------------------------------------\n\n");
             System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics().toString(false));
+
+            System.out.println(
+                    "\n\n-------------------------------------------------------------------------------------\n"
+                  + " Client Latency Statistics\n"
+                  + "-------------------------------------------------------------------------------------\n\n");
+            System.out.printf("Average latency:               %,9.2f ms\n",
+                    stats.getAverageLatency());
+            System.out.printf("10th percentile latency:       %,9d ms\n",
+                    stats.kPercentileLatency(.1));
+            System.out.printf("25th percentile latency:       %,9d ms\n",
+                    stats.kPercentileLatency(.25));
+            System.out.printf("50th percentile latency:       %,9d ms\n",
+                    stats.kPercentileLatency(.5));
+            System.out.printf("75th percentile latency:       %,9d ms\n",
+                    stats.kPercentileLatency(.75));
+            System.out.printf("90th percentile latency:       %,9d ms\n",
+                    stats.kPercentileLatency(.9));
+            System.out.printf("95th percentile latency:       %,9d ms\n",
+                    stats.kPercentileLatency(.95));
+            System.out.printf("99th percentile latency:       %,9d ms\n",
+                    stats.kPercentileLatency(.99));
+            System.out.printf("99.5th percentile latency:     %,9d ms\n",
+                    stats.kPercentileLatency(.995));
+            System.out.printf("99.9th percentile latency:     %,9d ms\n",
+                    stats.kPercentileLatency(.999));
+            System.out.println("\n\n" + stats.latencyHistoReport());
 
             // Dump statistics to a CSV file
             Con.unwrap(IVoltDBConnection.class).saveStatistics(config.statsfile);

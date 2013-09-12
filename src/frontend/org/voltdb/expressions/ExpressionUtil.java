@@ -21,14 +21,13 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Stack;
 
-import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
-import org.voltdb.types.TimestampType;
-import org.voltdb.utils.Encoder;
 
 /**
  *
@@ -45,7 +44,7 @@ public abstract class ExpressionUtil {
      *
      * @param exps
      */
-    public static AbstractExpression combine(List<AbstractExpression> exps) {
+    public static AbstractExpression combine(Collection<AbstractExpression> exps) {
         if (exps.isEmpty()) {
             return null;
         }
@@ -149,6 +148,79 @@ public abstract class ExpressionUtil {
         return out;
     }
 
+    public static boolean isColumnEquivalenceFilter(AbstractExpression expr) {
+        // Ignore expressions that are not of COMPARE_EQUAL type
+        if (expr.getExpressionType() != ExpressionType.COMPARE_EQUAL) {
+            return false;
+        }
+        AbstractExpression leftExpr = expr.getLeft();
+        AbstractExpression rightExpr = expr.getRight();
+        // Can't use an expression that is based on a column value but is not just a simple column value.
+        if ( ( ! (leftExpr instanceof TupleValueExpression)) &&
+                leftExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
+            return false;
+        }
+        if ( ( ! (rightExpr instanceof TupleValueExpression)) &&
+                rightExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Find any listed expressions that qualify as potential partitioning where filters,
+     * which is to say are equality comparisons with a TupleValueExpression on at least one side,
+     * and a TupleValueExpression, ConstantValueExpression, or ParameterValueExpression on the other.
+     * Add them to a map keyed by the TupleValueExpression(s) involved.
+     * @param filterList a list of candidate expressions
+     * @param the running result
+     * @return a Collection containing the qualifying filter expressions.
+     */
+    public static void
+    collectPartitioningFilters(Collection<AbstractExpression> filterList,
+                               HashMap<AbstractExpression, Set<AbstractExpression> > equivalenceSet)
+    {
+        ArrayList<AbstractExpression> output = new ArrayList<AbstractExpression>();
+        for (AbstractExpression expr : filterList) {
+            if ( ! isColumnEquivalenceFilter(expr)) {
+                continue;
+            }
+            AbstractExpression leftExpr = expr.getLeft();
+            AbstractExpression rightExpr = expr.getRight();
+
+            // Any two asserted-equal expressions need to map to the same equivalence set,
+            // which must contain them and must be the only such set that contains them.
+            Set<AbstractExpression> eqSet1 = null;
+            if (equivalenceSet.containsKey(leftExpr)) {
+                eqSet1 = equivalenceSet.get(leftExpr);
+            }
+            if (equivalenceSet.containsKey(rightExpr)) {
+                Set<AbstractExpression> eqSet2 = equivalenceSet.get(rightExpr);
+                if (eqSet1 == null) {
+                    // Add new leftExpr into existing rightExpr's eqSet.
+                    equivalenceSet.put(leftExpr, eqSet2);
+                    eqSet2.add(leftExpr);
+                } else {
+                    // Merge eqSets, re-mapping all the rightExpr's equivalents into leftExpr's eqset.
+                    for (AbstractExpression eqMember : eqSet2) {
+                        eqSet1.add(eqMember);
+                        equivalenceSet.put(eqMember, eqSet1);
+                    }
+                }
+            } else {
+                if (eqSet1 == null) {
+                    // Both leftExpr and rightExpr are new -- add leftExpr to the new eqSet first.
+                    eqSet1 = new HashSet<AbstractExpression>();
+                    equivalenceSet.put(leftExpr, eqSet1);
+                    eqSet1.add(leftExpr);
+                }
+                // Add new rightExpr into leftExpr's eqSet.
+                equivalenceSet.put(rightExpr, eqSet1);
+                eqSet1.add(rightExpr);
+            }
+        }
+    }
+
     /**
      *
      * @param left
@@ -188,191 +260,6 @@ public abstract class ExpressionUtil {
             }
         }
         return tves;
-    }
-
-    static void checkConstantValueTypeSafety(ConstantValueExpression expr) {
-        if (expr.getValueType().isInteger()) {
-            Long.parseLong(expr.getValue());
-        }
-        if ((expr.getValueType() == VoltType.DECIMAL) ||
-            (expr.getValueType() == VoltType.DECIMAL)) {
-            Double.parseDouble(expr.getValue());
-        }
-    }
-
-    static void castIntegerValueDownSafely(ConstantValueExpression expr, VoltType integerType) {
-        if (expr.m_isNull) {
-            expr.setValueType(integerType);
-            expr.setValueSize(integerType.getLengthInBytesForFixedTypes());
-            return;
-        }
-
-        long value = Long.parseLong(expr.getValue());
-
-        // Note that while Long.MIN_VALUE is used to represent NULL in VoltDB, we have decided that
-        // pass in the literal for Long.MIN_VALUE makes very little sense when you have the option
-        // to use the literal NULL. Thus the NULL values for each of the 4 integer types are considered
-        // an underflow exception for the type.
-
-        if (integerType == VoltType.BIGINT || integerType == VoltType.TIMESTAMP) {
-            if (value == VoltType.NULL_BIGINT)
-                throw new NumberFormatException("Constant value underflows BIGINT type.");
-        }
-        if (integerType == VoltType.INTEGER) {
-            if ((value > Integer.MAX_VALUE) || (value <= VoltType.NULL_INTEGER))
-                throw new NumberFormatException("Constant value overflows/underflows INTEGER type.");
-        }
-        if (integerType == VoltType.SMALLINT) {
-            if ((value > Short.MAX_VALUE) || (value <= VoltType.NULL_SMALLINT))
-                throw new NumberFormatException("Constant value overflows/underflows SMALLINT type.");
-        }
-        if (integerType == VoltType.TINYINT) {
-            if ((value > Byte.MAX_VALUE) || (value <= VoltType.NULL_TINYINT))
-                throw new NumberFormatException("Constant value overflows/underflows TINYINT type.");
-        }
-        expr.setValueType(integerType);
-        expr.setValueSize(integerType.getLengthInBytesForFixedTypes());
-    }
-
-    static void setOutputTypeForInsertExpressionRecursively(
-            AbstractExpression input, VoltType parentType, int parentSize, Map<Integer, VoltType> paramTypeOverrideMap) {
-        // stopping condiditon
-        if (input == null) return;
-
-        // make sure parameters jive with their parent types
-        if (input.getExpressionType() == ExpressionType.VALUE_PARAMETER) {
-            ParameterValueExpression pve = (ParameterValueExpression) input;
-            switch (parentType) {
-                case BIGINT:
-                case INTEGER:
-                case SMALLINT:
-                case TINYINT:
-                    paramTypeOverrideMap.put(pve.m_paramIndex, VoltType.BIGINT);
-                    input.setValueType(VoltType.BIGINT);
-                    input.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
-                    break;
-                case DECIMAL:
-                    paramTypeOverrideMap.put(pve.m_paramIndex, VoltType.DECIMAL);
-                    input.setValueType(VoltType.DECIMAL);
-                    input.setValueSize(VoltType.DECIMAL.getLengthInBytesForFixedTypes());
-                    break;
-                case FLOAT:
-                    paramTypeOverrideMap.put(pve.m_paramIndex, VoltType.FLOAT);
-                    input.setValueType(VoltType.FLOAT);
-                    input.setValueSize(VoltType.FLOAT.getLengthInBytesForFixedTypes());
-                    break;
-            }
-        }
-
-        // this is probably unnecessary
-        if (input.getExpressionType() == ExpressionType.VALUE_CONSTANT) {
-            checkConstantValueTypeSafety((ConstantValueExpression) input);
-        }
-
-        // recursive step
-        setOutputTypeForInsertExpressionRecursively(input.getLeft(), parentType, parentSize, paramTypeOverrideMap);
-        setOutputTypeForInsertExpressionRecursively(input.getRight(), parentType, parentSize, paramTypeOverrideMap);
-    }
-
-    public static void setOutputTypeForInsertExpression(
-            AbstractExpression input,
-            VoltType neededType,
-            int neededSize,
-            Map<Integer, VoltType> paramTypeOverrideMap)
-            throws Exception
-        {
-
-        if (input.getExpressionType() == ExpressionType.VALUE_PARAMETER) {
-            ParameterValueExpression pve = (ParameterValueExpression) input;
-            paramTypeOverrideMap.put(pve.m_paramIndex, neededType);
-            input.setValueType(neededType);
-            input.setValueSize(neededSize);
-        }
-        else if (input.getExpressionType() == ExpressionType.VALUE_CONSTANT) {
-            ConstantValueExpression cve = (ConstantValueExpression) input;
-
-            if (cve.m_isNull) {
-                cve.setValueType(neededType);
-                cve.setValueSize(neededSize);
-                return;
-            }
-
-            // handle the simple case where the constant is the type we want
-            if (cve.getValueType() == neededType) {
-
-                // only worry about strings/varbinary being too long
-                if ((cve.getValueType() == VoltType.STRING) || (cve.getValueType() == VoltType.VARBINARY)) {
-                    if (cve.getValue().length() > neededSize)
-                        throw new StringIndexOutOfBoundsException("Constant VARCHAR value too long for column.");
-                }
-                cve.setValueSize(neededSize);
-                checkConstantValueTypeSafety(cve);
-                return;
-            }
-
-            // handle downcasting integers
-            if (neededType.isInteger()) {
-                if (cve.getValueType().isInteger()) {
-                    castIntegerValueDownSafely(cve, neededType);
-                    checkConstantValueTypeSafety(cve);
-                    return;
-                }
-            }
-
-            // handle the types that can be converted to float
-            if (neededType == VoltType.FLOAT) {
-                if (cve.getValueType().isExactNumeric()) {
-                    cve.setValueType(neededType);
-                    cve.setValueSize(neededSize);
-                    checkConstantValueTypeSafety(cve);
-                    return;
-                }
-
-            }
-
-            // handle the types that can be converted to decimal
-            else if (neededType == VoltType.DECIMAL) {
-                if ((cve.getValueType().isExactNumeric()) || (cve.getValueType() == VoltType.FLOAT)) {
-                    cve.setValueType(neededType);
-                    cve.setValueSize(neededSize);
-                    checkConstantValueTypeSafety(cve);
-                    return;
-                }
-            }
-
-            else if (neededType == VoltType.VARBINARY) {
-                if ((cve.getValueType() == VoltType.STRING) && (Encoder.isHexEncodedString(cve.getValue()))) {
-                    cve.setValueType(neededType);
-                    cve.setValueSize(neededSize);
-                    checkConstantValueTypeSafety(cve);
-                    return;
-                }
-            }
-
-            else if (neededType == VoltType.TIMESTAMP) {
-                if (cve.getValueType() == VoltType.STRING) {
-                    try {
-                        TimestampType ts = new TimestampType(cve.m_value);
-                        cve.m_value = String.valueOf(ts.getTime());
-                        cve.setValueType(neededType);
-                        cve.setValueSize(neededSize);
-                        return;
-                    }
-                    // It couldn't be converted to timestamp, fall through and throw Exception.
-                    catch (IllegalArgumentException e) {}
-                }
-            }
-
-            throw new Exception(
-                    String.format("Constant value cannot be converted to %s column type.",
-                                  neededType.name()));
-        }
-        else {
-            input.setValueType(neededType);
-            input.setValueSize(neededSize);
-            setOutputTypeForInsertExpressionRecursively(input.getLeft(), neededType, neededSize, paramTypeOverrideMap);
-            setOutputTypeForInsertExpressionRecursively(input.getRight(), neededType, neededSize, paramTypeOverrideMap);
-        }
     }
 
     /**

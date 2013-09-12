@@ -47,7 +47,11 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.compilereport.ReportMaker;
 import org.voltdb.dtxn.SiteTracker;
+
+import com.google.common.base.Charsets;
+import com.google.common.io.Resources;
 
 public class HTTPAdminListener {
 
@@ -189,87 +193,73 @@ public class HTTPAdminListener {
                 return;
             }
 
-            try {
-                // handle the basic info page below this
-                SiteTracker st = VoltDB.instance().getSiteTrackerForSnapshot();
-
-                // get the cluster info
-                String clusterinfo = st.getAllHosts().size() + " hosts ";
-                clusterinfo += " with " + st.getAllSites().size() + " sites ";
-                clusterinfo += " (" + st.getAllSites().size() / st.getAllHosts().size();
-                clusterinfo += " per host)";
-
-                // get the start time
-                long t = SystemStatsCollector.getStartTime();
-                Date date = new Date(t);
-                long duration = System.currentTimeMillis() - t;
-                long minutes = duration / 60000;
-                long hours = minutes / 60; minutes -= hours * 60;
-                long days = hours / 24; hours -= days * 24;
-                String starttime = String.format("%s (%dd %dh %dm)",
-                        date.toString(), days, hours, minutes);
-
-                // get the hostname, but fail gracefully
-                String hostname = "&lt;unknownhost&gt;";
-                try {
-                    InetAddress addr = InetAddress.getLocalHost();
-                    hostname = addr.getHostName();
-                }
-                catch (Exception e) {
-                    try {
-                        InetAddress addr = InetAddress.getLocalHost();
-                        hostname = addr.getHostAddress();
-                    }
-                    catch (Exception e2) {}
-                }
-
-                // get memory usage
-                SystemStatsCollector.Datum d = SystemStatsCollector.getRecentSample();
-                double totalmemory = SystemStatsCollector.memorysize;
-                double used = d.rss / (double) (SystemStatsCollector.memorysize * 1024 * 1024);
-                double javaclaimed = d.javatotalheapmem + d.javatotalsysmem;
-                double javaused = d.javausedheapmem + d.javausedsysmem;
-                double javaunused = SystemStatsCollector.javamaxheapmem - d.javatotalheapmem;
-                double risk = (d.rss + javaunused) / (SystemStatsCollector.memorysize * 1024 * 1024);
-
-                // get csvfilename
-                String csvFilename = String.format("memstats-%s-%s.csv", hostname, new Date(System.currentTimeMillis()).toString());
-
-                // just print voltdb version for now
-                Map<String,String> params = new HashMap<String,String>();
-
-                params.put("hostname", hostname);
-                params.put("version", VoltDB.instance().getVersionString());
-                params.put("buildstring", VoltDB.instance().getBuildString());
-                params.put("cluster", clusterinfo);
-                params.put("starttime", starttime);
-                params.put("csvfilename", csvFilename);
-
-                params.put("2mincharturl", SystemStatsCollector.getGoogleChartURL(2, 320, 240, "-2min"));
-                params.put("30mincharturl", SystemStatsCollector.getGoogleChartURL(30, 640, 240, "-30min"));
-                params.put("24hrcharturl", SystemStatsCollector.getGoogleChartURL(1440, 640, 240, "-24hrs"));
-
-                params.put("totalmemory", String.format("%.1f", totalmemory));
-                params.put("used", String.format("%.1f", used * 100.0));
-                params.put("risk", String.format("%.1f", risk * 100.0));
-                params.put("rss", String.format("%.1f", d.rss / 1024.0 / 1024.0));
-                params.put("usedjava", String.format("%.1f", javaused / 1024.0 / 1024.0));
-                params.put("claimedjava", String.format("%.1f", javaclaimed / 1024.0 / 1024.0));
-                params.put("javamaxheap", String.format("%.1f", SystemStatsCollector.javamaxheapmem / 1024.0 / 1024.0));
-
-                String msg = getHTMLForAdminPage(params);
-
-                response.setContentType("text/html;charset=utf-8");
-                response.setStatus(HttpServletResponse.SC_OK);
-                baseRequest.setHandled(true);
-                response.getWriter().print(msg);
+            if (baseRequest.getRequestURI().contains("/memory/")) {
+                handleMemoryPage(baseRequest, response);
+                return;
             }
-            catch (IOException e) {
-                e.printStackTrace();
-                throw e;
-            }
+
+            handleReportPage(baseRequest, response);
         }
 
+    }
+
+    /**
+     * Draw the catalog report page, mostly by pulling it from the JAR.
+     */
+    void handleReportPage(Request baseRequest, HttpServletResponse response) {
+        try {
+            String report = ReportMaker.liveReport();
+
+            response.setContentType("text/html;charset=utf-8");
+            response.setStatus(HttpServletResponse.SC_OK);
+            baseRequest.setHandled(true);
+
+            response.getWriter().print(report);
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Draw the memory page.
+     */
+    void handleMemoryPage(Request baseRequest, HttpServletResponse response) {
+        try {
+            // get memory usage
+            SystemStatsCollector.Datum d = SystemStatsCollector.getRecentSample();
+            double totalmemory = SystemStatsCollector.memorysize;
+            double used = d.rss / (double) (SystemStatsCollector.memorysize * 1024 * 1024);
+            double javaclaimed = d.javatotalheapmem + d.javatotalsysmem;
+            double javaused = d.javausedheapmem + d.javausedsysmem;
+            double javaunused = SystemStatsCollector.javamaxheapmem - d.javatotalheapmem;
+            double risk = (d.rss + javaunused) / (SystemStatsCollector.memorysize * 1024 * 1024);
+
+            Map<String,String> params = new HashMap<String,String>();
+
+            params.put("2mincharturl", SystemStatsCollector.getGoogleChartURL(2, 640, 240, "-2min"));
+            params.put("30mincharturl", SystemStatsCollector.getGoogleChartURL(30, 640, 240, "-30min"));
+            params.put("24hrcharturl", SystemStatsCollector.getGoogleChartURL(1440, 640, 240, "-24hrs"));
+
+            params.put("totalmemory", String.format("%.1f", totalmemory));
+            params.put("used", String.format("%.1f", used * 100.0));
+            params.put("risk", String.format("%.1f", risk * 100.0));
+            params.put("rss", String.format("%.1f", d.rss / 1024.0 / 1024.0));
+            params.put("usedjava", String.format("%.1f", javaused / 1024.0 / 1024.0));
+            params.put("claimedjava", String.format("%.1f", javaclaimed / 1024.0 / 1024.0));
+            params.put("javamaxheap", String.format("%.1f", SystemStatsCollector.javamaxheapmem / 1024.0 / 1024.0));
+
+            String msg = getHTMLForAdminPage(params);
+
+            response.setContentType("text/html;charset=utf-8");
+            response.setStatus(HttpServletResponse.SC_OK);
+            baseRequest.setHandled(true);
+            response.getWriter().print(msg);
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
     }
 
     /**
@@ -295,24 +285,16 @@ public class HTTPAdminListener {
         return "<html><body>An unrecoverable error was encountered while generating this page.</body></html>";
     }
 
-    private void loadTemplate(String name) throws Exception {
-        // 8 lines or so just to read the file
-        InputStream is = HTTPAdminListener.class.getResourceAsStream(name);
-        BufferedReader r = new BufferedReader(new InputStreamReader(is));
-        StringBuilder sb = new StringBuilder();
-        String line = null;
-        while ((line = r.readLine()) != null) {
-            sb.append(line);
-        }
-        r.close(); is.close();
-        String template = sb.toString();
-        m_htmlTemplates.put(name, template);
+    private void loadTemplate(Class<?> clz, String name) throws Exception {
+        URL url = Resources.getResource(clz, name);
+        String contents = Resources.toString(url, Charsets.UTF_8);
+        m_htmlTemplates.put(name, contents);
     }
 
     public HTTPAdminListener(boolean jsonEnabled, int port) throws Exception {
         // PRE-LOAD ALL HTML TEMPLATES (one for now)
         try {
-            loadTemplate("admintemplate.html");
+            loadTemplate(HTTPAdminListener.class, "admintemplate.html");
         }
         catch (Exception e) {
             VoltLogger logger = new VoltLogger("HOST");

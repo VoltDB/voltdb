@@ -24,8 +24,12 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -125,7 +129,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
         } catch (ProcCallException e) {
             String msg = e.getMessage();
-            assertTrue(msg.indexOf("INTEGER") != -1); // TODO match a more explicit pattern
+            assertTrue(msg.matches(".*SQL ERROR\n.*VARCHAR.*"));
             caught = true;
         }
         assertTrue(caught);
@@ -381,6 +385,32 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals("where",result.getString(1));
     }
 
+    public void testDECODEInlineVarcharColumn_ENG5078()
+    throws NoConnectionsException, IOException, ProcCallException
+    {
+        System.out.println("STARTING DECODE inline varchar column pass-through");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P3_INLINE_DESC.insert", 1, "zheng", 10, 1.1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // null case
+        try {
+            cr = client.callProcedure("@AdHoc",
+                                      "select DECODE(id, -1, 'INVALID', desc) from P3_INLINE_DESC");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals("zheng",result.getString(0));
+        } catch (ProcCallException pce) {
+            System.out.println(pce);
+            fail("Looks like a regression of ENG-5078 inline varchar column pass-through by decode");
+        }
+    }
+
     public void testDECODEAsInput() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING DECODE No Default");
         Client client = getClient();
@@ -424,6 +454,123 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             String message = pce.getMessage();
             // It's about that string argument to the addition operator.
             assertTrue(message.contains("varchar"));
+        }
+    }
+
+    private void checkDecodeNullResult (ClientResponse cr, Object[] input) {
+        VoltTable result;
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        System.out.println("testDECODEWithNULL:" + result);
+
+        if (input instanceof String[]) {
+            String[] expected = (String[]) input;
+            for (int i = 0; i < expected.length; i++) {
+                if ( (i == 4 || i == 7) && !expected[i].startsWith("null") ) {
+                    // Float type, decimal type
+                    assertTrue(Math.abs(
+                            Double.valueOf(expected[i]) - Double.valueOf(result.getString(i))
+                            ) < 0.00001);
+                } else {
+                    assertEquals(expected[i],result.getString(i));
+                }
+            }
+        } else if  (input instanceof Long[]) {
+            Long[] expected = (Long[]) input;
+            for (int i = 0; i < expected.length; i++) {
+                assertEquals(expected[i],Long.valueOf(result.getLong(i)));
+            }
+        }
+    }
+
+    public void testDECODEWithNULL() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING DECODE with NULL");
+        Client client = getClient();
+        ClientResponse cr;
+
+        cr = client.callProcedure("R3.insert", 1, 1, 1, 1, 1, 1.1, "2013-07-18 02:00:00.123457", "IBM", 1);
+        cr = client.callProcedure("R3.insert", 2, null, null, null, null, null, null, null, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // Stored procedure tests
+        cr = client.callProcedure("TestDecodeNull", 1);
+        checkDecodeNullResult(cr, new String[]{"1","1","1","1","1.1","tm","IBM","1"});
+
+        cr = client.callProcedure("TestDecodeNull", 2);
+        checkDecodeNullResult(cr, new String[]{"null tiny","null small", "null num", "null big",
+                "null ratio", "null tm", "null var", "null dec"});
+
+        cr = client.callProcedure("TestDecodeNullParam", null, null, null, null, null, null, null, null, 1);
+        checkDecodeNullResult(cr, new String[]{"1","1","1","1","1.1","tm","IBM","1"});
+
+        cr = client.callProcedure("TestDecodeNullParam", null, null, null, null, null, null, null, null, 2);
+        checkDecodeNullResult(cr, new String[]{"null tiny","null small", "null num", "null big",
+                "null ratio", "null tm", "null var", "null dec"});
+
+        // Test CSV_NULL for params
+        cr = client.callProcedure("TestDecodeNullParam", "\\N","\\N","\\N","\\N","\\N","\\N","\\N","\\N", 1);
+        checkDecodeNullResult(cr, new String[]{"1","1","1","1","1.1","tm","IBM","1"});
+
+        cr = client.callProcedure("TestDecodeNullParam", "\\N","\\N","\\N","\\N","\\N","\\N","\\N","\\N", 2);
+        checkDecodeNullResult(cr, new String[]{"null tiny","null small", "null num", "null big",
+                "null ratio", "null tm", "null var", "null dec"});
+
+
+        // AdHoc queries tests
+        cr = client.callProcedure("@AdHoc", "select DECODE(tiny, NULL, 'null tiny', tiny)," +
+                "DECODE(small, NULL, 'null small', small), DECODE(num, NULL, 'null num', num),  " +
+                "DECODE(big, NULL, 'null big', big), DECODE(ratio, NULL, 'null ratio', ratio),  " +
+                "DECODE(tm, NULL, 'null tm', 'tm'), DECODE(var, NULL, 'null var', var), " +
+                "DECODE(dec, NULL, 'null dec', dec) from R3 where id = 1");
+        checkDecodeNullResult(cr, new String[]{"1","1","1","1","1.1","tm","IBM","1"});
+
+        cr = client.callProcedure("@AdHoc", "select DECODE(tiny, NULL, 'null tiny', tiny)," +
+                "DECODE(small, NULL, 'null small', small), DECODE(num, NULL, 'null num', num),  " +
+                "DECODE(big, NULL, 'null big', big), DECODE(ratio, NULL, 'null ratio', ratio),  " +
+                "DECODE(tm, NULL, 'null tm', 'tm'), DECODE(var, NULL, 'null var', var), " +
+                "DECODE(dec, NULL, 'null dec', dec) from R3 where id = 2");
+        checkDecodeNullResult(cr, new String[]{"null tiny","null small", "null num", "null big",
+                "null ratio", "null tm", "null var", "null dec"});
+
+
+        cr = client.callProcedure("P2.insert", 1, new Timestamp(1000L));
+        cr = client.callProcedure("P2.insert", 2, null);
+        // Test timestamp
+        try {
+            // Timstamp converted to varchar, See ENG-4284.
+            cr = client.callProcedure("TestDecodeNullTimestamp", 1);
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("TIMESTAMP can't be cast as VARCHAR"));
+        }
+
+        // Test NULL as the second search expression.
+        cr = client.callProcedure("@AdHoc", "select DECODE(tiny, -1, -1, NULL, 0, tiny)," +
+                "DECODE(small, -1, -1, NULL, 0, small), DECODE(num, -1, -1, NULL, 0, num),  " +
+                "DECODE(big, -1, -1, NULL, 0, big) from R3 where id = 1");
+        checkDecodeNullResult(cr, new Long[]{1L,1L,1L,1L});
+        cr = client.callProcedure("@AdHoc", "select DECODE(tiny, -1, -1, NULL, 0, tiny)," +
+                "DECODE(small, -1, -1, NULL, 0, small), DECODE(num, -1, -1, NULL, 0, num),  " +
+                "DECODE(big, -1, -1, NULL, 0, big) from R3 where id = 2");
+        checkDecodeNullResult(cr, new Long[]{0L,0L,0L,0L});
+
+        // Test Null return type
+        cr = client.callProcedure("@AdHoc","select DECODE(tiny, 4, 5, NULL, NULL, 10) " +
+                " from R3 where id = 2");
+        assertTrue(cr.getResults()[0].getRowCount() == 1);
+        assertTrue(cr.getResults()[0].advanceRow());
+        assertEquals(Integer.MIN_VALUE, cr.getResults()[0].getLong(0));
+
+        try {
+            cr = client.callProcedure("@AdHoc","select DECODE(tiny, 4, 5, NULL, 'tiny null', tiny) " +
+                    " from R3 where id = 2");
+            fail();
+        } catch (Exception ex) {
+            System.out.println(ex.getMessage());
+            assertTrue(ex.getMessage().contains("SQL ERROR"));
+            assertTrue(ex.getMessage().contains("value: 'tiny null'"));
         }
     }
 
@@ -802,6 +949,420 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(0L,result.getLong(0));
     }
 
+    public void testSINCE_EPOCH() throws Exception {
+        System.out.println("STARTING SINCE_EPOCH");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P2.insert", 0, new Timestamp(0L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("P2.insert", 1, new Timestamp(1L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("P2.insert", 2, new Timestamp(1000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("P2.insert", 3, new Timestamp(-1000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("P2.insert", 4, new Timestamp(1371808830000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("P2.insert", 5, "2013-07-18 02:00:00.123457");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // Test AdHoc
+        cr = client.callProcedure("@AdHoc", "select SINCE_EPOCH (SECOND, TM), TM from P2 where id = 4");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(1371808830L, result.getLong(0));
+        assertEquals(1371808830000000L, result.getTimestampAsLong(1));
+
+        // Test constants timestamp with string
+        cr = client.callProcedure("@AdHoc", "select TM, TO_TIMESTAMP(MICROS, SINCE_EPOCH (MICROS, '2013-07-18 02:00:00.123457') ) from P2 where id = 5");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(result.getTimestampAsLong(0), result.getTimestampAsLong(1));
+
+        // Test user error input, Only accept JDBC's timestamp format: YYYY-MM-DD-SS.sss.
+        try {
+            cr = client.callProcedure("@AdHoc", "select SINCE_EPOCH (MICROS, 'I am a timestamp')  from P2 where id = 5");
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("PlanningErrorException"));
+            assertTrue(ex.getMessage().contains("incompatible data type in conversion"));
+        }
+
+        String[] procedures = {"SINCE_EPOCH_SECOND", "SINCE_EPOCH_MILLIS",
+                "SINCE_EPOCH_MILLISECOND", "SINCE_EPOCH_MICROS", "SINCE_EPOCH_MICROSECOND"};
+
+        for (int i=0; i< procedures.length; i++) {
+            String proc = procedures[i];
+
+            cr = client.callProcedure(proc, 0);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            if (proc == "SINCE_EPOCH_SECOND") {
+                assertEquals(0, result.getLong(0));
+            } else if (proc == "SINCE_EPOCH_MILLIS" || proc == "SINCE_EPOCH_MILLISECOND") {
+                assertEquals(0, result.getLong(0));
+            } else if (proc == "SINCE_EPOCH_MICROS" || proc == "SINCE_EPOCH_MICROSECOND") {
+                assertEquals(0, result.getLong(0));
+            }
+
+            cr = client.callProcedure(proc, 1);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            if (proc == "SINCE_EPOCH_SECOND") {
+                assertEquals(0, result.getLong(0));
+            } else if (proc == "SINCE_EPOCH_MILLIS" || proc == "SINCE_EPOCH_MILLISECOND") {
+                assertEquals(1, result.getLong(0));
+            } else if (proc == "SINCE_EPOCH_MICROS" || proc == "SINCE_EPOCH_MICROSECOND") {
+                assertEquals(1000, result.getLong(0));
+            } else {
+                fail();
+            }
+
+            cr = client.callProcedure(proc, 2);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            if (proc == "SINCE_EPOCH_SECOND") {
+                assertEquals(1, result.getLong(0));
+            } else if (proc == "SINCE_EPOCH_MILLIS" || proc == "SINCE_EPOCH_MILLISECOND") {
+                assertEquals(1000, result.getLong(0));
+            } else if (proc == "SINCE_EPOCH_MICROS" || proc == "SINCE_EPOCH_MICROSECOND") {
+                assertEquals(1000000, result.getLong(0));
+            } else {
+                fail();
+            }
+
+            cr = client.callProcedure(proc, 3);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            if (proc == "SINCE_EPOCH_SECOND") {
+                assertEquals(-1, result.getLong(0));
+            } else if (proc == "SINCE_EPOCH_MILLIS" || proc == "SINCE_EPOCH_MILLISECOND") {
+                assertEquals(-1000, result.getLong(0));
+            } else if (proc == "SINCE_EPOCH_MICROS" || proc == "SINCE_EPOCH_MICROSECOND") {
+                assertEquals(-1000000, result.getLong(0));
+            } else {
+               fail();
+            }
+
+            cr = client.callProcedure(proc, 4);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            if (proc == "SINCE_EPOCH_SECOND") {
+                assertEquals(1371808830L, result.getLong(0));
+            } else if (proc == "SINCE_EPOCH_MILLIS" || proc == "SINCE_EPOCH_MILLISECOND") {
+                assertEquals(1371808830000L, result.getLong(0));
+            } else if (proc == "SINCE_EPOCH_MICROS" || proc == "SINCE_EPOCH_MICROSECOND") {
+                assertEquals(1371808830000000L, result.getLong(0));
+            } else {
+               fail();
+            }
+        }
+    }
+
+    public void testTO_TIMESTAMP() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING TO_TIMESTAMP");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P2.insert", 0, new Timestamp(0L));
+        cr = client.callProcedure("P2.insert", 1, new Timestamp(1L));
+        cr = client.callProcedure("P2.insert", 2, new Timestamp(1000L));
+        cr = client.callProcedure("P2.insert", 3, new Timestamp(-1000L));
+
+        // Test AdHoc
+        cr = client.callProcedure("@AdHoc", "select to_timestamp(second, 1372640523) from P2 limit 1");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(1372640523 * 1000000L, result.getTimestampAsLong(0));
+
+        // Test string input number, expect error
+        try {
+            cr = client.callProcedure("@AdHoc", "select to_timestamp(second, '1372640523') from P2 limit 1");
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("PlanningErrorException"));
+            assertTrue(ex.getMessage().contains("incompatible data type"));
+        }
+
+        String[] procedures = {"FROM_UNIXTIME", "TO_TIMESTAMP_SECOND", "TO_TIMESTAMP_MILLIS",
+                "TO_TIMESTAMP_MILLISECOND", "TO_TIMESTAMP_MICROS", "TO_TIMESTAMP_MICROSECOND"};
+
+        for (int i=0; i< procedures.length; i++) {
+            String proc = procedures[i];
+
+            cr = client.callProcedure(proc, 0L , 0);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            if (proc == "TO_TIMESTAMP_SECOND" || proc == "FROM_UNIXTIME") {
+                assertEquals(0L, result.getTimestampAsLong(0));
+            } else if (proc == "TO_TIMESTAMP_MILLIS" || proc == "TO_TIMESTAMP_MILLISECOND") {
+                assertEquals(0L, result.getTimestampAsLong(0));
+            } else if (proc == "TO_TIMESTAMP_MICROS" || proc == "TO_TIMESTAMP_MICROSECOND") {
+                assertEquals(0L, result.getTimestampAsLong(0));
+            } else {
+                fail();
+            }
+
+            cr = client.callProcedure(proc, 1L , 1);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            if (proc == "TO_TIMESTAMP_SECOND" || proc == "FROM_UNIXTIME") {
+                assertEquals(1000000L, result.getTimestampAsLong(0));
+            } else if (proc == "TO_TIMESTAMP_MILLIS" || proc == "TO_TIMESTAMP_MILLISECOND") {
+                assertEquals(1000L, result.getTimestampAsLong(0));
+            } else if (proc == "TO_TIMESTAMP_MICROS" || proc == "TO_TIMESTAMP_MICROSECOND") {
+                assertEquals(1L, result.getTimestampAsLong(0));
+            } else {
+                fail();
+            }
+
+            cr = client.callProcedure(proc, 1000L , 1);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            if (proc == "TO_TIMESTAMP_SECOND" || proc == "FROM_UNIXTIME") {
+                assertEquals(1000000000L, result.getTimestampAsLong(0));
+            } else if (proc == "TO_TIMESTAMP_MILLIS" || proc == "TO_TIMESTAMP_MILLISECOND") {
+                assertEquals(1000000L, result.getTimestampAsLong(0));
+            } else if (proc == "TO_TIMESTAMP_MICROS" || proc == "TO_TIMESTAMP_MICROSECOND") {
+                assertEquals(1000L, result.getTimestampAsLong(0));
+            } else {
+                fail();
+            }
+
+            cr = client.callProcedure(proc, -1000 , 1);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            if (proc == "TO_TIMESTAMP_SECOND" || proc == "FROM_UNIXTIME") {
+                assertEquals(-1000000000L, result.getTimestampAsLong(0));
+            } else if (proc == "TO_TIMESTAMP_MILLIS" || proc == "TO_TIMESTAMP_MILLISECOND") {
+                assertEquals(-1000000L, result.getTimestampAsLong(0));
+            } else if (proc == "TO_TIMESTAMP_MICROS" || proc == "TO_TIMESTAMP_MICROSECOND") {
+                assertEquals(-1000L, result.getTimestampAsLong(0));
+            } else {
+                fail();
+            }
+
+            cr = client.callProcedure(proc, 1371808830000L, 1);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            if (proc == "TO_TIMESTAMP_SECOND" || proc == "FROM_UNIXTIME") {
+                assertEquals(1371808830000000000L, result.getTimestampAsLong(0));
+            } else if (proc == "TO_TIMESTAMP_MILLIS" || proc == "TO_TIMESTAMP_MILLISECOND") {
+                assertEquals(1371808830000000L, result.getTimestampAsLong(0));
+            } else if (proc == "TO_TIMESTAMP_MICROS" || proc == "TO_TIMESTAMP_MICROSECOND") {
+                assertEquals(1371808830000L, result.getTimestampAsLong(0));
+            } else {
+                fail();
+            }
+        }
+
+    }
+
+    public void testTRUNCATE() throws Exception {
+        System.out.println("STARTING TRUNCATE with timestamp");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+        VoltDB.setDefaultTimezone();
+
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+        //System.out.println(dateFormat.getTimeZone());
+        Date time = null;
+
+        // Test Standard TRUNCATE function for floating numbers
+        Exception ex = null;
+        try {
+            cr = client.callProcedure("@AdHoc", "select TRUNCATE (1.2, 1), TM from P2 where id = 0");
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            ex = e;
+        } finally {
+            assertNotNull(ex);
+            assertTrue((ex.getMessage().contains("Error compiling query")));
+            assertTrue((ex.getMessage().contains("PlanningErrorException")));
+        }
+
+        // Test date before Gregorian calendar beginning.
+        cr = client.callProcedure("P2.insert", 0, Timestamp.valueOf("1582-03-06 13:56:40.123456"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        ex = null;
+        try {
+            cr = client.callProcedure("TRUNCATE", 0);
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            ex = e;
+        } finally {
+            assertNotNull(ex);
+            assertTrue((ex.getMessage().contains("SQL ERROR")));
+        }
+
+        // Test Timestamp Null value
+        cr = client.callProcedure("P2.insert", 1, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("TRUNCATE", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        for (int i=0; i< 11; i++) {
+            assertNull(result.getTimestampAsTimestamp(i));
+        }
+
+        // Test normal TRUNCATE functionalities
+        cr = client.callProcedure("P2.insert", 2, Timestamp.valueOf("2001-09-09 01:46:40.035123"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("TRUNCATE", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+
+        cr = client.callProcedure("TRUNCATE", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+
+        time = dateFormat.parse("2001-01-01 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(0));
+
+        time = dateFormat.parse("2001-07-01 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(1));
+
+        time = dateFormat.parse("2001-09-01 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(2));
+
+        time = dateFormat.parse("2001-09-09 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(3));
+
+        time = dateFormat.parse("2001-09-09 01:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(4));
+
+        time = dateFormat.parse("2001-09-09 01:46:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(5));
+
+        time = dateFormat.parse("2001-09-09 01:46:40.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(6));
+
+        time = dateFormat.parse("2001-09-09 01:46:40.035");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(7));
+
+        time = dateFormat.parse("2001-09-09 01:46:40.035");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(8));
+
+        assertEquals(1000000000035123L, result.getTimestampAsLong(9));
+        assertEquals(1000000000035123L, result.getTimestampAsLong(10));
+
+        // Test time before EPOCH
+        cr = client.callProcedure("P2.insert", 3, Timestamp.valueOf("1583-11-24 13:56:40.123456"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("TRUNCATE", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+
+        time = dateFormat.parse("1583-01-01 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(0));
+
+        time = dateFormat.parse("1583-10-01 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(1));
+
+        time = dateFormat.parse("1583-11-01 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(2));
+
+        time = dateFormat.parse("1583-11-24 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(3));
+
+        time = dateFormat.parse("1583-11-24 13:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(4));
+
+        time = dateFormat.parse("1583-11-24 13:56:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(5));
+
+        time = dateFormat.parse("1583-11-24 13:56:40.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(6));
+
+        time = dateFormat.parse("1583-11-24 13:56:40.123");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(7));
+
+        time = dateFormat.parse("1583-11-24 13:56:40.123");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(7));
+
+        assertEquals(-12184250599876544L, result.getTimestampAsLong(9));
+        assertEquals(-12184250599876544L, result.getTimestampAsLong(10));
+
+        // Test date in far future
+        cr = client.callProcedure("P2.insert", 4, Timestamp.valueOf("2608-03-06 13:56:40.123456"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("TRUNCATE", 4);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+
+        time = dateFormat.parse("2608-01-01 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(0));
+
+        time = dateFormat.parse("2608-01-01 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(1));
+
+        time = dateFormat.parse("2608-03-01 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(2));
+
+        time = dateFormat.parse("2608-03-06 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(3));
+
+        time = dateFormat.parse("2608-03-06 13:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(4));
+
+        time = dateFormat.parse("2608-03-06 13:56:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(5));
+
+        time = dateFormat.parse("2608-03-06 13:56:40.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(6));
+
+        time = dateFormat.parse("2608-03-06 13:56:40.123");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(7));
+
+        time = dateFormat.parse("2608-03-06 13:56:40.123");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(7));
+
+        assertEquals(20138939800123456L, result.getTimestampAsLong(9));
+        assertEquals(20138939800123456L, result.getTimestampAsLong(10));
+    }
+
     public void testFunctionsWithInvalidJSON() throws Exception {
 
         Client client = getClient();
@@ -888,11 +1449,40 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "NUM INTEGER, " +
                 "RATIO FLOAT, " +
                 "PRIMARY KEY (ID) ); " +
+                "PARTITION TABLE P1 ON COLUMN ID;" +
+
+                "CREATE TABLE P2 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "TM TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) ); " +
+                "PARTITION TABLE P2 ON COLUMN ID;\n" +
+
+                "CREATE TABLE P3_INLINE_DESC ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "DESC VARCHAR(30), " +
+                "NUM INTEGER, " +
+                "RATIO FLOAT, " +
+                "PRIMARY KEY (ID) ); " +
+                "PARTITION TABLE P3_INLINE_DESC ON COLUMN ID;" +
+
+                "CREATE TABLE R3 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "TINY TINYINT, " +
+                "SMALL SMALLINT, " +
+                "NUM INTEGER, " +
+                "BIG BIGINT, " +
+                "RATIO FLOAT, " +
+                "TM TIMESTAMP DEFAULT NULL, " +
+                "VAR VARCHAR(300), " +
+                "DEC DECIMAL, " +
+                "PRIMARY KEY (ID) ); " +
+
                 "CREATE TABLE JS1 (\n" +
                 "  ID INTEGER NOT NULL, \n" +
                 "  DOC VARCHAR(8192),\n" +
                 "  PRIMARY KEY(ID))\n" +
                 ";\n" +
+
                 "CREATE PROCEDURE IdFieldProc AS\n" +
                 "   SELECT ID FROM JS1 WHERE FIELD(DOC, ?) = ? ORDER BY ID\n" +
                 ";\n" +
@@ -941,7 +1531,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         } catch (IOException e) {
             assertFalse(true);
         }
-        project.addPartitionInfo("P1", "ID");
+
         // Test DECODE
         project.addStmtProcedure("DECODE", "select desc,  DECODE (desc,'IBM','zheng'," +
                         "'Microsoft','li'," +
@@ -971,6 +1561,37 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         // Test POSITION and CHAR_LENGTH
         project.addStmtProcedure("POSITION", "select desc, POSITION (? IN desc) from P1 where id = ?");
         project.addStmtProcedure("CHAR_LENGTH", "select desc, CHAR_LENGTH (desc) from P1 where id = ?");
+        // Test SINCE_EPOCH
+        project.addStmtProcedure("SINCE_EPOCH_SECOND", "select SINCE_EPOCH (SECOND, TM) from P2 where id = ?");
+        project.addStmtProcedure("SINCE_EPOCH_MILLIS", "select SINCE_EPOCH (MILLIS, TM) from P2 where id = ?");
+        project.addStmtProcedure("SINCE_EPOCH_MILLISECOND", "select SINCE_EPOCH (MILLISECOND, TM) from P2 where id = ?");
+        project.addStmtProcedure("SINCE_EPOCH_MICROS", "select SINCE_EPOCH (MICROS, TM) from P2 where id = ?");
+        project.addStmtProcedure("SINCE_EPOCH_MICROSECOND", "select SINCE_EPOCH (MICROSECOND, TM) from P2 where id = ?");
+        // Test TO_TIMESTAMP
+        project.addStmtProcedure("TO_TIMESTAMP_SECOND", "select TO_TIMESTAMP (SECOND, ?) from P2 where id = ?");
+        project.addStmtProcedure("TO_TIMESTAMP_MILLIS", "select TO_TIMESTAMP (MILLIS, ?) from P2 where id = ?");
+        project.addStmtProcedure("TO_TIMESTAMP_MILLISECOND", "select TO_TIMESTAMP (MILLISECOND, ?) from P2 where id = ?");
+        project.addStmtProcedure("TO_TIMESTAMP_MICROS", "select TO_TIMESTAMP (MICROS, ?) from P2 where id = ?");
+        project.addStmtProcedure("TO_TIMESTAMP_MICROSECOND", "select TO_TIMESTAMP (MICROSECOND, ?) from P2 where id = ?");
+
+        project.addStmtProcedure("TRUNCATE", "select TRUNCATE(YEAR, TM), TRUNCATE(QUARTER, TM), TRUNCATE(MONTH, TM), " +
+                "TRUNCATE(DAY, TM), TRUNCATE(HOUR, TM),TRUNCATE(MINUTE, TM),TRUNCATE(SECOND, TM), TRUNCATE(MILLIS, TM), " +
+                "TRUNCATE(MILLISECOND, TM), TRUNCATE(MICROS, TM), TRUNCATE(MICROSECOND, TM) from P2 where id = ?");
+
+        project.addStmtProcedure("FROM_UNIXTIME", "select FROM_UNIXTIME (?) from P2 where id = ?");
+
+        project.addStmtProcedure("TestDecodeNull", "select DECODE(tiny, NULL, 'null tiny', tiny)," +
+                "DECODE(small, NULL, 'null small', small), DECODE(num, NULL, 'null num', num),  " +
+                "DECODE(big, NULL, 'null big', big), DECODE(ratio, NULL, 'null ratio', ratio),  " +
+                "DECODE(tm, NULL, 'null tm', 'tm'), DECODE(var, NULL, 'null var', var), " +
+                "DECODE(dec, NULL, 'null dec', dec) from R3 where id = ?");
+        project.addStmtProcedure("TestDecodeNullParam", "select DECODE(tiny, ?, 'null tiny', tiny)," +
+                "DECODE(small, ?, 'null small', small), DECODE(num, ?, 'null num', num),  " +
+                "DECODE(big, ?, 'null big', big), DECODE(ratio, ?, 'null ratio', ratio),  " +
+                "DECODE(tm, ?, 'null tm', 'tm'), DECODE(var, ?, 'null var', var), " +
+                "DECODE(dec, ?, 'null dec', dec) from R3 where id = ?");
+
+        project.addStmtProcedure("TestDecodeNullTimestamp", "select DECODE(tm, NULL, 'null tm', tm) from p2 where id = ?");
 
         // CONFIG #1: Local Site/Partition running on JNI backend
         config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);

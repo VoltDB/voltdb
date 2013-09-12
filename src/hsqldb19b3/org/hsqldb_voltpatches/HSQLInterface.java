@@ -189,9 +189,115 @@ public class HSQLInterface {
         // it'll get called next time
         sessionProxy.sessionData.persistentStoreCollection.clearAllTables();
 
+        // clean up sql-in expressions
+        fixupInStatementExpressions(xml);
+
         assert(xml != null);
 
         return xml;
+    }
+
+    /**
+     * Recursively find all in-lists found in the XML and munge them into the
+     * simpler thing we want to pass to the AbstractParsedStmt.
+     */
+    private void fixupInStatementExpressions(VoltXMLElement expr) {
+        if (doesExpressionReallyMeanIn(expr)) {
+            inFixup(expr);
+            // can return because in can't be nested
+            return;
+        }
+
+        // recursive hunt
+        for (VoltXMLElement child : expr.children) {
+            fixupInStatementExpressions(child);
+        }
+    }
+
+    /**
+     * Find in-expressions in fresh-off-the-hsql-boat Volt XML. Is this fake XML
+     * representing an in-list in the weird table/row way that HSQL generates
+     * in-list expressions. Used by {@link this#fixupInStatementExpressions(VoltXMLElement)}.
+     */
+    private boolean doesExpressionReallyMeanIn(VoltXMLElement expr) {
+        if (!expr.name.equals("operation")) {
+            return false;
+        }
+        if (!expr.attributes.containsKey("optype") ||
+            !expr.attributes.get("optype").equals("equal")) {
+            return false;
+        }
+
+        // see if the children are "row" and "table".
+        int rowCount = 0;
+        int tableCount = 0;
+        int valueCount = 0;
+        for (VoltXMLElement child : expr.children) {
+            if (child.name.equals("row")) {
+                rowCount++;
+            }
+            else if (child.name.equals("table")) {
+                tableCount++;
+            }
+            else if (child.name.equals("value")) {
+                valueCount++;
+            }
+        }
+        if ((tableCount + rowCount) > 0) {
+            assert rowCount == 1;
+            assert tableCount + valueCount == 1;
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Take an equality-test expression that represents in-list
+     * and munge it into the simpler thing we want to output
+     * to the ParsedExrpession classes.
+     */
+    private void inFixup(VoltXMLElement inElement) {
+        // make this an in expression
+        inElement.name = "operation";
+        inElement.attributes.put("optype", "in");
+
+        VoltXMLElement rowElem = null;
+        VoltXMLElement tableElem = null;
+        VoltXMLElement valueElem = null;
+        for (VoltXMLElement child : inElement.children) {
+            if (child.name.equals("row")) {
+                rowElem = child;
+            }
+            else if (child.name.equals("table")) {
+                tableElem = child;
+            }
+            else if (child.name.equals("value")) {
+                valueElem = child;
+            }
+        }
+        assert(rowElem.children.size() == 1);
+
+        VoltXMLElement inlist;
+        if (tableElem != null) {
+            // make the table expression an in-list
+            inlist = new VoltXMLElement("vector");
+            for (VoltXMLElement child : tableElem.children) {
+                assert(child.name.equals("row"));
+                assert(child.children.size() == 1);
+                inlist.children.addAll(child.children);
+            }
+        }
+        else {
+            assert valueElem != null;
+            inlist = valueElem;
+        }
+
+        inElement.children.clear();
+        // short out the row expression
+        inElement.children.addAll(rowElem.children);
+        // add the inlist
+        inElement.children.add(inlist);
     }
 
     /**

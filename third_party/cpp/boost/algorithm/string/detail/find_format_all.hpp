@@ -58,7 +58,7 @@ namespace boost {
                 {
                     // Copy the beginning of the sequence
                     Output = std::copy( LastMatch, M.begin(), Output );
-                    // Copy formated result
+                    // Copy formatted result
                     Output = std::copy( ::boost::begin(M.format_result()), ::boost::end(M.format_result()), Output );
 
                     // Proceed to the next match
@@ -84,18 +84,18 @@ namespace boost {
                 FinderT Finder,
                 FormatterT Formatter,
                 const FindResultT& FindResult )
-            {       
+            {   
                 if( ::boost::algorithm::detail::check_find_result(Input, FindResult) ) {
-                return ::boost::algorithm::detail::find_format_all_copy_impl2( 
-                    Output,
-                    Input,
-                    Finder,
-                    Formatter,
-                    FindResult,
-                    Formatter(FindResult) );
+                    return ::boost::algorithm::detail::find_format_all_copy_impl2( 
+                        Output,
+                        Input,
+                        Finder,
+                        Formatter,
+                        FindResult,
+                        Formatter(FindResult) );
                 } else {
                     return std::copy( ::boost::begin(Input), ::boost::end(Input), Output );
-            }
+                }
             }
 
  // find_format_all_copy implementation ----------------------------------------------//
@@ -134,9 +134,9 @@ namespace boost {
                 while( M )
                 {
                     // Copy the beginning of the sequence
-                    insert( Output, ::boost::end(Output), LastMatch, M.begin() );
-                    // Copy formated result
-                    insert( Output, ::boost::end(Output), M.format_result() );
+                    boost::algorithm::detail::insert( Output, ::boost::end(Output), LastMatch, M.begin() );
+                    // Copy formatted result
+                    boost::algorithm::detail::insert( Output, ::boost::end(Output), M.format_result() );
 
                     // Proceed to the next match
                     LastMatch=M.end();
@@ -161,15 +161,15 @@ namespace boost {
                 const FindResultT& FindResult)
             {
                 if( ::boost::algorithm::detail::check_find_result(Input, FindResult) ) {
-                return ::boost::algorithm::detail::find_format_all_copy_impl2(
-                    Input,
-                    Finder,
-                    Formatter,
-                    FindResult,
-                    Formatter(FindResult) );
+                    return ::boost::algorithm::detail::find_format_all_copy_impl2(
+                        Input,
+                        Finder,
+                        Formatter,
+                        FindResult,
+                        Formatter(FindResult) );
                 } else {
                     return Input;
-            }
+                }
             }
 
  // find_format_all implementation ------------------------------------------------//
@@ -218,7 +218,7 @@ namespace boost {
                     // Adjust search iterator
                     SearchIt=M.end();
 
-                    // Copy formated replace to the storage
+                    // Copy formatted replace to the storage
                     ::boost::algorithm::detail::copy_to_storage( Storage, M.format_result() );
 
                     // Find range for a next match
@@ -257,13 +257,13 @@ namespace boost {
                 FindResultT FindResult)
             {
                 if( ::boost::algorithm::detail::check_find_result(Input, FindResult) ) {
-                ::boost::algorithm::detail::find_format_all_impl2(
-                    Input,
-                    Finder,
-                    Formatter,
-                    FindResult,
-                    Formatter(FindResult) );
-            }
+                    ::boost::algorithm::detail::find_format_all_impl2(
+                        Input,
+                        Finder,
+                        Formatter,
+                        FindResult,
+                        Formatter(FindResult) );
+                }
             }
 
         } // namespace detail

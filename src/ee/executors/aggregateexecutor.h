@@ -55,7 +55,7 @@
 #include "expressions/abstractexpression.h"
 
 namespace voltdb {
-class AggregateRow;
+struct AggregateRow;
 
 /**
  * The base class for aggregate executors regardless of the type of grouping that should be performed.
@@ -64,7 +64,7 @@ class AggregateExecutorBase : public AbstractExecutor
 {
 public:
     AggregateExecutorBase(VoltDBEngine* engine, AbstractPlanNode* abstract_node) :
-        AbstractExecutor(engine, abstract_node), m_groupByKeySchema(NULL)
+        AbstractExecutor(engine, abstract_node), m_groupByKeySchema(NULL), m_predicate(NULL)
     { }
     ~AggregateExecutorBase()
     {
@@ -108,6 +108,7 @@ protected:
     std::vector<AbstractExpression*> m_inputExpressions;
     std::vector<AbstractExpression*> m_outputColumnExpressions;
     std::vector<int> m_aggregateOutputColumns;
+    AbstractExpression* m_predicate;    // ENG-1565: for enabling max() using index purpose only
 };
 
 

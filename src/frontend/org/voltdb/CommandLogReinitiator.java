@@ -39,10 +39,13 @@ public interface CommandLogReinitiator {
 
     public void setInitiator(TransactionCreator initiator);
 
+    public void initPartitionTracking();
+
     /**
      * Generate the local replay plan. Call this before starting replay.
+     * @param newPartitionCount
      */
-    public void generateReplayPlan();
+    public void generateReplayPlan(int newPartitionCount);
 
     /**
      * Start replaying the log. Two threads will be started, one for reading the
@@ -50,7 +53,7 @@ public interface CommandLogReinitiator {
      * them off the queue and reinitiating them.
      *
      * Note: the replay plan has to be generated prior to calling this method.
-     * Call {@link #generateReplayPlan()} to generate the replay plan.
+     * Call {@link #generateReplayPlan(int)} to generate the replay plan.
      */
     public void replay();
 

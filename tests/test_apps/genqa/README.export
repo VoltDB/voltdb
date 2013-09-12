@@ -3,12 +3,29 @@ Quick hacky description on running the long-running export test.
 - Build everything:
 ./run.sh catalog
 
+TO RUN remote Export Client Test:
 - You'll need 4(four) terminals:
--- In 1, run the server:
-./run.sh server
--- In 2, run the export client:
-./run.sh export-tofile
--- In 3, start the app client:
-./run.sh async-export
--- In 4, start the verifier:
-./run.sh exportverify
+
+    -- In 1, run the server:
+    ./run.sh server-legacy
+    -- In 2, run the export client:
+    ./run.sh export-tofile
+    -- In 3, start the app client:
+    ./run.sh async-export
+    -- In 4, start the verifier:
+    ./run.sh export-verify
+
+TO RUN onserver Export Client Test:
+- You'll need 4(four) terminals:
+
+    -- In 1, run the server:
+    ./run.sh server
+    -- In 2, run the export client:
+    ./run.sh async-export
+    -- In 3, start the app client:
+    ./run.sh export-on-server-verify
+
+TO RUN onserver Export Client Test with custom class:
+    -- In 1, run the server:
+    ./run.sh server-custom
+    -- See that server comes up without any classloading issues.

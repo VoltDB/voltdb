@@ -40,15 +40,14 @@ public class AdHoc_RO_SP extends AdHocBase {
      * Use the base class implementation.
      *
      * @param ctx  execution context
-     * @param aggregatorFragments  aggregator plan fragments
-     * @param collectorFragments  collector plan fragments
-     * @param sqlStatements  source SQL statements
-     * @param replicatedTableDMLFlags  flags set to 1 when replicated
-     *
+     * @param partitionParam  serialized partition parameter
+     * @param partitionParamType  type of the partition parameter used to deserialize it
+     * @param serializedBatchData  serialized data needed for adhoc
      * @return  results as VoltTable array
      */
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
                            byte[] partitionParam,
+                           byte partitionParamType,
                            byte[] serializedBatchData) {
         return runAdHoc(ctx, serializedBatchData);
     }

@@ -18,6 +18,7 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
@@ -27,6 +28,8 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
@@ -35,10 +38,12 @@ import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
+import org.voltdb.utils.CatalogUtil;
 
 public class IndexScanPlanNode extends AbstractScanPlanNode {
 
@@ -46,8 +51,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         TARGET_INDEX_NAME,
         END_EXPRESSION,
         SEARCHKEY_EXPRESSIONS,
+        INITIAL_EXPRESSION,
         KEY_ITERATE,
         LOOKUP_TYPE,
+        DETERMINISM_ONLY,
         SORT_DIRECTION;
     }
 
@@ -68,7 +75,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     // This list of expressions corresponds to the values that we will use
     // at runtime in the lookup on the index
-    protected List<AbstractExpression> m_searchkeyExpressions = new ArrayList<AbstractExpression>();
+    protected final List<AbstractExpression> m_searchkeyExpressions = new ArrayList<AbstractExpression>();
+
+    // for reverse scan LTE only. used to do forward scan to find the correct starting point
+    protected AbstractExpression m_initialExpression;
 
     // ???
     protected Boolean m_keyIterate = false;
@@ -83,15 +93,48 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // this index scan is going to use
     protected Index m_catalogIndex = null;
 
-    private ArrayList<AbstractExpression> m_bindings = null;
+    private ArrayList<AbstractExpression> m_bindings = new ArrayList<AbstractExpression>();;
+
+    private boolean m_forDeterminismOnly = false;
 
     public IndexScanPlanNode() {
         super();
     }
 
+    public IndexScanPlanNode(AbstractScanPlanNode srcNode, AggregatePlanNode apn, Index index, SortDirectionType sortDirection) {
+        super();
+        m_tableSchema = srcNode.m_tableSchema;
+        m_predicate = srcNode.m_predicate;
+        m_targetTableAlias = srcNode.m_targetTableAlias;
+        m_targetTableName = srcNode.m_targetTableName;
+        m_tableScanSchema = srcNode.m_tableScanSchema.clone();
+        for (AbstractPlanNode inlineChild : srcNode.getInlinePlanNodes().values()) {
+            addInlinePlanNode(inlineChild);
+        }
+        m_catalogIndex = index;
+        m_targetIndexName = index.getTypeName();
+        m_lookupType = IndexLookupType.GTE;    // a safe way
+        m_sortDirection = sortDirection;
+        if (apn != null) {
+            m_outputSchema = apn.m_outputSchema.clone();
+        }
+    }
+
     @Override
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.INDEXSCAN;
+    }
+
+    @Override
+    public void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tableUpdated,
+                                    Collection<String> indexes)
+    {
+        super.getTablesAndIndexes(tablesRead, tableUpdated, indexes);
+        assert(m_targetIndexName.length() > 0);
+        if (indexes != null) {
+            assert(m_targetIndexName.length() > 0);
+            indexes.add(m_targetIndexName);
+        }
     }
 
     @Override
@@ -131,7 +174,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         // the only case in which a non-unique index can guarantee determinism is for an indexed-column-only scan,
         // because it would ignore any differences in the entries.
         // TODO: return true for an index-only scan --
-        // That would require testing of an inline projection node consisting solely of (functions of?) the indexed columns.
+        // That would require testing for an inline projection node consisting solely
+        // of (functions of?) the indexed columns.
         m_nondeterminismDetail = "index scan may provide insufficient ordering";
         return false;
     }
@@ -228,6 +272,21 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         }
     }
 
+    public void addEndExpression(AbstractExpression newExpr)
+    {
+        if (newExpr != null)
+        {
+            List<AbstractExpression> newEndExpressions = ExpressionUtil.uncombine(m_endExpression);
+            newEndExpressions.add((AbstractExpression)newExpr.clone());
+            m_endExpression = ExpressionUtil.combine(newEndExpressions);
+        }
+    }
+
+    public void clearSearchKeyExpression()
+    {
+        m_searchkeyExpressions.clear();
+    }
+
     public void addSearchKeyExpression(AbstractExpression expr)
     {
         if (expr != null)
@@ -239,6 +298,23 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         }
     }
 
+    public void removeLastSearchKey()
+    {
+        int size = m_searchkeyExpressions.size();
+        if (size <= 1) {
+            clearSearchKeyExpression();
+        } else {
+            m_searchkeyExpressions.remove(size - 1);
+        }
+    }
+
+    // CAUTION: only used in MIN/MAX optimization of reverse scan
+    // we know this plan should be chosen, so we can change it safely
+    public void resetPredicate()
+    {
+        m_predicate = null;
+    }
+
     /**
      * @return the searchkey_expressions
      */
@@ -247,6 +323,22 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     public List<AbstractExpression> getSearchKeyExpressions() {
         return Collections.unmodifiableList(m_searchkeyExpressions);
     }
+
+    public void setInitialExpression(AbstractExpression expr) {
+        if (expr != null) {
+            m_initialExpression = (AbstractExpression)expr.clone();
+        }
+    }
+
+    public AbstractExpression getInitialExpression() {
+        return m_initialExpression;
+    }
+
+    public boolean isReverseScan() {
+        return m_sortDirection == SortDirectionType.DESC ||
+                m_lookupType == IndexLookupType.LT || m_lookupType == IndexLookupType.LTE;
+    }
+
 
     @Override
     public void resolveColumnIndexes()
@@ -290,7 +382,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
         // get the width of the index and number of columns used
         // need doubles for math
-        double colCount = m_catalogIndex.getColumns().size();
+        double colCount = CatalogUtil.getCatalogIndexSize(m_catalogIndex);
         double keyWidth = m_searchkeyExpressions.size();
         assert(keyWidth <= colCount);
 
@@ -300,6 +392,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         }
         // When there is no start key, count an end-key as a single-column range scan key.
         else if (keyWidth == 0.0 && m_endExpression != null) {
+            // TODO: ( (double) ExpressionUtil.uncombineAny(m_endExpression).size() ) - 0.5
+            // might give a result that is more in line with multi-component start-key-only scans.
             keyWidth = 0.5;
         }
 
@@ -319,52 +413,65 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         }
         assert(tuplesToRead > 0);
 
-        // If not a unique, covering index, favor (discount) the choice with the most columns pre-filteredby the index.
+        // If not a unique, covering index, favor (discount)
+        // the choice with the most columns pre-filtered by the index.
         if (!m_catalogIndex.getUnique() || (colCount > keyWidth)) {
-            // Cost starts at 90% of a comparable seqscan
-            // AND gets scaled down by an additional factor of 0.1 for each fully covered indexed column.
-            // One intentional benchmark is for a single range-covered (i.e. half-covered, keyWidth == 0.5) column
-            // to have less than 1/3 the cost of a "for ordering purposes only" index scan (keyWidth == 0).
+            // Cost starts at 90% of a comparable seqscan AND
+            // gets scaled down by an additional factor of 0.1 for each fully covered indexed column.
+            // One intentional benchmark is for a single range-covered
+            // (i.e. half-covered, keyWidth == 0.5) column to have less than 1/3 the cost of a
+            // "for ordering purposes only" index scan (keyWidth == 0).
             // This is to completely compensate for the up to 3X final cost resulting from
             // the "order by" and non-inlined "projection" nodes that must be added later to the
             // inconveniently ordered scan result.
-            // Using a factor of 0.1 per FULLY covered (equality-filtered) column, the effective scale factor for
-            // a single PARTIALLY covered (range-filtered) comes to SQRT(0.1) which is just under 32% FTW!
+            // Using a factor of 0.1 per FULLY covered (equality-filtered) column,
+            // the effective scale factor for a single PARTIALLY covered (range-filtered) column
+            // comes to SQRT(0.1) which is just under 32% FTW!
             tuplesToRead += (int) (tableEstimates.maxTuples * 0.90 * Math.pow(0.10, keyWidth));
 
-            // With all this discounting, make sure that any non-"covering unique" index scan costs more than
-            // any "covering unique" one, no matter how many indexed column filters get piled on.
+            // With all this discounting, make sure that any non-"covering unique" index scan costs more
+            // than any "covering unique" one, no matter how many indexed column filters get piled on.
             // It's theoretically possible to be wrong here -- that a not-strictly-unique combination of
-            // indexed column filters statistically selects fewer (fractional) rows per scan than a unique index,
-            // but we favor the unique index anyway because:
+            // indexed column filters statistically selects fewer (fractional) rows per scan
+            // than a unique index, but we favor the unique index anyway because:
             // -- the "unique" declaration guarantees a worse-case upper limit of 1 row per scan.
-            // -- the per-indexed-column selectivity factors used above are highly fictionalized -- actual cardinality
-            //    for individual components of compound indexes MIGHT be very low,
-            //    making them much less selective than estimated.
+            // -- the per-indexed-column selectivity factors used above are highly fictionalized
+            //    -- actual cardinality for individual components of compound indexes MIGHT be very low,
+            //       making them much less selective than estimated.
             if (tuplesToRead < 4) {
                 tuplesToRead = 4; // i.e. costing 1 unit more than a covered unique btree.
             }
         }
 
-        // This tuplesToRead value estimates the number of base table tuples fetched from the index scan.
-        // It's a vague measure of the cost of the scan whose accuracy depends a lot on what kind of
-        // post-filtering needs to happen.
+        // This tuplesToRead value estimates the number of base table tuples
+        // fetched from the index scan.
+        // It's a vague measure of the cost of the scan whose accuracy depends a lot
+        // on what kind of post-filtering needs to happen.
         // The tuplesRead value is also used here to estimate the number of RESULT rows.
         // This value is estimated without regard to any post-filtering effect there might be
         // -- as if all rows found in the index passed any additional post-filter conditions.
-        // This ignoring of post-filter effects is at least consistent with the processing in SeqScanPlanNode.
-        // In effect, it gives index scans an "unfair" advantage -- follow-on sorts (etc.) are costed lower
-        // as if they are operating on fewer rows than would have come out of the seqscan, though that's nonsense.
-        // It's just an artifact of how SeqScanPlanNode costing ignores ALL filters but IndexScanPlanNode costing
-        // only ignores post-filters.
-        // In any case, it's important to keep this code roughly in synch with any changes
-        // to SeqScanPlanNode's costing to make sure that SeqScanPlanNode never gains an unfair advantage.
+        // This ignoring of post-filter effects is at least consistent with the SeqScanPlanNode.
+        // In effect, it gives index scans an "unfair" advantage
+        // -- follow-on sorts (etc.) are costed lower as if they are operating on fewer rows
+        // than would have come out of the seqscan, though that's nonsense.
+        // It's just an artifact of how SeqScanPlanNode costing ignores ALL filters but
+        // IndexScanPlanNode costing only ignores post-filters.
+        // In any case, it's important to keep this code roughly in synch with any changes to
+        // SeqScanPlanNode's costing to make sure that SeqScanPlanNode never gains an unfair advantage.
         m_estimatedOutputTupleCount = tuplesToRead;
         m_estimatedProcessedTupleCount = tuplesToRead;
 
         // special case a unique match for the output count
         if (m_catalogIndex.getUnique() && (colCount == keyWidth)) {
             m_estimatedOutputTupleCount = 1;
+        }
+
+        LimitPlanNode limit = (LimitPlanNode)m_inlineNodes.get(PlanNodeType.LIMIT);
+        if (limit != null && limit.getLimit() > 0) {
+            m_estimatedOutputTupleCount = Math.min(m_estimatedOutputTupleCount, limit.getLimit());
+            if (m_predicate == null) {
+                m_estimatedProcessedTupleCount = limit.getLimit() + limit.getOffset();
+            }
         }
     }
 
@@ -374,9 +481,16 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         stringer.key(Members.KEY_ITERATE.name()).value(m_keyIterate);
         stringer.key(Members.LOOKUP_TYPE.name()).value(m_lookupType.toString());
         stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirection.toString());
+        if (m_forDeterminismOnly) {
+            stringer.key(Members.DETERMINISM_ONLY.name()).value(true);
+        }
         stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_targetIndexName);
         stringer.key(Members.END_EXPRESSION.name());
         stringer.value(m_endExpression);
+
+        if (m_initialExpression != null) {
+            stringer.key(Members.INITIAL_EXPRESSION.name()).value(m_initialExpression);
+        }
 
         stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array();
         for (AbstractExpression ae : m_searchkeyExpressions) {
@@ -393,6 +507,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         m_keyIterate = jobj.getBoolean( Members.KEY_ITERATE.name() );
         m_lookupType = IndexLookupType.get( jobj.getString( Members.LOOKUP_TYPE.name() ) );
         m_sortDirection = SortDirectionType.get( jobj.getString( Members.SORT_DIRECTION.name() ) );
+        m_forDeterminismOnly = jobj.optBoolean(Members.DETERMINISM_ONLY.name());
         m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
         m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
         JSONObject tempjobj = null;
@@ -400,6 +515,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         if( !jobj.isNull( Members.END_EXPRESSION.name() ) ) {
             tempjobj = jobj.getJSONObject( Members.END_EXPRESSION.name() );
             m_endExpression = AbstractExpression.fromJSONObject( tempjobj, db);
+        }
+        // load initial_expression
+        if ( !jobj.isNull(Members.INITIAL_EXPRESSION.name() ) ) {
+            tempjobj = jobj.getJSONObject( Members.INITIAL_EXPRESSION.name() );
+            m_initialExpression = AbstractExpression.fromJSONObject(tempjobj,  db);
         }
         //load searchkey_expressions
         if( !jobj.isNull( Members.SEARCHKEY_EXPRESSIONS.name() ) ) {
@@ -416,30 +536,150 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     protected String explainPlanForNode(String indent) {
         assert(m_catalogIndex != null);
 
-        int indexSize = m_catalogIndex.getColumns().size();
+        int indexSize = CatalogUtil.getCatalogIndexSize(m_catalogIndex);
         int keySize = m_searchkeyExpressions.size();
 
-        // When there is no start key, count an end-key as a single-column range scan key.
+        // When there is no start key, count a range scan key for each ANDed end condition.
         if (keySize == 0 && m_endExpression != null) {
-            keySize = 1;
+            keySize = ExpressionUtil.uncombineAny(m_endExpression).size();
         }
 
-        String scanType = "unique-scan";
-        if (m_lookupType != IndexLookupType.EQ)
-            scanType = "range-scan";
+        String usageInfo;
+        String predicatePrefix;
+        if (keySize == 0) {
+            // The plan is easy to explain if it isn't using indexed expressions.
+            // Just explain why an index scan was chosen
+            // -- either for determinism or for an explicit ORDER BY requirement.
+            if (m_forDeterminismOnly) {
+                usageInfo = " (for deterministic order only)";
+            } else {
+                usageInfo = " (for sort order only)";
+            }
+            // Introduce on its own indented line, any unrelated post-filter applied to the result.
+            // e.g. " filter by OTHER_COL = 1"
+            predicatePrefix = "\n" + indent + " filter by ";
+        }
+        else {
+            String[] asIndexed = new String[indexSize];
+            // Not really expecting to need these fall-back labels,
+            // but in the case of an unexpected error accessing the catalog data,
+            // they beat an NPE.
+            for (int ii = 0; ii < keySize; ++ii) {
+                asIndexed[ii] = "(index key " + ii + ")";
+            }
+            String jsonExpr = m_catalogIndex.getExpressionsjson();
+            // if this is a pure-column index...
+            if (jsonExpr.isEmpty()) {
+                // grab the short names of the indexed columns in use.
+                for (ColumnRef cref : m_catalogIndex.getColumns()) {
+                    Column col = cref.getColumn();
+                    asIndexed[cref.getIndex()] = col.getName();
+                }
+            }
+            else {
+                try {
+                    List<AbstractExpression> indexExpressions =
+                        AbstractExpression.fromJSONArrayString(jsonExpr, null);
+                    int ii = 0;
+                    for (AbstractExpression ae : indexExpressions) {
+                        asIndexed[ii++] = ae.explain(m_targetTableName);
+                    }
+                } catch (JSONException e) {
+                    // If something unexpected went wrong,
+                    // just fall back on the positional key labels.
+                }
+            }
 
-        String cover = "covering";
-        if (indexSize > keySize)
-            cover = String.format("%d/%d cols", keySize, indexSize);
-
-        String usageInfo = String.format("(%s %s)", scanType, cover);
-        if (keySize == 0)
-            usageInfo = "(for sort order only)";
-
+            // Explain the search criteria that describe the start of the index scan, like
+            // "(event_type = 1 AND event_start > x.start_time)"
+            String start = explainSearchKeys(asIndexed, keySize);
+            if (m_lookupType == IndexLookupType.EQ) {
+                // qualify whether the equality matching is for a unique value.
+                // " uniquely match (event_id = 1)" vs.
+                // " scan matches for (event_type = 1) AND (event_location = x.region)"
+                if (m_catalogIndex.getUnique()) {
+                    usageInfo = "\n" + indent + " uniquely match " + start;
+                }
+                else {
+                    usageInfo = "\n" + indent + " scan matches for " + start;
+                }
+            }
+            else {
+                usageInfo = "\n" + indent;
+                if (m_lookupType == IndexLookupType.LT || m_lookupType == IndexLookupType.LTE) {
+                    usageInfo += "reverse ";
+                }
+                // qualify whether the inequality matching covers all or only some index key components
+                // " " range-scan covering from (event_type = 1) AND (event_start > x.start_time)" vs
+                // " " range-scan on 1 of 2 cols from event_type = 1"
+                if (indexSize == keySize) {
+                    usageInfo += "range-scan covering from " + start;
+                }
+                else {
+                    usageInfo += String.format("range-scan on %d of %d cols from %s", keySize, indexSize, start);
+                }
+                // Explain the criteria for continuinuing the scan such as
+                // "while (event_type = 1 AND event_start < x.start_time+30)"
+                // or label it as a scan "to the end"
+                usageInfo += explainEndKeys(asIndexed);
+            }
+            // Introduce any additional filters not related to the index
+            // that could cause rows to be skipped.
+            // e.g. "... scan ... from ... while ..., filter by OTHER_COL = 1"
+            predicatePrefix = ", filter by ";
+        }
+        // Describe any additional filters not related to the index
+        // e.g. "...filter by OTHER_COL = 1".
+        String predicate = explainPredicate(predicatePrefix);
+        // Describe the table name and either a user-provided name of the index or
+        // its user-specified role ("primary key").
         String retval = "INDEX SCAN of \"" + m_targetTableName + "\"";
-        retval += " using \"" + m_targetIndexName + "\"";
-        retval += " " + usageInfo;
+        String indexDescription = " using \"" + m_targetIndexName + "\"";
+        // Replace ugly system-generated index name with a description of its user-specified role.
+        if (m_targetIndexName.startsWith("SYS_IDX_PK_") ||
+            m_targetIndexName.startsWith("SYS_IDX_SYS_PK_") ||
+            m_targetIndexName.startsWith("MATVIEW_PK_INDEX") ) {
+            indexDescription = " using its primary key index";
+        }
+        // Bring all the pieces together describing the index, how it is scanned,
+        // and whatever extra filter processing is done to the result.
+        retval += indexDescription;
+        retval += usageInfo + predicate;
         return retval;
+    }
+
+    /// Explain that this index scan begins at the "start" of the index
+    /// or at a particular key, possibly compound.
+    private String explainSearchKeys(String[] asIndexed, int nCovered)
+    {
+        // By default, indexing starts at the start of the index.
+        if (m_searchkeyExpressions.isEmpty()) {
+            return "start";
+        }
+        String conjunction = "";
+        String result = "(";
+        int prefixSize = nCovered - 1;
+        for (int ii = 0; ii < prefixSize; ++ii) {
+            result += conjunction +
+                asIndexed[ii] + " = " + m_searchkeyExpressions.get(ii).explain(m_targetTableName);
+            conjunction = ") AND (";
+        }
+        // last element
+        result += conjunction +
+            asIndexed[prefixSize] + " " + m_lookupType.getSymbol() + " " +
+                m_searchkeyExpressions.get(prefixSize).explain(m_targetTableName) + ")";
+        return result;
+    }
+
+    /// Explain that this index scans "to end" of the index
+    /// or only "while" an end expression involving indexed key values remains true.
+    private String explainEndKeys(String[] asIndexed)
+    {
+        // By default, indexing starts at the start of the index.
+        if (m_endExpression == null) {
+            return " to end";
+        }
+        return " while " + m_endExpression.explain(m_targetTableName);
     }
 
     public void setBindings(ArrayList<AbstractExpression> bindings) {
@@ -448,5 +688,75 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     public ArrayList<AbstractExpression> getBindings() {
         return m_bindings;
+    }
+
+    public void addBindings(List<AbstractExpression> bindings) {
+        m_bindings.addAll(bindings);
+    }
+
+    public void setForDeterminismOnly() {
+        m_forDeterminismOnly = true;
+    }
+
+    // Called by ReplaceWithIndexLimit and ReplaceWithIndexCounter
+    // only apply those optimization if it has no (post-)predicates
+    // except those (post-)predicates are artifact predicates we
+    // added for reverse scan purpose only
+    public boolean isPredicatesOptimizableForAggregate() {
+
+        // for reverse scan, need to examine "added" predicates
+        List<AbstractExpression> predicates = ExpressionUtil.uncombine(m_predicate);
+        // if the size of predicates doesn't equal 2, can't be our added artifact predicates
+        // TODO: someday when index scans on non-nullable values are recognized, soften this
+        // test to make the NOT NULL predicate optional
+        if (predicates.size() != 2) {
+            return false;
+        }
+        // examin each possible "added" predicates
+        // the 1st predicate must matches the last searchKey and the 2nd is NOT NULL expr
+        AbstractExpression expr = predicates.get(0);
+        if (expr.getExpressionType() != ExpressionType.COMPARE_LESSTHAN &&
+                expr.getExpressionType() != ExpressionType.COMPARE_LESSTHANOREQUALTO) {
+            return false;
+        }
+        int searchKeyCount = m_searchkeyExpressions.size();
+        String exprsjson = m_catalogIndex.getExpressionsjson();
+        AbstractExpression left = expr.getLeft();
+        if (exprsjson.isEmpty()) {
+            if (left.getExpressionType() != ExpressionType.VALUE_TUPLE) {
+                return false;
+            }
+            if (((TupleValueExpression)left).getColumnIndex() !=
+                    CatalogUtil.getSortedCatalogItems(m_catalogIndex.getColumns(), "index").get(searchKeyCount - 1).getColumn().getIndex()) {
+                return false;
+            }
+        } else {
+            List<AbstractExpression> indexedExprs = null;
+            try {
+                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, null);
+            } catch (JSONException e) {
+                e.printStackTrace();
+                assert(false);
+                return false;
+            }
+            if (left.equals(indexedExprs.get(searchKeyCount - 1))) {
+                return false;
+            }
+        }
+        if (!expr.getRight().equals(m_searchkeyExpressions.get(searchKeyCount - 1))) {
+            return false;
+        }
+        expr = predicates.get(1);
+        if (expr.getExpressionType() != ExpressionType.OPERATOR_NOT) {
+            return false;
+        }
+        if (expr.getLeft().getExpressionType() != ExpressionType.OPERATOR_IS_NULL) {
+            return false;
+        }
+        if (!expr.getLeft().getLeft().equals(predicates.get(0).getLeft())) {
+            return false;
+        }
+
+        return true;
     }
 }

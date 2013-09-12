@@ -338,7 +338,7 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     for (index_iterator = index_map.begin(); index_iterator != index_map.end();
          index_iterator++) {
         // Exclude the primary key
-        if (index_iterator->first.compare(pkey_index_id) == 0) {
+        if (index_iterator->second.name.compare(pkey_index_id) == 0) {
             pkey_index_scheme = index_iterator->second;
         // Just add it to the list
         } else {
@@ -407,15 +407,12 @@ void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & vie
                   std::map<std::string, CatalogDelegate*> const &delegatesByName)
 {
     std::vector<catalog::MaterializedViewInfo*> survivingInfos;
-    std::vector<catalog::MaterializedViewInfo*> changingInfos;
     std::vector<MaterializedViewMetadata*> survivingViews;
-    std::vector<MaterializedViewMetadata*> changingViews;
     std::vector<MaterializedViewMetadata*> obsoleteViews;
 
     // Now, it's safe to transfer the wholesale state of the surviving dependent materialized views.
     existingTable->segregateMaterializedViews(views.begin(), views.end(),
                                               survivingInfos, survivingViews,
-                                              changingInfos, changingViews,
                                               obsoleteViews);
 
     // This process temporarily duplicates the materialized view definitions and their
@@ -503,7 +500,7 @@ TableCatalogDelegate::migrateChangedTuples(catalog::Table const &catalogTable,
     int64_t existingTupleCount = existingTable->activeTupleCount();
 
     // remove all indexes from the existing table
-    vector<TableIndex*> currentIndexes = existingTable->allIndexes();
+    const vector<TableIndex*> currentIndexes = existingTable->allIndexes();
     for (int i = 0; i < currentIndexes.size(); i++) {
         existingTable->removeIndex(currentIndexes[i]);
     }
@@ -541,7 +538,7 @@ TableCatalogDelegate::migrateChangedTuples(catalog::Table const &catalogTable,
          colIter != catalogTable.columns().end();
          colIter++)
     {
-        std::string colName = colIter->first;
+        std::string colName = colIter->second->name();
         catalog::Column *column = colIter->second;
         int newIndex = column->index();
 
@@ -587,7 +584,7 @@ TableCatalogDelegate::migrateChangedTuples(catalog::Table const &catalogTable,
                 if (columnSourceMap[i] >= 0) {
                     NValue value = scannedTuple.getNValue(columnSourceMap[i]);
                     if (columnExploded[i]) {
-                        value.allocatePersistentObjectFromInlineValue();
+                        value.allocateObjectFromInlinedValue();
                     }
                     tupleToInsert.setNValue(i, value);
                 }

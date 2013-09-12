@@ -313,7 +313,7 @@ public class Benchmark {
     private void connect() throws InterruptedException {
         log.info("Connecting to VoltDB...");
 
-        final CountDownLatch connections = new CountDownLatch(config.parsedServers.length);
+        final CountDownLatch connections = new CountDownLatch(1);
 
         // use a new thread to connect to each server
         for (final String server : config.parsedServers) {
@@ -325,7 +325,7 @@ public class Benchmark {
                 }
             }).start();
         }
-        // block until all have connected
+        // block until at least one connection is established
         connections.await();
     }
 
@@ -475,6 +475,9 @@ public class Benchmark {
             adHocMayhemThread.start();
         }
 
+        InvokeDroppedProcedureThread idpt = new InvokeDroppedProcedureThread(client);
+        idpt.start();
+
         List<ClientThread> clientThreads = new ArrayList<ClientThread>();
         for (byte cid = (byte) config.threadoffset; cid < config.threadoffset + config.threads; cid++) {
             ClientThread clientThread = new ClientThread(cid, txnCount, client, processor, permits,
@@ -496,6 +499,7 @@ public class Benchmark {
         partitionedLoader.shutdown();
         readThread.shutdown();
         adHocMayhemThread.shutdown();
+        idpt.shutdown();
         for (ClientThread clientThread : clientThreads) {
             clientThread.shutdown();
         }
@@ -503,6 +507,7 @@ public class Benchmark {
         partitionedLoader.join();
         readThread.join();
         adHocMayhemThread.join();
+        idpt.join();
         for (ClientThread clientThread : clientThreads) {
             clientThread.join();
         }

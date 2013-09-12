@@ -21,14 +21,11 @@ import java.io.File;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
-import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -51,6 +48,7 @@ public class VoltDB {
     public static final int DEFAULT_ADMIN_PORT = 21211;
     public static final int DEFAULT_INTERNAL_PORT = 3021;
     public static final int DEFAULT_ZK_PORT = 2181;
+    public static final int DEFAULT_IPC_PORT = 10000;
     public static final String DEFAULT_EXTERNAL_INTERFACE = "";
     public static final String DEFAULT_INTERNAL_INTERFACE = "";
     public static final int DEFAULT_DR_PORT = 5555;
@@ -104,8 +102,6 @@ public class VoltDB {
         return startAction.doesRejoin();
     }
 
-    public static final Charset UTF8ENCODING = Charset.forName("UTF-8");
-
     //The GMT time zone you know and love
     public static final TimeZone GMT_TIMEZONE = TimeZone.getTimeZone("GMT+0");
 
@@ -133,7 +129,7 @@ public class VoltDB {
     /** Encapsulates VoltDB configuration parameters */
     public static class Configuration {
 
-        public List<Integer> m_ipcPorts = Collections.synchronizedList(new LinkedList<Integer>());
+        public int m_ipcPort = DEFAULT_IPC_PORT;
 
         protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
@@ -185,7 +181,7 @@ public class VoltDB {
         /** running the enterprise version? */
         public final boolean m_isEnterprise = org.voltdb.utils.MiscUtils.isPro();
 
-        public int m_deadHostTimeoutMS = 10000;
+        public int m_deadHostTimeoutMS = 90 * 1000;
 
         /** start up action */
         public StartAction m_startAction = null;
@@ -392,7 +388,7 @@ public class VoltDB {
                     m_startAction = StartAction.LIVE_REJOIN;
                 } else if (arg.equals("live") && args.length > i + 1 && args[++i].trim().equals("rejoin")) {
                     m_startAction = StartAction.LIVE_REJOIN;
-                } else if (arg.startsWith("join")) {
+                } else if (arg.startsWith("add")) {
                     m_startAction = StartAction.JOIN;
                 }
 
@@ -432,12 +428,9 @@ public class VoltDB {
                     m_pathToDeployment = args[++i];
                 } else if (arg.equals("license")) {
                     m_pathToLicense = args[++i];
-                } else if (arg.equalsIgnoreCase("ipcports")) {
-                    String portList = args[++i];
-                    String ports[] = portList.split(",");
-                    for (String port : ports) {
-                        m_ipcPorts.add(Integer.valueOf(port));
-                    }
+                } else if (arg.equalsIgnoreCase("ipcport")) {
+                    String portStr = args[++i];
+                    m_ipcPort = Integer.valueOf(portStr);
                 } else if (arg.equals("enableiv2")) {
                     m_enableIV2 = true;
                 } else {
@@ -500,14 +493,6 @@ public class VoltDB {
             if (m_leader == null) {
                 isValid = false;
                 hostLog.fatal("The hostname is missing.");
-            }
-
-            if (m_backend.isIPC) {
-                if (m_ipcPorts.isEmpty()) {
-                    isValid = false;
-                    hostLog.fatal("Specified an IPC backend but did not supply a , " +
-                            " separated list of ports via ipcports param");
-                }
             }
 
             // require deployment file location

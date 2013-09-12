@@ -77,21 +77,21 @@
 
 #include <algorithm>    // std::find
 
-using namespace voltdb;
+namespace voltdb {
 
 void* keyTupleStorage = NULL;
 TableTuple keyTuple;
 
 #define TABLE_BLOCKSIZE 2097152
 
-PersistentTable::PersistentTable(int partitionColumn) :
-    Table(TABLE_BLOCKSIZE),
+PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetSize) :
+    Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
     m_iter(this, m_data.begin()),
     m_allowNulls(),
     m_partitionColumn(partitionColumn),
     stats_(this),
     m_failedCompactionCount(0),
-    m_tuplesPendingDeleteCount(0)
+    m_invisibleTuplesPendingDeleteCount(0)
 {
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
@@ -292,6 +292,7 @@ void PersistentTable::insertTupleForUndo(char *tuple)
     target.move(tuple);
     target.setPendingDeleteOnUndoReleaseFalse();
     m_tuplesPinnedByUndo--;
+    --m_invisibleTuplesPendingDeleteCount;
 
     /*
      * The only thing to do is reinsert the tuple into the indexes. It was never moved,
@@ -329,8 +330,9 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         if ( ! checkUpdateOnUniqueIndexes(targetTupleToUpdate,
                                           sourceTupleWithNewValues,
                                           indexesToUpdate)) {
-            throw ConstraintFailureException(this, targetTupleToUpdate,
+            throw ConstraintFailureException(this,
                                              sourceTupleWithNewValues,
+                                             targetTupleToUpdate,
                                              CONSTRAINT_TYPE_UNIQUE);
         }
 
@@ -338,8 +340,9 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
          * Check for null constraint violations. Assumes source tuple is fully fleshed out.
          */
         FAIL_IF(!checkNulls(sourceTupleWithNewValues)) {
-            throw ConstraintFailureException(this, targetTupleToUpdate,
+            throw ConstraintFailureException(this,
                                              sourceTupleWithNewValues,
+                                             targetTupleToUpdate,
                                              CONSTRAINT_TYPE_NOT_NULL);
         }
 
@@ -534,6 +537,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
         if (uq) {
             target.setPendingDeleteOnUndoReleaseTrue();
             m_tuplesPinnedByUndo++;
+            ++m_invisibleTuplesPendingDeleteCount;
             // Create and register an undo action.
             uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), this), this);
             return true;
@@ -555,6 +559,7 @@ void PersistentTable::deleteTupleRelease(char* tupleData)
     target.move(tupleData);
     target.setPendingDeleteOnUndoReleaseFalse();
     m_tuplesPinnedByUndo--;
+    --m_invisibleTuplesPendingDeleteCount;
     deleteTupleFinalize(target);
 }
 
@@ -565,8 +570,9 @@ void PersistentTable::deleteTupleRelease(char* tupleData)
 void PersistentTable::deleteTupleFinalize(TableTuple &target)
 {
     // A snapshot (background scan) in progress can still cause a hold-up.
+    // canSafelyFreeTuple() defaults to returning true for all context types
+    // other than CopyOnWriteContext.
     if (   m_tableStreamer != NULL
-        && m_tableStreamer->isCopyOnWriteActive()
         && ! m_tableStreamer->canSafelyFreeTuple(target)) {
         // Mark it pending delete and let the snapshot land the finishing blow.
 
@@ -584,9 +590,8 @@ void PersistentTable::deleteTupleFinalize(TableTuple &target)
             return;
         }
 
+        ++m_invisibleTuplesPendingDeleteCount;
         target.setPendingDeleteTrue();
-        // This count is a testability feature not intended for use in product logic.
-        ++m_tuplesPendingDeleteCount;
         return;
     }
 
@@ -756,8 +761,6 @@ PersistentTable::segregateMaterializedViews(std::map<std::string, catalog::Mater
                                             std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & end,
                                             std::vector< catalog::MaterializedViewInfo*> &survivingInfosOut,
                                             std::vector<MaterializedViewMetadata*> &survivingViewsOut,
-                                            std::vector<catalog::MaterializedViewInfo*> &changingInfosOut,
-                                            std::vector<MaterializedViewMetadata*> &changingViewsOut,
                                             std::vector<MaterializedViewMetadata*> &obsoleteViewsOut)
 {
     //////////////////////////////////////////////////////////
@@ -864,7 +867,10 @@ void PersistentTable::onSetColumns() {
  * to do additional processing for views and Export and non-inline
  * memory tracking
  */
-void PersistentTable::processLoadedTuple(TableTuple &tuple) {
+void PersistentTable::processLoadedTuple(TableTuple &tuple,
+                                         ReferenceSerializeOutput *uniqueViolationOutput,
+                                         int32_t &serializedTupleCount,
+                                         size_t &tupleCountPosition) {
 
     // not null checks at first
     FAIL_IF(!checkNulls(tuple)) {
@@ -872,20 +878,37 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple) {
                                          CONSTRAINT_TYPE_NOT_NULL);
     }
 
+    // Account for non-inlined memory allocated via bulk load or recovery
+    // Do this before unique constraints which might roll back the memory
+    if (m_schema->getUninlinedObjectColumnCount() != 0)
+    {
+        increaseStringMemCount(tuple.getNonInlinedMemorySize());
+    }
+
     if (!tryInsertOnAllIndexes(&tuple)) {
-        throw ConstraintFailureException(this, tuple, TableTuple(),
-                                         CONSTRAINT_TYPE_UNIQUE);
+        if (uniqueViolationOutput) {
+            if (serializedTupleCount == 0) {
+                serializeColumnHeaderTo(*uniqueViolationOutput);
+                tupleCountPosition = uniqueViolationOutput->reserveBytes(sizeof(int32_t));
+            }
+            serializedTupleCount++;
+            tuple.serializeTo(*uniqueViolationOutput);
+            deleteTupleStorage(tuple);
+            return;
+        } else {
+            throw ConstraintFailureException(this, tuple, TableTuple(),
+                                             CONSTRAINT_TYPE_UNIQUE);
+        }
+    }
+    UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+    if (uq) {
+        char* tupleData = uq->allocatePooledCopy(tuple.address(), tuple.tupleLength());
+        uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, this));
     }
 
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
         m_views[i]->processTupleInsert(tuple, true);
-    }
-
-    // Account for non-inlined memory allocated via bulk load or recovery
-    if (m_schema->getUninlinedObjectColumnCount() != 0)
-    {
-        increaseStringMemCount(tuple.getNonInlinedMemorySize());
     }
 }
 
@@ -900,31 +923,35 @@ bool PersistentTable::activateStream(
     int32_t partitionId,
     CatalogId tableId,
     ReferenceSerializeInput &serializeIn) {
-
-    // Expect m_tableStreamer to be null. Only make it fatal in debug builds.
-    assert(m_tableStreamer.get() == NULL);
-
-    if (m_tableStreamer.get() == NULL) {
-        // Prepare a TableStreamer.
-        m_tableStreamer.reset(
-            new TableStreamer(tupleSerializer, streamType, partitionId, serializeIn));
-    }
-
-    return activateStream(tableId);
+    return activateStreamInternal(
+        tableId,
+        boost::shared_ptr<TableStreamer>(
+            new TableStreamer(tupleSerializer, streamType, partitionId, serializeIn)));
 }
 
 /** Prepare table for streaming. */
-bool PersistentTable::activateStream(CatalogId tableId) {
+bool PersistentTable::activateStreamInternal(
+     CatalogId tableId,
+     boost::shared_ptr<TableStreamerInterface> tableStreamer) {
 
+    // Expect m_tableStreamer to be null. Only make it fatal in debug builds.
+    assert(m_tableStreamer == NULL);
+    if (m_tableStreamer == NULL) {
+        m_tableStreamer = tableStreamer;
+    }
+
+    // true => context is already active.
     if (m_tableStreamer->isAlreadyActive()) {
-        // true => COW or recovery context is already active.
         return true;
     }
 
+    // false => no tuples.
     if (m_tupleCount == 0) {
         return false;
     }
 
+    //TODO: Move this special case snapshot code into the COW context.
+    // Probably want to move all of the snapshot-related stuff there.
     if (m_tableStreamer->getStreamType() == TABLE_STREAM_SNAPSHOT) {
         //All blocks are now pending snapshot
         m_blocksPendingSnapshot.swap(m_blocksNotPendingSnapshot);
@@ -965,7 +992,7 @@ int64_t PersistentTable::streamMore(TupleOutputStreamProcessor &outputStreams,
 void PersistentTable::processRecoveryMessage(RecoveryProtoMsg* message, Pool *pool) {
     switch (message->msgType()) {
     case RECOVERY_MSG_TYPE_SCAN_TUPLES: {
-        if (activeTupleCount() == 0) {
+        if (isPersistentTableEmpty()) {
             uint32_t tupleCount = message->totalTupleCount();
             BOOST_FOREACH(TableIndex *index, m_indexes) {
                 index->ensureCapacity(tupleCount);
@@ -1013,6 +1040,14 @@ void PersistentTable::notifyBlockWasCompactedAway(TBPtr block) {
         m_tableStreamer->notifyBlockWasCompactedAway(block);
     }
 
+}
+
+// Call-back from TupleBlock::merge() for each tuple moved.
+void PersistentTable::notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
+                                          TableTuple &sourceTuple, TableTuple &targetTuple) {
+    if (m_tableStreamer != NULL) {
+        m_tableStreamer->notifyTupleMovement(sourceBlock, targetBlock, sourceTuple, targetTuple);
+    }
 }
 
 void PersistentTable::swapTuples(TableTuple &originalTuple,
@@ -1116,7 +1151,7 @@ bool PersistentTable::doCompactionWithinSubset(TBBucketMap *bucketMap) {
             return false;
         }
 
-        std::pair<int, int> bucketChanges = fullest->merge(this, lightest);
+        std::pair<int, int> bucketChanges = fullest->merge(this, lightest, this);
         int tempFullestBucketChange = bucketChanges.first;
         if (tempFullestBucketChange != -1) {
             fullestBucketChange = tempFullestBucketChange;
@@ -1156,7 +1191,8 @@ void PersistentTable::doIdleCompaction() {
 }
 
 void PersistentTable::doForcedCompaction() {
-    if (m_tableStreamer.get() != NULL && m_tableStreamer->isRecoveryActive()) {
+    if (   m_tableStreamer.get() != NULL
+        && m_tableStreamer->getActiveStreamType() == TABLE_STREAM_RECOVERY) {
         LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO,
             "Deferring compaction until recovery is complete.");
         return;
@@ -1277,3 +1313,20 @@ void PersistentTable::printBucketInfo() {
     }
     std::cout << std::endl;
 }
+
+int64_t PersistentTable::validatePartitioning(TheHashinator *hashinator, int32_t partitionId) {
+    TableIterator iter = iterator();
+
+    int64_t mispartitionedRows = 0;
+
+    while (iter.hasNext()) {
+        TableTuple tuple(schema());
+        iter.next(tuple);
+        if (hashinator->hashinate(tuple.getNValue(m_partitionColumn)) != partitionId) {
+            mispartitionedRows++;
+        }
+    }
+    return mispartitionedRows;
+}
+
+} // namespace voltdb

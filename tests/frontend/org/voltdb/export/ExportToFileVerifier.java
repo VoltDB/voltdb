@@ -36,7 +36,8 @@ import java.util.List;
 import java.util.TreeMap;
 
 import org.voltdb.TheHashinator;
-import org.voltdb.VoltDB;
+import org.voltdb.VoltType;
+import org.voltdb.common.Constants;
 
 import au.com.bytecode.opencsv_voltpatches.CSVReader;
 
@@ -53,9 +54,10 @@ public class ExportToFileVerifier {
         m_nonce = nonce;
     }
 
-    public void addRow(String tableName, Object partitionHash, Object[] data)
+    public void addRow(String tableName, Object partitionHash, Object[] data) throws Exception
     {
-        int partition = TheHashinator.hashToPartition(partitionHash);
+        int partition = TheHashinator.getPartitionForParameter(VoltType.typeFromObject(partitionHash).getValue(),
+                partitionHash);
         ExportToFileTestVerifier verifier = m_verifiers.get(tableName + partition);
         if (verifier == null)
         {
@@ -111,7 +113,7 @@ public class ExportToFileVerifier {
 
                 FileInputStream fis = new FileInputStream(f);
                 BufferedInputStream bis = new BufferedInputStream(fis);
-                InputStreamReader isr = new InputStreamReader(bis, VoltDB.UTF8ENCODING);
+                InputStreamReader isr = new InputStreamReader(bis, Constants.UTF8ENCODING);
                 CSVReader csvreader = new CSVReader(isr);
                 String next[] = null;
                 while ((next = csvreader.readNext()) != null) {

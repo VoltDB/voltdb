@@ -100,6 +100,8 @@ getGeneral(ExpressionType c,
         return new ComparisonExpression<CmpGte>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_LIKE):
         return new ComparisonExpression<CmpLike>(c, l, r);
+    case (EXPRESSION_TYPE_COMPARE_IN):
+        return new ComparisonExpression<CmpIn>(c, l, r);
     default:
         char message[256];
         snprintf(message, 256, "Invalid ExpressionType '%s' called"
@@ -131,6 +133,8 @@ getMoreSpecialized(ExpressionType c, L* l, R* r)
         return new InlinedComparisonExpression<CmpGte, L, R>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_LIKE):
         return new InlinedComparisonExpression<CmpLike, L, R>(c, l, r);
+    case (EXPRESSION_TYPE_COMPARE_IN):
+        return new InlinedComparisonExpression<CmpIn, L, R>(c, l, r);
     default:
         char message[256];
         snprintf(message, 256, "Invalid ExpressionType '%s' called for"
@@ -322,15 +326,22 @@ tupleValueFactory(PlannerDomValue obj, ExpressionType et,
     // read the tuple value expression specific data
     int columnIndex = obj.valueForKey("COLUMN_IDX").asInt();
     std::string tableName = obj.valueForKey("TABLE_NAME").asStr();
+    int tableIdx = 0;
+    if (obj.hasNonNullKey("TABLE_IDX")) {
+        tableIdx = obj.valueForKey("TABLE_IDX").asInt();
+    }
 
     // verify input
     if (columnIndex < 0) {
+        char message[100]; // enough to hold all numbers up to 64-bits
+        snprintf(message, 100, "tupleValueFactory: invalid column_idx %d for table %s",
+                columnIndex, tableName.c_str());
+
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "tupleValueFactory: invalid column_idx.");
+                std::string(message));
     }
 
-    //TODO: The columnName argument should be deprecated. The member is not used anywhere.
-    return new TupleValueExpression(columnIndex, tableName, "");
+    return new TupleValueExpression(tableIdx, columnIndex);
 }
 
 AbstractExpression *
@@ -388,6 +399,7 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     case (EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO):
     case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
     case (EXPRESSION_TYPE_COMPARE_LIKE):
+    case (EXPRESSION_TYPE_COMPARE_IN):
         ret = comparisonFactory( et, lc, rc);
     break;
 
@@ -424,6 +436,16 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
                      nameString.c_str(), aliasBuffer, functionId, (int)args->size());
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, fn_message);
         }
+    }
+    break;
+
+    case (EXPRESSION_TYPE_VALUE_VECTOR): {
+        // Parse whatever is needed out of obj and pass the pieces to inListFactory
+        // to make it easier to unit test independently of the parsing.
+        // The first argument is used as the list element type.
+        // If the ValueType of the list builder expression needs to be "ARRAY" or something else,
+        // a separate element type attribute will have to be serialized and passed in here.
+        ret = vectorFactory(vt, args);
     }
     break;
 

@@ -34,6 +34,7 @@ import org.voltdb.types.PlanNodeType;
 public class AggregatePlanNode extends AbstractPlanNode {
 
     public enum Members {
+        PREDICATE,          // ENG-1565: to accelerate min() / max() using index purpose only
         AGGREGATE_COLUMNS,
         AGGREGATE_TYPE,
         AGGREGATE_DISTINCT,
@@ -61,6 +62,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
     // for an aggregator that was pushed down. Must know to correctly
     // decide if other nodes can be pushed down / past this node.
     public boolean m_isCoordinatingAggregator = false;
+
+    protected AbstractExpression m_predicate;
 
     public AggregatePlanNode() {
         super();
@@ -99,6 +102,42 @@ public class AggregatePlanNode extends AbstractPlanNode {
             return false;
 
         return true;
+    }
+
+    // single min() without GROUP BY?
+    public boolean isTableMin() {
+        // do not support GROUP BY for now
+        if (m_groupByExpressions.isEmpty() == false)
+            return false;
+        if (m_aggregateTypes.size() != 1)
+            return false;
+        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_MIN) == false)
+            return false;
+
+        return true;
+    }
+
+    // single max() without GROUP BY?
+    public boolean isTableMax() {
+        // do not support GROUP BY for now
+        if (m_groupByExpressions.isEmpty() == false)
+            return false;
+        if (m_aggregateTypes.size() != 1)
+            return false;
+        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_MAX) == false)
+            return false;
+
+        return true;
+    }
+
+    // set predicate for SELECT MAX(X) FROM T WHERE X > / >= ? case
+    public void setPredicate(AbstractExpression predicate) {
+        m_predicate = predicate;
+    }
+
+    // for single min() / max(), return the single aggregate expression
+    public AbstractExpression getFirstAggregateExpression() {
+        return m_aggregateExpressions.get(0);
     }
 
     public void setOutputSchema(NodeSchema schema)
@@ -253,6 +292,9 @@ public class AggregatePlanNode extends AbstractPlanNode {
             }
             stringer.endArray();
         }
+        if (m_predicate != null) {
+            stringer.key(Members.PREDICATE.name()).value(m_predicate);
+        }
     }
 
     @Override
@@ -272,6 +314,9 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
         // trim the last ", " from the string
         sb.setLength(sb.length() - 2);
+        if (m_predicate != null) {
+            sb.append(" (" + m_predicate.explain(m_outputSchema.getColumns().get(0).getTableName()) + ")");
+        }
         return sb.toString();
     }
 
@@ -303,6 +348,9 @@ public class AggregatePlanNode extends AbstractPlanNode {
                 m_groupByExpressions.add(
                         AbstractExpression.fromJSONObject( jarray.getJSONObject(i), db));
             }
+        }
+        if(!jobj.isNull(Members.PREDICATE.name())) {
+            m_predicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.PREDICATE.name()), db);
         }
     }
 }

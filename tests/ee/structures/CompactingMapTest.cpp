@@ -29,6 +29,7 @@
 #include <sys/time.h>
 #include "harness.h"
 #include "structures/CompactingMap.h"
+#include "common/FixUnusedAssertHack.h"
 
 using namespace voltdb;
 using namespace std;

@@ -21,6 +21,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.utils.VoltTypeUtil;
 
@@ -79,19 +80,36 @@ public class OperatorExpression extends AbstractExpression {
     }
 
     @Override
-    public void refineValueType(VoltType columnType) {
-        if ((m_valueType != null) && (m_valueType != VoltType.NUMERIC)) {
-            return;
-        }
+    public void refineValueType(VoltType neededType, int neededSize)
+    {
         ExpressionType type = getExpressionType();
         if (type == ExpressionType.OPERATOR_IS_NULL || type == ExpressionType.OPERATOR_NOT) {
-            m_valueType = VoltType.BIGINT;
-            m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
             return;
         }
-        m_left.refineValueType(columnType);
+        // The intent here is to allow operands to have the maximum flexibility given the
+        // desired result type. The interesting cases are basically integer, decimal, and
+        // float. If any of the lhs, rhs, or target result type are float, then any ambiguity
+        // in the remaining arguments (such as parameters) should be resolved in favor of
+        // float. Otherwise, if any are decimal, then decimal should be favored. Otherwise,
+        // the broadest integer type is preferable, even if the target is of a more limited
+        // integer type -- math has a way of scaling values up AND down.
+        VoltType operandType = neededType;
+        if (operandType.isInteger()) {
+            operandType = VoltType.BIGINT;
+        }
+        VoltType leftType = m_left.getValueType();
+        VoltType rightType = m_right.getValueType();
+        if (leftType == VoltType.FLOAT || rightType == VoltType.FLOAT) {
+            operandType = VoltType.FLOAT;
+        }
+        else if (operandType != VoltType.FLOAT) {
+            if (leftType == VoltType.DECIMAL || rightType == VoltType.DECIMAL) {
+                operandType = VoltType.DECIMAL;
+            }
+        }
+        m_left.refineOperandType(operandType);
+        m_right.refineOperandType(operandType);
         //XXX Not sure how unary minus (and unary plus?) are handled (possibly via an implicit zero left argument?)
-        m_right.refineValueType(columnType);
         VoltType cast_type = VoltTypeUtil.determineImplicitCasting(m_left.getValueType(), m_right.getValueType());
         if (cast_type == VoltType.INVALID) {
             throw new RuntimeException("ERROR: Invalid output value type for Expression '" + this + "'");
@@ -122,6 +140,23 @@ public class OperatorExpression extends AbstractExpression {
         m_valueType = cast_type;
         // this may not always be safe
         m_valueSize = cast_type.getLengthInBytesForFixedTypes();
+    }
+
+    @Override
+    public String explain(String impliedTableName) {
+        ExpressionType type = getExpressionType();
+        if (type == ExpressionType.OPERATOR_IS_NULL) {
+            return "(" + m_left.explain(impliedTableName) + " IS NULL)";
+        }
+        if (type == ExpressionType.OPERATOR_NOT) {
+            return "(NOT " + m_left.explain(impliedTableName) + ")";
+        }
+        if (type == ExpressionType.OPERATOR_CAST) {
+            return "(CAST " + m_left.explain(impliedTableName) + " AS " + m_valueType.toSQLString() + ")";
+        }
+        return "(" + m_left.explain(impliedTableName) +
+            " " + type.symbol() + " " +
+            m_right.explain(impliedTableName) + ")";
     }
 
 }

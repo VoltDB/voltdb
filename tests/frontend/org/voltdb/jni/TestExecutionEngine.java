@@ -23,6 +23,7 @@
 
 package org.voltdb.jni;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -39,6 +40,7 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.LegacyHashinator;
+import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.RecoverySiteProcessorDestination;
 import org.voltdb.RecoverySiteProcessorSource;
@@ -103,7 +105,14 @@ public class TestExecutionEngine extends TestCase {
         }
 
         System.out.println(warehousedata.toString());
-        engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0);
+        // Long.MAX_VALUE is a no-op don't track undo token
+        engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, false, Long.MAX_VALUE);
+
+        //Check that we can detect and handle the dups when loading the data twice
+        byte results[] = engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, true, Long.MAX_VALUE);
+        System.out.println("Printing dups");
+        System.out.println(PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(results), true));
+
 
         VoltTable stockdata = new VoltTable(
                 new VoltTable.ColumnInfo("S_I_ID", VoltType.INTEGER),
@@ -129,7 +138,8 @@ public class TestExecutionEngine extends TestCase {
                              "sdist4", "sdist5", "sdist6", "sdist7", "sdist8",
                              "sdist9", "sdist10", 0, 0, 0, "sdata");
         }
-        engine.loadTable(STOCK_TABLEID, stockdata, 0, 0);
+        // Long.MAX_VALUE is a no-op don't track undo token
+        engine.loadTable(STOCK_TABLEID, stockdata, 0, 0, false, Long.MAX_VALUE);
     }
 
     public void testLoadTable() throws Exception {
@@ -162,8 +172,7 @@ public class TestExecutionEngine extends TestCase {
                                 "",
                                 100,
                                 HashinatorType.LEGACY,
-                                configBytes,
-                                null));
+                                configBytes));
             }
         };
         destEEThread.start();
@@ -305,8 +314,7 @@ public class TestExecutionEngine extends TestCase {
                             "",
                             100,
                             HashinatorType.LEGACY,
-                            configBytes,
-                            null);
+                            configBytes);
                 destinationReference.set(destinationEngine);
                 destinationEngine.loadCatalog( 0, serializedCatalog);
                 RecoverySiteProcessorDestination destinationProcess =
@@ -346,8 +354,7 @@ public class TestExecutionEngine extends TestCase {
                                 "",
                                 100,
                                 HashinatorType.LEGACY,
-                                configBytes,
-                                null);
+                                configBytes);
                 sourceReference.set(sourceEngine);
                 sourceEngine.loadCatalog( 0, serializedCatalog);
 
@@ -438,8 +445,7 @@ public class TestExecutionEngine extends TestCase {
                         "",
                         100,
                         HashinatorType.LEGACY,
-                        LegacyHashinator.getConfigureBytes(1),
-                        null);
+                        LegacyHashinator.getConfigureBytes(1));
         m_project = new TPCCProjectBuilder();
         m_catalog = m_project.createTPCCSchemaCatalog();
     }

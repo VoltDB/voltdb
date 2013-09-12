@@ -59,6 +59,7 @@
 #include "common/TupleSchema.h"
 #include "common/Pool.hpp"
 #include "common/tabletuple.h"
+#include "common/TheHashinator.h"
 #include "storage/TupleBlock.h"
 #include "stx/btree_set.h"
 #include "common/ThreadLocalPool.h"
@@ -151,26 +152,6 @@ class Table {
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     // -- Most callers should be using TempTable::insertTempTuple, anyway.
     virtual bool insertTuple(TableTuple &tuple) = 0;
-    // Optimized version of update that only updates specific indexes.
-    // The caller knows which indexes MAY need to be updated.
-    // The fallible flag is used to denote a change to a persistent table
-    // which is part of a long transaction that has been vetted and can
-    // never fail (e.g. violate a constraint).
-    // The initial use case is a live catalog update that adds a materialized view.
-    // Constraint checks are bypassed and the change does not make use of "undo" support.
-    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
-    virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
-                                                TableTuple &sourceTupleWithNewValues,
-                                                std::vector<TableIndex*> const &indexesToUpdate,
-                                                bool fallible=true) = 0;
-
-    /// This is not used in any production code path
-    /// -- it has been DEPRECATED to a convenient wrapper until tests can be weaned off it.
-    bool updateTuple(TableTuple &targetTupleToUpdate, TableTuple &sourceTupleWithNewValues)
-    {
-        updateTupleWithSpecificIndexes(targetTupleToUpdate, sourceTupleWithNewValues, m_indexes, true);
-        return true;
-    }
 
     // ------------------------------------------------------------------
     // TUPLES AND MEMORY USAGE
@@ -240,7 +221,7 @@ class Table {
     }
 
     // returned via shallow vector copy -- seems good enough.
-    std::vector<TableIndex*> allIndexes() const { return m_indexes; }
+    const std::vector<TableIndex*>& allIndexes() const { return m_indexes; }
 
     virtual TableIndex *index(std::string name);
 
@@ -289,14 +270,16 @@ class Table {
      * Used for recovery where the schema is not sent.
      */
     void loadTuplesFromNoHeader(SerializeInput &serialize_in,
-                                Pool *stringPool = NULL);
+                                Pool *stringPool = NULL,
+                                ReferenceSerializeOutput *uniqueViolationOutput = NULL);
 
     /**
      * Loads only tuple data, not schema, from the serialized table.
      * Used for initial data loading and receiving dependencies.
      */
     void loadTuplesFrom(SerializeInput &serialize_in,
-                        Pool *stringPool = NULL);
+                        Pool *stringPool = NULL,
+                        ReferenceSerializeOutput *uniqueViolationOutput = NULL);
 
 
     // ------------------------------------------------------------------
@@ -354,12 +337,33 @@ class Table {
         return false;
     }
 
+    /**
+     * These metrics are needed by some iterators.
+     */
+    uint32_t getTupleLength() const {
+        return m_tupleLength;
+    }
+    int getTableAllocationSize() const {
+        return m_tableAllocationSize;
+    }
+    uint32_t getTuplesPerBlock() const {
+        return m_tuplesPerBlock;
+    }
+
+    virtual int64_t validatePartitioning(TheHashinator *hashinator, int32_t partitionId) {
+        throwFatalException("Validate partitioning unsupported on this table type");
+        return 0;
+    }
+
 protected:
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom
      * to do additional processing for views and Export
      */
-    virtual void processLoadedTuple(TableTuple &tuple) {
+    virtual void processLoadedTuple(TableTuple &tuple,
+                                    ReferenceSerializeOutput *uniqueViolationOutput,
+                                    int32_t &serializedTupleCount,
+                                    size_t &tupleCountPosition) {
     };
 
     virtual void swapTuples(TableTuple &sourceTupleWithNewValues, TableTuple &destinationTuple) {

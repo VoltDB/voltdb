@@ -68,6 +68,6 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
 
     @Override
     protected String explainPlanForNode(String indent) {
-        return "SEQUENTIAL SCAN of \"" + m_targetTableName + "\"";
+        return "SEQUENTIAL SCAN of \"" + m_targetTableName + "\"" + explainPredicate("\n" + indent + " filter by ");
     }
 }

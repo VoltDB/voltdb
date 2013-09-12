@@ -94,7 +94,7 @@ public class FunctionExpression extends AbstractExpression {
                 // The only purpose of refining the parameter argument's type is to force a more specific
                 // refinement than NUMERIC as implied by HSQL, in case that might be more specific than
                 // what can be be inferred later from the function call context.
-                param_arg.refineValueType(value_type);
+                param_arg.refineValueType(value_type, value_type.getMaxLengthInBytes());
             }
         }
         if (value_type != null) {
@@ -233,7 +233,7 @@ public class FunctionExpression extends AbstractExpression {
     }
 
     @Override
-    public void refineValueType(VoltType columnType) {
+    public void refineValueType(VoltType neededType, int neededSize) {
         if (m_parameterArg == NOT_PARAMETERIZED) {
             // Non-parameterized functions should have a fixed SPECIFIC type.
             // Further refinement should be useless/un-possible.
@@ -249,9 +249,11 @@ public class FunctionExpression extends AbstractExpression {
         if (valueType != null && valueType != VoltType.NUMERIC) {
             return;
         }
-        arg.refineValueType(columnType);
+        // No assumption is made that functions that are parameterized by
+        // variably-sized types are size-preserving, so allow any size
+        arg.refineValueType(neededType, neededType.getMaxLengthInBytes());
         m_valueType = arg.getValueType();
-        m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
+        m_valueSize = m_valueType.getMaxLengthInBytes();
     }
 
     @Override
@@ -294,4 +296,17 @@ public class FunctionExpression extends AbstractExpression {
         // resolving a child column has type implications for parameterized functions
         negotiateInitialValueTypes();
     }
+
+    @Override
+    public String explain(String impliedTableName) {
+        String result = m_name + "(";
+        String connector = "";
+        for (AbstractExpression arg : m_args) {
+            result += connector + arg.explain(impliedTableName);
+            connector = ", ";
+        }
+        result += ")";
+        return result;
+    }
+
 }

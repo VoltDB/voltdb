@@ -28,14 +28,16 @@
  *
  * While asynchronous processing is (marginally) more convoluted to work
  * with and not adapted to all workloads, it is the preferred interaction
- * model to VoltDB as it guarantees blazing performance.
+ * model to VoltDB as it allows a single client with a small amount of
+ * threads to flood VoltDB with requests, guaranteeing blazing throughput
+ * performance.
  *
- * Because there is a risk of 'firehosing' a database cluster (if the
- * cluster is too slow (slow or too few CPUs), this sample performs
- * auto-tuning to target a specific latency (5ms by default).
- * This tuning process, as demonstrated here, is important and should be
- * part of your pre-launch evaluation so you can adequately provision your
- * VoltDB cluster with the number of servers required for your needs.
+ * Note that this benchmark focuses on throughput performance and
+ * not low latency performance.  This benchmark will likely 'firehose'
+ * the database cluster (if the cluster is too slow or has too few CPUs)
+ * and as a result, queue a significant amount of requests on the server
+ * to maximize throughput measurement. To test VoltDB latency, run the
+ * SyncBenchmark client, also found in the voter sample directory.
  */
 
 package voter;
@@ -117,13 +119,10 @@ public class AsyncBenchmark {
         int maxvotes = 2;
 
         @Option(desc = "Maximum TPS rate for benchmark.")
-        int ratelimit = 100000;
+        int ratelimit = Integer.MAX_VALUE;
 
-        @Option(desc = "Determine transaction rate dynamically based on latency.")
-        boolean autotune = true;
-
-        @Option(desc = "Server-side latency target for auto-tuning.")
-        int latencytarget = 5;
+        @Option(desc = "Report latency for async benchmark run.")
+        boolean latencyreport = false;
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
@@ -142,7 +141,6 @@ public class AsyncBenchmark {
             if (contestants <= 0) exitWithMessageAndUsage("contestants must be > 0");
             if (maxvotes <= 0) exitWithMessageAndUsage("maxvotes must be > 0");
             if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
-            if (latencytarget <= 0) exitWithMessageAndUsage("latencytarget must be > 0");
         }
     }
 
@@ -170,13 +168,8 @@ public class AsyncBenchmark {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig(config.user, config.password, new StatusListener());
-        if (config.autotune) {
-            clientConfig.enableAutoTune();
-            clientConfig.setAutoTuneTargetInternalLatency(config.latencytarget);
-        }
-        else {
-            clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
-        }
+        clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
+
         client = ClientFactory.createClient(clientConfig);
 
         periodicStatsContext = client.createStatsContext();
@@ -188,6 +181,9 @@ public class AsyncBenchmark {
         System.out.println(" Command Line Configuration");
         System.out.println(HORIZONTAL_RULE);
         System.out.println(config.getConfigDumpString());
+        if(config.latencyreport) {
+            System.out.println("NOTICE: Option latencyreport is ON for async run, please set a reasonable ratelimit.\n");
+        }
     }
 
     /**
@@ -266,10 +262,13 @@ public class AsyncBenchmark {
 
         System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
         System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
-        System.out.printf("Aborts/Failures %d/%d, ",
+        System.out.printf("Aborts/Failures %d/%d",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
-        System.out.printf("Avg/95%% Latency %.2f/%dms\n", stats.getAverageLatency(),
+        if(this.config.latencyreport) {
+            System.out.printf(", Avg/95%% Latency %.2f/%dms", stats.getAverageLatency(),
                 stats.kPercentileLatency(0.95));
+        }
+        System.out.printf("\n");
     }
 
     /**
@@ -310,19 +309,28 @@ public class AsyncBenchmark {
         System.out.println(HORIZONTAL_RULE);
 
         System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
-        System.out.printf("Average latency:               %,9.2f ms\n", stats.getAverageLatency());
-        System.out.printf("95th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.95));
-        System.out.printf("99th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.99));
+        if(this.config.latencyreport) {
+            System.out.printf("Average latency:               %,9.2f ms\n", stats.getAverageLatency());
+            System.out.printf("10th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.1));
+            System.out.printf("25th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.25));
+            System.out.printf("50th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.5));
+            System.out.printf("75th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.75));
+            System.out.printf("90th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.9));
+            System.out.printf("95th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.95));
+            System.out.printf("99th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.99));
+            System.out.printf("99.5th percentile latency:     %,9d ms\n", stats.kPercentileLatency(.995));
+            System.out.printf("99.9th percentile latency:     %,9d ms\n", stats.kPercentileLatency(.999));
 
-        System.out.print("\n" + HORIZONTAL_RULE);
-        System.out.println(" System Server Statistics");
-        System.out.println(HORIZONTAL_RULE);
+            System.out.print("\n" + HORIZONTAL_RULE);
+            System.out.println(" System Server Statistics");
+            System.out.println(HORIZONTAL_RULE);
+            System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", stats.getAverageInternalLatency());
 
-        if (config.autotune) {
-            System.out.printf("Targeted Internal Avg Latency: %,9d ms\n", config.latencytarget);
+            System.out.print("\n" + HORIZONTAL_RULE);
+            System.out.println(" Latency Histogram");
+            System.out.println(HORIZONTAL_RULE);
+            System.out.println(stats.latencyHistoReport());
         }
-        System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", stats.getAverageInternalLatency());
-
         // 4. Write stats to file if requested
         client.writeSummaryCSV(stats, config.statsfile);
     }
@@ -373,7 +381,7 @@ public class AsyncBenchmark {
         client.callProcedure("Initialize", config.contestants, CONTESTANT_NAMES_CSV);
 
         System.out.print(HORIZONTAL_RULE);
-        System.out.println("Starting Benchmark");
+        System.out.println(" Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
 
         // Run the benchmark loop for the requested warmup time

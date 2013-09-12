@@ -2074,6 +2074,121 @@ public class FunctionSQL extends Expression {
             exp.children.remove(0);
             return exp;
 
+        case FunctionForVoltDB.FunctionId.FUNC_VOLT_SINCE_EPOCH :
+            volt_alias = null;
+            keywordConstant = ((Integer) nodes[0].valueData).intValue();
+            int since_epoch_func = -1;
+            switch (keywordConstant) {
+            case Tokens.SECOND :
+                volt_alias = "since_epoch_second";
+                since_epoch_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_SINCE_EPOCH_SECOND;
+                break;
+            case Tokens.MILLIS :
+            case Tokens.MILLISECOND:
+                volt_alias = "since_epoch_millisecond";
+                since_epoch_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_SINCE_EPOCH_MILLISECOND;
+                break;
+            case Tokens.MICROS :
+            case Tokens.MICROSECOND :
+                volt_alias = "since_epoch_microsecond";
+                since_epoch_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_SINCE_EPOCH_MICROSECOND;
+                break;
+            default:
+                throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeTypeForVoltDB: " + String.valueOf(keywordConstant));
+            }
+
+            exp.attributes.put("function_id", String.valueOf(since_epoch_func));
+            exp.attributes.put("volt_alias", volt_alias);
+
+            // Having accounted for the first argument, remove it from the child expression list.
+            exp.children.remove(0);
+            return exp;
+
+        case FunctionForVoltDB.FunctionId.FUNC_VOLT_TO_TIMESTAMP :
+            volt_alias = null;
+            keywordConstant = ((Integer) nodes[0].valueData).intValue();
+            int to_timestamp_func = -1;
+            switch (keywordConstant) {
+            case Tokens.SECOND :
+                volt_alias = "to_timestamp_second";
+                to_timestamp_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TO_TIMESTAMP_SECOND;
+                break;
+            case Tokens.MILLIS :
+            case Tokens.MILLISECOND :
+                volt_alias = "to_timestamp_millisecond";
+                to_timestamp_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TO_TIMESTAMP_MILLISECOND;
+                break;
+            case Tokens.MICROS :
+            case Tokens.MICROSECOND :
+                volt_alias = "to_timestamp_microsecond";
+                to_timestamp_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TO_TIMESTAMP_MICROSECOND;
+                break;
+            default:
+                throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeTypeForVoltDB: " + String.valueOf(keywordConstant));
+            }
+
+            exp.attributes.put("function_id", String.valueOf(to_timestamp_func));
+            exp.attributes.put("volt_alias", volt_alias);
+
+            // Having accounted for the first argument, remove it from the child expression list.
+            exp.children.remove(0);
+            return exp;
+
+        case FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_TIMESTAMP :
+            volt_alias = null;
+            keywordConstant = ((Integer) nodes[0].valueData).intValue();
+            int truncate_func = -1;
+            switch (keywordConstant) {
+            case Tokens.YEAR :
+                volt_alias = "truncate_year";
+                truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_YEAR;
+                break;
+            case Tokens.QUARTER :
+                volt_alias = "truncate_quarter";
+                truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_QUARTER;
+                break;
+            case Tokens.MONTH :
+                volt_alias = "truncate_month";
+                truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_MONTH;
+                break;
+            case Tokens.DAY :
+                volt_alias = "truncate_day";
+                truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_DAY;
+                break;
+            case Tokens.HOUR :
+                volt_alias = "truncate_hour";
+                truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_HOUR;
+                break;
+            case Tokens.MINUTE :
+                volt_alias = "truncate_minute";
+                truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_MINUTE;
+                break;
+            case Tokens.SECOND :
+                volt_alias = "truncate_second";
+                truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_SECOND;
+                break;
+            case Tokens.MILLIS:
+            case Tokens.MILLISECOND :
+                volt_alias = "truncate_millisecond";
+                truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_MILLISECOND;
+                break;
+            case Tokens.MICROS:
+            case Tokens.MICROSECOND :
+                volt_alias = "truncate_microseconcd";
+                truncate_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TRUNCATE_MICROSECOND;
+                break;
+            default:
+                throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeTypeForVoltDB: " + String.valueOf(keywordConstant));
+            }
+
+            exp.attributes.put("function_id", String.valueOf(truncate_func));
+            exp.attributes.put("volt_alias", volt_alias);
+
+            // Having accounted for the first argument, remove it from the child expression list.
+            exp.children.remove(0);
+            return exp;
+
+
         default :
             if (voltDisabled != null) {
                 exp.attributes.put("disabled", voltDisabled);

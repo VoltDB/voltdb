@@ -236,7 +236,11 @@ public abstract class ProcedureCompiler {
         // track if there are any writer statements and/or sequential scans and/or an overlooked common partitioning parameter
         boolean procHasWriteStmts = false;
         boolean procHasSeqScans = false;
-        boolean procWantsCommonPartitioning = true; // true but procPartitionExpression == null means a correctly MP proc
+        // procWantsCommonPartitioning == true but commonPartitionExpression == null signifies a proc
+        // for which the planner was requested to attempt to find an SP plan, but that was not possible
+        // -- it had a replicated write or it had one or more partitioned reads that were not all
+        // filtered by the same partition key value -- so it was planned as an MP proc.
+        boolean procWantsCommonPartitioning = true;
         AbstractExpression commonPartitionExpression = null;
         String exampleSPstatement = null;
         Object exampleSPvalue = null;
@@ -614,7 +618,7 @@ public abstract class ProcedureCompiler {
             // name each parameter "param1", "param2", etc...
             ProcParameter procParam = params.add("param" + String.valueOf(paramCount));
             procParam.setIndex(stmtParam.getIndex());
-            procParam.setIsarray(false);
+            procParam.setIsarray(stmtParam.getIsarray());
             procParam.setType(stmtParam.getJavatype());
             paramCount++;
         }

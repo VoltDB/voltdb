@@ -106,7 +106,7 @@ public class SequentialRejoinCoordinator extends JoinCoordinator {
     }
 
     @Override
-    public boolean startJoin(Database catalog, Cartographer cartographer) {
+    public boolean startJoin(Database catalog, Cartographer cartographer, String clSnapshotPath) {
         long firstSite;
         synchronized (m_lock) {
             firstSite = m_pendingSites.poll();

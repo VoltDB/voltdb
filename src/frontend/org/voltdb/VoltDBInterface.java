@@ -73,10 +73,10 @@ public interface VoltDBInterface
     public HostMessenger getHostMessenger();
     public ArrayList<ClientInterface> getClientInterfaces();
     public Map<Long, ExecutionSite> getLocalSites();
+    public OpsAgent getOpsAgent(OpsSelector selector);
+    // Keep this method to centralize the cast to StatsAgent for
+    // existing code
     public StatsAgent getStatsAgent();
-    // TODO: CLEAN ME UP
-    public SystemCatalogAgent getSystemCatalogAgent();
-    public SystemInformationAgent getSystemInformationAgent();
     public MemoryStats getMemoryStatsSource();
     public FaultDistributorInterface getFaultDistributor();
     public BackendTarget getBackendTargetType();
