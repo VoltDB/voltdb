@@ -36,12 +36,10 @@ CREATE VIEW v_votes_by_phone_number
 (
   phone_number
 , num_votes
-, min_number
 )
 AS
    SELECT phone_number
         , COUNT(*)
-        , min(contestant_number)
      FROM votes
  GROUP BY phone_number
 ;

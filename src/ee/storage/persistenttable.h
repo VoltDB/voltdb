@@ -222,6 +222,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     /** Add/drop/list materialized views to this table */
     void addMaterializedView(MaterializedViewMetadata *view);
+    void addIndexForMaterializedView(MaterializedViewMetadata *view);
 
     /** Prepare table for streaming from serialized data. */
     bool activateStream(TupleSerializer &tupleSerializer,
@@ -377,6 +378,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     // list of materialized views that are sourced from this table
     std::vector<MaterializedViewMetadata *> m_views;
+    std::vector<TableIndex*> m_viewIndexes;
 
     // STATS
     voltdb::PersistentTableStats stats_;

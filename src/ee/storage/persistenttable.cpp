@@ -61,6 +61,8 @@
 #include "common/StreamPredicateList.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
+#include "indexes/indexkey.h"
+#include "indexes/CompactingTreeMultiMapIndex.h"
 #include "logging/LogManager.h"
 #include "storage/table.h"
 #include "storage/tableiterator.h"
@@ -279,6 +281,11 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
         m_views[i]->processTupleInsert(source, fallible);
+        if (!m_viewIndexes[i]->addEntry(&target)) {
+            VOLT_DEBUG("Failed to insert into matview index %s,%s",
+                    m_viewIndexes[i]->getTypeName().c_str(),
+                    m_viewIndexes[i]->getName().c_str());
+        }
     }
 }
 
@@ -307,6 +314,13 @@ void PersistentTable::insertTupleForUndo(char *tuple)
         throwFatalException("Failed to insert tuple into table %s for undo:"
                             " unique constraint violation\n%s\n", m_name.c_str(),
                             target.debugNoHeader().c_str());
+    }
+    for (int i = 0; i < m_views.size(); i++) {
+        FAIL_IF (!m_viewIndexes[i]->addEntry(&target)) {
+            VOLT_DEBUG("Failed to insert into matview index %s,%s for undo",
+                    m_viewIndexes[i]->getTypeName().c_str(),
+                    m_viewIndexes[i]->getName().c_str());
+        }
     }
 }
 
@@ -384,7 +398,17 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     }
 
     // handle any materialized views
+    bool changedViewIndex[m_viewIndexes.size()];
     for (int i = 0; i < m_views.size(); i++) {
+        if (!m_viewIndexes[i]->checkForIndexChange(&targetTupleToUpdate, &sourceTupleWithNewValues)) {
+            changedViewIndex[i] = false;
+            continue;
+        }
+        changedViewIndex[i] = true;
+        if (!m_viewIndexes[i]->deleteEntry(&targetTupleToUpdate)) {
+            throwFatalException("Failed to remove tuple from matview index (during update) in Table: %s Index %s",
+                                m_name.c_str(), m_viewIndexes[i]->getName().c_str());
+        }
         m_views[i]->processTupleDelete(targetTupleToUpdate, fallible);
     }
 
@@ -452,6 +476,12 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
         m_views[i]->processTupleInsert(targetTupleToUpdate, fallible);
+        if (changedViewIndex[i]) {
+            if (!m_viewIndexes[i]->addEntry(&targetTupleToUpdate)) {
+                throwFatalException("Failed to insert updated tuple into matview index in Table: %s Index %s",
+                                    m_name.c_str(), m_viewIndexes[i]->getName().c_str());
+            }
+        }
     }
     return true;
 }
@@ -489,6 +519,13 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
                                     m_name.c_str(), index->getName().c_str());
             }
         }
+
+        for (int i = 0; i < m_viewIndexes.size(); i++) {
+            if (!m_viewIndexes[i]->deleteEntry(&targetTupleToUpdate)) {
+                throwFatalException("Failed to update tuple in Table: %s matview Index %s",
+                                    m_name.c_str(), m_viewIndexes[i]->getName().c_str());
+            }
+        }
     }
 
     if (m_schema->getUninlinedObjectColumnCount() != 0)
@@ -514,6 +551,11 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
                                     m_name.c_str(), index->getName().c_str());
             }
         }
+        for (int i = 0; i < m_viewIndexes.size(); i++) {
+            if (!m_viewIndexes[i]->addEntry(&targetTupleToUpdate)) {
+                throwFatalException("Failed to update tuple in Table: %s matview Index %s",
+                                    m_name.c_str(), m_viewIndexes[i]->getName().c_str());            }
+        }
     }
 }
 
@@ -529,6 +571,10 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
 
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
+        if (!m_viewIndexes[i]->deleteEntry(&target)) {
+            throwFatalException(
+                                "Failed to delete tuple in Table: %s Index %s", m_name.c_str(), m_viewIndexes[i]->getName().c_str());
+        }
         m_views[i]->processTupleDelete(target, fallible);
     }
 
@@ -638,6 +684,12 @@ void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
     assert(target.isActive());
 
     deleteFromAllIndexes(&target);
+    for (int i = 0; i < m_views.size(); i++) {
+        if (!m_viewIndexes[i]->deleteEntry(&target)) {
+            throwFatalException("Failed to delete tuple in Table: %s matview Index %s",
+                    m_name.c_str(), m_viewIndexes[i]->getName().c_str());
+        }
+    }
     deleteTupleStorage(target); // also frees object columns
 }
 
@@ -736,6 +788,29 @@ void PersistentTable::addMaterializedView(MaterializedViewMetadata *view)
     m_views.push_back(view);
 }
 
+void PersistentTable::addIndexForMaterializedView(MaterializedViewMetadata *view)
+{
+    std::vector<int32_t> columnIndices;
+    if (view->getGroupbyExprs().size() == 0) {
+        for(int i = 0; i < view->getGroupByColumnCount(); i++) {
+            columnIndices.push_back(view->getGroupByColumns()[i]);
+        }
+    }
+    TableIndexScheme *scheme = new TableIndexScheme("MATVIEW_GROUPBY_INDEX", BALANCED_TREE_INDEX,
+            columnIndices, view->getGroupbyExprs(), false, true, m_schema);
+
+    TableIndex *newIndex = new CompactingTreeMultiMapIndex<TupleKey, true >(
+            view->targetTable()->primaryKeyIndex()->getKeySchema(), *scheme);
+
+    TableTuple tuple(m_schema);
+    TableIterator iter = iterator();
+    while (iter.next(tuple)) {
+        newIndex->addEntry(&tuple);
+    }
+    m_viewIndexes.push_back(newIndex);
+    m_views.back()->setGroupbyIndex(newIndex);
+}
+
 /*
  * drop a view. the table is no longer feeding it.
  * The destination table will go away when the view metadata is deleted (or later?) as its refcount goes to 0.
@@ -743,16 +818,28 @@ void PersistentTable::addMaterializedView(MaterializedViewMetadata *view)
 void PersistentTable::dropMaterializedView(MaterializedViewMetadata *targetView)
 {
     assert( ! m_views.empty());
+    TableIndex *targetIndex;
     MaterializedViewMetadata *lastView = m_views.back();
+    TableIndex *lastIndex = m_viewIndexes.back();
     if (targetView != lastView) {
         // iterator to vector element:
         std::vector<MaterializedViewMetadata*>::iterator toView = find(m_views.begin(), m_views.end(), targetView);
         assert(toView != m_views.end());
         // Use the last view to patch the potential hole.
         *toView = lastView;
+
+        // deal with group by index
+        targetIndex = (dynamic_cast<MaterializedViewMetadata*>(*toView))->groupbyIndex();
+        if (targetIndex != lastIndex) {
+            std::vector<TableIndex*>::iterator toIndex = find(m_viewIndexes.begin(), m_viewIndexes.end(), targetIndex);
+            assert(toIndex != m_viewIndexes.end());
+            *toIndex = lastIndex;
+        }
     }
     // The last element is now excess.
     m_views.pop_back();
+    m_viewIndexes.pop_back();
+    delete targetIndex;
     delete targetView;
 }
 

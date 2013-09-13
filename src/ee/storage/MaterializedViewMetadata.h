@@ -57,6 +57,22 @@ public:
     PersistentTable * targetTable() const { return m_target; }
 
     void setTargetTable(PersistentTable * target);
+
+    TableIndex *groupbyIndex() const { return m_groupbyIndex; }
+    void setGroupbyIndex(TableIndex *groupbyIndex) { m_groupbyIndex = groupbyIndex; }
+
+    int32_t getGroupByColumnCount() const {
+        return m_groupByColumnCount;
+    }
+
+    int32_t* getGroupByColumns() const {
+        return m_groupByColumns;
+    }
+
+    const std::vector<AbstractExpression*>& getGroupbyExprs() const {
+        return m_groupbyExprs;
+    }
+
 private:
 
     void freeBackedTuples();
@@ -85,6 +101,8 @@ private:
     // the primary index on the view table whose columns
     // are the same as the group by in the view query
     TableIndex *m_index;
+    // the group by index on the source table
+    TableIndex *m_groupbyIndex;
 
     // space to store temp view tuples
     TableTuple m_existingTuple;
