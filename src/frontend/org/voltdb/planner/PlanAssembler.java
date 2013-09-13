@@ -1042,7 +1042,7 @@ public class PlanAssembler {
                 // if this is a fancy expression-based index...
                 else {
                     try {
-                        indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, null);
+                        indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr);
                     } catch (JSONException e) {
                         e.printStackTrace(); // danger will robinson
                         assert(false);

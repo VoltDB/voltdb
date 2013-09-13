@@ -203,7 +203,8 @@ public class FunctionExpression extends AbstractExpression {
     }
 
     @Override
-    protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {
+    protected void loadFromJSONObject(JSONObject obj) throws JSONException
+    {
         m_name = obj.getString(Members.NAME.name());
         m_alias = obj.getString(Members.ALIAS.name());
         m_functionId = obj.getInt(Members.FUNCTION_ID.name());

@@ -336,21 +336,11 @@ public class AggregatePlanNode extends AbstractPlanNode {
             }
             else {
                 m_aggregateExpressions.add(
-                        AbstractExpression.fromJSONObject(
-                                tempObj.getJSONObject( Members.AGGREGATE_EXPRESSION.name() ),
-                                db) );
+                    AbstractExpression.fromJSONChild(tempObj, Members.AGGREGATE_EXPRESSION.name()));
             }
         }
-        if ( ! jobj.isNull(Members.GROUPBY_EXPRESSIONS.name()) ) {
-            jarray = jobj.getJSONArray( Members.GROUPBY_EXPRESSIONS.name() );
-            size = jarray.length();
-            for( int i = 0; i < size; i++ ) {
-                m_groupByExpressions.add(
-                        AbstractExpression.fromJSONObject( jarray.getJSONObject(i), db));
-            }
-        }
-        if(!jobj.isNull(Members.PREDICATE.name())) {
-            m_predicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.PREDICATE.name()), db);
-        }
+        AbstractExpression.loadFromJSONArrayChild(m_groupByExpressions, jobj,
+                                                  Members.GROUPBY_EXPRESSIONS.name());
+        m_predicate = AbstractExpression.fromJSONChild(jobj, Members.PREDICATE.name());
     }
 }
