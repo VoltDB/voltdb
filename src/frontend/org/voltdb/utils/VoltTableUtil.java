@@ -73,7 +73,7 @@ public class VoltTableUtil {
      * @return
      */
     public static boolean addRowToVoltTableFromLine(VoltTable table, String fields[],
-            Map<Integer, VoltType> columnTypes)
+            Map<Integer, VoltType> columnTypes, NumberFormat nf)
             throws ParseException, IOException {
 
         if (fields == null || fields.length <= 0) {
@@ -88,7 +88,6 @@ public class VoltTableUtil {
                     || type == VoltType.SMALLINT
                     || type == VoltType.TINYINT) {
                 if (fields[i] != null) {
-                    NumberFormat nf = NumberFormat.getInstance();
                     row_args[i] = nf.parse(fields[i]);
                 } else {
                     row_args[i] = 0L;

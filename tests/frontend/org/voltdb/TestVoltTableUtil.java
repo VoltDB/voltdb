@@ -39,6 +39,7 @@ import org.voltdb.utils.VoltTableUtil;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 import java.math.BigDecimal;
+import java.text.NumberFormat;
 import java.text.ParseException;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -166,8 +167,9 @@ public class TestVoltTableUtil extends Mockito {
         VoltTable vt = new VoltTable(columns);
         String fields[] = {"1", "11", "1,110", "1212121212110",
             "1.00", "12091212.33", "This is a String", "BytesArray", "2010-07-01 12:30:21.0678"};
+        NumberFormat nf = NumberFormat.getInstance();
         try {
-            VoltTableUtil.addRowToVoltTableFromLine(vt, fields, columnTypes);
+            VoltTableUtil.addRowToVoltTableFromLine(vt, fields, columnTypes, nf);
             assertEquals(1, vt.getRowCount());
             vt.advanceRow();
             long l = vt.getLong(0);
@@ -191,7 +193,7 @@ public class TestVoltTableUtil extends Mockito {
             TimestampType ts = new TimestampType(vt.getTimestampAsLong(8));
             assertEquals(ts.toString(), "2010-07-01 12:30:21.067800");
 
-            VoltTableUtil.addRowToVoltTableFromLine(vt, fields, columnTypes);
+            VoltTableUtil.addRowToVoltTableFromLine(vt, fields, columnTypes, nf);
             assertEquals(2, vt.getRowCount());
         } catch (ParseException ex) {
             fail(ex.toString());
