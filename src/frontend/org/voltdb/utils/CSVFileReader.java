@@ -34,7 +34,8 @@ import org.voltdb.client.Client;
 import static org.voltdb.utils.CSVLoader.m_log;
 
 /**
- * This is a single thread reader which feeds the lines after validating syntax to correct Partition Processors.
+ * This is a single thread reader which feeds the lines after validating syntax to correct Partition Processors. In case
+ * of MP table or user supplied procedure we use just one processor.
  *
  */
 class CSVFileReader implements Runnable {

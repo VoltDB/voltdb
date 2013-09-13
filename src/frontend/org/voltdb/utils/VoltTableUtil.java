@@ -69,7 +69,7 @@ public class VoltTableUtil {
      *
      * @param table
      * @param fields
-     * @param columnTypes
+     * @param columnTypes type values for columns with ordinal position as key.
      * @return
      */
     public static boolean addRowToVoltTableFromLine(VoltTable table, String fields[],
