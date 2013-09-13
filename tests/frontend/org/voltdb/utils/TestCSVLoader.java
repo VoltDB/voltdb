@@ -795,6 +795,15 @@ public class TestCSVLoader extends TestCase {
             System.out.println("data inserted to table BLAH:\n" + modCount);
             int rowct = modCount.getRowCount();
 
+            // Call validate partitioning to check if we are good.
+            VoltTable valTable;
+            valTable = client.callProcedure("@ValidatePartitioning", null, null).getResults()[0];
+            System.out.println("Validate for BLAH:\n" + valTable);
+            while (valTable.advanceRow()) {
+                long miscnt = valTable.getLong("MISPARTITIONED_ROWS");
+                assertEquals(miscnt, 0);
+            }
+
             BufferedReader csvreport = new BufferedReader(new FileReader(CSVLoader.pathReportfile));
             int lineCount = 0;
             String line = "";
