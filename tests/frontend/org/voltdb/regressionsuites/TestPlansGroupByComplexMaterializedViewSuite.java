@@ -511,6 +511,10 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
 
         VoltTable vt = null;
         Client client = this.getClient();
+
+        vt = client.callProcedure("@AdHoc", "Select count(*) from V_P1").getResults()[0];
+        assertEquals(0, vt.asScalarLong());
+
         String tb = "P1.insert";
         client.callProcedure(tb, 1,  10,  1 );
         client.callProcedure(tb, 2,  20,  3 );
@@ -520,6 +524,10 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
 
 //        "CREATE VIEW V_P1 (V_P1_G1, V_P1_CNT, V_P1_sum_wage) " +
 //        "AS SELECT dept, count(*), SUM(wage) FROM P1 GROUP BY dept;" +
+
+        // TODO(xin): BUG
+//        vt = client.callProcedure("@AdHoc", "Select count(*) from V_P1").getResults()[0];
+//        assertEquals(2, vt.asScalarLong());
 
         vt = client.callProcedure("@AdHoc", "Select * from V_P1 ORDER BY V_P1_G1").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{1,3,100},{3,2,60}});
@@ -694,6 +702,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         } catch (IOException e) {
             assertFalse(true);
         }
+
         config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);

@@ -144,6 +144,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
         return m_aggregateTypes;
     }
 
+    public List<AbstractExpression> getGroExpressionTypes () {
+        return m_groupByExpressions;
+    }
+
     public void setOutputSchema(NodeSchema schema)
     {
         // aggregates currently have their output schema specified

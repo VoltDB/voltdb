@@ -137,16 +137,16 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public static class MVFixInfo {
         // Preparation for MV based distributed query
-        public boolean isMVBasedDistributedQuery = false;
+        public boolean mayNeedFixMVBasedDistributedQuery = false;
         public boolean finalNeedFix = false;
-
         public int numOfGroupByColumns = -1;
 
-        public ArrayList<ParsedColInfo> mvDisplayColumns = null;
-        public ArrayList<ParsedColInfo> mvAggResultColumns = null;
-        public ArrayList<ParsedColInfo> mvGroupByColumns = null;
+        public ArrayList<ParsedColInfo> originalDisplayColumns = null;
+        public ArrayList<ParsedColInfo> originalAggResultColumns = null;
+        public ArrayList<ParsedColInfo> originalGroupByColumns = null;
 
-        public List<ParsedColInfo> orignalGroupbyColumnsList = null;
+        public List<ParsedColInfo> mvDDLGroupbyColumnsList = null;
+
         public Table mvTable = null;
         public NodeSchema inlineProjSchema = null;
     }
@@ -262,15 +262,19 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     private boolean needprocessMVBasedQueryFix() {
         // Check valiad cases first
-        if (tableList.size() != 1) {
-            return false;
-        }
+
         Table mvTable = tableList.get(0);
         String mvTableName = mvTable.getTypeName();
         Table srcTable = mvTable.getMaterializer();
         if (srcTable == null) {
             return false;
         }
+
+        if (tableList.size() != 1) {
+            String errorMsg = String.format("Unsupported query joined with materialized table %s", mvTableName);
+            throw new PlanningErrorException(errorMsg);
+        }
+
         Column partitionCol = srcTable.getPartitioncolumn();
         if (partitionCol == null) {
             return false;
@@ -318,8 +322,19 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             return false;
         }
 
+        if (!isGrouped() && hasAggregateExpression) {
+            if (displayColumns.size() == 1) {
+                // TODO(xin): optimize it later.
+                // currently, do not fix COUNT(*) query.
+                if (displayColumns.get(0).expression.getExpressionType()
+                        == ExpressionType.AGGREGATE_COUNT_STAR) {
+                    return false;
+                }
+            }
+        }
+
         mvFixInfo.mvTable = mvTable;
-        mvFixInfo.isMVBasedDistributedQuery = true;
+        mvFixInfo.mayNeedFixMVBasedDistributedQuery = true;
         return true;
     }
 
@@ -330,7 +345,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         ArrayList<ParsedColInfo> tmpAggResultColumns = new ArrayList<ParsedColInfo>(aggResultColumns);
         ArrayList<ParsedColInfo> tmpGroupbyColumns = new ArrayList<ParsedColInfo>(groupByColumns);
         // Keep the newAggSchema the same without any changes if it has been created.
-        mvFixInfo.orignalGroupbyColumnsList = new ArrayList<ParsedColInfo>();
+        mvFixInfo.mvDDLGroupbyColumnsList = new ArrayList<ParsedColInfo>();
 
         List<Column> mvColumnArray =
                 CatalogUtil.getSortedCatalogItems(mvFixInfo.mvTable.getColumns(), "index");
@@ -353,7 +368,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             tve.setValueSize(mvCol.getSize());
             col.expression = tve;
 
-            mvFixInfo.orignalGroupbyColumnsList.add(col);
+            mvFixInfo.mvDDLGroupbyColumnsList.add(col);
             if (ParsedColInfo.isNewtoColumnList(aggResultColumns, col)) {
                 aggResultColumns.add(col);
             }
@@ -369,38 +384,49 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         placeTVEsinColumns();
 
         // Switch them back
-        mvFixInfo.mvDisplayColumns = displayColumns;
-        mvFixInfo.mvAggResultColumns = aggResultColumns;
-        mvFixInfo.mvGroupByColumns = groupByColumns;
+        mvFixInfo.originalDisplayColumns = displayColumns;
+        mvFixInfo.originalAggResultColumns = aggResultColumns;
+        mvFixInfo.originalGroupByColumns = groupByColumns;
 
         displayColumns = tmpDisplayColumns;
         aggResultColumns = tmpAggResultColumns;
         groupByColumns = tmpGroupbyColumns;
 
         // Prepare for the inlined projection node schema for scan node.
+        mvFixInfo.inlineProjSchema = new NodeSchema();
+        ArrayList<SchemaColumn> orignalGroupbyColumnsList = new ArrayList<SchemaColumn>();
+        // construct new projection columns for scan plan node.
+        for (ParsedColInfo col: mvFixInfo.mvDDLGroupbyColumnsList) {
+            assert(col.expression instanceof TupleValueExpression);
+            TupleValueExpression tve = (TupleValueExpression)col.expression;
+            SchemaColumn scol = new SchemaColumn(tve.getTableName(),
+                    tve.getColumnName(),tve.getColumnAlias(), tve);
+            orignalGroupbyColumnsList.add(scol);
+        }
+        ArrayList<SchemaColumn> newValue = new ArrayList<SchemaColumn>();
+
         for (String key: scanColumns.keySet()) {
             ArrayList<SchemaColumn> value = scanColumns.get(key);
             if (key.equals(mvTableName)) {
-                ArrayList<SchemaColumn> newValue = new ArrayList<SchemaColumn>(value);
+                newValue.addAll(value);
                 Set<SchemaColumn> valueSet = new HashSet<SchemaColumn>(value);
                 // construct new projection columns for scan plan node.
-                for (ParsedColInfo col: mvFixInfo.orignalGroupbyColumnsList) {
-                    assert(col.expression instanceof TupleValueExpression);
-                    TupleValueExpression tve = (TupleValueExpression)col.expression;
-                    SchemaColumn scol = new SchemaColumn(tve.getTableName(),
-                            tve.getColumnName(),tve.getColumnAlias(), tve);
+                for (SchemaColumn scol : orignalGroupbyColumnsList) {
                     if (!valueSet.contains(scol)) {
                         valueSet.add(scol);
                         newValue.add(scol);
                     }
                 }
-                mvFixInfo.inlineProjSchema = new NodeSchema();
-                for (SchemaColumn scol: newValue) {
-                    mvFixInfo.inlineProjSchema.addColumn(scol);
-                }
                 break;
             }
         }
+        if (newValue.size() == 0) {
+            newValue = orignalGroupbyColumnsList;
+        }
+        for (SchemaColumn scol: newValue) {
+            mvFixInfo.inlineProjSchema.addColumn(scol);
+        }
+
     }
 
     public void switchFixSuiteForMVBasedQuery() {
@@ -409,14 +435,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         ArrayList<ParsedColInfo> tmpGroupByColumns = groupByColumns;
 
         // Switch set for MV fix use.
-        displayColumns = mvFixInfo.mvDisplayColumns;
-        aggResultColumns = mvFixInfo.mvAggResultColumns;
-        groupByColumns = mvFixInfo.mvGroupByColumns;
+        displayColumns = mvFixInfo.originalDisplayColumns;
+        aggResultColumns = mvFixInfo.originalAggResultColumns;
+        groupByColumns = mvFixInfo.originalGroupByColumns;
 
         // But keep the original set in mv set for future use.
-        mvFixInfo.mvDisplayColumns = tmpDisplayColumns;
-        mvFixInfo.mvAggResultColumns = tmpAggResultColumns;
-        mvFixInfo.mvGroupByColumns = tmpGroupByColumns;
+        mvFixInfo.originalDisplayColumns = tmpDisplayColumns;
+        mvFixInfo.originalAggResultColumns = tmpAggResultColumns;
+        mvFixInfo.originalGroupByColumns = tmpGroupByColumns;
     }
 
     private void processAvgPushdownOptimization (VoltXMLElement displayElement,
@@ -928,10 +954,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public boolean mayNeedAvgPushdown() {
         return hasAverage;
-    }
-
-    public boolean mayNeedSwitchMVSet() {
-        return mvFixInfo.isMVBasedDistributedQuery;
     }
 
     public boolean hasOrderByColumns() {

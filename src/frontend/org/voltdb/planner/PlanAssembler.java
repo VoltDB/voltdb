@@ -538,7 +538,7 @@ public class PlanAssembler {
         if (distributedQuery && m_parsedSelect.mayNeedAvgPushdown()) {
             m_parsedSelect.switchOptimalSuiteForAvgPushdown();
         }
-        if (distributedQuery && m_parsedSelect.mayNeedSwitchMVSet()) {
+        if (distributedQuery && m_parsedSelect.mvFixInfo.mayNeedFixMVBasedDistributedQuery) {
             m_parsedSelect.switchFixSuiteForMVBasedQuery();
             m_parsedSelect.mvFixInfo.finalNeedFix = true;
         }
@@ -1215,8 +1215,11 @@ public class PlanAssembler {
         for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.aggResultColumns) {
             AbstractExpression rootExpr = col.expression;
             SchemaColumn schema_col = null;
-            if (ParsedColInfo.isNewtoColumnList(mvFixInfo.orignalGroupbyColumnsList, col)) {
+            if (ParsedColInfo.isNewtoColumnList(mvFixInfo.mvDDLGroupbyColumnsList, col)) {
+                // TODO(xin):
+                // Change this when MV can support more aggregation types, like MIN & MAX
                 ExpressionType agg_expression_type = ExpressionType.AGGREGATE_SUM;
+
                 boolean is_distinct = false;
                 AbstractExpression agg_input_expr = null;
 
@@ -1226,7 +1229,9 @@ public class PlanAssembler {
                 tve.setColumnIndex(outputColumnIndex);
 
                 if (rootExpr instanceof AggregateExpression) {
-                    is_distinct = ((AggregateExpression)rootExpr).isDistinct();
+                    AggregateExpression aggExpr = (AggregateExpression)rootExpr;
+
+                    is_distinct = aggExpr.isDistinct();
                     tve.setColumnName("");
                     tve.setColumnAlias(col.alias);
                     tve.setTableName("VOLT_TEMP_TABLE");
@@ -1255,7 +1260,7 @@ public class PlanAssembler {
         aggNode.setOutputSchema(agg_schema);
 
 
-        for (ParsedSelectStmt.ParsedColInfo col : mvFixInfo.orignalGroupbyColumnsList) {
+        for (ParsedSelectStmt.ParsedColInfo col : mvFixInfo.mvDDLGroupbyColumnsList) {
             aggNode.addGroupByExpression(col.expression);
         }
 
@@ -1278,22 +1283,22 @@ public class PlanAssembler {
         }
 
         // Switch back for the real query's displayColumns
-        m_parsedSelect.displayColumns = mvFixInfo.mvDisplayColumns;
+        m_parsedSelect.displayColumns = mvFixInfo.originalDisplayColumns;
 
         return root;
     }
 
     AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
-        if (m_parsedSelect.mvFixInfo.finalNeedFix) {
-            if (m_parsedSelect.groupByColumns().size() == m_parsedSelect.mvFixInfo.numOfGroupByColumns) {
-                return root;
-            }
-        }
-
         AggregatePlanNode aggNode = null;
 
         /* Check if any aggregate expressions are present */
         boolean containsAggregateExpression = m_parsedSelect.hasAggregateExpression();
+
+        if (m_parsedSelect.mvFixInfo.finalNeedFix && !containsAggregateExpression) {
+            if (m_parsedSelect.groupByColumns().size() == m_parsedSelect.mvFixInfo.numOfGroupByColumns) {
+                return root;
+            }
+        }
 
         /*
          * "Select A from T group by A" is grouped but has no aggregate operator
@@ -1455,7 +1460,14 @@ public class PlanAssembler {
                 aggNode.addGroupByExpression(col.expression);
 
                 if (topAggNode != null) {
-                    topAggNode.addGroupByExpression(m_parsedSelect.groupByExpressions.get(col.alias));
+                    if (!m_parsedSelect.mvFixInfo.finalNeedFix) {
+                        topAggNode.addGroupByExpression(m_parsedSelect.groupByExpressions.get(col.alias));
+                    } else {
+                        if (m_parsedSelect.mvFixInfo.originalGroupByColumns.contains(col)) {
+                            topAggNode.addGroupByExpression(m_parsedSelect.groupByExpressions.get(col.alias));
+                        }
+                    }
+
                 }
             }
             aggNode.setOutputSchema(agg_schema);
