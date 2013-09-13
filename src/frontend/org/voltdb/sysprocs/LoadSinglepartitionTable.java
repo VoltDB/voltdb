@@ -133,16 +133,14 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
             voltQueueSQL(stmt, params);
             ++queued;
 
-            // every 200 statements, exec the batch
-            // 200 is an arbitrary number, but is tied to CSVloading and procedure runner fastPath
-            if ((i % 200) == 0) {
+            // every 100 statements, exec the batch
+            // 100 is an arbitrary number
+            if ((i % 100) == 0) {
                 executed += executeSQL();
-                //Reset queued
-                queued = 0;
             }
         }
         // execute any leftover batched statements
-        if (queued > 0) {
+        if (queued > executed) {
             executed += executeSQL();
         }
 

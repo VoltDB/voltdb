@@ -110,7 +110,7 @@ class CSVFileReader implements Runnable {
                 CSVLineWithMetaData lineData = new CSVLineWithMetaData(correctedLine, lineList, listReader.getLineNumber());
                 int partitionId = 0;
                 //Find partiton to send this line to and put on correct partition processor queue.
-                if (!CSVPartitionProcessor.isMP) {
+                if (!CSVPartitionProcessor.isMP && !config.useSuppliedProcedure) {
                     partitionId = TheHashinator.getPartitionForParameter(partitionColumnType.getValue(),
                             (Object) lineData.correctedLine[partitionedColumnIndex]);
                 }

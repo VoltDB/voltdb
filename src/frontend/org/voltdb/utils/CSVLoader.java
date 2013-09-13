@@ -543,8 +543,11 @@ public class CSVLoader {
 
     private static void close_cleanup() throws IOException,
             InterruptedException {
+        //Reset all this for tests which uses main to load csv data.
         CSVFileReader.errorInfo.clear();
         CSVFileReader.errored = false;
+        CSVLoader.numProcessors = 1;
+        CSVLoader.columnCnt = 0;
         CSVFileReader.totalLineCount = new AtomicLong(0);
         CSVFileReader.totalRowCount = new AtomicLong(0);
 

@@ -83,7 +83,7 @@ class CSVPartitionProcessor implements Runnable {
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
             if (response.getStatus() != ClientResponse.SUCCESS) {
-                String[] info = {m_csvLine.rawLine.toString(), response.getException().getMessage()};
+                String[] info = {m_csvLine.rawLine.toString(), response.getStatusString()};
                 if (CSVFileReader.synchronizeErrorInfo(m_csvLine.lineNumber, info)) {
                     m_processor.m_errored = true;
                     return;
