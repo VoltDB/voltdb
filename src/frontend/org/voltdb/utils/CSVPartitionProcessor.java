@@ -309,6 +309,7 @@ class CSVPartitionProcessor implements Runnable {
 
             processLoadTable(table, procName, partitionParam);
         }
+        m_partitionQueue.clear();
 
         //Let partition processor drain and put any failures on failure processing.
         try {
