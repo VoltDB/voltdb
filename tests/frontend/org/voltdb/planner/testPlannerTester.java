@@ -57,7 +57,7 @@ public class testPlannerTester extends PlannerTestCase {
         System.out.println( collected );
         System.out.println( collected.size() );
         for( AbstractPlanNode n : collected ) {
-            System.out.println( n.toExplainPlanString() );
+            System.out.println( n.toExplainPlanString(getDatabase()) );
         }
         assertTrue( collected.size() == 1 );
         JSONObject j;
@@ -76,14 +76,14 @@ public class testPlannerTester extends PlannerTestCase {
                     "testplans-plannerTester-ddl");
             List<AbstractPlanNode> pnList = plannerTester.testCompile("select * from l, t where t.a=l.a limit ?;");
             System.out.println( pnList.size() );
-            System.out.println( pnList.get(0).toExplainPlanString() );
+            System.out.println( pnList.get(0).toExplainPlanString(getDatabase()) );
 
             assert( pnList.size() == 2 );
             assert( pnList.get(1) instanceof SendPlanNode );
             if ( pnList.get(0).reattachFragment( ( SendPlanNode )pnList.get(1) ) ) {
                 AbstractPlanNode pn = pnList.get(0);
-                System.out.println( pn.toExplainPlanString() );
-                assertTrue( pn.toExplainPlanString().contains("SEND PARTITION RESULTS TO COORDINATOR"));
+                System.out.println( pn.toExplainPlanString(getDatabase()) );
+                assertTrue( pn.toExplainPlanString(getDatabase()).contains("SEND PARTITION RESULTS TO COORDINATOR"));
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -103,13 +103,13 @@ public class testPlannerTester extends PlannerTestCase {
         pnList.get(0).reattachFragment( (SendPlanNode) pnList.get(1) );
         pn = pnList.get(0);
         System.out.println( pn.toJSONString() );
-        System.out.println( pn.toExplainPlanString() );
+        System.out.println( pn.toExplainPlanString(getDatabase()) );
         plannerTester.writePlanToFile( pn, path, "prettyJson.txt", "");
 
         ArrayList<String> getsql = new ArrayList<String>();
         PlanNodeTree pnt = plannerTester.loadPlanFromFile(path+"prettyJson.txt", getsql);
         System.out.println( pnt.toJSONString() );
-        System.out.println( pnt.getRootPlanNode().toExplainPlanString() );
+        System.out.println( pnt.getRootPlanNode().toExplainPlanString(getDatabase()) );
         ArrayList<AbstractPlanNode> list1 = pn.getPlanNodeList();
         ArrayList<AbstractPlanNode> list2 = pnt.getRootPlanNode().getPlanNodeList();
         assertTrue( list1.size() == list2.size() );
@@ -129,14 +129,14 @@ public class testPlannerTester extends PlannerTestCase {
         String path = m_homeDir+"/";
         plannerTester.setUpForTest(m_currentDir+"/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
                 "testplans-plannerTester-ddl");
-        System.out.println( pn.toExplainPlanString() );
+        System.out.println( pn.toExplainPlanString(getDatabase()) );
         System.out.println( pn.toJSONString() );
         plannerTester.writePlanToFile( pn, path, "prettyJson.txt", "");
 
         ArrayList<String> getsql = new ArrayList<String>();
         PlanNodeTree pnt = plannerTester.loadPlanFromFile(path+"prettyJson.txt", getsql);
         System.out.println( pnt.toJSONString() );
-        System.out.println( pnt.getRootPlanNode().toExplainPlanString() );
+        System.out.println( pnt.getRootPlanNode().toExplainPlanString(getDatabase()) );
         ArrayList<AbstractPlanNode> list1 = pn.getPlanNodeList();
         ArrayList<AbstractPlanNode> list2 = pnt.getRootPlanNode().getPlanNodeList();
         assertTrue( list1.size() == list2.size() );
@@ -156,7 +156,7 @@ public class testPlannerTester extends PlannerTestCase {
 
         ArrayList<AbstractPlanNode> pnlist = pn1.getPlanNodeList();
 
-        System.out.println( pn1.toExplainPlanString() );
+        System.out.println( pn1.toExplainPlanString(getDatabase()) );
         System.out.println( pnlist.size() );
         for( int i = 0; i<pnlist.size(); i++ ){
             System.out.println( pnlist.get(i).toJSONString() );

@@ -143,9 +143,9 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {
-        helpLoadFromJSONObject(obj, db);
-
+    protected void loadFromJSONObject(JSONObject obj) throws JSONException
+    {
+        helpLoadFromJSONObject(obj);
         assert(!obj.isNull(Members.TABLE_DATA.name()));
         m_tableData = AbstractExpression.fromJSONChild(obj, Members.TABLE_DATA.name());
 

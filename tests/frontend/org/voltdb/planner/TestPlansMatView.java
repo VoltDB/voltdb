@@ -39,14 +39,14 @@ public class TestPlansMatView extends PlannerTestCase {
     public void testPartitionedMatView()
     {
         List<AbstractPlanNode> pns = compileToFragments("SELECT V_D1 FROM VP WHERE V_PARTKEY = 1;");
-        System.out.println(pns.get(0).toExplainPlanString());
+        System.out.println(pns.get(0).toExplainPlanString(getDatabase()));
         assertEquals(1, pns.size());
     }
 
     public void testFixedCasePartitionedMatView()
     {
         List<AbstractPlanNode> pns = compileToFragments("SELECT V_D1 FROM VPF WHERE V_PARTKEY = 1;");
-        System.out.println(pns.get(0).toExplainPlanString());
+        System.out.println(pns.get(0).toExplainPlanString(getDatabase()));
         assertEquals(1, pns.size());
     }
 
@@ -55,7 +55,7 @@ public class TestPlansMatView extends PlannerTestCase {
         List<AbstractPlanNode> pns =
             compileToFragments("SELECT CNT, VAL1 FROM VPF, P " +
                                "WHERE PARTKEY = ? AND V_PARTKEY = PARTKEY;");
-        System.out.println(pns.get(0).toExplainPlanString());
+        System.out.println(pns.get(0).toExplainPlanString(getDatabase()));
         assertEquals(1, pns.size());
     }
 
@@ -63,30 +63,30 @@ public class TestPlansMatView extends PlannerTestCase {
     {
         List<AbstractPlanNode> pns =
             compileToFragments("SELECT CNT, VAL1 FROM VPF, P WHERE V_PARTKEY = PARTKEY;");
-        System.out.println(pns.get(0).toExplainPlanString());
+        System.out.println(pns.get(0).toExplainPlanString(getDatabase()));
         assertEquals(2, pns.size());
     }
 
     public void testMultipartitionedQueryOnMatView()
     {
         List<AbstractPlanNode> pns = compileToFragments("SELECT V_D1 FROM VP WHERE V_D2 = 1;");
-        System.out.println(pns.get(0).toExplainPlanString());
+        System.out.println(pns.get(0).toExplainPlanString(getDatabase()));
         assertEquals(2, pns.size());
-        System.out.println(pns.get(1).toExplainPlanString());
+        System.out.println(pns.get(1).toExplainPlanString(getDatabase()));
     }
 
     public void testMultipartitionedMatView()
     {
         List<AbstractPlanNode> pns = compileToFragments("SELECT V_D1 FROM VNP WHERE V_D2 = 1;");
-        System.out.println(pns.get(0).toExplainPlanString());
+        System.out.println(pns.get(0).toExplainPlanString(getDatabase()));
         assertEquals(2, pns.size());
-        System.out.println(pns.get(1).toExplainPlanString());
+        System.out.println(pns.get(1).toExplainPlanString(getDatabase()));
     }
 
     public void testReplicatedMatView()
     {
         List<AbstractPlanNode> pns = compileToFragments("SELECT V_D1 FROM VR WHERE V_D2 = 1;");
-        System.out.println(pns.get(0).toExplainPlanString());
+        System.out.println(pns.get(0).toExplainPlanString(getDatabase()));
         assertEquals(1, pns.size());
     }
 
@@ -98,37 +98,37 @@ public class TestPlansMatView extends PlannerTestCase {
         pns = compileToFragments("SELECT * FROM VR WHERE V_D1 = 1 " +
                                  "ORDER BY CNT DESC LIMIT 10;");
         assertEquals(1, pns.size());
-        explainedFragment = pns.get(0).toExplainPlanString();
+        explainedFragment = pns.get(0).toExplainPlanString(getDatabase());
         assertTrue(explainedFragment.contains(" using \"ENG4826_VR_COUNT\""));
 
         pns = compileToFragments("SELECT * FROM VR WHERE V_D2 = 1 " +
                                  "ORDER BY CNT DESC LIMIT 10;");
         assertEquals(1, pns.size());
-        explainedFragment = pns.get(0).toExplainPlanString();
+        explainedFragment = pns.get(0).toExplainPlanString(getDatabase());
         assertTrue(explainedFragment.contains(" using \"ENG4826_VR_COUNT\""));
 
         pns = compileToFragments("SELECT * FROM VR WHERE V_D3 = 1 " +
                                  "ORDER BY V_D2 LIMIT 10;");
         assertEquals(1, pns.size());
-        explainedFragment = pns.get(0).toExplainPlanString();
+        explainedFragment = pns.get(0).toExplainPlanString(getDatabase());
         assertTrue(explainedFragment.contains(" using \"ENG4826_VR_ALT_ORDER\""));
 
         pns = compileToFragments("SELECT * FROM VP WHERE V_PARTKEY = 1 AND V_D1 = 1 " +
                                  "ORDER BY CNT DESC LIMIT 10;");
         assertEquals(1, pns.size());
-        explainedFragment = pns.get(0).toExplainPlanString();
+        explainedFragment = pns.get(0).toExplainPlanString(getDatabase());
         assertTrue(explainedFragment.contains(" using \"ENG4826_VP_COUNT\""));
 
         pns = compileToFragments("SELECT * FROM VP WHERE V_PARTKEY = 1 AND V_D2 = 1 " +
                                  "ORDER BY CNT DESC LIMIT 10;");
         assertEquals(1, pns.size());
-        explainedFragment = pns.get(0).toExplainPlanString();
+        explainedFragment = pns.get(0).toExplainPlanString(getDatabase());
         assertTrue(explainedFragment.contains(" using \"ENG4826_VP_COUNT\""));
 
         pns = compileToFragments("SELECT * FROM VP WHERE V_PARTKEY = 1 AND V_D3 = 1 " +
                                  "ORDER BY V_D2 LIMIT 10;");
         assertEquals(1, pns.size());
-        explainedFragment = pns.get(0).toExplainPlanString();
+        explainedFragment = pns.get(0).toExplainPlanString(getDatabase());
         assertTrue(explainedFragment.contains(" using \"ENG4826_VP_ALT_ORDER\""));
 
         // TODO: gloves-off MP testing of VP

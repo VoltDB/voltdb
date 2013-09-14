@@ -41,7 +41,7 @@ public class TestPlansDML extends PlannerTestCase {
 
         pns = compileToFragments("UPDATE R1 SET C = 1 WHERE C = 0");
         pn = pns.get(0);
-        System.out.println(pn.toExplainPlanString());
+        System.out.println(pn.toExplainPlanString(getDatabase()));
         n = pn.getChild(0).getChild(0);
         assertTrue(n instanceof ReceivePlanNode);
         pn = pns.get(1);
@@ -50,7 +50,7 @@ public class TestPlansDML extends PlannerTestCase {
 
         pns = compileToFragments("DELETE FROM R1 WHERE C = 0");
         pn = pns.get(0);
-        System.out.println(pn.toExplainPlanString());
+        System.out.println(pn.toExplainPlanString(getDatabase()));
         n = pn.getChild(0).getChild(0);
         assertTrue(n instanceof ReceivePlanNode);
         pn = pns.get(1);
@@ -59,7 +59,7 @@ public class TestPlansDML extends PlannerTestCase {
 
         pns = compileToFragments("INSERT INTO R1 VALUES (1, 2, 3)");
         pn = pns.get(0);
-        System.out.println(pn.toExplainPlanString());
+        System.out.println(pn.toExplainPlanString(getDatabase()));
         n = pn.getChild(0).getChild(0);
         assertTrue(n instanceof ReceivePlanNode);
         pn = pns.get(1);
@@ -68,7 +68,7 @@ public class TestPlansDML extends PlannerTestCase {
 
         pns = compileToFragments("UPDATE P1 SET C = 1 WHERE C = 0");
         pn = pns.get(0);
-        System.out.println(pn.toExplainPlanString());
+        System.out.println(pn.toExplainPlanString(getDatabase()));
         n = pn.getChild(0).getChild(0);
         assertTrue(n instanceof ReceivePlanNode);
         pn = pns.get(1);
@@ -77,7 +77,7 @@ public class TestPlansDML extends PlannerTestCase {
 
         pns = compileToFragments("DELETE FROM P1 WHERE C = 0");
         pn = pns.get(0);
-        System.out.println(pn.toExplainPlanString());
+        System.out.println(pn.toExplainPlanString(getDatabase()));
         n = pn.getChild(0).getChild(0);
         assertTrue(n instanceof ReceivePlanNode);
         pn = pns.get(1);
@@ -86,19 +86,19 @@ public class TestPlansDML extends PlannerTestCase {
 
         pns = compileToFragments("UPDATE P1 SET C = 1 WHERE A = 0");
         pn = pns.get(0);
-        System.out.println(pn.toExplainPlanString());
+        System.out.println(pn.toExplainPlanString(getDatabase()));
         //n = pn.getChild(0);
         assertTrue(pn instanceof UpdatePlanNode);
 
         pns = compileToFragments("DELETE FROM P1 WHERE A = 0");
         pn = pns.get(0);
-        System.out.println(pn.toExplainPlanString());
+        System.out.println(pn.toExplainPlanString(getDatabase()));
         //n = pn.getChild(0);
         assertTrue(pn instanceof DeletePlanNode);
 
         pns = compileToFragments("INSERT INTO P1 VALUES (1, 2)");
         pn = pns.get(0);
-        System.out.println(pn.toExplainPlanString());
+        System.out.println(pn.toExplainPlanString(getDatabase()));
         //n = pn.getChild(0).getChild(0);
         assertTrue(pn instanceof InsertPlanNode);
 

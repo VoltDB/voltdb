@@ -48,7 +48,7 @@ public class TestReplaceWithIndexLimit extends PlannerTestCase {
         assertTrue (pn.size() > 0);
 
         for ( AbstractPlanNode nd : pn) {
-            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString(getDatabase()));
         }
 
         // Navigate to the leaf node of the last plan fragment.
@@ -64,7 +64,7 @@ public class TestReplaceWithIndexLimit extends PlannerTestCase {
             }
             assertTrue (p instanceof IndexScanPlanNode);
             assertTrue (p.getInlinePlanNode(PlanNodeType.LIMIT) != null);
-            assertTrue (indexSet.contains(((IndexScanPlanNode)p).getCatalogIndex().getTypeName()));
+            assertTrue (indexSet.contains(((IndexScanPlanNode)p).getTargetIndexName()));
         }
         else {
             boolean flag = false;

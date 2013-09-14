@@ -761,20 +761,20 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
     }
 
-    public String toExplainPlanString() {
+    public String toExplainPlanString(Database db) {
         StringBuilder sb = new StringBuilder();
-        explainPlan_recurse(sb, "");
+        explainPlan_recurse(sb, "", db);
         return sb.toString();
     }
 
-    public void explainPlan_recurse(StringBuilder sb, String indent) {
+    public void explainPlan_recurse(StringBuilder sb, String indent, Database db) {
         // skip projection nodes basically (they're boring as all get out)
         String extraIndent = " ";
         if (getPlanNodeType() == PlanNodeType.PROJECTION) {
             extraIndent = "";
         }
         else {
-            String nodePlan = explainPlanForNode(indent);
+            String nodePlan = explainPlanForNode(indent, db);
             sb.append(indent + nodePlan + "\n");
         }
 
@@ -783,15 +783,23 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             if (inlineNode.getPlanNodeType() == PlanNodeType.PROJECTION)
                 continue;
             sb.append(indent + "inline ");
-            sb.append(inlineNode.explainPlanForNode(indent));
+            sb.append(inlineNode.explainPlanForNode(indent, db));
             sb.append("\n");
         }
 
         for (AbstractPlanNode node : m_children) {
             // inline nodes shouldn't have children I hope
             assert(m_isInline == false);
-            node.explainPlan_recurse(sb, indent + extraIndent);
+            node.explainPlan_recurse(sb, indent + extraIndent, db);
         }
+    }
+
+    // Derived classes can implement either of the following signatures.
+    // Implementing the first typically prevents the second from being called.
+    protected String explainPlanForNode(String indent, Database db)
+    {
+        // Most classes implement only this simplified signature.
+        return explainPlanForNode(indent);
     }
 
     protected abstract String explainPlanForNode(String indent);
@@ -842,9 +850,10 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         collected.add(this);
     }
 
-    abstract protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException;
+    abstract protected void loadFromJSONObject(JSONObject obj) throws JSONException;
 
-    protected final void helpLoadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+    protected final void helpLoadFromJSONObject(JSONObject jobj) throws JSONException
+    {
         assert( jobj != null );
         m_id = jobj.getInt( Members.ID.name() );
 
@@ -853,7 +862,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         if( !jobj.isNull( Members.INLINE_NODES.name() ) ){
             jarray = jobj.getJSONArray( Members.INLINE_NODES.name() );
             PlanNodeTree pnt = new PlanNodeTree();
-            pnt.loadFromJSONArray(jarray, db);
+            pnt.loadFromJSONArray(jarray);
             List<AbstractPlanNode> list = pnt.getNodeList();
             for( AbstractPlanNode pn : list ) {
                 m_inlineNodes.put( pn.getPlanNodeType(), pn);

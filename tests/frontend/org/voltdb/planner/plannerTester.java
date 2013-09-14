@@ -41,7 +41,6 @@ import java.util.Set;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.voltdb.catalog.Database;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
@@ -384,8 +383,7 @@ public class plannerTester {
         try {
             jobj = new JSONObject( prettyJson );
             JSONArray jarray =  jobj.getJSONArray("PLAN_NODES");
-            Database db = s_singleton.getDatabase();
-            pnt.loadFromJSONArray(jarray, db);
+            pnt.loadFromJSONArray(jarray);
         } catch (JSONException e) {
             e.printStackTrace();
         }
@@ -483,8 +481,9 @@ public class plannerTester {
             if( diff( pn1, pn2, false ) ) {
                 m_numPass++;
                 if( m_reportExplainedPlan ) {
-                    m_reportWriter.write( "SQL statement:\n"+m_stmts.get(i)+"\n");
-                    m_reportWriter.write("\nExplained plan:\n"+pn2.toExplainPlanString()+"\n");
+                    m_reportWriter.write("SQL statement:\n"+m_stmts.get(i)+"\n");
+                    m_reportWriter.write("\nExplained plan:\n"+
+                                         pn2.toExplainPlanString(s_singleton.getDatabase())+"\n");
                 }
             } else {
                 m_numFail++;
@@ -515,7 +514,9 @@ public class plannerTester {
                 }
 
                 if( m_reportDiffExplainedPlan ) {
-                    m_reportWriter.write("\nExplained plan:\n"+pn1.toExplainPlanString()+"\n==>\n"+pn2.toExplainPlanString()+"\n");
+                    m_reportWriter.write("\nExplained plan:\n" +
+                                         pn1.toExplainPlanString(s_singleton.getDatabase())+"\n==>\n" +
+                                         pn2.toExplainPlanString(s_singleton.getDatabase()) + "\n");
                 }
 
                 m_reportWriter.write("Path to the config file :"+config+"\n" +

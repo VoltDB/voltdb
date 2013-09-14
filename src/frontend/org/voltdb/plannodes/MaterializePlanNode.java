@@ -71,8 +71,9 @@ public class MaterializePlanNode extends ProjectionPlanNode {
     }
 
     @Override
-    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
-        super.loadFromJSONObject(jobj, db);
+    public void loadFromJSONObject(JSONObject jobj) throws JSONException
+    {
+        super.loadFromJSONObject(jobj);
         m_batched = jobj.getBoolean( Members.BATCHED.name() );
     }
 

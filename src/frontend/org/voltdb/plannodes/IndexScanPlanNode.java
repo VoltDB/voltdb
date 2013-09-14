@@ -88,9 +88,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // The sorting direction
     protected SortDirectionType m_sortDirection = SortDirectionType.INVALID;
 
-    // A reference to the Catalog index object which defined the index which
+    // Cached attributes of Catalog index object which defined the index which
     // this index scan is going to use
-    protected Index m_catalogIndex = null;
+    private boolean m_catalogIndexIsUnique = false;
+    private boolean m_hasCountableIndex;
 
     private ArrayList<AbstractExpression> m_bindings = new ArrayList<AbstractExpression>();;
 
@@ -110,8 +111,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         for (AbstractPlanNode inlineChild : srcNode.getInlinePlanNodes().values()) {
             addInlinePlanNode(inlineChild);
         }
-        m_catalogIndex = index;
         m_targetIndexName = index.getTypeName();
+        m_catalogIndexIsUnique = index.getUnique();
+        m_hasCountableIndex = index.getCountable();
         m_lookupType = IndexLookupType.GTE;    // a safe way
         m_sortDirection = sortDirection;
         if (apn != null) {
@@ -161,7 +163,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
      */
     @Override
     public boolean isOrderDeterministic() {
-        if (m_catalogIndex.getUnique()) {
+        if (m_catalogIndexIsUnique) {
             // Any unique index scan capable of returning multiple rows will return them in a fixed order.
             // XXX: This may not be strictly true if/when we support order-determinism based on a mix of columns
             // from different joined tables -- an equality filter based on a non-ordered column from the other table
@@ -181,12 +183,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     public void setCatalogIndex(Index index)
     {
-        m_catalogIndex = index;
-    }
-
-    public Index getCatalogIndex()
-    {
-        return m_catalogIndex;
+        m_catalogIndexIsUnique = index.getUnique();
+        m_targetIndexName = index.getTypeName();
     }
 
     /**
@@ -241,13 +239,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
      */
     public String getTargetIndexName() {
         return m_targetIndexName;
-    }
-
-    /**
-     * @param targetIndexName the target_index_name to set
-     */
-    public void setTargetIndexName(String targetIndexName) {
-        m_targetIndexName = targetIndexName;
     }
 
     /**
@@ -338,6 +329,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 m_lookupType == IndexLookupType.LT || m_lookupType == IndexLookupType.LTE;
     }
 
+    public boolean hasCountableIndex()
+    {
+        return m_hasCountableIndex;
+    }
 
     @Override
     public void resolveColumnIndexes()
@@ -365,8 +360,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
-
+    public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db,
+                                     DatabaseEstimates estimates, ScalarValueHints[] paramHints)
+    {
+        Index catalogIndex = db.getTables().get(m_targetTableName).getIndexes().get(m_targetIndexName);
         // HOW WE COST INDEXES
         // unique, covering index always wins
         // otherwise, pick the index with the most columns covered otherwise
@@ -381,7 +378,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
         // get the width of the index and number of columns used
         // need doubles for math
-        double colCount = CatalogUtil.getCatalogIndexSize(m_catalogIndex);
+        double colCount = CatalogUtil.getCatalogIndexSize(catalogIndex);
         double keyWidth = m_searchkeyExpressions.size();
         assert(keyWidth <= colCount);
 
@@ -403,18 +400,18 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         int tuplesToRead = 0;
 
         // Assign minor priorities for different index types (tiebreakers).
-        if (m_catalogIndex.getType() == IndexType.HASH_TABLE.getValue()) {
+        if (catalogIndex.getType() == IndexType.HASH_TABLE.getValue()) {
             tuplesToRead = 2;
         }
-        else if ((m_catalogIndex.getType() == IndexType.BALANCED_TREE.getValue()) ||
-                 (m_catalogIndex.getType() == IndexType.BTREE.getValue())) {
+        else if ((catalogIndex.getType() == IndexType.BALANCED_TREE.getValue()) ||
+                 (catalogIndex.getType() == IndexType.BTREE.getValue())) {
             tuplesToRead = 3;
         }
         assert(tuplesToRead > 0);
 
         // If not a unique, covering index, favor (discount)
         // the choice with the most columns pre-filtered by the index.
-        if (!m_catalogIndex.getUnique() || (colCount > keyWidth)) {
+        if (!catalogIndex.getUnique() || (colCount > keyWidth)) {
             // Cost starts at 90% of a comparable seqscan AND
             // gets scaled down by an additional factor of 0.1 for each fully covered indexed column.
             // One intentional benchmark is for a single range-covered
@@ -461,7 +458,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         m_estimatedProcessedTupleCount = tuplesToRead;
 
         // special case a unique match for the output count
-        if (m_catalogIndex.getUnique() && (colCount == keyWidth)) {
+        if (catalogIndex.getUnique() && (colCount == keyWidth)) {
             m_estimatedOutputTupleCount = 1;
         }
 
@@ -501,14 +498,14 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     //all members loaded
     @Override
-    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
-        super.loadFromJSONObject(jobj, db);
+    public void loadFromJSONObject(JSONObject jobj) throws JSONException
+    {
+        super.loadFromJSONObject(jobj);
         m_keyIterate = jobj.getBoolean( Members.KEY_ITERATE.name() );
         m_lookupType = IndexLookupType.get( jobj.getString( Members.LOOKUP_TYPE.name() ) );
         m_sortDirection = SortDirectionType.get( jobj.getString( Members.SORT_DIRECTION.name() ) );
         m_forDeterminismOnly = jobj.optBoolean(Members.DETERMINISM_ONLY.name());
         m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
-        m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
         JSONObject tempjobj = null;
         //load end_expression
         m_endExpression = AbstractExpression.fromJSONChild(jobj, Members.END_EXPRESSION.name());
@@ -519,11 +516,16 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 Members.SEARCHKEY_EXPRESSIONS.name());
     }
 
+    /// Never called without Database argument.
     @Override
-    protected String explainPlanForNode(String indent) {
-        assert(m_catalogIndex != null);
+    protected String explainPlanForNode(String indent) { assert(false); return null; }
 
-        int indexSize = CatalogUtil.getCatalogIndexSize(m_catalogIndex);
+    @Override
+    protected String explainPlanForNode(String indent, Database db) {
+        Index catalogIndex = db.getTables().get(m_targetTableName).getIndexes().get(m_targetIndexName);
+        assert(catalogIndex != null);
+
+        int indexSize = CatalogUtil.getCatalogIndexSize(catalogIndex);
         int keySize = m_searchkeyExpressions.size();
 
         // When there is no start key, count a range scan key for each ANDed end condition.
@@ -554,11 +556,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             for (int ii = 0; ii < keySize; ++ii) {
                 asIndexed[ii] = "(index key " + ii + ")";
             }
-            String jsonExpr = m_catalogIndex.getExpressionsjson();
+            String jsonExpr = catalogIndex.getExpressionsjson();
             // if this is a pure-column index...
             if (jsonExpr.isEmpty()) {
                 // grab the short names of the indexed columns in use.
-                for (ColumnRef cref : m_catalogIndex.getColumns()) {
+                for (ColumnRef cref : catalogIndex.getColumns()) {
                     Column col = cref.getColumn();
                     asIndexed[cref.getIndex()] = col.getName();
                 }
@@ -584,7 +586,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 // qualify whether the equality matching is for a unique value.
                 // " uniquely match (event_id = 1)" vs.
                 // " scan matches for (event_type = 1) AND (event_location = x.region)"
-                if (m_catalogIndex.getUnique()) {
+                if (catalogIndex.getUnique()) {
                     usageInfo = "\n" + indent + " uniquely match " + start;
                 }
                 else {
@@ -689,8 +691,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // only apply those optimization if it has no (post-)predicates
     // except those (post-)predicates are artifact predicates we
     // added for reverse scan purpose only
-    public boolean isPredicatesOptimizableForAggregate() {
-
+    public boolean isPredicatesOptimizableForAggregate(Database db)
+    {
+        Index catalogIndex = db.getTables().get(m_targetTableName).getIndexes().get(m_targetIndexName);
         // for reverse scan, need to examine "added" predicates
         List<AbstractExpression> predicates = ExpressionUtil.uncombine(m_predicate);
         // if the size of predicates doesn't equal 2, can't be our added artifact predicates
@@ -707,14 +710,14 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             return false;
         }
         int searchKeyCount = m_searchkeyExpressions.size();
-        String exprsjson = m_catalogIndex.getExpressionsjson();
+        String exprsjson = catalogIndex.getExpressionsjson();
         AbstractExpression left = expr.getLeft();
         if (exprsjson.isEmpty()) {
             if (left.getExpressionType() != ExpressionType.VALUE_TUPLE) {
                 return false;
             }
             if (((TupleValueExpression)left).getColumnIndex() !=
-                    CatalogUtil.getSortedCatalogItems(m_catalogIndex.getColumns(), "index").get(searchKeyCount - 1).getColumn().getIndex()) {
+                    CatalogUtil.getSortedCatalogItems(catalogIndex.getColumns(), "index").get(searchKeyCount - 1).getColumn().getIndex()) {
                 return false;
             }
         } else {

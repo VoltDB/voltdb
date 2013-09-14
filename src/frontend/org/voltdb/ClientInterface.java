@@ -59,14 +59,18 @@ import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
-import org.voltcore.network.ReverseDNSPolicy;
 import org.voltcore.network.InputHandler;
 import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.QueueMonitor;
+import org.voltcore.network.ReverseDNSPolicy;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.network.WriteStream;
-import org.voltcore.utils.*;
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DeferredSerialization;
+import org.voltcore.utils.EstTime;
+import org.voltcore.utils.Pair;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.ClientInterfaceHandleManager.Iv2InFlight;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
@@ -1509,8 +1513,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     try {
                         JSONObject jobj = new JSONObject( plan );
                         JSONArray jarray =  jobj.getJSONArray(PlanNodeTree.Members.PLAN_NODES.name());
-                        pnt.loadFromJSONArray(jarray, db);
-                        String str = pnt.getRootPlanNode().toExplainPlanString();
+                        pnt.loadFromJSONArray(jarray);
+                        String str = pnt.getRootPlanNode().toExplainPlanString(db);
                         vt[i] = new VoltTable(new VoltTable.ColumnInfo( "EXECUTION_PLAN", VoltType.STRING));
                         vt[i].addRow(str);
                     } catch (JSONException e) {
@@ -1526,15 +1530,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     try {
                         JSONObject jobj = new JSONObject( aggplan );
                         JSONArray jarray =  jobj.getJSONArray(PlanNodeTree.Members.PLAN_NODES.name());
-                        pnt.loadFromJSONArray(jarray, db);
+                        pnt.loadFromJSONArray(jarray);
                         //reattach plan fragments
                         jobj = new JSONObject( collplan );
                         jarray =  jobj.getJSONArray(PlanNodeTree.Members.PLAN_NODES.name());
-                        collpnt.loadFromJSONArray(jarray, db);
+                        collpnt.loadFromJSONArray(jarray);
                         assert( collpnt.getRootPlanNode() instanceof SendPlanNode);
                         pnt.getRootPlanNode().reattachFragment( (SendPlanNode) collpnt.getRootPlanNode() );
 
-                        String str = pnt.getRootPlanNode().toExplainPlanString();
+                        String str = pnt.getRootPlanNode().toExplainPlanString(db);
                         vt[i] = new VoltTable(new VoltTable.ColumnInfo( "EXECUTION_PLAN", VoltType.STRING));
                         vt[i].addRow(str);
                     } catch (JSONException e) {

@@ -75,10 +75,6 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     // The overall index lookup operation type
     protected IndexLookupType m_endType = IndexLookupType.EQ;
 
-    // A reference to the Catalog index object which defined the index which
-    // this index scan is going to use
-    protected Index m_catalogIndex = null;
-
     private ArrayList<AbstractExpression> m_bindings;
 
     public IndexCountPlanNode() {
@@ -89,8 +85,6 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
                                IndexLookupType endType, List<AbstractExpression> endKeys)
     {
         super();
-
-        m_catalogIndex = isp.m_catalogIndex;
 
         m_estimatedOutputTupleCount = 1;
         m_tableSchema = isp.m_tableSchema;
@@ -134,7 +128,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     // These prefix-equal cases would be missed in an EQ or LTE filter, causing undercounts.
     // A prefix-only LT filter is intended to discard prefix-equal cases, so it is allowed.
     // @return the IndexCountPlanNode or null if one is not possible.
-    public static IndexCountPlanNode createOrNull(IndexScanPlanNode isp, AggregatePlanNode apn)
+    public static IndexCountPlanNode createOrNull(IndexScanPlanNode isp, AggregatePlanNode apn, Index index)
     {
         // add support for reverse scan
         // for ASC scan, check endExpression; for DESC scan, need to check searchkeys
@@ -162,11 +156,11 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         }
 
         int indexSize = 0;
-        String jsonstring = isp.getCatalogIndex().getExpressionsjson();
+        String jsonstring = index.getExpressionsjson();
         List<ColumnRef> indexedColRefs = null;
         List<AbstractExpression> indexedExprs = null;
         if (jsonstring.isEmpty()) {
-            indexedColRefs = CatalogUtil.getSortedCatalogItems(isp.getCatalogIndex().getColumns(), "index");
+            indexedColRefs = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
             indexSize = indexedColRefs.size();
         } else {
             try {
@@ -328,15 +322,14 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
-        super.loadFromJSONObject(jobj, db);
+    public void loadFromJSONObject(JSONObject jobj) throws JSONException
+    {
+        super.loadFromJSONObject(jobj);
         m_keyIterate = jobj.getBoolean( Members.KEY_ITERATE.name() );
 
         m_lookupType = IndexLookupType.get( jobj.getString( Members.LOOKUP_TYPE.name() ) );
         m_endType = IndexLookupType.get( jobj.getString( Members.END_TYPE.name() ) );
         m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
-        m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
-        JSONObject tempjobj = null;
         //load end_expression
         AbstractExpression.loadFromJSONArrayChild(m_endkeyExpressions, jobj,
                 Members.ENDKEY_EXPRESSIONS.name());
@@ -344,11 +337,16 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
                 Members.SEARCHKEY_EXPRESSIONS.name());
     }
 
+    /// Never called without Database argument.
     @Override
-    protected String explainPlanForNode(String indent) {
-        assert(m_catalogIndex != null);
+    protected String explainPlanForNode(String indent) { assert(false); return null; }
 
-        int indexSize = CatalogUtil.getCatalogIndexSize(m_catalogIndex);
+    @Override
+    protected String explainPlanForNode(String indent, Database db) {
+        Index catalogIndex = db.getTables().get(m_targetTableName).getIndexes().get(m_targetIndexName);
+        assert(catalogIndex != null);
+
+        int indexSize = CatalogUtil.getCatalogIndexSize(catalogIndex);
         int keySize = m_searchkeyExpressions.size();
 
         String scanType = "tree-counter";

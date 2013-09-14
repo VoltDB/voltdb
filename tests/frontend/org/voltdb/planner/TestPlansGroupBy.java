@@ -51,14 +51,14 @@ public class TestPlansGroupBy extends PlannerTestCase {
     public void testGroupByA1() {
         pns = compileToFragments("SELECT A1 from T1 group by A1");
         for (AbstractPlanNode apn: pns) {
-            System.out.println(apn.toExplainPlanString());
+            System.out.println(apn.toExplainPlanString(getDatabase()));
         }
     }
 
     public void testCountA1() {
         pns = compileToFragments("SELECT count(A1) from T1");
         for (AbstractPlanNode apn: pns) {
-            System.out.println(apn.toExplainPlanString());
+            System.out.println(apn.toExplainPlanString(getDatabase()));
         }
     }
 
@@ -66,21 +66,21 @@ public class TestPlansGroupBy extends PlannerTestCase {
     {
         pns = compileToFragments("SELECT count(*) from T1");
         for (AbstractPlanNode apn: pns) {
-            System.out.println(apn.toExplainPlanString());
+            System.out.println(apn.toExplainPlanString(getDatabase()));
         }
     }
 
     public void testCountDistinctA1() {
         pns = compileToFragments("SELECT count(distinct A1) from T1");
         for (AbstractPlanNode apn: pns) {
-            System.out.println(apn.toExplainPlanString());
+            System.out.println(apn.toExplainPlanString(getDatabase()));
         }
     }
 
     public void testDistinctA1() {
         pns = compileToFragments("SELECT DISTINCT A1 FROM T1");
         for (AbstractPlanNode apn: pns) {
-            System.out.println(apn.toExplainPlanString());
+            System.out.println(apn.toExplainPlanString(getDatabase()));
         }
     }
 
@@ -234,7 +234,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         boolean isDistributed = pns.size() > 1 ? true: false;
 
         for ( AbstractPlanNode nd : pns) {
-            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString(getDatabase()));
         }
 
         AbstractPlanNode p = pns.get(0).getChild(0);

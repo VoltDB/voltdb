@@ -337,8 +337,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
-        helpLoadFromJSONObject(jobj, db);
+    public void loadFromJSONObject(JSONObject jobj) throws JSONException
+    {
+        helpLoadFromJSONObject(jobj);
         m_predicate = AbstractExpression.fromJSONChild(jobj, Members.PREDICATE.name());
         m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
 

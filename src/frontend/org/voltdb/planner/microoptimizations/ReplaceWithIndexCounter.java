@@ -33,8 +33,12 @@ import org.voltdb.plannodes.TableCountPlanNode;
 
 public class ReplaceWithIndexCounter extends MicroOptimization {
 
+    private Database m_db;
+
     @Override
-    public List<CompiledPlan> apply(CompiledPlan plan, Database db) {
+    public List<CompiledPlan> apply(CompiledPlan plan, Database db)
+    {
+        m_db = db;
         ArrayList<CompiledPlan> retval = new ArrayList<CompiledPlan>();
 
         AbstractPlanNode planGraph = plan.rootPlanGraph;
@@ -98,7 +102,7 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
 
         // An index count or table count can replace an index scan only if it has no (post-)predicates
         // except those (post-)predicates are artifact predicates we added for reverse scan purpose only
-        if (isp.getPredicate() != null && !isp.isPredicatesOptimizableForAggregate()) {
+        if (isp.getPredicate() != null && !isp.isPredicatesOptimizableForAggregate(m_db)) {
             return plan;
         }
 
@@ -112,8 +116,7 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
         }
 
         // check for the index's support for counting
-        Index idx = isp.getCatalogIndex();
-        if ( ! idx.getCountable()) {
+        if ( ! isp.hasCountableIndex()) {
             return plan;
         }
 
@@ -124,7 +127,9 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
         // - whether the count should include or exclude entries exactly matching each of the start/end keys.
         // Not all combinations of these options are supported;
         // unsupportable cases cause the factory method to return null.
-        IndexCountPlanNode countingPlan = IndexCountPlanNode.createOrNull(isp, aggplan);
+        Index index = m_db.getTables().get(isp.getTargetTableName()).getIndexes().get(isp.getTargetIndexName());
+
+        IndexCountPlanNode countingPlan = IndexCountPlanNode.createOrNull(isp, aggplan, index);
         if (countingPlan == null) {
             return plan;
         }

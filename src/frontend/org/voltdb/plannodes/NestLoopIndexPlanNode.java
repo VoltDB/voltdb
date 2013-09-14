@@ -190,6 +190,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         resolvePredicate(m_wherePredicate, outer_schema, index_schema);
     }
 
+    @Override
     public void resolveSortDirection() {
         super.resolveSortDirection();
         // special treatment for NLIJ, when the outer table is a materialized scan node
@@ -257,6 +258,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
                 explainFilters(indent);
     }
 
+    @Override
     public void toJSONString(JSONStringer stringer) throws JSONException
     {
         super.toJSONString(stringer);
@@ -265,9 +267,10 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         }
     }
 
-    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException
+    @Override
+    public void loadFromJSONObject(JSONObject jobj) throws JSONException
     {
-        super.loadFromJSONObject(jobj, db);
+        super.loadFromJSONObject(jobj);
         if (!jobj.isNull(Members.SORT_DIRECTION.name())) {
             m_sortDirection = SortDirectionType.get( jobj.getString( Members.SORT_DIRECTION.name() ) );
         }

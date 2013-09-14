@@ -1226,7 +1226,6 @@ public abstract class SubPlanAssembler {
             scanNode.setScanColumns(m_parsedStmt.scanColumns.get(table.getTypeName()));
         }
         scanNode.setTargetTableAlias(table.getTypeName());
-        scanNode.setTargetIndexName(index.getTypeName());
         return resultNode;
     }
 

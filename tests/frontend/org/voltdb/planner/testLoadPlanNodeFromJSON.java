@@ -56,7 +56,7 @@ public class testLoadPlanNodeFromJSON extends PlannerTestCase {
         JSONArray jarray = new JSONObject(str)
                 .getJSONArray(PlanNodeTree.Members.PLAN_NODES.name());
         PlanNodeTree pnt1 = new PlanNodeTree();
-        pnt1.loadFromJSONArray(jarray, getDatabase());
+        pnt1.loadFromJSONArray(jarray);
         String str1 = pnt1.toJSONString();
         assertTrue(str.equals(str1));
     }

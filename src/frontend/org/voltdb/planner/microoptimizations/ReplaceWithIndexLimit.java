@@ -31,6 +31,7 @@ import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -43,12 +44,12 @@ import org.voltdb.utils.CatalogUtil;
 
 public class ReplaceWithIndexLimit extends MicroOptimization {
 
-    Database db = null;
+    Database m_db = null;
 
     @Override
     public List<CompiledPlan> apply(CompiledPlan plan, Database db) {
         ArrayList<CompiledPlan> retval = new ArrayList<CompiledPlan>();
-        this.db = db;
+        m_db = db;
         AbstractPlanNode planGraph = plan.rootPlanGraph;
         planGraph = recursivelyApply(planGraph);
         plan.rootPlanGraph = planGraph;
@@ -118,6 +119,8 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
 
         AbstractPlanNode child = plan.getChild(0);
         AbstractExpression aggExpr = aggplan.getFirstAggregateExpression();
+        // get all indexes for the table
+        CatalogMap<Index> allIndexes = m_db.getTables().get(((AbstractScanPlanNode)child).getTargetTableName()).getIndexes();
 
         /**
          * For generated SeqScan plan, look through all available indexes, if the first key
@@ -136,9 +139,6 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
             if (((SeqScanPlanNode)child).getPredicate() != null) {
                 return plan;
             }
-
-            // get all indexes for the table
-            CatalogMap<Index> allIndexes = db.getTables().get(((SeqScanPlanNode)child).getTargetTableName()).getIndexes();
 
             // create an empty bindingExprs list, used for store (possible) bindings for adHoc query
             ArrayList<AbstractExpression> bindings = new ArrayList<AbstractExpression>();
@@ -178,8 +178,8 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         // can do optimization only if it has no (post-)predicates
         // except those (post-)predicates are artifact predicates
         // we added for reverse scan purpose only
-        if (((IndexScanPlanNode)child).getPredicate() != null &&
-                !((IndexScanPlanNode)child).isPredicatesOptimizableForAggregate()) {
+        if (ispn.getPredicate() != null &&
+                !ispn.isPredicatesOptimizableForAggregate(m_db)) {
             return plan;
         }
 
@@ -244,7 +244,9 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         // do not aggressively evaluate all indexes, just examine the index currently in use;
         // because for all qualified indexes, one access plan must have been generated already,
         // and we can take advantage of that
-        if (!checkIndex(ispn.getCatalogIndex(), aggExpr, exprs, ispn.getBindings())) {
+        String indexName = ispn.getTargetIndexName();
+        Index index = allIndexes.get(indexName);
+        if (!checkIndex(index, aggExpr, exprs, ispn.getBindings())) {
             return plan;
         } else {
             // we know which end we want to fetch, set the sort direction

@@ -77,7 +77,7 @@ public class TestPushDownAggregates extends PlannerTestCase {
     public void testAvgOnPartitionedTable() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT AVG(A1) from T1");
         for (AbstractPlanNode apn: pn) {
-            System.out.println(apn.toExplainPlanString());
+            System.out.println(apn.toExplainPlanString(getDatabase()));
         }
         checkPushedDown(pn, true,
                         new ExpressionType[] {ExpressionType.AGGREGATE_SUM,
@@ -125,7 +125,7 @@ public class TestPushDownAggregates extends PlannerTestCase {
         List<AbstractPlanNode> pn =
             compileToFragments("SELECT count(*), count(PKEY), sum(PKEY), min(PKEY), max(PKEY), avg(PKEY) FROM T1");
         for (AbstractPlanNode apn: pn) {
-            System.out.println(apn.toExplainPlanString());
+            System.out.println(apn.toExplainPlanString(getDatabase()));
         }
         checkPushedDown(pn, true,
                         new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR,
@@ -145,7 +145,7 @@ public class TestPushDownAggregates extends PlannerTestCase {
         List<AbstractPlanNode> pn =
             compileToFragments("SELECT count(*), count(PKEY), min(PKEY), max(PKEY), avg(PKEY) FROM T1");
         for (AbstractPlanNode apn: pn) {
-            System.out.println(apn.toExplainPlanString());
+            System.out.println(apn.toExplainPlanString(getDatabase()));
         }
         checkPushedDown(pn, true,
                         new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR,
@@ -165,7 +165,7 @@ public class TestPushDownAggregates extends PlannerTestCase {
         List<AbstractPlanNode> pn =
             compileToFragments("SELECT count(*), min(PKEY), max(PKEY), avg(PKEY) FROM T1");
         for (AbstractPlanNode apn: pn) {
-            System.out.println(apn.toExplainPlanString());
+            System.out.println(apn.toExplainPlanString(getDatabase()));
         }
         checkPushedDown(pn, true,
                         new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR,
@@ -217,14 +217,14 @@ public class TestPushDownAggregates extends PlannerTestCase {
     {
         List<AbstractPlanNode> pn = compileSinglePartitionToFragments("select PKEY from T1 order by PKEY limit 5 offset 1");
         assertEquals(1, pn.size());
-        assertTrue(pn.get(0).toExplainPlanString().contains("LIMIT"));
+        assertTrue(pn.get(0).toExplainPlanString(getDatabase()).contains("LIMIT"));
     }
 
     public void testMultiPartOffset() {
         List<AbstractPlanNode> pn = compileToFragments("select PKEY from T1 order by PKEY limit 5 offset 1");
         assertEquals(2, pn.size());
-        assertTrue(pn.get(0).toExplainPlanString().contains("LIMIT"));
-        assertTrue(pn.get(1).toExplainPlanString().contains("LIMIT"));
+        assertTrue(pn.get(0).toExplainPlanString(getDatabase()).contains("LIMIT"));
+        assertTrue(pn.get(1).toExplainPlanString(getDatabase()).contains("LIMIT"));
     }
 
     public void testLimit() {
@@ -240,8 +240,8 @@ public class TestPushDownAggregates extends PlannerTestCase {
                 compileToFragments("select A1, count(*) as tag from T1 group by A1 order by A1 limit 1");
 
         for ( AbstractPlanNode nd : pn) {
-            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
-            assertTrue(nd.toExplainPlanString().contains("LIMIT"));
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString(getDatabase()));
+            assertTrue(nd.toExplainPlanString(getDatabase()).contains("LIMIT"));
         }
     }
 
@@ -250,8 +250,8 @@ public class TestPushDownAggregates extends PlannerTestCase {
                 compileToFragments("select A1, count(*) as tag from T1 group by A1 order by 1 limit 1");
 
         for ( AbstractPlanNode nd : pn) {
-            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
-            assertTrue(nd.toExplainPlanString().contains("LIMIT"));
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString(getDatabase()));
+            assertTrue(nd.toExplainPlanString(getDatabase()).contains("LIMIT"));
         }
     }
 
@@ -260,10 +260,10 @@ public class TestPushDownAggregates extends PlannerTestCase {
                 compileToFragments("select A1, count(*) as tag from T1 group by A1 order by tag, A1 limit 1");
 
         for ( AbstractPlanNode nd : pn) {
-            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString(getDatabase()));
         }
-        assertTrue(pn.get(0).toExplainPlanString().contains("LIMIT"));
-        assertFalse(pn.get(1).toExplainPlanString().contains("LIMIT"));
+        assertTrue(pn.get(0).toExplainPlanString(getDatabase()).contains("LIMIT"));
+        assertFalse(pn.get(1).toExplainPlanString(getDatabase()).contains("LIMIT"));
     }
 
     public void testMultiPartNoLimitPushdownByTwo() {
@@ -271,10 +271,10 @@ public class TestPushDownAggregates extends PlannerTestCase {
                 compileToFragments("select A1, count(*) as tag from T1 group by A1 order by 2 limit 1");
 
         for ( AbstractPlanNode nd : pn) {
-            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString(getDatabase()));
         }
-        assertTrue(pn.get(0).toExplainPlanString().contains("LIMIT"));
-        assertFalse(pn.get(1).toExplainPlanString().contains("LIMIT"));
+        assertTrue(pn.get(0).toExplainPlanString(getDatabase()).contains("LIMIT"));
+        assertFalse(pn.get(1).toExplainPlanString(getDatabase()).contains("LIMIT"));
     }
 
     /**

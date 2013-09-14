@@ -20,7 +20,6 @@ package org.voltdb.plannodes;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.catalog.Database;
 import org.voltdb.types.PlanNodeType;
 
 public class InsertPlanNode extends AbstractOperationPlanNode {
@@ -54,10 +53,10 @@ public class InsertPlanNode extends AbstractOperationPlanNode {
         stringer.key(Members.MULTI_PARTITION.name()).value(m_multiPartition);
     }
 
-    // TODO:Members not loaded
     @Override
-    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
-        super.loadFromJSONObject(jobj, db);
+    public void loadFromJSONObject(JSONObject jobj) throws JSONException
+    {
+        super.loadFromJSONObject(jobj);
         m_multiPartition = jobj.getBoolean( Members.MULTI_PARTITION.name() );
     }
 

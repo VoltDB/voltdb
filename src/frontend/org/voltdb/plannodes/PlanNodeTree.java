@@ -29,7 +29,6 @@ import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Database;
 import org.voltdb.types.PlanNodeType;
 
 /**
@@ -121,7 +120,8 @@ public class PlanNodeTree implements JSONString {
         return m_planNodes;
     }
 
-    public void loadFromJSONArray( JSONArray jArray, Database db )  {
+    public void loadFromJSONArray(JSONArray jArray)
+    {
         int size = jArray.length();
 
         try {
@@ -142,7 +142,7 @@ public class PlanNodeTree implements JSONString {
                     e.printStackTrace();
                     return;
                 }
-                apn.loadFromJSONObject(jobj, db);
+                apn.loadFromJSONObject(jobj);
                 m_planNodes.add(apn);
             }
             //link children and parents

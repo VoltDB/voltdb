@@ -171,7 +171,7 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
     public void testCountStar20() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT AGE, count(*) from T2 WHERE USERNAME ='XIN' AND POINTS < 1 Group by AGE");
         for ( AbstractPlanNode nd : pn)
-            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString(getDatabase()));
         AbstractPlanNode p = pn.get(0).getChild(0);
         assertTrue(p instanceof AggregatePlanNode);
         p = p.getChild(0);
@@ -182,7 +182,7 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
     public void testCountStar21() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT RATIO, count(*) from P1 WHERE NUM < 1 Group by RATIO");
         for ( AbstractPlanNode nd : pn)
-            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString(getDatabase()));
         AbstractPlanNode p = pn.get(0).getChild(0);
         assertTrue(p instanceof AggregatePlanNode);
         p = pn.get(1).getChild(0);
@@ -195,7 +195,7 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
     public void testCountStar22() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from P1 WHERE NUM < ?");
         for ( AbstractPlanNode nd : pn)
-            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString(getDatabase()));
         AbstractPlanNode p = pn.get(0).getChild(0);
         assertTrue(p instanceof AggregatePlanNode);
         p = pn.get(1).getChild(0);
@@ -227,7 +227,7 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
     public void testCountStar26() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from P1 WHERE NUM = 1 AND RATIO >= ?");
         for ( AbstractPlanNode nd : pn)
-            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString(getDatabase()));
         AbstractPlanNode p = pn.get(0).getChild(0);
         assertTrue(p instanceof AggregatePlanNode);
         p = pn.get(1).getChild(0);
@@ -268,7 +268,7 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
         assertTrue(pn.size() > 0);
 
         for ( AbstractPlanNode nd : pn) {
-            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString(getDatabase()));
         }
         AbstractPlanNode p = pn.get(0).getChild(0);
         if (isReplaceable)

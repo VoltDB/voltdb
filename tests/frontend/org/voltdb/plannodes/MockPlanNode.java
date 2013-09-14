@@ -127,9 +127,9 @@ public class MockPlanNode extends AbstractPlanNode
     }
 
     @Override
-    protected void loadFromJSONObject(JSONObject jobj, Database db)
-            throws JSONException {
-        helpLoadFromJSONObject(jobj, db);
+    protected void loadFromJSONObject(JSONObject jobj) throws JSONException
+    {
+        helpLoadFromJSONObject(jobj);
     }
 
 }

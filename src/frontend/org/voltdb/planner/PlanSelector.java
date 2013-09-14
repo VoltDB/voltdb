@@ -179,7 +179,7 @@ public class PlanSelector implements Cloneable {
                 m_bestFilename = filename;
             }
 
-            outputPlan(plan, planGraph, filename);
+            outputPlan(plan, m_db, planGraph, filename);
         }
    }
 
@@ -187,7 +187,7 @@ public class PlanSelector implements Cloneable {
         if (m_quietPlanner) {
             return;
         }
-        outputPlan(m_bestPlan, m_bestPlan.rootPlanGraph, m_bestFilename);
+        outputPlan(m_bestPlan, m_db, m_bestPlan.rootPlanGraph, m_bestFilename);
 
         // find out where debugging is going
         String prefix = BuildDirectoryUtils.getBuildDirectoryPath() +
@@ -225,14 +225,14 @@ public class PlanSelector implements Cloneable {
      * @param plan graph
      * @param filename
      */
-    private void outputPlan(CompiledPlan plan, AbstractPlanNode planGraph, String filename) {
+    private void outputPlan(CompiledPlan plan, Database db, AbstractPlanNode planGraph, String filename) {
         if (!m_quietPlanner) {
             if (m_fullDebug) {
                 outputPlanFullDebug(plan, planGraph, filename);
             }
 
             // get the explained plan for the node
-            plan.explainedPlan = planGraph.toExplainPlanString();
+            plan.explainedPlan = planGraph.toExplainPlanString(db);
             outputExplainedPlan(plan, filename);
         }
     }

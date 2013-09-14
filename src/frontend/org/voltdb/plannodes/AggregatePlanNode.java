@@ -321,8 +321,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
-        helpLoadFromJSONObject(jobj, db);
+    public void loadFromJSONObject(JSONObject jobj) throws JSONException {
+        helpLoadFromJSONObject(jobj);
         JSONArray jarray = jobj.getJSONArray( Members.AGGREGATE_COLUMNS.name() );
         int size = jarray.length();
         for (int i = 0; i < size; i++) {
