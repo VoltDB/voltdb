@@ -164,6 +164,27 @@ public class TestPlansOrderBy extends PlannerTestCase {
         //validatePlan("SELECT T_D0, COUNT(*) AS FOO FROM T GROUP BY T_D0 ORDER BY FOO");
     }
 
+    public void testOrderByWithoutAlias() {
+        validatePlan("SELECT T_D0, SUM(T_D1) FROM T GROUP BY T_D0 ORDER BY SUM(T_D1)",
+                true, false, true, true);
+        validatePlan("SELECT T_D0, COUNT(*) FROM T GROUP BY T_D0 ORDER BY COUNT(*)",
+                true, false, true, true);
+        validatePlan("SELECT T_D0, AVG(T_D1) FROM T GROUP BY T_D0 ORDER BY AVG(T_D1)",
+                true, false, true, true);
+        validatePlan("SELECT T_D0, COUNT(T_D1) FROM T GROUP BY T_D0 ORDER BY COUNT(T_D1)",
+                true, false, true, true);
+        validatePlan("SELECT T_D0, MIN(T_D1) FROM T GROUP BY T_D0 ORDER BY MIN(T_D1)",
+                true, false, true, true);
+        validatePlan("SELECT T_D0, MAX(T_D1) FROM T GROUP BY T_D0 ORDER BY MAX(T_D1)",
+                true, false, true, true);
+
+        // Complex aggregation
+        validatePlan("SELECT T_D0, COUNT(*)+1 FROM T GROUP BY T_D0 ORDER BY COUNT(*)+1",
+                true, false, true, true);
+        validatePlan("SELECT T_D0, abs(MAX(T_D1)) FROM T GROUP BY T_D0 ORDER BY abs(MAX(T_D1))",
+                true, false, true, true);
+    }
+
     public void testEng450()
     {
         // This used to not compile. It does now. That's all we care about.

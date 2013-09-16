@@ -817,6 +817,10 @@ public class ExpressionColumn extends Expression {
             case OpTypes.COLUMN :
                 return column == other.getColumn();
 
+            case OpTypes.ASTERISK :
+                return opType  == other.opType;
+
+
             default :
                 return false;
         }

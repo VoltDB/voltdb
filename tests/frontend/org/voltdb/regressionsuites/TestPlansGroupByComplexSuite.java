@@ -86,8 +86,19 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
+    private void emptyData() throws IOException, ProcCallException {
+        Client client = this.getClient();
+        ClientResponse cr = null;
 
-    public void testStrangeCasesAndOrderby() throws IOException, ProcCallException {
+        // id, wage, dept, rate
+        for (String tb: tbs) {
+            cr = client.callProcedure("@AdHoc", "delete from " + tb);
+        }
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+    }
+
+
+    private void strangeCasesAndOrderby() throws IOException, ProcCallException {
         loadData();
 
         Client client = this.getClient();
@@ -140,9 +151,70 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             System.out.println(vt.toString());
             compareTable(vt, expected);
         }
+
+        emptyData();
     }
 
-    public void testComplexAggsOrderbySuite() throws IOException, ProcCallException {
+
+
+    public void testComplexAggsSuite() throws IOException, ProcCallException {
+
+
+        complexAggs();
+        complexAggsOrderbySuite();
+        complexAggsDistinctLimit();
+
+    }
+
+    private void complexAggs() throws IOException, ProcCallException {
+        loadData();
+
+        Client client = this.getClient();
+        ClientResponse cr;
+        VoltTable vt;
+        long[][] expected;
+
+        for (String tb: tbs) {
+            // Test normal group by with expressions, addition, division for avg.
+            cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage), count(wage)+5, " +
+                    "sum(wage)/count(wage) from " + tb + " GROUP BY dept ORDER BY dept DESC;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] {{2, 90, 7, 45}, {1, 60, 8, 20} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            // Test different group by column order, non-grouped TVE, sum for column, division
+            cr = client.callProcedure("@AdHoc", "SELECT sum(wage)/count(wage) + 1, dept, " +
+                    "SUM(wage+1), SUM(wage)/2 from " + tb + " GROUP BY dept ORDER BY dept");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] {{21 ,1, 63, 30}, {46, 2, 92, 45}};
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            // Test Complex Agg with functions
+            cr = client.callProcedure("@AdHoc", "SELECT dept, SUM(ABS(wage) - 1) as tag, " +
+                    "(count(*)+sum(dept*2))/2 from " + tb + " GROUP BY dept ORDER BY ABS(dept)");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {1, 57, 4} , {2, 88, 5}};
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            // Test sum()/count(), Addition
+            cr = client.callProcedure("@AdHoc", "SELECT dept, SUM(wage), COUNT(wage), AVG(wage), " +
+                    "MAX(wage), MIN(wage), SUM(wage)/COUNT(wage),  " +
+                    "MAX(wage)+MIN(wage)+1 from " + tb + " GROUP BY dept ORDER BY dept");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] {{1, 60, 3, 20, 30, 10, 20, 41}, {2, 90, 2, 45, 50, 40, 45, 91}};
+            compareTable(vt, expected);
+        }
+        emptyData();
+    }
+
+    private void complexAggsOrderbySuite() throws IOException, ProcCallException {
         loadData();
 
         Client client = this.getClient();
@@ -229,57 +301,10 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             System.out.println(vt.toString());
             compareTable(vt, expected);
         }
-
+        emptyData();
     }
 
-    public void testComplexAggs() throws IOException, ProcCallException {
-        loadData();
-
-        Client client = this.getClient();
-        ClientResponse cr;
-        VoltTable vt;
-        long[][] expected;
-
-        for (String tb: tbs) {
-            // Test normal group by with expressions, addition, division for avg.
-            cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage), count(wage)+5, " +
-                    "sum(wage)/count(wage) from " + tb + " GROUP BY dept ORDER BY dept DESC;");
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            vt = cr.getResults()[0];
-            expected = new long[][] {{2, 90, 7, 45}, {1, 60, 8, 20} };
-            System.out.println(vt.toString());
-            compareTable(vt, expected);
-
-            // Test different group by column order, non-grouped TVE, sum for column, division
-            cr = client.callProcedure("@AdHoc", "SELECT sum(wage)/count(wage) + 1, dept, " +
-                    "SUM(wage+1), SUM(wage)/2 from " + tb + " GROUP BY dept ORDER BY dept");
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            vt = cr.getResults()[0];
-            expected = new long[][] {{21 ,1, 63, 30}, {46, 2, 92, 45}};
-            System.out.println(vt.toString());
-            compareTable(vt, expected);
-
-            // Test Complex Agg with functions
-            cr = client.callProcedure("@AdHoc", "SELECT dept, SUM(ABS(wage) - 1) as tag, " +
-                    "(count(*)+sum(dept*2))/2 from " + tb + " GROUP BY dept ORDER BY ABS(dept)");
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            vt = cr.getResults()[0];
-            expected = new long[][] { {1, 57, 4} , {2, 88, 5}};
-            System.out.println(vt.toString());
-            compareTable(vt, expected);
-
-            // Test sum()/count(), Addition
-            cr = client.callProcedure("@AdHoc", "SELECT dept, SUM(wage), COUNT(wage), AVG(wage), " +
-                    "MAX(wage), MIN(wage), SUM(wage)/COUNT(wage),  " +
-                    "MAX(wage)+MIN(wage)+1 from " + tb + " GROUP BY dept ORDER BY dept");
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            vt = cr.getResults()[0];
-            expected = new long[][] {{1, 60, 3, 20, 30, 10, 20, 41}, {2, 90, 2, 45, 50, 40, 45, 91}};
-            compareTable(vt, expected);
-        }
-    }
-
-    public void testComplexAggsDistinctLimit() throws IOException, ProcCallException {
+    private void complexAggsDistinctLimit() throws IOException, ProcCallException {
         loadData();
 
         Client client = this.getClient();
@@ -321,9 +346,16 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             System.out.println(vt.toString());
             compareTable(vt, expected);
         }
+        emptyData();
     }
 
-    public void testComplexGroupby() throws IOException, ProcCallException, ParseException{
+    public void testcomplexGroupbySuite() throws IOException, ProcCallException, ParseException{
+        complexGroupby();
+        complexGroupbyDistinctLimit();
+        complexGroupbyOrderbySuite();
+    }
+
+    private void complexGroupby() throws IOException, ProcCallException, ParseException{
         loadData();
 
         Client client = this.getClient();
@@ -405,9 +437,10 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
                 compareTable(vt, expected);
             }
         }
+        emptyData();
     }
 
-    public void testComplexGroupbyDistinctLimit() throws IOException, ProcCallException, ParseException {
+    private void complexGroupbyDistinctLimit() throws IOException, ProcCallException, ParseException {
         loadData();
 
         Client client = this.getClient();
@@ -509,10 +542,11 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             System.out.println(vt.toString());
             compareTable(vt, expected);
         }
+        emptyData();
     }
 
 
-    public void testComplexGroupbyOrderbySuite() throws IOException, ProcCallException {
+    private void complexGroupbyOrderbySuite() throws IOException, ProcCallException {
         loadData();
 
         Client client = this.getClient();
@@ -687,11 +721,22 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 11}, {8,11}, {3,21}, {4,31}, {6,41}, {9,41}, {7,51}};
             compareTable(vt, expected);
-
         }
+
+        emptyData();
     }
 
-    public void testENG4285() throws IOException, ProcCallException {
+    public void testOtherCases() throws IOException, ProcCallException {
+        strangeCasesAndOrderby();
+
+        ENG4285();
+        ENG5016();
+
+        supportedCases();
+        unsupportedCases();
+    }
+
+    private void ENG4285() throws IOException, ProcCallException {
         loadData();
 
         Client client = this.getClient();
@@ -733,13 +778,13 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 40, 13, 3} , {2, 73, 36, 2}};
             compareTable(vt, expected);
-
         }
 
+        emptyData();
     }
 
     // Test group by columns do not have to be in display columns.
-    public void testENG5016() throws IOException, ProcCallException {
+    private void ENG5016() throws IOException, ProcCallException {
         loadData();
 
         Client client = this.getClient();
@@ -781,12 +826,12 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals("C3", vt.getColumnName(2));
             assertEquals(1, vt.getColumnIndex("NO_BUG"));
             assertEquals(2, vt.getColumnIndex("C3"));
-
-
         }
+
+        emptyData();
     }
 
-    public void testSupportedCases() throws IOException, ProcCallException {
+    private void supportedCases() throws IOException, ProcCallException {
         loadData();
 
         Client client = this.getClient();
@@ -802,12 +847,35 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 3, 60} , {2, 2, 90}};
             compareTable(vt, expected);
+
+            cr = client.callProcedure("@AdHoc", "SELECT dept, COUNT(*) as tag, sum(wage) from " + tb +
+                    " GROUP BY dept ORDER BY COUNT(*) DESC");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {1, 3, 60} , {2, 2, 90}};
+            compareTable(vt, expected);
+
+            cr = client.callProcedure("@AdHoc", "SELECT dept, COUNT(*), sum(wage) from " + tb +
+                    " GROUP BY dept ORDER BY COUNT(*) DESC");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {1, 3, 60} , {2, 2, 90}};
+            compareTable(vt, expected);
+
+            cr = client.callProcedure("@AdHoc", "SELECT dept, COUNT(*) as tag, sum(wage) - 1 from " + tb +
+                    " GROUP BY dept ORDER BY COUNT(*) DESC");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {1, 3, 59} , {2, 2, 89}};
+            compareTable(vt, expected);
+
         }
+        emptyData();
     }
 
     // TODO(XIN): make the following un-taged order by cases work, ENG-4958
-    // COUNT(*)
-    public void testUnsupportedCases() throws IOException, ProcCallException {
+    // Test group by column not in display columns
+    private void unsupportedCases() throws IOException, ProcCallException {
         loadData();
 
         Client client = this.getClient();
@@ -818,34 +886,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         Exception ex = null;
         for (String tb: tbs) {
             // Test order by agg without tag
-            // Weird, works fine if order by
-            ex = null;
-            try {
-                cr = client.callProcedure("@AdHoc", "SELECT dept, COUNT(*) as tag, sum(wage) from " + tb +
-                        " GROUP BY dept ORDER BY COUNT(*) DESC");
-                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-                vt = cr.getResults()[0];
-                expected = new long[][] { {1, 3, 60} , {2, 2, 90}};
-                compareTable(vt, expected);
-            } catch (ProcCallException e) {
-                ex = e;
-            } finally {
-                assertTrue(ex.getMessage().contains("invalid ORDER BY expression"));
-            }
-
-            ex = null;
-            try {
-                cr = client.callProcedure("@AdHoc", "SELECT dept, COUNT(*), sum(wage) from " + tb +
-                        " GROUP BY dept ORDER BY COUNT(*) DESC");
-                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-                vt = cr.getResults()[0];
-                expected = new long[][] { {1, 3, 60} , {2, 2, 90}};
-                compareTable(vt, expected);
-            } catch (ProcCallException e) {
-                ex = e;
-            } finally {
-                assertTrue(ex.getMessage().contains("invalid ORDER BY expression"));
-            }
 
             ex = null;
             try {
@@ -894,21 +934,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
 
             ex = null;
             try {
-                // Test order by agg without tag
-                cr = client.callProcedure("@AdHoc", "SELECT dept, COUNT(*) as tag, sum(wage) - 1 from " + tb +
-                        " GROUP BY dept ORDER BY COUNT(*) DESC");
-                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-                vt = cr.getResults()[0];
-                expected = new long[][] { {1, 3, 59} , {2, 2, 89}};
-                compareTable(vt, expected);
-            } catch (ProcCallException e) {
-                ex = e;
-            } finally {
-                assertTrue(ex.getMessage().contains("invalid ORDER BY expression"));
-            }
-
-            ex = null;
-            try {
                 // Test order by agg not in display columns
                 cr = client.callProcedure("@AdHoc", "SELECT dept, avg(wage), sum(wage) - 1 from " + tb +
                         " GROUP BY dept ORDER BY COUNT(*) DESC");
@@ -921,7 +946,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             } finally {
                 assertTrue(ex.getMessage().contains("invalid ORDER BY expression"));
             }
-
 
             ex = null;
             try {
@@ -953,6 +977,8 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
                 assertTrue(ex.getMessage().contains("invalid ORDER BY expression"));
             }
         }
+
+        emptyData();
     }
 
     //
