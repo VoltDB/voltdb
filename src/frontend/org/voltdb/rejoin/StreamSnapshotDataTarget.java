@@ -160,11 +160,10 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
          * a RejoinDataMessage instance, and finally hand it off to the messaging
          * subsystem.
          */
-        protected int send(Mailbox mb, BBContainer message) throws IOException {
+        protected int send(Mailbox mb, MessageFactory msgFactory, BBContainer message) throws IOException {
             if (message.b.isDirect()) {
                 byte[] data = CompressionService.compressBuffer(message.b);
-                RejoinDataMessage msg = new RejoinDataMessage(m_targetId, data);
-                mb.send(m_destHSId, msg);
+                mb.send(m_destHSId, msgFactory.makeDataMessage(m_targetId, data));
 
                 if (rejoinLog.isTraceEnabled()) {
                     rejoinLog.trace("Sending direct buffer");
@@ -177,8 +176,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                         message.b.array(), message.b.position(),
                         message.b.remaining());
 
-                RejoinDataMessage msg = new RejoinDataMessage(m_targetId, compressedBytes);
-                mb.send(m_destHSId, msg);
+                mb.send(m_destHSId, msgFactory.makeDataMessage(m_targetId, compressedBytes));
 
                 if (rejoinLog.isTraceEnabled()) {
                     rejoinLog.trace("Sending heap buffer");
@@ -188,14 +186,14 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             }
         }
 
-        public synchronized int doWork(Mailbox mb) throws Exception {
+        public synchronized int doWork(Mailbox mb, MessageFactory msgFactory) throws Exception {
             // this work has already been discarded
             if (m_message == null) {
                 return 0;
             }
 
             try {
-                return send(mb, m_message);
+                return send(mb, msgFactory, m_message);
             } finally {
                 // Always discard the buffer so that they can be reused
                 discard();
@@ -284,6 +282,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
      */
     public static class SnapshotSender implements Runnable {
         private final Mailbox m_mb;
+        private final MessageFactory m_msgFactory;
         private final LinkedBlockingQueue<SendWork> m_workQueue;
         private final AtomicInteger m_expectedEOFs;
 
@@ -292,8 +291,14 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
         public SnapshotSender(Mailbox mb)
         {
+            this(mb, new DefaultMessageFactory());
+        }
+
+        public SnapshotSender(Mailbox mb, MessageFactory msgFactory)
+        {
             Preconditions.checkArgument(mb != null);
             m_mb = mb;
+            m_msgFactory = msgFactory;
             m_workQueue = new LinkedBlockingQueue<SendWork>();
             m_expectedEOFs = new AtomicInteger();
             m_bytesSent = Collections.synchronizedMap(new HashMap<Long, AtomicLong>());
@@ -336,7 +341,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                         }
                     }
 
-                    m_bytesSent.get(work.m_targetId).addAndGet(work.doWork(m_mb));
+                    m_bytesSent.get(work.m_targetId).addAndGet(work.doWork(m_mb, m_msgFactory));
                 }
                 catch (Exception e) {
                     m_lastException = e;
