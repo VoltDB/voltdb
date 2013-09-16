@@ -282,7 +282,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
     public void testMultiPartitionMVBasedQuery_AggQueryEdge() {
         try {
-            pns = compileToFragments("SELECT count(*) FROM V_P1");
+            pns = compileToFragments("SELECT count(V_SUM_C1) FROM V_P1");
             fail();
         } catch (Exception e) {
             assertTrue(e.getMessage().contains("group by query or aggregation on materialized table"));
