@@ -67,7 +67,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         }
     }
 
-    public void notestMVInsertDeleteR1() throws IOException, ProcCallException {
+    public void testMVInsertDeleteR1() throws IOException, ProcCallException {
         System.out.println("Test R1 insert and delete...");
         String mvTable = "V_R1";
         String orderbyStmt = mvTable+"_G1";
@@ -162,7 +162,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         compareMVcontentsOfLongs(client, mvTable, null, orderbyStmt);
     }
 
-    public void notestMVUpdateR1() throws IOException, ProcCallException {
+    public void testMVUpdateR1() throws IOException, ProcCallException {
         System.out.println("Test R1 update...");
 
         Client client = this.getClient();
@@ -224,7 +224,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
     }
 
 
-    public void notestMVInsertDeleteR2() throws Exception {
+    public void testMVInsertDeleteR2() throws Exception {
         System.out.println("Test R2 insert and delete...");
         String mvTable = "V_R2";
         String orderbyStmt = mvTable+"_G1, " + mvTable + "_G2";
@@ -308,7 +308,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         }
     }
 
-    public void notestMVUpdateR2() throws Exception {
+    public void testMVUpdateR2() throws Exception {
         System.out.println("Test R2 update...");
 
         if (!isHSQL()) {
@@ -413,7 +413,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         compareTableR3(client, mvTable+"_test4", expected24, orderbyStmt);
     }
 
-    public void notestMVInsertDeleteR3() throws Exception {
+    public void testMVInsertDeleteR3() throws Exception {
         System.out.println("Test R3 insert and delete...");
         String orderbyStmt = "V_R3_CNT, V_R3_sum_wage";
         Client client = this.getClient();
@@ -472,7 +472,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
     }
 
 
-    public void notestMVUpdateR3() throws Exception {
+    public void testMVUpdateR3() throws Exception {
         System.out.println("Test R3 update...");
 
         String orderbyStmt = "V_R3_CNT, V_R3_sum_wage";
