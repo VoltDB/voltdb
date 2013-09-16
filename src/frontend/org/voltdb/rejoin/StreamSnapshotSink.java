@@ -215,7 +215,7 @@ public class StreamSnapshotSink {
             m_bytesReceived += nextChunk.remaining();
 
             // Queue ack to this block
-            m_ack.ack(hsId, targetId, blockIndex);
+            m_ack.ack(hsId, m_EOF, targetId, blockIndex);
 
             return Pair.of(tableId, nextChunk);
         } finally {
