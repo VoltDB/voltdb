@@ -23,6 +23,7 @@ import java.io.Writer;
 
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExpectedProcedureException;
 import org.voltdb.ProcedureRunner;
@@ -89,7 +90,12 @@ abstract public class ProcedureTask extends TransactionTask
                         "This can happen if a catalog update removing the procedure occurred " +
                         "after the procedure was submitted " +
                         "but before the procedure was executed.";
-                    hostLog.debug(error);
+                    RateLimitedLogger.tryLogForMessage(
+                            error + " This log message is rate limited to once every 60 seconds.",
+                            System.currentTimeMillis(),
+                            60 * 1000,
+                            hostLog,
+                            Level.WARN);
                     response.setResults(
                             new ClientResponseImpl(
                                 ClientResponse.UNEXPECTED_FAILURE,

@@ -306,17 +306,17 @@ public class ExportGeneration {
         return new Watcher() {
             @Override
             public void process(final WatchedEvent event) {
-                if (m_drainedSources.get() == m_numSources) {
-                    return;
-                }
-                m_zk.getChildren(
-                        m_leadersZKPath + "/" + partition,
-                        constructLeaderChildWatcher(partition),
-                        new org.apache.zookeeper_voltpatches.AsyncCallback.ChildrenCallback() {
-
+                final Runnable processRunnable = new Runnable() {
+                    @Override
+                    public void run() {
+                        if (m_drainedSources.get() == m_numSources) {
+                            return;
+                        }
+                        final AsyncCallback.ChildrenCallback childrenCallback =
+                                new org.apache.zookeeper_voltpatches.AsyncCallback.ChildrenCallback() {
                             @Override
                             public void processResult(final int rc, final String path, Object ctx,
-                                    final List<String> children) {
+                                                      final List<String> children) {
                                 KeeperException.Code code = KeeperException.Code.get(rc);
                                 if (code != KeeperException.Code.OK) {
                                     VoltDB.crashLocalVoltDB(
@@ -335,7 +335,14 @@ public class ExportGeneration {
                                     }
                                 });
                             }
-                        }, null);
+                        };
+                        m_zk.getChildren(
+                                m_leadersZKPath + "/" + partition,
+                                constructLeaderChildWatcher(partition),
+                                childrenCallback, null);
+                    }
+                };
+                m_childUpdatingThread.execute(processRunnable);
             }
         };
     }
@@ -697,7 +704,10 @@ public class ExportGeneration {
 
     }
 
-    public void truncateExportToTxnId(long txnId, long[] perPartitionTxnIds) {
+    /*
+     * Returns true if the generatino was completely truncated away
+     */
+    public boolean truncateExportToTxnId(long txnId, long[] perPartitionTxnIds) {
         // create an easy partitionId:txnId lookup.
         HashMap<Integer, Long> partitionToTxnId = new HashMap<Integer, Long>();
         for (long tid : perPartitionTxnIds) {
@@ -726,6 +736,7 @@ public class ExportGeneration {
                 }
             }
         }
+
         try {
             Futures.allAsList(tasks).get();
         } catch (Exception e) {
@@ -733,6 +744,8 @@ public class ExportGeneration {
                                     "You can back up export overflow data and start the " +
                                     "DB without it to get past this error", true, e);
         }
+
+        return m_drainedSources.get() == m_numSources;
     }
 
     public void close() {

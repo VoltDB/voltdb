@@ -1,9 +1,13 @@
-{@insert_vals = "_id, _value[string], _value[int32], _value[float]"}
-{@from_tables = "_table, _table"}
-{@col_type = "int"}
-{@cmp_type = "_value[int:0,100]"}
-{@assign_col = "NUM"}
-{@assign_type = "_value[int:0,100]"}
-{@optional_fn = "_pick[@FN1 <options=,ABS,CEILING,FLOOR,SQRT,EXP>]"}
-{@optional_fn2 = "_pick[@FN2 <options=,ABS,CEILING,FLOOR,SQRT,EXP>]"}
+<grammar.sql>
+{@insertvals = "_id, _value[string], _value[int32], _value[float]"}
+{@dmltable = "_table"}
+{@fromtables = "_table, _table"}
+{@columntype = "int"}
+{@comparabletype = "numeric"}
+{@comparableconstant = "44"}
+{@columnpredicate = "_numericcolumnpredicate"}
+{@dmlcolumnpredicate = "_variable[numeric] _cmp _value[int16]"}
+{@updatecolumn = "NUM"}
+{@updatevalue = "_value[int:0,100]"}
+{@optionalfn = "_numfun"}
 <advanced-template.sql>

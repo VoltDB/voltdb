@@ -125,6 +125,7 @@ public class VoltCompiler {
     String m_jarOutputPath = null;
     String m_currentFilename = null;
     Map<String, String> m_ddlFilePaths = new HashMap<String, String>();
+    String[] m_addedClasses = null;
 
     // generated html text for catalog report
     String m_report = null;
@@ -888,8 +889,38 @@ public class VoltCompiler {
             Collection<ProcedureDescriptor> allProcs = voltDdlTracker.getProcedureDescriptors();
             compileProcedures(db, hsql, allProcs, classDependencies, whichProcs);
         }
+
+        // add extra classes from the DDL
+        m_addedClasses = voltDdlTracker.m_extraClassses;
+        addExtraClasses();
     }
 
+    /**
+     * Once the DDL file is over, take all of the extra classes found and add them to the jar.
+     */
+    private void addExtraClasses() throws VoltCompilerException {
+
+        List<String> addedClasses = new ArrayList<String>();
+
+        for (String className : m_addedClasses) {
+            try {
+                Class<?> clz = Class.forName(className);
+
+                if (addClassToJar(clz)) {
+                    addedClasses.add(className);
+                }
+
+            } catch (Exception e) {
+                String msg = "Class %s could not be loaded/found/added to the jar. " +
+                             "";
+                msg = String.format(msg, className);
+                throw new VoltCompilerException(msg);
+            }
+
+            // reset the added classes to the actual added classes
+            m_addedClasses = addedClasses.toArray(new String[0]);
+        }
+    }
 
     /**
      * @param db the database entry in the catalog
@@ -1739,6 +1770,23 @@ public class VoltCompiler {
             }
             outputStream.println("------------------------------------------\n");
 
+            if (m_addedClasses.length > 0) {
+
+                if (m_addedClasses.length > 10) {
+                    outputStream.printf("Added %d additional classes to the catalog jar.\n\n",
+                            m_addedClasses.length);
+                }
+                else {
+                    String logMsg = "Added the following additional classes to the catalog jar:\n";
+                    for (String className : m_addedClasses) {
+                        logMsg += "  " + className + "\n";
+                    }
+                    outputStream.println(logMsg);
+                }
+
+                outputStream.println("------------------------------------------\n");
+            }
+
             //
             // post-compile summary and legend.
             //
@@ -1836,11 +1884,15 @@ public class VoltCompiler {
     // this needs to be reset in the main compile func
     private static final HashSet<Class<?>> cachedAddedClasses = new HashSet<Class<?>>();
 
-    public void addClassToJar(final Class<?> cls)
+    /**
+     * Return true if the class was added. Return false if the class was already in the
+     * jar. Throw and exception if the class can't be added for another reason.
+     */
+    public boolean addClassToJar(final Class<?> cls)
     throws VoltCompiler.VoltCompilerException {
 
         if (cachedAddedClasses.contains(cls)) {
-            return;
+            return false;
         } else {
             cachedAddedClasses.add(cls);
         }
@@ -1883,7 +1935,7 @@ public class VoltCompiler {
             e.printStackTrace();
             System.exit(-1);
             // Prevent warning  about fis possibly being null below.
-            return;
+            return false;
         }
 
         assert(fileSize > 0);
@@ -1901,6 +1953,7 @@ public class VoltCompiler {
         }
 
         m_jarOutput.put(packagePath, fileBytes);
+        return true;
     }
 
     /**

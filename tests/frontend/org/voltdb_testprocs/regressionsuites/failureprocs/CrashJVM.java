@@ -21,31 +21,28 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.sqlgenerator;
+package org.voltdb_testprocs.regressionsuites.failureprocs;
 
-import org.voltdb.compiler.VoltProjectBuilder;
+import java.lang.reflect.Field;
 
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-public class SimpleProjectBuilder extends VoltProjectBuilder {
-    public static final Class<?> PROCEDURES[] = new Class<?>[] {
-        StubProcedure.class
-    };
+import sun.misc.Unsafe;
 
-    private String m_filename = null;
+public class CrashJVM extends VoltProcedure {
+    public VoltTable[] run() {
+        try {
+            getUnsafe().getByte(0);
+        } catch (Exception e) {
 
-    public SimpleProjectBuilder(String filename) {
-        m_filename = filename;
+        }
+        return null;
     }
 
-    public void addDefaultProcedures() {
-        addProcedures(PROCEDURES);
-    }
-
-    public void addDefaultPartitioning() {
-        addPartitionInfo("P1", "ID");
-    }
-
-    public void addDefaultSchema() {
-        addSchema(getClass().getResource(m_filename));
+    private static Unsafe getUnsafe() throws NoSuchFieldException, IllegalAccessException {
+        Field theUnsafe = Unsafe.class.getDeclaredField("theUnsafe");
+        theUnsafe.setAccessible(true);
+        return (Unsafe) theUnsafe.get(null);
     }
 }

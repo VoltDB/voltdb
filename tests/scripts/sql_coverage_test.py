@@ -58,7 +58,7 @@ class Config:
     def get_config(self, config_name):
         return self.__config[config_name]
 
-def run_once(name, command, statements_path, results_path, testConfigKit):
+def run_once(name, command, statements_path, results_path, submit_verbosely, testConfigKit):
 
     print "Running \"run_once\":"
     print "  name: %s" % (name)
@@ -110,7 +110,8 @@ def run_once(name, command, statements_path, results_path, testConfigKit):
             break
 
         try:
-            ### print "VERBOSELY SPOUTING SENDING adhoc %s" % statement["SQL"]
+            if submit_verbosely:
+                print "Submitting to backend " + name + " adhoc " + statement["SQL"]
             client.onecmd("adhoc " + statement["SQL"])
         except:
             print >> sys.stderr, "Error occurred while executing '%s': %s" % \
@@ -135,9 +136,10 @@ def run_once(name, command, statements_path, results_path, testConfigKit):
                         "Failed to kill the server process %d" % (server.pid)
             break
         if client.response.tables != None:
+            ### print "DEBUG: got table(s) from ", statement["SQL"] ,"."
             tables = [normalize(t, statement["SQL"]) for t in client.response.tables]
-        # else:
-        #     print "DEBUG: but I got no table(s) from ?", statement["SQL"] ,"?"
+        else:
+            print "DEBUG: returned no table(s) from ?", statement["SQL"] ,"?"
         cPickle.dump({"Status": client.response.status,
                       "Info": client.response.statusString,
                       "Result": tables,
@@ -160,7 +162,7 @@ def run_once(name, command, statements_path, results_path, testConfigKit):
     else:
         return 0
 
-def run_config(suite_name, config, basedir, output_dir, random_seed, report_all, generate_only, args, testConfigKit):
+def run_config(suite_name, config, basedir, output_dir, random_seed, report_all, generate_only, submit_verbosely, args, testConfigKit):
     for key in config.iterkeys():
         print "in run_config key = '%s', config[key] = '%s'" % (key, config[key])
         if not os.path.isabs(config[key]):
@@ -196,11 +198,13 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
         counter += 1
     statements_file.close()
 
-    if (generate_only):
+    if generate_only or submit_verbosely:
+        print "Generated %d statements." % counter
+    if generate_only:
         # Claim success without running servers.
-        return [0,0]
+        return {"keyStats" : None, "mis" : 0}
 
-    if run_once("jni", command, statements_path, jni_path, testConfigKit) != 0:
+    if run_once("jni", command, statements_path, jni_path, submit_verbosely, testConfigKit) != 0:
         print >> sys.stderr, "Test with the JNI backend had errors."
         print >> sys.stderr, "  jni_path: %s" % (jni_path)
         sys.stderr.flush()
@@ -223,7 +227,7 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
         counter += 1
     statements_file.close()
 
-    if run_once("hsqldb", command, statements_path, hsql_path, testConfigKit) != 0:
+    if run_once("hsqldb", command, statements_path, hsql_path, submit_verbosely, testConfigKit) != 0:
         print >> sys.stderr, "Test with the HSQLDB backend had errors."
         exit(1)
 
@@ -477,7 +481,7 @@ if __name__ == "__main__":
             # To add one more key
             testConfigKits["testCatalog"] = testCatalog
         result = run_config(config_name, config, basedir, report_dir, seed, options.report_all, \
-                            options.generate_only, args, testConfigKits)
+                            options.generate_only, options.report_all, args, testConfigKits)
         statistics[config_name] = result["keyStats"]
         statistics["seed"] = seed
         if result["mis"] != 0:

@@ -142,7 +142,7 @@ fi
 CLASSPATH=${CLASSPATH}:${EXTRA_CLASSPATH}
 
 # run it
-export CMDVAL="$JAVA -Xmx512m $VOLTDB_OPTS -Dlog4j.configuration=file://${LOG4J_CONFIG_PATH} "
+export CMDVAL="$JAVA -Djava.awt.headless=true -Xmx512m $VOLTDB_OPTS -Dlog4j.configuration=file://${LOG4J_CONFIG_PATH} "
 export CMDVAL=$CMDVAL"-classpath $CLASSPATH org.voltdb.compiler.VoltCompiler $@"
 #echo $CMDVAL
 exec $CMDVAL

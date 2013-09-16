@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -1060,7 +1061,9 @@ public class SnapshotUtil {
                     throw new RuntimeException(e);
                 }
             }
-        });
+        },
+           "SnapshotUtilAdapter"
+            );
 
         final SnapshotDaemon sd = VoltDB.instance().getClientInterfaces().get(0).getSnapshotDaemon();
         Runnable work = new Runnable() {

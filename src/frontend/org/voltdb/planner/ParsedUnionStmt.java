@@ -128,7 +128,6 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         }
 
         // these just shouldn't happen right?
-        assert(multiTableSelectionList.size() == 0);
         assert(noTableSelectionList.size() == 0);
 
         this.sql = sql;

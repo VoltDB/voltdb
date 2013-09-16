@@ -29,4 +29,5 @@ CREATE PROCEDURE FROM CLASS voltcache.procedures.Set;
 CREATE PROCEDURE FROM CLASS voltcache.procedures.Get;
 CREATE PROCEDURE FROM CLASS voltcache.procedures.Gets;
 CREATE PROCEDURE FROM CLASS voltcache.procedures.FlushAll;
-CREATE PROCEDURE FROM CLASS voltcache.procedures.VoltCacheProcBase;
+
+IMPORT CLASS voltcache.procedures.VoltCacheProcBase;

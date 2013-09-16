@@ -52,7 +52,7 @@ public class RandomMsgGenerator
         long seed = System.currentTimeMillis();
         System.out.println("Running with seed: " + seed);
         m_rand = new Random(seed);
-        m_mpiTxnEgo = TxnEgo.makeZero(TxnEgo.MP_PARTITIONID);
+        m_mpiTxnEgo = TxnEgo.makeZero(MpInitiator.MP_INIT_PID);
     }
 
     private Iv2InitiateTaskMessage makeIv2InitiateTaskMsg(boolean readOnly)

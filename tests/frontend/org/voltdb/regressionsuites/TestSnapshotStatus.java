@@ -25,15 +25,15 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import org.voltdb.client.Client;
-
-import org.voltdb.VoltTable;
-
-import org.voltdb_testprocs.regressionsuites.SaveRestoreBase;
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.VoltTable;
+import org.voltdb.client.Client;
+import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb_testprocs.regressionsuites.SaveRestoreBase;
 
 public class TestSnapshotStatus extends SaveRestoreBase {
 
@@ -41,17 +41,23 @@ public class TestSnapshotStatus extends SaveRestoreBase {
         super(name);
     }
 
-    public void testSnapshotStatus() throws Exception
+    public void testSnapshotStatus() throws NoConnectionsException, IOException, ProcCallException
     {
         Client client = getClient();
-        VoltTable[] results = client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, 1).getResults();
+        VoltTable[] results = null;
+        try {
+            results = client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, 1).getResults();
+        } catch (Exception ex) {
+             fail();
+        }
+
         System.out.println(results[0]);
         // better be four rows, one for each execution site, in the blocking save results:
         assertEquals(4, results[0].getRowCount());
         results = client.callProcedure("@SnapshotStatus").getResults();
         System.out.println(results[0]);
         // better be four rows, one for each table at each node, in the status results:
-        assertEquals(4, results[0].getRowCount());
+        assertEquals(6, results[0].getRowCount());
         // better not be any zeros in the completion time
         while (results[0].advanceRow()) {
             long completed = results[0].getLong("END_TIME");
@@ -60,17 +66,32 @@ public class TestSnapshotStatus extends SaveRestoreBase {
     }
 
     // Regression test for ENG-4802
-    public void testCsvSnapshotStatus() throws Exception
+    public void testCsvSnapshotStatus() throws NoConnectionsException, IOException, ProcCallException
     {
         Client client = getClient();
+        client.callProcedure("TA.insert", 1, 1);
+        client.callProcedure("T_.insert", 2);
         // Lazy man's JSON construction for snapshot opts
         String json = "{uripath:\"file:///" + TMPDIR + "\", nonce:\"" + TESTNONCE + "\",block:true, format:\"csv\"}";
-        VoltTable[] results = client.callProcedure("@SnapshotSave", json).getResults();
+        VoltTable[] results = null;
+        try {
+            // This used to fail with table name "T_".
+            results = client.callProcedure("@SnapshotSave", json).getResults();
+        } catch(Exception ex) {
+            fail();
+        }
+
         System.out.println(results[0]);
-        results = client.callProcedure("@SnapshotStatus").getResults();
+        try {
+            results = client.callProcedure("@SnapshotStatus").getResults();
+        } catch (NoConnectionsException e) {
+            e.printStackTrace();
+        } catch (Exception ex) {
+            fail();
+        }
         System.out.println(results[0]);
-        // better be three rows, one for the replicated table, and one for each partition of the partitioned table
-        assertEquals(3, results[0].getRowCount());
+        // better be five rows, one for the replicated table, and one for each partition of the partitioned table
+        assertEquals(5, results[0].getRowCount());
         // better not be any zeros in the completion time
         while (results[0].advanceRow()) {
             long completed = results[0].getLong("END_TIME");
@@ -89,14 +110,18 @@ public class TestSnapshotStatus extends SaveRestoreBase {
             new MultiConfigSuiteBuilder(TestSnapshotStatus.class);
 
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addLiteralSchema("CREATE TABLE T(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1));" +
+        project.addLiteralSchema("CREATE TABLE TA(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1));" +
+
+                "CREATE TABLE T_(A1 INTEGER NOT NULL, PRIMARY KEY(A1));" +
+
                 "CREATE TABLE R(R1 INTEGER NOT NULL, R2 INTEGER);");
-        project.addPartitionInfo("T", "A1");
-        project.addStmtProcedure("InsertA", "INSERT INTO T VALUES(?,?);", "T.A1: 0");
+        project.addPartitionInfo("TA", "A1");
+        project.addPartitionInfo("T_", "A1");
+        //project.addStmtProcedure("InsertA", "INSERT INTO TA VALUES(?,?);", "TA.A1: 0");
 
         LocalCluster lcconfig = new LocalCluster("testsnapshotstatus.jar", 2, 2, 1,
                                                BackendTarget.NATIVE_EE_JNI);
-        lcconfig.compile(project);
+        assertTrue(lcconfig.compile(project));
         builder.addServerConfig(lcconfig);
 
         return builder;

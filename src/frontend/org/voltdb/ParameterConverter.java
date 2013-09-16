@@ -424,12 +424,12 @@ public class ParameterConverter {
             if (numberParam != null) {
                 BigInteger bi = new BigInteger(param.toString());
                 BigDecimal bd = new BigDecimal(bi);
-                bd = bd.setScale(12, BigDecimal.ROUND_HALF_EVEN);
+                bd = VoltDecimalHelper.setDefaultScale(bd);
                 return bd;
             }
             if (inputClz == BigDecimal.class) {
                 BigDecimal bd = (BigDecimal) param;
-                bd = bd.setScale(12 ,BigDecimal.ROUND_HALF_EVEN);
+                bd = VoltDecimalHelper.setDefaultScale(bd);
                 return bd;
             }
             if (inputClz == Float.class || inputClz == Double.class) {

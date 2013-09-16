@@ -65,10 +65,7 @@ import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.network.WriteStream;
-import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.DeferredSerialization;
-import org.voltcore.utils.EstTime;
-import org.voltcore.utils.Pair;
+import org.voltcore.utils.*;
 import org.voltdb.ClientInterfaceHandleManager.Iv2InFlight;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
@@ -878,7 +875,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              */
             cihm.m_acg.logTransactionCompleted(
                     cihm.connection.connectionId(),
-                    cihm.connection.getHostnameAndIP(),
+                    cihm.connection.getHostnameOrIP(),
                     clientData.m_procName,
                     delta,
                     clientResponse.getStatus());
@@ -930,12 +927,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     int partition = getPartitionForProcedure(partitionParamIndex,
                             partitionParamType, response.getInvocation());
                     createTransaction(cihm.connection.connectionId(),
-                            null, false, response.getInvocation(),
+                            response.getInvocation(),
                             isReadonly,
                             true, // Only SP could be mis-partitioned
                             false, // Only SP could be mis-partitioned
-                            new int[] {partition},
-                            cihm.connection,
+                            partition,
                             messageSize,
                             now);
                     return true;
@@ -954,29 +950,23 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     // Wrap API to SimpleDtxnInitiator - mostly for the future
     public boolean createTransaction(
             final long connectionId,
-            final String connectionHostname,
-            final boolean adminConnection,
             final StoredProcedureInvocation invocation,
             final boolean isReadOnly,
             final boolean isSinglePartition,
             final boolean isEveryPartition,
-            final int partitions[],
-            final Object clientData,
+            final int partition,
             final int messageSize,
             final long now)
     {
         return createTransaction(
                 connectionId,
-                connectionHostname,
-                adminConnection,
                 Iv2InitiateTaskMessage.UNUSED_MP_TXNID,
                 0, //unused timestammp
                 invocation,
                 isReadOnly,
                 isSinglePartition,
                 isEveryPartition,
-                partitions,
-                clientData,
+                partition,
                 messageSize,
                 now,
                 false);  // is for replay.
@@ -985,20 +975,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     // Wrap API to SimpleDtxnInitiator - mostly for the future
     public  boolean createTransaction(
             final long connectionId,
-            final String connectionHostname,
-            final boolean adminConnection,
             final long txnId,
             final long uniqueId,
             final StoredProcedureInvocation invocation,
             final boolean isReadOnly,
             final boolean isSinglePartition,
             final boolean isEveryPartition,
-            final int partitions[],
-            final Object clientData,
+            final int partition,
             final int messageSize,
             final long now,
             final boolean isForReplay)
     {
+        assert(!isSinglePartition || (partition >= 0));
         final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
 
         Long initiatorHSId = null;
@@ -1010,12 +998,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          */
         if (isSinglePartition && !isEveryPartition) {
             if (isReadOnly) {
-                initiatorHSId = m_localReplicas.get(partitions[0]);
+                initiatorHSId = m_localReplicas.get(partition);
             }
             if (initiatorHSId != null) {
                 isShortCircuitRead = true;
             } else {
-                initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partitions[0]);
+                initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partition);
             }
         }
         else {
@@ -1025,11 +1013,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         if (initiatorHSId == null) {
             hostLog.error("Failed to find master initiator for partition: "
-                    + Integer.toString(partitions[0]) + ". Transaction not initiated.");
+                    + Integer.toString(partition) + ". Transaction not initiated.");
             return false;
         }
 
-        long handle = cihm.getHandle(isSinglePartition, partitions[0], invocation.getClientHandle(),
+        long handle = cihm.getHandle(isSinglePartition, partition, invocation.getClientHandle(),
                 messageSize, now, invocation.getProcName(), initiatorHSId, isReadOnly, isShortCircuitRead);
 
         Iv2InitiateTaskMessage workRequest =
@@ -1485,7 +1473,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         AdHocPlannerWork ahpw = new AdHocPlannerWork(
                 m_siteId,
                 false, task.clientHandle, handler.connectionId(),
-                ccxn.getHostnameAndIP(), handler.isAdmin(), ccxn,
+                ccxn.getHostnameAndIPAndPort(), handler.isAdmin(), ccxn,
                 sql, sqlStatements, partitionParam, null, false, true,
                 task.type, task.originalTxnId, task.originalUniqueId,
                 m_adhocCompletionHandler);
@@ -1521,7 +1509,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         LocalObjectMessage work = new LocalObjectMessage(
                 new CatalogChangeWork(
                     m_siteId,
-                    task.clientHandle, handler.connectionId(), ccxn.getHostnameAndIP(),
+                    task.clientHandle, handler.connectionId(), ccxn.getHostnameAndIPAndPort(),
                     handler.isAdmin(), ccxn, catalogBytes, deploymentString,
                     task.type, task.originalTxnId, task.originalUniqueId,
                     m_adhocCompletionHandler));
@@ -1541,28 +1529,26 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                         ClientInputHandler handler,
                                                         Connection ccxn)
     {
-        int[] involvedPartitions = null;
+        int partition = -1;
         try {
             CatalogMap<Table> tables = m_catalogContext.get().database.getTables();
             int partitionParamType = getLoadSinglePartitionTablePartitionParamType(tables, task);
             byte[] valueToHash = (byte[])task.getParameterAtIndex(0);
-            involvedPartitions =
-                new int[]{ TheHashinator.getPartitionForParameter(partitionParamType, valueToHash)};
+            partition = TheHashinator.getPartitionForParameter(partitionParamType, valueToHash);
         }
         catch (Exception e) {
             authLog.warn(e.getMessage());
             return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                                           new VoltTable[0], e.getMessage(), task.clientHandle);
         }
-        assert(involvedPartitions != null);
-        createTransaction(handler.connectionId(), ccxn.getHostnameAndIP(),
-                          handler.isAdmin(),
+        assert(partition != -1);
+        createTransaction(handler.connectionId(),
                           task,
                           catProc.getReadonly(),
                           catProc.getSinglepartition(),
                           catProc.getEverysite(),
-                          involvedPartitions,
-                          ccxn, buf.capacity(),
+                          partition,
+                          buf.capacity(),
                           System.currentTimeMillis());
         return null;
     }
@@ -1667,14 +1653,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // This only happens on one node so we don't need to pick a leader.
         createTransaction(
                 handler.connectionId(),
-                ccxn.getHostnameAndIP(),
-                handler.isAdmin(),
                 task,
                 sysProc.getReadonly(),
                 sysProc.getSinglepartition(),
                 sysProc.getEverysite(),
-                m_allPartitions,
-                ccxn,
+                0,//No partition needed for multi-part
                 buf.capacity(),
                 System.currentTimeMillis());
 
@@ -1750,7 +1733,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         if (catProc == null) {
             String errorMessage = "Procedure " + task.procName + " was not found";
-            authLog.l7dlog( Level.WARN, LogKeys.auth_ClientInterface_ProcedureNotFound.name(), new Object[] { task.procName }, null);
+            RateLimitedLogger.tryLogForMessage(
+                            errorMessage + ". This message is rate limited to once every 60 seconds.",
+                            System.currentTimeMillis(),
+                            1000 * 60,
+                            authLog,
+                            Level.WARN);
             return new ClientResponseImpl(
                     ClientResponseImpl.UNEXPECTED_FAILURE,
                     new VoltTable[0], errorMessage, task.clientHandle);
@@ -1832,19 +1820,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         }
 
-        int[] involvedPartitions;
-        if (catProc.getSinglepartition() == false) {
-            involvedPartitions = m_allPartitions;
-        }
-        else {
+        int partition = -1;
+        if (catProc.getSinglepartition()) {
             // break out the Hashinator and calculate the appropriate partition
             try {
-                involvedPartitions = new int[] {
+                partition =
                         getPartitionForProcedure(
                                 catProc.getPartitionparameter(),
                                 catProc.getPartitioncolumn().getType(),
-                                task)
-                };
+                                task);
             }
             catch (RuntimeException e) {
                 // unable to hash to a site, return an error
@@ -1865,14 +1849,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         }
         boolean success =
-                createTransaction(handler.connectionId(), ccxn.getHostnameAndIP(),
-                        handler.isAdmin(),
+                createTransaction(handler.connectionId(),
                         task,
                         catProc.getReadonly(),
                         catProc.getSinglepartition(),
                         catProc.getEverysite(),
-                        involvedPartitions,
-                        ccxn, buf.capacity(),
+                        partition,
+                        buf.capacity(),
                         now);
         if (!success) {
             // HACK: this return is for the DR agent so that it
@@ -1899,7 +1882,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // pick the sysproc based on the presence of partition info
         // HSQL does not specifically implement AdHoc SP -- instead, use its always-SP implementation of AdHoc
         boolean isSinglePartition = plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForHSQL;
-        int partitions[] = null;
+        int partition = -1;
 
         if (isSinglePartition) {
             if (plannedStmtBatch.isReadOnly()) {
@@ -1916,7 +1899,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (plannedStmtBatch.partitionParam != null) {
                 type = VoltType.typeFromObject(plannedStmtBatch.partitionParam).getValue();
             }
-            partitions = new int[] { TheHashinator.getPartitionForParameter(type, plannedStmtBatch.partitionParam) };
+            partition = TheHashinator.getPartitionForParameter(type, plannedStmtBatch.partitionParam);
         }
         else {
             if (plannedStmtBatch.isReadOnly()) {
@@ -1925,7 +1908,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             else {
                 task.procName = "@AdHoc_RW_MP";
             }
-            partitions = m_allPartitions;
         }
 
         // Set up the parameters.
@@ -1974,10 +1956,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         // initiate the transaction
-        createTransaction(plannedStmtBatch.connectionId, plannedStmtBatch.hostname,
-                plannedStmtBatch.adminConnection, task,
+        createTransaction(plannedStmtBatch.connectionId, task,
                 plannedStmtBatch.isReadOnly(), isSinglePartition, false,
-                partitions, plannedStmtBatch.clientData,
+                partition,
                 serializedSize, EstTime.currentTimeMillis());
     }
 
@@ -2100,10 +2081,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                             // initiate the transaction. These hard-coded values from catalog
                             // procedure are horrible, horrible, horrible.
-                            createTransaction(changeResult.connectionId, changeResult.hostname,
-                                    changeResult.adminConnection,
-                                    task, false, false, false, m_allPartitions,
-                                    changeResult.clientData, task.getSerializedSize(),
+                            createTransaction(changeResult.connectionId,
+                                    task, false, false, false, 0, task.getSerializedSize(),
                                     EstTime.currentTimeMillis());
                         }
                     }
@@ -2317,12 +2296,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
         // initiate the transaction
         createTransaction(m_snapshotDaemonAdapter.connectionId(),
-                "SnapshotDaemon",
-                true, // treat the snapshot daemon like it's on an admin port
                 spi, catProc.getReadonly(),
                 catProc.getSinglepartition(), catProc.getEverysite(),
-                m_allPartitions,
-                m_snapshotDaemonAdapter,
+                0,
                 0, EstTime.currentTimeMillis());
     }
 
@@ -2369,8 +2345,23 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
-        public String getHostnameAndIP() {
-            return "";
+        public String getHostnameAndIPAndPort() {
+            return "SnapshotDaemon";
+        }
+
+        @Override
+        public String getHostnameOrIP() {
+            return "SnapshotDaemon";
+        }
+
+        @Override
+        public int getRemotePort() {
+            return -1;
+        }
+
+        @Override
+        public InetSocketAddress getRemoteSocketAddress() {
+            return null;
         }
 
         @Override
@@ -2458,7 +2449,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 long outstandingTxns = e.getValue().getOutstandingTxns();
                 client_stats.put(
                         e.getKey(), new Pair<String, long[]>(
-                            e.getValue().connection.getHostnameAndIP(),
+                            e.getValue().connection.getHostnameOrIP(),
                             new long[] {adminMode, readWait, writeWait, outstandingTxns}));
             }
         }
