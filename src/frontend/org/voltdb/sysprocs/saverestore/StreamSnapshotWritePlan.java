@@ -162,7 +162,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                     sdts.add(new DataTargetInfo(stream,
                                                 srcHSId,
                                                 destHSId,
-                                                new StreamSnapshotDataTarget(destHSId, schemas, mb,
+                                                new StreamSnapshotDataTarget(destHSId, schemas,
                                                                              sender, ackReceiver)));
                 }
             }

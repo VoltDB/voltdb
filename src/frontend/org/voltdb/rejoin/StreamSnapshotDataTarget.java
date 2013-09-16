@@ -67,8 +67,6 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
     // schemas for all the tables on this partition
     private final Map<Integer, byte[]> m_schemas = new HashMap<Integer, byte[]>();
-    // Mailbox used to transfer snapshot data
-    private Mailbox m_mb;
     // HSId of the destination mailbox
     private final long m_destHSId;
     // input and output threads
@@ -89,14 +87,12 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     private final AtomicBoolean m_closed = new AtomicBoolean(false);
 
     public StreamSnapshotDataTarget(long HSId, Map<Integer, byte[]> schemas,
-                                    Mailbox mb,
                                     SnapshotSender sender, StreamSnapshotAckReceiver ackReceiver)
     {
         super();
         m_targetId = m_totalSnapshotTargetCount.getAndIncrement();
         m_schemas.putAll(schemas);
         m_destHSId = HSId;
-        m_mb = mb;
         m_sender = sender;
         m_sender.registerDataTarget(m_targetId);
         m_ackReceiver = ackReceiver;
@@ -469,7 +465,6 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
             // locked so m_closed is true when the ack thread dies
             synchronized(this) {
-                m_mb = null;
                 m_closed.set(true);
 
                 assert(m_outstandingWork.size() == 0);
