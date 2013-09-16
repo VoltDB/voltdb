@@ -65,14 +65,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     // Manages pending tasks.
     final SiteTaskerQueue m_scheduler;
 
-    /*
-     * There is really no legit reason to touch the initiator mailbox from the site,
-     * but it turns out to be necessary at startup when restoring a snapshot. The snapshot
-     * has the transaction id for the partition that it must continue from and it has to be
-     * set at all replicas of the partition.
-     */
-    final InitiatorMailbox m_initiatorMailbox;
-
     // Still need m_hsql here.
     HsqlBackend m_hsql;
 
@@ -237,8 +229,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             long siteId,
             BackendTarget backend,
             CatalogContext context,
-            int partitionId,
-            InitiatorMailbox initiatorMailbox)
+            int partitionId)
     {
         m_siteId = siteId;
         m_context = context;
@@ -246,7 +237,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         m_scheduler = scheduler;
         m_backend = backend;
         m_currentTxnId = Long.MIN_VALUE;
-        m_initiatorMailbox = initiatorMailbox;
     }
 
     /** Update the loaded procedures. */

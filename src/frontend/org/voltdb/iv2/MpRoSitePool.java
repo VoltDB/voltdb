@@ -64,8 +64,7 @@ class MpRoSitePool {
             m_queue = new SiteTaskerQueue();
             // IZZY: Just need something non-null for now
             m_queue.setStarvationTracker(new StarvationTracker(siteId));
-            m_site = new MpRoSite(m_queue, siteId, backend, m_catalogContext,
-                    partitionId, initiatorMailbox);
+            m_site = new MpRoSite(m_queue, siteId, backend, m_catalogContext, partitionId);
             m_prf = new ProcedureRunnerFactory();
             m_prf.configure(m_site, m_site.m_sysprocContext);
             m_loadedProcedures = new LoadedProcedureSet(m_site, m_prf,
