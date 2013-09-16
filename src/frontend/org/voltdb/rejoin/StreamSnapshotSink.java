@@ -106,9 +106,8 @@ public class StreamSnapshotSink {
      * @param buf
      * @return
      */
-    private ByteBuffer getNextChunk(int tableId, ByteBuffer buf,
-                                    CachedByteBufferAllocator resultBufferAllocator) {
-        byte[] schemaBytes = m_schemas.get(tableId);
+    public static ByteBuffer getNextChunk(byte[] schemaBytes, ByteBuffer buf,
+                                          CachedByteBufferAllocator resultBufferAllocator) {
         buf.position(buf.position() + 4);//skip partition id
         int length = schemaBytes.length + buf.remaining();
 
