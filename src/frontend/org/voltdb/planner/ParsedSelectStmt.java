@@ -139,6 +139,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // Preparation for MV based distributed query
         public boolean mayNeedFixMVBasedDistributedQuery = false;
         public boolean finalNeedFix = false;
+        public boolean disableGroupbyAndAggQuery = false;
         public int numOfGroupByColumns = -1;
 
         public ArrayList<ParsedColInfo> originalDisplayColumns = null;
@@ -270,21 +271,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             return false;
         }
 
-//        if (tableList.size() != 1) {
-//            String errorMsg = String.format("Unsupported query joined with materialized table %s", mvTableName);
-//            //throw new PlanningErrorException(errorMsg);
-//        }
-//
-//        AbstractExpression whereExpr = getSingleTableFilterExpression();
-//        if (whereExpr != null) {
-//            String errorMsg = String.format("Unsupported query materialized table %s has filter on the table", mvTableName);
-//            //throw new PlanningErrorException(errorMsg);
-//        }
-
         Column partitionCol = srcTable.getPartitioncolumn();
         if (partitionCol == null) {
             return false;
         }
+
         String partitionColName = partitionCol.getName();
         MaterializedViewInfo mvInfo = srcTable.getViews().get(mvTableName);
 
@@ -328,19 +319,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             return false;
         }
 
-        if (!isGrouped() && hasAggregateExpression) {
-            if (displayColumns.size() == 1) {
-                // TODO(xin): optimize it later.
-                // currently, do not fix COUNT(*) query.
-                if (displayColumns.get(0).expression.getExpressionType()
-                        == ExpressionType.AGGREGATE_COUNT_STAR) {
-                    return false;
-                }
-            }
-        }
-
         mvFixInfo.mvTable = mvTable;
         mvFixInfo.mayNeedFixMVBasedDistributedQuery = true;
+
+        // Currently, disable it
+        if (isGrouped() || hasAggregateExpression()) {
+            mvFixInfo.disableGroupbyAndAggQuery = true;
+        }
+
         return true;
     }
 

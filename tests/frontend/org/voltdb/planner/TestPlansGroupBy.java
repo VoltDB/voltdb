@@ -241,7 +241,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         String[] tbs = {"V_P1", "V_P1_ABS"};
         for (String tb: tbs) {
             pns = compileToFragments("SELECT * FROM " + tb);
-            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 3); // 5 (# of select) - 2 (# of group-by)
+            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 3);
 
             pns = compileToFragments("SELECT * FROM " + tb + " order by V_A1");
             checkMVReaggreateFeatureNoBottomAgg(pns, 2, 3);
@@ -281,22 +281,16 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
 
     public void testMultiPartitionMVBasedQuery_AggQueryEdge() {
-        // TODO(xin):
-        // Fix it later.
-//        pns = compileToFragments("SELECT count(*) FROM V_P1");
-//        for (AbstractPlanNode apn: pns) {
-//            System.out.println(apn.toExplainPlanString());
-//        }
-
-        //checkMVReaggreateFeatureAggPushdown(pns, 0, 1, 2, 1, 2, 1);
-
-
-        pns = compileToFragments("SELECT V_SUM_C1 FROM V_P1_ABS GROUP by V_SUM_C1");
-        checkMVReaggreateFeatureAggPushdown(pns, 1, 0, 2, 1, 3, 0);
+        try {
+            pns = compileToFragments("SELECT count(*) FROM V_P1");
+            fail();
+        } catch (Exception e) {
+            assertTrue(e.getMessage().contains("group by query or aggregation on materialized table"));
+        }
 
     }
 
-    public void testMultiPartitionMVBasedQuery_AggQuery() {
+    public void notestMultiPartitionMVBasedQuery_AggQuery() {
 //      CREATE VIEW V_P1 (V_A1, V_B1, V_CNT, V_SUM_C1, V_SUM_D1)
 //      AS SELECT A1, B1, COUNT(*), SUM(C1), COUNT(D1)
 //      FROM P1  GROUP BY A1, B1;
@@ -392,12 +386,12 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testMultiPartitionMVBasedQuery_Where() {
-//        try {
-//            pns = compileToFragments("SELECT * FROM V_P1 where v_a1 = 1");
-//            fail();
-//        } catch (Exception e) {
-//            assertTrue(e.getMessage().contains("has filter on the table"));
-//        }
+        try {
+            pns = compileToFragments("SELECT * FROM V_P1 where v_a1 = 1");
+            fail();
+        } catch (Exception e) {
+            assertTrue(e.getMessage().contains("has filter on the table"));
+        }
     }
 
     private void checkMVReaggreateFeatureNoFix_Normal(List<AbstractPlanNode> pns,

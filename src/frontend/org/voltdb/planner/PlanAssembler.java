@@ -538,7 +538,27 @@ public class PlanAssembler {
         if (distributedQuery && m_parsedSelect.mayNeedAvgPushdown()) {
             m_parsedSelect.switchOptimalSuiteForAvgPushdown();
         }
+
         if (distributedQuery && m_parsedSelect.mvFixInfo.mayNeedFixMVBasedDistributedQuery) {
+            if (m_parsedSelect.tableList.size() != 1) {
+                String errorMsg = String.format("Unsupported query joined with materialized table %s",
+                        m_parsedSelect.mvFixInfo.mvTable.getTypeName());
+                throw new PlanningErrorException(errorMsg);
+            }
+
+            if (m_parsedSelect.mvFixInfo.disableGroupbyAndAggQuery) {
+                String errorMsg = String.format("Unsupported group by query or aggregation on " +
+                        "materialized table %s", m_parsedSelect.mvFixInfo.mvTable.getTypeName());
+                throw new PlanningErrorException(errorMsg);
+            }
+
+            AbstractExpression whereExpr = m_parsedSelect.getSingleTableFilterExpression();
+            if (whereExpr != null) {
+                String errorMsg = String.format("Unsupported query materialized table %s has filter " +
+                        "on the table", m_parsedSelect.mvFixInfo.mvTable.getTypeName());
+                throw new PlanningErrorException(errorMsg);
+            }
+
             m_parsedSelect.switchFixSuiteForMVBasedQuery();
             m_parsedSelect.mvFixInfo.finalNeedFix = true;
         }
@@ -1400,8 +1420,16 @@ public class PlanAssembler {
                             }
                             else {
                                 top_expression_type = ExpressionType.AGGREGATE_SUM;
+
+                                // For Future use: ENG-3504
+//                                if (agg_expression_type == ExpressionType.AGGREGATE_COUNT_STAR &&
+//                                        m_parsedSelect.mvFixInfo.finalNeedFix) {
+//                                    top_expression_type = ExpressionType.AGGREGATE_COUNT_STAR;
+//                                    tve = null;
+//                                }
                             }
                         }
+
                         /*
                          * For min() and max(), the pushed-down aggregate node
                          * doesn't change. An extra aggregate node of the same
