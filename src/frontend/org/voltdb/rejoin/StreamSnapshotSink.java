@@ -163,6 +163,7 @@ public class StreamSnapshotSink {
             return null;
         }
 
+        Pair<Integer, ByteBuffer> processed = null;
         long hsId = msg.getFirst();
         long targetId = msg.getSecond().getFirst();
         BBContainer container = msg.getSecond().getSecond();
@@ -178,16 +179,16 @@ public class StreamSnapshotSink {
                 if (m_expectedEOFs.decrementAndGet() == 0) {
                     m_EOF = true;
                 }
-                return null;
             }
-            if (type == StreamSnapshotMessageType.END) {
-                rejoinLog.trace("Got END message");
+            else if (type == StreamSnapshotMessageType.END) {
+                if (rejoinLog.isTraceEnabled()) {
+                    rejoinLog.trace("Got END message " + blockIndex);
+                }
 
                 // End of stream, no need to ack this buffer
                 if (m_expectedEOFs.decrementAndGet() == 0) {
                     m_EOF = true;
                 }
-                return null;
             }
             else if (type == StreamSnapshotMessageType.SCHEMA) {
                 rejoinLog.trace("Got SCHEMA message");
@@ -197,27 +198,29 @@ public class StreamSnapshotSink {
                 block.get(schemaBytes);
                 m_schemas.put(block.getInt(StreamSnapshotDataTarget.tableIdOffset),
                               schemaBytes);
-                return null;
             }
+            else {
+                // It's normal snapshot data afterwards
 
-            // It's normal snapshot data afterwards
                 final int tableId = block.getInt(StreamSnapshotDataTarget.tableIdOffset);
 
+                if (!m_schemas.containsKey(tableId)) {
+                    VoltDB.crashLocalVoltDB("No schema for table with ID " + tableId,
+                                            false, null);
+                }
 
-            if (!m_schemas.containsKey(tableId)) {
-                VoltDB.crashLocalVoltDB("No schema for table with ID " + tableId,
-                                        false, null);
+                // Get the byte buffer ready to be consumed
+                block.position(StreamSnapshotDataTarget.contentOffset);
+                ByteBuffer nextChunk = getNextChunk(m_schemas.get(tableId), block, resultBufferAllocator);
+                m_bytesReceived += nextChunk.remaining();
+
+                processed = Pair.of(tableId, nextChunk);
             }
-
-            // Get the byte buffer ready to be consumed
-            block.position(StreamSnapshotDataTarget.contentOffset);
-            ByteBuffer nextChunk = getNextChunk(tableId, block, resultBufferAllocator);
-            m_bytesReceived += nextChunk.remaining();
 
             // Queue ack to this block
             m_ack.ack(hsId, m_EOF, targetId, blockIndex);
 
-            return Pair.of(tableId, nextChunk);
+            return processed;
         } finally {
             container.discard();
         }

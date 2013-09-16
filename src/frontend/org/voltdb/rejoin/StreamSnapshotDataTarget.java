@@ -454,6 +454,11 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         if (!m_closed.get()) {
             rejoinLog.trace("Closing stream snapshot target");
 
+            sendEOS();
+
+            // Terminate the sender thread after the last block
+            m_sender.offer(new SendWork());
+
             // block until all acks have arrived
             while (!m_writeFailed.get() && (m_outstandingWorkCount.get() > 0)) {
                 Thread.yield();
@@ -461,30 +466,6 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
             // if here because a write failed, cleanup outstanding work
             clearOutstanding();
-
-            // Send EOF
-            ByteBuffer buf = ByteBuffer.allocate(1);
-            if (m_writeFailed.get()) {
-                // signify failure, at least on this end
-                buf.put((byte) StreamSnapshotMessageType.FAILURE.ordinal());
-            }
-            else {
-                // success - join the cluster
-                buf.put((byte) StreamSnapshotMessageType.END.ordinal());
-            }
-
-            buf.flip();
-            byte compressedBytes[] =
-                    CompressionService.compressBytes(
-                            buf.array(), buf.position(),
-                            buf.remaining());
-            RejoinDataMessage msg = new RejoinDataMessage(m_targetId, compressedBytes);
-            m_mb.send(m_destHSId, msg);
-            m_sender.m_bytesSent.get(m_targetId).addAndGet(compressedBytes.length);
-
-            // Terminate the sender thread and the ack receiver thread
-            m_sender.offer(new SendWork());
-            m_mb.deliver(new RejoinDataAckMessage(true));
 
             // locked so m_closed is true when the ack thread dies
             synchronized(this) {
@@ -501,6 +482,23 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         if (closeHandle != null) {
             closeHandle.run();
         }
+    }
+
+    private void sendEOS()
+    {
+        // Send EOF
+        ByteBuffer buf = ByteBuffer.allocate(1 + 4); // 1 byte type, 4 bytes index
+        if (m_writeFailed.get()) {
+            // signify failure, at least on this end
+            buf.put((byte) StreamSnapshotMessageType.FAILURE.ordinal());
+        }
+        else {
+            // success - join the cluster
+            buf.put((byte) StreamSnapshotMessageType.END.ordinal());
+        }
+        buf.putInt(m_blockIndex);
+        buf.flip();
+        send(m_blockIndex++, DBBPool.wrapBB(buf));
     }
 
     @Override
