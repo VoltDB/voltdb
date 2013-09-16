@@ -238,55 +238,61 @@ public class TestPlansGroupBy extends PlannerTestCase {
 //        AS SELECT A1, B1, COUNT(*), SUM(C1), COUNT(D1)
 //        FROM P1  GROUP BY A1, B1;
 
-        pns = compileToFragments("SELECT * FROM V_P1");
-        checkMVReaggreateFeatureNoBottomAgg(pns, 2, 3); // 5 (# of select) - 2 (# of group-by)
+        String[] tbs = {"V_P1", "V_P1_ABS"};
+        for (String tb: tbs) {
+            pns = compileToFragments("SELECT * FROM " + tb);
+            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 3); // 5 (# of select) - 2 (# of group-by)
 
-        pns = compileToFragments("SELECT * FROM V_P1 order by V_A1");
-        checkMVReaggreateFeatureNoBottomAgg(pns, 2, 3);
+            pns = compileToFragments("SELECT * FROM " + tb + " order by V_A1");
+            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 3);
 
-        pns = compileToFragments("SELECT * FROM V_P1 order by V_A1, V_B1");
-        checkMVReaggreateFeatureNoBottomAgg(pns, 2, 3);
+            pns = compileToFragments("SELECT * FROM " + tb + " order by V_A1, V_B1");
+            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 3);
 
-        pns = compileToFragments("SELECT * FROM V_P1 order by V_SUM_D1");
-        checkMVReaggreateFeatureNoBottomAgg(pns, 2, 3);
+            pns = compileToFragments("SELECT * FROM " + tb + " order by V_SUM_D1");
+            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 3);
 
-        pns = compileToFragments("SELECT * FROM V_P1 limit 1");
-        checkMVReaggreateFeatureNoBottomAgg(pns, 2, 3);
+            pns = compileToFragments("SELECT * FROM " + tb + " limit 1");
+            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 3);
 
-        pns = compileToFragments("SELECT * FROM V_P1 order by V_A1, V_B1 limit 1");
-        checkMVReaggreateFeatureNoBottomAgg(pns, 2, 3);
+            pns = compileToFragments("SELECT * FROM " + tb + " order by V_A1, V_B1 limit 1");
+            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 3);
 
-        pns = compileToFragments("SELECT v_sum_c1 FROM V_P1");
-        checkMVReaggreateFeatureNoBottomAgg(pns, 2, 1);
+            pns = compileToFragments("SELECT v_sum_c1 FROM " + tb + "");
+            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 1);
 
-        pns = compileToFragments("SELECT v_sum_c1 FROM V_P1 order by v_sum_c1");
-        checkMVReaggreateFeatureNoBottomAgg(pns, 2, 1);
+            pns = compileToFragments("SELECT v_sum_c1 FROM " + tb + " order by v_sum_c1");
+            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 1);
 
-        pns = compileToFragments("SELECT v_sum_c1 FROM V_P1 order by v_sum_d1");
-        checkMVReaggreateFeatureNoBottomAgg(pns, 2, 1);
+            pns = compileToFragments("SELECT v_sum_c1 FROM " + tb + " order by v_sum_d1");
+            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 1);
 
-        pns = compileToFragments("SELECT v_sum_c1 FROM V_P1 limit 1");
-        checkMVReaggreateFeatureNoBottomAgg(pns, 2, 1);
+            pns = compileToFragments("SELECT v_sum_c1 FROM " + tb + " limit 1");
+            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 1);
 
-        pns = compileToFragments("SELECT v_sum_c1 FROM V_P1 order by v_sum_c1 limit 1");
-        checkMVReaggreateFeatureNoBottomAgg(pns, 2, 1);
+            pns = compileToFragments("SELECT v_sum_c1 FROM " + tb + " order by v_sum_c1 limit 1");
+            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 1);
 
-        // test distinct down.
-        pns = compileToFragments("SELECT distinct v_sum_c1 FROM V_P1 limit 1");
-        checkMVReaggreateFeatureNoBottomAgg(pns, 2, 1);
+            // test distinct down.
+            pns = compileToFragments("SELECT distinct v_sum_c1 FROM " + tb + " limit 1");
+            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 1);
+        }
     }
 
 
     public void testMultiPartitionMVBasedQuery_AggQueryEdge() {
         // TODO(xin):
         // Fix it later.
-        pns = compileToFragments("SELECT count(*) FROM V_P1");
-        for (AbstractPlanNode apn: pns) {
-            System.out.println(apn.toExplainPlanString());
-        }
+//        pns = compileToFragments("SELECT count(*) FROM V_P1");
+//        for (AbstractPlanNode apn: pns) {
+//            System.out.println(apn.toExplainPlanString());
+//        }
 
         //checkMVReaggreateFeatureAggPushdown(pns, 0, 1, 2, 1, 2, 1);
 
+
+        pns = compileToFragments("SELECT V_SUM_C1 FROM V_P1_ABS GROUP by V_SUM_C1");
+        checkMVReaggreateFeatureAggPushdown(pns, 1, 0, 2, 1, 3, 0);
 
     }
 
@@ -295,64 +301,122 @@ public class TestPlansGroupBy extends PlannerTestCase {
 //      AS SELECT A1, B1, COUNT(*), SUM(C1), COUNT(D1)
 //      FROM P1  GROUP BY A1, B1;
 
-        // Test set (1)
-        pns = compileToFragments("SELECT V_SUM_C1 FROM V_P1 GROUP by V_SUM_C1");
-        checkMVReaggreateFeatureAggPushdown(pns, 1, 0, 2, 1, 3, 0);
+        String[] tbs = {"V_P1", "V_P1_ABS"};
 
-        pns = compileToFragments("SELECT V_SUM_C1 FROM V_P1 GROUP by V_SUM_C1 " +
-                "ORDER BY V_SUM_C1");
-        checkMVReaggreateFeatureAggPushdown(pns, 1, 0, 2, 1, 3, 0);
+        for (String tb: tbs) {
+            // Test set (1)
+            pns = compileToFragments("SELECT V_SUM_C1 FROM " + tb +
+                    " GROUP by V_SUM_C1");
+            checkMVReaggreateFeatureAggPushdown(pns, 1, 0, 2, 1, 3, 0);
 
-        pns = compileToFragments("SELECT V_SUM_C1 FROM V_P1 GROUP by V_SUM_C1 " +
-                "ORDER BY V_SUM_C1 LIMIT 5");
-        checkMVReaggreateFeatureAggPushdown(pns, 1, 0, 2, 1, 3, 0);
+            pns = compileToFragments("SELECT V_SUM_C1 FROM " + tb +
+                    " GROUP by V_SUM_C1 ORDER BY V_SUM_C1");
+            checkMVReaggreateFeatureAggPushdown(pns, 1, 0, 2, 1, 3, 0);
 
-        pns = compileToFragments("SELECT V_SUM_C1 FROM V_P1 GROUP by V_SUM_C1 LIMIT 5");
-        checkMVReaggreateFeatureAggPushdown(pns, 1, 0, 2, 1, 3, 0);
+            pns = compileToFragments("SELECT V_SUM_C1 FROM " + tb + " GROUP by V_SUM_C1 " +
+                    "ORDER BY V_SUM_C1 LIMIT 5");
+            checkMVReaggreateFeatureAggPushdown(pns, 1, 0, 2, 1, 3, 0);
 
-        pns = compileToFragments("SELECT distinct V_SUM_C1 FROM V_P1 GROUP by V_SUM_C1 LIMIT 5");
-        checkMVReaggreateFeatureAggPushdown(pns, 1, 0, 2, 1, 3, 0);
+            pns = compileToFragments("SELECT V_SUM_C1 FROM " + tb +
+                    " GROUP by V_SUM_C1 LIMIT 5");
+            checkMVReaggreateFeatureAggPushdown(pns, 1, 0, 2, 1, 3, 0);
 
-        // Test set (2)
-        pns = compileToFragments("SELECT V_SUM_C1, sum(V_CNT) FROM V_P1 GROUP by V_SUM_C1");
-        checkMVReaggreateFeatureAggPushdown(pns, 1, 1, 2, 2, 3, 1);
+            pns = compileToFragments("SELECT distinct V_SUM_C1 FROM " + tb +
+                    " GROUP by V_SUM_C1 LIMIT 5");
+            checkMVReaggreateFeatureAggPushdown(pns, 1, 0, 2, 1, 3, 0);
 
-        pns = compileToFragments("SELECT V_SUM_C1, sum(V_CNT) FROM V_P1 " +
-                "GROUP by V_SUM_C1 ORDER BY V_SUM_C1");
-        checkMVReaggreateFeatureAggPushdown(pns, 1, 1, 2, 2, 3, 1);
+            // Test set (2)
+            pns = compileToFragments("SELECT V_SUM_C1, sum(V_CNT) FROM " + tb +
+                    " GROUP by V_SUM_C1");
+            checkMVReaggreateFeatureAggPushdown(pns, 1, 1, 2, 2, 3, 1);
 
-        pns = compileToFragments("SELECT V_SUM_C1, sum(V_CNT) FROM V_P1 " +
-                "GROUP by V_SUM_C1 ORDER BY V_SUM_C1 limit 2");
-        checkMVReaggreateFeatureAggPushdown(pns, 1, 1, 2, 2, 3, 1);
+            pns = compileToFragments("SELECT V_SUM_C1, sum(V_CNT) FROM " + tb +
+                    " GROUP by V_SUM_C1 ORDER BY V_SUM_C1");
+            checkMVReaggreateFeatureAggPushdown(pns, 1, 1, 2, 2, 3, 1);
 
-        // Distinct: No aggregation push down.
-        pns = compileToFragments("SELECT V_SUM_C1, sum(distinct V_CNT) " +
-                "FROM V_P1 GROUP by V_SUM_C1 ORDER BY V_SUM_C1");
-        checkMVReaggreateFeatureAggPushdownFalse(pns, 3, 1, 2, 2);
+            pns = compileToFragments("SELECT V_SUM_C1, sum(V_CNT) FROM " + tb +
+                    " GROUP by V_SUM_C1 ORDER BY V_SUM_C1 limit 2");
+            checkMVReaggreateFeatureAggPushdown(pns, 1, 1, 2, 2, 3, 1);
+
+            // Distinct: No aggregation push down.
+            pns = compileToFragments("SELECT V_SUM_C1, sum(distinct V_CNT) " +
+                    "FROM " + tb + " GROUP by V_SUM_C1 ORDER BY V_SUM_C1");
+            checkMVReaggreateFeatureAggPushdownFalse(pns, 3, 1, 2, 2);
 
 
-        // Test set (3)
-        pns = compileToFragments("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM V_P1 " +
-                "GROUP BY V_A1,V_B1, V_SUM_C1");
-        checkMVReaggreateFeatureAggPushdown(pns, 3, 1, 2, 2, 3, 1);
+            // Test set (3)
+            pns = compileToFragments("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
+                    " GROUP BY V_A1,V_B1, V_SUM_C1");
+            checkMVReaggreateFeatureAggPushdown(pns, 3, 1, 2, 2, 3, 1);
 
-        pns = compileToFragments("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM V_P1 " +
-                "GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1,V_B1, V_SUM_C1");
-        checkMVReaggreateFeatureAggPushdown(pns, 3, 1, 2, 2, 3, 1);
+            pns = compileToFragments("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
+                    " GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1,V_B1, V_SUM_C1");
+            checkMVReaggreateFeatureAggPushdown(pns, 3, 1, 2, 2, 3, 1);
 
-        pns = compileToFragments("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM V_P1 " +
-                "GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1,V_B1, V_SUM_C1 LIMIT 5");
-        checkMVReaggreateFeatureAggPushdown(pns, 3, 1, 2, 2, 3, 1);
+            pns = compileToFragments("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
+                    " GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1,V_B1, V_SUM_C1 LIMIT 5");
+            checkMVReaggreateFeatureAggPushdown(pns, 3, 1, 2, 2, 3, 1);
 
-        pns = compileToFragments("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM V_P1 " +
-                "GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1, V_SUM_C1 LIMIT 5");
-        checkMVReaggreateFeatureAggPushdown(pns, 3, 1, 2, 2, 3, 1);
+            pns = compileToFragments("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
+                    " GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1, V_SUM_C1 LIMIT 5");
+            checkMVReaggreateFeatureAggPushdown(pns, 3, 1, 2, 2, 3, 1);
 
-        // Distinct: No aggregation push down.
-        pns = compileToFragments("SELECT V_A1,V_B1, V_SUM_C1, sum( distinct V_SUM_D1) FROM V_P1 " +
-                "GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1, V_SUM_C1 LIMIT 5");
-        checkMVReaggreateFeatureAggPushdownFalse(pns, 3, 1, 2, 2);
+            // Distinct: No aggregation push down.
+            pns = compileToFragments("SELECT V_A1,V_B1, V_SUM_C1, sum( distinct V_SUM_D1) FROM " +
+                    tb + " GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1, V_SUM_C1 LIMIT 5");
+            checkMVReaggreateFeatureAggPushdownFalse(pns, 3, 1, 2, 2);
+        }
+    }
 
+    public void testMultiPartitionMVBasedQuery_NoFix() {
+        // Normal select queries
+        pns = compileToFragments("SELECT * FROM V_P1_TEST1");
+        checkMVReaggreateFeatureNoFix_Normal(pns, false, false);
+
+        pns = compileToFragments("SELECT V_SUM_C1 FROM V_P1_TEST1 ORDER BY V_A1");
+        checkMVReaggreateFeatureNoFix_Normal(pns, false, false);
+
+        pns = compileToFragments("SELECT V_SUM_C1 FROM V_P1_TEST1 LIMIT 1");
+        checkMVReaggreateFeatureNoFix_Normal(pns, false, false);
+
+        pns = compileToFragments("SELECT DISTINCT V_SUM_C1 FROM V_P1_TEST1");
+        checkMVReaggreateFeatureNoFix_Normal(pns, false, true);
+
+        // Distributed group by query
+        pns = compileToFragments("SELECT V_SUM_C1 FROM V_P1_TEST1 GROUP by V_SUM_C1");
+        checkMVReaggreateFeatureNoFix_Distributed(pns, 1,0, 1, 0, true, false);
+
+        pns = compileToFragments("SELECT V_SUM_C1, sum(V_CNT) FROM V_P1_TEST1 " +
+                "GROUP by V_SUM_C1");
+        checkMVReaggreateFeatureNoFix_Distributed(pns, 1,1, 1, 1, true, false);
+    }
+
+    public void testMultiPartitionMVBasedQuery_Where() {
+//        try {
+//            pns = compileToFragments("SELECT * FROM V_P1 where v_a1 = 1");
+//            fail();
+//        } catch (Exception e) {
+//            assertTrue(e.getMessage().contains("has filter on the table"));
+//        }
+    }
+
+    private void checkMVReaggreateFeatureNoFix_Normal(List<AbstractPlanNode> pns,
+            boolean aggPushdown, boolean distinctPushdown) {
+        // the first '-1' indicates that there is no top aggregation node.
+        checkMVReaggreateFeature(pns, -1, -1, -1, -1, -1, -1,
+                aggPushdown, distinctPushdown, false);
+    }
+
+    private void checkMVReaggreateFeatureNoFix_Distributed(List<AbstractPlanNode> pns,
+            int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
+            int numGroupbyOfAggNode, int numAggsOfAggNode,
+            boolean aggPushdown, boolean distinctPushdown) {
+        // the first '-1' indicates that there is no top aggregation node.
+        checkMVReaggreateFeature(pns,
+                numGroupbyOfTopAggNode, numAggsOfAggNode,
+                -1, -1,
+                numGroupbyOfAggNode, numAggsOfAggNode,
+                aggPushdown, distinctPushdown, false);
     }
 
     private void checkMVReaggreateFeatureNoBottomAgg(List<AbstractPlanNode> pns,
@@ -360,38 +424,38 @@ public class TestPlansGroupBy extends PlannerTestCase {
         // the first '-1' indicates that there is no top aggregation node.
         checkMVReaggreateFeature(pns, -1, -1,
                 numGroupbyOfReaggNode, numAggsOfReaggNode,
-                -1, -1, false, false);
+                -1, -1, false, false, true);
     }
 
     private void checkMVReaggreateFeatureAggPushdown(List<AbstractPlanNode> pns,
-            int numOfGroupbyOfTopAggNode, int numAggsOfTopAggNode,
+            int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
             int numGroupbyOfReaggNode, int numAggsOfReaggNode,
-            int numOfGroupbyOfAggNode, int numAggsOfAggNode) {
+            int numGroupbyOfAggNode, int numAggsOfAggNode) {
 
         checkMVReaggreateFeature(pns,
-                numOfGroupbyOfTopAggNode, numAggsOfTopAggNode,
+                numGroupbyOfTopAggNode, numAggsOfTopAggNode,
                 numGroupbyOfReaggNode, numAggsOfReaggNode,
-                numOfGroupbyOfAggNode, numAggsOfAggNode,
-                true, false);
+                numGroupbyOfAggNode, numAggsOfAggNode,
+                true, false, true);
     }
 
     private void checkMVReaggreateFeatureAggPushdownFalse(List<AbstractPlanNode> pns,
-            int numOfGroupbyOfTopAggNode, int numAggsOfTopAggNode,
+            int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
             int numGroupbyOfReaggNode, int numAggsOfReaggNode) {
 
         checkMVReaggreateFeature(pns,
-                numOfGroupbyOfTopAggNode, numAggsOfTopAggNode,
+                numGroupbyOfTopAggNode, numAggsOfTopAggNode,
                 numGroupbyOfReaggNode, numAggsOfReaggNode,
                 -1, -1, // never used these two numbers for this case.
-                false, false);
+                false, false, true);
     }
 
     // topNode, reAggNode, aggNode.
     private void checkMVReaggreateFeature(List<AbstractPlanNode> pns,
-            int numOfGroupbyOfTopAggNode, int numAggsOfTopAggNode,
+            int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
             int numGroupbyOfReaggNode, int numAggsOfReaggNode,
-            int numOfGroupbyOfAggNode, int numAggsOfAggNode,
-            boolean aggPushdown, boolean distinctPushdown) {
+            int numGroupbyOfAggNode, int numAggsOfAggNode,
+            boolean aggPushdown, boolean distinctPushdown, boolean needFix) {
 
         for (AbstractPlanNode apn: pns) {
             System.out.println(apn.toExplainPlanString());
@@ -405,8 +469,11 @@ public class TestPlansGroupBy extends PlannerTestCase {
             // No limit pushed down.
             p = p.getChild(0);
         }
-        assertTrue(p instanceof ProjectionPlanNode);
-        p = p.getChild(0);
+        if (needFix || !aggPushdown) {
+            // No projection node for no-need fixed group by query
+            assertTrue(p instanceof ProjectionPlanNode);
+            p = p.getChild(0);
+        }
 
         if (p instanceof OrderByPlanNode) {
             p = p.getChild(0);
@@ -418,17 +485,20 @@ public class TestPlansGroupBy extends PlannerTestCase {
         HashAggregatePlanNode reAggNode = null;
 
         // Indicates that there is no top aggregation node.
-        if (numOfGroupbyOfTopAggNode == -1 ) {
-            assertTrue(p instanceof HashAggregatePlanNode);
-            reAggNode = (HashAggregatePlanNode) p;
+        if (numGroupbyOfTopAggNode == -1 ) {
+            if (needFix) {
+                assertTrue(p instanceof HashAggregatePlanNode);
+                reAggNode = (HashAggregatePlanNode) p;
 
-            assertEquals(numGroupbyOfReaggNode, reAggNode.getGroExpressionTypes().size());
-            assertEquals(numAggsOfReaggNode, reAggNode.getAggregateTypes().size());
+                assertEquals(numGroupbyOfReaggNode, reAggNode.getGroExpressionTypes().size());
+                assertEquals(numAggsOfReaggNode, reAggNode.getAggregateTypes().size());
 
-            for (ExpressionType type: reAggNode.getAggregateTypes()) {
-                assertEquals(ExpressionType.AGGREGATE_SUM, type);
+                for (ExpressionType type: reAggNode.getAggregateTypes()) {
+                    assertEquals(ExpressionType.AGGREGATE_SUM, type);
+                }
+                p = p.getChild(0);
             }
-            assertTrue(reAggNode.getChild(0) instanceof ReceivePlanNode);
+            assertTrue(p instanceof ReceivePlanNode);
 
             p = pns.get(1).getChild(0);
             if (distinctPushdown) {
@@ -440,19 +510,23 @@ public class TestPlansGroupBy extends PlannerTestCase {
             assertTrue(p instanceof AggregatePlanNode);
             AggregatePlanNode topAggNode = (AggregatePlanNode) p;
 
-            assertEquals(numOfGroupbyOfTopAggNode, topAggNode.getGroExpressionTypes().size());
+            assertEquals(numGroupbyOfTopAggNode, topAggNode.getGroExpressionTypes().size());
             assertEquals(numAggsOfTopAggNode, topAggNode.getAggregateTypes().size());
+            p = p.getChild(0);
 
-            assertTrue(p.getChild(0) instanceof HashAggregatePlanNode);
-            reAggNode = (HashAggregatePlanNode) p.getChild(0);
+            if (needFix) {
+                assertTrue(p instanceof HashAggregatePlanNode);
+                reAggNode = (HashAggregatePlanNode) p;
 
-            assertEquals(numGroupbyOfReaggNode, reAggNode.getGroExpressionTypes().size());
-            assertEquals(numAggsOfReaggNode, reAggNode.getAggregateTypes().size());
+                assertEquals(numGroupbyOfReaggNode, reAggNode.getGroExpressionTypes().size());
+                assertEquals(numAggsOfReaggNode, reAggNode.getAggregateTypes().size());
 
-            for (ExpressionType type: reAggNode.getAggregateTypes()) {
-                assertEquals(ExpressionType.AGGREGATE_SUM, type);
+                for (ExpressionType type: reAggNode.getAggregateTypes()) {
+                    assertEquals(ExpressionType.AGGREGATE_SUM, type);
+                }
+                p = p.getChild(0);
             }
-            assertTrue(reAggNode.getChild(0) instanceof ReceivePlanNode);
+            assertTrue(p instanceof ReceivePlanNode);
 
             // Test the second part
             p = pns.get(1);
@@ -462,11 +536,10 @@ public class TestPlansGroupBy extends PlannerTestCase {
             if (aggPushdown) {
                 assertTrue(p instanceof AggregatePlanNode);
                 AggregatePlanNode aggNode = (AggregatePlanNode) p;
-                assertEquals(numOfGroupbyOfAggNode, aggNode.getGroExpressionTypes().size());
+                assertEquals(numGroupbyOfAggNode, aggNode.getGroExpressionTypes().size());
                 assertEquals(numAggsOfAggNode, aggNode.getAggregateTypes().size());
                 p = p.getChild(0);
             }
-
             assertTrue(p instanceof AbstractScanPlanNode);
         }
     }

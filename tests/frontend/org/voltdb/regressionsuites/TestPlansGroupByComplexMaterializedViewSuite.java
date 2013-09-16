@@ -67,7 +67,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         }
     }
 
-    public void testMaterializedViewInsertDeleteR1() throws IOException, ProcCallException {
+    public void testMVInsertDeleteR1() throws IOException, ProcCallException {
         System.out.println("Test R1 insert and delete...");
         String mvTable = "V_R1";
         String orderbyStmt = mvTable+"_G1";
@@ -162,7 +162,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         compareMVcontentsOfLongs(client, mvTable, null, orderbyStmt);
     }
 
-    public void testMaterializedViewUpdateR1() throws IOException, ProcCallException {
+    public void testMVUpdateR1() throws IOException, ProcCallException {
         System.out.println("Test R1 update...");
 
         Client client = this.getClient();
@@ -224,7 +224,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
     }
 
 
-    public void testMaterializedViewInsertDeleteR2() throws Exception {
+    public void testMVInsertDeleteR2() throws Exception {
         System.out.println("Test R2 insert and delete...");
         String mvTable = "V_R2";
         String orderbyStmt = mvTable+"_G1, " + mvTable + "_G2";
@@ -308,7 +308,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         }
     }
 
-    public void testMaterializedViewUpdateR2() throws Exception {
+    public void testMVUpdateR2() throws Exception {
         System.out.println("Test R2 update...");
 
         if (!isHSQL()) {
@@ -413,7 +413,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         compareTableR3(client, mvTable+"_test4", expected24, orderbyStmt);
     }
 
-    public void testMaterializedViewInsertDeleteR3() throws Exception {
+    public void testMVInsertDeleteR3() throws Exception {
         System.out.println("Test R3 insert and delete...");
         String orderbyStmt = "V_R3_CNT, V_R3_sum_wage";
         Client client = this.getClient();
@@ -472,7 +472,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
     }
 
 
-    public void testMaterializedViewUpdateR3() throws Exception {
+    public void testMVUpdateR3() throws Exception {
         System.out.println("Test R3 update...");
 
         String orderbyStmt = "V_R3_CNT, V_R3_sum_wage";
@@ -506,7 +506,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         }
     }
 
-   public void testMVUpdateP1() throws Exception {
+   public void testMVBasedP1() throws Exception {
         System.out.println("Test MV partition...");
 
         VoltTable vt = null;
@@ -515,12 +515,15 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         vt = client.callProcedure("@AdHoc", "Select count(*) from V_P1").getResults()[0];
         assertEquals(0, vt.asScalarLong());
 
-        String tb = "P1.insert";
-        client.callProcedure(tb, 1,  10,  1 );
-        client.callProcedure(tb, 2,  20,  3 );
-        client.callProcedure(tb, 6,  40,  3 );
-        client.callProcedure(tb, 4,  40,  1 );
-        client.callProcedure(tb, 5,  50,  1 );
+        String insert = "P1.insert";
+        // Partition 0
+        client.callProcedure(insert, 2,  20,  3 );
+        client.callProcedure(insert, 6,  40,  3 );
+        client.callProcedure(insert, 4,  40,  1 );
+
+        // Partition 1
+        client.callProcedure(insert, 1,  10,  1 );
+        client.callProcedure(insert, 5,  50,  1 );
 
 //        "CREATE VIEW V_P1 (V_P1_G1, V_P1_CNT, V_P1_sum_wage) " +
 //        "AS SELECT dept, count(*), SUM(wage) FROM P1 GROUP BY dept;" +
@@ -529,20 +532,27 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
 //        vt = client.callProcedure("@AdHoc", "Select count(*) from V_P1").getResults()[0];
 //        assertEquals(2, vt.asScalarLong());
 
-        vt = client.callProcedure("@AdHoc", "Select * from V_P1 ORDER BY V_P1_G1").getResults()[0];
-        validateTableOfLongs(vt, new long[][]{{1,3,100},{3,2,60}});
+        String[] tbs = {"V_P1", "V_P1_ABS"};
 
-        vt = client.callProcedure("@AdHoc",
-                "Select V_P1_sum_wage from V_P1 ORDER BY V_P1_sum_wage").getResults()[0];
-        validateTableOfLongs(vt, new long[][]{{60},{100}});
+        for (String tb: tbs) {
+            vt = client.callProcedure("@AdHoc", "Select * from " + tb +
+                    " ORDER BY V_P1_G1").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{1,3,100},{3,2,60}});
 
-        vt = client.callProcedure("@AdHoc", "Select V_P1_sum_wage as tag, sum(V_P1_CNT) " +
-                "from V_P1 group by V_P1_sum_wage order by tag").getResults()[0];
-        validateTableOfLongs(vt, new long[][]{{60,2},{100,3}});
+            vt = client.callProcedure("@AdHoc",
+                    "Select V_P1_sum_wage from " + tb +
+                    " ORDER BY V_P1_sum_wage").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{60},{100}});
 
-        vt = client.callProcedure("@AdHoc", "Select V_P1_G1, V_P1_sum_wage, sum(V_P1_CNT) " +
-                "from V_P1 group by V_P1_G1, V_P1_sum_wage order by V_P1_G1 desc, V_P1_sum_wage").getResults()[0];
-        validateTableOfLongs(vt, new long[][]{{3,60,2},{1,100,3}});
+            vt = client.callProcedure("@AdHoc", "Select V_P1_sum_wage as tag, sum(V_P1_CNT) " +
+                    "from " + tb + " group by V_P1_sum_wage order by tag").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{60,2},{100,3}});
+
+            vt = client.callProcedure("@AdHoc", "Select V_P1_G1, V_P1_sum_wage, sum(V_P1_CNT) " +
+                    "from " + tb + " group by V_P1_G1, V_P1_sum_wage " +
+                            "order by V_P1_G1 desc, V_P1_sum_wage").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{3,60,2},{1,100,3}});
+        }
 
     }
 
@@ -695,6 +705,9 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
 
                 "CREATE VIEW V_P1 (V_P1_G1, V_P1_CNT, V_P1_sum_wage) " +
                 "AS SELECT dept, count(*), SUM(wage) FROM P1 GROUP BY dept;" +
+
+                "CREATE VIEW V_P1_ABS (V_P1_G1, V_P1_CNT, V_P1_sum_wage) " +
+                "AS SELECT abs(dept), count(*), SUM(wage) FROM P1 GROUP BY abs(dept);" +
                 ""
                 ;
         try {

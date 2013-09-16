@@ -270,10 +270,16 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             return false;
         }
 
-        if (tableList.size() != 1) {
-            String errorMsg = String.format("Unsupported query joined with materialized table %s", mvTableName);
-            throw new PlanningErrorException(errorMsg);
-        }
+//        if (tableList.size() != 1) {
+//            String errorMsg = String.format("Unsupported query joined with materialized table %s", mvTableName);
+//            //throw new PlanningErrorException(errorMsg);
+//        }
+//
+//        AbstractExpression whereExpr = getSingleTableFilterExpression();
+//        if (whereExpr != null) {
+//            String errorMsg = String.format("Unsupported query materialized table %s has filter on the table", mvTableName);
+//            //throw new PlanningErrorException(errorMsg);
+//        }
 
         Column partitionCol = srcTable.getPartitioncolumn();
         if (partitionCol == null) {
