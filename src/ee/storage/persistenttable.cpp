@@ -1183,6 +1183,12 @@ void PersistentTable::swapTuples(TableTuple &originalTuple,
                                     m_name.c_str(), index->getName().c_str());
             }
         }
+        for (int i = 0; i < m_viewIndexes.size(); i++) {
+            if (!m_viewIndexes[i]->replaceEntryNoKeyChange(destinationTuple, originalTuple)) {
+                throwFatalException("Failed to update tuple in Table: %s Index %s",
+                                    m_name.c_str(), m_viewIndexes[i]->getName().c_str());
+            }
+        }
     }
 }
 
