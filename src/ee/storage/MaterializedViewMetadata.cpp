@@ -390,7 +390,6 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
                 min = min.castAs(m_target->schema()->columnType(i));
                 max = max.castAs(m_target->schema()->columnType(i));
                 TableTuple tuple;
-                bool skippedOne = false;
                 VOLT_TRACE("Starting to scan grouped tuples using groupby index %s\n", groupbyIndex->debug().c_str());
                 while (!(tuple = m_groupbyIndex->nextValueAtKey()).isNullTuple()) {
                     VOLT_TRACE("Scanning tuple: %s\n", tuple.debugNoHeader().c_str());
@@ -399,11 +398,6 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
                         current = expr->eval(&tuple, NULL);
                     } else {
                         current = tuple.getNValue(m_outputColumnSrcTableIndexes[i]);
-                    }
-                    if (!skippedOne && current.compare(existingValue) == 0) {
-                        VOLT_TRACE("Skip tuple: %s\n", tuple.debugNoHeader().c_str());
-                        skippedOne = true;
-                        continue;
                     }
                     VOLT_TRACE("Check tuple: %s\n", tuple.debugNoHeader().c_str());
                     if (min.isNull() || max.isNull()) {

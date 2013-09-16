@@ -267,6 +267,7 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
 
     // this is skipped for inserts that are never expected to fail,
     // like some (initially, all) cases of tuple migration on schema change
+    PersistentTableUndoInsertAction *uia = NULL;
     if (fallible) {
         /*
          * Create and register an undo action.
@@ -274,7 +275,8 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
         UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
         if (uq) {
             char* tupleData = uq->allocatePooledCopy(target.address(), target.tupleLength());
-            uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, this));
+            uia = new (*uq) PersistentTableUndoInsertAction(tupleData, this);
+            uq->registerUndoAction(uia);
         }
     }
 
@@ -286,6 +288,9 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
                     m_viewIndexes[i]->getTypeName().c_str(),
                     m_viewIndexes[i]->getName().c_str());
         }
+        if (uia != NULL) {
+            uia->changedViewIndexes();
+        }
     }
 }
 
@@ -293,7 +298,7 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
  * Insert a tuple but don't allocate a new copy of the uninlineable
  * strings or create an UndoAction or update a materialized view.
  */
-void PersistentTable::insertTupleForUndo(char *tuple)
+void PersistentTable::insertTupleForUndo(char *tuple, bool revertViewIndexes)
 {
     TableTuple target(m_schema);
     target.move(tuple);
@@ -315,11 +320,14 @@ void PersistentTable::insertTupleForUndo(char *tuple)
                             " unique constraint violation\n%s\n", m_name.c_str(),
                             target.debugNoHeader().c_str());
     }
-    for (int i = 0; i < m_views.size(); i++) {
-        FAIL_IF (!m_viewIndexes[i]->addEntry(&target)) {
-            VOLT_DEBUG("Failed to insert into matview index %s,%s for undo",
-                    m_viewIndexes[i]->getTypeName().c_str(),
-                    m_viewIndexes[i]->getName().c_str());
+
+    if (revertViewIndexes) {
+        for (int i = 0; i < m_views.size(); i++) {
+            FAIL_IF (!m_viewIndexes[i]->addEntry(&target)) {
+                VOLT_DEBUG("Failed to insert into matview index %s,%s for undo",
+                        m_viewIndexes[i]->getTypeName().c_str(),
+                        m_viewIndexes[i]->getName().c_str());
+            }
         }
     }
 }
@@ -400,14 +408,17 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     // handle any materialized views
     bool changedViewIndex[m_viewIndexes.size()];
     for (int i = 0; i < m_views.size(); i++) {
+        bool updateIndex = true;
         if (!m_viewIndexes[i]->checkForIndexChange(&targetTupleToUpdate, &sourceTupleWithNewValues)) {
             changedViewIndex[i] = false;
-            continue;
+            updateIndex = false;
         }
-        changedViewIndex[i] = true;
-        if (!m_viewIndexes[i]->deleteEntry(&targetTupleToUpdate)) {
-            throwFatalException("Failed to remove tuple from matview index (during update) in Table: %s Index %s",
-                                m_name.c_str(), m_viewIndexes[i]->getName().c_str());
+        if (updateIndex) {
+            changedViewIndex[i] = true;
+            if (!m_viewIndexes[i]->deleteEntry(&targetTupleToUpdate)) {
+                throwFatalException("Failed to remove tuple from matview index (during update) in Table: %s Index %s",
+                                    m_name.c_str(), m_viewIndexes[i]->getName().c_str());
+            }
         }
         m_views[i]->processTupleDelete(targetTupleToUpdate, fallible);
     }
@@ -570,7 +581,9 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
     deleteFromAllIndexes(&target);
 
     // handle any materialized views
+    bool matViewIndexesChanged = false;
     for (int i = 0; i < m_views.size(); i++) {
+        matViewIndexesChanged = true;
         if (!m_viewIndexes[i]->deleteEntry(&target)) {
             throwFatalException(
                                 "Failed to delete tuple in Table: %s Index %s", m_name.c_str(), m_viewIndexes[i]->getName().c_str());
@@ -585,7 +598,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
             m_tuplesPinnedByUndo++;
             ++m_invisibleTuplesPendingDeleteCount;
             // Create and register an undo action.
-            uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), this), this);
+            uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), this, matViewIndexesChanged), this);
             return true;
         }
     }
@@ -667,7 +680,7 @@ void PersistentTable::deleteTupleForSchemaChange(TableTuple &target) {
  *     skipLookup will be true in this case because the passed tuple
  *     can be used directly.
  */
-void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
+void PersistentTable::deleteTupleForUndo(char* tupleData, bool revertViewIndexes, bool skipLookup) {
     TableTuple target(tupleData, m_schema);
     if (!skipLookup) {
         // The UndoInsertAction got a pooled copy of the tupleData.
@@ -684,12 +697,16 @@ void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
     assert(target.isActive());
 
     deleteFromAllIndexes(&target);
-    for (int i = 0; i < m_views.size(); i++) {
-        if (!m_viewIndexes[i]->deleteEntry(&target)) {
-            throwFatalException("Failed to delete tuple in Table: %s matview Index %s",
-                    m_name.c_str(), m_viewIndexes[i]->getName().c_str());
+
+    if (revertViewIndexes) {
+        for (int i = 0; i < m_views.size(); i++) {
+            if (!m_viewIndexes[i]->deleteEntry(&target)) {
+                throwFatalException("Failed to delete tuple in Table: %s matview Index %s",
+                        m_name.c_str(), m_viewIndexes[i]->getName().c_str());
+            }
         }
     }
+
     deleteTupleStorage(target); // also frees object columns
 }
 
@@ -818,9 +835,9 @@ void PersistentTable::addIndexForMaterializedView(MaterializedViewMetadata *view
 void PersistentTable::dropMaterializedView(MaterializedViewMetadata *targetView)
 {
     assert( ! m_views.empty());
-    TableIndex *targetIndex;
     MaterializedViewMetadata *lastView = m_views.back();
     TableIndex *lastIndex = m_viewIndexes.back();
+    TableIndex *targetIndex = lastIndex;
     if (targetView != lastView) {
         // iterator to vector element:
         std::vector<MaterializedViewMetadata*>::iterator toView = find(m_views.begin(), m_views.end(), targetView);
