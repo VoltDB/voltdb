@@ -169,6 +169,7 @@ public class StreamSnapshotSink {
         try {
             ByteBuffer block = container.b;
             byte typeByte = block.get(StreamSnapshotDataTarget.typeOffset);
+            final int blockIndex = block.getInt(StreamSnapshotDataTarget.blockIndexOffset);
             StreamSnapshotMessageType type = StreamSnapshotMessageType.values()[typeByte];
             if (type == StreamSnapshotMessageType.FAILURE) {
                 VoltDB.crashLocalVoltDB("Rejoin source sent failure message.", false, null);
@@ -191,7 +192,7 @@ public class StreamSnapshotSink {
             else if (type == StreamSnapshotMessageType.SCHEMA) {
                 rejoinLog.trace("Got SCHEMA message");
 
-                block.position(block.position() + 1 + 4);
+                block.position(StreamSnapshotDataTarget.contentOffset);
                 byte[] schemaBytes = new byte[block.remaining()];
                 block.get(schemaBytes);
                 m_schemas.put(block.getInt(StreamSnapshotDataTarget.tableIdOffset),
@@ -200,9 +201,8 @@ public class StreamSnapshotSink {
             }
 
             // It's normal snapshot data afterwards
+                final int tableId = block.getInt(StreamSnapshotDataTarget.tableIdOffset);
 
-            final int tableId = block.getInt(StreamSnapshotDataTarget.tableIdOffset);
-            final int blockIndex = block.getInt(StreamSnapshotDataTarget.blockIndexOffset);
 
             if (!m_schemas.containsKey(tableId)) {
                 VoltDB.crashLocalVoltDB("No schema for table with ID " + tableId,

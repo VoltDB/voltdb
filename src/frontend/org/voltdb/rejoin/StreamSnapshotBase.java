@@ -21,8 +21,8 @@ package org.voltdb.rejoin;
  * Base class for reading and writing snapshot streams over the network.
  */
 public abstract class StreamSnapshotBase {
-    protected static final int typeOffset = 0; // 1 byte
-    protected static final int tableIdOffset = typeOffset + 1; // 4 bytes
-    protected static final int blockIndexOffset = tableIdOffset + 4; // 4 bytes
-    protected static final int contentOffset = blockIndexOffset + 4;
+    public static final int typeOffset = 0; // 1 byte
+    public static final int blockIndexOffset = typeOffset + 1; // 4 bytes
+    public static final int tableIdOffset = blockIndexOffset + 4; // 4 bytes
+    public static final int contentOffset = tableIdOffset + 4;
 }

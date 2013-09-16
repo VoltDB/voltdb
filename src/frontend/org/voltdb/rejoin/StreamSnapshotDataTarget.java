@@ -116,10 +116,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
      */
     public static class SendWork {
         BBContainer m_message;
-        BBContainer m_schema;
         final long m_targetId;
         final long m_destHSId;
-        final int m_blockIndex;
         final long m_ts;
 
         final boolean m_isEmpty;
@@ -134,19 +132,16 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             m_isEmpty = true;
             m_targetId = -1;
             m_destHSId = -1;
-            m_blockIndex = -1;
             m_ts = -1;
             m_future = null;
         }
 
-        SendWork (long targetId, long destHSId, int blockIndex,
-                  BBContainer schema, BBContainer message,
+        SendWork (long targetId, long destHSId,
+                  BBContainer message,
                   SettableFuture<Boolean> future) {
             m_isEmpty = false;
             m_targetId = targetId;
             m_destHSId = destHSId;
-            m_blockIndex = blockIndex;
-            m_schema = schema;
             m_message = message;
             m_ts = System.currentTimeMillis();
             m_future = future;
@@ -157,18 +152,10 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
          * BBContainters held.
          */
         public synchronized void discard() {
-            if (rejoinLog.isTraceEnabled()) {
-                rejoinLog.trace("Discarding buffer at index " + String.valueOf(m_blockIndex));
-            }
-
             // discard the buffers and null them out
             if (m_message != null) {
                 m_message.discard();
                 m_message = null;
-            }
-            if (m_schema != null) {
-                m_schema.discard();
-                m_schema = null;
             }
         }
 
@@ -211,14 +198,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 return 0;
             }
 
-            int bytesSent = 0;
             try {
-                if (m_schema != null) {
-                    bytesSent = send(mb, m_schema);
-                }
-
-                bytesSent += send(mb, m_message);
-                return bytesSent;
+                return send(mb, m_message);
             } finally {
                 // Always discard the buffer so that they can be reused
                 discard();
@@ -408,33 +389,32 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 return Futures.immediateFailedFuture(e);
             }
 
-            BBContainer schemaContainer = null;
-
             // Have we seen this table before, if not, send schema
             if (m_schemas.containsKey(tableId)) {
                 // remove the schema once sent
                 byte[] schema = m_schemas.remove(tableId);
                 rejoinLog.debug("Sending schema for table " + tableId);
 
-                // 1 byte for the type, 4 bytes for table Id
-                ByteBuffer buf = ByteBuffer.allocate(schema.length + 1 + 4);
+                // 1 byte for the type, 4 bytes for the block index, 4 bytes for table Id
+                ByteBuffer buf = ByteBuffer.allocate(schema.length + 1 + 4 + 4);
                 buf.put((byte) StreamSnapshotMessageType.SCHEMA.ordinal());
+                buf.putInt(m_blockIndex);
                 buf.putInt(tableId);
                 buf.put(schema);
                 buf.flip();
-                schemaContainer = DBBPool.wrapBB(buf);
 
                 rejoinLog.trace("Writing schema as part of this write");
+                send(m_blockIndex++, DBBPool.wrapBB(buf));
             }
 
             chunk.b.put((byte) StreamSnapshotMessageType.DATA.ordinal());
-            chunk.b.putInt(tableId); // put table ID
             chunk.b.putInt(m_blockIndex); // put chunk index
+            chunk.b.putInt(tableId); // put table ID
+
             chunk.b.position(0);
 
-            return send(m_blockIndex++, schemaContainer, chunk);
-        }
-        finally {
+            return send(m_blockIndex++, chunk);
+        } finally {
             rejoinLog.trace("Finished call to write");
         }
     }
@@ -449,10 +429,9 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
      * @param chunk Snapshot data to send.
      * @return return a listenable future for the caller to wait until the buffer is sent
      */
-    synchronized ListenableFuture<Boolean> send(int blockIndex, BBContainer schemaContainer, BBContainer chunk) {
+    synchronized ListenableFuture<Boolean> send(int blockIndex, BBContainer chunk) {
         SettableFuture<Boolean> sendFuture = SettableFuture.create();
-        SendWork sendWork = new SendWork(m_targetId, m_destHSId, blockIndex,
-                                         schemaContainer, chunk, sendFuture);
+        SendWork sendWork = new SendWork(m_targetId, m_destHSId, chunk, sendFuture);
         m_outstandingWork.put(blockIndex, sendWork);
         m_outstandingWorkCount.incrementAndGet();
         m_sender.offer(sendWork);
