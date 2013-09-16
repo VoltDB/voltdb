@@ -46,6 +46,12 @@ ElasticContext::~ElasticContext()
 TableStreamerContext::ActivationReturnCode
 ElasticContext::handleActivation(TableStreamType streamType, bool reactivate)
 {
+    // Clear the index? Valid to clear the index while a snapshot is in progress
+    if (streamType == TABLE_STREAM_ELASTIC_INDEX_CLEAR) {
+        m_surgeon.dropIndex();
+        return ACTIVATION_SUCCEEDED;
+    }
+
     // Can't activate an indexing stream during a snapshot.
     if (m_surgeon.hasStreamType(TABLE_STREAM_SNAPSHOT)) {
         VOLT_ERROR("Elastic context activation is not allowed while a snapshot is in progress.");
@@ -61,12 +67,6 @@ ElasticContext::handleActivation(TableStreamType streamType, bool reactivate)
             return ACTIVATION_FAILED;
         }
         m_surgeon.createIndex();
-        return ACTIVATION_SUCCEEDED;
-    }
-
-    // Clear the index?
-    if (streamType == TABLE_STREAM_ELASTIC_INDEX_CLEAR) {
-        m_surgeon.dropIndex();
         return ACTIVATION_SUCCEEDED;
     }
 

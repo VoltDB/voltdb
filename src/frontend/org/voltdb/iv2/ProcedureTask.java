@@ -27,6 +27,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExpectedProcedureException;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
@@ -114,7 +115,8 @@ abstract public class ProcedureTask extends TransactionTask
                     }
                 } else {
                     // mis-partitioned invocation, reject it and let the ClientInterface restart it
-                    response.setMispartitioned(true, task.getStoredProcedureInvocation());
+                    response.setMispartitioned(true, task.getStoredProcedureInvocation(),
+                                               TheHashinator.getCurrentVersionedConfig());
                 }
             }
         }

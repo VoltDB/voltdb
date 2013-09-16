@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import com.google.common.collect.Maps;
 import org.apache.cassandra_voltpatches.MurmurHash3;
 import org.voltcore.utils.Pair;
 
@@ -146,34 +147,6 @@ public class ElasticHashinator extends TheHashinator {
     }
 
     /**
-     * Given an existing elastic hashinator, add a set of new partitions to the existing hash ring
-     * with calculated ranges.
-     * @param oldHashinator An elastic hashinator
-     * @param partitionsAndRanges A set of new partitions and their associated ranges
-     * @return The config bytes of the new hash ring
-     */
-    public static byte[] addPartitions(TheHashinator oldHashinator,
-                                       Map<Long, Integer> tokensToPartitions) {
-        Preconditions.checkArgument(oldHashinator instanceof ElasticHashinator);
-        ElasticHashinator oldElasticHashinator = (ElasticHashinator) oldHashinator;
-        Map<Long, Integer> newConfig = new HashMap<Long, Integer>(oldElasticHashinator.tokens);
-        Set<Integer> existingPartitions = new HashSet<Integer>(oldElasticHashinator.tokens.values());
-
-        for (Map.Entry<Long, Integer> entry : tokensToPartitions.entrySet()) {
-            long token = entry.getKey();
-            int pid = entry.getValue();
-
-            Integer oldPartition = newConfig.put(token, pid);
-            if (oldPartition != null && oldPartition != pid) {
-                throw new RuntimeException("Token " + token + " used to map to partition " +
-                                               oldPartition + " but now maps to " + pid);
-            }
-        }
-
-        return new ElasticHashinator(newConfig).m_configBytes;
-    }
-
-    /**
      * Convenience method for generating a deterministic token distribution for the ring based
      * on a given partition count and tokens per partition. Each partition will have N tokens
      * placed randomly on the ring.
@@ -195,7 +168,7 @@ public class ElasticHashinator extends TheHashinator {
      * Serializes the configuration into bytes, also updates the currently cached m_configBytes.
      * @return The byte[] of the current configuration.
      */
-    private byte[] toBytes() {
+    public byte[] toBytes() {
         ByteBuffer buf = ByteBuffer.allocate(4 + (tokens.size() * 12));//long and an int per
         buf.putInt(tokens.size());
 
@@ -237,6 +210,19 @@ public class ElasticHashinator extends TheHashinator {
     public ImmutableSortedMap<Long, Integer> getTokens()
     {
         return tokens;
+    }
+
+    /**
+     * Add the given token to the ring and generate the new hashinator. The current hashinator is not changed.
+     * @param token        The new token
+     * @param partition    The partition associated with the new token
+     * @return The new hashinator
+     */
+    public ElasticHashinator addToken(long token, int partition)
+    {
+        HashMap<Long, Integer> newTokens = Maps.newHashMap(tokens);
+        newTokens.put(token, partition);
+        return new ElasticHashinator(newTokens);
     }
 
     @Override
