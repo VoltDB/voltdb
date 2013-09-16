@@ -447,7 +447,18 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     }
 
     @Override
-    public void close() throws IOException, InterruptedException {
+    public void close() {
+        close(Long.MAX_VALUE);
+    }
+
+    /**
+     * Close the data target.
+     * @param timeout    Timeout value in milliseconds. If timeout is reached, an exception is thrown.
+     * @return true if the data target is closed, false if the specified time value has elapsed.
+     */
+    public boolean close(long timeout) {
+        final long startTs = System.currentTimeMillis();
+
         /*
          * could be called multiple times, because all tables share one stream
          * target
@@ -462,6 +473,11 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
             // block until all acks have arrived
             while (!m_writeFailed.get() && (m_outstandingWorkCount.get() > 0)) {
+                if (System.currentTimeMillis() - startTs >= timeout) {
+                    // Timed out
+                    return false;
+                }
+
                 Thread.yield();
             }
 
@@ -482,6 +498,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         if (closeHandle != null) {
             closeHandle.run();
         }
+
+        return true;
     }
 
     private void sendEOS()
