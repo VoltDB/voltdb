@@ -71,7 +71,7 @@ class CSVPartitionProcessor implements Runnable {
     }
 
     //Callback for single row procedure invoke called for rows in failed batch.
-    public static final class PartitionSingleExecuteProcedureCallback implements ProcedureCallback {
+    public static class PartitionSingleExecuteProcedureCallback implements ProcedureCallback {
 
         CSVPartitionProcessor m_processor;
         final CSVLineWithMetaData m_csvLine;
@@ -122,6 +122,8 @@ class CSVPartitionProcessor implements Runnable {
                 try {
                     CSVLineWithMetaData lineList;
                     lineList = failedQueue.take();
+                    //If we see endOfData or processor has indicated to be in error stop further error processing.
+                    //we must have reached maxerrors or end of processing.
                     if (lineList == endOfData || m_processor.m_errored) {
                         m_log.info("Shutting down failure processor for  " + m_processor.m_processorName);
                         break;
@@ -155,7 +157,7 @@ class CSVPartitionProcessor implements Runnable {
 
     // Callback for batch invoke when table has more than 1 entries. The callback on failure feeds failedQueue for
     // one row at a time processing.
-    public static final class PartitionProcedureCallback implements ProcedureCallback {
+    public static class PartitionProcedureCallback implements ProcedureCallback {
 
         static int lastMultiple = 0;
         protected static final VoltLogger m_log = new VoltLogger("CONSOLE");
@@ -163,7 +165,8 @@ class CSVPartitionProcessor implements Runnable {
         final private List<CSVLineWithMetaData> m_batchList;
         private final BlockingQueue<CSVLineWithMetaData> failedQueue;
 
-        public PartitionProcedureCallback(List<CSVLineWithMetaData> batchList, CSVPartitionProcessor pp, BlockingQueue<CSVLineWithMetaData> fq) {
+        public PartitionProcedureCallback(List<CSVLineWithMetaData> batchList,
+                CSVPartitionProcessor pp, BlockingQueue<CSVLineWithMetaData> fq) {
             m_processor = pp;
             m_batchList = new ArrayList(batchList);
             failedQueue = fq;
