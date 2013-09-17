@@ -127,12 +127,9 @@ public class DuplicateCounter
         ClientResponseImpl r = message.getClientResponseData();
         // get the hash of sql run
         long hash = 0;
-        // A mispartitioned transaction has no response in the message
-        if (r != null) {
-            Integer sqlHash = r.getHash();
-            if (sqlHash != null) {
-                hash = sqlHash.intValue();
-            }
+        Integer sqlHash = r.getHash();
+        if (sqlHash != null) {
+            hash = sqlHash.intValue();
         }
         return checkCommon(hash, message.isRecovering(), message);
     }

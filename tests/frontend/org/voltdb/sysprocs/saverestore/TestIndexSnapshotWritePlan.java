@@ -175,7 +175,7 @@ public class TestIndexSnapshotWritePlan {
             involvedPartitions.add(pid);
         }
 
-        IndexSnapshotRequestConfig config = new IndexSnapshotRequestConfig(tables, pRanges);
+        IndexSnapshotRequestConfig config = new IndexSnapshotRequestConfig(pRanges);
         JSONStringer stringer = new JSONStringer();
         stringer.object();
         config.toJSONString(stringer);

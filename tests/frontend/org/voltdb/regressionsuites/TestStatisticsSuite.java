@@ -31,6 +31,7 @@ import java.util.Set;
 
 import org.voltdb.VoltDB;
 
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb_testprocs.regressionsuites.SaveRestoreBase;
 
 import junit.framework.Test;
@@ -590,7 +591,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         // Make sure we can find the MPI, at least
         boolean found = false;
         while (topo.advanceRow()) {
-            if ((int)topo.getLong("Partition") == TxnEgo.MP_PARTITIONID) {
+            if ((int)topo.getLong("Partition") == MpInitiator.MP_INIT_PID) {
                 found = true;
             }
         }

@@ -571,7 +571,7 @@ inline void PersistentTableSurgeon::createIndex() {
 }
 
 inline void PersistentTableSurgeon::dropIndex() {
-    assert(m_index != NULL);
+    assert(m_indexingComplete == true);
     m_index.reset(NULL);
     m_indexingComplete = false;
 }

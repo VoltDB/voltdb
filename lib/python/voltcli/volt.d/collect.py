@@ -28,7 +28,7 @@
 @VOLT.Command(
     description = 'Collect logs for problem analysis.',
     options = (
-        VOLT.StringOption (None, '--prefix', 'uniqueid',
+        VOLT.StringOption (None, '--prefix', 'prefix',
                            'file name prefix for uniquely identifying collection',
                            default = 'voltdb_logs'),
         VOLT.StringOption (None, '--upload', 'host',
@@ -46,7 +46,7 @@
         VOLT.BooleanOption(None, '--dry-run', 'dryrun',
                            'list the log files without collecting them',
                            default = False),
-        VOLT.BooleanOption(None, '--no-heap-dump', 'noheapdump',
+        VOLT.BooleanOption(None, '--skip-heap-dump', 'skipheapdump',
                            'exclude heap dump file from collection',
                            default = False),
     ),
@@ -56,5 +56,5 @@
 )
 
 def collect(runner):
-    runner.args.extend([runner.opts.voltdbroot, runner.opts.uniqueid, runner.opts.host, runner.opts.username, runner.opts.password, runner.opts.noprompt, runner.opts.dryrun, runner.opts.noheapdump])
+    runner.args.extend([runner.opts.voltdbroot, runner.opts.prefix, runner.opts.host, runner.opts.username, runner.opts.password, runner.opts.noprompt, runner.opts.dryrun, runner.opts.skipheapdump])
     runner.java.execute('org.voltdb.utils.Collector', None, *runner.args)

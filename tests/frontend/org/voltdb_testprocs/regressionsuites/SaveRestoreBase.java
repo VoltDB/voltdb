@@ -56,8 +56,8 @@ public class SaveRestoreBase extends RegressionSuite {
     @Override
     public void tearDown() throws Exception
     {
-        deleteTestFiles();
         super.tearDown();
+        deleteTestFiles();
     }
 
     private void deleteRecursively(File f) {

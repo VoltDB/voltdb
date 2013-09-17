@@ -17,7 +17,6 @@
 
 package org.voltdb.planner;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -59,8 +58,6 @@ public abstract class AbstractParsedStmt {
     }
 
     public ArrayList<AbstractExpression> noTableSelectionList = new ArrayList<AbstractExpression>();
-
-    public ArrayList<AbstractExpression> multiTableSelectionList = new ArrayList<AbstractExpression>();
 
     protected ArrayList<AbstractExpression> aggregationList = null;
 
@@ -663,6 +660,7 @@ public abstract class AbstractParsedStmt {
      */
     HashMap<AbstractExpression, Set<AbstractExpression>> analyzeValueEquivalence() {
         // collect individual where/join expressions
+        analyzeJoinExpressions(joinTree);
         return joinTree.getAllEquivalenceFilters();
     }
 
@@ -781,22 +779,15 @@ public abstract class AbstractParsedStmt {
             tableSet.clear();
             getTablesForExpression(expr, tableSet);
             Table tables[] = tableSet.toArray(new Table[0]);
-            if (tableSet.size() == 0) {
+            if (tableSet.isEmpty()) {
                 noTableSelectionList.add(expr);
-            }
-            else if (tableSet.size() == 1) {
-                if (outerSet.contains(tables[0])) {
-                    outerList.add(expr);
-                } else if (innerSet.contains(tables[0])) {
-                    innerList.add(expr);
-                } else {
-                    // can not be, right?
-                    assert(false);
+            } else {
+                boolean outer = false;
+                boolean inner = false;
+                for (Table table : tables) {
+                    outer = outer || outerSet.contains(table);
+                    inner = inner || innerSet.contains(table);
                 }
-            }
-            else if (tableSet.size() == 2) {
-                boolean outer = outerSet.contains(tables[0]) || outerSet.contains(tables[1]);
-                boolean inner = innerSet.contains(tables[0]) || innerSet.contains(tables[1]);
                 if (outer && inner) {
                     innerOuterList.add(expr);
                 } else if (outer) {
@@ -807,9 +798,6 @@ public abstract class AbstractParsedStmt {
                     // can not be, right?
                     assert(false);
                 }
-            }
-            else if (tableSet.size() > 2) {
-                multiTableSelectionList.add(expr);
             }
         }
     }
@@ -963,45 +951,14 @@ public abstract class AbstractParsedStmt {
             retval += "\tALL\n";
         }
 
+        retval += "\nJOIN TREE :\n";
         if (joinTree != null ) {
-            retval += "\nTABLES:\n";
-            ArrayDeque<JoinNode> joinNodes = new ArrayDeque<JoinNode>();
-            joinNodes.add(joinTree);
-            while (!joinNodes.isEmpty()) {
-                JoinNode joinNode = joinNodes.poll();
-                if (joinNode == null) {
-                    continue;
-                }
-                if (joinNode.m_leftNode != null) {
-                    joinNodes.add(joinNode.m_leftNode);
-                }
-                if (joinNode.m_rightNode != null) {
-                    joinNodes.add(joinNode.m_rightNode);
-                }
-                if (joinNode.m_table != null) {
-                    retval += "\tTABLE: " + joinNode.m_table.getTypeName() + ", JOIN: " + joinNode.m_joinType.toString() + "\n";
-                    int i = 0;
-                    if (joinNode.m_joinExpr != null) {
-                        retval += "\t\t JOIN CONDITIONS:\n";
-                        retval += "\t\t\t(" + String.valueOf(i++) + ") " + joinNode.m_joinExpr.toString() + "\n";
-                    }
-                    int j = 0;
-                    if (joinNode.m_whereExpr != null) {
-                        retval += "\t\t WHERE CONDITIONS:\n";
-                        retval += "\t\t\t(" + String.valueOf(j++) + ") " + joinNode.m_whereExpr.toString() + "\n";
-                    }
-                }
-            }
+            retval += joinTree.toString();
         }
 
         retval += "NO TABLE SELECTION LIST:\n";
         int i = 0;
         for (AbstractExpression expr : noTableSelectionList)
-            retval += "\t(" + String.valueOf(i++) + ") " + expr.toString() + "\n";
-
-        retval += "MULTI TABLE SELECTION LIST:\n";
-        i = 0;
-        for (AbstractExpression expr : multiTableSelectionList)
             retval += "\t(" + String.valueOf(i++) + ") " + expr.toString() + "\n";
 
         return retval;

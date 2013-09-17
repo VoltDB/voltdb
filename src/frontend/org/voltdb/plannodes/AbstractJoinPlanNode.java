@@ -29,10 +29,12 @@ import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SortDirectionType;
 
 public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
 
     public enum Members {
+        SORT_DIRECTION,
         JOIN_TYPE,
         PRE_JOIN_PREDICATE,
         JOIN_PREDICATE,
@@ -40,6 +42,9 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     }
 
     protected JoinType m_joinType = JoinType.INNER;
+    // sortDirection is only used in handleOrderBy(),
+    // and the sortDirection used in EE is from inlined IndexScan node for NLIJ
+    protected SortDirectionType m_sortDirection = SortDirectionType.INVALID;
     protected AbstractExpression m_preJoinPredicate;
     protected AbstractExpression m_joinPredicate;
     protected AbstractExpression m_wherePredicate;
@@ -211,6 +216,24 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         resolvePredicate(m_wherePredicate, outer_schema, inner_schema);
     }
 
+    public SortDirectionType getSortDirection() {
+        return m_sortDirection;
+    }
+
+    // TODO: need to extend the sort direction for join from one table to the other table if possible
+    // right now, only consider the sort direction on the outer table
+    public void resolveSortDirection() {
+        AbstractPlanNode outerTable = m_children.get(0);
+        if (outerTable.getPlanNodeType() == PlanNodeType.INDEXSCAN) {
+            m_sortDirection = ((IndexScanPlanNode)outerTable).getSortDirection();
+            return;
+        }
+        if (outerTable instanceof AbstractJoinPlanNode) {
+            ((AbstractJoinPlanNode)outerTable).resolveSortDirection();
+            m_sortDirection = ((AbstractJoinPlanNode)outerTable).getSortDirection();
+        }
+    }
+
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException
     {
@@ -240,7 +263,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     /**
      * @param predicate the predicate to set
      */
-    private void resolvePredicate(AbstractExpression predicate, NodeSchema outer_schema, NodeSchema inner_schema)
+    protected void resolvePredicate(AbstractExpression predicate, NodeSchema outer_schema, NodeSchema inner_schema)
     {
         // Finally, resolve m_predicate
         List<TupleValueExpression> predicate_tves =
@@ -248,6 +271,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         for (TupleValueExpression tve : predicate_tves)
         {
             int index = outer_schema.getIndexOfTve(tve);
+            int tableIdx = 0;   // 0 for outer table
             if (index == -1)
             {
                 index = inner_schema.getIndexOfTve(tve);
@@ -256,8 +280,10 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
                     throw new RuntimeException("Unable to find index for join TVE: " +
                                                tve.toString());
                 }
+                tableIdx = 1;   // 1 for inner table
             }
             tve.setColumnIndex(index);
+            tve.setTableIndex(tableIdx);
         }
     }
 

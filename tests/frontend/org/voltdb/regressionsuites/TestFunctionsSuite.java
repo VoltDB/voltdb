@@ -283,6 +283,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         r = cr.getResults()[0];
         assertEquals(5, r.asScalarLong()); // used to get 6, matching like >=
 
+        initialLoad(client, "R1");
+
         cr = client.callProcedure("WHERE_ABS");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
@@ -357,6 +359,39 @@ public class TestFunctionsSuite extends RegressionSuite {
         r = cr.getResults()[0];
         assertEquals(5, r.asScalarLong());
 */
+
+        initialLoad(client, "R1");
+
+        initialLoad(client, "R2");
+
+        // The next 2 queries failed in 3.4 with a runtime type exception about casting from VARCHAR reported in ENG-5004
+        cr = client.callProcedure("@AdHoc", "select * from P1, R2 where P1.ID = R2.ID AND ABS(P1.NUM) > 0");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.out.println(r);
+        assertEquals(8, r.getRowCount());
+
+        cr = client.callProcedure("@AdHoc", "select * from P1, R2 where P1.ID = R2.ID AND ABS(P1.NUM+0) > 0");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.out.println(r);
+        assertEquals(8, r.getRowCount());
+
+        // These next queries fail in 3.5 with a runtime type exception about unrecognized type related?/similar? to ENG-5004?
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1, R2 where P1.ID = R2.ID AND ABS(R2.NUM+0) > 0");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.out.println(r);
+        assertEquals(8, r.asScalarLong());
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1, R2 where P1.ID = R2.ID AND ABS(R2.NUM) > 0");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.out.println(r);
+        assertEquals(8, r.asScalarLong());
+        // */
+
+
         // Test null propagation
         cr = client.callProcedure("INSERT_NULL", 99);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -441,6 +476,20 @@ public class TestFunctionsSuite extends RegressionSuite {
         r = cr.getResults()[0];
         resultB = r.asScalarLong();
         assertEquals(resultA, resultB);
+
+        // Here's the ENG-3196 case, all better now
+        cr = client.callProcedure("@AdHoc", "SELECT ABS(ID) AS ENG3196 FROM R1 ORDER BY (ID) LIMIT 5;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.out.println("DEBUG ENG-3196: " + r);
+        long resultCount = r.getRowCount();
+        assertEquals(5, resultCount);
+        r.advanceRow();
+        resultB = r.getLong(0);
+        assertEquals(14, resultB);
+        r.advanceToRow(4);
+        resultB = r.getLong(0);
+        assertEquals(10, resultB);
 
         boolean caught = false;
 
@@ -1992,6 +2041,8 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "PAST TIMESTAMP DEFAULT NULL, " +
                 "PRIMARY KEY (ID) ); " +
 
+                "PARTITION TABLE P1 ON COLUMN ID;" +
+
                 // Test generalized index on a function of a non-indexed column.
                 "CREATE INDEX P1_ABS_NUM ON P1 ( ABS(NUM) ); " +
 
@@ -2019,6 +2070,14 @@ public class TestFunctionsSuite extends RegressionSuite {
                 // Test generalized expression index with a constant argument.
                 "CREATE INDEX R1_ABS_ID_SCALED ON R1 ( ID / 3 ); " +
 
+                "CREATE TABLE R2 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "DESC VARCHAR(300), " +
+                "NUM INTEGER, " +
+                "RATIO FLOAT, " +
+                "PAST TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) ); " +
+
                 //Another table that has all numeric types, for testing numeric column functions.
                 "CREATE TABLE NUMBER_TYPES ( " +
                 "INTEGERNUM INTEGER DEFAULT '0' NOT NULL, " +
@@ -2035,7 +2094,6 @@ public class TestFunctionsSuite extends RegressionSuite {
         } catch (IOException e) {
             assertFalse(true);
         }
-        project.addPartitionInfo("P1", "ID");
 
         project.addStmtProcedure("WHERE_ABS", "select count(*) from P1 where ABS(ID) > 9");
         project.addStmtProcedure("WHERE_ABSFF", "select count(*) from P1 where ABS(ID - 0.4) > 9.5");

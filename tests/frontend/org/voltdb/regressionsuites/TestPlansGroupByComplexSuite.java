@@ -738,6 +738,54 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
 
     }
 
+    // Test group by columns do not have to be in display columns.
+    public void testENG5016() throws IOException, ProcCallException {
+        loadData();
+
+        Client client = this.getClient();
+        ClientResponse cr = null;
+        VoltTable vt;
+        long[][] expected;
+
+        for (String tb: tbs) {
+            cr = client.callProcedure("@AdHoc", "SELECT count(*), sum(wage) from " + tb +
+                    " GROUP BY dept ORDER BY sum(wage)");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {3, 60} , {2, 90}};
+            compareTable(vt, expected);
+
+            cr = client.callProcedure("@AdHoc", "SELECT count(*) as tag, sum(wage), sum(wage) from " + tb +
+                    " GROUP BY dept ORDER BY tag");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {2, 90, 90}, {3, 60, 60} };
+            compareTable(vt, expected);
+
+            // Demo bug, ENG-5149
+            // Check column alias for the identical aggregation
+            assertEquals("C2", vt.getColumnName(1));
+            assertEquals("C3", vt.getColumnName(2));
+            assertEquals(1, vt.getColumnIndex("C2"));
+            assertEquals(2, vt.getColumnIndex("C3"));
+
+            cr = client.callProcedure("@AdHoc", "SELECT count(*) as tag, " +
+                    "sum(wage)+1 as NO_BUG, sum(wage)+1 from " + tb +
+                    " GROUP BY dept ORDER BY tag");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {2, 91, 91}, {3, 61, 61} };
+            compareTable(vt, expected);
+
+            assertEquals("NO_BUG", vt.getColumnName(1));
+            assertEquals("C3", vt.getColumnName(2));
+            assertEquals(1, vt.getColumnIndex("NO_BUG"));
+            assertEquals(2, vt.getColumnIndex("C3"));
+
+
+        }
+    }
+
     public void testSupportedCases() throws IOException, ProcCallException {
         loadData();
 
@@ -962,8 +1010,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertFalse(true);
         }
         boolean success;
-        //project.addStmtProcedure("failedProcedure", "SELECT wage, SUM(wage) from R1 group by ID;");
-        //project.addStmtProcedure("groupby", "SELECT (dept+1) as tag, count(wage) from R1 GROUP BY dept+1 ORDER BY tag");
 
         config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);

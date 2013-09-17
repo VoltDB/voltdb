@@ -1,32 +1,30 @@
--- BASIC SQL Coverage cases.  These represent more-or-less the
--- simplest possible templates for SQL statements that cover the SQL
--- keywords that we want to support for a version 1 release.
---
--- Required preprocessor template:
--- @insert_vals: the list of types of the table columns for INSERT
--- @cmp_type
--- @assign_col
--- @assign_type
-
 -- DML, generate random data first.
 --INSERT
 -- test basic INSERT
-INSERT INTO _table VALUES (@insert_vals)
+INSERT INTO _table VALUES (@insertvals)
 
 SELECT * FROM _table LHS11 ,              _table RHS WHERE                                 LHS11._variable[@columntype] = RHS._variable[@comparabletype]
-SELECT * FROM _table LHS12 ,              _table RHS WHERE LHS12.@id_col = RHS.@id_col
-SELECT * FROM _table LHS13 ,              _table RHS WHERE LHS13.@id_col = RHS.@id_col AND     RHS.@num_col = 2 
-SELECT * FROM _table LHS14 ,              _table RHS WHERE LHS14.@id_col = RHS.@id_col AND   LHS14.@num_col = 2
-SELECT * FROM _table LHS15 ,              _table RHS WHERE LHS15.@id_col = RHS.@id_col AND   LHS15._variable[@col_type] < 45 AND LHS15._variable[@col_type] = RHS._variable
+SELECT * FROM _table LHS12 ,              _table RHS WHERE LHS12.@idcol = RHS.@idcol
+SELECT * FROM _table LHS13 ,              _table RHS WHERE LHS13.@idcol = RHS.@idcol AND     RHS._variable[numeric] = 2 
+SELECT * FROM _table LHS14 ,              _table RHS WHERE LHS14.@idcol = RHS.@idcol AND   LHS14._variable[numeric] = 2
+SELECT * FROM _table LHS15 ,              _table RHS WHERE LHS15.@idcol = RHS.@idcol AND   LHS15._variable[@columntype] < 45 AND LHS15._variable[@columntype] = RHS._variable[@comparabletype]
+SELECT * FROM _table LHS16 ,              _table RHS WHERE LHS16.@idcol = RHS.@idcol AND   LHS16.@numcol = RHS.@numcol AND   RHS.@idcol > 10 AND LHS16.@numcol < 30 AND LHS16.@numcol >= RHS.@idcol
 
-SELECT * FROM _table[@lhs] @join_type JOIN _table[@rhs] ON __[@lhs]._variable[@col_type] = __[@rhs]._variable
-SELECT * FROM _table[@lhs] @join_type JOIN _table[@rhs] ON __[@lhs].@id_col = __[@rhs].@id_col
-SELECT * FROM _table[@lhs] @join_type JOIN _table[@rhs] ON __[@lhs].@id_col = __[@rhs].@id_col AND __[@rhs].@num_col = 2 
-SELECT * FROM _table[@lhs] @join_type JOIN _table[@rhs] ON __[@lhs].@id_col = __[@rhs].@id_col AND __[@lhs].@num_col = 2
-SELECT * FROM _table[@lhs] @join_type JOIN _table[@rhs] ON __[@lhs].@id_col = __[@rhs].@id_col WHERE __[@lhs]._variable[@col_type] < 45 AND __[@lhs]._variable[@col_type] = __[@rhs]._variable
+SELECT * FROM _table LHS21 @jointype JOIN _table RHS ON                                    LHS21._variable[@columntype] = RHS._variable[@comparabletype]
+SELECT * FROM _table LHS22 @jointype JOIN _table RHS ON    LHS22.@idcol = RHS.@idcol
+-- These STILL need softening
+-- SELECT * FROM _table LHS23 @jointype JOIN _table RHS ON    LHS23.@idcol = RHS.@idcol AND     RHS._variable[numeric] = 2
+-- SELECT * FROM _table LHS24 @jointype JOIN _table RHS ON    LHS24.@idcol = RHS.@idcol AND   LHS24._variable[numeric] = 2
+   SELECT * FROM _table LHS23 @jointype JOIN _table RHS ON    LHS23.@idcol = RHS.@idcol AND     RHS.@numcol = 2
+   SELECT * FROM _table LHS24 @jointype JOIN _table RHS ON    LHS24.@idcol = RHS.@idcol AND   LHS24.@numcol = 2
+SELECT * FROM _table LHS25 @jointype JOIN _table RHS ON    LHS25.@idcol = RHS.@idcol WHERE LHS25._variable[@columntype] < 45 AND LHS25._variable[@columntype] = RHS._variable[@comparabletype]
 
+-- Still triggers wrong answer from mis-partitioning?
+SELECT * FROM _table LHS31 @jointype JOIN _table RHS ON    LHS31.@idcol = RHS.@idcol AND     RHS.@idcol = 2
+SELECT * FROM _table LHS32 @jointype JOIN _table RHS ON    LHS32.@idcol = RHS.@idcol AND   LHS32.@idcol = 2
 
---TODO: ENG-4929 Investigate why these get a planner NullPointerException for a timeout.
--- SELECT *                 FROM _table[@lhs] @join_type JOIN _table[@rhs] USING(@id_col, @num_col) WHERE @id_col > 10 AND @num_col < 30 AND @id_col = @num_col
--- it's not (just) the select * that fails:
--- SELECT @id_col, @num_col FROM _table[@lhs] @join_type JOIN _table[@rhs] USING(@id_col, @num_col) WHERE @id_col > 10 AND @num_col < 30 AND @id_col = @num_col
+SELECT * FROM _table LHS36 @jointype JOIN _table RHS USING(      @idcol,                         @numcol)              WHERE     @idcol > 10 AND       @numcol < 30 AND       @numcol >=     @idcol
+SELECT * FROM _table LHS37 @jointype JOIN _table RHS USING(      @idcol,                         @numcol)              WHERE     @idcol > 10 AND       @numcol < 30 AND       @idcol  =      @numcol
+SELECT @idcol, @numcol FROM _table LHS38 @jointype JOIN _table RHS USING(     @idcol,            @numcol)              WHERE     @idcol > 10 AND       @numcol < 30 AND       @numcol >=     @idcol
+SELECT @idcol, @numcol FROM _table LHS39 @jointype JOIN _table RHS USING(     @idcol,            @numcol)              WHERE     @idcol > 10 AND       @numcol < 30 AND       @idcol  =      @numcol
+
