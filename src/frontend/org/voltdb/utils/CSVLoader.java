@@ -288,7 +288,8 @@ public class CSVLoader {
             }
         }
 
-        if (isMP) {
+        //Only print warning with -p case for table case we use sys procs.
+        if (isMP && config.useSuppliedProcedure) {
             m_log.warn("Using a multi-partitioned procedure to load data will be slow. "
                     + "If loading a partitioned table, use a single-partitioned procedure "
                     + "for best performance.");
