@@ -29,9 +29,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.supercsv.io.CsvListReader;
@@ -360,7 +360,7 @@ public class CSVLoader {
             Map<Integer, BlockingQueue<CSVLineWithMetaData>> lineq = new HashMap<Integer, BlockingQueue<CSVLineWithMetaData>>(numProcessors);
             List<CSVPartitionProcessor> processors = new ArrayList<CSVPartitionProcessor>(numProcessors);
             for (int i = 0; i < numProcessors; i++) {
-                ArrayBlockingQueue<CSVLineWithMetaData> partitionQueue = new ArrayBlockingQueue<CSVLineWithMetaData>((int) config.batch * 2);
+                LinkedBlockingQueue<CSVLineWithMetaData> partitionQueue = new LinkedBlockingQueue<CSVLineWithMetaData>(Integer.MAX_VALUE);
                 lineq.put(i, partitionQueue);
                 CSVPartitionProcessor processor = new CSVPartitionProcessor(csvClient, i, partitionedColumnIndex,
                         partitionQueue, endOfData);

@@ -116,7 +116,7 @@ class CSVFileReader implements Runnable {
                             (Object) lineData.correctedLine[partitionedColumnIndex]);
                 }
                 BlockingQueue<CSVLineWithMetaData> q = processorQueues.get(partitionId);
-                q.put(lineData);
+                q.offer(lineData);
             } catch (SuperCsvException e) {
                 //Catch rows that can not be read by superCSV listReader. E.g. items without quotes when strictquotes is enabled.
                 e.printStackTrace();
@@ -127,8 +127,6 @@ class CSVFileReader implements Runnable {
             } catch (IOException ioex) {
                 ioex.printStackTrace();
                 break;
-            } catch (InterruptedException ex) {
-                m_log.error("Failed to add lines for partition processor queues: " + ex);
             }
         }
 
