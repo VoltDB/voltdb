@@ -81,11 +81,11 @@ public class TestPlansOrderBy extends PlannerTestCase {
     }
 
     public void testOrderByTwo() {
-        validatePlan("SELECT * from T ORDER BY T_D0, T_D1", true, false, false, false);
+        validateOptimalPlan("SELECT * from T ORDER BY T_D0, T_D1");
     }
 
     public void testOrderByTwoDesc() {
-        validatePlan("SELECT * from T ORDER BY T_D0 DESC, T_D1 DESC", true, false, false, false);
+        validateOptimalPlan("SELECT * from T ORDER BY T_D0 DESC, T_D1 DESC");
     }
 
     public void testOrderByTwoAscDesc() {
