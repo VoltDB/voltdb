@@ -793,13 +793,14 @@ PersistentTable::segregateMaterializedViews(std::map<std::string, catalog::Mater
 }
 
 void
-PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target)
+PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target, catalog::MaterializedViewInfo* targetMvInfo)
 {
     std::string targetName = target->name();
     // find the materialized view that uses the table or its precursor (by the same name).
     BOOST_FOREACH(MaterializedViewMetadata* currView, m_views) {
         PersistentTable* currTarget = currView->targetTable();
-        if (currTarget == target) {
+        TableIndex *currIndexForMinOrMax = currView->indexForMinMax();
+        if (currTarget == target && currIndexForMinOrMax->getName().compare(targetMvInfo->indexForMinMax()) == 0) {
             // The view is already up to date.
             return;
         }
@@ -809,6 +810,7 @@ PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target)
             // A match on name only indicates that the target table has been re-defined since
             // the view was initialized, so re-initialize the view.
             currView->setTargetTable(target);
+            currView->setIndexForMinMax(targetMvInfo->indexForMinMax());
             return;
         }
     }

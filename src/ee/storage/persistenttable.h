@@ -236,7 +236,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                                     std::vector<catalog::MaterializedViewInfo*> &survivingInfosOut,
                                     std::vector<MaterializedViewMetadata*> &survivingViewsOut,
                                     std::vector<MaterializedViewMetadata*> &obsoleteViewsOut);
-    void updateMaterializedViewTargetTable(PersistentTable* target);
+    void updateMaterializedViewTargetTable(PersistentTable* target, catalog::MaterializedViewInfo* targetMvInfo);
 
     /**
      * Attempt to stream more tuples from the table to the provided
