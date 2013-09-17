@@ -238,8 +238,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 params.writeExternal(fs);
             }
             catch (IOException e) {
-                e.printStackTrace();
-                assert (false);
+                VoltDB.crashLocalVoltDB("Failed to serialize parameter for fragment: " + params.toString(), true, e);
             }
             parambytes = fs.getBuffer();
         }
