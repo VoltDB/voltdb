@@ -60,8 +60,8 @@ public class HsqlBackend {
             if (m_backend == null) {
                 try {
                     m_backend = new HsqlBackend(siteId);
-                    final String hexDDL = context.database.getSchema();
-                    final String ddl = Encoder.hexDecodeToString(hexDDL);
+                    final String binDDL = context.database.getSchema();
+                    final String ddl = Encoder.decodeBase64AndDecompress(binDDL);
                     final String[] commands = ddl.split("\n");
                     for (String command : commands) {
                         String decoded_cmd = Encoder.hexDecodeToString(command);

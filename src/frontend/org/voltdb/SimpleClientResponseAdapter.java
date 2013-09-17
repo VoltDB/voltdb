@@ -24,8 +24,11 @@ import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.client.ClientResponse;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.util.concurrent.Exchanger;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * A very simple adapter that deserializes bytes into client responses. It calls
@@ -36,17 +39,45 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
         public void handleResponse(ClientResponse response);
     }
 
+    public static final class SyncCallback implements Callback {
+        private final Exchanger<ClientResponse> m_responseExchanger = new Exchanger<ClientResponse>();
+
+        public ClientResponse getResponse() throws InterruptedException
+        {
+            return m_responseExchanger.exchange(null);
+        }
+
+        @Override
+        public void handleResponse(ClientResponse response)
+        {
+            try {
+                m_responseExchanger.exchange(response);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
     private final long m_connectionId;
     private final Callback m_callback;
+    private final String m_name;
+    public static volatile AtomicLong m_testConnectionIdGenerator;
+
 
     /**
      * @param connectionId    The connection ID for this adapter, needs to be unique for this
      *                        node.
      * @param callback        A callback to take the client response, null is accepted.
+     * @param name            Human readable name identifying the adapter, will stand in for hostname
      */
-    public SimpleClientResponseAdapter(long connectionId, Callback callback) {
-        m_connectionId = connectionId;
+    public SimpleClientResponseAdapter(long connectionId, Callback callback, String name) {
+        if (m_testConnectionIdGenerator != null) {
+            m_connectionId = m_testConnectionIdGenerator.incrementAndGet();
+        } else {
+            m_connectionId = connectionId;
+        }
         m_callback = callback;
+        m_name = name;
     }
 
     @Override
@@ -141,8 +172,23 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
     }
 
     @Override
-    public String getHostnameAndIP() {
-        return "";
+    public String getHostnameAndIPAndPort() {
+        return m_name;
+    }
+
+    @Override
+    public String getHostnameOrIP() {
+        return m_name;
+    }
+
+    @Override
+    public int getRemotePort() {
+        return -1;
+    }
+
+    @Override
+    public InetSocketAddress getRemoteSocketAddress() {
+        return null;
     }
 
     @Override

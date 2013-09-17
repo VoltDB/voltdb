@@ -124,7 +124,7 @@ public abstract class CatalogUtil {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     // The minimum version of catalog that's compatible with this version of Volt
-    public static final int[] minCompatibleVersion = {3, 2};
+    public static final int[] minCompatibleVersion = {3, 6, 1};
 
     public static final String CATALOG_FILENAME = "catalog.txt";
     public static final String CATALOG_BUILDINFO_FILENAME = "buildinfo.txt";
@@ -1666,6 +1666,24 @@ public abstract class CatalogUtil {
             }
         }
         return tables;
+    }
+
+    /**
+     * Iterate through all the tables in the catalog, find a table with an id that matches the
+     * given table id, and return its name.
+     *
+     * @param catalog  Catalog database
+     * @param tableId  table id
+     * @return table name associated with the given table id (null if no association is found)
+     */
+    public static String getTableNameFromId(Database catalog, int tableId) {
+        String tableName = null;
+        for (Table table: catalog.getTables()) {
+            if (table.getRelativeIndex() == tableId) {
+                tableName = table.getTypeName();
+            }
+        }
+        return tableName;
     }
 
     // Calculate the width of an index:

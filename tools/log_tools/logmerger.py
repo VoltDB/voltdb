@@ -138,6 +138,7 @@ class ApprunnerTarFile():
             'apprunner.log',           #apprunner logging
             '\.Benchmark\.(?!jstack)',           #client benchmark
             'VoltDBReplicationAgent\.(?!jstack)',  #dragent
+            '.*SchemaChangeClient.*',
             #'stdout.txt$',            #VEM
             ]
         pat = '|'.join(patterns)
@@ -238,6 +239,7 @@ if __name__ == "__main__":
         'org.voltdb.dr.VoltDB(ReplicationAgent)': '%%',
         '(apprunner).log': '&&',
         '(.*)\.Benchmark\.': '--',
+        '(.*)\.SchemaChangeClient\.': '--',
         }
 
     #Go, go, go

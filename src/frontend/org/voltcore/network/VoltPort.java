@@ -94,10 +94,10 @@ public class VoltPort implements Connection
      * It is not recommended to use the value of this variable as a key. Use
      * m_remoteIP if you need to identify a host.
      */
-    volatile String m_remoteHost = null;
+    volatile String m_remoteHostname = null;
     final InetSocketAddress m_remoteSocketAddress;
     final String m_remoteSocketAddressString;
-
+    private volatile String m_remoteHostAndAddressAndPort;
     private String m_toString = null;
 
     /** Wrap a socket with a VoltPort */
@@ -109,8 +109,10 @@ public class VoltPort implements Connection
         m_network = network;
         m_handler = handler;
         m_remoteSocketAddress = remoteAddress;
-        m_remoteSocketAddressString = remoteAddress.toString();
+        m_remoteSocketAddressString = remoteAddress.getAddress().getHostAddress();
         m_pool = pool;
+        m_remoteHostAndAddressAndPort = "/" + m_remoteSocketAddressString + ":" + m_remoteSocketAddress.getPort();
+        m_toString = super.toString() + ":" + m_remoteHostAndAddressAndPort;
     }
 
     /**
@@ -123,8 +125,9 @@ public class VoltPort implements Connection
             public void run() {
                 String remoteHost = m_remoteSocketAddress.getHostName();
                 if (!remoteHost.equals(m_remoteSocketAddress.getAddress().getHostAddress())) {
-                    m_remoteHost = remoteHost + "(" + m_remoteSocketAddressString + ")";
-                    m_toString = super.toString() + ":" + m_remoteHost;
+                    m_remoteHostname = remoteHost;
+                    m_remoteHostAndAddressAndPort = remoteHost + m_remoteHostAndAddressAndPort;
+                    m_toString = super.toString() + ":" + m_remoteHostAndAddressAndPort;
                 }
             }
         };
@@ -147,8 +150,6 @@ public class VoltPort implements Connection
     void setKey (SelectionKey key) {
         m_selectionKey = key;
         m_channel = (SocketChannel)key.channel();
-        SocketAddress remoteAddress = m_channel.socket().getRemoteSocketAddress();
-        m_toString = super.toString() + ":" + (remoteAddress == null ? "null" : remoteAddress.toString());
         m_readStream = new NIOReadStream();
         m_writeStream = new NIOWriteStream(
                 this,
@@ -161,7 +162,6 @@ public class VoltPort implements Connection
     /**
      * Lock the VoltPort for running by the VoltNetwork executor service. This prevents anything from sneaking in a messing with
      * the selector set until the executor service has had a chance to handle all the I/O.
-     * @param selectedOps
      */
     void lockForHandlingWork() {
         synchronized(m_lock) {
@@ -424,12 +424,27 @@ public class VoltPort implements Connection
     }
 
     @Override
-    public String getHostnameAndIP() {
-        if (m_remoteHost != null) {
-            return m_remoteHost;
+    public String getHostnameOrIP() {
+        if (m_remoteHostname != null) {
+            return m_remoteHostname;
         } else {
             return m_remoteSocketAddressString;
         }
+    }
+
+    @Override
+    public String getHostnameAndIPAndPort() {
+        return m_remoteHostAndAddressAndPort;
+    }
+
+    @Override
+    public int getRemotePort() {
+        return m_remoteSocketAddress.getPort();
+    }
+
+    @Override
+    public InetSocketAddress getRemoteSocketAddress() {
+        return m_remoteSocketAddress;
     }
 
     @Override

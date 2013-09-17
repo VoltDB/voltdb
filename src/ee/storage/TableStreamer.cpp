@@ -109,14 +109,14 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                     break;
 
                 case TABLE_STREAM_ELASTIC_INDEX_CLEAR:
-                    VOLT_ERROR("Not allowed to clear the elastic index before materializing it.");
-                    failed = true;
+                    VOLT_DEBUG("Clear elastic index before materializing it.");
+                    // not an error
                     break;
 
                 default:
                     assert(false);
             }
-            if (!failed) {
+            if (context) {
                 TableStreamerContext::ActivationReturnCode retcode = context->handleActivation(streamType, false);
                 switch (retcode) {
                     case TableStreamerContext::ACTIVATION_SUCCEEDED:

@@ -117,6 +117,8 @@ public:
     void createIndex();
     void dropIndex();
     bool hasIndex() const;
+    bool isIndexEmpty() const;
+    size_t indexSize() const;
     bool isIndexingComplete() const;
     void setIndexingComplete();
     bool indexHas(TableTuple &tuple) const;
@@ -365,7 +367,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return m_tupleCount == 0;
     }
 
-
     virtual int64_t validatePartitioning(TheHashinator *hashinator, int32_t partitionId);
 
   private:
@@ -543,6 +544,16 @@ inline bool PersistentTableSurgeon::hasIndex() const {
     return (m_index != NULL);
 }
 
+inline bool PersistentTableSurgeon::isIndexEmpty() const {
+    assert (m_index != NULL);
+    return (m_index->size() == (size_t)0);
+}
+
+inline size_t PersistentTableSurgeon::indexSize() const {
+    assert (m_index != NULL);
+    return m_index->size();
+}
+
 inline bool PersistentTableSurgeon::isIndexingComplete() const {
     assert (m_index != NULL);
     return m_indexingComplete;
@@ -560,7 +571,7 @@ inline void PersistentTableSurgeon::createIndex() {
 }
 
 inline void PersistentTableSurgeon::dropIndex() {
-    assert(m_index != NULL);
+    assert(m_indexingComplete == true);
     m_index.reset(NULL);
     m_indexingComplete = false;
 }

@@ -16,6 +16,7 @@
  */
 
 #include "storage/ElasticContext.h"
+#include "storage/ElasticIndex.h"
 #include "storage/persistenttable.h"
 #include "common/TupleOutputStreamProcessor.h"
 #include "common/FixUnusedAssertHack.h"
@@ -66,6 +67,11 @@ ElasticContext::handleActivation(TableStreamType streamType, bool reactivate)
 
     // Clear the index?
     if (streamType == TABLE_STREAM_ELASTIC_INDEX_CLEAR) {
+        if (!m_surgeon.isIndexEmpty()) {
+            VOLT_ERROR("Elastic index clear is not allowed while an index is "
+                       "present that has not been completely consumed.");
+            return ACTIVATION_FAILED;
+        }
         m_surgeon.dropIndex();
         return ACTIVATION_SUCCEEDED;
     }

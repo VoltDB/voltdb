@@ -23,11 +23,9 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
 
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
 
@@ -53,10 +51,9 @@ public class IndexSnapshotRequestConfig extends SnapshotRequestConfig {
 
     public final Collection<PartitionRanges> partitionRanges;
 
-    public IndexSnapshotRequestConfig(List<Table> tables,
-                                      Collection<PartitionRanges> partitionRanges)
+    public IndexSnapshotRequestConfig(Collection<PartitionRanges> partitionRanges)
     {
-        super(tables);
+        super(null); // all partitioned tables will be included
         this.partitionRanges = ImmutableList.copyOf(partitionRanges);
     }
 
