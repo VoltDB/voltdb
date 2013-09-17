@@ -17,20 +17,22 @@
 
 package org.voltdb;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.concurrent.Callable;
+
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.Pair;
+import org.voltdb.utils.CatalogUtil;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.UnmodifiableIterator;
 import com.google.common.util.concurrent.Callables;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.Pair;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
-import java.util.concurrent.Callable;
 
 /**
  * A class that manages streaming data from a single table. It knows how to interpret the return codes and check for
@@ -70,8 +72,9 @@ public class TableStreamer {
     public void activate(SystemProcedureExecutionContext context, long undoToken, byte[] predicates)
     {
         if (!context.activateTableStream(m_tableId, m_type, undoToken, predicates)) {
-            VoltDB.crashLocalVoltDB("Attempted to activate copy on write mode for table "
-                                    + m_tableId + " and failed", false, null);
+            String tableName = CatalogUtil.getTableNameFromId(context.getDatabase(), m_tableId);
+            VoltDB.crashLocalVoltDB("Attempted to activate a table stream of type " + m_type +
+                                    "for table " + tableName + " and failed", false, null);
         }
     }
 
