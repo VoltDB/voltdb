@@ -34,12 +34,14 @@ public class TupleValueExpression extends AbstractValueExpression {
     public enum Members {
         COLUMN_IDX,
         TABLE_NAME,
+        TABLE_ALIAS,
         COLUMN_NAME,
         TABLE_IDX,  // used for JOIN queries only, 0 for outer table, 1 for inner table
     }
 
     protected int m_columnIndex = -1;
     protected String m_tableName = null;
+    protected String m_tableAlias = null;
     protected String m_columnName = null;
     protected String m_columnAlias = null;
     protected int m_tableIdx = 0;
@@ -65,6 +67,7 @@ public class TupleValueExpression extends AbstractValueExpression {
         TupleValueExpression clone = (TupleValueExpression)super.clone();
         clone.m_columnIndex = m_columnIndex;
         clone.m_tableName = m_tableName;
+        clone.m_tableAlias = m_tableAlias;
         clone.m_columnName = m_columnName;
         clone.m_columnAlias = m_columnAlias;
         return clone;
@@ -139,6 +142,20 @@ public class TupleValueExpression extends AbstractValueExpression {
         m_tableName = name;
     }
 
+    /**
+     * @return the tables
+     */
+    public String getTableAlias() {
+        return m_tableAlias;
+    }
+
+    /**
+     * @param name the table name to set
+     */
+    public void setTableAlias(String alias) {
+        m_tableAlias = alias;
+    }
+
     public int getTableIndex() {
         return m_tableIdx;
     }
@@ -162,6 +179,13 @@ public class TupleValueExpression extends AbstractValueExpression {
         }
         if (m_tableName != null) { // Implying both sides non-null
             if (m_tableName.equals(expr.m_tableName) == false) {
+                return false;
+            }
+        }
+        if (m_tableAlias != null && expr.m_tableAlias != null) {
+        	// Implying both sides non-null
+        	// If only one side is NULL aliases are not part of the comparison
+            if (m_tableAlias.equals(expr.m_tableAlias) == false) {
                 return false;
             }
         }
@@ -192,6 +216,7 @@ public class TupleValueExpression extends AbstractValueExpression {
         super.toJSONString(stringer);
         stringer.key(Members.COLUMN_IDX.name()).value(m_columnIndex);
         stringer.key(Members.TABLE_NAME.name()).value(m_tableName);
+        stringer.key(Members.TABLE_ALIAS.name()).value(m_tableAlias);
         // Column name is not required in the EE but testing showed that it is
         // needed to support type resolution of indexed expressions in the planner
         // after they get round-tripped through the catalog's index definition.
@@ -206,6 +231,7 @@ public class TupleValueExpression extends AbstractValueExpression {
     protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {
         m_columnIndex = obj.getInt(Members.COLUMN_IDX.name());
         m_tableName = obj.getString(Members.TABLE_NAME.name());
+        m_tableAlias = obj.getString(Members.TABLE_ALIAS.name());
         m_columnName = obj.getString(Members.COLUMN_NAME.name());
         if (obj.has(Members.TABLE_IDX.name())) {
             m_tableIdx = obj.getInt(Members.TABLE_IDX.name());
@@ -246,12 +272,12 @@ public class TupleValueExpression extends AbstractValueExpression {
     // Even though this function applies generally to expressions and tables and not just to TVEs as such,
     // this function is somewhat TVE-related because TVEs DO represent the points where expression trees
     // depend on tables.
-    public static AbstractExpression getOtherTableExpression(AbstractExpression expr, Table table) {
+    public static AbstractExpression getOtherTableExpression(AbstractExpression expr, String tableAlias) {
         assert(expr != null);
         AbstractExpression retval = expr.getLeft();
-        if (isOperandDependentOnTable(retval, table)) {
+        if (isOperandDependentOnTable(retval, tableAlias)) {
             retval = expr.getRight();
-            assert( ! isOperandDependentOnTable(retval, table));
+            assert( ! isOperandDependentOnTable(retval, tableAlias));
         }
         return retval;
     }
@@ -259,11 +285,12 @@ public class TupleValueExpression extends AbstractValueExpression {
     // Even though this function applies generally to expressions and tables and not just to TVEs as such,
     // this function is somewhat TVE-related because TVEs DO represent the points where expression trees
     // depend on tables.
-    public static boolean isOperandDependentOnTable(AbstractExpression expr, Table table) {
+    public static boolean isOperandDependentOnTable(AbstractExpression expr, String tableAlias) {
+        assert(tableAlias != null);
         for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(expr)) {
             //TODO: This clumsy testing of table names regardless of table aliases is
             // EXACTLY why we can't have nice things like self-joins.
-            if (table.getTypeName().equals(tve.getTableName()))
+            if (tableAlias.equals(tve.getTableAlias()))
             {
                 return true;
             }

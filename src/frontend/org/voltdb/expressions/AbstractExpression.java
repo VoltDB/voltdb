@@ -559,6 +559,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             tve.setColumnName(col.columnName);
             tve.setColumnAlias(col.alias);
             tve.setTableName(col.tableName);
+            tve.setTableAlias(col.tableAlias);
             // To prevent pushdown of LIMIT when ORDER BY references an agg. ENG-3487.
             if (hasAnySubexpressionOfClass(AggregateExpression.class))
                 tve.setHasAggregate(true);

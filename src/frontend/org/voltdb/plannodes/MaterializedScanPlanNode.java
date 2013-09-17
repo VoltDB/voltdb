@@ -64,6 +64,7 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
         m_outputExpression.setColumnIndex(0);
         m_outputExpression.setColumnName("list_element");
         m_outputExpression.setTableName("materialized_temp_table");
+        m_outputExpression.setTableAlias("materialized_temp_table");
         m_outputExpression.setValueType(m_tableData.getValueType());
         m_outputExpression.setValueSize(m_tableData.getValueSize());
     }
@@ -115,6 +116,7 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
             // must produce a tuple value expression for the one column.
             m_outputSchema.addColumn(
                 new SchemaColumn(m_outputExpression.getTableName(),
+                                 m_outputExpression.getTableAlias(),
                                  m_outputExpression.getColumnName(),
                                  m_outputExpression.getColumnAlias(),
                                  m_outputExpression));

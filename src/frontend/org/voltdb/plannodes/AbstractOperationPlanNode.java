@@ -125,9 +125,11 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
             tve.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
             tve.setColumnIndex(0);
             tve.setTableName("VOLT_TEMP_TABLE");
+            tve.setTableAlias("VOLT_TEMP_TABLE");
             tve.setColumnName("modified_tuples");
             tve.setColumnAlias("modified_tuples");
             SchemaColumn col = new SchemaColumn("VOLT_TEMP_TABLE",
+                                                "VOLT_TEMP_TABLE",
                                                 "modified_tuples",
                                                 "modified_tuples",
                                                 tve);

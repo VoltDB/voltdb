@@ -840,6 +840,9 @@ public class ExpressionColumn extends Expression {
         if ((alias == null) || (getAlias().length() == 0)) {
             exp.attributes.put("alias", columnName);
         }
+        if (rangeVariable != null && rangeVariable.tableAlias != null) {
+            exp.attributes.put("tablealias",  rangeVariable.tableAlias.name);
+        }
         return exp;
     }
 }

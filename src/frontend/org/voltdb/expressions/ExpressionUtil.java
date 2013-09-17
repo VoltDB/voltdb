@@ -292,17 +292,17 @@ public abstract class ExpressionUtil {
      *      If it is a disjunction of null-rejected conditions
      *
      * @param expr
-     * @param tableName
+     * @param tableAlias
      * @return
      */
-    public static boolean isNullRejectingExpression(AbstractExpression expr, String tableName) {
+    public static boolean isNullRejectingExpression(AbstractExpression expr, String tableAlias) {
         ExpressionType exprType = expr.getExpressionType();
         if (exprType == ExpressionType.CONJUNCTION_AND) {
             assert(expr.m_left != null && expr.m_right != null);
-            return isNullRejectingExpression(expr.m_left, tableName) || isNullRejectingExpression(expr.m_right, tableName);
+            return isNullRejectingExpression(expr.m_left, tableAlias) || isNullRejectingExpression(expr.m_right, tableAlias);
         } else if (exprType == ExpressionType.CONJUNCTION_OR) {
             assert(expr.m_left != null && expr.m_right != null);
-            return isNullRejectingExpression(expr.m_left, tableName) && isNullRejectingExpression(expr.m_right, tableName);
+            return isNullRejectingExpression(expr.m_left, tableAlias) && isNullRejectingExpression(expr.m_right, tableAlias);
         } else if (exprType == ExpressionType.OPERATOR_NOT) {
             assert(expr.m_left != null);
             // "NOT ( P and Q )" is as null-rejecting as "NOT P or NOT Q"
@@ -310,7 +310,7 @@ public abstract class ExpressionUtil {
             // Handling AND and OR expressions requires a "negated" flag to the recursion that tweaks
             // (switches?) the handling of ANDs and ORs to enforce the above equivalences.
             if (expr.m_left.getExpressionType() == ExpressionType.OPERATOR_IS_NULL) {
-                return containsMatchingTVE(expr, tableName);
+                return containsMatchingTVE(expr, tableAlias);
             } else if (expr.m_left.getExpressionType() == ExpressionType.CONJUNCTION_AND ||
                     expr.m_left.getExpressionType() == ExpressionType.CONJUNCTION_OR) {
                 assert(expr.m_left.m_left != null && expr.m_left.m_right != null);
@@ -333,14 +333,14 @@ public abstract class ExpressionUtil {
                 ExpressionType type = (expr.m_left.getExpressionType() == ExpressionType.CONJUNCTION_AND) ?
                         ExpressionType.CONJUNCTION_OR : ExpressionType.CONJUNCTION_AND;
                 AbstractExpression tempExpr = new OperatorExpression(type, tempLeft, tempRight);
-                return isNullRejectingExpression(tempExpr, tableName);
+                return isNullRejectingExpression(tempExpr, tableAlias);
             } else if (expr.m_left.getExpressionType() == ExpressionType.OPERATOR_NOT) {
                 // It's probably safe to assume that HSQL will have stripped out other double negatives,
                 // (like "NOT T.c IS NOT NULL"). Yet, we could also handle them here
                 assert(expr.m_left.m_left != null);
-                return isNullRejectingExpression(expr.m_left.m_left, tableName);
+                return isNullRejectingExpression(expr.m_left.m_left, tableAlias);
             } else {
-                return isNullRejectingExpression(expr.m_left, tableName);
+                return isNullRejectingExpression(expr.m_left, tableAlias);
             }
         } else if (exprType == ExpressionType.OPERATOR_IS_NULL) {
             // IS NOT NULL is NULL rejecting -- IS NULL is not
@@ -355,15 +355,19 @@ public abstract class ExpressionUtil {
             // would be support for standard pseudo-functions that take logical condition arguments.
             // These should probably be supported as special non-functions/operations for a number
             // of reasons and may need special casing here.
-            return containsMatchingTVE(expr, tableName);
+            return containsMatchingTVE(expr, tableAlias);
         }
     }
 
-    private static boolean containsMatchingTVE(AbstractExpression expr, String tableName) {
+    private static boolean containsMatchingTVE(AbstractExpression expr, String tableAlias) {
         assert(expr != null);
         List<TupleValueExpression> tves = getTupleValueExpressions(expr);
         for (TupleValueExpression tve : tves) {
-            if (tve.m_tableName == tableName) {
+            if (tve.m_tableAlias != null) {
+                if (tve.m_tableAlias.equals(tableAlias)) {
+                    return true;
+                }
+            } else if (tve.m_tableName.equals(tableAlias)) {
                 return true;
             }
         }

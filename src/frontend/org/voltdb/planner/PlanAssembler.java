@@ -625,6 +625,7 @@ public class PlanAssembler {
         NodeSchema proj_schema = new NodeSchema();
         // This planner-created column is magic.
         proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
+                                               "VOLT_TEMP_TABLE",
                                                "tuple_address",
                                                "tuple_address",
                                                addressExpr));
@@ -688,6 +689,7 @@ public class PlanAssembler {
         NodeSchema proj_schema = new NodeSchema();
         // This planner-generated column is magic.
         proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
+                                               "VOLT_TEMP_TABLE",
                                                "tuple_address",
                                                "tuple_address",
                                                tae));
@@ -704,6 +706,7 @@ public class PlanAssembler {
         // to avoid any false schema/column matches with the actual table.
         for (Entry<Column, AbstractExpression> col : m_parsedUpdate.columns.entrySet()) {
             proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
+                                                   "VOLT_TEMP_TABLE",
                                                    col.getKey().getTypeName(),
                                                    col.getKey().getTypeName(),
                                                    col.getValue()));
@@ -811,6 +814,7 @@ public class PlanAssembler {
             // add column to the materialize node.
             // This table name is magic.
             mat_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
+                                                  "VOLT_TEMP_TABLE",
                                                   column.getTypeName(),
                                                   column.getTypeName(),
                                                   expr));
@@ -874,6 +878,7 @@ public class PlanAssembler {
             count_tve.setColumnName("modified_tuples");
             count_tve.setColumnAlias("modified_tuples");
             count_tve.setTableName("VOLT_TEMP_TABLE");
+            count_tve.setTableAlias("VOLT_TEMP_TABLE");
             countNode.addAggregate(ExpressionType.AGGREGATE_SUM, false, 0, count_tve);
 
             // The output column. Not really based on a TVE (it is really the
@@ -887,8 +892,10 @@ public class PlanAssembler {
             tve.setColumnName("modified_tuples");
             tve.setColumnAlias("modified_tuples");
             tve.setTableName("VOLT_TEMP_TABLE");
+            tve.setTableAlias("VOLT_TEMP_TABLE");
             NodeSchema count_schema = new NodeSchema();
             SchemaColumn col = new SchemaColumn("VOLT_TEMP_TABLE",
+                    "VOLT_TEMP_TABLE",
                     "modified_tuples",
                     "modified_tuples",
                     tve);
@@ -926,6 +933,7 @@ public class PlanAssembler {
         {
             assert(outputCol.expression != null);
             SchemaColumn col = new SchemaColumn(outputCol.tableName,
+                                                outputCol.tableAlias,
                                                 outputCol.columnName,
                                                 outputCol.alias,
                                                 outputCol.expression);
@@ -1033,6 +1041,7 @@ public class PlanAssembler {
                         tve.setColumnName(col.getName());
                         tve.setExpressionType(ExpressionType.VALUE_TUPLE);
                         tve.setHasAggregate(false);
+                        // Can not set table Alias here, only table name
                         tve.setTableName(table.getTypeName());
                         tve.setValueSize(col.getSize());
                         tve.setValueType(VoltType.get((byte) col.getType()));
@@ -1250,10 +1259,11 @@ public class PlanAssembler {
                     tve.setColumnName("");
                     tve.setColumnAlias(col.alias);
                     tve.setTableName("VOLT_TEMP_TABLE");
+                    tve.setTableAlias("VOLT_TEMP_TABLE");
                     boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
                     aggNode.addAggregate(agg_expression_type, is_distinct, outputColumnIndex, agg_input_expr);
-                    schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "", col.alias, tve);
-                    top_schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "", col.alias, tve);
+                    schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "", col.alias, tve);
+                    top_schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "", col.alias, tve);
 
                     /*
                      * Special case count(*), count(), sum(), min() and max() to
@@ -1326,14 +1336,14 @@ public class PlanAssembler {
                      * MUST already exist in the child node's output. Find them and
                      * add them to the aggregate's output.
                      */
-                    schema_col = new SchemaColumn(col.tableName, col.columnName, col.alias, col.expression);
+                    schema_col = new SchemaColumn(col.tableName, col.tableAlias, col.columnName, col.alias, col.expression);
                     AbstractExpression topExpr = null;
                     if (col.groupBy) {
                         topExpr = m_parsedSelect.groupByExpressions.get(col.alias);
                     } else {
                         topExpr = col.expression;
                     }
-                    top_schema_col = new SchemaColumn(col.tableName, col.columnName, col.alias, topExpr);
+                    top_schema_col = new SchemaColumn(col.tableName, col.tableAlias, col.columnName, col.alias, topExpr);
                 }
 
                 agg_schema.addColumn(schema_col);
@@ -1342,7 +1352,7 @@ public class PlanAssembler {
             }
 
             for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.groupByColumns) {
-                if (agg_schema.find(col.tableName, col.columnName, col.alias) == null) {
+                if (agg_schema.find(col.tableName, col.tableAlias, col.columnName, col.alias) == null) {
                     throw new PlanningErrorException("GROUP BY column " + col.alias +
                                                      " is not in the display columns." +
                                                      " Please specify " + col.alias +

@@ -348,6 +348,7 @@ public class QueryPlanner {
         for (ParsedColInfo display_col : stmt.displayColumns)
         {
             SchemaColumn col = output_schema.find(display_col.tableName,
+                                                  display_col.tableAlias,
                                                   display_col.columnName,
                                                   display_col.alias);
             if (col == null)

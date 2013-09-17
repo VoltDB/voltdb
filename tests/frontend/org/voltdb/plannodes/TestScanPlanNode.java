@@ -75,7 +75,7 @@ public class TestScanPlanNode extends TestCase
         assertEquals(COLS.length, dut_schema.size());
         for (int i = 0; i < COLS.length; ++i)
         {
-            SchemaColumn col = dut_schema.find(TABLE1, COLS[i], COLS[i]);
+            SchemaColumn col = dut_schema.find(TABLE1, TABLE1, COLS[i], COLS[i]);
             assertNotNull(col);
             assertEquals(col.getExpression().getExpressionType(),
                          ExpressionType.VALUE_TUPLE);
@@ -97,11 +97,12 @@ public class TestScanPlanNode extends TestCase
         {
             TupleValueExpression tve = new TupleValueExpression();
             tve.setTableName(TABLE1);
+            tve.setTableAlias(TABLE1);
             tve.setColumnName(COLS[index]);
             tve.setColumnAlias(COLS[index]);
             tve.setValueType(COLTYPES[index]);
             tve.setValueSize(COLTYPES[index].getLengthInBytesForFixedTypes());
-            SchemaColumn col = new SchemaColumn(TABLE1, COLS[index],
+            SchemaColumn col = new SchemaColumn(TABLE1, TABLE1, COLS[index],
                                                 COLS[index], tve);
             scanColumns.add(col);
         }
@@ -116,7 +117,7 @@ public class TestScanPlanNode extends TestCase
             assertEquals(scan_col_indexes.length, dut_schema.size());
             for (int index : scan_col_indexes)
             {
-                SchemaColumn col = dut_schema.find(TABLE1, COLS[index], "");
+                SchemaColumn col = dut_schema.find(TABLE1, TABLE1, COLS[index], "");
                 assertNotNull(col);
                 assertEquals(col.getExpression().getExpressionType(),
                              ExpressionType.VALUE_TUPLE);
@@ -145,7 +146,7 @@ public class TestScanPlanNode extends TestCase
         String[] cols = new String[4];
 
         TupleAddressExpression col1_exp = new TupleAddressExpression();
-        proj_schema.addColumn(new SchemaColumn("", "tuple_address",
+        proj_schema.addColumn(new SchemaColumn("", "", "tuple_address",
                                                "tuple_address",
                                                col1_exp));
         cols[0] = "tuple_address";
@@ -157,7 +158,7 @@ public class TestScanPlanNode extends TestCase
         col2_exp.setValueSize(COLTYPES[1].getLengthInBytesForFixedTypes());
         // XXX I'm not sure what to do with the name for the updated column yet.
         // I think it should be an alias and not the original table name/col name
-        proj_schema.addColumn(new SchemaColumn(TABLE1, COLS[1], COLS[1],
+        proj_schema.addColumn(new SchemaColumn(TABLE1, TABLE1, COLS[1], COLS[1],
                                                col2_exp));
         cols[1] = COLS[1];
 
@@ -166,7 +167,7 @@ public class TestScanPlanNode extends TestCase
         col3_exp.setValueType(COLTYPES[3]);
         col3_exp.setValueSize(COLTYPES[3].getLengthInBytesForFixedTypes());
         col3_exp.setValue("3.14159");
-        proj_schema.addColumn(new SchemaColumn(TABLE1, COLS[3], COLS[3],
+        proj_schema.addColumn(new SchemaColumn(TABLE1, TABLE1, COLS[3], COLS[3],
                                                col3_exp));
         cols[2] = COLS[3];
 
@@ -177,19 +178,21 @@ public class TestScanPlanNode extends TestCase
         col4_exp.setExpressionType(ExpressionType.OPERATOR_PLUS);
         TupleValueExpression left = new TupleValueExpression();
         left.setTableName(TABLE1);
+        left.setTableAlias(TABLE1);
         left.setColumnName(COLS[0]);
         left.setColumnAlias(COLS[0]);
         left.setValueType(COLTYPES[0]);
         left.setValueSize(COLTYPES[0].getLengthInBytesForFixedTypes());
         TupleValueExpression right = new TupleValueExpression();
         right.setTableName(TABLE1);
+        right.setTableAlias(TABLE1);
         right.setColumnName(COLS[2]);
         right.setColumnAlias(COLS[2]);
         right.setValueType(COLTYPES[2]);
         right.setValueSize(COLTYPES[2].getLengthInBytesForFixedTypes());
         col4_exp.setLeft(left);
         col4_exp.setRight(right);
-        proj_schema.addColumn(new SchemaColumn(TABLE1, COLS[4], "C1",
+        proj_schema.addColumn(new SchemaColumn(TABLE1, TABLE1, COLS[4], "C1",
                                                col4_exp));
         cols[3] = COLS[4];
 
@@ -207,11 +210,11 @@ public class TestScanPlanNode extends TestCase
             SchemaColumn col = null;
             if (i == 0)
             {
-                col = dut_schema.find("", cols[i], cols[i]);
+                col = dut_schema.find("", "", cols[i], cols[i]);
             }
             else
             {
-                col = dut_schema.find(TABLE1, cols[i], cols[i]);
+                col = dut_schema.find(TABLE1, TABLE1, cols[i], cols[i]);
             }
             assertNotNull(col);
             assertEquals(col.getExpression().getExpressionType(),

@@ -124,6 +124,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
             {
                 NodeSchema input_schema = m_children.get(0).getOutputSchema();
                 SchemaColumn agg_col = input_schema.find(col.getTableName(),
+                                                         col.getTableAlias(),
                                                          col.getColumnName(),
                                                          col.getColumnAlias());
                 if (agg_col == null)

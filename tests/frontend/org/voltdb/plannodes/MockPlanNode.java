@@ -52,10 +52,12 @@ public class MockPlanNode extends AbstractPlanNode
         {
             TupleValueExpression tve = new TupleValueExpression();
             tve.setTableName(m_tableName);
+            tve.setTableAlias(m_tableName);
             tve.setColumnName(m_columnNames[i]);
             tve.setColumnAlias(m_columnNames[i]);
             tve.setColumnIndex(i);
             m_outputSchema.addColumn(new SchemaColumn(m_tableName,
+                                                      m_tableName,
                                                       m_columnNames[i],
                                                       m_columnNames[i],
                                                       tve));

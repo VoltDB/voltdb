@@ -113,10 +113,12 @@ public abstract class SubPlanAssembler {
      * @param postExprs post expressions this table is part of
      * @return List of valid access paths
      */
-    protected ArrayList<AccessPath> getRelevantAccessPathsForTable(Table table,
+    protected ArrayList<AccessPath> getRelevantAccessPathsForTable(int tableAliasIdx,
                                                                    List<AbstractExpression> joinExprs,
                                                                    List<AbstractExpression> filterExprs,
                                                                    List<AbstractExpression> postExprs) {
+        assert(tableAliasIdx != StmtCatalogCache.NULL_ALIAS_INDEX);
+        Table table = m_parsedStmt.stmtCache.get(tableAliasIdx).m_table;
         ArrayList<AccessPath> paths = new ArrayList<AccessPath>();
         List<AbstractExpression> allJoinExprs = new ArrayList<AbstractExpression>();
         List<AbstractExpression> allExprs = new ArrayList<AbstractExpression>();
@@ -1126,19 +1128,19 @@ public abstract class SubPlanAssembler {
      * @param path The access path to access the data in the table (index/scan/etc).
      * @return The root of a plan graph to get the data.
      */
-    protected AbstractPlanNode getAccessPlanForTable(Table table, AccessPath path) {
-        assert(table != null);
+    protected AbstractPlanNode getAccessPlanForTable(int tableAliasIdx, AccessPath path) {
+        assert(tableAliasIdx != StmtCatalogCache.NULL_ALIAS_INDEX);
         assert(path != null);
 
         AbstractPlanNode scanNode = null;
         // if no path is a sequential scan, call a subroutine for that
         if (path.index == null)
         {
-            scanNode = getScanAccessPlanForTable(table, path.otherExprs);
+            scanNode = getScanAccessPlanForTable(tableAliasIdx, path.otherExprs);
         }
         else
         {
-            scanNode = getIndexAccessPlanForTable(table, path);
+            scanNode = getIndexAccessPlanForTable(tableAliasIdx, path);
         }
         return scanNode;
     }
@@ -1152,15 +1154,19 @@ public abstract class SubPlanAssembler {
      * @return A scan plan node
      */
     protected AbstractScanPlanNode
-    getScanAccessPlanForTable(Table table, ArrayList<AbstractExpression> exprs)
+    getScanAccessPlanForTable(int tableAliasIdx, ArrayList<AbstractExpression> exprs)
     {
+        assert(tableAliasIdx != StmtCatalogCache.NULL_ALIAS_INDEX);
+        assert(tableAliasIdx < m_parsedStmt.stmtCache.size());
         // build the scan node
         SeqScanPlanNode scanNode = new SeqScanPlanNode();
-        scanNode.setTargetTableName(table.getTypeName());
+        StmtCatalogCache tableCache = m_parsedStmt.stmtCache.get(tableAliasIdx);
+        scanNode.setTargetTableName(tableCache.m_table.getTypeName());
+        scanNode.setTargetTableAlias(tableCache.m_tableAlias);
         //TODO: push scan column identification into "setTargetTableName"
         // (on the way to enabling it for DML plans).
-        if (m_parsedStmt.scanColumns != null) {
-            scanNode.setScanColumns(m_parsedStmt.scanColumns.get(table.getTypeName()));
+        if (!m_parsedStmt.scanColumns.isEmpty()) {
+            scanNode.setScanColumns(m_parsedStmt.scanColumns.get(tableAliasIdx));
         }
 
         // build the predicate
@@ -1178,17 +1184,20 @@ public abstract class SubPlanAssembler {
      * Get a index scan access plan for a table. For multi-site plans/tables,
      * scans at all partitions and sends to one partition.
      *
-     * @param table The table to get data from.
+     * @param tableAliasIndex The table to get data from.
      * @param path The access path to access the data in the table (index/scan/etc).
      * @return An index scan plan node OR,
                in one edge case, an NLIJ of a MaterializedScan and an index scan plan node.
      */
-    protected AbstractPlanNode getIndexAccessPlanForTable(Table table, AccessPath path)
+    protected AbstractPlanNode getIndexAccessPlanForTable(int tableAliasIdx, AccessPath path)
     {
         // now assume this will be an index scan and get the relevant index
         Index index = path.index;
         IndexScanPlanNode scanNode = new IndexScanPlanNode();
         AbstractPlanNode resultNode = scanNode;
+        assert(tableAliasIdx != StmtCatalogCache.NULL_ALIAS_INDEX);
+        assert(tableAliasIdx < m_parsedStmt.stmtCache.size());
+        StmtCatalogCache tableCache = m_parsedStmt.stmtCache.get(tableAliasIdx);
 
         // set sortDirection here becase it might be used for IN list
         scanNode.setSortDirection(path.sortDirection);
@@ -1219,13 +1228,14 @@ public abstract class SubPlanAssembler {
         scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
         scanNode.setPredicate(ExpressionUtil.combine(path.otherExprs));
         scanNode.setInitialExpression(ExpressionUtil.combine(path.initialExpr));
-        scanNode.setTargetTableName(table.getTypeName());
+        scanNode.setTargetTableName(tableCache.m_table.getTypeName());
+        scanNode.setTargetTableAlias(tableCache.m_tableAlias);
         //TODO: push scan column identification into "setTargetTableName"
         // (on the way to enabling it for DML plans).
-        if (m_parsedStmt.scanColumns != null) {
-            scanNode.setScanColumns(m_parsedStmt.scanColumns.get(table.getTypeName()));
+        if (!m_parsedStmt.scanColumns.isEmpty()) {
+            scanNode.setScanColumns(m_parsedStmt.scanColumns.get(tableAliasIdx));
         }
-        scanNode.setTargetTableAlias(table.getTypeName());
+        scanNode.setTargetTableAlias(tableCache.m_tableAlias);
         scanNode.setTargetIndexName(index.getTypeName());
         return resultNode;
     }

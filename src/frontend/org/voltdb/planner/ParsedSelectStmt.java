@@ -46,6 +46,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         public String alias = null;
         public String columnName = null;
         public String tableName = null;
+        public String tableAlias = null;
         public AbstractExpression expression = null;
         public boolean finalOutput = true;
         public int index = 0;
@@ -62,8 +63,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (obj == null) return false;
             if (obj instanceof ParsedColInfo == false) return false;
             ParsedColInfo col = (ParsedColInfo) obj;
-            if ( columnName != null && columnName.equals(col.columnName)
-                    && tableName != null && tableName.equals(col.tableName) &&
+            if ( columnName != null && columnName.equals(col.columnName) &&
+                    tableName != null && tableName.equals(col.tableName) &&
+                    tableAlias != null && tableAlias.equals(col.tableAlias) &&
                     expression != null && expression.equals(col.expression) )
                 return true;
             return false;
@@ -77,6 +79,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if ( alias != null && alias.equals(col.alias )
                     && columnName != null && columnName.equals(col.columnName)
                     && tableName != null && tableName.equals(col.tableName)
+                    && tableAlias != null && tableAlias.equals(col.tableAlias)
                     && expression.equals(col.expression) && index == col.index && size == col.size
                     && orderBy == col.orderBy && ascending == col.ascending && groupBy == col.groupBy
                     && finalOutput == col.finalOutput) {
@@ -92,7 +95,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 result += expression.hashCode();
             // calculate hash for other member variable
             result = new HashCodeBuilder(17, 31).
-                    append(alias).append(columnName).append(tableName).
+                    append(alias).append(columnName).append(tableName).append(tableAlias).
                     //append(index).append(size).
                     //append(finalOutput).append(orderBy).append(ascending).append(groupBy).
                     toHashCode();
@@ -333,7 +336,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             newAggSchema = new NodeSchema();
             for (ParsedColInfo col : displayColumns) {
                 AbstractExpression expr = col.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
-                SchemaColumn schema_col = new SchemaColumn(col.tableName, col.columnName, col.alias, expr);
+                SchemaColumn schema_col = new SchemaColumn(col.tableName, col.tableAlias, col.columnName, col.alias, expr);
                 newAggSchema.addColumn(schema_col);
             }
         }
@@ -418,6 +421,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (aggColumns.size() == 1 && cookedCol.expression.equals(aggColumns.get(0))) {
                 col.alias = cookedCol.alias;
                 col.tableName = cookedCol.tableName;
+                col.tableAlias = cookedCol.tableAlias;
                 col.columnName = cookedCol.columnName;
                 if (isNewtoAggResultColumn(col)) {
                     aggResultColumns.add(col);
@@ -428,6 +432,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             hasComplexAgg = true;
             // Aggregation column use the the hacky stuff
             col.tableName = "VOLT_TEMP_TABLE";
+            col.tableAlias = "VOLT_TEMP_TABLE";
             col.columnName = "";
             if (isNewtoAggResultColumn(col)) {
                 aggResultColumns.add(col);
@@ -443,6 +448,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             col.alias = tve.getColumnAlias();
             col.columnName = tve.getColumnName();
             col.tableName = tve.getTableName();
+            col.tableAlias = tve.getTableAlias();
             col.expression = tve;
             if (isNewtoAggResultColumn(col)) {
                 aggResultColumns.add(col);
@@ -498,44 +504,66 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     private void parseDisplayColumns(VoltXMLElement columnsNode, boolean isDistributed) {
         for (VoltXMLElement child : columnsNode.children) {
-            ParsedColInfo col = new ParsedColInfo();
-            aggregationList.clear();
-            col.expression = parseExpressionTree(child);
-            if (col.expression instanceof ConstantValueExpression) {
-                assert(col.expression.getValueType() != VoltType.NUMERIC);
-            }
-            assert(col.expression != null);
-            if (isDistributed) {
-                col.expression = col.expression.replaceAVG();
-                updateAvgExpresions();
-            }
-            ExpressionUtil.finalizeValueTypes(col.expression);
-
-            col.alias = child.attributes.get("alias");
-            if (child.name.equals("columnref")) {
-                col.columnName =
-                    child.attributes.get("column");
-                col.tableName =
-                    child.attributes.get("table");
-            }
-            else
-            {
-                // XXX hacky, assume all non-column refs come from a temp table
-                col.tableName = "VOLT_TEMP_TABLE";
-                col.columnName = "";
-            }
-            // This index calculation is only used for sanity checking
-            // materialized views (which use the parsed select statement but
-            // don't go through the planner pass that does more involved
-            // column index resolution).
-            col.index = displayColumns.size();
-
-            insertAggExpressionsToAggResultColumns(aggregationList, col);
-            if (aggregationList.size() >= 1) {
-                hasAggregateExpression = true;
-            }
+            ParsedColInfo col = parseDisplayColumnReferences(child, isDistributed);
+            // display schema must have only the top level columnref
             displayColumns.add(col);
         }
+    }
+
+
+    private ParsedColInfo parseDisplayColumnReferences(VoltXMLElement columnRef, boolean isDistributed) {
+        for (VoltXMLElement child : columnRef.children) {
+            // In case of "select * from T1, T2" if multiple tables have columns with the same name
+            // the top level columnref element will have nested columnref elements for each table
+            // having the same column name.
+            if (child.name.equals("columnref")) {
+                parseDisplayColumnReferences(child, isDistributed);
+            }
+        }
+        ParsedColInfo col = new ParsedColInfo();
+        aggregationList.clear();
+        col.expression = parseExpressionTree(columnRef);
+        if (col.expression instanceof ConstantValueExpression) {
+            assert(col.expression.getValueType() != VoltType.NUMERIC);
+        }
+        assert(col.expression != null);
+        if (isDistributed) {
+            col.expression = col.expression.replaceAVG();
+            updateAvgExpresions();
+        }
+        ExpressionUtil.finalizeValueTypes(col.expression);
+
+        col.alias = columnRef.attributes.get("alias");
+        if (columnRef.name.equals("columnref")) {
+            col.columnName =
+                    columnRef.attributes.get("column");
+            col.tableName =
+                    columnRef.attributes.get("table");
+            col.tableAlias =
+                    columnRef.attributes.get("tablealias");
+            if (col.tableAlias == null) {
+                col.tableAlias = col.tableName;
+            }
+        }
+        else
+        {
+            // XXX hacky, assume all non-column refs come from a temp table
+            col.tableName = "VOLT_TEMP_TABLE";
+            col.tableAlias = "VOLT_TEMP_TABLE";
+            col.columnName = "";
+        }
+        // This index calculation is only used for sanity checking
+        // materialized views (which use the parsed select statement but
+        // don't go through the planner pass that does more involved
+        // column index resolution).
+        col.index = displayColumns.size();
+
+        insertAggExpressionsToAggResultColumns(aggregationList, col);
+        if (aggregationList.size() >= 1) {
+            hasAggregateExpression = true;
+        }
+
+        return col;
     }
 
     private void parseGroupByColumns(VoltXMLElement columnsNode) {
@@ -556,6 +584,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             groupbyCol.alias = groupByNode.attributes.get("alias");
             groupbyCol.columnName = groupByNode.attributes.get("column");
             groupbyCol.tableName = groupByNode.attributes.get("table");
+            groupbyCol.tableAlias = groupByNode.attributes.get("tablealias");
+            if (groupbyCol.tableAlias == null) {
+                groupbyCol.tableAlias = groupbyCol.tableName;
+            }
 
             // This col.index set up is only useful for Materialized view.
             org.voltdb.catalog.Column catalogColumn =
@@ -567,6 +599,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // TODO(XIN): throw a error for Materialized view when possible.
             // XXX hacky, assume all non-column refs come from a temp table
             groupbyCol.tableName = "VOLT_TEMP_TABLE";
+            groupbyCol.tableAlias = "VOLT_TEMP_TABLE";
             groupbyCol.columnName = "";
             hasComplexGroupby = true;
 
@@ -626,11 +659,17 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             TupleValueExpression tve = (TupleValueExpression) order_exp;
             order_col.columnName = tve.getColumnName();
             order_col.tableName = tve.getTableName();
+            order_col.tableAlias = tve.getTableAlias();
+            if (order_col.tableAlias == null) {
+                order_col.tableAlias = order_col.tableName;
+            }
+
             order_col.alias = tve.getColumnAlias();
         } else {
             String alias = child.attributes.get("alias");
             order_col.alias = alias;
             order_col.tableName = "VOLT_TEMP_TABLE";
+            order_col.tableAlias = "VOLT_TEMP_TABLE";
             order_col.columnName = "";
             // Replace its expression to TVE after we build the ExpressionIndexMap
 
