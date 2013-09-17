@@ -50,6 +50,11 @@ import org.voltdb_testprocs.regressionsuites.matviewprocs.UpdatePerson;
 
 public class TestMaterializedViewSuite extends RegressionSuite {
 
+    // Constants to control whether to abort a procedure invocation with explicit sabotage
+    // or to allow it to run normally.
+    private static final int SABOTAGE = 2;
+    private static final int NORMALLY = 0;
+
     // procedures used by these tests
     static final Class<?>[] PROCEDURES = {
         AddPerson.class, DeletePerson.class, UpdatePerson.class, AggAges.class,
@@ -103,15 +108,14 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         results = client.callProcedure("AggAges", 1).getResults();
         assertEquals(1, results.length);
         assertEquals(0, results[0].getRowCount());
-        assert(results != null);
 
-        results = client.callProcedure("AddPerson", 1, 1L, 31L, 27500.20, 7).getResults();
+        results = client.callProcedure("AddPerson", 1, 1L, 31L, 27500.20, 7, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
-        results = client.callProcedure("AddPerson", 1, 2L, 31L, 28920.99, 3).getResults();
+        results = client.callProcedure("AddPerson", 1, 2L, 31L, 28920.99, 3, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
-        results = client.callProcedure("AddPerson", 1, 3L, 32L, 63250.01, -1).getResults();
+        results = client.callProcedure("AddPerson", 1, 3L, 32L, 63250.01, -1, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
 
@@ -119,7 +123,22 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         assertEquals(2, results[0].getRowCount());
         assert(results != null);
-    }
+
+        // HSQL backend does not support multi-statement transactionality.
+        if ( ! isHSQL()) {
+            // Make a doomed attempt to insert that should have no effect.
+            try {
+                results = client.callProcedure("AddPerson", 1, 4L, 44L, 44444.44, 4, SABOTAGE).getResults();
+                fail("intentional ProcCallException failed");
+            } catch (ProcCallException pce) {
+                // Expected the throw.
+            }
+        }
+        results = client.callProcedure("AggAges", 1).getResults();
+        assertEquals(1, results.length);
+        assertEquals(2, results[0].getRowCount());
+
+}
 
     private void subtestDeleteSinglePartition() throws IOException, ProcCallException
     {
@@ -130,16 +149,39 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         results = client.callProcedure("AggAges", 1).getResults();
         assertEquals(1, results.length);
         assertEquals(0, results[0].getRowCount());
-        assert(results != null);
 
-        results = client.callProcedure("AddPerson", 1, 1L, 31L, 27500.20, 7).getResults();
+        results = client.callProcedure("AddPerson", 1, 1L, 31L, 27500.20, 7, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
-        results = client.callProcedure("AddPerson", 1, 2L, 31L, 28920.99, 3).getResults();
+        results = client.callProcedure("AddPerson", 1, 2L, 31L, 28920.99, 3, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
 
-        results = client.callProcedure("DeletePerson", 1, 1L).getResults();
+        results = client.callProcedure("AggAges", 1).getResults();
+        assertEquals(1, results.length);
+        results[0].advanceRow();
+        assertEquals(31L, results[0].getLong(0));
+        assertEquals(2L, results[0].getLong(2));
+        assertEquals(27500.20 + 28920.99, results[0].getDouble("SALARIES"), 0.001);
+
+        // HSQL backend does not support multi-statement transactionality.
+        if ( ! isHSQL()) {
+            // Make a doomed attempt to delete that should have no effect.
+            try {
+                results = client.callProcedure("DeletePerson", 1, 1L, SABOTAGE).getResults();
+                fail("intentional ProcCallException failed");
+            } catch (ProcCallException pce) {
+                // Expected the throw.
+            }
+        }
+        results = client.callProcedure("AggAges", 1).getResults();
+        assertEquals(1, results.length);
+        results[0].advanceRow();
+        assertEquals(31L, results[0].getLong(0));
+        assertEquals(2L, results[0].getLong(2));
+        assertEquals(27500.20 + 28920.99, results[0].getDouble("SALARIES"), 0.001);
+
+        results = client.callProcedure("DeletePerson", 1, 1L, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
 
@@ -149,12 +191,12 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         while (results[0].advanceRow()) {
             assertEquals(31L, results[0].getLong(0));
             assertEquals(1L, results[0].getLong(2));
-            assertTrue(Math.abs(results[0].getDouble(3) - 28920.99) < .01);
+            assertEquals(28920.99, results[0].getDouble(3), 0.01);
             assertEquals(3L, results[0].getLong(4));
         }
         assert(results != null);
 
-        results = client.callProcedure("DeletePerson", 1, 2L).getResults();
+        results = client.callProcedure("DeletePerson", 1, 2L, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
 
@@ -175,13 +217,13 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(0, results[0].getRowCount());
         assert(results != null);
 
-        results = client.callProcedure("AddPerson", 1, 1L, 31L, 27500.20, 7).getResults();
+        results = client.callProcedure("AddPerson", 1, 1L, 31L, 27500.20, 7, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
-        results = client.callProcedure("AddPerson", 1, 2L, 31L, 28920.99, 3).getResults();
+        results = client.callProcedure("AddPerson", 1, 2L, 31L, 28920.99, 3, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
-        results = client.callProcedure("AddPerson", 1, 3L, 33L, 28920.99, 3).getResults();
+        results = client.callProcedure("AddPerson", 1, 3L, 33L, 28920.99, 3, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
         results = client.callProcedure("UpdatePerson", 1, 2L, 31L, 15000.00, 3).getResults();
@@ -221,10 +263,10 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assert(results != null);
 
         // expecting the 2yr old won't make it
-        results = client.callProcedure("AddPerson", 1, 1L, 31L, 1000.0, 7).getResults();
+        results = client.callProcedure("AddPerson", 1, 1L, 31L, 1000.0, 7, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
-        results = client.callProcedure("AddPerson", 1, 2L, 2L, 2000.0, 3).getResults();
+        results = client.callProcedure("AddPerson", 1, 2L, 2L, 2000.0, 3, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
 
@@ -251,7 +293,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results[0].getRowCount());
         assert(results != null);
 
-        results = client.callProcedure("DeletePerson", 1, 1L).getResults();
+        results = client.callProcedure("DeletePerson", 1, 1L, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
 
@@ -282,28 +324,28 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(0, results[0].getRowCount());
         assert(results != null);
 
-        results = client.callProcedure("AddPerson", 1, 1L, 31L, 1000.0, 3).getResults();
+        results = client.callProcedure("AddPerson", 1, 1L, 31L, 1000.0, 3, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
-        results = client.callProcedure("AddPerson", 1, 2L, 2L, 1000.0, 3).getResults();
+        results = client.callProcedure("AddPerson", 1, 2L, 2L, 1000.0, 3, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
-        results = client.callProcedure("AddPerson", 2, 3L, 23L, 1000.0, 3).getResults();
+        results = client.callProcedure("AddPerson", 2, 3L, 23L, 1000.0, 3, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
-        results = client.callProcedure("AddPerson", 2, 4L, 23L, 1000.0, 3).getResults();
+        results = client.callProcedure("AddPerson", 2, 4L, 23L, 1000.0, 3, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
-        results = client.callProcedure("AddPerson", 2, 5L, 35L, 1000.0, 3).getResults();
+        results = client.callProcedure("AddPerson", 2, 5L, 35L, 1000.0, 3, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
-        results = client.callProcedure("AddPerson", 2, 6L, 35L, 1000.0, 3).getResults();
+        results = client.callProcedure("AddPerson", 2, 6L, 35L, 1000.0, 3, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
         results = client.callProcedure("UpdatePerson", 1, 2L, 32L, 1000.0, 3).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
-        results = client.callProcedure("DeletePerson", 2, 6L).getResults();
+        results = client.callProcedure("DeletePerson", 2, 6L, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
 
@@ -418,34 +460,34 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(0, results[0].getRowCount());
         assert(results != null);
 
-        results = client.callProcedure("AddPerson", 1, 1L, 31L, 1000.0, 3).getResults();
+        results = client.callProcedure("AddPerson", 1, 1L, 31L, 1000.0, 3, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
-        results = client.callProcedure("AddPerson", 1, 2L, 31L, 1000.0, 3).getResults();
+        results = client.callProcedure("AddPerson", 1, 2L, 31L, 1000.0, 3, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
-        results = client.callProcedure("AddPerson", 1, 3L, 33L, 28920.99, 3).getResults();
+        results = client.callProcedure("AddPerson", 1, 3L, 33L, 28920.99, 3, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
-        results = client.callProcedure("AddPerson", 2, 4L, 23L, 1000.0, 3).getResults();
+        results = client.callProcedure("AddPerson", 2, 4L, 23L, 1000.0, 3, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
-        results = client.callProcedure("AddPerson", 2, 5L, 35L, 1000.0, 3).getResults();
+        results = client.callProcedure("AddPerson", 2, 5L, 35L, 1000.0, 3, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
-        results = client.callProcedure("AddPerson", 2, 6L, 35L, 1000.0, 3).getResults();
+        results = client.callProcedure("AddPerson", 2, 6L, 35L, 1000.0, 3, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
-        results = client.callProcedure("AddPerson", 2, 7L, 23L, 1000.0, 3).getResults();
+        results = client.callProcedure("AddPerson", 2, 7L, 23L, 1000.0, 3, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
-        results = client.callProcedure("AddPerson", 2, 8L, 31L, 2222.22, 3).getResults();
+        results = client.callProcedure("AddPerson", 2, 8L, 31L, 2222.22, 3, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
         results = client.callProcedure("UpdatePerson", 1, 2L, 32L, 1000.0, 3).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
-        results = client.callProcedure("DeletePerson", 2, 6L).getResults();
+        results = client.callProcedure("DeletePerson", 2, 6L, NORMALLY).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
 
