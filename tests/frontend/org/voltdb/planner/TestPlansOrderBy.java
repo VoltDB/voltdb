@@ -142,7 +142,7 @@ public class TestPlansOrderBy extends PlannerTestCase {
     public void testOrderByTooMany()
     {
         validateBruteForcePlan("SELECT * from Tnokey ORDER BY T_D0, T_D1, T_D2");
-        validateIndexedBruteForcePlan("SELECT * from T ORDER BY T_D0, T_D1, T_D2");
+        validateBruteForcePlan("SELECT * from T ORDER BY T_D0, T_D1, T_D2");
     }
 
     public void testNoIndexToOrderBy() {
