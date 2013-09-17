@@ -73,7 +73,7 @@ public class TableStreamer {
     {
         if (!context.activateTableStream(m_tableId, m_type, undoToken, predicates)) {
             String tableName = CatalogUtil.getTableNameFromId(context.getDatabase(), m_tableId);
-            VoltDB.crashLocalVoltDB("Attempted to activate copy on write mode of stream type " + m_type +
+            VoltDB.crashLocalVoltDB("Attempted to activate a table stream of type " + m_type +
                                     "for table " + tableName + " and failed", false, null);
         }
     }
