@@ -1668,6 +1668,24 @@ public abstract class CatalogUtil {
         return tables;
     }
 
+    /**
+     * Iterate through all the tables in the catalog, find a table with an id that matches the
+     * given table id, and return its name.
+     *
+     * @param catalog  Catalog database
+     * @param tableId  table id
+     * @return table name associated with the given table id (null if no association is found)
+     */
+    public static String getTableNameFromId(Database catalog, int tableId) {
+        String tableName = null;
+        for (Table table: catalog.getTables()) {
+            if (table.getRelativeIndex() == tableId) {
+                tableName = table.getTypeName();
+            }
+        }
+        return tableName;
+    }
+
     // Calculate the width of an index:
     // -- if the index is a pure-column index, return number of columns in the index
     // -- if the index is an expression index, return number of expressions used to create the index
