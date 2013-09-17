@@ -118,11 +118,10 @@ PersistentTable::~PersistentTable()
 
     // note this class has ownership of the views, even if they
     // were allocated by VoltDBEngine
-    assert (m_views.size() == m_viewIndexes.size());
     for (int i = 0; i < m_views.size(); i++) {
         delete m_views[i];
-        delete m_viewIndexes[i];
     }
+
 }
 
 // ------------------------------------------------------------------
