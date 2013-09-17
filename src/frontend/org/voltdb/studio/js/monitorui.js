@@ -173,7 +173,7 @@ this.RefreshMonitorData = function(id)
 		}
 		connection.getQueue().Start()
                 			.BeginExecute('@Statistics', ['MEMORY', 0], MonitorUI.Monitors[id].memStatsCallback)
-    			            .BeginExecute('@Statistics', ['PROCEDURE', 0], MonitorUI.Monitors[id].procStatsCallback)
+    			            .BeginExecute('@Statistics', ['PROCEDUREPROFILE', 0], MonitorUI.Monitors[id].procStatsCallback)
     			            .BeginExecute('@Statistics', ['STARVATION', 1], MonitorUI.Monitors[id].starvStatsCallback)
     	                	.End(MonitorUI.RefreshMonitor, id);
     }
@@ -203,7 +203,6 @@ this.RefreshMonitor = function(id, Success)
 	if ((monitor.starvStatsResponse == null) || (monitor.strData == null))
         return;
 
-
 	var currentTimerTick = (new Date()).getTime();
 	var latData = monitor.latData;
 	var tpsData = monitor.tpsData;
@@ -215,6 +214,7 @@ this.RefreshMonitor = function(id, Success)
 	var dataTPS = tpsData[0];
 	var dataIdx  = dataMem[dataMem.length-1][0]+1;
 	var Mem = 0;
+	// Compute the memory statistics
 	var table = monitor.memStatsResponse.results[0].data;
 	for(var j = 0; j < table.length; j++)
 		Mem += table[j][3]*1.0/1048576.0;
@@ -223,40 +223,26 @@ this.RefreshMonitor = function(id, Success)
 	var Lat = 0;
 	var TPS = 0;
 	var procStats = {};
+    // Compute procedure statistics 
 	table = monitor.procStatsResponse.results[0].data;
-	var cleanTable = {};
 	for(var j = 0; j < table.length; j++)
 	{
-		if ((table[j][4] + "." + table[j][5]) in cleanTable)
-		{
-			var dat = cleanTable[table[j][4] + "." + table[j][5]];
-			if (table[j][6] > dat[6]) dat[6] = table[j][6];
-			if (table[j][7] > dat[7]) dat[7] = table[j][7];
-			if (table[j][8] < dat[8]) dat[8] = table[j][8];
-			if (table[j][9] > dat[9]) dat[9] = table[j][9];
-			if (table[j][10] > dat[10]) dat[10] = table[j][10];
-			cleanTable[table[j][4] + "." + table[j][5]] = dat;
-		}
-		else
-			cleanTable[table[j][4] + "." + table[j][5]] = table[j];
-	}
-	for(var key in cleanTable)
-	{
-		var srcData = cleanTable[key];
+		var srcData = table[j];
 		var data = null;
-		if (srcData[5] in procStats)
+		if (srcData[1] in procStats)
 		{
-			data = procStats[srcData[5]];
-			data[1] += srcData[6];
-			if (data[2] > srcData[8]) data[2] = srcData[8];
-			data[3] += srcData[10]*srcData[7];
-			if (data[4] < srcData[9]) data[4] = srcData[9];
-			data[5] += srcData[7];
+			data = procStats[srcData[1]];
+			data[1] = srcData[3]; // invocations
+			data[2] = srcData[2]; // %
+			data[3] = srcData[5]; // min latency
+            data[4] = srcData[4]; // ave latency
+            data[5] = srcData[6]; // max latency
 		}
 		else
-			data = [srcData[5], srcData[6], srcData[8], srcData[10]*srcData[7], srcData[9], srcData[7]];
-		procStats[srcData[5]] = data;
+			data = [srcData[1], srcData[3], srcData[2], srcData[5], srcData[4], srcData[6]];
+		procStats[srcData[1]] = data;
 	}
+    // Compute memory usage 
 	table = monitor.starvStatsResponse.results[0].data;
 	var starvStats = {}
 	for(var j=0;j<table.length;j++)
@@ -270,24 +256,24 @@ this.RefreshMonitor = function(id, Success)
 		}
 		else
 			data = [table[j][5],1.0];
-			starvStats
 		starvStats[table[j][3]] = data;
 	}
-	var currentTransactionCount = 0.0;
+	// Compute latency 
 	var currentTimedTransactionCount = 0.0;
-	var currentLatencyAverage = 0.0;
+    var currentLatencySum = 0.0;
+    var currentLatencyAverage = 0.0;
 	for(var proc in procStats)
 	{
-		currentTransactionCount += procStats[proc][1];
-		currentTimedTransactionCount += procStats[proc][5];
-		currentLatencyAverage += procStats[proc][3];
-		procStats[proc][3] = procStats[proc][3]/procStats[proc][5];
+		currentTimedTransactionCount += procStats[proc][1];
+		currentLatencySum += procStats[proc][1]*procStats[proc][4];
+		currentLatencyAverage += procStats[proc][4];
 	}
-	currentLatencyAverage = currentLatencyAverage / currentTimedTransactionCount;
+	// Compute initial latency averge. We'll compute the delta average next.
+	currentLatencyAverage = currentLatencySum / currentTimedTransactionCount;
 	
 	if (monitor.lastTransactionCount > 0 && monitor.lastTimerTick > 0)
 	{
-		var delta = currentTransactionCount - monitor.lastTransactionCount;
+		var delta = currentTimedTransactionCount - monitor.lastTransactionCount;
 		dataTPS = dataTPS.slice(1);
 		dataTPS.push([dataIdx, delta*1000.0 / (currentTimerTick - monitor.lastTimerTick)]);
 		dataLat = dataLat.slice(1);
@@ -299,9 +285,14 @@ this.RefreshMonitor = function(id, Success)
 				dataLat.push([dataIdx,currentLatencyAverage/1000000.0]);
 		}
 		else
-			dataLat.push([dataIdx,((currentLatencyAverage * currentTimedTransactionCount - monitor.lastLatencyAverage * monitor.lastTimedTransactionCount) / (currentTimedTransactionCount - monitor.lastTimedTransactionCount)) /1000000.0]);
+		{
+		    // Compute delta latency
+		    var latency_val = currentLatencySum - (monitor.lastLatencyAverage * monitor.lastTimedTransactionCount);
+		    var delta_latency = latency_val / delta;
+			dataLat.push([dataIdx,delta_latency/1000000.0]);
+        }
 	}
-	
+	// Update procedure statistics table
 	if ($('#stats-' + id + ' tbody tr').size() == Object.size(procStats))
 	{
 		var rows = $('#stats-' + id + ' tbody tr');
@@ -312,10 +303,11 @@ this.RefreshMonitor = function(id, Success)
 				var cells = $(rows[k]).find('td');
 				if ($(cells[0]).text() == procStats[j][0])
 				{
-					$(cells[1]).text(procStats[j][1]);
-					$(cells[2]).text((Math.round(procStats[j][2]/10.0/1000.0)/100.0));
+                    $(cells[1]).text(procStats[j][1]);
+                    $(cells[2]).text(procStats[j][2]);
 					$(cells[3]).text((Math.round(procStats[j][3]/10.0/1000.0)/100.0));
 					$(cells[4]).text((Math.round(procStats[j][4]/10.0/1000.0)/100.0));
+					$(cells[5]).text((Math.round(procStats[j][5]/10.0/1000.0)/100.0));
 				}
 			}
 		}
@@ -324,14 +316,15 @@ this.RefreshMonitor = function(id, Success)
 	else
 	{
 		var src = '<table id="stats-' + id + '" class="sortable tablesorter statstable" border="0" cellpadding="0" cellspacing="1"><thead class="ui-widget-header noborder"><tr>';
-		src += '<th>Procedure</th><th>Calls</th><th>Min (ms)</th><th>Avg (ms)</th><th>Max (ms)</th>';
+		src += '<th>Procedure</th><th>Invocations</th><th>Percent (%)</th><th>Min (ms)</th><th>Avg (ms)</th><th>Max (ms)</th>';
 		src += '</tr></thead><tbody>';
 		for(var j in procStats)
 		{
 			src += '<tr>';
-			src += '<td align="left">' + procStats[j][0] + '</td>';
+            src += '<td align="left">' + procStats[j][0] + '</td>';
 			src += '<td align="right">' + procStats[j][1] + '</td>';
-			for(var k = 2; k < 5; k++)
+            src += '<td align="right">'  + procStats[j][2] + '</td>';
+			for(var k = 3; k < 6; k++)
 				src += '<td align="right">' + (Math.round(procStats[j][k]/10.0/1000.00)/100.0) + '</td>';
 			src += '</tr>';
 		}
@@ -340,7 +333,7 @@ this.RefreshMonitor = function(id, Success)
 	}
 	sorttable.makeSortable(document.getElementById('stats-' + id));
 	
-	monitor.lastTransactionCount = currentTransactionCount;
+	monitor.lastTransactionCount = currentTimedTransactionCount;
 	monitor.lastTimedTransactionCount = currentTimedTransactionCount;
 	monitor.lastLatencyAverage = currentLatencyAverage;
 	
@@ -372,7 +365,6 @@ this.RefreshMonitor = function(id, Success)
 		if (ry2max < dataTPS[j][1])
 			ry2max = dataTPS[j][1];
 	}
-	//TMCrymax = Math.ceil(rymax/100)*100;
 	ry2max = Math.ceil(ry2max/1000)*1000;
 	var tickValues = [];
 	tickValues.push(dataIdx-120);
@@ -391,7 +383,7 @@ this.RefreshMonitor = function(id, Success)
 	monitor.strData = strData;
 
 	monitor.tickValues = tickValues;
-	
+	// Update the monitor graphs
 	var lmax = 1;
 	var rmax = 1;
 	switch(monitor.leftMetric)
