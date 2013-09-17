@@ -37,6 +37,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.dtxn.UndoAction;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -447,5 +448,9 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     protected void noteOperationalFailure(String errMsg) {
         m_runner.m_statusCode = ClientResponse.OPERATIONAL_FAILURE;
         m_runner.m_statusString = errMsg;
+    }
+
+    protected void registerUndoAction(UndoAction action) {
+        m_runner.getTxnState().registerUndoAction(action);
     }
 }

@@ -29,6 +29,7 @@ import org.voltcore.utils.Pair;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Throwables;
+import org.voltdb.dtxn.UndoAction;
 
 /**
  * Class that maps object values to partitions. It's rather simple
@@ -289,17 +290,36 @@ public abstract class TheHashinator {
      * Update the hashinator in a thread safe manner with a newer version of the hash function.
      * A version number must be provided and the new config will only be used if it is greater than
      * the current version of the hash function.
+     *
+     * Returns an action for undoing the hashinator update
      */
-    public static void updateHashinator(
+    public static UndoAction updateHashinator(
             Class<? extends TheHashinator> hashinatorImplementation, long version, byte config[]) {
         while (true) {
             final Pair<Long, ? extends TheHashinator> snapshot = instance.get();
             if (version > snapshot.getFirst()) {
                 Pair<Long, ? extends TheHashinator> update =
                         Pair.of(version, constructHashinator(hashinatorImplementation, config));
-                if (instance.compareAndSet(snapshot, update)) return;
+                if (instance.compareAndSet(snapshot, update)) {
+                    return new UndoAction() {
+                        @Override
+                        public void release() {}
+
+                        @Override
+                        public void undo() {
+                            instance.set(snapshot);
+                        }
+                    };
+                }
             } else {
-                return;
+                return new UndoAction() {
+
+                    @Override
+                    public void release() {}
+
+                    @Override
+                    public void undo() {}
+                };
             }
         }
     }

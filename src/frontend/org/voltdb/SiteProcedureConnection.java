@@ -24,6 +24,7 @@ import java.util.concurrent.Future;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.iv2.JoinProducerBase;
 
@@ -112,7 +113,7 @@ public interface SiteProcedureConnection {
     /**
      * IV2 commit / rollback interface to the EE
      */
-    public void truncateUndoLog(boolean rollback, long token, long txnId, long spHandle);
+    public void truncateUndoLog(boolean rollback, long token, long txnId, long spHandle, List<UndoAction> undoActions);
 
     /**
      * IV2: send dependencies to the EE

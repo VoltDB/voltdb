@@ -19,10 +19,7 @@ package org.voltdb.iv2;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Deque;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -66,6 +63,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngine.TaskType;
@@ -743,11 +741,24 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         return currentTxnState.recursableRun(this);
     }
 
+    private static void handleUndoLog(List<UndoAction> undoLog, boolean undo) {
+        if (undoLog == null) return;
+
+        for (final ListIterator<UndoAction> iterator = undoLog.listIterator(undoLog.size()); iterator.hasPrevious();) {
+            final UndoAction action = iterator.previous();
+            if (undo)
+                action.undo();
+            else
+                action.release();
+        }
+    }
+
     @Override
-    public void truncateUndoLog(boolean rollback, long beginUndoToken, long txnId, long spHandle)
+    public void truncateUndoLog(boolean rollback, long beginUndoToken, long txnId, long spHandle, List<UndoAction> undoLog)
     {
         if (rollback) {
             m_ee.undoUndoToken(beginUndoToken);
+            handleUndoLog(undoLog, true);
         }
         else {
             assert(latestUndoToken != Site.kInvalidUndoToken);
@@ -762,6 +773,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         TxnEgo.getPartitionId(spHandle), true, null);
             }
             m_lastCommittedSpHandle = spHandle;
+            handleUndoLog(undoLog, false);
         }
     }
 

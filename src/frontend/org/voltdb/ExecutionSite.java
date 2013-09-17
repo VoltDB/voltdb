@@ -62,6 +62,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.export.processors.RawProcessor;
 import org.voltdb.fault.FaultHandler;
@@ -1702,7 +1703,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
     // do-nothing implementation of IV2 SiteProcedeConnection API
     @Override
-    public void truncateUndoLog(boolean rollback, long token, long txnId, long spHandle) {
+    public void truncateUndoLog(boolean rollback, long token, long txnId, long spHandle, List<UndoAction> undoLog) {
         throw new RuntimeException("Unsupported IV2-only API.");
     }
 
