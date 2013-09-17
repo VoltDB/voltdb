@@ -75,6 +75,13 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         Client client = this.getClient();
         ClientResponse cr = null;
 
+        // Empty data from table.
+        for (String tb: tbs) {
+            cr = client.callProcedure("@AdHoc", "delete from " + tb);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        }
+
+        // Insert records into the table.
         // id, wage, dept, rate
         for (String tb: procs) {
             cr = client.callProcedure(tb, 1,  10,  1 , "2013-06-18 02:00:00.123457");
@@ -85,18 +92,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         }
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
-
-    private void emptyData() throws IOException, ProcCallException {
-        Client client = this.getClient();
-        ClientResponse cr = null;
-
-        // id, wage, dept, rate
-        for (String tb: tbs) {
-            cr = client.callProcedure("@AdHoc", "delete from " + tb);
-        }
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-    }
-
 
     private void strangeCasesAndOrderby() throws IOException, ProcCallException {
         loadData();
@@ -151,8 +146,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             System.out.println(vt.toString());
             compareTable(vt, expected);
         }
-
-        emptyData();
     }
 
 
@@ -211,7 +204,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             expected = new long[][] {{1, 60, 3, 20, 30, 10, 20, 41}, {2, 90, 2, 45, 50, 40, 45, 91}};
             compareTable(vt, expected);
         }
-        emptyData();
     }
 
     private void complexAggsOrderbySuite() throws IOException, ProcCallException {
@@ -301,7 +293,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             System.out.println(vt.toString());
             compareTable(vt, expected);
         }
-        emptyData();
     }
 
     private void complexAggsDistinctLimit() throws IOException, ProcCallException {
@@ -346,7 +337,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             System.out.println(vt.toString());
             compareTable(vt, expected);
         }
-        emptyData();
     }
 
     public void testcomplexGroupbySuite() throws IOException, ProcCallException, ParseException{
@@ -437,7 +427,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
                 compareTable(vt, expected);
             }
         }
-        emptyData();
     }
 
     private void complexGroupbyDistinctLimit() throws IOException, ProcCallException, ParseException {
@@ -542,7 +531,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             System.out.println(vt.toString());
             compareTable(vt, expected);
         }
-        emptyData();
     }
 
 
@@ -722,8 +710,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             expected = new long[][] { {2, 11}, {8,11}, {3,21}, {4,31}, {6,41}, {9,41}, {7,51}};
             compareTable(vt, expected);
         }
-
-        emptyData();
     }
 
     public void testOtherCases() throws IOException, ProcCallException {
@@ -779,8 +765,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             expected = new long[][] { {1, 40, 13, 3} , {2, 73, 36, 2}};
             compareTable(vt, expected);
         }
-
-        emptyData();
     }
 
     // Test group by columns do not have to be in display columns.
@@ -827,8 +811,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(1, vt.getColumnIndex("NO_BUG"));
             assertEquals(2, vt.getColumnIndex("C3"));
         }
-
-        emptyData();
     }
 
     private void supportedCases() throws IOException, ProcCallException {
@@ -870,7 +852,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             compareTable(vt, expected);
 
         }
-        emptyData();
     }
 
     // TODO(XIN): make the following un-taged order by cases work, ENG-4958
@@ -885,8 +866,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
 
         Exception ex = null;
         for (String tb: tbs) {
-            // Test order by agg without tag
-
             ex = null;
             try {
                 // Test order by agg not in display columns
@@ -977,8 +956,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
                 assertTrue(ex.getMessage().contains("invalid ORDER BY expression"));
             }
         }
-
-        emptyData();
     }
 
     //

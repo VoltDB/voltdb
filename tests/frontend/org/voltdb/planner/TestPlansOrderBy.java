@@ -164,7 +164,7 @@ public class TestPlansOrderBy extends PlannerTestCase {
         //validatePlan("SELECT T_D0, COUNT(*) AS FOO FROM T GROUP BY T_D0 ORDER BY FOO");
     }
 
-    public void testOrderByWithoutAlias() {
+    public void testOrderByAggWithoutAlias() {
         validatePlan("SELECT T_D0, SUM(T_D1) FROM T GROUP BY T_D0 ORDER BY SUM(T_D1)",
                 true, false, true, true);
         validatePlan("SELECT T_D0, COUNT(*) FROM T GROUP BY T_D0 ORDER BY COUNT(*)",
