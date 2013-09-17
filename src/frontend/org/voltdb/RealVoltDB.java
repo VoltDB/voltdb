@@ -1293,6 +1293,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         if (!m_rejoining) {
             hostLog.info(startActionLog);
         }
+        hostLog.info("PID of this Volt process is " + CLibrary.getpid());
 
         // print out awesome network stuff
         hostLog.info(String.format("Listening for native wire protocol clients on port %d.", m_config.m_port));
@@ -2199,7 +2200,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_nodeDRGateway.bindPorts();
             }
         } catch (Exception ex) {
-            hostLog.warn("Replication Service failed to bind to port: " + ex);
+            MiscUtils.printPortsInUse(hostLog);
+            VoltDB.crashLocalVoltDB("Failed to initialize DR", true, ex);
         }
     }
 
