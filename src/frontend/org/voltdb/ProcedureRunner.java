@@ -721,7 +721,7 @@ public class ProcedureRunner {
 
         for (PlanFragment frag : catStmt.getFragments()) {
             byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
-            byte[] plan = Encoder.base64Decode(frag.getPlannodetree());
+            byte[] plan = Encoder.decodeBase64AndDecompressToBytes(frag.getPlannodetree());
             long id = ActivePlanRepository.loadOrAddRefPlanFragment(planHash, plan);
             boolean transactional = frag.getNontransactional() == false;
 
