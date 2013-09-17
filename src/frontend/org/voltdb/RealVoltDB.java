@@ -2201,7 +2201,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
         } catch (Exception ex) {
             MiscUtils.printPortsInUse(hostLog);
-            VoltDB.crashLocalVoltDB("Failed to initialize DR", true, ex);
+            VoltDB.crashLocalVoltDB("Failed to initialize DR", false, ex);
         }
     }
 
