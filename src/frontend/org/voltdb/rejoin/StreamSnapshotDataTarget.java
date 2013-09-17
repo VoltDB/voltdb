@@ -62,7 +62,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     final long m_targetId;
 
     // shortened when in test mode
-    final static long WRITE_TIMEOUT_MS = m_rejoinDeathTestMode ? 10000 : 60000;
+    final static long DEFAULT_WRITE_TIMEOUT_MS = m_rejoinDeathTestMode ? 10000 : 60000;
     final static long WATCHDOG_PERIOS_S = 5;
 
     // schemas for all the tables on this partition
@@ -89,6 +89,12 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     public StreamSnapshotDataTarget(long HSId, Map<Integer, byte[]> schemas,
                                     SnapshotSender sender, StreamSnapshotAckReceiver ackReceiver)
     {
+        this(HSId, schemas, DEFAULT_WRITE_TIMEOUT_MS, sender, ackReceiver);
+    }
+
+    public StreamSnapshotDataTarget(long HSId, Map<Integer, byte[]> schemas, long writeTimeout,
+                                    SnapshotSender sender, StreamSnapshotAckReceiver ackReceiver)
+    {
         super();
         m_targetId = m_totalSnapshotTargetCount.getAndIncrement();
         m_schemas.putAll(schemas);
@@ -103,7 +109,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 CoreUtils.hsIdToString(HSId), m_targetId));
 
         // start a periodic task to look for timed out connections
-        VoltDB.instance().scheduleWork(new Watchdog(0), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
+        VoltDB.instance().scheduleWork(new Watchdog(0, writeTimeout), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
     }
 
     /**
@@ -204,14 +210,16 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
     /**
      * Task run every so often to look for writes that haven't been acked
-     * in WRITE_TIMEOUT_MS time.
+     * in writeTimeout time.
      */
     class Watchdog implements Runnable {
 
         final long m_bytesWrittenSinceConstruction;
+        final long m_writeTimeout;
 
-        Watchdog(long bytesWritten) {
+        Watchdog(long bytesWritten, long writeTimout) {
             m_bytesWrittenSinceConstruction = bytesWritten;
+            m_writeTimeout = writeTimout;
         }
 
         @Override
@@ -227,7 +235,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             long now = System.currentTimeMillis();
             for (Entry<Integer, SendWork> e : m_outstandingWork.entrySet()) {
                 SendWork work = e.getValue();
-                if ((now - work.m_ts) > WRITE_TIMEOUT_MS) {
+                if ((now - work.m_ts) > m_writeTimeout) {
                     rejoinLog.error(String.format(
                             "A snapshot write task failed after a timeout (currently %d seconds outstanding).",
                             (now - work.m_ts) / 1000));
@@ -240,7 +248,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             }
 
             // schedule to run again
-            VoltDB.instance().scheduleWork(new Watchdog(bytesWritten), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
+            VoltDB.instance().scheduleWork(new Watchdog(bytesWritten, m_writeTimeout), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
         }
     }
 
@@ -448,17 +456,6 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
     @Override
     public void close() {
-        close(Long.MAX_VALUE);
-    }
-
-    /**
-     * Close the data target.
-     * @param timeout    Timeout value in milliseconds. If timeout is reached, an exception is thrown.
-     * @return true if the data target is closed, false if the specified time value has elapsed.
-     */
-    public boolean close(long timeout) {
-        final long startTs = System.currentTimeMillis();
-
         /*
          * could be called multiple times, because all tables share one stream
          * target
@@ -473,11 +470,6 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
             // block until all acks have arrived
             while (!m_writeFailed.get() && (m_outstandingWorkCount.get() > 0)) {
-                if (System.currentTimeMillis() - startTs >= timeout) {
-                    // Timed out
-                    return false;
-                }
-
                 Thread.yield();
             }
 
@@ -498,8 +490,6 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         if (closeHandle != null) {
             closeHandle.run();
         }
-
-        return true;
     }
 
     private void sendEOS()
@@ -517,6 +507,11 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         buf.putInt(m_blockIndex);
         buf.flip();
         send(m_blockIndex++, DBBPool.wrapBB(buf));
+    }
+
+    public boolean didWriteFail()
+    {
+        return m_writeFailed.get();
     }
 
     @Override
