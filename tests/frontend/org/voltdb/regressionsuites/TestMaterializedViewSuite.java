@@ -86,7 +86,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             // System.out.println(countTable);
             ++nStatement;
             long count = countTable.asScalarLong();
-            assertEquals("COUNT statement " + nStatement + "/" + results.length + " should have found no undeleted rows.", 0, count);
+            assertEquals("COUNT statement " + nStatement + "/" +
+            results.length + " should have found no undeleted rows.", 0, count);
         }
     }
 
