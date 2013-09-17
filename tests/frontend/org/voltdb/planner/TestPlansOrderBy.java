@@ -80,8 +80,9 @@ public class TestPlansOrderBy extends PlannerTestCase {
         validateOptimalPlan("SELECT * from T WHERE T_D0 = 1 ORDER BY T_D1");
     }
 
-    public void testOrderByTwo() {
+    public void testOrderByIndexedColumns() {
         validateOptimalPlan("SELECT * from T ORDER BY T_D0, T_D1");
+        validateOptimalPlan("SELECT * from Tmanykeys ORDER BY T_D0, T_D1, T_D2");
     }
 
     public void testOrderByTwoDesc() {
@@ -89,7 +90,7 @@ public class TestPlansOrderBy extends PlannerTestCase {
     }
 
     public void testOrderByTwoAscDesc() {
-        validateIndexedBruteForcePlan("SELECT * from T ORDER BY T_D0, T_D1 DESC");
+        validateBruteForcePlan("SELECT * from T ORDER BY T_D0, T_D1 DESC");
         validateBruteForcePlan("SELECT * from Tnokey ORDER BY T_D0, T_D1 DESC");
     }
 
@@ -120,18 +121,21 @@ public class TestPlansOrderBy extends PlannerTestCase {
 
     public void testOrderByWrongPermutation()
     {
-        validateIndexedBruteForcePlan("SELECT * from Tmanykeys ORDER BY T_D2, T_D1, T_D0");
-        validateIndexedBruteForcePlan("SELECT * from Tmanykeys ORDER BY T_D2, T_D0, T_D1");
-        validateIndexedBruteForcePlan("SELECT * from Tmanykeys ORDER BY T_D1, T_D0, T_D2");
-        validateIndexedBruteForcePlan("SELECT * from Tmanykeys ORDER BY T_D1, T_D2, T_D0");
+        // Order determinism, so do not make it worse by using index scan.
+        validateBruteForcePlan("SELECT * from Tmanykeys ORDER BY T_D2, T_D1, T_D0");
+        validateBruteForcePlan("SELECT * from Tmanykeys ORDER BY T_D2, T_D0, T_D1");
+        validateBruteForcePlan("SELECT * from Tmanykeys ORDER BY T_D1, T_D0, T_D2");
+        validateBruteForcePlan("SELECT * from Tmanykeys ORDER BY T_D1, T_D2, T_D0");
+        validateBruteForcePlan("SELECT * from Tmanykeys ORDER BY T_D0, T_D2, T_D1");
+
+        // Use index for filter.
         validateIndexedBruteForcePlan("SELECT * from Tmanykeys WHERE T_D0 = ? ORDER BY T_D2, T_D1");
         validateIndexedBruteForcePlan("SELECT * from Tmanykeys WHERE T_D1 = ? ORDER BY T_D2, T_D0");
-        validateIndexedBruteForcePlan("SELECT * from Tmanykeys ORDER BY T_D0, T_D2, T_D1");
     }
 
     public void testOrderByTooManyToIndex()
     {
-        validateIndexedBruteForcePlan("SELECT * from T ORDER BY T_D0, T_D1, T_D2");
+        validateBruteForcePlan("SELECT * from T ORDER BY T_D0, T_D1, T_D2");
         validateBruteForcePlan("SELECT * from Tnokey ORDER BY T_D0, T_D1, T_D2");
     }
 

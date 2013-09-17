@@ -58,8 +58,11 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
         // already been post-sorted into strict order determinism,
         // so, check first for plan.isOrderDeterministic()?
         AbstractPlanNode planGraph = plan.rootPlanGraph;
-        planGraph = recursivelyApply(planGraph, db);
-        plan.rootPlanGraph = planGraph;
+
+        if (!plan.isOrderDeterministic()) {
+            planGraph = recursivelyApply(planGraph, db);
+            plan.rootPlanGraph = planGraph;
+        }
 
         retval.add(plan);
         return retval;
