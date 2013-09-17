@@ -67,7 +67,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         }
     }
 
-    public void testMaterializedViewInsertDeleteR1() throws IOException, ProcCallException {
+    public void testMVInsertDeleteR1() throws IOException, ProcCallException {
         System.out.println("Test R1 insert and delete...");
         String mvTable = "V_R1";
         String orderbyStmt = mvTable+"_G1";
@@ -162,7 +162,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         compareMVcontentsOfLongs(client, mvTable, null, orderbyStmt);
     }
 
-    public void testMaterializedViewUpdateR1() throws IOException, ProcCallException {
+    public void testMVUpdateR1() throws IOException, ProcCallException {
         System.out.println("Test R1 update...");
 
         Client client = this.getClient();
@@ -224,7 +224,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
     }
 
 
-    public void testMaterializedViewInsertDeleteR2() throws Exception {
+    public void testMVInsertDeleteR2() throws Exception {
         System.out.println("Test R2 insert and delete...");
         String mvTable = "V_R2";
         String orderbyStmt = mvTable+"_G1, " + mvTable + "_G2";
@@ -308,7 +308,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         }
     }
 
-    public void testMaterializedViewUpdateR2() throws Exception {
+    public void testMVUpdateR2() throws Exception {
         System.out.println("Test R2 update...");
 
         if (!isHSQL()) {
@@ -413,7 +413,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         compareTableR3(client, mvTable+"_test4", expected24, orderbyStmt);
     }
 
-    public void testMaterializedViewInsertDeleteR3() throws Exception {
+    public void testMVInsertDeleteR3() throws Exception {
         System.out.println("Test R3 insert and delete...");
         String orderbyStmt = "V_R3_CNT, V_R3_sum_wage";
         Client client = this.getClient();
@@ -472,7 +472,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
     }
 
 
-    public void testMaterializedViewUpdateR3() throws Exception {
+    public void testMVUpdateR3() throws Exception {
         System.out.println("Test R3 update...");
 
         String orderbyStmt = "V_R3_CNT, V_R3_sum_wage";
@@ -504,6 +504,63 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                     new Object[][] {{"VoltDB"+longStr,2,70},{"IBM"+longStr,3,82}},
                     orderbyStmt);
         }
+    }
+
+   public void testMVBasedP1() throws Exception {
+        System.out.println("Test MV partition...");
+
+        VoltTable vt = null;
+        Client client = this.getClient();
+
+//        vt = client.callProcedure("@Explain", "Select count(*) from V_P1").getResults()[0];
+//        System.out.println(vt);
+//        vt = client.callProcedure("@AdHoc", "Select count(*) from V_P1").getResults()[0];
+//        System.out.println(vt);
+//        assertEquals(0, vt.asScalarLong());
+
+        String insert = "P1.insert";
+        // Partition 0
+        client.callProcedure(insert, 6,  40,  3 );
+        client.callProcedure(insert, 4,  40,  1 );
+
+        // Partition 1
+        client.callProcedure(insert, 1,  10,  1 );
+        client.callProcedure(insert, 3,  20,  3 );
+        client.callProcedure(insert, 5,  50,  1 );
+
+//        "CREATE VIEW V_P1 (V_P1_G1, V_P1_CNT, V_P1_sum_wage) " +
+//        "AS SELECT dept, count(*), SUM(wage) FROM P1 GROUP BY dept;" +
+
+//        vt = client.callProcedure("@AdHoc", "Select sum(V_P1_sum_wage) from V_P1").getResults()[0];
+//        assertEquals(160, vt.asScalarLong());
+
+        String[] tbs = {"V_P1", "V_P1_ABS"};
+
+        for (String tb: tbs) {
+            vt = client.callProcedure("@AdHoc", "Select * from " + tb +
+                    " ORDER BY V_P1_G1").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{1,3,100},{3,2,60}});
+
+            vt = client.callProcedure("@AdHoc", "Select V_P1_G1 from " + tb +
+                    " ORDER BY V_P1_G1").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{1},{3}});
+
+
+//            vt = client.callProcedure("@AdHoc",
+//                    "Select V_P1_sum_wage from " + tb +
+//                    " ORDER BY V_P1_sum_wage").getResults()[0];
+//            validateTableOfLongs(vt, new long[][]{{60},{100}});
+//
+//            vt = client.callProcedure("@AdHoc", "Select V_P1_sum_wage as tag, sum(V_P1_CNT) " +
+//                    "from " + tb + " group by V_P1_sum_wage order by tag").getResults()[0];
+//            validateTableOfLongs(vt, new long[][]{{60,2},{100,3}});
+//
+//            vt = client.callProcedure("@AdHoc", "Select V_P1_G1, V_P1_sum_wage, sum(V_P1_CNT) " +
+//                    "from " + tb + " group by V_P1_G1, V_P1_sum_wage " +
+//                            "order by V_P1_G1 desc, V_P1_sum_wage").getResults()[0];
+//            validateTableOfLongs(vt, new long[][]{{3,60,2},{1,100,3}});
+        }
+
     }
 
     //
@@ -644,6 +701,20 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "AS SELECT vlong || '" + longStr + "', " +
                 "count(*), SUM(wage) " +
                 "FROM R3 GROUP BY vlong || '" + longStr + "';" +
+
+
+                "CREATE TABLE P1 ( " +
+                "id INTEGER DEFAULT '0' NOT NULL, " +
+                "wage INTEGER, " +
+                "dept INTEGER, " +
+                "PRIMARY KEY (id) );" +
+                "PARTITION TABLE P1 ON COLUMN id;" +
+
+                "CREATE VIEW V_P1 (V_P1_G1, V_P1_CNT, V_P1_sum_wage) " +
+                "AS SELECT dept, count(*), SUM(wage) FROM P1 GROUP BY dept;" +
+
+                "CREATE VIEW V_P1_ABS (V_P1_G1, V_P1_CNT, V_P1_sum_wage) " +
+                "AS SELECT abs(dept), count(*), SUM(wage) FROM P1 GROUP BY abs(dept);" +
                 ""
                 ;
         try {
@@ -651,6 +722,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         } catch (IOException e) {
             assertFalse(true);
         }
+
         config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);

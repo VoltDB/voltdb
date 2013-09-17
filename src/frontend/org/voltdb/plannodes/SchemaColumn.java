@@ -71,7 +71,7 @@ public class SchemaColumn
      * Clone a schema column
      */
     @Override
-    protected SchemaColumn clone()
+    public SchemaColumn clone()
     {
         return new SchemaColumn(m_tableName, m_columnName, m_columnAlias,
                                 m_expression);
