@@ -24,7 +24,6 @@
 package org.voltdb.rejoin;
 
 import static junit.framework.Assert.*;
-import static org.mockito.Mockito.*;
 
 import com.google.common.collect.Maps;
 import com.google.common.primitives.Ints;
@@ -34,18 +33,19 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltcore.messaging.MockMailbox;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltdb.MockVoltDB;
-import org.voltdb.SnapshotTableTask;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.CompressionService;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 
 public class TestStreamSnapshotDataTarget {
     private MockMailbox m_mb;
@@ -55,7 +55,7 @@ public class TestStreamSnapshotDataTarget {
     private Thread m_ackThread;
     private Map<Integer, byte[]> m_schemas;
 
-    private List<StreamSnapshotDataTarget> m_duts = new ArrayList<StreamSnapshotDataTarget>();
+    private ExecutorService m_es = CoreUtils.getCachedSingleThreadExecutor("Close stream thread", 10000);
 
     @BeforeClass
     public static void sestUpBeforeClass()
@@ -91,10 +91,7 @@ public class TestStreamSnapshotDataTarget {
 
     private StreamSnapshotDataTarget makeDataTarget(long destHSId)
     {
-        StreamSnapshotDataTarget dut =
-            new StreamSnapshotDataTarget(destHSId, m_schemas, m_mb, m_sender, m_ack);
-        m_duts.add(dut);
-        return dut;
+        return new StreamSnapshotDataTarget(destHSId, m_schemas, m_sender, m_ack);
     }
 
     private Callable<DBBPool.BBContainer> makeTuples()
@@ -115,13 +112,11 @@ public class TestStreamSnapshotDataTarget {
 
         ByteBuffer data = ByteBuffer.wrap(CompressionService.decompressBytes(msg.getData()));
         assertEquals(type.ordinal(), data.get(StreamSnapshotBase.typeOffset));
-        if (type != StreamSnapshotMessageType.END && type != StreamSnapshotMessageType.FAILURE) {
-            assertEquals(tableId, data.getInt(StreamSnapshotBase.tableIdOffset));
+        assertEquals(blockIndex, data.getInt(StreamSnapshotBase.blockIndexOffset));
 
-            // Only data block has block index
-            if (type == StreamSnapshotMessageType.DATA) {
-                assertEquals(blockIndex, data.getInt(StreamSnapshotBase.blockIndexOffset));
-            }
+        // Only data block and schema blocks have table ID
+        if (type == StreamSnapshotMessageType.SCHEMA || type == StreamSnapshotMessageType.DATA) {
+            assertEquals(tableId, data.getInt(StreamSnapshotBase.tableIdOffset));
         }
     }
 
@@ -139,7 +134,7 @@ public class TestStreamSnapshotDataTarget {
                        dut.m_targetId,
                        StreamSnapshotMessageType.SCHEMA,
                        tableId,
-                       dut.m_blockIndex - 1);
+                       dut.m_blockIndex - 2);
         }
 
         while (m_mb.noSentMessages()) {
@@ -153,36 +148,67 @@ public class TestStreamSnapshotDataTarget {
                    dut.m_blockIndex - 1);
     }
 
-    private void ack(StreamSnapshotDataTarget dut)
+    private void ack(boolean isEOS, long targetId, int blockIndex)
     {
         // send ack
-        m_mb.deliver(new RejoinDataAckMessage(dut.m_targetId, dut.m_blockIndex - 1));
+        m_mb.deliver(new RejoinDataAckMessage(isEOS, targetId, blockIndex));
+    }
+
+    private void closeStream(final StreamSnapshotDataTarget dut)
+        throws IOException, InterruptedException, ExecutionException
+    {
+        Future<?> closeWork = m_es.submit(new Runnable() {
+            @Override
+            public void run()
+            {
+                // close data target 1, the sender thread and the ack thread should stay up
+                // and the mailbox should still be reachable from the host messenger
+                try {
+                    dut.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    throw new RuntimeException(e);
+                }
+            }
+        });
+
+        // Wait until the END message is sent
+        while (m_mb.noSentMessages()) {
+            Thread.yield();
+        }
+        verifyData((RejoinDataMessage) m_mb.pollMessage(),
+                   dut.m_targetId,
+                   StreamSnapshotMessageType.END,
+                   /* tableId = */ 0,
+                   /* blockIndex = */ dut.m_blockIndex - 1);
+
+        // Ack the END message
+        ack(true, dut.m_targetId, dut.m_blockIndex - 1);
+
+        closeWork.get();
     }
 
     @Test
-    public void testStreamClose() throws IOException, InterruptedException
+    public void testStreamClose() throws IOException, InterruptedException, ExecutionException
     {
         StreamSnapshotDataTarget dut1 = makeDataTarget(1000);
         StreamSnapshotDataTarget dut2 = makeDataTarget(1001);
 
-        // close data target 1, the sender thread and the ack thread should stay up
-        // and the mailbox should still be reachable from the host messenger
-        dut1.close();
-        verifyData((RejoinDataMessage) m_mb.pollMessage(),
-                   dut1.m_targetId,
-                   StreamSnapshotMessageType.END,
-                   /* tableId = */ 0,
-                   /* blockIndex = */ 0);
+        closeStream(dut1);
         assertNotNull(VoltDB.instance().getHostMessenger().getMailbox(m_mb.getHSId()));
 
         // write some data to data target 2 and make sure the sender sends it and we can still ack
         writeAndVerify(/* dataTarget = */ dut2, /* tableId = */ 0, /* hasSchema = */ true);
-        ack(dut2);
-        dut2.close();
+        // ack schema block
+        ack(false, dut2.m_targetId, dut2.m_blockIndex - 2);
+        // ack data block
+        ack(false, dut2.m_targetId, dut2.m_blockIndex - 1);
+
+        closeStream(dut2);
     }
 
     @Test
-    public void testMultiplexing() throws IOException, InterruptedException
+    public void testMultiplexing() throws IOException, InterruptedException, ExecutionException
     {
         StreamSnapshotDataTarget dut1 = makeDataTarget(1000);
         StreamSnapshotDataTarget dut2 = makeDataTarget(1001);
@@ -190,20 +216,23 @@ public class TestStreamSnapshotDataTarget {
         writeAndVerify(/* dataTarget = */ dut1, /* tableId = */ 0, /* hasSchema = */ true);
         writeAndVerify(/* dataTarget = */ dut2, /* tableId = */ 1, /* hasSchema = */ true);
 
-        assertEquals(1, dut1.m_outstandingWorkCount.get());
-        assertEquals(1, dut2.m_outstandingWorkCount.get());
+        // 2 outstanding works, 1 for schema, 1 for data
+        assertEquals(2, dut1.m_outstandingWorkCount.get());
+        assertEquals(2, dut2.m_outstandingWorkCount.get());
 
-        ack(dut1);
+        ack(false, dut1.m_targetId, dut1.m_blockIndex - 2);
+        ack(false, dut1.m_targetId, dut1.m_blockIndex - 1);
         while (dut1.m_outstandingWorkCount.get() != 0) {
             Thread.yield();
         }
 
-        ack(dut2);
+        ack(false, dut2.m_targetId, dut2.m_blockIndex - 2);
+        ack(false, dut2.m_targetId, dut2.m_blockIndex - 1);
         while (dut2.m_outstandingWorkCount.get() != 0) {
             Thread.yield();
         }
 
-        dut1.close();
-        dut2.close();
+        closeStream(dut1);
+        closeStream(dut2);
     }
 }
