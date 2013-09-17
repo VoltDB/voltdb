@@ -463,18 +463,15 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         if (!m_closed.get()) {
             rejoinLog.trace("Closing stream snapshot target");
 
+            // block until all acks have arrived
+            waitForOutstandingWork();
+
+            // Send the EOS message after clearing outstanding work so that if there's a failure,
+            // we'll send the correct EOS to the receiving end
             sendEOS();
 
             // Terminate the sender thread after the last block
             m_sender.offer(new SendWork());
-
-            // block until all acks have arrived
-            while (!m_writeFailed.get() && (m_outstandingWorkCount.get() > 0)) {
-                Thread.yield();
-            }
-
-            // if here because a write failed, cleanup outstanding work
-            clearOutstanding();
 
             // locked so m_closed is true when the ack thread dies
             synchronized(this) {
@@ -507,6 +504,19 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         buf.putInt(m_blockIndex);
         buf.flip();
         send(m_blockIndex++, DBBPool.wrapBB(buf));
+
+        // Wait for the ack of the EOS message
+        waitForOutstandingWork();
+    }
+
+    private void waitForOutstandingWork()
+    {
+        while (!m_writeFailed.get() && (m_outstandingWorkCount.get() > 0)) {
+            Thread.yield();
+        }
+
+        // if here because a write failed, cleanup outstanding work
+        clearOutstanding();
     }
 
     public boolean didWriteFail()
