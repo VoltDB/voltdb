@@ -104,8 +104,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
         pns = compileToFragments("SELECT A1, count(*) as tag FROM P1 group by A1 order by tag, A1 limit 1");
         p = pns.get(0).getChild(0);
 
-        assertTrue(p instanceof LimitPlanNode);
-        assertTrue(p.getChild(0) instanceof ProjectionPlanNode);
+        // ENG-5066: now Limit is pushed under Projection
+        assertTrue(p instanceof ProjectionPlanNode);
+        assertTrue(p.getChild(0) instanceof LimitPlanNode);
         assertTrue(p.getChild(0).getChild(0) instanceof OrderByPlanNode);
         assertTrue(p.getChild(0).getChild(0).getChild(0) instanceof AggregatePlanNode);
 
