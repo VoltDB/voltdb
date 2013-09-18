@@ -112,7 +112,8 @@ class CSVPartitionProcessor implements Runnable {
         private final String m_tableName;
         private final Object m_partitionParam;
 
-        public FailedBatchProcessor(CSVPartitionProcessor pp, String procName, String tableName, Object partitionParam) {
+        public FailedBatchProcessor(CSVPartitionProcessor pp, String procName,
+                String tableName, Object partitionParam) {
             m_processor = pp;
             m_procName = procName;
             m_tableName = tableName;
@@ -141,7 +142,8 @@ class CSVPartitionProcessor implements Runnable {
                             continue;
                         }
 
-                        PartitionSingleExecuteProcedureCallback cbmt = new PartitionSingleExecuteProcedureCallback(lineList, m_processor);
+                        PartitionSingleExecuteProcedureCallback cbmt =
+                                new PartitionSingleExecuteProcedureCallback(lineList, m_processor);
                         if (!CSVPartitionProcessor.m_isMP) {
                             m_csvClient.callProcedure(cbmt, m_procName, m_partitionParam, m_tableName, table);
                         } else {
@@ -284,7 +286,8 @@ class CSVPartitionProcessor implements Runnable {
                 }
                 // call supplied procedure.
                 try {
-                    PartitionSingleExecuteProcedureCallback cbmt = new PartitionSingleExecuteProcedureCallback(lineList, this);
+                    PartitionSingleExecuteProcedureCallback cbmt =
+                            new PartitionSingleExecuteProcedureCallback(lineList, this);
                     m_csvClient.callProcedure(cbmt, procName, (Object[]) lineList.correctedLine);
                     m_partitionProcessedCount.incrementAndGet();
                 } catch (IOException ex) {
