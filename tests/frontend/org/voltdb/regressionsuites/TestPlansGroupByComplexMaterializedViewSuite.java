@@ -639,9 +639,11 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                     + tb).getResults()[0];
             assertEquals(23, vt.asScalarLong());
 
-            vt = client.callProcedure("@AdHoc", "Select sum(V_sum_age) + 5 from "
-                    + tb).getResults()[0];
-            assertEquals(260, vt.asScalarLong());
+            if (!isHSQL()) {
+                vt = client.callProcedure("@AdHoc", "Select sum(V_sum_age) + 5 from "
+                        + tb).getResults()[0];
+                assertEquals(260, vt.asScalarLong());
+            }
 
             vt = client.callProcedure("@AdHoc", "Select avg(V_sum_age) from "
                     + tb).getResults()[0];
