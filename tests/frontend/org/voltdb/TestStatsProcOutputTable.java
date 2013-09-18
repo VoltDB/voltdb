@@ -28,6 +28,7 @@ import org.voltdb.StatsProcOutputTable.ProcOutputRow;
 
 public class TestStatsProcOutputTable {
 
+    long mB = 1024*1024;
     // result row in java form for test
     static class ResultRow {
         long timestamp;
@@ -51,21 +52,36 @@ public class TestStatsProcOutputTable {
             this.avgOUT = avgOUT;
             this.totalOUT = totalOUT;
         }
+
     }
 
     // push rows from data in to the table.
     void loadEmUp(StatsProcOutputTable dut, ProcOutputRow[] data) {
         for (int ii = 0; ii < data.length; ++ii) {
-         dut.updateTable(
-            data[ii].procedure,
-            data[ii].partition,
-            data[ii].timestamp,
-            data[ii].invocations,
-            data[ii].minOUT,
-            data[ii].maxOUT,
-            data[ii].avgOUT);
-     }
- }
+            dut.updateTable(true,
+                    data[ii].procedure,
+                    data[ii].partition,
+                    data[ii].timestamp,
+                    data[ii].invocations,
+                    data[ii].minOUT,
+                    data[ii].maxOUT,
+                    data[ii].avgOUT);
+        }
+    }
+
+    // push rows from data in to the table.
+    void loadEmUpNoDeDup(StatsProcOutputTable dut, ProcOutputRow[] data) {
+        for (int ii = 0; ii < data.length; ++ii) {
+            dut.updateTable(false,
+                    data[ii].procedure,
+                    data[ii].partition,
+                    data[ii].timestamp,
+                    data[ii].invocations,
+                    data[ii].minOUT,
+                    data[ii].maxOUT,
+                    data[ii].avgOUT);
+        }
+    }
 
     // validate contents of sorted dut vs. expectation of ResultRow[]
  void validateEmGood(String testname, StatsProcOutputTable dut, ResultRow[] data) {
@@ -89,15 +105,16 @@ public class TestStatsProcOutputTable {
 
 @Test
 public void testBaseCase() throws Exception {
+
         // validate sensical round-trip of one row.
     ProcOutputRow[] data = {
                             //proc/part/time/invok/min/max/avg
-        new ProcOutputRow("proc", 0L, 12345L, 100L, 2L, 4L, 3L)
+        new ProcOutputRow("proc", 0L, 12345L, 100*mB, 2L, 4L, 3L)
     };
 
     ResultRow[] result = {
                             //time/proc/perc/inok/min/max/avg/tot
-        new ResultRow(12345L, "proc", 100L, 100L, 2L, 4L, 3L, 300L)
+        new ResultRow(12345L, "proc", 100L, 100*mB, 2L, 4L, 3L, 300L)
     };
 
     StatsProcOutputTable dut = new StatsProcOutputTable();
@@ -123,35 +140,34 @@ public void testAllZeros() throws Exception {
     @Test
     public void testMultipleProcs() throws Exception {
         ProcOutputRow data[] = {     //proc/part/time/invok/min/max/avg
-            new ProcOutputRow("A", 0L, 12345L, 300L, 3L, 5L, 4L),
-            new ProcOutputRow("B", 0L, 12345L, 100L, 1L, 4L, 2L),
-            new ProcOutputRow("B", 1L, 12345L, 100L, 1L, 3L, 2L)
+            new ProcOutputRow("A", 0L, 12345L, 300*mB, 3L, 5L, 4L),
+            new ProcOutputRow("B", 0L, 12345L, 100*mB, 1L, 4L, 2L),
+            new ProcOutputRow("B", 1L, 12345L, 100*mB, 1L, 3L, 2L)
         };
         ResultRow result[] = {  //time/proc/perc/inok/min/max/avg/tot
-            new ResultRow(12345L, "A", 75L, 300L, 3L, 5L, 4L, 1200L),
-            new ResultRow(12345L, "B", 25L, 200L, 1L, 4L, 2L, 400L)
+            new ResultRow(12345L, "A", 75L, 300*mB, 3L, 5L, 4L, 1200L),
+            new ResultRow(12345L, "B", 25L, 200*mB, 1L, 4L, 2L, 400L)
         };
         StatsProcOutputTable dut = new StatsProcOutputTable();
         loadEmUp(dut, data);
         validateEmGood("testMulipleProcs", dut, result);
     }
 
-
     @Test
     public void testSiteDedupe() throws Exception {
         // need to not double count invocations at replicas, but do look at
         // min, max, avg
         ProcOutputRow data[] = { //proc/part/time/invok/min/max/avg
-            new ProcOutputRow("proc", 0L, 12345L, 200L, 4L, 10L, 6L),
-            new ProcOutputRow("proc", 0L, 12345L, 100L, 4L, 25L, 10L),
-            new ProcOutputRow("proc", 0L, 12345L, 100L, 1L, 4L, 2L),
-            new ProcOutputRow("proc", 1L, 12345L, 400L, 2L, 8L, 4L)
+            new ProcOutputRow("proc", 0L, 12345L, 200*mB, 4L, 10L, 6L),
+            new ProcOutputRow("proc", 0L, 12345L, 100*mB, 4L, 25L, 10L),
+            new ProcOutputRow("proc", 0L, 12345L, 100*mB, 1L, 4L, 2L),
+            new ProcOutputRow("proc", 1L, 12345L, 400*mB, 2L, 8L, 4L)
         };
         ResultRow result[] = { //time/proc/perc/inok/min/max/avg/tot
-            new ResultRow(12345L, "proc", 100L, 600L, 1L, 25L, 5L, 3000L)
+            new ResultRow(12345L, "proc", 100L, 800 * mB, 1L, 25L, 4L, 3200L)
         };
         StatsProcOutputTable dut = new StatsProcOutputTable();
-        loadEmUp(dut, data);
+        loadEmUpNoDeDup(dut, data);
         validateEmGood("testSiteDedupe", dut, result);
     }
 }

@@ -177,13 +177,13 @@ public class TestTwoSitePlans extends TestCase {
         ActivePlanRepository.clear();
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
-                Encoder.base64Decode(selectBottomFrag.getPlannodetree()));
+                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()));
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(selectTopFrag),
-                Encoder.base64Decode(selectTopFrag.getPlannodetree()));
+                Encoder.decodeBase64AndDecompressToBytes(selectTopFrag.getPlannodetree()));
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(insertFrag),
-                Encoder.base64Decode(insertFrag.getPlannodetree()));
+                Encoder.decodeBase64AndDecompressToBytes(insertFrag.getPlannodetree()));
 
         // insert some data
         ParameterSet params = ParameterSet.fromArrayNoCopy(1L, 1L, 1L);

@@ -860,9 +860,13 @@ public class AsyncBenchmark {
     }
 
     public void summary4qa() {
-        // Put a key/value pair, asynchronously
-
-        System.out.printf("Checking put count in the database against expected data");
+        // print the summary results
+        try {
+            printResults();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        System.out.printf("\n\nChecking put count in the database against expected data");
         Iterator<String> it = hashMap.keySet().iterator();
         if(debug) {
             System.out.printf("HashMap Size: %10d\n", hashMap.size());

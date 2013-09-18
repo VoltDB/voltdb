@@ -58,7 +58,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // groupby
         public boolean groupBy = false;
 
-        public boolean simpleEquals (Object obj) {
+        @Override
+        public boolean equals (Object obj) {
             if (obj == null) return false;
             if (obj instanceof ParsedColInfo == false) return false;
             ParsedColInfo col = (ParsedColInfo) obj;
@@ -69,22 +70,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             return false;
         }
 
-        @Override
-        public boolean equals (Object obj) {
-            if (obj == null) return false;
-            if (obj instanceof ParsedColInfo == false) return false;
-            ParsedColInfo col = (ParsedColInfo) obj;
-            if ( alias != null && alias.equals(col.alias )
-                    && columnName != null && columnName.equals(col.columnName)
-                    && tableName != null && tableName.equals(col.tableName)
-                    && expression.equals(col.expression) && index == col.index && size == col.size
-                    && orderBy == col.orderBy && ascending == col.ascending && groupBy == col.groupBy
-                    && finalOutput == col.finalOutput) {
-                return true;
-            }
-            return false;
-        }
-
+        // Based on implementation on equals().
         @Override
         public int hashCode() {
             int result = 0;
@@ -92,10 +78,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 result += expression.hashCode();
             // calculate hash for other member variable
             result = new HashCodeBuilder(17, 31).
-                    append(alias).append(columnName).append(tableName).
-                    //append(index).append(size).
-                    //append(finalOutput).append(orderBy).append(ascending).append(groupBy).
-                    toHashCode();
+                    append(columnName).append(tableName).toHashCode();
             return result;
         }
 
@@ -281,11 +264,27 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 }
             }
         }
+        // size of aggResultColumns list should be the same as numDisplayCols
+        // as it would be a substitue of DisplayCols.
         if (aggResultColumns.size() != numDisplayCols) {
             // Display columns have duplicated Aggs or TVEs (less than case)
             // Display columns have several pass-through columns if group by primary key (larger than case)
             hasComplexAgg = true;
             return true;
+        }
+
+        // Case: Groupby cols do not appear in SELECT list
+        // Find duplicates
+        HashSet <ParsedColInfo> tmpContainer = new HashSet<ParsedColInfo>();
+
+        for (int i=0; i < numDisplayCols; i++) {
+            ParsedColInfo icol = displayColumns.get(i);
+            if (tmpContainer.contains(icol)) {
+                hasComplexAgg = true;
+                return true;
+            } else {
+                tmpContainer.add(icol);
+            }
         }
 
         return false;
@@ -374,7 +373,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private boolean isNewtoAggResultColumn(ParsedColInfo col) {
         boolean isNew = true;
         for (ParsedColInfo ic: aggResultColumns) {
-            if (ic.simpleEquals(col)) {
+            if (ic.equals(col)) {
                 isNew = false;
                 break;
             }
