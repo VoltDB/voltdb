@@ -346,13 +346,13 @@ public class CSVLoader {
             setupCSVLoader(csvClient);
 
             CountDownLatch processor_cdl = new CountDownLatch(numProcessors);
-            CSVPartitionProcessor.processor_cdl = processor_cdl;
-            CSVPartitionProcessor.colInfo = colInfo;
-            CSVPartitionProcessor.columnTypes = columnTypes;
-            CSVPartitionProcessor.insertProcedure = insertProcedure;
-            CSVPartitionProcessor.isMP = isMP;
-            CSVPartitionProcessor.config = config;
-            CSVPartitionProcessor.tableName = config.table;
+            CSVPartitionProcessor.m_processor_cdl = processor_cdl;
+            CSVPartitionProcessor.m_colInfo = colInfo;
+            CSVPartitionProcessor.m_columnTypes = columnTypes;
+            CSVPartitionProcessor.m_insertProcedure = insertProcedure;
+            CSVPartitionProcessor.m_isMP = isMP;
+            CSVPartitionProcessor.m_config = config;
+            CSVPartitionProcessor.m_tableName = config.table;
 
             //Create a launch processor threads. If Multipartitioned onle 1 processor is launched.
             List<Thread> spawned = new ArrayList<Thread>(numProcessors);
@@ -372,16 +372,16 @@ public class CSVLoader {
                 spawned.add(th);
             }
 
-            CSVFileReader.config = config;
-            CSVFileReader.listReader = listReader;
-            CSVFileReader.partitionedColumnIndex = partitionedColumnIndex;
-            CSVFileReader.partitionColumnType = partitionColumnType;
-            CSVFileReader.typeList = typeList;
-            CSVFileReader.columnCnt = columnCnt;
-            CSVFileReader.csvClient = csvClient;
+            CSVFileReader.m_config = config;
+            CSVFileReader.m_listReader = listReader;
+            CSVFileReader.m_partitionedColumnIndex = partitionedColumnIndex;
+            CSVFileReader.m_partitionColumnType = partitionColumnType;
+            CSVFileReader.m_typeList = typeList;
+            CSVFileReader.m_columnCnt = columnCnt;
+            CSVFileReader.m_csvClient = csvClient;
             CSVFileReader.processorQueues = lineq;
-            CSVFileReader.endOfData = endOfData;
-            CSVFileReader.processor_cdl = processor_cdl;
+            CSVFileReader.m_endOfData = endOfData;
+            CSVFileReader.m_processor_cdl = processor_cdl;
 
             CSVFileReader csvReader = new CSVFileReader();
             Thread th = new Thread(csvReader);
@@ -397,7 +397,7 @@ public class CSVLoader {
             th.start();
             th.join();
 
-            long readerTime = (csvReader.m_parsingTimeEnd - csvReader.m_parsingTimeSt) / 1000000;
+            long readerTime = (csvReader.m_parsingTime) / 1000000;
 
             insertTimeEnd = System.currentTimeMillis();
 
@@ -407,7 +407,7 @@ public class CSVLoader {
             for (CSVPartitionProcessor pp : processors) {
                 insertCount += pp.m_partitionProcessedCount.get();
             }
-            long ackCount = CSVPartitionProcessor.partitionAcknowledgedCount.get();
+            long ackCount = CSVPartitionProcessor.m_partitionAcknowledgedCount.get();
             m_log.info("Parsing CSV file took " + readerTime + " milliseconds.");
             m_log.info("Inserting Data took " + ((insertTimeEnd - insertTimeStart) - readerTime) + " milliseconds.");
             m_log.info("Inserted " + insertCount + " and acknowledged "
@@ -473,7 +473,7 @@ public class CSVLoader {
     }
 
     private static void produceFiles(long ackCount, long insertCount) {
-        Map<Long, String[]> errorInfo = CSVFileReader.errorInfo;
+        Map<Long, String[]> errorInfo = CSVFileReader.m_errorInfo;
         latency = System.currentTimeMillis() - start;
         m_log.info("CSVLoader elapsed: " + latency / 1000F
                 + " seconds");
@@ -504,20 +504,20 @@ public class CSVLoader {
                     + " seconds\n");
             long trueSkip = 0;
             //get the actuall number of lines skipped
-            if (config.skip < CSVFileReader.totalLineCount.get()) {
+            if (config.skip < CSVFileReader.m_totalLineCount.get()) {
                 trueSkip = config.skip;
             } else {
-                trueSkip = CSVFileReader.totalLineCount.get();
+                trueSkip = CSVFileReader.m_totalLineCount.get();
             }
             out_reportfile.write("Number of input lines skipped: "
                     + trueSkip + "\n");
             out_reportfile.write("Number of lines read from input: "
-                    + (CSVFileReader.totalLineCount.get() - trueSkip) + "\n");
+                    + (CSVFileReader.m_totalLineCount.get() - trueSkip) + "\n");
             if (config.limitrows == -1) {
-                out_reportfile.write("Input stopped after " + CSVFileReader.totalRowCount.get() + " rows read" + "\n");
+                out_reportfile.write("Input stopped after " + CSVFileReader.m_totalRowCount.get() + " rows read" + "\n");
             }
             out_reportfile.write("Number of rows discovered: "
-                    + CSVFileReader.totalLineCount.get() + "\n");
+                    + CSVFileReader.m_totalLineCount.get() + "\n");
             out_reportfile.write("Number of rows successfully inserted: "
                     + ackCount + "\n");
             // if prompted msg changed, change it also for test case
@@ -545,14 +545,14 @@ public class CSVLoader {
     private static void close_cleanup() throws IOException,
             InterruptedException {
         //Reset all this for tests which uses main to load csv data.
-        CSVFileReader.errorInfo.clear();
-        CSVFileReader.errored = false;
+        CSVFileReader.m_errorInfo.clear();
+        CSVFileReader.m_errored = false;
         CSVLoader.numProcessors = 1;
         CSVLoader.columnCnt = 0;
-        CSVFileReader.totalLineCount = new AtomicLong(0);
-        CSVFileReader.totalRowCount = new AtomicLong(0);
+        CSVFileReader.m_totalLineCount = new AtomicLong(0);
+        CSVFileReader.m_totalRowCount = new AtomicLong(0);
 
-        CSVPartitionProcessor.partitionAcknowledgedCount = new AtomicLong(0);
+        CSVPartitionProcessor.m_partitionAcknowledgedCount = new AtomicLong(0);
         out_invaliderowfile.close();
         out_logfile.close();
         out_reportfile.close();
