@@ -931,11 +931,6 @@ public class TestPlansJoin extends PlannerTestCase {
        // Self JOIN . Temporary restriction
        failToCompile("select R1.C FROM R1 LEFT OUTER JOIN R2 ON R1.C = R2.C RIGHT JOIN R2 ON R2.C = R1.C",
                      "VoltDB does not support self joins, consider using views instead");
-       // OUTER JOIN with more then two tables. Temporary restriction
-       failToCompile("select R1.C FROM R1 LEFT OUTER JOIN R2 ON R1.C = R2.C RIGHT JOIN R3 ON R3.C = R1.C",
-                     "VoltDB does not support outer joins with more than two tables involved");
-       failToCompile("select R1.C FROM R1 LEFT JOIN R2 ON R1.C = R2.C, R3 WHERE R3.C = R1.C",
-                     "VoltDB does not support outer joins with more than two tables involved");
    }
 
 
