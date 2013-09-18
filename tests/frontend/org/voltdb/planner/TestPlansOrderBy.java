@@ -41,6 +41,13 @@ public class TestPlansOrderBy extends PlannerTestCase {
     private void validatePlan(String sql, boolean expectIndexScan,
             boolean expectSeqScan, boolean expectOrderBy, boolean expectHashAggregate)
     {
+        validatePlan(sql, expectIndexScan, expectSeqScan, expectOrderBy, expectHashAggregate);
+    }
+
+    private void validatePlan(String sql, boolean expectIndexScan,
+            boolean expectSeqScan, boolean expectOrderBy, boolean expectHashAggregate,
+            boolean expectedAggregate)
+    {
         AbstractPlanNode pn = compile(sql);
         //System.out.println(pn.getChild(0).toJSONString());
         System.out.println(pn.getChild(0).toExplainPlanString());
@@ -48,6 +55,7 @@ public class TestPlansOrderBy extends PlannerTestCase {
         assertEquals(expectSeqScan, pn.hasAnyNodeOfType(PlanNodeType.SEQSCAN));
         assertEquals(expectOrderBy, pn.hasAnyNodeOfType(PlanNodeType.ORDERBY));
         assertEquals(expectHashAggregate, pn.hasAnyNodeOfType(PlanNodeType.HASHAGGREGATE));
+        assertEquals(expectedAggregate, pn.hasAnyNodeOfType(PlanNodeType.AGGREGATE));
     }
 
     /// Validate that a plan uses the full bag of tricks
@@ -158,12 +166,24 @@ public class TestPlansOrderBy extends PlannerTestCase {
                      "ORDER BY T.T_D0, T.T_D1", true, true, true, false);
     }
 
+    public void testTableAgg() {
+        validatePlan("SELECT SUM(T_D0) from T", false, true, false, false, true);
+        validatePlan("SELECT SUM(T_D0), COUNT(*), AVG(T_D1) from T", false, true, false, false, true);
+
+        validatePlan("SELECT SUM(T_D0) from T ORDER BY T_D0, T_D1",
+                true, false, false, false, true);
+        validatePlan("SELECT SUM(T_D0), COUNT(*), AVG(T_D1) from T ORDER BY T_D0, T_D1",
+                true, false, false, false, true);
+    }
+
     //TODO: This test actually validates that we generate a sub-optimal plan for this query
     //-- but we're keeping the test because, well, at least the query compiles to SOME kind of plan?
     //When ENG-4096 is addressed, the validation will be quite different.
     public void testOrderByCountStar() {
-        validatePlan("SELECT T_D0, COUNT(*) AS FOO FROM T GROUP BY T_D0 ORDER BY FOO", true, false, true, true);
-        validatePlan("SELECT T_D0, COUNT(*) AS FOO FROM Tnokey GROUP BY T_D0 ORDER BY FOO", false, true, true, true);
+        validatePlan("SELECT T_D0, COUNT(*) AS FOO FROM T GROUP BY T_D0 ORDER BY FOO",
+                true, false, true, true);
+        validatePlan("SELECT T_D0, COUNT(*) AS FOO FROM Tnokey GROUP BY T_D0 ORDER BY FOO",
+                false, true, true, true);
         //Expected ENG-4096 effect:
         //validatePlan("SELECT T_D0, COUNT(*) AS FOO FROM T GROUP BY T_D0 ORDER BY FOO");
     }
