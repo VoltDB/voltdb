@@ -53,16 +53,17 @@ import org.voltdb.client.ProcCallException;
 /**
  * CSVLoader is a simple utility to load data from a CSV formatted file to a table.
  *
- * This utility processes partitioned data efficiently and creates as many partition processors. For partitioned data
- * each processor calls
+ * This utility processes partitioned data efficiently and creates as many partition processors.
+ * For partitioned data each processor calls
  * @LoadSinglepartitionTable
  *
  * For multi-partitioned data it uses a single processor which call
  * @LoadMultipartitionTable
  *
- * The maxerror indicates maximum number of errors it can tolerate. Its a threshold but since processors are processing
- * in parallel we may process rows beyond maxerror and additional errors may occur. Only first maxerror indicated errors
- * will be reported.
+ * The maxerror indicates maximum number of errors it can tolerate.
+ * Its a threshold but since processors are processing in parallel we may process rows beyond
+ * maxerror and additional errors may occur. Only first maxerror indicated errors will be reported.
+ *
  */
 public class CSVLoader {
 
