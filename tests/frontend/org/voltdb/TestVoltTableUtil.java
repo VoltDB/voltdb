@@ -38,13 +38,8 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.utils.VoltTableUtil;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
-import java.math.BigDecimal;
-import java.text.NumberFormat;
-import java.text.ParseException;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import org.mockito.Mockito;
 
@@ -140,65 +135,4 @@ public class TestVoltTableUtil extends Mockito {
         assertEquals(numbers.contains(2l), true);
     }
 
-    @Test
-    public void testaddRowToVoltTableFromLine() {
-        ColumnInfo[] columns = new ColumnInfo[]{
-            new ColumnInfo("", VoltType.TINYINT),
-            new ColumnInfo("", VoltType.SMALLINT),
-            new ColumnInfo("", VoltType.INTEGER),
-            new ColumnInfo("", VoltType.BIGINT),
-            new ColumnInfo("", VoltType.DECIMAL),
-            new ColumnInfo("", VoltType.FLOAT),
-            new ColumnInfo("", VoltType.STRING),
-            new ColumnInfo("", VoltType.VARBINARY),
-            new ColumnInfo("", VoltType.TIMESTAMP)
-        };
-        Map<Integer, VoltType> columnTypes = new HashMap<Integer, VoltType>();
-        columnTypes.put(0, VoltType.TINYINT);
-        columnTypes.put(1, VoltType.SMALLINT);
-        columnTypes.put(2, VoltType.INTEGER);
-        columnTypes.put(3, VoltType.BIGINT);
-        columnTypes.put(4, VoltType.DECIMAL);
-        columnTypes.put(5, VoltType.FLOAT);
-        columnTypes.put(6, VoltType.STRING);
-        columnTypes.put(7, VoltType.VARBINARY);
-        columnTypes.put(8, VoltType.TIMESTAMP);
-
-        VoltTable vt = new VoltTable(columns);
-        String fields[] = {"1", "11", "1,110", "1212121212110",
-            "1.00", "12091212.33", "This is a String", "BytesArray", "2010-07-01 12:30:21.0678"};
-        NumberFormat nf = NumberFormat.getInstance();
-        try {
-            VoltTableUtil.addRowToVoltTableFromLine(vt, fields, columnTypes, nf);
-            assertEquals(1, vt.getRowCount());
-            vt.advanceRow();
-            long l = vt.getLong(0);
-            assertEquals(l, 1);
-            l = vt.getLong(1);
-            assertEquals(l, 11);
-            l = vt.getLong(2);
-            assertEquals(l, 1110);
-            l = vt.getLong(3);
-            assertEquals(l, 1212121212110L);
-            BigDecimal bd = vt.getDecimalAsBigDecimal(4);
-            assertEquals(bd.doubleValue(), 1.0, 0);
-            double d = vt.getDouble(5);
-            assertEquals(d, 12091212.33, 0);
-            String s = vt.getString(6);
-            assertEquals(s, "This is a String");
-
-            byte ba[] = vt.getVarbinary(7);
-            assertEquals(new String(ba), "BytesArray");
-
-            TimestampType ts = new TimestampType(vt.getTimestampAsLong(8));
-            assertEquals(ts.toString(), "2010-07-01 12:30:21.067800");
-
-            VoltTableUtil.addRowToVoltTableFromLine(vt, fields, columnTypes, nf);
-            assertEquals(2, vt.getRowCount());
-        } catch (ParseException ex) {
-            fail(ex.toString());
-        } catch (IOException ex) {
-            fail(ex.toString());
-        }
-    }
 }

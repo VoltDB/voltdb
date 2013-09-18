@@ -17,7 +17,6 @@
 package org.voltdb.utils;
 
 import java.io.IOException;
-import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +27,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.LegacyHashinator;
+import org.voltdb.ParameterConverter;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -262,7 +262,6 @@ class CSVPartitionProcessor implements Runnable {
 
         @Override
         public void run() {
-            NumberFormat nf = NumberFormat.getInstance();
             while (true) {
                 try {
                     CSVLineWithMetaData lineList;
@@ -277,7 +276,7 @@ class CSVPartitionProcessor implements Runnable {
                         VoltTable table = new VoltTable(m_colInfo);
                         //No need to check error here if a correctedLine has come here it was previously successful.
                         try {
-                            VoltTableUtil.addRowToVoltTableFromLine(table, lineList.correctedLine, m_columnTypes, nf);
+                            addRowToVoltTableFromLine(table, lineList.correctedLine);
                         } catch (Exception ex) {
                             continue;
                         }
@@ -342,7 +341,6 @@ class CSVPartitionProcessor implements Runnable {
     // while there are rows and m_endOfData not seen batch and call procedure for insert.
     private void processLoadTable(VoltTable table, String procName, Object partitionParam) {
         List<CSVLineWithMetaData> batchList = new ArrayList<CSVLineWithMetaData>();
-        NumberFormat nf = NumberFormat.getInstance();
 
         while (true) {
             if (m_errored) {
@@ -373,7 +371,7 @@ class CSVPartitionProcessor implements Runnable {
                 }
                 //Build table or just call one proc at a time.
                 try {
-                    if (VoltTableUtil.addRowToVoltTableFromLine(table, lineList.correctedLine, m_columnTypes, nf)) {
+                    if (addRowToVoltTableFromLine(table, lineList.correctedLine)) {
                         batchList.add(lineList);
                     } else {
                         String[] info = {lineList.rawLine.toString(), "Missing or Invalid Data in Row."};
@@ -437,6 +435,28 @@ class CSVPartitionProcessor implements Runnable {
                 }
             }
         }
+    }
+
+    /**
+     * Add rows data to VoltTable given fields values.
+     *
+     * @param table
+     * @param fields
+     * @return
+     */
+    private boolean addRowToVoltTableFromLine(VoltTable table, String fields[])
+            throws Exception {
+
+        if (fields == null || fields.length <= 0) {
+            return false;
+        }
+        Object row_args[] = new Object[fields.length];
+        for (int i = 0; i < fields.length; i++) {
+            final VoltType type = m_columnTypes.get(i);
+            row_args[i] = ParameterConverter.tryToMakeCompatible(type.classFromType(), fields[i]);
+        }
+        table.addRow(row_args);
+        return true;
     }
 
     @Override
