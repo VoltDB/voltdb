@@ -559,7 +559,6 @@ public class PlanAssembler {
                 throw new PlanningErrorException(errorMsg);
             }
 
-            m_parsedSelect.switchFixSuiteForMVBasedQuery();
             m_parsedSelect.mvFixInfo.finalNeedFix = true;
         }
 
@@ -569,7 +568,9 @@ public class PlanAssembler {
         root = handleAggregationOperators(root);
 
         // Process the re-aggregate plan node and insert it into the plan.
-        root = handleMVBasedMultiPartQuery(root);
+        if (m_parsedSelect.mvFixInfo.finalNeedFix) {
+            root = handleMVBasedMultiPartQuery(root);
+        }
 
         if (m_parsedSelect.hasComplexAgg()) {
             AbstractPlanNode aggNode = root.getChild(0);
@@ -1227,42 +1228,31 @@ public class PlanAssembler {
         scanNode.addInlinePlanNode(inlineProj);
 
         // Construct a new re-aggregate plan node as the parent of receive node.
-        AggregatePlanNode aggNode = new HashAggregatePlanNode();
+        AggregatePlanNode reAggNode = new HashAggregatePlanNode();
 
         int outputColumnIndex = 0;
-        NodeSchema agg_schema = new NodeSchema();
+        NodeSchema aggSchema = new NodeSchema();
 
-        for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.aggResultColumns) {
+        for (ParsedSelectStmt.ParsedColInfo col : mvFixInfo.mvAggResultColumns) {
             AbstractExpression rootExpr = col.expression;
             SchemaColumn schema_col = null;
             if (ParsedColInfo.isNewtoColumnList(mvFixInfo.mvDDLGroupbyColumnsList, col)) {
-                // TODO(xin):
-                // Change this when MV can support more aggregation types, like MIN & MAX
-                ExpressionType agg_expression_type = ExpressionType.AGGREGATE_SUM;
-
-                boolean is_distinct = false;
+                // Support more aggregation types, like MIN & MAX
+                ExpressionType reAggType = mvFixInfo.mvColumnAggType.get(col.columnName);
+                assert(reAggType != null);
                 AbstractExpression agg_input_expr = null;
+                assert(rootExpr instanceof TupleValueExpression);
 
                 TupleValueExpression tve = new TupleValueExpression();
                 tve.setValueType(rootExpr.getValueType());
                 tve.setValueSize(rootExpr.getValueSize());
                 tve.setColumnIndex(outputColumnIndex);
+                tve.setColumnName(col.columnName);
+                tve.setColumnAlias(col.alias);
+                tve.setTableName(col.tableName);
 
-                if (rootExpr instanceof AggregateExpression) {
-                    AggregateExpression aggExpr = (AggregateExpression)rootExpr;
-
-                    is_distinct = aggExpr.isDistinct();
-                    tve.setColumnName("");
-                    tve.setColumnAlias(col.alias);
-                    tve.setTableName("VOLT_TEMP_TABLE");
-                } else {
-                    tve.setColumnName(col.columnName);
-                    tve.setColumnAlias(col.alias);
-                    tve.setTableName(col.tableName);
-                }
                 agg_input_expr = (AbstractExpression) tve.clone();
-
-                aggNode.addAggregate(agg_expression_type, is_distinct, outputColumnIndex, agg_input_expr);
+                reAggNode.addAggregate(reAggType, false, outputColumnIndex, agg_input_expr);
                 schema_col = new SchemaColumn(col.tableName, col.columnName, col.alias, tve);
             }
             else
@@ -1274,20 +1264,20 @@ public class PlanAssembler {
                 schema_col = new SchemaColumn(col.tableName, col.columnName, col.alias, col.expression);
             }
 
-            agg_schema.addColumn(schema_col);
+            aggSchema.addColumn(schema_col);
             outputColumnIndex++;
         }
-        aggNode.setOutputSchema(agg_schema);
+        reAggNode.setOutputSchema(aggSchema);
 
-
+        // Add group by expression.
         for (ParsedSelectStmt.ParsedColInfo col : mvFixInfo.mvDDLGroupbyColumnsList) {
-            aggNode.addGroupByExpression(col.expression);
+            reAggNode.addGroupByExpression(col.expression);
         }
 
         // Find receive plan node and insert the constructed re-aggregation plan node.
         if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
-            aggNode.addAndLinkChild(root);
-            root = aggNode;
+            reAggNode.addAndLinkChild(root);
+            root = reAggNode;
         } else {
             AbstractPlanNode receiveNode = root;
             while (receiveNode.getPlanNodeType() != PlanNodeType.RECEIVE) {
@@ -1298,12 +1288,9 @@ public class PlanAssembler {
             receiveNode.clearParents();
             parent.clearChildren();
 
-            aggNode.addAndLinkChild(receiveNode);
-            parent.addAndLinkChild(aggNode);
+            reAggNode.addAndLinkChild(receiveNode);
+            parent.addAndLinkChild(reAggNode);
         }
-
-        // Switch back for the real query's displayColumns
-        m_parsedSelect.displayColumns = mvFixInfo.originalDisplayColumns;
 
         return root;
     }
@@ -1313,12 +1300,6 @@ public class PlanAssembler {
 
         /* Check if any aggregate expressions are present */
         boolean containsAggregateExpression = m_parsedSelect.hasAggregateExpression();
-
-        if (m_parsedSelect.mvFixInfo.finalNeedFix && !containsAggregateExpression) {
-            if (m_parsedSelect.groupByColumns().size() == m_parsedSelect.mvFixInfo.numOfGroupByColumns) {
-                return root;
-            }
-        }
 
         /*
          * "Select A from T group by A" is grouped but has no aggregate operator
@@ -1420,13 +1401,6 @@ public class PlanAssembler {
                             }
                             else {
                                 top_expression_type = ExpressionType.AGGREGATE_SUM;
-
-                                // For Future use: ENG-3504
-//                                if (agg_expression_type == ExpressionType.AGGREGATE_COUNT_STAR &&
-//                                        m_parsedSelect.mvFixInfo.finalNeedFix) {
-//                                    top_expression_type = ExpressionType.AGGREGATE_COUNT_STAR;
-//                                    tve = null;
-//                                }
                             }
                         }
 
@@ -1488,14 +1462,7 @@ public class PlanAssembler {
                 aggNode.addGroupByExpression(col.expression);
 
                 if (topAggNode != null) {
-                    if (!m_parsedSelect.mvFixInfo.finalNeedFix) {
-                        topAggNode.addGroupByExpression(m_parsedSelect.groupByExpressions.get(col.alias));
-                    } else {
-                        if (m_parsedSelect.mvFixInfo.originalGroupByColumns.contains(col)) {
-                            topAggNode.addGroupByExpression(m_parsedSelect.groupByExpressions.get(col.alias));
-                        }
-                    }
-
+                    topAggNode.addGroupByExpression(m_parsedSelect.groupByExpressions.get(col.alias));
                 }
             }
             aggNode.setOutputSchema(agg_schema);
@@ -1509,7 +1476,19 @@ public class PlanAssembler {
             }
 
             NodeSchema newSchema = m_parsedSelect.getFinalProjectionSchema();
-            root = pushDownAggregate(root, aggNode, topAggNode, m_parsedSelect.hasComplexAgg(), newSchema);
+            // Never push down aggregation for MV fix case.
+            if (!m_parsedSelect.mvFixInfo.finalNeedFix) {
+                root = pushDownAggregate(root, aggNode, topAggNode, m_parsedSelect.hasComplexAgg(), newSchema);
+            } else {
+                aggNode.addAndLinkChild(root);
+                root = aggNode;
+                if (m_parsedSelect.hasComplexAgg()) {
+                    ProjectionPlanNode proj = new ProjectionPlanNode();
+                    proj.addAndLinkChild(root);
+                    proj.setOutputSchema(newSchema);
+                    root = proj;
+                }
+            }
         }
 
         if (m_parsedSelect.isGrouped()) {

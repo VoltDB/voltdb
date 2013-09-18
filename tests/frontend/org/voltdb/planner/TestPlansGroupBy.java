@@ -241,41 +241,41 @@ public class TestPlansGroupBy extends PlannerTestCase {
         String[] tbs = {"V_P1", "V_P1_ABS"};
         for (String tb: tbs) {
             pns = compileToFragments("SELECT * FROM " + tb);
-            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 3);
+            checkMVFix_NoTopAgg(pns, 2, 3);
 
             pns = compileToFragments("SELECT * FROM " + tb + " order by V_A1");
-            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 3);
+            checkMVFix_NoTopAgg(pns, 2, 3);
 
             pns = compileToFragments("SELECT * FROM " + tb + " order by V_A1, V_B1");
-            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 3);
+            checkMVFix_NoTopAgg(pns, 2, 3);
 
             pns = compileToFragments("SELECT * FROM " + tb + " order by V_SUM_D1");
-            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 3);
+            checkMVFix_NoTopAgg(pns, 2, 3);
 
             pns = compileToFragments("SELECT * FROM " + tb + " limit 1");
-            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 3);
+            checkMVFix_NoTopAgg(pns, 2, 3);
 
             pns = compileToFragments("SELECT * FROM " + tb + " order by V_A1, V_B1 limit 1");
-            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 3);
+            checkMVFix_NoTopAgg(pns, 2, 3);
 
             pns = compileToFragments("SELECT v_sum_c1 FROM " + tb + "");
-            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 1);
+            checkMVFix_NoTopAgg(pns, 2, 1);
 
             pns = compileToFragments("SELECT v_sum_c1 FROM " + tb + " order by v_sum_c1");
-            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 1);
+            checkMVFix_NoTopAgg(pns, 2, 1);
 
             pns = compileToFragments("SELECT v_sum_c1 FROM " + tb + " order by v_sum_d1");
-            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 1);
+            checkMVFix_NoTopAgg(pns, 2, 2);
 
             pns = compileToFragments("SELECT v_sum_c1 FROM " + tb + " limit 1");
-            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 1);
+            checkMVFix_NoTopAgg(pns, 2, 1);
 
             pns = compileToFragments("SELECT v_sum_c1 FROM " + tb + " order by v_sum_c1 limit 1");
-            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 1);
+            checkMVFix_NoTopAgg(pns, 2, 1);
 
             // test distinct down.
             pns = compileToFragments("SELECT distinct v_sum_c1 FROM " + tb + " limit 1");
-            checkMVReaggreateFeatureNoBottomAgg(pns, 2, 1);
+            checkMVFix_NoTopAgg(pns, 2, 1, true);
         }
     }
 
@@ -301,88 +301,88 @@ public class TestPlansGroupBy extends PlannerTestCase {
             // Test set (1)
             pns = compileToFragments("SELECT V_SUM_C1 FROM " + tb +
                     " GROUP by V_SUM_C1");
-            checkMVReaggreateFeatureAggPushdown(pns, 1, 0, 2, 1, 3, 0);
+            checkMVFix_TopAgg_ReAgg(pns, 1, 0, 2, 1);
 
             pns = compileToFragments("SELECT V_SUM_C1 FROM " + tb +
                     " GROUP by V_SUM_C1 ORDER BY V_SUM_C1");
-            checkMVReaggreateFeatureAggPushdown(pns, 1, 0, 2, 1, 3, 0);
+            checkMVFix_TopAgg_ReAgg(pns, 1, 0, 2, 1);
 
             pns = compileToFragments("SELECT V_SUM_C1 FROM " + tb + " GROUP by V_SUM_C1 " +
                     "ORDER BY V_SUM_C1 LIMIT 5");
-            checkMVReaggreateFeatureAggPushdown(pns, 1, 0, 2, 1, 3, 0);
+            checkMVFix_TopAgg_ReAgg(pns, 1, 0, 2, 1);
 
             pns = compileToFragments("SELECT V_SUM_C1 FROM " + tb +
                     " GROUP by V_SUM_C1 LIMIT 5");
-            checkMVReaggreateFeatureAggPushdown(pns, 1, 0, 2, 1, 3, 0);
+            checkMVFix_TopAgg_ReAgg(pns, 1, 0, 2, 1);
 
             pns = compileToFragments("SELECT distinct V_SUM_C1 FROM " + tb +
                     " GROUP by V_SUM_C1 LIMIT 5");
-            checkMVReaggreateFeatureAggPushdown(pns, 1, 0, 2, 1, 3, 0);
+            checkMVFix_TopAgg_ReAgg(pns, 1, 0, 2, 1);
 
             // Test set (2)
             pns = compileToFragments("SELECT V_SUM_C1, sum(V_CNT) FROM " + tb +
                     " GROUP by V_SUM_C1");
-            checkMVReaggreateFeatureAggPushdown(pns, 1, 1, 2, 2, 3, 1);
+            checkMVFix_TopAgg_ReAgg(pns, 1, 1, 2, 2);
 
             pns = compileToFragments("SELECT V_SUM_C1, sum(V_CNT) FROM " + tb +
                     " GROUP by V_SUM_C1 ORDER BY V_SUM_C1");
-            checkMVReaggreateFeatureAggPushdown(pns, 1, 1, 2, 2, 3, 1);
+            checkMVFix_TopAgg_ReAgg(pns, 1, 1, 2, 2);
 
             pns = compileToFragments("SELECT V_SUM_C1, sum(V_CNT) FROM " + tb +
                     " GROUP by V_SUM_C1 ORDER BY V_SUM_C1 limit 2");
-            checkMVReaggreateFeatureAggPushdown(pns, 1, 1, 2, 2, 3, 1);
+            checkMVFix_TopAgg_ReAgg(pns, 1, 1, 2, 2);
 
             // Distinct: No aggregation push down.
             pns = compileToFragments("SELECT V_SUM_C1, sum(distinct V_CNT) " +
                     "FROM " + tb + " GROUP by V_SUM_C1 ORDER BY V_SUM_C1");
-            checkMVReaggreateFeatureAggPushdownFalse(pns, 3, 1, 2, 2);
+            checkMVFix_TopAgg_ReAgg(pns, 1, 1, 2, 2);
 
 
             // Test set (3)
             pns = compileToFragments("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
                     " GROUP BY V_A1,V_B1, V_SUM_C1");
-            checkMVReaggreateFeatureAggPushdown(pns, 3, 1, 2, 2, 3, 1);
+            checkMVFix_TopAgg_ReAgg(pns, 1, 1, 2, 2);
 
             pns = compileToFragments("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
                     " GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1,V_B1, V_SUM_C1");
-            checkMVReaggreateFeatureAggPushdown(pns, 3, 1, 2, 2, 3, 1);
+            checkMVFix_TopAgg_ReAgg(pns, 1, 1, 2, 2);
 
             pns = compileToFragments("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
                     " GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1,V_B1, V_SUM_C1 LIMIT 5");
-            checkMVReaggreateFeatureAggPushdown(pns, 3, 1, 2, 2, 3, 1);
+            checkMVFix_TopAgg_ReAgg(pns, 1, 1, 2, 2);
 
             pns = compileToFragments("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
                     " GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1, V_SUM_C1 LIMIT 5");
-            checkMVReaggreateFeatureAggPushdown(pns, 3, 1, 2, 2, 3, 1);
+            checkMVFix_TopAgg_ReAgg(pns, 1, 1, 2, 2);
 
             // Distinct: No aggregation push down.
             pns = compileToFragments("SELECT V_A1,V_B1, V_SUM_C1, sum( distinct V_SUM_D1) FROM " +
                     tb + " GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1, V_SUM_C1 LIMIT 5");
-            checkMVReaggreateFeatureAggPushdownFalse(pns, 3, 1, 2, 2);
+            checkMVFix_TopAgg_ReAgg(pns, 1, 1, 2, 2);
         }
     }
 
     public void testMultiPartitionMVBasedQuery_NoFix() {
         // Normal select queries
         pns = compileToFragments("SELECT * FROM V_P1_TEST1");
-        checkMVReaggreateFeatureNoFix_Normal(pns, false, false);
+        checkMVNoFix_NoAgg(pns, false);
 
         pns = compileToFragments("SELECT V_SUM_C1 FROM V_P1_TEST1 ORDER BY V_A1");
-        checkMVReaggreateFeatureNoFix_Normal(pns, false, false);
+        checkMVNoFix_NoAgg(pns, false);
 
         pns = compileToFragments("SELECT V_SUM_C1 FROM V_P1_TEST1 LIMIT 1");
-        checkMVReaggreateFeatureNoFix_Normal(pns, false, false);
+        checkMVNoFix_NoAgg(pns, false);
 
         pns = compileToFragments("SELECT DISTINCT V_SUM_C1 FROM V_P1_TEST1");
-        checkMVReaggreateFeatureNoFix_Normal(pns, false, true);
+        checkMVNoFix_NoAgg(pns, true);
 
         // Distributed group by query
         pns = compileToFragments("SELECT V_SUM_C1 FROM V_P1_TEST1 GROUP by V_SUM_C1");
-        checkMVReaggreateFeatureNoFix_Distributed(pns, 1,0, 1, 0, true, false);
+        checkMVNoFix_Agg(pns, 1, 0, false);
 
         pns = compileToFragments("SELECT V_SUM_C1, sum(V_CNT) FROM V_P1_TEST1 " +
                 "GROUP by V_SUM_C1");
-        checkMVReaggreateFeatureNoFix_Distributed(pns, 1,1, 1, 1, true, false);
+        checkMVNoFix_Agg(pns, 1, 1, false);
     }
 
     public void testMultiPartitionMVBasedQuery_Where() {
@@ -394,62 +394,58 @@ public class TestPlansGroupBy extends PlannerTestCase {
         }
     }
 
-    private void checkMVReaggreateFeatureNoFix_Normal(List<AbstractPlanNode> pns,
-            boolean aggPushdown, boolean distinctPushdown) {
+    private void checkMVNoFix_NoAgg(List<AbstractPlanNode> pns,
+            boolean distinctPushdown) {
         // the first '-1' indicates that there is no top aggregation node.
-        checkMVReaggreateFeature(pns, -1, -1, -1, -1, -1, -1,
-                aggPushdown, distinctPushdown, false);
+
+        checkMVReaggreateFeature(pns, -1, -1, -1, -1,
+                distinctPushdown, false, false, true);
     }
 
-    private void checkMVReaggreateFeatureNoFix_Distributed(List<AbstractPlanNode> pns,
+    private void checkMVNoFix_Agg(List<AbstractPlanNode> pns,
             int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
-            int numGroupbyOfAggNode, int numAggsOfAggNode,
-            boolean aggPushdown, boolean distinctPushdown) {
+            boolean distinctPushdown) {
         // the first '-1' indicates that there is no top aggregation node.
         checkMVReaggreateFeature(pns,
-                numGroupbyOfTopAggNode, numAggsOfAggNode,
+                numGroupbyOfTopAggNode, numAggsOfTopAggNode,
                 -1, -1,
-                numGroupbyOfAggNode, numAggsOfAggNode,
-                aggPushdown, distinctPushdown, false);
+                distinctPushdown, false, true, false);
     }
 
-    private void checkMVReaggreateFeatureNoBottomAgg(List<AbstractPlanNode> pns,
+    private void checkMVFix_NoTopAgg(List<AbstractPlanNode> pns,
             int numGroupbyOfReaggNode, int numAggsOfReaggNode) {
         // the first '-1' indicates that there is no top aggregation node.
-        checkMVReaggreateFeature(pns, -1, -1,
-                numGroupbyOfReaggNode, numAggsOfReaggNode,
-                -1, -1, false, false, true);
-    }
-
-    private void checkMVReaggreateFeatureAggPushdown(List<AbstractPlanNode> pns,
-            int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
-            int numGroupbyOfReaggNode, int numAggsOfReaggNode,
-            int numGroupbyOfAggNode, int numAggsOfAggNode) {
-
         checkMVReaggreateFeature(pns,
-                numGroupbyOfTopAggNode, numAggsOfTopAggNode,
+                -1, -1,
                 numGroupbyOfReaggNode, numAggsOfReaggNode,
-                numGroupbyOfAggNode, numAggsOfAggNode,
-                true, false, true);
+                false, true, false, true);
     }
 
-    private void checkMVReaggreateFeatureAggPushdownFalse(List<AbstractPlanNode> pns,
+    private void checkMVFix_NoTopAgg(List<AbstractPlanNode> pns,
+            int numGroupbyOfReaggNode, int numAggsOfReaggNode, boolean distinct) {
+        // the first '-1' indicates that there is no top aggregation node.
+        checkMVReaggreateFeature(pns,
+                -1, -1,
+                numGroupbyOfReaggNode, numAggsOfReaggNode,
+                distinct, true, false, true);
+    }
+
+    private void checkMVFix_TopAgg_ReAgg(List<AbstractPlanNode> pns,
             int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
             int numGroupbyOfReaggNode, int numAggsOfReaggNode) {
 
         checkMVReaggreateFeature(pns,
                 numGroupbyOfTopAggNode, numAggsOfTopAggNode,
                 numGroupbyOfReaggNode, numAggsOfReaggNode,
-                -1, -1, // never used these two numbers for this case.
-                false, false, true);
+                false, true, false, true);
     }
 
-    // topNode, reAggNode, aggNode.
+    // topNode, reAggNode
     private void checkMVReaggreateFeature(List<AbstractPlanNode> pns,
             int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
             int numGroupbyOfReaggNode, int numAggsOfReaggNode,
-            int numGroupbyOfAggNode, int numAggsOfAggNode,
-            boolean aggPushdown, boolean distinctPushdown, boolean needFix) {
+            boolean distinctPushdown, boolean needFix,
+            boolean aggPushdown, boolean projectionNode ) {
 
         for (AbstractPlanNode apn: pns) {
             System.out.println(apn.toExplainPlanString());
@@ -463,8 +459,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
             // No limit pushed down.
             p = p.getChild(0);
         }
-        if (needFix || !aggPushdown) {
-            // No projection node for no-need fixed group by query
+        if (projectionNode) {
             assertTrue(p instanceof ProjectionPlanNode);
             p = p.getChild(0);
         }
@@ -494,7 +489,10 @@ public class TestPlansGroupBy extends PlannerTestCase {
             }
             assertTrue(p instanceof ReceivePlanNode);
 
-            p = pns.get(1).getChild(0);
+            p = pns.get(1);
+            assertTrue(p instanceof SendPlanNode);
+            p = p.getChild(0);
+
             if (distinctPushdown) {
                 assertTrue(p instanceof DistinctPlanNode);
                 p = p.getChild(0);
@@ -525,15 +523,14 @@ public class TestPlansGroupBy extends PlannerTestCase {
             // Test the second part
             p = pns.get(1);
             assertTrue(p instanceof SendPlanNode);
-            p = pns.get(1).getChild(0);
+            p = p.getChild(0);
 
             if (aggPushdown) {
+                assertTrue(!needFix);
                 assertTrue(p instanceof AggregatePlanNode);
-                AggregatePlanNode aggNode = (AggregatePlanNode) p;
-                assertEquals(numGroupbyOfAggNode, aggNode.getGroExpressionTypes().size());
-                assertEquals(numAggsOfAggNode, aggNode.getAggregateTypes().size());
                 p = p.getChild(0);
             }
+
             assertTrue(p instanceof AbstractScanPlanNode);
         }
     }

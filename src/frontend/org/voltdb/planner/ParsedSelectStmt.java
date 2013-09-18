@@ -142,11 +142,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         public boolean disableGroupbyAndAggQuery = false;
         public int numOfGroupByColumns = -1;
 
-        public ArrayList<ParsedColInfo> originalDisplayColumns = null;
-        public ArrayList<ParsedColInfo> originalAggResultColumns = null;
-        public ArrayList<ParsedColInfo> originalGroupByColumns = null;
-
+        public ArrayList<ParsedColInfo> mvAggResultColumns = null;
         public List<ParsedColInfo> mvDDLGroupbyColumnsList = null;
+        public Map <String, ExpressionType> mvColumnAggType;
 
         public Table mvTable = null;
         public NodeSchema inlineProjSchema = null;
@@ -343,20 +341,25 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private void processMVBasedQueryFix() {
         // Start to do real processing now.
         String mvTableName = mvFixInfo.mvTable.getTypeName();
-        ArrayList<ParsedColInfo> tmpDisplayColumns = new ArrayList<ParsedColInfo>(displayColumns);
-        ArrayList<ParsedColInfo> tmpAggResultColumns = new ArrayList<ParsedColInfo>(aggResultColumns);
-        ArrayList<ParsedColInfo> tmpGroupbyColumns = new ArrayList<ParsedColInfo>(groupByColumns);
-        // Keep the newAggSchema the same without any changes if it has been created.
         mvFixInfo.mvDDLGroupbyColumnsList = new ArrayList<ParsedColInfo>();
+        mvFixInfo.mvAggResultColumns = new ArrayList<ParsedColInfo>();
+        mvFixInfo.mvColumnAggType = new HashMap<String, ExpressionType>();
 
         List<Column> mvColumnArray =
                 CatalogUtil.getSortedCatalogItems(mvFixInfo.mvTable.getColumns(), "index");
+        for (Column mvCol: mvColumnArray) {
+            ExpressionType reAggType = ExpressionType.get(mvCol.getAggregatetype());
+            if (reAggType == ExpressionType.AGGREGATE_COUNT_STAR ||
+                    reAggType == ExpressionType.AGGREGATE_COUNT) {
+                reAggType = ExpressionType.AGGREGATE_SUM;
+            }
+            mvFixInfo.mvColumnAggType.put(mvCol.getName(), reAggType);
+        }
 
         assert(mvFixInfo.numOfGroupByColumns > 0);
         for (int i = 0; i < mvFixInfo.numOfGroupByColumns; i++) {
             ParsedColInfo col = new ParsedColInfo();
             Column mvCol = mvColumnArray.get(i);
-
             col.columnName = mvCol.getName();
             col.tableName = mvTableName;
             col.alias = mvCol.getName();
@@ -371,28 +374,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             col.expression = tve;
 
             mvFixInfo.mvDDLGroupbyColumnsList.add(col);
-            if (ParsedColInfo.isNewtoColumnList(aggResultColumns, col)) {
-                aggResultColumns.add(col);
-            }
-            if (ParsedColInfo.isNewtoColumnList(displayColumns, col)) {
-                displayColumns.add(col);
-            }
-            if (ParsedColInfo.isNewtoColumnList(groupByColumns, col)) {
-                groupByColumns.add(col);
-            }
         }
-
-        assert(projectSchema != null);
-        placeTVEsinColumns();
-
-        // Switch them back
-        mvFixInfo.originalDisplayColumns = displayColumns;
-        mvFixInfo.originalAggResultColumns = aggResultColumns;
-        mvFixInfo.originalGroupByColumns = groupByColumns;
-
-        displayColumns = tmpDisplayColumns;
-        aggResultColumns = tmpAggResultColumns;
-        groupByColumns = tmpGroupbyColumns;
 
         // Prepare for the inlined projection node schema for scan node.
         mvFixInfo.inlineProjSchema = new NodeSchema();
@@ -407,19 +389,18 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         ArrayList<SchemaColumn> newValue = new ArrayList<SchemaColumn>();
 
-        for (String key: scanColumns.keySet()) {
-            ArrayList<SchemaColumn> value = scanColumns.get(key);
-            if (key.equals(mvTableName)) {
-                newValue.addAll(value);
-                Set<SchemaColumn> valueSet = new HashSet<SchemaColumn>(value);
-                // construct new projection columns for scan plan node.
-                for (SchemaColumn scol : orignalGroupbyColumnsList) {
-                    if (!valueSet.contains(scol)) {
-                        valueSet.add(scol);
-                        newValue.add(scol);
-                    }
+        assert(scanColumns.keySet().size() == 1);
+        for (String tbName: scanColumns.keySet()) {
+            assert(tbName.equals(mvTableName));
+            ArrayList<SchemaColumn> columns = scanColumns.get(tbName);
+            newValue.addAll(columns);
+            Set<SchemaColumn> valueSet = new HashSet<SchemaColumn>(columns);
+            // construct new projection columns for scan plan node.
+            for (SchemaColumn scol : orignalGroupbyColumnsList) {
+                if (!valueSet.contains(scol)) {
+                    valueSet.add(scol);
+                    newValue.add(scol);
                 }
-                break;
             }
         }
         if (newValue.size() == 0) {
@@ -429,22 +410,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             mvFixInfo.inlineProjSchema.addColumn(scol);
         }
 
-    }
-
-    public void switchFixSuiteForMVBasedQuery() {
-        ArrayList<ParsedColInfo> tmpDisplayColumns = displayColumns;
-        ArrayList<ParsedColInfo> tmpAggResultColumns = aggResultColumns;
-        ArrayList<ParsedColInfo> tmpGroupByColumns = groupByColumns;
-
-        // Switch set for MV fix use.
-        displayColumns = mvFixInfo.originalDisplayColumns;
-        aggResultColumns = mvFixInfo.originalAggResultColumns;
-        groupByColumns = mvFixInfo.originalGroupByColumns;
-
-        // But keep the original set in mv set for future use.
-        mvFixInfo.originalDisplayColumns = tmpDisplayColumns;
-        mvFixInfo.originalAggResultColumns = tmpAggResultColumns;
-        mvFixInfo.originalGroupByColumns = tmpGroupByColumns;
+        // Construct MV aggResult list.
+        for (SchemaColumn scol: newValue) {
+            ParsedColInfo col = new ParsedColInfo();
+            col.expression = scol.getExpression();
+            col.alias = scol.getColumnAlias();
+            col.columnName = scol.getColumnName();
+            col.tableName = scol.getTableName();
+            mvFixInfo.mvAggResultColumns.add(col);
+        }
     }
 
     private void processAvgPushdownOptimization (VoltXMLElement displayElement,
