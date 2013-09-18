@@ -206,7 +206,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // (That is, InitiatorMailbox's API, used by BabySitter, is synchronized on the same
     // lock deliver() is synchronized on.)
     @Override
-    public void updateReplicas(List<Long> replicas)
+    public void updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters)
     {
         // First - correct the official replica set.
         m_replicaHSIds = replicas;
