@@ -21,17 +21,20 @@ import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.LegacyHashinator;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import static org.voltdb.utils.CSVFileReader.synchronizeErrorInfo;
 
@@ -49,12 +52,8 @@ class CSVPartitionProcessor implements Runnable {
     final CSVLineWithMetaData m_endOfData;
     //Partition for which this processor thread is processing.
     final int m_partitionId;
-    static String m_insertProcedure = "";
-    static String m_tableName;
+    //This is just so we can identity thread name and log information.
     final String m_processorName;
-    static Map<Integer, VoltType> m_columnTypes;
-    static VoltTable.ColumnInfo m_colInfo[];
-    static boolean m_isMP = false;
     //Processed count indicates how many inser sent to server.
     final AtomicLong m_partitionProcessedCount = new AtomicLong(0);
     //Incremented after insert is acknowledged by server.
@@ -63,6 +62,30 @@ class CSVPartitionProcessor implements Runnable {
     static CountDownLatch m_processor_cdl;
     boolean m_errored = false;
     static int m_reportEveryNRows = 10000;
+    //Following fields are detected by initializeProcessorInformation
+    //Procedure supplied in -p mode
+    static String m_insertProcedure = "";
+    //Table name to insert into.
+    static String m_tableName;
+    //Types of columns
+    static List<VoltType> m_typeList = new ArrayList<VoltType>();
+    //Column information
+    static VoltTable.ColumnInfo m_colInfo[];
+    //Column types
+    static Map<Integer, VoltType> m_columnTypes;
+    //Column Names
+    static Map<Integer, String> m_colNames;
+    //Zero based index of the partitioned column
+    static int m_partitionedColumnIndex = -1;
+    //Partitioned column type
+    static VoltType m_partitionColumnType = VoltType.NULL;
+    //Number of columns
+    static int m_columnCnt = 0;
+    //Is this a MP transaction
+    static boolean m_isMP = false;
+    //Number of processors default to 1 when its a MP procedure or table.
+    static int m_numProcessors = 1;
+
 
     public CSVPartitionProcessor(Client client, int partitionId,
             int partitionColumnIndex, BlockingQueue<CSVLineWithMetaData> partitionQueue, CSVLineWithMetaData eod) {
@@ -72,6 +95,123 @@ class CSVPartitionProcessor implements Runnable {
         m_partitionColumnIndex = partitionColumnIndex;
         m_endOfData = eod;
         m_processorName = "PartitionProcessor-" + partitionId;
+    }
+
+    private static boolean isProcedureMp(Client csvClient)
+            throws IOException, org.voltdb.client.ProcCallException {
+        boolean procedure_is_mp = false;
+        VoltTable procInfo = csvClient.callProcedure("@SystemCatalog",
+                "PROCEDURES").getResults()[0];
+        while (procInfo.advanceRow()) {
+            if (m_insertProcedure.matches(procInfo.getString("PROCEDURE_NAME"))) {
+                String remarks = procInfo.getString("REMARKS");
+                if (remarks.contains("\"singlePartition\":false")) {
+                    procedure_is_mp = true;
+                }
+                break;
+            }
+        }
+        return procedure_is_mp;
+    }
+
+    // Based on method of loading do sanity check and setup info for loading.
+    public static boolean initializeProcessorInformation(CSVLoader.CSVConfig config, Client csvClient) throws IOException, ProcCallException, InterruptedException {
+        VoltTable procInfo;
+        m_config = config;
+        if (m_config.useSuppliedProcedure) {
+            // -p mode where user specified a procedure name could be standard CRUD or written from scratch.
+            boolean isProcExist = false;
+            m_insertProcedure = m_config.procedure;
+            procInfo = csvClient.callProcedure("@SystemCatalog",
+                    "PROCEDURECOLUMNS").getResults()[0];
+            while (procInfo.advanceRow()) {
+                if (m_insertProcedure.matches((String) procInfo.get(
+                        "PROCEDURE_NAME", VoltType.STRING))) {
+                    m_columnCnt++;
+                    isProcExist = true;
+                    String typeStr = (String) procInfo.get("TYPE_NAME", VoltType.STRING);
+                    m_typeList.add(VoltType.typeFromString(typeStr));
+                }
+            }
+            if (isProcExist == false) {
+                m_log.error("No matching insert procedure available");
+                return false;
+            }
+            m_isMP = isProcedureMp(csvClient);
+        } else {
+            //Table mode get table details and then build partition and column information.
+            m_tableName = m_config.table;
+            procInfo = csvClient.callProcedure("@SystemCatalog",
+                    "COLUMNS").getResults()[0];
+            m_columnTypes = new TreeMap<Integer, VoltType>();
+            m_colNames = new TreeMap<Integer, String>();
+            while (procInfo.advanceRow()) {
+                String table = procInfo.getString("TABLE_NAME");
+                if (m_config.table.equalsIgnoreCase(table)) {
+                    VoltType vtype = VoltType.typeFromString(procInfo.getString("TYPE_NAME"));
+                    int idx = (int) procInfo.getLong("ORDINAL_POSITION") - 1;
+                    m_columnTypes.put(idx, vtype);
+                    m_colNames.put(idx, procInfo.getString("COLUMN_NAME"));
+                    String remarks = procInfo.getString("REMARKS");
+                    if (remarks != null && remarks.equalsIgnoreCase("PARTITION_COLUMN")) {
+                        m_partitionColumnType = vtype;
+                        m_partitionedColumnIndex = idx;
+                        m_log.info("Table " + m_config.table + " Partition Column Name is: " + procInfo.getString("COLUMN_NAME"));
+                        m_log.info("Table " + m_config.table + " Partition Column Type is: " + vtype.toString());
+                    }
+                }
+            }
+
+            if (m_columnTypes.isEmpty()) {
+                m_log.error("Table " + m_config.table + " Not found");
+                return false;
+            }
+            m_columnCnt = m_columnTypes.size();
+            //Build column info so we can build VoltTable
+            m_colInfo = new VoltTable.ColumnInfo[m_columnTypes.size()];
+            for (int i = 0; i < m_columnTypes.size(); i++) {
+                VoltType type = m_columnTypes.get(i);
+                String cname = m_colNames.get(i);
+                VoltTable.ColumnInfo ci = new VoltTable.ColumnInfo(cname, type);
+                m_colInfo[i] = ci;
+            }
+            m_typeList = new ArrayList<VoltType>(m_columnTypes.values());
+            int sitesPerHost = 1;
+            int kfactor = 0;
+            int hostcount = 1;
+            procInfo = csvClient.callProcedure("@SystemInformation",
+                    "deployment").getResults()[0];
+            while (procInfo.advanceRow()) {
+                String prop = procInfo.getString("PROPERTY");
+                if (prop != null && prop.equalsIgnoreCase("sitesperhost")) {
+                    sitesPerHost = Integer.parseInt(procInfo.getString("VALUE"));
+                }
+                if (prop != null && prop.equalsIgnoreCase("hostcount")) {
+                    hostcount = Integer.parseInt(procInfo.getString("VALUE"));
+                }
+                if (prop != null && prop.equalsIgnoreCase("kfactor")) {
+                    kfactor = Integer.parseInt(procInfo.getString("VALUE"));
+                }
+            }
+            m_isMP = (m_partitionedColumnIndex == -1 ? true : false);
+            if (!m_isMP) {
+                m_numProcessors = (hostcount * sitesPerHost) / (kfactor + 1);
+                m_log.info("Number of Partitions: " + m_numProcessors);
+                m_log.info("Batch Size is: " + m_config.batch);
+
+                TheHashinator.initialize(LegacyHashinator.class, LegacyHashinator.getConfigureBytes(m_numProcessors));
+            }
+        }
+
+        //Only print warning with -p case for table case we use sys procs.
+        if (m_isMP && m_config.useSuppliedProcedure) {
+            m_log.warn("Using a multi-partitioned procedure to load data will be slow. "
+                    + "If loading a partitioned table, use a single-partitioned procedure "
+                    + "for best performance.");
+        }
+        //Create the CDL based on number of processors we are going to run.
+        CSVPartitionProcessor.m_processor_cdl = new CountDownLatch(m_numProcessors);
+        return true;
     }
 
     //Callback for single row procedure invoke called for rows in failed batch.

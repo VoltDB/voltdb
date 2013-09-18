@@ -17,20 +17,17 @@
 package org.voltdb.utils;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicLong;
 import org.supercsv.exception.SuperCsvException;
 import org.supercsv.io.ICsvListReader;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.client.Client;
 import static org.voltdb.utils.CSVLoader.m_log;
 
 /**
@@ -45,20 +42,11 @@ class CSVFileReader implements Runnable {
     static AtomicLong m_totalRowCount = new AtomicLong(0);
     static AtomicLong m_totalLineCount = new AtomicLong(0);
     static CSVLoader.CSVConfig m_config;
-    //Columns in table we are inserting.
-    static int m_columnCnt;
     static ICsvListReader m_listReader;
-    static Client m_csvClient;
     //Map of partition to Queues to put CSVLineWithMetaData
-    static Map<Integer, BlockingQueue<CSVLineWithMetaData>> processorQueues;
-    // zero based index of partition column in table.
-    static int m_partitionedColumnIndex;
-    //Type detected for the partition column.
-    static VoltType m_partitionColumnType;
+    static Map<Integer, BlockingQueue<CSVLineWithMetaData>> m_processorQueues;
     // This is the last thing put on Queue so that processors will detect the end.
     static CSVLineWithMetaData m_endOfData;
-    //Count down latch for each processor.
-    static CountDownLatch m_processor_cdl;
     static boolean m_errored = false;
     long m_parsingTime = 0;
     private static Map<VoltType, String> m_blankValues = new EnumMap<VoltType, String>(VoltType.class);
@@ -74,8 +62,6 @@ class CSVFileReader implements Runnable {
         m_blankValues.put(VoltType.DECIMAL, "0");
         m_blankValues.put(VoltType.VARBINARY, "");
     }
-    //Types of table we are loading data into.
-    static List<VoltType> m_typeList = new ArrayList<VoltType>();
     //Errors we keep track only upto maxerrors
     static Map<Long, String[]> m_errorInfo = new TreeMap<Long, String[]>();
 
@@ -109,7 +95,7 @@ class CSVFileReader implements Runnable {
 
                 String lineCheckResult;
                 if ((lineCheckResult = checkparams_trimspace(correctedLine,
-                        m_columnCnt)) != null) {
+                        CSVPartitionProcessor.m_columnCnt)) != null) {
                     String[] info = {lineList.toString(), lineCheckResult};
                     if (synchronizeErrorInfo(m_totalLineCount.get() + 1, info)) {
                         m_errored = true;
@@ -124,14 +110,14 @@ class CSVFileReader implements Runnable {
                 //If Parser got error and we have reached limit this loop will exit and no more elements
                 //will be pushed to queue. Queues will break out as well after seeing endOfData
                 if (!CSVPartitionProcessor.m_isMP && !m_config.useSuppliedProcedure) {
-                    partitionId = TheHashinator.getPartitionForParameter(m_partitionColumnType.getValue(),
-                            (Object) lineData.correctedLine[m_partitionedColumnIndex]);
+                    partitionId = TheHashinator.getPartitionForParameter(CSVPartitionProcessor.m_partitionColumnType.getValue(),
+                            (Object) lineData.correctedLine[CSVPartitionProcessor.m_partitionedColumnIndex]);
                 }
-                BlockingQueue<CSVLineWithMetaData> q = processorQueues.get(partitionId);
+                BlockingQueue<CSVLineWithMetaData> q = m_processorQueues.get(partitionId);
                 q.offer(lineData);
             } catch (SuperCsvException e) {
                 //Catch rows that can not be read by superCSV m_listReader.
-                // E.g. items without quotes when strictquotes is enabled.
+                // e.g. items without quotes when strictquotes is enabled.
                 e.printStackTrace();
                 String[] info = {e.getMessage(), ""};
                 if (synchronizeErrorInfo(m_totalLineCount.get() + 1, info)) {
@@ -155,7 +141,7 @@ class CSVFileReader implements Runnable {
         } catch (IOException ex) {
             m_log.error("Error cloging Reader: " + ex);
         } finally {
-            for (BlockingQueue<CSVLineWithMetaData> q : processorQueues.values()) {
+            for (BlockingQueue<CSVLineWithMetaData> q : m_processorQueues.values()) {
                 try {
                     q.put(m_endOfData);
                 } catch (InterruptedException ex) {
@@ -166,7 +152,7 @@ class CSVFileReader implements Runnable {
         }
         try {
             m_log.info("Waiting for partition processors to finish.");
-            m_processor_cdl.await();
+            CSVPartitionProcessor.m_processor_cdl.await();
             m_log.info("Partition Processors Done.");
         } catch (InterruptedException ex) {
             ;
@@ -204,7 +190,7 @@ class CSVFileReader implements Runnable {
                 if (m_config.blank.equalsIgnoreCase("error")) {
                     return "Error: blank item";
                 } else if (m_config.blank.equalsIgnoreCase("empty")) {
-                    slot[i] = m_blankValues.get(m_typeList.get(i));
+                    slot[i] = m_blankValues.get(CSVPartitionProcessor.m_typeList.get(i));
                 }
                 //else m_config.blank == null which is already the case
             } // trim white space in this correctedLine. SuperCSV preserves all the whitespace by default
