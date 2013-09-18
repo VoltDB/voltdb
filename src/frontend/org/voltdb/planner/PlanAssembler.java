@@ -546,11 +546,11 @@ public class PlanAssembler {
                 throw new PlanningErrorException(errorMsg);
             }
 
-            if (m_parsedSelect.mvFixInfo.disableGroupbyAndAggQuery) {
-                String errorMsg = String.format("Unsupported group by query or aggregation on " +
-                        "materialized table %s", m_parsedSelect.mvFixInfo.mvTable.getTypeName());
-                throw new PlanningErrorException(errorMsg);
-            }
+//            if (m_parsedSelect.mvFixInfo.disableGroupbyAndAggQuery) {
+//                String errorMsg = String.format("Unsupported group by query or aggregation on " +
+//                        "materialized table %s", m_parsedSelect.mvFixInfo.mvTable.getTypeName());
+//                throw new PlanningErrorException(errorMsg);
+//            }
 
             AbstractExpression whereExpr = m_parsedSelect.getSingleTableFilterExpression();
             if (whereExpr != null) {

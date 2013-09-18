@@ -282,15 +282,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
     public void testMultiPartitionMVBasedQuery_AggQueryEdge() {
         try {
-            pns = compileToFragments("SELECT count(V_SUM_C1) FROM V_P1");
-            fail();
+            //pns = compileToFragments("SELECT sum(V_SUM_C1) FROM V_P1");
+            pns = compileToFragments("SELECT count(*) FROM V_P1");
+            checkMVFix_TopAgg_ReAgg(pns, 0, 1, 2, 0);
+            //fail();
         } catch (Exception e) {
             assertTrue(e.getMessage().contains("group by query or aggregation on materialized table"));
         }
 
     }
 
-    public void notestMultiPartitionMVBasedQuery_AggQuery() {
+    public void testMultiPartitionMVBasedQuery_AggQuery() {
 //      CREATE VIEW V_P1 (V_A1, V_B1, V_CNT, V_SUM_C1, V_SUM_D1)
 //      AS SELECT A1, B1, COUNT(*), SUM(C1), COUNT(D1)
 //      FROM P1  GROUP BY A1, B1;
@@ -341,24 +343,24 @@ public class TestPlansGroupBy extends PlannerTestCase {
             // Test set (3)
             pns = compileToFragments("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
                     " GROUP BY V_A1,V_B1, V_SUM_C1");
-            checkMVFix_TopAgg_ReAgg(pns, 1, 1, 2, 2);
+            checkMVFix_TopAgg_ReAgg(pns, 3, 1, 2, 2);
 
             pns = compileToFragments("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
                     " GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1,V_B1, V_SUM_C1");
-            checkMVFix_TopAgg_ReAgg(pns, 1, 1, 2, 2);
+            checkMVFix_TopAgg_ReAgg(pns, 3, 1, 2, 2);
 
             pns = compileToFragments("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
                     " GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1,V_B1, V_SUM_C1 LIMIT 5");
-            checkMVFix_TopAgg_ReAgg(pns, 1, 1, 2, 2);
+            checkMVFix_TopAgg_ReAgg(pns, 3, 1, 2, 2);
 
             pns = compileToFragments("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
                     " GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1, V_SUM_C1 LIMIT 5");
-            checkMVFix_TopAgg_ReAgg(pns, 1, 1, 2, 2);
+            checkMVFix_TopAgg_ReAgg(pns, 3, 1, 2, 2);
 
             // Distinct: No aggregation push down.
             pns = compileToFragments("SELECT V_A1,V_B1, V_SUM_C1, sum( distinct V_SUM_D1) FROM " +
                     tb + " GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1, V_SUM_C1 LIMIT 5");
-            checkMVFix_TopAgg_ReAgg(pns, 1, 1, 2, 2);
+            checkMVFix_TopAgg_ReAgg(pns, 3, 1, 2, 2);
         }
     }
 

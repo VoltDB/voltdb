@@ -276,17 +276,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         String partitionColName = partitionCol.getName();
         MaterializedViewInfo mvInfo = srcTable.getViews().get(mvTableName);
 
-        if (displayColumns.size() == 1 && !isGrouped()) {
-            AbstractExpression expr = displayColumns.get(0).expression;
-            if (expr.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR) {
-                // For the moment, let COUNT(*) query pass with wrong answer.
-                // As the test cases use this kind of query a lot.
-
-                // Or, I should comment out the queries in TruncateMatViewDataMP.
-                return false;
-            }
-        }
-
         // Justify whether partition column is in group by column list or not
         boolean partitionColInGroupbyCols = false;
         String complexGroupbyJson = mvInfo.getGroupbyexpressionsjson();
@@ -389,7 +378,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         ArrayList<SchemaColumn> newValue = new ArrayList<SchemaColumn>();
 
-        assert(scanColumns.keySet().size() == 1);
+        // COUNT(*) will have 0 table. Otherwise, there should be 1.
+        assert(scanColumns.keySet().size() <= 1);
+
         for (String tbName: scanColumns.keySet()) {
             assert(tbName.equals(mvTableName));
             ArrayList<SchemaColumn> columns = scanColumns.get(tbName);
