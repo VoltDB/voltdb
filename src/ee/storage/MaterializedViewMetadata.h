@@ -55,7 +55,7 @@ public:
     void processTupleDelete(TableTuple &oldTuple, bool fallible);
 
     PersistentTable * targetTable() const { return m_target; }
-    TableIndex * indexForMinMax() const { return m_indexForMinMax; }
+    std::string indexForMinMax() const { return m_indexForMinMax == NULL ? "" : m_indexForMinMax->getName(); }
 
     void setTargetTable(PersistentTable * target);
     void setIndexForMinMax(std::string index);

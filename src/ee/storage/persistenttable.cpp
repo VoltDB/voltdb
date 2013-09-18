@@ -799,11 +799,10 @@ PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target, cata
     // find the materialized view that uses the table or its precursor (by the same name).
     BOOST_FOREACH(MaterializedViewMetadata* currView, m_views) {
         PersistentTable* currTarget = currView->targetTable();
-        TableIndex *currIndexForMinOrMax = currView->indexForMinMax();
         if (currTarget == target) {
             // The view is already up to date.
             // but still need to update the index used for min/max
-            if (currIndexForMinOrMax->getName().compare(targetMvInfo->indexForMinMax()) != 0) {
+            if (currView->indexForMinMax().compare(targetMvInfo->indexForMinMax()) != 0) {
                 currView->setIndexForMinMax(targetMvInfo->indexForMinMax());
             }
             return;
