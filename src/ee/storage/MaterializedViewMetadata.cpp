@@ -408,8 +408,13 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
                 // indexscan if an index is available, otherwise tablescan
                 if (m_indexForMinMax != NULL) {
                     m_indexForMinMax->moveToKey(&m_searchKey);
-                    VOLT_TRACE("Starting to scan grouped tuples using index %s\n", groupbyIndex->debug().c_str());
+                    VOLT_TRACE("Starting to scan tuples using index %s\n", m_indexForMinMax->debug().c_str());
                     while (!(tuple = m_indexForMinMax->nextValueAtKey()).isNullTuple()) {
+                        // skip the oldTuple and apply post filter
+                        if (tuple.equals(oldTuple) ||
+                                (m_filterPredicate && m_filterPredicate->eval(&tuple, NULL).isFalse())) {
+                            continue;
+                        }
                         VOLT_TRACE("Scanning tuple: %s\n", tuple.debugNoHeader().c_str());
                         if (m_aggregationExprs.size() != 0) {
                             AbstractExpression * expr = m_aggregationExprs.at(i-colindex);
@@ -417,7 +422,6 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
                         } else {
                             current = tuple.getNValue(m_outputColumnSrcTableIndexes[i]);
                         }
-                        VOLT_TRACE("Check tuple: %s\n", tuple.debugNoHeader().c_str());
                         if (min.isNull() || max.isNull()) {
                             min = current;
                             max = current;
@@ -458,6 +462,10 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
                     TableIterator &iterator = m_srcTable->iterator();
                     bool skippedOne = false;
                     while (iterator.next(scannedTuple) && filter->eval(&scannedTuple, NULL).isTrue()) {
+                        // apply post filter
+                        if(m_filterPredicate && m_filterPredicate->eval(&scannedTuple, NULL).isFalse()) {
+                            continue;
+                        }
                         if (m_aggregationExprs.size() != 0) {
                             AbstractExpression * expr = m_aggregationExprs.at(i-colindex);
                             current = expr->eval(&scannedTuple, NULL);
