@@ -567,7 +567,6 @@ int8_t VoltDBIPC::quiesce(struct ipc_command *cmd) {
 
 void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
     int errors = 0;
-    NValueArray &params = m_engine->getParameterContainer();
 
     querypfs *queryCommand = (querypfs*) cmd;
 
@@ -581,39 +580,32 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
                   << " numFragIds=" << numFrags << std::endl;
 
     // data has binary packed fragmentIds first
-    int64_t *fragmentId = (int64_t*) (&(queryCommand->data));
-    int64_t *inputDepId = fragmentId + numFrags;
+    int64_t *fragmentIds = (int64_t*) (&(queryCommand->data));
+    int64_t *inputDepIds = fragmentIds + numFrags;
+
+    // fix network byte order
+    for (int i = 0; i < numFrags; ++i) {
+        fragmentIds[i] = ntohll(fragmentIds[i]);
+        inputDepIds[i] = ntohll(inputDepIds[i]);
+    }
 
     // ...and fast serialized parameter sets last.
     void* offset = queryCommand->data + (sizeof(int64_t) * numFrags * 2);
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(querypfs) - sizeof(int32_t) * ntohl(queryCommand->numFragmentIds));
     ReferenceSerializeInput serialize_in(offset, sz);
 
-    try {
-        // and reset to space for the results output
-        m_engine->resetReusedResultOutputBuffer(1);//1 byte to add status code
-        m_engine->setUndoToken(ntohll(queryCommand->undoToken));
-        Pool *pool = m_engine->getStringPool();
-        for (int i = 0; i < numFrags; ++i) {
-            int cnt = serialize_in.readShort();
-            assert(cnt> -1);
+    // and reset to space for the results output
+    m_engine->resetReusedResultOutputBuffer(1);//1 byte to add status code
 
-            deserializeParameterSetCommon(cnt, serialize_in, params, pool);
-            m_engine->setUsedParamcnt(cnt);
-            if (m_engine->executeQuery(ntohll(fragmentId[i]),
+    try {
+        errors = m_engine->executePlanFragments(numFrags,
                                                 fragmentIds,
-                                       1,
-                                       (int32_t)(ntohll(inputDepId[i])), // Java sends int64 but EE wants int32
-                                       params,
-                                       ntohll(queryCommand->spHandle),
-                                       ntohll(queryCommand->lastCommittedSpHandle),
-                                       ntohll(queryCommand->uniqueId),
-                                       i == 0 ? true : false, //first
-                                       i == numFrags - 1 ? true : false)) { //last
-                ++errors;
-            }
-        }
-        pool->purge();
+                                                inputDepIds,
+                                                serialize_in,
+                                                ntohll(queryCommand->spHandle),
+                                                ntohll(queryCommand->lastCommittedSpHandle),
+                                                ntohll(queryCommand->uniqueId),
+                                                ntohll(queryCommand->undoToken));
     }
     catch (const FatalException &e) {
         crashVoltDB(e);
