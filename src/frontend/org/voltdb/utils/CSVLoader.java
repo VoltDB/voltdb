@@ -262,6 +262,7 @@ public class CSVLoader {
             CSVFileReader.m_listReader = listReader;
             CSVFileReader.m_processorQueues = lineq;
             CSVFileReader.m_endOfData = endOfData;
+            CSVFileReader.m_csvClient = csvClient;
 
             CSVFileReader csvReader = new CSVFileReader();
             Thread th = new Thread(csvReader);

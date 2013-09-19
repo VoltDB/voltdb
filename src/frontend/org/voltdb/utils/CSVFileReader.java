@@ -28,6 +28,7 @@ import org.supercsv.io.ICsvListReader;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.client.Client;
 import static org.voltdb.utils.CSVLoader.m_log;
 
 /**
@@ -42,6 +43,7 @@ class CSVFileReader implements Runnable {
     static AtomicLong m_totalRowCount = new AtomicLong(0);
     static AtomicLong m_totalLineCount = new AtomicLong(0);
     static CSVLoader.CSVConfig m_config;
+    static Client m_csvClient;
     static ICsvListReader m_listReader;
     //Map of partition to Queues to put CSVLineWithMetaData
     static Map<Long, BlockingQueue<CSVLineWithMetaData>> m_processorQueues;
@@ -167,7 +169,7 @@ class CSVFileReader implements Runnable {
             CSVPartitionProcessor.m_processor_cdl.await();
             m_log.info("Partition Processors Done.");
         } catch (InterruptedException ex) {
-            ;
+            ex.printStackTrace();
         }
     }
 

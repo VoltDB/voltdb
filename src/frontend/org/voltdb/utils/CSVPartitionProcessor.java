@@ -32,7 +32,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import static org.voltdb.utils.CSVFileReader.synchronizeErrorInfo;
@@ -494,18 +493,13 @@ class CSVPartitionProcessor implements Runnable {
                     m_failedQueue.put(m_endOfData);
                 }
                 failureProcessor.join();
-                //Drain again for failure callbacks to finish.
                 m_csvClient.drain();
             }
-        } catch (NoConnectionsException ex) {
+        } catch (Exception ex) {
             CSVFileReader.m_errored = true;
-            m_log.warn("Failed to Drain the client: ", ex);
-        } catch (InterruptedException ex) {
-            CSVFileReader.m_errored = true;
-            m_log.warn("Failed to Drain the client: ", ex);
+        } finally {
+            CSVPartitionProcessor.m_processor_cdl.countDown();
+            m_log.info("Done Processing partition: " + m_partitionId + " Processed: " + m_partitionProcessedCount);
         }
-
-        CSVPartitionProcessor.m_processor_cdl.countDown();
-        m_log.info("Done Processing partition: " + m_partitionId + " Processed: " + m_partitionProcessedCount);
     }
 }
