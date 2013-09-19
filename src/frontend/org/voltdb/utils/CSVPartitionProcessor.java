@@ -26,7 +26,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.LegacyHashinator;
 import org.voltdb.ParameterConverter;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
@@ -198,8 +197,6 @@ class CSVPartitionProcessor implements Runnable {
                 m_numProcessors = (hostcount * sitesPerHost) / (kfactor + 1);
                 m_log.info("Number of Partitions: " + m_numProcessors);
                 m_log.info("Batch Size is: " + m_config.batch);
-
-                TheHashinator.initialize(LegacyHashinator.class, LegacyHashinator.getConfigureBytes(m_numProcessors));
             }
         }
 
@@ -284,6 +281,7 @@ class CSVPartitionProcessor implements Runnable {
                         PartitionSingleExecuteProcedureCallback cbmt =
                                 new PartitionSingleExecuteProcedureCallback(lineList, m_processor);
                         if (!CSVPartitionProcessor.m_isMP) {
+                            //If transaction is restarted because of wrong partition client will retry
                             m_csvClient.callProcedure(cbmt, m_procName, m_partitionParam, m_tableName, table);
                         } else {
                             m_csvClient.callProcedure(cbmt, m_procName, m_tableName, table);

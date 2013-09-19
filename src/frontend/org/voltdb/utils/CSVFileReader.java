@@ -99,6 +99,7 @@ class CSVFileReader implements Runnable {
                     String[] info = {lineList.toString(), lineCheckResult};
                     if (synchronizeErrorInfo(m_totalLineCount.get() + 1, info)) {
                         m_errored = true;
+                        break;
                     }
                     continue;
                 }
@@ -114,6 +115,16 @@ class CSVFileReader implements Runnable {
                             (Object) lineData.correctedLine[CSVPartitionProcessor.m_partitionedColumnIndex]);
                 }
                 BlockingQueue<CSVLineWithMetaData> q = m_processorQueues.get(partitionId);
+                if (q == null) {
+                    //We have not known about this partition do something.
+                    m_log.warn("Unknown or New partition detected possibly because of change in topology.");
+                    String[] info = {lineList.toString(), "Unknown or New partition detected possibly because of change in topology."};
+                    if (synchronizeErrorInfo(m_totalLineCount.get() + 1, info)) {
+                        m_errored = true;
+                        break;
+                    }
+                    continue;
+                }
                 q.offer(lineData);
             } catch (SuperCsvException e) {
                 //Catch rows that can not be read by superCSV m_listReader.
