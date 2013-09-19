@@ -191,7 +191,7 @@ public class ElasticHashinator extends TheHashinator {
      * Serializes the configuration into bytes, also updates the currently cached m_configBytes.
      * @return The byte[] of the current configuration.
      */
-    private byte[] toBytes() {
+    public byte[] toBytes() {
         ByteBuffer buf = ByteBuffer.allocate(4 + (m_tokens.size() * 12));//long and an int per
         buf.putInt(m_tokens.size());
 
