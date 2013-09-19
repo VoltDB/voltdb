@@ -117,9 +117,21 @@ public class TestLimitOffsetSuite extends RegressionSuite {
     public void testJoinAndLimitOffset() throws IOException, ProcCallException, InterruptedException {
         Client client = this.getClient();
         load(client);
+        client.callProcedure("InsertA", -1, 0);
         VoltTable result = client.callProcedure("@AdHoc", "SELECT * FROM A, B WHERE A.PKEY < B.PKEY LIMIT 1 OFFSET 1;")
                                  .getResults()[0];
         assertEquals(1, result.getRowCount());
+        result = client.callProcedure("@AdHoc", "SELECT A.PKEY FROM A, B WHERE A.PKEY = B.PKEY LIMIT 1;")
+                .getResults()[0];
+        assertEquals(1, result.getRowCount());
+        result.advanceRow();
+        assertEquals(0, result.getLong(0));
+        result = client.callProcedure("@AdHoc", "SELECT A.PKEY FROM A, B WHERE A.PKEY = B.PKEY LIMIT 2 OFFSET 2;")
+                .getResults()[0];
+        assertEquals(2, result.getRowCount());
+        result = client.callProcedure("@AdHoc", "SELECT A.PKEY FROM A LEFT JOIN B ON A.I = B.I LIMIT 10 OFFSET 5;")
+                .getResults()[0];
+        assertEquals(6, result.getRowCount());
     }
 
     public void testENG3487() throws IOException, ProcCallException {
