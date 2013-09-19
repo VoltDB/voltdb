@@ -286,9 +286,13 @@ public class RegressionSuite extends TestCase {
                 actual = vt.getLong(i);
             } catch (IllegalArgumentException ex) {
                 try {
-                    actual = vt.getTimestampAsLong(i);
+                    actual = (long) vt.getDouble(i);
                 } catch (IllegalArgumentException newEx) {
-                    fail();
+                    try {
+                        actual = vt.getTimestampAsLong(i);
+                    } catch (IllegalArgumentException exTm) {
+                        fail();
+                    }
                 }
             }
             assertEquals(expected[i], actual);

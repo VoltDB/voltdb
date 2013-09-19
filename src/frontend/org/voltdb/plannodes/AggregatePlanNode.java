@@ -140,12 +140,12 @@ public class AggregatePlanNode extends AbstractPlanNode {
         return m_aggregateExpressions.get(0);
     }
 
-    public List<ExpressionType> getAggregateTypes () {
-        return m_aggregateTypes;
+    public int getAggregateTypesSize () {
+        return m_aggregateTypes.size();
     }
 
-    public List<AbstractExpression> getGroExpressionTypes () {
-        return m_groupByExpressions;
+    public int getGroupByExpressionsSize () {
+        return m_groupByExpressions.size();
     }
 
     public void setOutputSchema(NodeSchema schema)

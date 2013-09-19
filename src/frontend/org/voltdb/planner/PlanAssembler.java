@@ -42,7 +42,6 @@ import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.ParsedSelectStmt.MVFixInfo;
-import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -533,34 +532,30 @@ public class PlanAssembler {
                 root = subAssembler.addSendReceivePair(root);
             }
         }
-        final boolean distributedQuery = (root instanceof ReceivePlanNode) ? true: false;
 
-        if (distributedQuery && m_parsedSelect.mayNeedAvgPushdown()) {
-            m_parsedSelect.switchOptimalSuiteForAvgPushdown();
-        }
-
-        if (distributedQuery && m_parsedSelect.mvFixInfo.mayNeedFixMVBasedDistributedQuery) {
-            if (m_parsedSelect.tableList.size() != 1) {
-                String errorMsg = String.format("Unsupported query joined with materialized table %s",
-                        m_parsedSelect.mvFixInfo.mvTable.getTypeName());
-                throw new PlanningErrorException(errorMsg);
+        if (root instanceof ReceivePlanNode) {
+            if (m_parsedSelect.mayNeedAvgPushdown()) {
+                m_parsedSelect.switchOptimalSuiteForAvgPushdown();
             }
 
-//            if (m_parsedSelect.mvFixInfo.disableGroupbyAndAggQuery) {
-//                String errorMsg = String.format("Unsupported group by query or aggregation on " +
-//                        "materialized table %s", m_parsedSelect.mvFixInfo.mvTable.getTypeName());
-//                throw new PlanningErrorException(errorMsg);
-//            }
+            if (m_parsedSelect.mvFixInfo.needed) {
+                if (m_parsedSelect.tableList.size() != 1) {
+                    String errorMsg = String.format("Unsupported query joined with materialized table %s",
+                            m_parsedSelect.mvFixInfo.mvTable.getTypeName());
+                    throw new PlanningErrorException(errorMsg);
+                }
 
-            AbstractExpression whereExpr = m_parsedSelect.getSingleTableFilterExpression();
-            if (whereExpr != null) {
-                String errorMsg = String.format("Unsupported query materialized table %s has filter " +
-                        "on the table", m_parsedSelect.mvFixInfo.mvTable.getTypeName());
-                throw new PlanningErrorException(errorMsg);
+                AbstractExpression whereExpr = m_parsedSelect.getSingleTableFilterExpression();
+                if (whereExpr != null) {
+                    String errorMsg = String.format("Unsupported query materialized table %s has filter " +
+                            "on the table", m_parsedSelect.mvFixInfo.mvTable.getTypeName());
+                    throw new PlanningErrorException(errorMsg);
+                }
             }
-
-            m_parsedSelect.mvFixInfo.finalNeedFix = true;
+        } else {
+            m_parsedSelect.mvFixInfo.needed = false;
         }
+
 
         /*
          * Establish the output columns for the sub select plan.
@@ -568,7 +563,7 @@ public class PlanAssembler {
         root = handleAggregationOperators(root);
 
         // Process the re-aggregate plan node and insert it into the plan.
-        if (m_parsedSelect.mvFixInfo.finalNeedFix) {
+        if (m_parsedSelect.mvFixInfo.needed) {
             root = handleMVBasedMultiPartQuery(root);
         }
 
@@ -595,17 +590,11 @@ public class PlanAssembler {
     }
 
     private boolean needProjectionNode (AbstractPlanNode root) {
-        if ( (root.getPlanNodeType() == PlanNodeType.DISTINCT) ||
+        if ( (root.getPlanNodeType() == PlanNodeType.AGGREGATE) ||
+                (root.getPlanNodeType() == PlanNodeType.HASHAGGREGATE) ||
+                (root.getPlanNodeType() == PlanNodeType.DISTINCT) ||
                 (root.getPlanNodeType() == PlanNodeType.PROJECTION)) {
             return false;
-        }
-        assert(!m_parsedSelect.hasComplexAgg());
-
-        if ((root.getPlanNodeType() == PlanNodeType.AGGREGATE) ||
-                (root.getPlanNodeType() == PlanNodeType.HASHAGGREGATE)) {
-            if (!m_parsedSelect.mvFixInfo.finalNeedFix) {
-                return false;
-            }
         }
 
         // Assuming the restrictions: Order by columns are (1) columns from table
@@ -619,7 +608,6 @@ public class PlanAssembler {
         }
         // TODO(XIN): Maybe we can remove this projection node for more cases
         // as optimization in the future.
-
         return true;
     }
 
@@ -1142,7 +1130,7 @@ public class PlanAssembler {
             }
         }
 
-        if (m_parsedSelect.mvFixInfo.finalNeedFix) {
+        if (m_parsedSelect.mvFixInfo.needed) {
             // Do not push down limit for mv based distributed query.
             canPushDown = false;
         }
@@ -1213,85 +1201,49 @@ public class PlanAssembler {
     }
 
     AbstractPlanNode handleMVBasedMultiPartQuery (AbstractPlanNode root) {
-        if (!m_parsedSelect.mvFixInfo.finalNeedFix) {
-            return root;
-        }
-        // Set up the scan plan node's scan columns
-        // Add inline projection node for scan node.
         MVFixInfo mvFixInfo = m_parsedSelect.mvFixInfo;
-        AbstractPlanNode scanNode = root;
-        while (scanNode instanceof AbstractScanPlanNode == false) {
-            scanNode = scanNode.getChild(0);
-        }
-        ProjectionPlanNode inlineProj = new ProjectionPlanNode();
-        inlineProj.setOutputSchema(mvFixInfo.inlineProjSchema);
-        scanNode.addInlinePlanNode(inlineProj);
 
-        // Construct a new re-aggregate plan node as the parent of receive node.
-        AggregatePlanNode reAggNode = new HashAggregatePlanNode();
+        AggregatePlanNode reAggNode = mvFixInfo.reAggNode;
+        reAggNode.clearChildren();
+        reAggNode.clearParents();
 
-        int outputColumnIndex = 0;
-        NodeSchema aggSchema = new NodeSchema();
-
-        for (ParsedSelectStmt.ParsedColInfo col : mvFixInfo.mvAggResultColumns) {
-            AbstractExpression rootExpr = col.expression;
-            SchemaColumn schema_col = null;
-            if (ParsedColInfo.isNewtoColumnList(mvFixInfo.mvDDLGroupbyColumnsList, col)) {
-                // Support more aggregation types, like MIN & MAX
-                ExpressionType reAggType = mvFixInfo.mvColumnAggType.get(col.columnName);
-                assert(reAggType != null);
-                AbstractExpression agg_input_expr = null;
-                assert(rootExpr instanceof TupleValueExpression);
-
-                TupleValueExpression tve = new TupleValueExpression();
-                tve.setValueType(rootExpr.getValueType());
-                tve.setValueSize(rootExpr.getValueSize());
-                tve.setColumnIndex(outputColumnIndex);
-                tve.setColumnName(col.columnName);
-                tve.setColumnAlias(col.alias);
-                tve.setTableName(col.tableName);
-
-                agg_input_expr = (AbstractExpression) tve.clone();
-                reAggNode.addAggregate(reAggType, false, outputColumnIndex, agg_input_expr);
-                schema_col = new SchemaColumn(col.tableName, col.columnName, col.alias, tve);
-            }
-            else
-            {
-                /*
-                 * These columns are the pass through columns that are not being
-                 * aggregated on. These are the ones from the mvGroupbyColumnsSet.
-                 */
-                schema_col = new SchemaColumn(col.tableName, col.columnName, col.alias, col.expression);
-            }
-
-            aggSchema.addColumn(schema_col);
-            outputColumnIndex++;
-        }
-        reAggNode.setOutputSchema(aggSchema);
-
-        // Add group by expression.
-        for (ParsedSelectStmt.ParsedColInfo col : mvFixInfo.mvDDLGroupbyColumnsList) {
-            reAggNode.addGroupByExpression(col.expression);
-        }
-
+        AbstractPlanNode receiveNode = root;
         // Find receive plan node and insert the constructed re-aggregation plan node.
         if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
             reAggNode.addAndLinkChild(root);
             root = reAggNode;
         } else {
-            AbstractPlanNode receiveNode = root;
-            while (receiveNode.getPlanNodeType() != PlanNodeType.RECEIVE) {
-                receiveNode = receiveNode.getChild(0);
-            }
-            assert(receiveNode.getPlanNodeType() == PlanNodeType.RECEIVE);
+            List<AbstractPlanNode> recList = root.findAllNodesOfType(PlanNodeType.RECEIVE);
+            assert(recList.size() == 1);
+            receiveNode = recList.get(0);
+
             AbstractPlanNode parent = receiveNode.getParent(0);
             receiveNode.clearParents();
             parent.clearChildren();
-
             reAggNode.addAndLinkChild(receiveNode);
             parent.addAndLinkChild(reAggNode);
         }
 
+        // Set up the scan plan node's scan columns
+        // Add inline projection node for scan node.
+        assert(receiveNode instanceof ReceivePlanNode);
+        AbstractPlanNode sendNode = receiveNode.getChild(0);
+        assert(sendNode instanceof SendPlanNode);
+        AbstractPlanNode sendNodeChild = sendNode.getChild(0);
+        List<AbstractScanPlanNode> scanList = sendNodeChild.getScanNodeList();
+        assert(scanList.size() == 1);
+        AbstractScanPlanNode scanNode = scanList.get(0);
+        assert(scanNode.getTargetTableName().equals(mvFixInfo.mvTable.getTypeName()));
+
+//        if (root == reAggNode) {
+//            scanNode.generateOutputSchema(m_catalogDb);
+//            ProjectionPlanNode proNode = new ProjectionPlanNode();
+//            proNode.setOutputSchema(scanNode.getOutputSchema());
+//            proNode.addAndLinkChild(root);
+//            root = proNode;
+//        }
+
+        scanNode.addInlinePlanNode(mvFixInfo.projectionNode);
         return root;
     }
 
@@ -1307,7 +1259,7 @@ public class PlanAssembler {
          */
         if (containsAggregateExpression || m_parsedSelect.isGrouped()) {
 
-            AggregatePlanNode topAggNode;
+            AggregatePlanNode topAggNode = null;
             // A hash is required to build up per-group aggregates in parallel vs.
             // when there is only one aggregation over the entire table OR when the
             // per-group aggregates are being built serially from the ordered output
@@ -1328,14 +1280,19 @@ public class PlanAssembler {
             // This is the less ambitious aspect of issue ENG-4096. The more ambitious aspect
             // is that the ability to by-pass use of the hash could actually motivate selection of
             // a compatible index scan, even when one would not be motivated by a WHERE or ORDER BY clause.
+
             if (m_parsedSelect.isGrouped() &&
                 (root.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
                  ((IndexScanPlanNode) root).getSortDirection() == SortDirectionType.INVALID)) {
                 aggNode = new HashAggregatePlanNode();
-                topAggNode = new HashAggregatePlanNode();
+                if (!m_parsedSelect.mvFixInfo.needed) {
+                    topAggNode = new HashAggregatePlanNode();
+                }
             } else {
                 aggNode = new AggregatePlanNode();
-                topAggNode = new AggregatePlanNode();
+                if (!m_parsedSelect.mvFixInfo.needed) {
+                    topAggNode = new AggregatePlanNode();
+                }
             }
 
             int outputColumnIndex = 0;
@@ -1477,18 +1434,8 @@ public class PlanAssembler {
 
             NodeSchema newSchema = m_parsedSelect.getFinalProjectionSchema();
             // Never push down aggregation for MV fix case.
-            if (!m_parsedSelect.mvFixInfo.finalNeedFix) {
-                root = pushDownAggregate(root, aggNode, topAggNode, m_parsedSelect.hasComplexAgg(), newSchema);
-            } else {
-                aggNode.addAndLinkChild(root);
-                root = aggNode;
-                if (m_parsedSelect.hasComplexAgg()) {
-                    ProjectionPlanNode proj = new ProjectionPlanNode();
-                    proj.addAndLinkChild(root);
-                    proj.setOutputSchema(newSchema);
-                    root = proj;
-                }
-            }
+            root = pushDownAggregate(root, aggNode, topAggNode, m_parsedSelect.hasComplexAgg(), newSchema);
+
         }
 
         if (m_parsedSelect.isGrouped()) {

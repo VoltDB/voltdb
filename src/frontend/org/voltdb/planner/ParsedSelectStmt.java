@@ -43,7 +43,10 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.plannodes.AggregatePlanNode;
+import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.NodeSchema;
+import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.utils.CatalogUtil;
@@ -137,17 +140,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public static class MVFixInfo {
         // Preparation for MV based distributed query
-        public boolean mayNeedFixMVBasedDistributedQuery = false;
-        public boolean finalNeedFix = false;
-        public boolean disableGroupbyAndAggQuery = false;
-        public int numOfGroupByColumns = -1;
-
-        public ArrayList<ParsedColInfo> mvAggResultColumns = null;
-        public List<ParsedColInfo> mvDDLGroupbyColumnsList = null;
-        public Map <String, ExpressionType> mvColumnAggType;
-
+        public boolean needed = false;
         public Table mvTable = null;
-        public NodeSchema inlineProjSchema = null;
+        public ProjectionPlanNode projectionNode = null;
+        public AggregatePlanNode reAggNode = null;
     }
 
     public ArrayList<ParsedColInfo> displayColumns = new ArrayList<ParsedColInfo>();
@@ -254,23 +250,22 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             processAvgPushdownOptimization(displayElement, orderbyElement, groupbyElement);
         }
         // Prepare for the mv based distributed query fix only if it might be required.
-        if (needprocessMVBasedQueryFix()) {
-            processMVBasedQueryFix();
-        }
+        mvFixInfo.mvTable = tableList.get(0);
+        processMVBasedQueryFix(mvFixInfo, m_db, scanColumns);
     }
 
-    private boolean needprocessMVBasedQueryFix() {
-        // Check valiad cases first
-        Table mvTable = tableList.get(0);
-        String mvTableName = mvTable.getTypeName();
-        Table srcTable = mvTable.getMaterializer();
+    private void processMVBasedQueryFix(MVFixInfo mvFixInfo, Database db,
+            Map<String, ArrayList<SchemaColumn>> scanColumns)
+    {
+        // Check valid cases first
+        String mvTableName = mvFixInfo.mvTable.getTypeName();
+        Table srcTable = mvFixInfo.mvTable.getMaterializer();
         if (srcTable == null) {
-            return false;
+            return;
         }
-
         Column partitionCol = srcTable.getPartitioncolumn();
         if (partitionCol == null) {
-            return false;
+            return;
         }
 
         String partitionColName = partitionCol.getName();
@@ -278,16 +273,17 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         // Justify whether partition column is in group by column list or not
         boolean partitionColInGroupbyCols = false;
+        int numOfGroupByColumns;
         String complexGroupbyJson = mvInfo.getGroupbyexpressionsjson();
         if (complexGroupbyJson.length() > 0) {
             List<AbstractExpression> mvComplexGroupbyCols = null;
             try {
                 mvComplexGroupbyCols =
-                        AbstractExpression.fromJSONArrayString(complexGroupbyJson, m_db);
+                        AbstractExpression.fromJSONArrayString(complexGroupbyJson, db);
             } catch (JSONException e) {
                 e.printStackTrace();
             }
-            mvFixInfo.numOfGroupByColumns = mvComplexGroupbyCols.size();
+            numOfGroupByColumns = mvComplexGroupbyCols.size();
 
             for (AbstractExpression expr: mvComplexGroupbyCols) {
                 if (expr instanceof TupleValueExpression) {
@@ -300,7 +296,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
         } else {
             CatalogMap<ColumnRef> mvSimpleGroupbyCols = mvInfo.getGroupbycols();
-            mvFixInfo.numOfGroupByColumns = mvSimpleGroupbyCols.size();
+            numOfGroupByColumns = mvSimpleGroupbyCols.size();
 
             for (ColumnRef colRef: mvSimpleGroupbyCols) {
                 if (colRef.getColumn().getName().equals(partitionColName)) {
@@ -313,26 +309,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // Group by columns contain partition column from source table.
             // Then, query on mv table will have duplicates from each partition.
             // There is no need to fix this case, so just return.
-            return false;
+            return;
         }
 
-        mvFixInfo.mvTable = mvTable;
-        mvFixInfo.mayNeedFixMVBasedDistributedQuery = true;
-
-        // Currently, disable it
-        if (isGrouped() || hasAggregateExpression()) {
-            mvFixInfo.disableGroupbyAndAggQuery = true;
-        }
-
-        return true;
-    }
-
-    private void processMVBasedQueryFix() {
         // Start to do real processing now.
-        String mvTableName = mvFixInfo.mvTable.getTypeName();
-        mvFixInfo.mvDDLGroupbyColumnsList = new ArrayList<ParsedColInfo>();
-        mvFixInfo.mvAggResultColumns = new ArrayList<ParsedColInfo>();
-        mvFixInfo.mvColumnAggType = new HashMap<String, ExpressionType>();
+        mvFixInfo.needed = true;
+
+        Set<SchemaColumn> mvNewScanColumns = new HashSet<SchemaColumn>();
+        Set<SchemaColumn> mvDDLGroupbyColumns = new HashSet<SchemaColumn>();
+        Map<String, ExpressionType> mvColumnAggType = new HashMap<String, ExpressionType>();
 
         List<Column> mvColumnArray =
                 CatalogUtil.getSortedCatalogItems(mvFixInfo.mvTable.getColumns(), "index");
@@ -342,16 +327,22 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                     reAggType == ExpressionType.AGGREGATE_COUNT) {
                 reAggType = ExpressionType.AGGREGATE_SUM;
             }
-            mvFixInfo.mvColumnAggType.put(mvCol.getName(), reAggType);
+            mvColumnAggType.put(mvCol.getName(), reAggType);
+        }
+        NodeSchema inlineProjSchema = new NodeSchema();
+        // COUNT(*) size is 0, otherwise it is 1.
+        assert(scanColumns.keySet().size() <= 1);
+        if (scanColumns.keySet().size() == 1) {
+            mvNewScanColumns.addAll(scanColumns.get(mvTableName));
+        }
+        // construct new projection columns for scan plan node.
+        for (SchemaColumn scol: mvNewScanColumns) {
+            inlineProjSchema.addColumn(scol);
         }
 
-        assert(mvFixInfo.numOfGroupByColumns > 0);
-        for (int i = 0; i < mvFixInfo.numOfGroupByColumns; i++) {
-            ParsedColInfo col = new ParsedColInfo();
+        assert(numOfGroupByColumns > 0);
+        for (int i = 0; i < numOfGroupByColumns; i++) {
             Column mvCol = mvColumnArray.get(i);
-            col.columnName = mvCol.getName();
-            col.tableName = mvTableName;
-            col.alias = mvCol.getName();
 
             TupleValueExpression tve = new TupleValueExpression();
             tve.setColumnIndex(i);
@@ -360,56 +351,43 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             tve.setColumnAlias(mvCol.getName());
             tve.setValueType(VoltType.get((byte)mvCol.getType()));
             tve.setValueSize(mvCol.getSize());
-            col.expression = tve;
 
-            mvFixInfo.mvDDLGroupbyColumnsList.add(col);
-        }
+            SchemaColumn scol = new SchemaColumn( mvTableName,
+                    mvCol.getName(),mvCol.getName(), tve);
 
-        // Prepare for the inlined projection node schema for scan node.
-        mvFixInfo.inlineProjSchema = new NodeSchema();
-        ArrayList<SchemaColumn> orignalGroupbyColumnsList = new ArrayList<SchemaColumn>();
-        // construct new projection columns for scan plan node.
-        for (ParsedColInfo col: mvFixInfo.mvDDLGroupbyColumnsList) {
-            assert(col.expression instanceof TupleValueExpression);
-            TupleValueExpression tve = (TupleValueExpression)col.expression;
-            SchemaColumn scol = new SchemaColumn(tve.getTableName(),
-                    tve.getColumnName(),tve.getColumnAlias(), tve);
-            orignalGroupbyColumnsList.add(scol);
-        }
-        ArrayList<SchemaColumn> newValue = new ArrayList<SchemaColumn>();
-
-        // COUNT(*) will have 0 table. Otherwise, there should be 1.
-        assert(scanColumns.keySet().size() <= 1);
-
-        for (String tbName: scanColumns.keySet()) {
-            assert(tbName.equals(mvTableName));
-            ArrayList<SchemaColumn> columns = scanColumns.get(tbName);
-            newValue.addAll(columns);
-            Set<SchemaColumn> valueSet = new HashSet<SchemaColumn>(columns);
-            // construct new projection columns for scan plan node.
-            for (SchemaColumn scol : orignalGroupbyColumnsList) {
-                if (!valueSet.contains(scol)) {
-                    valueSet.add(scol);
-                    newValue.add(scol);
-                }
+            mvDDLGroupbyColumns.add(scol);
+            if (!mvNewScanColumns.contains(scol)) {
+                mvNewScanColumns.add(scol);
+                // construct new projection columns for scan plan node.
+                inlineProjSchema.addColumn(scol);
             }
         }
-        if (newValue.size() == 0) {
-            newValue = orignalGroupbyColumnsList;
-        }
-        for (SchemaColumn scol: newValue) {
-            mvFixInfo.inlineProjSchema.addColumn(scol);
-        }
 
-        // Construct MV aggResult list.
-        for (SchemaColumn scol: newValue) {
-            ParsedColInfo col = new ParsedColInfo();
-            col.expression = scol.getExpression();
-            col.alias = scol.getColumnAlias();
-            col.columnName = scol.getColumnName();
-            col.tableName = scol.getTableName();
-            mvFixInfo.mvAggResultColumns.add(col);
+        mvFixInfo.projectionNode = new ProjectionPlanNode();
+        mvFixInfo.projectionNode.setOutputSchema(inlineProjSchema);
+
+        // Construct the reAggregation plan node's aggSchema
+        mvFixInfo.reAggNode = new HashAggregatePlanNode();
+        int outputColumnIndex = 0;
+        NodeSchema aggSchema = new NodeSchema();
+
+        // Construct reAggregation node's aggregation and group by list.
+        for (SchemaColumn scol: mvNewScanColumns) {
+            if (mvDDLGroupbyColumns.contains(scol)) {
+                // Add group by expression.
+                mvFixInfo.reAggNode.addGroupByExpression(scol.getExpression());
+            } else {
+                ExpressionType reAggType = mvColumnAggType.get(scol.getColumnName());
+                assert(reAggType != null);
+                AbstractExpression agg_input_expr = scol.getExpression();
+                assert(agg_input_expr instanceof TupleValueExpression);
+                // Add aggregation information.
+                mvFixInfo.reAggNode.addAggregate(reAggType, false, outputColumnIndex, agg_input_expr);
+            }
+            aggSchema.addColumn(scol);
+            outputColumnIndex++;
         }
+        mvFixInfo.reAggNode.setOutputSchema(aggSchema);
     }
 
     private void processAvgPushdownOptimization (VoltXMLElement displayElement,

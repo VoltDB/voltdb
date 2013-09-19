@@ -64,7 +64,11 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
                 try {
                     actual = (long) vt.getDouble(i);
                 } catch (IllegalArgumentException newEx) {
-                    actual = vt.getTimestampAsLong(i);
+                    try {
+                        actual = vt.getTimestampAsLong(i);
+                    } catch (IllegalArgumentException exTm) {
+                        fail();
+                    }
                 }
             }
             assertEquals(expected[i], actual);
