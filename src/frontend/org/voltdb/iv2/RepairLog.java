@@ -26,6 +26,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.TheHashinator;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -213,16 +214,18 @@ public class RepairLog
         List<Iv2RepairLogResponseMessage> responses =
             new LinkedList<Iv2RepairLogResponseMessage>();
 
-        int seq = 0;
-        Iv2RepairLogResponseMessage header =
-            new Iv2RepairLogResponseMessage(
-                    requestId,
-                    seq++,
-                    ofTotal,
-                    m_lastSpHandle,
-                    m_lastMpHandle,
-                    null); // no payload. just an ack.
-        responses.add(header);
+        // this constructor sets its sequence no to 0 as ack
+        // messages are first in the sequence
+        Iv2RepairLogResponseMessage hheader =
+                new Iv2RepairLogResponseMessage(
+                        requestId,
+                        ofTotal,
+                        m_lastSpHandle,
+                        m_lastMpHandle,
+                        TheHashinator.getCurrentVersionedConfig());
+        responses.add(hheader);
+
+        int seq = responses.size();
 
         Iterator<Item> itemator = items.iterator();
         while (itemator.hasNext()) {

@@ -31,6 +31,7 @@ import junit.framework.TestCase;
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HeartbeatResponseMessage;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterSet;
 import org.voltdb.StoredProcedureInvocation;
@@ -396,6 +397,7 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(r1.getTxnId(), r2.getTxnId());
         assertEquals(r1.getRequestId(), r2.getRequestId());
         assertEquals(r1.getSequence(), r2.getSequence());
+        assertFalse(r1.hasHashinatorConfig());
 
         // make sure the payload was round-tripped correctly.
         Iv2InitiateTaskMessage itask2 = (Iv2InitiateTaskMessage)r2.getPayload();
@@ -417,12 +419,17 @@ public class TestVoltMessageSerialization extends TestCase {
     public void testFirstIv2RepairLogResponseMessage() throws Exception
     {
         // simulate the first message in the sequence, sequence must be 0
-        Iv2RepairLogResponseMessage r1 = new Iv2RepairLogResponseMessage(0, 0, 10, Long.MAX_VALUE, Long.MAX_VALUE, null);
+        Iv2RepairLogResponseMessage r1 = new Iv2RepairLogResponseMessage(
+                0, 10, Long.MAX_VALUE, Long.MAX_VALUE,
+                Pair.<Long, byte[]>of(2L, new byte[] {(byte)1,(byte)2,(byte)3})
+                );
         Iv2RepairLogResponseMessage r2 = (Iv2RepairLogResponseMessage)checkVoltMessage(r1);
         assertEquals(r1.getOfTotal(), r2.getOfTotal());
         assertEquals(r1.getHandle(), r2.getHandle());
         assertEquals(r1.getTxnId(), r2.getTxnId());
         assertEquals(r1.getRequestId(), r2.getRequestId());
         assertEquals(r1.getSequence(), r2.getSequence());
+        assertTrue(r1.hasHashinatorConfig());
+        assertEquals(r1.getHashinatorVersionedConfig().getFirst(),new Long(2));
     }
 }
