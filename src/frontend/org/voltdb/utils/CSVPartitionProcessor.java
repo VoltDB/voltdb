@@ -85,6 +85,8 @@ class CSVPartitionProcessor implements Runnable {
     //Number of processors default to 1 when its a MP procedure or table.
     static int m_numProcessors = 1;
 
+    //Queue of batch entries where some rows failed.
+    private BlockingQueue<CSVLineWithMetaData> m_failedQueue = null;
 
     public CSVPartitionProcessor(Client client, long partitionId,
             int partitionColumnIndex, BlockingQueue<CSVLineWithMetaData> partitionQueue, CSVLineWithMetaData eod) {
@@ -240,8 +242,7 @@ class CSVPartitionProcessor implements Runnable {
             }
         }
     }
-    //Queue of batch entries where some rows failed.
-    private BlockingQueue<CSVLineWithMetaData> failedQueue = null;
+
     private class FailedBatchProcessor extends Thread {
 
         private final CSVPartitionProcessor m_processor;
@@ -260,7 +261,7 @@ class CSVPartitionProcessor implements Runnable {
             while (true) {
                 try {
                     CSVLineWithMetaData lineList;
-                    lineList = failedQueue.take();
+                    lineList = m_failedQueue.take();
                     //If we see m_endOfData or processor has indicated to be in error stop further error processing.
                     //we must have reached maxerrors or end of processing.
                     if (lineList == m_endOfData || m_processor.m_errored) {
@@ -288,30 +289,32 @@ class CSVPartitionProcessor implements Runnable {
                         m_partitionProcessedCount.addAndGet(table.getRowCount());
                     } catch (IOException ioex) {
                         m_log.warn("Failure Processor failed, failures will not be processed: " + ioex);
+                        m_failedQueue.clear();
+                        m_failedQueue = null;
+                        break;
                     }
                 } catch (InterruptedException ex) {
                     m_log.info("Stopped failure processor.");
+                    m_failedQueue.clear();
+                    m_failedQueue = null;
                     break;
                 }
             }
         }
     }
 
-    // Callback for batch invoke when table has more than 1 entries. The callback on failure feeds failedQueue for
+    static int lastMultiple = 0;
+    // Callback for batch invoke when table has more than 1 entries. The callback on failure feeds m_failedQueue for
     // one row at a time processing.
-    public static class PartitionProcedureCallback implements ProcedureCallback {
+    public class PartitionProcedureCallback implements ProcedureCallback {
 
-        static int lastMultiple = 0;
-        protected static final VoltLogger m_log = new VoltLogger("CONSOLE");
         protected CSVPartitionProcessor m_processor;
         final private List<CSVLineWithMetaData> m_batchList;
-        private final BlockingQueue<CSVLineWithMetaData> failedQueue;
 
         public PartitionProcedureCallback(List<CSVLineWithMetaData> batchList,
-                CSVPartitionProcessor pp, BlockingQueue<CSVLineWithMetaData> fq) {
+                CSVPartitionProcessor pp) {
             m_processor = pp;
             m_batchList = new ArrayList(batchList);
-            failedQueue = fq;
         }
 
         @Override
@@ -320,8 +323,11 @@ class CSVPartitionProcessor implements Runnable {
                 // Batch failed queue it for individual processing and find out which actually m_errored.
                 m_processor.m_partitionProcessedCount.addAndGet(-1 * m_batchList.size());
                 if (!m_processor.m_errored) {
-                    //If we have not reached the limit continue pushing to failure processor.
-                    failedQueue.addAll(m_batchList);
+                    //If we have not reached the limit continue pushing to failure processor only if
+                    //failure processor is available.
+                    if (m_failedQueue != null) {
+                        m_failedQueue.addAll(m_batchList);
+                    }
                 }
                 return;
             }
@@ -351,7 +357,7 @@ class CSVPartitionProcessor implements Runnable {
                 if (lineList == m_endOfData) {
                     //Process anything that we didnt process yet.
                     if (table.getRowCount() > 0) {
-                        PartitionProcedureCallback cbmt = new PartitionProcedureCallback(batchList, this, failedQueue);
+                        PartitionProcedureCallback cbmt = new PartitionProcedureCallback(batchList, this);
                         try {
                             if (!m_isMP) {
                                 m_csvClient.callProcedure(cbmt, procName, rpartitionParam, m_tableName, table);
@@ -384,7 +390,7 @@ class CSVPartitionProcessor implements Runnable {
                 //If our batch is complete submit it.
                 if (table.getRowCount() >= m_config.batch) {
                     try {
-                        PartitionProcedureCallback cbmt = new PartitionProcedureCallback(batchList, this, failedQueue);
+                        PartitionProcedureCallback cbmt = new PartitionProcedureCallback(batchList, this);
                         if (!m_isMP) {
                             rpartitionParam = TheHashinator.valueToBytes(table.fetchRow(0).get(CSVPartitionProcessor.m_partitionedColumnIndex, m_partitionColumnType));
                             m_csvClient.callProcedure(cbmt, procName, rpartitionParam, m_tableName, table);
@@ -395,9 +401,11 @@ class CSVPartitionProcessor implements Runnable {
                         //Clear table data as we start building new table with new rows.
                         table.clearRowData();
                     } catch (IOException ex) {
+                        //We lost network.
                         table.clearRowData();
                         String[] info = {lineList.rawLine.toString(), ex.toString()};
                         m_errored = synchronizeErrorInfo(lineList.lineNumber, info);
+                        CSVFileReader.m_errored = true;
                         return;
                     }
                     batchList = new ArrayList<CSVLineWithMetaData>();
@@ -461,35 +469,39 @@ class CSVPartitionProcessor implements Runnable {
     public void run() {
 
         FailedBatchProcessor failureProcessor = null;
-        //Process the Partition queue.
-        if (m_config.useSuppliedProcedure) {
-            processUserSuppliedProcedure(m_insertProcedure);
-        } else {
+        try {
+            //Process the Partition queue.
+            if (m_config.useSuppliedProcedure) {
+                processUserSuppliedProcedure(m_insertProcedure);
+            } else {
 
-            VoltTable table = new VoltTable(m_colInfo);
-            String procName = (m_isMP ? "@LoadMultipartitionTable" : "@LoadSinglepartitionTable");
+                VoltTable table = new VoltTable(m_colInfo);
+                String procName = (m_isMP ? "@LoadMultipartitionTable" : "@LoadSinglepartitionTable");
 
-            //Launch failureProcessor
-            failedQueue = new LinkedBlockingQueue<CSVLineWithMetaData>();
-            failureProcessor = new FailedBatchProcessor(this, procName, m_tableName);
-            failureProcessor.start();
+                //Launch failureProcessor
+                m_failedQueue = new LinkedBlockingQueue<CSVLineWithMetaData>();
+                failureProcessor = new FailedBatchProcessor(this, procName, m_tableName);
+                failureProcessor.start();
 
-            processLoadTable(table, procName);
-        }
-        m_partitionQueue.clear();
+                processLoadTable(table, procName);
+            }
+            m_partitionQueue.clear();
 
         //Let partition processor drain and put any failures on failure processing.
-        try {
             m_csvClient.drain();
             if (failureProcessor != null) {
-                failedQueue.put(m_endOfData);
+                if (m_failedQueue != null) {
+                    m_failedQueue.put(m_endOfData);
+                }
                 failureProcessor.join();
                 //Drain again for failure callbacks to finish.
                 m_csvClient.drain();
             }
         } catch (NoConnectionsException ex) {
+            CSVFileReader.m_errored = true;
             m_log.warn("Failed to Drain the client: ", ex);
         } catch (InterruptedException ex) {
+            CSVFileReader.m_errored = true;
             m_log.warn("Failed to Drain the client: ", ex);
         }
 
