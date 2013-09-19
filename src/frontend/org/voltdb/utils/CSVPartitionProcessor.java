@@ -487,7 +487,7 @@ class CSVPartitionProcessor implements Runnable {
             }
             m_partitionQueue.clear();
 
-        //Let partition processor drain and put any failures on failure processing.
+            //Let partition processor drain and put any failures on failure processing.
             m_csvClient.drain();
             if (failureProcessor != null) {
                 if (m_failedQueue != null) {
