@@ -50,12 +50,11 @@ public class MockPlanNode extends AbstractPlanNode
         m_hasSignificantOutputSchema = true;
         for (int i = 0; i < m_columnNames.length; ++i)
         {
-            TupleValueExpression tve = new TupleValueExpression();
-            tve.setTableName(m_tableName);
-            tve.setTableAlias(m_tableName);
-            tve.setColumnName(m_columnNames[i]);
-            tve.setColumnAlias(m_columnNames[i]);
-            tve.setColumnIndex(i);
+            TupleValueExpression tve = new TupleValueExpression(m_tableName,
+                                                                m_tableName,
+                                                                m_columnNames[i],
+                                                                m_columnNames[i],
+                                                                i);
             m_outputSchema.addColumn(new SchemaColumn(m_tableName,
                                                       m_tableName,
                                                       m_columnNames[i],

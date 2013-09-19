@@ -48,6 +48,46 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     private boolean m_hasAggregate = false;
 
+    /**
+     * Create a new TupleValueExpression
+     * @param tableName  The name of the table where this column originated,
+     *        if any.  Currently, internally created columns will be assigned
+     *        the table name "VOLT_TEMP_TABLE" for disambiguation.
+     * @param tableAlias  The alias assigned to this table, if any
+     * @param columnName  The name of this column, if any
+     * @param columnAlias  The alias assigned to this column, if any
+     * @param columnIndex. The column index in the table
+     */
+    public TupleValueExpression(String tableName,
+                                String tableAlias,
+                                String columnName,
+                                String columnAlias,
+                                int columnIndex) {
+        super(ExpressionType.VALUE_TUPLE);
+        m_tableName = tableName;
+        m_tableAlias = tableAlias;
+        m_columnName = columnName;
+        m_columnAlias = columnAlias;
+        m_columnIndex = columnIndex;
+    }
+
+    public TupleValueExpression(String tableName,
+                                String tableAlias,
+                                String columnName,
+                                String columnAlias) {
+        this(tableName, tableAlias, columnName, columnAlias, -1);
+    }
+
+    public TupleValueExpression(String tableName,
+                                String columnName,
+                                int columnIndex) {
+        this(tableName, null, columnName, null, columnIndex);
+    }
+
+    public TupleValueExpression() {
+        super(ExpressionType.VALUE_TUPLE);
+    }
+
     /// Only set for the special case of an aggregate function result used in an "ORDER BY" clause.
     /// This TupleValueExpression represents the corresponding "column" in the aggregate's generated output TEMP table.
     public boolean hasAggregate() {
@@ -56,10 +96,6 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     public void setHasAggregate(boolean m_hasAggregate) {
         this.m_hasAggregate = m_hasAggregate;
-    }
-
-    public TupleValueExpression() {
-        super(ExpressionType.VALUE_TUPLE);
     }
 
     @Override
@@ -183,8 +219,9 @@ public class TupleValueExpression extends AbstractValueExpression {
             }
         }
         if (m_tableAlias != null && expr.m_tableAlias != null) {
-        	// Implying both sides non-null
-        	// If only one side is NULL aliases are not part of the comparison
+            // Implying both sides non-null
+            // If one of the table aliases is NULL it is considered to be a wild card
+            // matching any alias.
             if (m_tableAlias.equals(expr.m_tableAlias) == false) {
                 return false;
             }
@@ -203,6 +240,9 @@ public class TupleValueExpression extends AbstractValueExpression {
         int result = 0;
         if (m_tableName != null) {
             result += m_tableName.hashCode();
+        }
+        if (m_tableAlias != null) {
+            result += m_tableAlias.hashCode();
         }
         if (m_columnName != null) {
             result += m_columnName.hashCode();

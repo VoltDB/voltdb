@@ -320,8 +320,6 @@ public abstract class AbstractParsedStmt {
      * @return
      */
     private AbstractExpression parseColumnRefExpression(VoltXMLElement exprNode) {
-        TupleValueExpression expr = new TupleValueExpression();
-
         String alias = exprNode.attributes.get("alias");
         String tableName = exprNode.attributes.get("table");
         // When the column lacks required detail,
@@ -348,10 +346,7 @@ public abstract class AbstractParsedStmt {
         // add table to the query cache
         addTableToQueryCache(tableName, tableAlias);
 
-        expr.setColumnAlias(alias);
-        expr.setColumnName(columnName);
-        expr.setTableName(tableName);
-        expr.setTableAlias(tableAlias);
+        TupleValueExpression expr = new TupleValueExpression(tableName, tableAlias, columnName, alias);
 
         expr.resolveForDB(m_db);
         return expr;

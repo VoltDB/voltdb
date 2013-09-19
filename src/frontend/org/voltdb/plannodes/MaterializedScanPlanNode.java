@@ -41,7 +41,7 @@ import org.voltdb.types.SortDirectionType;
 public class MaterializedScanPlanNode extends AbstractPlanNode {
 
     private AbstractExpression m_tableData;
-    private final TupleValueExpression m_outputExpression = new TupleValueExpression();
+    private TupleValueExpression m_outputExpression = null;
     private SortDirectionType m_sortDirection = SortDirectionType.INVALID;
 
     public enum Members {
@@ -61,10 +61,8 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
     public void setRowData(AbstractExpression tableData) {
         assert(tableData instanceof VectorValueExpression || tableData instanceof ParameterValueExpression);
         m_tableData = tableData;
-        m_outputExpression.setColumnIndex(0);
-        m_outputExpression.setColumnName("list_element");
-        m_outputExpression.setTableName("materialized_temp_table");
-        m_outputExpression.setTableAlias("materialized_temp_table");
+        m_outputExpression = new TupleValueExpression(
+                "materialized_temp_table", "materialized_temp_table", "list_element", null, 0);
         m_outputExpression.setValueType(m_tableData.getValueType());
         m_outputExpression.setValueSize(m_tableData.getValueSize());
     }

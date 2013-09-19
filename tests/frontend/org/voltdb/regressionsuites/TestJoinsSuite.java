@@ -62,6 +62,8 @@ public class TestJoinsSuite extends RegressionSuite {
         subtestThreeTableSeqInnerMultiJoin(client);
         clearSeqTables(client);
         subtestSeqOuterJoin(client);
+        clearSeqTables(client);
+        subtestSelfJoin(client);
     }
 
     /**
@@ -237,6 +239,36 @@ public class TestJoinsSuite extends RegressionSuite {
         client.callProcedure("@AdHoc", "DELETE FROM R3;");
         client.callProcedure("@AdHoc", "DELETE FROM P2;");
         client.callProcedure("@AdHoc", "DELETE FROM P3;");
+    }
+
+    /**
+     * Self Join table NLJ
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    private void subtestSelfJoin(Client client)
+            throws NoConnectionsException, IOException, ProcCallException
+    {
+        client.callProcedure("InsertR1", 1, 2, 7);
+        client.callProcedure("InsertR1", 2, 2, 7);
+        client.callProcedure("InsertR1", 4, 3, 2);
+        client.callProcedure("InsertR1", 5, 6, null);
+        // 2,2,1,1,2,7
+        //2,2,1,2,2,7
+        VoltTable result = client.callProcedure("@AdHoc", "SELECT * FROM R1 A JOIN R1 B ON A.A = B.C;")
+                                 .getResults()[0];
+        System.out.println(result.toString());
+        assertEquals(2, result.getRowCount());
+
+        // 1,2,7,NULL,NULL,NULL
+        // 2,2,7,4,3,2
+        // 4,3,2,NULL,NULL,NULL
+        // 5,6,NULL,NULL,NULL,NULL
+        result = client.callProcedure("@AdHoc", "SELECT * FROM R1 A LEFT JOIN R1 B ON A.A = B.D;")
+                .getResults()[0];
+        System.out.println(result.toString());
+        assertEquals(4, result.getRowCount());
     }
 
     public void testIndexJoins()

@@ -156,12 +156,8 @@ public class SchemaColumn
         }
         else
         {
-            new_exp = new TupleValueExpression();
+            new_exp = new TupleValueExpression(m_tableName, m_tableAlias, m_columnName, m_columnAlias);
             // XXX not sure this is right
-            new_exp.setTableName(m_tableName);
-            new_exp.setTableAlias(m_tableAlias);
-            new_exp.setColumnName(m_columnName);
-            new_exp.setColumnAlias(m_columnAlias);
             new_exp.setValueType(m_expression.getValueType());
             new_exp.setValueSize(m_expression.getValueSize());
         }

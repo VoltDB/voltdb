@@ -551,15 +551,11 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     {
         Integer ii = aggTableIndexMap.get(this);
         if (ii != null) {
-            TupleValueExpression tve = new TupleValueExpression();
+            ParsedColInfo col = indexToColumnMap.get(ii);
+            TupleValueExpression tve = new TupleValueExpression(
+                    col.tableName, col.tableAlias, col.columnName, col.alias, ii);
             tve.setValueType(getValueType());
             tve.setValueSize(getValueSize());
-            tve.setColumnIndex(ii);
-            ParsedColInfo col = indexToColumnMap.get(ii);
-            tve.setColumnName(col.columnName);
-            tve.setColumnAlias(col.alias);
-            tve.setTableName(col.tableName);
-            tve.setTableAlias(col.tableAlias);
             // To prevent pushdown of LIMIT when ORDER BY references an agg. ENG-3487.
             if (hasAnySubexpressionOfClass(AggregateExpression.class))
                 tve.setHasAggregate(true);

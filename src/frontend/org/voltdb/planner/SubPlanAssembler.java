@@ -1212,6 +1212,7 @@ public abstract class SubPlanAssembler {
                 // Extract a TVE from the LHS MaterializedScan for use by the IndexScan in its new role.
                 MaterializedScanPlanNode matscan = (MaterializedScanPlanNode)resultNode.getChild(0);
                 AbstractExpression elemExpr = matscan.getOutputExpression();
+                assert(elemExpr != null);
                 // Replace the IN LIST condition in the end expression referencing all the list elements
                 // with a more efficient equality filter referencing the TVE for each element in turn.
                 replaceInListFilterWithEqualityFilter(path.endExprs, expr2, elemExpr);

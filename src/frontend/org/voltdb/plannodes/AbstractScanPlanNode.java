@@ -193,14 +193,10 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             for (Column col : CatalogUtil.getSortedCatalogItems(cols, "index"))
             {
                 // must produce a tuple value expression for this column.
-                TupleValueExpression tve = new TupleValueExpression();
+                TupleValueExpression tve = new TupleValueExpression(
+                        m_targetTableName, m_targetTableAlias, col.getTypeName(), col.getTypeName(), col.getIndex());
                 tve.setValueType(VoltType.get((byte)col.getType()));
                 tve.setValueSize(col.getSize());
-                tve.setColumnIndex(col.getIndex());
-                tve.setTableName(m_targetTableName);
-                tve.setTableAlias(m_targetTableAlias);
-                tve.setColumnAlias(col.getTypeName());
-                tve.setColumnName(col.getTypeName());
                 m_tableSchema.addColumn(new SchemaColumn(m_targetTableName,
                                                          m_targetTableAlias,
                                                          col.getTypeName(),

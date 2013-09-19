@@ -21,6 +21,7 @@ package org.voltdb.planner;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -323,13 +324,13 @@ public class PartitioningForStatement implements Cloneable{
      * Additionally, in this case, there may be a constant equality filter on any of the columns,
      * which we want to extract as our SP partitioning parameter.
      *
-     * @param tableList The tables.
+     * @param tableAliasList The tables.
      * @param valueEquivalence Their column equality filters
      * @return the number of independently partitioned tables
      *         -- partitioned tables that aren't joined or filtered by the same value.
      *         The caller can raise an alarm if there is more than one.
      */
-    public int analyzeForMultiPartitionAccess(ArrayList<Table> tableList,
+    public int analyzeForMultiPartitionAccess(List<StmtCatalogCache> tableAliasList,
             HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence)
     {
         TupleValueExpression tokenPartitionKey = null;
@@ -337,13 +338,14 @@ public class PartitioningForStatement implements Cloneable{
         int unfilteredPartitionKeyCount = 0;
 
         // Iterate over the tables to collect partition columns.
-        for (Table table : tableList) {
+        for (StmtCatalogCache tableAlias : tableAliasList) {
             // Replicated tables don't need filter coverage.
-            if (table.getIsreplicated()) {
+            if (tableAlias.m_table.getIsreplicated()) {
                 continue;
             }
 
-            String partitionedTable = table.getTypeName();
+            String partitionedTableAlias = tableAlias.m_tableAlias;
+            String partitionedTable = tableAlias.m_table.getTypeName();
             String columnNeedingCoverage = m_partitionColumnByTable.get(partitionedTable);
             boolean unfiltered = true;
 
@@ -352,7 +354,8 @@ public class PartitioningForStatement implements Cloneable{
                     continue;
                 }
                 TupleValueExpression candidatePartitionKey = (TupleValueExpression) candidateColumn;
-                if ( ! candidatePartitionKey.getTableName().equals(partitionedTable)) {
+                assert(candidatePartitionKey.getTableAlias() != null);
+                if ( ! candidatePartitionKey.getTableAlias().equals(partitionedTableAlias)) {
                     continue;
                 }
                 if ( ! candidatePartitionKey.getColumnName().equals(columnNeedingCoverage)) {

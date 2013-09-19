@@ -441,7 +441,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 HashMap<AbstractExpression, Set<AbstractExpression>>
                     valueEquivalence = joinTree.getAllEquivalenceFilters();
                 int countOfIndependentlyPartitionedTables =
-                        m_partitioning.analyzeForMultiPartitionAccess(m_parsedStmt.tableList,
+                        m_partitioning.analyzeForMultiPartitionAccess(m_parsedStmt.stmtCache,
                                                                       valueEquivalence);
                 if (countOfIndependentlyPartitionedTables > 1) {
                     // The case of more than one independent partitioned table

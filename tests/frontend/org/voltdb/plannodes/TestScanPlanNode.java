@@ -95,11 +95,7 @@ public class TestScanPlanNode extends TestCase
         ArrayList<SchemaColumn> scanColumns = new ArrayList<SchemaColumn>();
         for (int index : scan_col_indexes)
         {
-            TupleValueExpression tve = new TupleValueExpression();
-            tve.setTableName(TABLE1);
-            tve.setTableAlias(TABLE1);
-            tve.setColumnName(COLS[index]);
-            tve.setColumnAlias(COLS[index]);
+            TupleValueExpression tve = new TupleValueExpression(TABLE1, TABLE1, COLS[index], COLS[index]);
             tve.setValueType(COLTYPES[index]);
             tve.setValueSize(COLTYPES[index].getLengthInBytesForFixedTypes());
             SchemaColumn col = new SchemaColumn(TABLE1, TABLE1, COLS[index],
@@ -176,18 +172,10 @@ public class TestScanPlanNode extends TestCase
         col4_exp.setValueType(COLTYPES[4]);
         col4_exp.setValueSize(COLTYPES[4].getLengthInBytesForFixedTypes());
         col4_exp.setExpressionType(ExpressionType.OPERATOR_PLUS);
-        TupleValueExpression left = new TupleValueExpression();
-        left.setTableName(TABLE1);
-        left.setTableAlias(TABLE1);
-        left.setColumnName(COLS[0]);
-        left.setColumnAlias(COLS[0]);
+        TupleValueExpression left = new TupleValueExpression(TABLE1, TABLE1, COLS[0], COLS[0]);
         left.setValueType(COLTYPES[0]);
         left.setValueSize(COLTYPES[0].getLengthInBytesForFixedTypes());
-        TupleValueExpression right = new TupleValueExpression();
-        right.setTableName(TABLE1);
-        right.setTableAlias(TABLE1);
-        right.setColumnName(COLS[2]);
-        right.setColumnAlias(COLS[2]);
+        TupleValueExpression right = new TupleValueExpression(TABLE1, TABLE1, COLS[2], COLS[2]);
         right.setValueType(COLTYPES[2]);
         right.setValueSize(COLTYPES[2].getLengthInBytesForFixedTypes());
         col4_exp.setLeft(left);
