@@ -41,9 +41,8 @@ import org.voltdb.StarvationTracker;
 class MpRoSitePool {
     final static VoltLogger tmLog = new VoltLogger("TM");
 
-    // IZZY: temporary static vars
-    static int MAX_POOL_SIZE = 100;
-    static int INITIAL_POOL_SIZE = 0;
+    static int DEFAULT_MAX_POOL_SIZE = 20;
+    static int INITIAL_POOL_SIZE = 1;
 
     class MpRoSiteContext {
         final private BackendTarget m_backend;
@@ -101,6 +100,7 @@ class MpRoSitePool {
     private CatalogContext m_catalogContext;
     private CatalogSpecificPlanner m_csp;
     private ThreadFactory m_poolThreadFactory;
+    private final int m_poolSize;
 
     MpRoSitePool(
             long siteId,
@@ -120,6 +120,12 @@ class MpRoSitePool {
             CoreUtils.getThreadFactory("RO MP Iv2ExecutionSite - " + CoreUtils.hsIdToString(m_siteId),
                     CoreUtils.MEDIUM_STACK_SIZE);
 
+        Integer poolSize = Integer.getInteger("mpiReadPoolSize");
+        if (poolSize == null) {
+            poolSize = DEFAULT_MAX_POOL_SIZE;
+        }
+        m_poolSize = poolSize;
+        tmLog.info("Setting maximum size of MPI read pool to: " + m_poolSize);
 
         // Construct the initial pool
         for (int i = 0; i < INITIAL_POOL_SIZE; i++) {
@@ -172,7 +178,7 @@ class MpRoSitePool {
      */
     boolean canAcceptWork()
     {
-        boolean retval = (!m_idleSites.isEmpty() || m_busySites.size() < MAX_POOL_SIZE);
+        boolean retval = (!m_idleSites.isEmpty() || m_busySites.size() < m_poolSize);
         return retval;
     }
 
