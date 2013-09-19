@@ -104,45 +104,21 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             col.expression = (AbstractExpression) expression.clone();
             return col;
         }
-
-        public static boolean isNewtoColumnList(List<ParsedColInfo>columnList, ParsedColInfo col) {
-            boolean isNew = true;
-            for (ParsedColInfo ic: columnList) {
-                if (ic.equals(col)) {
-                    isNew = false;
-                    break;
-                }
-            }
-            return isNew;
-        }
-
-        public static boolean isNewtoColumnList(List<ParsedColInfo>columnList, AbstractExpression expr) {
-            boolean isNew = true;
-            for (ParsedColInfo ic: columnList) {
-                if (ic.expression.equals(expr)) {
-                    isNew = false;
-                    break;
-                }
-            }
-            return isNew;
-        }
-
-        // Concat elements to the XXXColumns list
-        public static void insertToColumnList (List<ParsedColInfo>columnList,
-                List<ParsedColInfo> colCollection) {
-            for (ParsedColInfo col: colCollection) {
-                if (isNewtoColumnList(columnList, col)) {
-                    columnList.add(col);
-                }
-            }
-        }
     }
 
+    /**
+     * This class contain all the information that Materialized view partitioned query need to be fixed.
+     *
+     */
+
     public static class MVFixInfo {
-        // Preparation for MV based distributed query
+        // Does this mv partitioned based query needs to be fixed.
         public boolean needed = false;
+        // materialized view table
         public Table mvTable = null;
-        public ProjectionPlanNode projectionNode = null;
+        // New inlined projection node for the scan node, contain extra group by columns.
+        public ProjectionPlanNode scanInlinedProjectionNode = null;
+        // New re-Aggregation plan node on the coordinator to eliminate the duplicated rows.
         public AggregatePlanNode reAggNode = null;
     }
 
@@ -173,8 +149,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private boolean hasComplexGroupby = false;
     private boolean hasAggregateExpression = false;
     private boolean hasAverage = false;
-
-    public boolean needHandleAggregationOperators = false;
 
     public MVFixInfo mvFixInfo = new MVFixInfo();
 
@@ -227,7 +201,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         if (groupbyElement != null) {
             parseGroupByColumns(groupbyElement);
-            ParsedColInfo.insertToColumnList(aggResultColumns, groupByColumns);
+            insertToColumnList(aggResultColumns, groupByColumns);
         }
 
         if (orderbyElement != null) {
@@ -363,8 +337,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
         }
 
-        mvFixInfo.projectionNode = new ProjectionPlanNode();
-        mvFixInfo.projectionNode.setOutputSchema(inlineProjSchema);
+        mvFixInfo.scanInlinedProjectionNode = new ProjectionPlanNode();
+        mvFixInfo.scanInlinedProjectionNode.setOutputSchema(inlineProjSchema);
 
         // Construct the reAggregation plan node's aggSchema
         mvFixInfo.reAggNode = new HashAggregatePlanNode();
@@ -411,7 +385,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         parseDisplayColumns(displayElement, true);
 
         if (groupbyElement != null) {
-            ParsedColInfo.insertToColumnList(aggResultColumns, groupByColumns);
+            insertToColumnList(aggResultColumns, groupByColumns);
         }
         if (orderbyElement != null) {
             parseOrderColumns(orderbyElement, true);
@@ -458,7 +432,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
 
         for (ParsedColInfo col : displayColumns) {
-            if (ParsedColInfo.isNewtoColumnList(aggResultColumns, col)) {
+            if (!aggResultColumns.contains(col)) {
                 // Now Only TVEs in displayColumns are left for AggResultColumns
                 if (col.expression instanceof TupleValueExpression) {
                     aggResultColumns.add(col);
@@ -500,7 +474,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      */
     private void fillUpAggResultColumns () {
         for (ParsedColInfo col: displayColumns) {
-            if (ParsedColInfo.isNewtoColumnList(aggResultColumns, col)) {
+            if (!aggResultColumns.contains(col)) {
                 if (col.expression instanceof TupleValueExpression) {
                     aggResultColumns.add(col);
                 } else {
@@ -596,7 +570,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 col.alias = cookedCol.alias;
                 col.tableName = cookedCol.tableName;
                 col.columnName = cookedCol.columnName;
-                if (ParsedColInfo.isNewtoColumnList(aggResultColumns,col)) {
+                if (!aggResultColumns.contains(col)) {
                     aggResultColumns.add(col);
                 }
                 return;
@@ -606,7 +580,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // Aggregation column use the the hacky stuff
             col.tableName = "VOLT_TEMP_TABLE";
             col.columnName = "";
-            if (ParsedColInfo.isNewtoColumnList(aggResultColumns,col)) {
+            if (!aggResultColumns.contains(col)) {
                 aggResultColumns.add(col);
             }
             ExpressionUtil.finalizeValueTypes(col.expression);
@@ -621,10 +595,31 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             col.columnName = tve.getColumnName();
             col.tableName = tve.getTableName();
             col.expression = tve;
-            if (ParsedColInfo.isNewtoColumnList(aggResultColumns, col)) {
+            if (!aggResultColumns.contains(col)) {
                 aggResultColumns.add(col);
             }
         }
+    }
+
+    // Concat elements to the XXXColumns list
+    private void insertToColumnList (List<ParsedColInfo>columnList,
+            List<ParsedColInfo> newCols) {
+        for (ParsedColInfo col: newCols) {
+            if (!columnList.contains(col)) {
+                columnList.add(col);
+            }
+        }
+    }
+
+    private boolean isNewtoColumnList(List<ParsedColInfo>columnList, AbstractExpression expr) {
+        boolean isNew = true;
+        for (ParsedColInfo ic: columnList) {
+            if (ic.expression.equals(expr)) {
+                isNew = false;
+                break;
+            }
+        }
+        return isNew;
     }
 
     /**
@@ -633,7 +628,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      * @param tveList
      */
     private void findAllTVEs(AbstractExpression expr, List<TupleValueExpression> tveList) {
-        if (!ParsedColInfo.isNewtoColumnList(aggResultColumns, expr))
+        if (!isNewtoColumnList(aggResultColumns, expr))
             return;
         if (expr instanceof TupleValueExpression) {
             tveList.add((TupleValueExpression) expr.clone());

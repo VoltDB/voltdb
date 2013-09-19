@@ -1241,7 +1241,7 @@ public class PlanAssembler {
         AbstractScanPlanNode scanNode = scanList.get(0);
         assert(scanNode.getTargetTableName().equals(mvFixInfo.mvTable.getTypeName()));
 
-        scanNode.addInlinePlanNode(mvFixInfo.projectionNode);
+        scanNode.addInlinePlanNode(mvFixInfo.scanInlinedProjectionNode);
         return root;
     }
 
