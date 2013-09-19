@@ -118,7 +118,7 @@ class CSVFileReader implements Runnable {
                 if (q == null) {
                     //We have not known about this partition do something.
                     m_log.warn("Unknown or New partition detected possibly because of change in topology.");
-                    String[] info = {lineList.toString(), "Unknown or New partition detected possibly because of change in topology."};
+                    String[] info = {lineList.toString(), "Topology changed."};
                     if (synchronizeErrorInfo(m_totalLineCount.get() + 1, info)) {
                         m_errored = true;
                         break;
