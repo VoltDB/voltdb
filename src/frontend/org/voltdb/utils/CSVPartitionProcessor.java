@@ -50,7 +50,7 @@ class CSVPartitionProcessor implements Runnable {
     final int m_partitionColumnIndex;
     final CSVLineWithMetaData m_endOfData;
     //Partition for which this processor thread is processing.
-    final int m_partitionId;
+    final long m_partitionId;
     //This is just so we can identity thread name and log information.
     final String m_processorName;
     //Processed count indicates how many inser sent to server.
@@ -86,7 +86,7 @@ class CSVPartitionProcessor implements Runnable {
     static int m_numProcessors = 1;
 
 
-    public CSVPartitionProcessor(Client client, int partitionId,
+    public CSVPartitionProcessor(Client client, long partitionId,
             int partitionColumnIndex, BlockingQueue<CSVLineWithMetaData> partitionQueue, CSVLineWithMetaData eod) {
         m_csvClient = client;
         m_partitionId = partitionId;
@@ -247,14 +247,12 @@ class CSVPartitionProcessor implements Runnable {
         private final CSVPartitionProcessor m_processor;
         private final String m_procName;
         private final String m_tableName;
-        private final Object m_partitionParam;
 
         public FailedBatchProcessor(CSVPartitionProcessor pp, String procName,
-                String tableName, Object partitionParam) {
+                String tableName) {
             m_processor = pp;
             m_procName = procName;
             m_tableName = tableName;
-            m_partitionParam = partitionParam;
         }
 
         @Override
@@ -282,7 +280,8 @@ class CSVPartitionProcessor implements Runnable {
                                 new PartitionSingleExecuteProcedureCallback(lineList, m_processor);
                         if (!CSVPartitionProcessor.m_isMP) {
                             //If transaction is restarted because of wrong partition client will retry
-                            m_csvClient.callProcedure(cbmt, m_procName, m_partitionParam, m_tableName, table);
+                            Object rpartitionParam = TheHashinator.valueToBytes(table.fetchRow(0).get(CSVPartitionProcessor.m_partitionedColumnIndex, m_partitionColumnType));
+                            m_csvClient.callProcedure(cbmt, m_procName, rpartitionParam, m_tableName, table);
                         } else {
                             m_csvClient.callProcedure(cbmt, m_procName, m_tableName, table);
                         }
@@ -337,9 +336,9 @@ class CSVPartitionProcessor implements Runnable {
     }
 
     // while there are rows and m_endOfData not seen batch and call procedure for insert.
-    private void processLoadTable(VoltTable table, String procName, Object partitionParam) {
+    private void processLoadTable(VoltTable table, String procName) {
         List<CSVLineWithMetaData> batchList = new ArrayList<CSVLineWithMetaData>();
-
+        Object rpartitionParam = null;
         while (true) {
             if (m_errored) {
                 //Let file reader know not to read any more. All Partition Processors will quit processing.
@@ -355,7 +354,7 @@ class CSVPartitionProcessor implements Runnable {
                         PartitionProcedureCallback cbmt = new PartitionProcedureCallback(batchList, this, failedQueue);
                         try {
                             if (!m_isMP) {
-                                m_csvClient.callProcedure(cbmt, procName, partitionParam, m_tableName, table);
+                                m_csvClient.callProcedure(cbmt, procName, rpartitionParam, m_tableName, table);
                             } else {
                                 m_csvClient.callProcedure(cbmt, procName, m_tableName, table);
                             }
@@ -387,7 +386,8 @@ class CSVPartitionProcessor implements Runnable {
                     try {
                         PartitionProcedureCallback cbmt = new PartitionProcedureCallback(batchList, this, failedQueue);
                         if (!m_isMP) {
-                            m_csvClient.callProcedure(cbmt, procName, partitionParam, m_tableName, table);
+                            rpartitionParam = TheHashinator.valueToBytes(table.fetchRow(0).get(CSVPartitionProcessor.m_partitionedColumnIndex, m_partitionColumnType));
+                            m_csvClient.callProcedure(cbmt, procName, rpartitionParam, m_tableName, table);
                         } else {
                             m_csvClient.callProcedure(cbmt, procName, m_tableName, table);
                         }
@@ -465,21 +465,16 @@ class CSVPartitionProcessor implements Runnable {
         if (m_config.useSuppliedProcedure) {
             processUserSuppliedProcedure(m_insertProcedure);
         } else {
-            //If SP get partition param from Hashinator.
-            Object partitionParam = null;
-            if (!m_isMP) {
-                partitionParam = TheHashinator.valueToBytes(m_partitionId);
-            }
 
             VoltTable table = new VoltTable(m_colInfo);
             String procName = (m_isMP ? "@LoadMultipartitionTable" : "@LoadSinglepartitionTable");
 
             //Launch failureProcessor
             failedQueue = new LinkedBlockingQueue<CSVLineWithMetaData>();
-            failureProcessor = new FailedBatchProcessor(this, procName, m_tableName, partitionParam);
+            failureProcessor = new FailedBatchProcessor(this, procName, m_tableName);
             failureProcessor.start();
 
-            processLoadTable(table, procName, partitionParam);
+            processLoadTable(table, procName);
         }
         m_partitionQueue.clear();
 

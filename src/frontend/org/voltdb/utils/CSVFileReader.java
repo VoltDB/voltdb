@@ -44,7 +44,7 @@ class CSVFileReader implements Runnable {
     static CSVLoader.CSVConfig m_config;
     static ICsvListReader m_listReader;
     //Map of partition to Queues to put CSVLineWithMetaData
-    static Map<Integer, BlockingQueue<CSVLineWithMetaData>> m_processorQueues;
+    static Map<Long, BlockingQueue<CSVLineWithMetaData>> m_processorQueues;
     // This is the last thing put on Queue so that processors will detect the end.
     static CSVLineWithMetaData m_endOfData;
     static boolean m_errored = false;
@@ -68,6 +68,7 @@ class CSVFileReader implements Runnable {
     @Override
     public void run() {
         List<String> lineList = null;
+        m_log.debug("Using Hashinator: " + TheHashinator.getConfiguredHashinatorType().name());
         while ((m_config.limitrows-- > 0)) {
             if (m_errored) {
                 break;
@@ -106,7 +107,7 @@ class CSVFileReader implements Runnable {
 
                 CSVLineWithMetaData lineData = new CSVLineWithMetaData(correctedLine, lineList,
                         m_listReader.getLineNumber());
-                int partitionId = 0;
+                long partitionId = 0;
                 //Find partiton to send this line to and put on correct partition processor queue.
                 //If Parser got error and we have reached limit this loop will exit and no more elements
                 //will be pushed to queue. Queues will break out as well after seeing endOfData
