@@ -562,9 +562,15 @@ public class PlanAssembler {
          */
         root = handleAggregationOperators(root);
 
+
         // Process the re-aggregate plan node and insert it into the plan.
+        boolean mvFixNeedsProjection = false;
         if (m_parsedSelect.mvFixInfo.needed) {
+            AbstractPlanNode tmpRoot = root;
             root = handleMVBasedMultiPartQuery(root);
+            if (root != tmpRoot) {
+                mvFixNeedsProjection = true;
+            }
         }
 
         if (m_parsedSelect.hasComplexAgg()) {
@@ -577,7 +583,7 @@ public class PlanAssembler {
             root = handleOrderBy(root);
         }
 
-        if (needProjectionNode(root)) {
+        if (mvFixNeedsProjection || needProjectionNode(root)) {
             root = addProjection(root);
         }
 
@@ -1234,14 +1240,6 @@ public class PlanAssembler {
         assert(scanList.size() == 1);
         AbstractScanPlanNode scanNode = scanList.get(0);
         assert(scanNode.getTargetTableName().equals(mvFixInfo.mvTable.getTypeName()));
-
-//        if (root == reAggNode) {
-//            scanNode.generateOutputSchema(m_catalogDb);
-//            ProjectionPlanNode proNode = new ProjectionPlanNode();
-//            proNode.setOutputSchema(scanNode.getOutputSchema());
-//            proNode.addAndLinkChild(root);
-//            root = proNode;
-//        }
 
         scanNode.addInlinePlanNode(mvFixInfo.projectionNode);
         return root;
