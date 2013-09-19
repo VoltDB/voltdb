@@ -1208,6 +1208,10 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
             }
             sb.append("\n");
         }
+
+        // Idempotent. Reset the row position for the next guy...
+        this.resetRowPosition();
+
         return sb.toString();
     }
 

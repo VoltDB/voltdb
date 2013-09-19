@@ -20,7 +20,6 @@ package org.voltdb;
 import java.util.Map;
 
 import org.voltcore.utils.InstanceId;
-import org.voltdb.catalog.Database;
 import org.voltdb.dtxn.TransactionCreator;
 
 public interface CommandLogReinitiator {
@@ -57,20 +56,6 @@ public interface CommandLogReinitiator {
      * Call {@link #generateReplayPlan(int)} to generate the replay plan.
      */
     public void replay();
-
-    /**
-     * Whether or not we have started replaying local command log.
-     *
-     * @return true if it's replaying or it has finished, false if we are still
-     *         waiting for replay plan
-     */
-    public boolean started();
-
-    /**
-     * Joins the two threads
-     * @throws InterruptedException
-     */
-    public void join() throws InterruptedException;
 
     /**
      * Whether or not there were log segments replayed in the cluster. This will
@@ -115,5 +100,16 @@ public interface CommandLogReinitiator {
      */
     public void returnAllSegments();
 
+    /**
+     * Request an elastic index snapshot if the command log will replay @BalancePartitions transactions.
+     * @return true if successfully requested.
+     */
     public boolean requestIndexSnapshot();
+
+    /**
+     * Call @BalancePartitions until the partitions are balanced if necessary. Does nothing if the partitions are
+     * already balanced or if the legacy hashinator is used.
+     * @return true if the partitions are balanced successfully.
+     */
+    public boolean checkAndBalancePartitions();
 }

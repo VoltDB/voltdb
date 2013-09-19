@@ -47,10 +47,6 @@ public class DefaultCommandLogReinitiator implements CommandLogReinitiator
     }
 
     @Override
-    public void join() throws InterruptedException {
-    }
-
-    @Override
     public boolean hasReplayedSegments() {
         return false;
     }
@@ -66,11 +62,6 @@ public class DefaultCommandLogReinitiator implements CommandLogReinitiator
     }
 
     @Override
-    public boolean started() {
-        return true;
-    }
-
-    @Override
     public void setSnapshotTxnId(RestoreAgent.SnapshotInfo info) {
     }
 
@@ -80,6 +71,12 @@ public class DefaultCommandLogReinitiator implements CommandLogReinitiator
 
     @Override
     public boolean requestIndexSnapshot()
+    {
+        return true;
+    }
+
+    @Override
+    public boolean checkAndBalancePartitions()
     {
         return true;
     }

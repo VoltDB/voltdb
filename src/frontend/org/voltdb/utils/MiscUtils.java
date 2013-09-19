@@ -34,13 +34,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.google.common.base.Supplier;
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.ListMultimap;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
@@ -51,6 +44,13 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.licensetool.LicenseException;
 
+import com.google.common.base.Supplier;
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ListMultimap;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 import com.google.common.net.HostAndPort;
 
 public class MiscUtils {
@@ -466,10 +466,22 @@ public class MiscUtils {
      */
     public static synchronized void printPortsInUse(VoltLogger log) {
         try {
-            Process p = Runtime.getRuntime().exec("lsof -i");
+            /*
+             * Don't do DNS resolution, don't use names for port numbers
+             */
+            ProcessBuilder pb = new ProcessBuilder("lsof", "-i", "-n", "-P");
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
             java.io.InputStreamReader reader = new java.io.InputStreamReader(p.getInputStream());
             java.io.BufferedReader br = new java.io.BufferedReader(reader);
-            String str = null;
+            String str = br.readLine();
+            log.fatal("Logging ports that are bound for listening, " +
+                      "this doesn't include ports bound by outgoing connections " +
+                      "which can also cause a failure to bind");
+            log.fatal("The PID of this process is " + CLibrary.getpid());
+            if (str != null) {
+                log.fatal(str);
+            }
             while((str = br.readLine()) != null) {
                 if (str.contains("LISTEN")) {
                     log.fatal(str);

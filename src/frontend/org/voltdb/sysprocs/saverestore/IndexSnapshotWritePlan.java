@@ -39,6 +39,7 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.HashRangeExpression;
 import org.voltdb.sysprocs.SnapshotRegistry;
+import org.voltdb.utils.CatalogUtil;
 
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -62,18 +63,21 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
             new IndexSnapshotRequestConfig(jsData, context.getDatabase());
         final Map<Integer, Long> pidToLocalHSIds = findLocalSources(config.partitionRanges, tracker);
 
+        // only create index on partitioned tables
+        List<Table> tables = CatalogUtil.getNormalTables(context.getDatabase(), false);
+
         // mark snapshot start in registry
-        final AtomicInteger numTables = new AtomicInteger(config.tables.length);
+        final AtomicInteger numTables = new AtomicInteger(tables.size());
         final SnapshotRegistry.Snapshot snapshotRecord =
             SnapshotRegistry.startSnapshot(txnId,
                                            context.getHostId(),
                                            file_path,
                                            file_nonce,
                                            SnapshotFormat.INDEX,
-                                           config.tables);
+                                           tables.toArray(new Table[0]));
 
         // create table tasks
-        for (Table table : config.tables) {
+        for (Table table : tables) {
             createTasksForTable(table,
                                 config.partitionRanges,
                                 pidToLocalHSIds,

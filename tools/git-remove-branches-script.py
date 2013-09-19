@@ -8,21 +8,32 @@
 
 #TODO: Make it handle incorrect password the 1st time, then abort
 
-from optparse import OptionParser
-from datetime import date, datetime, timedelta
+#from datetime import date, datetime, timedelta
 import getpass
+from optparse import OptionParser
 import re
 from subprocess import Popen
 import subprocess
+import sys
+import time
 
 import jiratools
 
 # set exclusions if there are any branches that should not be listed
-exclusions = ['master',]
+exclusions = ['master']
 jira_url = 'https://issues.voltdb.com/'
+gitshowmap = \
+    {
+    "unixtime":"%ct",
+    "datetime":"%ci",
+    "humantime":"%cr",
+    "email":"%ce",
+    }
+DELIMITER='^'
 
 def run_cmd(cmd):
     proc = Popen(cmd.split(' '),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    #print cmd
     (out, err) = proc.communicate(input=None)
     return (proc.returncode, out, err)
 
@@ -38,78 +49,73 @@ def get_branch_list(merged):
 
     #Filter others from list
     origin_exclusions = ['origin/' + b for b in exclusions]
-    branches = list(set(branches) - set(origin_exclusions))
-    branches.sort()
+    return  list(set(branches) - set(origin_exclusions))
 
-    return branches
-
-def make_delete_branches_script(branches, dry_run):
+def make_delete_branches_script(branch_infos, dry_run):
     other_args = ''
     if dry_run:
         other_args = ' --dry-run'
 
-    for b in branches:
+    for bi in branch_infos:
+        b = bi['name']
         cmd = 'git push origin --delete %s%s' % \
-            (b.split('origin/')[1], other_args)
-        comment = get_jira_info(b)
-        print "%-40s %s" %(cmd, comment)
+            (b, other_args)
+        comment = make_comment(bi)
+        print
+        print comment
+        print cmd
+
+def make_comment(bi):
+    comment = '#%-20s last checkin %s %s by %s' % \
+        (bi['name'],bi['datetime'],bi['humantime'],bi['email'])
+    if options.use_jira:
+        ticket_summary = get_jira_info(bi['name'])
+        if ticket_summary:
+            comment +=  ('\n' + ticket_summary)
+    return comment
 
 def get_jira_info(b):
 
-    comment = ''
+    comment = None
     rg = re.compile('(eng)-?(\d+)', re.IGNORECASE)
     m = rg.search(b)
     if m:
         issue = m.group(1) + '-' + m.group(2)
         #print "##Getting %s" % issue
-        ticket = jiratools.get_jira_issue(jira_url, user, password, issue, 'summary,assignee')
+        ticket = jiratools.get_jira_issue(jira_url, user, password, issue, 'summary,assignee,status,resolution')
         if ticket:
             assignee = 'Unassigned'
             if ticket['fields']['assignee']:
                 assignee = ticket['fields']['assignee']['name']
             summary = ticket['fields']['summary']
             #issue_url = jira_url +  'browse/' + issue_key
-            comment = " # %s: %s" % (assignee, summary)
+            status_resolution = ticket['fields']['status']['name']
+            if status_resolution in ('Closed','Resolved'):
+                status_resolution += '/' + ticket['fields']['resolution']['name']
+            comment = "#%s %s %s: %s" % (issue, status_resolution.upper(), assignee, summary)
 
     return comment
 
-def make_archive_branches_script(branches, dry_run):
+def make_archive_branches_script(branch_infos, dry_run):
     other_args = ''
     if dry_run:
         other_args = ' --dry-run'
-    for b in branches:
-        comment = get_jira_info(b)
-        shortname = b.split('origin/')[1]
-        tagname = "archive/" + shortname
+    for bi in branch_infos:
+        comment = make_comment(bi)
+        tagname = "archive/" + bi['name']
         print
         print comment
-        print 'git tag -m "archiving branch %s" %s %s' % \
-            (shortname, tagname, b)
+        print 'git tag -m "archiving branch %s" %s origin/%s' % \
+            (bi['name'], tagname, bi['name'])
         print 'git push origin %s' % (tagname)
-        print 'git push origin --delete %s %s' % (other_args, shortname)
-
-
-def weed_out_newer_branches(branches,maxage):
-    old_branches = []
-    print "####List of branches newer than %d days####" % maxage
-
-    for b in branches:
-        cmd = 'git show -s --pretty=format:"%%ci" %s' % b
-        (ret,stdout,stderr) = run_cmd(cmd)
-        if not ret:
-            #print stdout + b
-            d = datetime.strptime(stdout.split(' ')[0],'"%Y-%m-%d').date()
-            if (date.today() - d) > timedelta(days = maxage):
-                old_branches.append(b)
-            else:
-                print ("#  %-25s last checkin %-2d days ago - %s" %
-                       (b, (date.today()-d).days, d))
-    print "####"
-    return old_branches
+        print 'git push origin --delete %s %s' % (other_args, bi['name'])
 
 if __name__ == "__main__":
 
     parser = OptionParser()
+    parser.add_option('--no-jira', dest='use_jira', action = 'store_false',
+                      help = 'Don\'t look up jira ticket',
+                      default = 'True')
     parser.add_option('-u', '--username', dest = 'username', action = 'store',
                       help = 'username to use for Jira lookups',
                       default = getpass.getuser())
@@ -120,23 +126,46 @@ if __name__ == "__main__":
                       default = True)
     parser.add_option('--older', dest = 'olderthan', action = 'store',
                       help = "age of unmerged branches to list",
-                      type="int", default = 21);
-
+                      type="int", default = 60);
 
     (options,args) = parser.parse_args()
 
-    user = options.username
-    password = options.password or getpass.getpass('Enter your Jira password: ')
+    if options.use_jira:
+        user = options.username
+        password = options.password or getpass.getpass('Enter your Jira password: ')
 
-    if not options.merged:
-        print ('# Branches with checkins within %d days will not be listed'
-               % options.olderthan)
+    #Get the branch list
+    branch_names = get_branch_list(options.merged)
+    format_string = DELIMITER.join([gitshowmap[key] for key in sorted(gitshowmap)])
+    #Iterate over it and get a bunch of commit information using git log
+    branch_infos = []
+    for b in branch_names:
+        branch_info = {}
+        branch_info['name'] = b.split('/')[1]
 
-    branch_list = get_branch_list(options.merged)
+        #Get the git log info and pack it into a branch_info dictionary
+        cmd = 'git log -1 --format=%s %s' % (format_string, b)
+        (ret,stdout,stderr) = run_cmd(cmd)
+        if not ret:
+            values = stdout.rstrip().split(DELIMITER)
+            for k,v in zip(sorted(gitshowmap),values):
+                try:
+                    branch_info[k] = float(v)
+                except ValueError:
+                    branch_info[k] = v
+            branch_infos.append(branch_info)
+        else:
+            sys.stderr.write( "ERROR: Can't get git information for %s\n" % b)
+            sys.stderr.write( "\tcmd = %s\n" % cmd)
+            sys.stderr.write( "\tstderr=%s\n" % stderr)
 
-    old_branches = weed_out_newer_branches(branch_list, options.olderthan )
+    now = time.time()
+
+    sorted_branch_infos = sorted(branch_infos, reverse = True, key=lambda bi:bi['unixtime'])
+    old_branch_infos = [bi for bi in sorted_branch_infos if (now - bi['unixtime']) > options.olderthan * 60* 60* 24]
+
     if options.merged:
-        make_delete_branches_script(old_branches, dry_run=False)
+        make_delete_branches_script(old_branch_infos, dry_run=False)
     else:
-        make_archive_branches_script(old_branches, dry_run=False)
+        make_archive_branches_script(old_branch_infos, dry_run=False)
 

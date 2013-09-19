@@ -1080,11 +1080,11 @@ public:
         m_undoToken++;
     }
 
-    void clearIndex(const T_HashRange &testRange) {
+    void clearIndex(const T_HashRange &testRange, bool expected) {
         boost::shared_ptr<ReferenceSerializeInput> predicateInput = getHashRangePredicateInput(testRange);
         bool activated = m_table->activateStream(m_serializer, TABLE_STREAM_ELASTIC_INDEX_CLEAR,
                                                  0, m_tableId, *predicateInput);
-        ASSERT_TRUE(activated);
+        ASSERT_EQ(expected,activated);
     }
 
     voltdb::VoltDBEngine *m_engine;
@@ -1911,8 +1911,13 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
         }
 
         // Clear the index and validate.
-        clearIndex(testRange);
-        ASSERT_EQ(NULL, getElasticIndex());
+        if (!undo) {
+            clearIndex(testRange, true);
+            ASSERT_EQ(NULL, getElasticIndex());
+        } else if (undo && itest == 1) {
+            clearIndex(testRange, false);
+            ASSERT_NE(NULL, getElasticIndex());
+        }
 
         itest++;
     }

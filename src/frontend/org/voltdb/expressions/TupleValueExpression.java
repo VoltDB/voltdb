@@ -35,12 +35,14 @@ public class TupleValueExpression extends AbstractValueExpression {
         COLUMN_IDX,
         TABLE_NAME,
         COLUMN_NAME,
+        TABLE_IDX,  // used for JOIN queries only, 0 for outer table, 1 for inner table
     }
 
     protected int m_columnIndex = -1;
     protected String m_tableName = null;
     protected String m_columnName = null;
     protected String m_columnAlias = null;
+    protected int m_tableIdx = 0;
 
     private boolean m_hasAggregate = false;
 
@@ -137,6 +139,14 @@ public class TupleValueExpression extends AbstractValueExpression {
         m_tableName = name;
     }
 
+    public int getTableIndex() {
+        return m_tableIdx;
+    }
+
+    public void setTableIndex(int idx) {
+        m_tableIdx = idx;
+    }
+
     @Override
     public boolean equals(Object obj) {
         if (obj instanceof TupleValueExpression == false) {
@@ -186,6 +196,10 @@ public class TupleValueExpression extends AbstractValueExpression {
         // needed to support type resolution of indexed expressions in the planner
         // after they get round-tripped through the catalog's index definition.
         stringer.key(Members.COLUMN_NAME.name()).value(m_columnName);
+        if (m_tableIdx > 0) {
+            stringer.key(Members.TABLE_IDX.name()).value(m_tableIdx);
+            //System.out.println("TVE: toJSONString(), tableIdx = " + m_tableIdx);
+        }
     }
 
     @Override
@@ -193,6 +207,10 @@ public class TupleValueExpression extends AbstractValueExpression {
         m_columnIndex = obj.getInt(Members.COLUMN_IDX.name());
         m_tableName = obj.getString(Members.TABLE_NAME.name());
         m_columnName = obj.getString(Members.COLUMN_NAME.name());
+        if (obj.has(Members.TABLE_IDX.name())) {
+            m_tableIdx = obj.getInt(Members.TABLE_IDX.name());
+            //System.out.println("TVE: loadFromJSONObject(), tableIdx = " + m_tableIdx);
+        }
     }
 
     @Override
@@ -205,6 +223,7 @@ public class TupleValueExpression extends AbstractValueExpression {
             assert(false);
             return;
         }
+        // TODO(XIN): getIgnoreCase takes 2% of Planner CPU, Optimize it later
         Table table = db.getTables().getIgnoreCase(m_tableName);
         resolveForTable(table);
     }

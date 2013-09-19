@@ -79,12 +79,12 @@ public class TestDDLCompiler extends TestCase {
         fail();
     }
 
-    /**
-     * Note, this should succeed as HSQL doesn't have a hard limit
-     * on the number of columns. The test in TestVoltCompiler will
-     * fail on 1025 columns.
-     * @throws HSQLParseException
-     */
+    //
+    // Note, this should succeed as HSQL doesn't have a hard limit
+    // on the number of columns. The test in TestVoltCompiler will
+    // fail on 1025 columns.
+    // @throws HSQLParseException
+    //
     public void testTooManyColumnTable() throws IOException, HSQLParseException {
         String schemaPath = "";
         URL url = TestVoltCompiler.class.getResource("toowidetable-ddl.sql");
@@ -107,14 +107,14 @@ public class TestDDLCompiler extends TestCase {
 
     }
 
-    /**
-     * Before the fix for ENG-912, the following schema would work:
-     *  create table tmc (name varchar(32), user varchar(32));
-     * but this wouldn't:
-     *  create table tmc (name varchar(32), user varchar(32), primary key (name, user));
-     *
-     * Changes in HSQL's ParserDQL and ParserBase make this more consistent
-     */
+    //
+    // Before the fix for ENG-912, the following schema would work:
+    //  create table tmc (name varchar(32), user varchar(32));
+    // but this wouldn't:
+    //  create table tmc (name varchar(32), user varchar(32), primary key (name, user));
+    //
+    // Changes in HSQL's ParserDQL and ParserBase make this more consistent
+    //
     public void testENG_912() throws HSQLParseException {
         String schema = "create table tmc (name varchar(32), user varchar(32), primary key (name, user));";
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
@@ -126,10 +126,10 @@ public class TestDDLCompiler extends TestCase {
 
     }
 
-    /**
-     * Before fixing ENG-2345, the VIEW definition wouldn't compile if it were
-     * containing single quote characters.
-     */
+    //
+    // Before fixing ENG-2345, the VIEW definition wouldn't compile if it were
+    // containing single quote characters.
+    //
     public void testENG_2345() throws HSQLParseException {
         String table = "create table tmc (name varchar(32), user varchar(32), primary key (name, user));";
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
@@ -144,10 +144,10 @@ public class TestDDLCompiler extends TestCase {
 
     }
 
-    /**
-     * ENG-4865
-     * @throws HSQLParseException
-     */
+    //
+    // ENG-4865
+    // @throws HSQLParseException
+    //
     public void testUniqueIndexGiveWarnings() throws HSQLParseException {
         // ensure the test cleans up
         File jarOut = new File("checkCompilerWarnings.jar");
@@ -248,11 +248,11 @@ public class TestDDLCompiler extends TestCase {
         }
     }
 
-    /**
-     * ENG-2643: Ensure VoltDB can compile DDL with check and fk constrants,
-     * but warn the user, rather than silently ignoring the stuff VoltDB
-     * doesn't support.
-     */
+    //
+    // ENG-2643: Ensure VoltDB can compile DDL with check and fk constrants,
+    // but warn the user, rather than silently ignoring the stuff VoltDB
+    // doesn't support.
+    //
     public void testFKsAndChecksGiveWarnings() throws HSQLParseException {
         // ensure the test cleans up
         File jarOut = new File("checkCompilerWarnings.jar");
@@ -323,5 +323,34 @@ public class TestDDLCompiler extends TestCase {
 
         // cleanup after the test
         jarOut.delete();
+    }
+
+    boolean checkImportValidity(String importStmt) {
+        File jarOut = new File("checkImportValidity.jar");
+        jarOut.deleteOnExit();
+
+        String schema = String.format("IMPORT CLASS %s;", importStmt);
+
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
+        schemaFile.deleteOnExit();
+
+        // compile and fail on bad import
+        VoltCompiler compiler = new VoltCompiler();
+        return compiler.compileFromDDL(jarOut.getPath(), schemaFile.getPath());
+    }
+
+    public void testExtraClasses() {
+        assertFalse(checkImportValidity("org.1oltdb.**"));
+        assertTrue(checkImportValidity("org.voltdb.V**"));
+        assertFalse(checkImportValidity("$.1oltdb.**"));
+        assertFalse(checkImportValidity("org.voltdb.** org.bolt"));
+        assertTrue(checkImportValidity("org.voltdb.V*"));
+        assertTrue(checkImportValidity("你rg.voltdb.V*"));
+        assertTrue(checkImportValidity("org.我不爱你.V*"));
+        assertFalse(checkImportValidity("org.1我不爱你.V*"));
+        assertTrue(checkImportValidity("org"));
+        assertTrue(checkImportValidity("*org"));
+        assertTrue(checkImportValidity("org.**.RealVoltDB"));
+        assertTrue(checkImportValidity("org.vol*db.RealVoltDB"));
     }
 }

@@ -549,7 +549,7 @@ public class RawProcessor implements ExportDataProcessor {
     @Override
     public void bootClient() {
         for (Connection c : m_knownConnections) {
-            m_logger.info("Booting export connection " + c.getHostnameAndIP());
+            m_logger.info("Booting export connection " + c.getHostnameAndIPAndPort());
             c.unregister();
         }
     }

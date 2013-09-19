@@ -11,7 +11,6 @@ VoltDB is a horizontally-scalable, in-memory SQL RDBMS designed for
 applications that have extremely high read and write throughput 
 requirements.
 
-
 Getting Started
 ===============
 If you have installed VoltDB from the distribution kit, you now have 

@@ -384,20 +384,6 @@ public abstract class TheHashinator {
     }
 
     /**
-     * Add new partitions to create a new hashinator configuration.
-     */
-    public static byte[] addPartitions(Map<Long, Integer> tokensToPartitions) {
-        HashinatorType type = getConfiguredHashinatorType();
-        switch (type) {
-        case LEGACY:
-            throw new RuntimeException("Legacy hashinator doesn't support adding partitions");
-        case ELASTIC:
-            return ElasticHashinator.addPartitions(instance.get().getSecond(), tokensToPartitions);
-        }
-        throw new RuntimeException("Should not reach here");
-    }
-
-    /**
      * Get a basic configuration for the currently selected hashinator type based
      * on the current partition count. If Elastic is in play
      */
@@ -468,5 +454,11 @@ public abstract class TheHashinator {
      */
     public static byte[] deserializeConfiguredHashinator(long version, byte config[]) {
         return deserializeHashinator(getConfiguredHashinatorClass(), version, config, true);
+    }
+
+    public static Pair<Long, byte[]> getCurrentVersionedConfig()
+    {
+        Pair<Long, ? extends TheHashinator> currentHashinator = instance.get();
+        return Pair.of(currentHashinator.getFirst(), currentHashinator.getSecond().pGetCurrentConfig().getSecond());
     }
 }
