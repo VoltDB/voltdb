@@ -55,6 +55,7 @@
 #include "expressions/tuplevalueexpression.h"
 #include "plannodes/nestloopindexnode.h"
 #include "plannodes/indexscannode.h"
+#include "plannodes/limitnode.h"
 #include "storage/table.h"
 #include "storage/persistenttable.h"
 #include "storage/temptable.h"
@@ -219,11 +220,24 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
         where_expression->substitute(params);
         VOLT_TRACE("Where Expression:\n%s", where_expression->debug(true).c_str());
     }
+
+    // initial expression
     AbstractExpression* initial_expression = inline_node->getInitialExpression();
     if (initial_expression != NULL) {
         initial_expression->substitute(params);
         VOLT_TRACE("Initial Expression:\n%s", initial_expression->debug(true).c_str());
     }
+
+    LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+    int tuple_ctr = 0;
+    int tuple_skipped = 0;
+    int limit = -1;
+    int offset = -1;
+    if (limit_node) {
+        limit_node->getLimitAndOffsetByReference(params, limit, offset);
+    }
+
+
     //
     // OUTER TABLE ITERATION
     //
@@ -238,7 +252,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     int num_of_inner_cols = (join_type == JOIN_TYPE_LEFT)? null_tuple.sizeInValues() : 0;
 
     VOLT_TRACE("<num_of_outer_cols>: %d\n", num_of_outer_cols);
-    while (outer_iterator.next(outer_tuple)) {
+    while (outer_iterator.next(outer_tuple) && (limit == -1 || tuple_ctr < limit)) {
         VOLT_TRACE("outer_tuple:%s",
                    outer_tuple.debug(outer_table->name()).c_str());
         // Set the outer tuple columns. Must be outside the inner loop
@@ -393,10 +407,11 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                     index->moveToEnd(toStartActually);
                 }
 
-                while ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
+                while (((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
                         !(inner_tuple = index->nextValueAtKey()).isNullTuple()) ||
                        ((localLookupType != INDEX_LOOKUP_TYPE_EQ || num_of_searchkeys == 0) &&
-                        !(inner_tuple = index->nextValue()).isNullTuple()))
+                        !(inner_tuple = index->nextValue()).isNullTuple())) &&
+                        (limit == -1 || tuple_ctr < limit))
                 {
                     VOLT_TRACE("inner_tuple:%s",
                                inner_tuple.debug(inner_table->name()).c_str());
@@ -418,6 +433,12 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                         match = true;
                         // Still need to pass where filtering
                         if (where_expression == NULL || where_expression->eval(&outer_tuple, &inner_tuple).isTrue()) {
+                            // Check if we have to skip this tuple because of offset
+                            if (tuple_skipped < offset) {
+                                tuple_skipped++;
+                                continue;
+                            }
+                            ++tuple_ctr;
                             //
                             // Try to put the tuple into our output table
                             // Append the inner values to the end of our join tuple
@@ -448,6 +469,12 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
         //
         if (join_type == JOIN_TYPE_LEFT && !match ) {
             if (where_expression == NULL || where_expression->eval(&outer_tuple, &null_tuple).isTrue()) {
+                // Check if we have to skip this tuple because of offset
+                if (tuple_skipped < offset) {
+                    tuple_skipped++;
+                    continue;
+                }
+                ++tuple_ctr;
                 join_tuple.setNValues(num_of_outer_cols, m_null_tuple, 0, num_of_inner_cols);
                 output_table->insertTupleNonVirtual(join_tuple);
             }
