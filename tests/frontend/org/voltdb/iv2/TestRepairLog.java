@@ -244,6 +244,8 @@ public class TestRepairLog
                     }
                     mpTxnId = null;
                 }
+            } else {
+                assertTrue(imsg.hasHashinatorConfig());
             }
         }
     }

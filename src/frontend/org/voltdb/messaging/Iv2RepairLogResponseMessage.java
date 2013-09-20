@@ -184,8 +184,6 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         if (m_sequence != 0) {
             VoltDbMessageFactory messageFactory = new VoltDbMessageFactory();
             m_payload = messageFactory.createMessageFromBuffer(buf, m_sourceHSId);
-            m_hashinatorConfig = new byte[0];
-            m_hashinatorVersion = Long.MIN_VALUE;
         }
         // only the first packet with sequence 0 has the hashinator configurations
         else {

@@ -190,16 +190,12 @@ public class MpPromoteAlgo implements RepairAlgo
                 tmLog.debug(m_whoami + "collected " + rrs.m_receivedResponses
                           + " responses for " + rrs.m_expectedResponses
                           + " repair log entries from " + CoreUtils.hsIdToString(response.m_sourceHSId));
+
                 if (areRepairLogsComplete()) {
-                    long currentVersion = TheHashinator.getCurrentVersionedConfig().getFirst();
-                    if (m_newestHashinatorConfig.getFirst() > currentVersion) {
-                        if (tmLog.isDebugEnabled()) {
-                            tmLog.debug(m_whoami + " updating hashinator config to version "
-                                      + m_newestHashinatorConfig.getFirst());
-                        }
-                        TheHashinator.updateHashinator(TheHashinator.getConfiguredHashinatorType().hashinatorClass,
-                                m_newestHashinatorConfig.getFirst(), m_newestHashinatorConfig.getSecond());
-                    }
+
+                    TheHashinator.updateHashinator(TheHashinator.getConfiguredHashinatorType().hashinatorClass,
+                            m_newestHashinatorConfig.getFirst(), m_newestHashinatorConfig.getSecond());
+
                     repairSurvivors();
                 }
             }
