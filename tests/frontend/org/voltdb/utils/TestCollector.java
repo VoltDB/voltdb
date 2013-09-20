@@ -71,9 +71,9 @@ public class TestCollector {
         assert (success);
         cluster.startUp(true);
 
-        String voltDbFilePrefix = cluster.getSubRoots().get(0).getCanonicalPath();
-        File voltDbRoot = new File(voltDbFilePrefix, builder.getPathToVoltRoot().getCanonicalPath());
-        voltDbRootPath = voltDbRoot.getCanonicalPath();
+        String voltDbFilePrefix = cluster.getSubRoots().get(0).getPath();
+        File voltDbRoot = new File(voltDbFilePrefix, builder.getPathToVoltRoot().getPath());
+        voltDbRootPath = voltDbRoot.getPath();
 
         listener = cluster.getListenerAddresses().get(0);
         client = ClientFactory.createClient();

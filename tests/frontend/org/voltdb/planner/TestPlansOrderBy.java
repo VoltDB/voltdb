@@ -41,6 +41,13 @@ public class TestPlansOrderBy extends PlannerTestCase {
     private void validatePlan(String sql, boolean expectIndexScan,
             boolean expectSeqScan, boolean expectOrderBy, boolean expectHashAggregate)
     {
+        validatePlan(sql, expectIndexScan, expectSeqScan, expectOrderBy, expectHashAggregate, false);
+    }
+
+    private void validatePlan(String sql, boolean expectIndexScan,
+            boolean expectSeqScan, boolean expectOrderBy, boolean expectHashAggregate,
+            boolean expectedAggregate)
+    {
         AbstractPlanNode pn = compile(sql);
         //System.out.println(pn.getChild(0).toJSONString());
         System.out.println(pn.getChild(0).toExplainPlanString());
@@ -48,6 +55,7 @@ public class TestPlansOrderBy extends PlannerTestCase {
         assertEquals(expectSeqScan, pn.hasAnyNodeOfType(PlanNodeType.SEQSCAN));
         assertEquals(expectOrderBy, pn.hasAnyNodeOfType(PlanNodeType.ORDERBY));
         assertEquals(expectHashAggregate, pn.hasAnyNodeOfType(PlanNodeType.HASHAGGREGATE));
+        assertEquals(expectedAggregate, pn.hasAnyNodeOfType(PlanNodeType.AGGREGATE));
     }
 
     /// Validate that a plan uses the full bag of tricks
@@ -80,16 +88,17 @@ public class TestPlansOrderBy extends PlannerTestCase {
         validateOptimalPlan("SELECT * from T WHERE T_D0 = 1 ORDER BY T_D1");
     }
 
-    public void testOrderByTwo() {
-        validatePlan("SELECT * from T ORDER BY T_D0, T_D1", true, false, false, false);
+    public void testOrderByIndexedColumns() {
+        validateOptimalPlan("SELECT * from T ORDER BY T_D0, T_D1");
+        validateOptimalPlan("SELECT * from Tmanykeys ORDER BY T_D0, T_D1, T_D2");
     }
 
     public void testOrderByTwoDesc() {
-        validatePlan("SELECT * from T ORDER BY T_D0 DESC, T_D1 DESC", true, false, false, false);
+        validateOptimalPlan("SELECT * from T ORDER BY T_D0 DESC, T_D1 DESC");
     }
 
     public void testOrderByTwoAscDesc() {
-        validateIndexedBruteForcePlan("SELECT * from T ORDER BY T_D0, T_D1 DESC");
+        validateBruteForcePlan("SELECT * from T ORDER BY T_D0, T_D1 DESC");
         validateBruteForcePlan("SELECT * from Tnokey ORDER BY T_D0, T_D1 DESC");
     }
 
@@ -120,25 +129,28 @@ public class TestPlansOrderBy extends PlannerTestCase {
 
     public void testOrderByWrongPermutation()
     {
-        validateIndexedBruteForcePlan("SELECT * from Tmanykeys ORDER BY T_D2, T_D1, T_D0");
-        validateIndexedBruteForcePlan("SELECT * from Tmanykeys ORDER BY T_D2, T_D0, T_D1");
-        validateIndexedBruteForcePlan("SELECT * from Tmanykeys ORDER BY T_D1, T_D0, T_D2");
-        validateIndexedBruteForcePlan("SELECT * from Tmanykeys ORDER BY T_D1, T_D2, T_D0");
+        // Order determinism, so do not make it worse by using index scan.
+        validateBruteForcePlan("SELECT * from Tmanykeys ORDER BY T_D2, T_D1, T_D0");
+        validateBruteForcePlan("SELECT * from Tmanykeys ORDER BY T_D2, T_D0, T_D1");
+        validateBruteForcePlan("SELECT * from Tmanykeys ORDER BY T_D1, T_D0, T_D2");
+        validateBruteForcePlan("SELECT * from Tmanykeys ORDER BY T_D1, T_D2, T_D0");
+        validateBruteForcePlan("SELECT * from Tmanykeys ORDER BY T_D0, T_D2, T_D1");
+
+        // Use index for filter.
         validateIndexedBruteForcePlan("SELECT * from Tmanykeys WHERE T_D0 = ? ORDER BY T_D2, T_D1");
         validateIndexedBruteForcePlan("SELECT * from Tmanykeys WHERE T_D1 = ? ORDER BY T_D2, T_D0");
-        validateIndexedBruteForcePlan("SELECT * from Tmanykeys ORDER BY T_D0, T_D2, T_D1");
     }
 
     public void testOrderByTooManyToIndex()
     {
-        validateIndexedBruteForcePlan("SELECT * from T ORDER BY T_D0, T_D1, T_D2");
+        validateBruteForcePlan("SELECT * from T ORDER BY T_D0, T_D1, T_D2");
         validateBruteForcePlan("SELECT * from Tnokey ORDER BY T_D0, T_D1, T_D2");
     }
 
     public void testOrderByTooMany()
     {
         validateBruteForcePlan("SELECT * from Tnokey ORDER BY T_D0, T_D1, T_D2");
-        validateIndexedBruteForcePlan("SELECT * from T ORDER BY T_D0, T_D1, T_D2");
+        validateBruteForcePlan("SELECT * from T ORDER BY T_D0, T_D1, T_D2");
     }
 
     public void testNoIndexToOrderBy() {
@@ -154,14 +166,49 @@ public class TestPlansOrderBy extends PlannerTestCase {
                      "ORDER BY T.T_D0, T.T_D1", true, true, true, false);
     }
 
+    public void testTableAgg() {
+        validatePlan("SELECT SUM(T_D0) from T", false, true, false, false, true);
+        validatePlan("SELECT SUM(T_D0), COUNT(*), AVG(T_D1) from T", false, true, false, false, true);
+
+        // Fix it with (false, true, false, false, true)
+        // when ENG-4937 is solved.
+        validatePlan("SELECT SUM(T_D0) from T ORDER BY T_D0, T_D1",
+                true, false, false, false, true);
+        validatePlan("SELECT SUM(T_D0), COUNT(*), AVG(T_D1) from T ORDER BY T_D0, T_D1",
+                true, false, false, false, true);
+    }
+
     //TODO: This test actually validates that we generate a sub-optimal plan for this query
     //-- but we're keeping the test because, well, at least the query compiles to SOME kind of plan?
     //When ENG-4096 is addressed, the validation will be quite different.
     public void testOrderByCountStar() {
-        validatePlan("SELECT T_D0, COUNT(*) AS FOO FROM T GROUP BY T_D0 ORDER BY FOO", true, false, true, true);
-        validatePlan("SELECT T_D0, COUNT(*) AS FOO FROM Tnokey GROUP BY T_D0 ORDER BY FOO", false, true, true, true);
+        validatePlan("SELECT T_D0, COUNT(*) AS FOO FROM T GROUP BY T_D0 ORDER BY FOO",
+                true, false, true, true);
+        validatePlan("SELECT T_D0, COUNT(*) AS FOO FROM Tnokey GROUP BY T_D0 ORDER BY FOO",
+                false, true, true, true);
         //Expected ENG-4096 effect:
         //validatePlan("SELECT T_D0, COUNT(*) AS FOO FROM T GROUP BY T_D0 ORDER BY FOO");
+    }
+
+    public void testOrderByAggWithoutAlias() {
+        validatePlan("SELECT T_D0, SUM(T_D1) FROM T GROUP BY T_D0 ORDER BY SUM(T_D1)",
+                true, false, true, true);
+        validatePlan("SELECT T_D0, COUNT(*) FROM T GROUP BY T_D0 ORDER BY COUNT(*)",
+                true, false, true, true);
+        validatePlan("SELECT T_D0, AVG(T_D1) FROM T GROUP BY T_D0 ORDER BY AVG(T_D1)",
+                true, false, true, true);
+        validatePlan("SELECT T_D0, COUNT(T_D1) FROM T GROUP BY T_D0 ORDER BY COUNT(T_D1)",
+                true, false, true, true);
+        validatePlan("SELECT T_D0, MIN(T_D1) FROM T GROUP BY T_D0 ORDER BY MIN(T_D1)",
+                true, false, true, true);
+        validatePlan("SELECT T_D0, MAX(T_D1) FROM T GROUP BY T_D0 ORDER BY MAX(T_D1)",
+                true, false, true, true);
+
+        // Complex aggregation
+        validatePlan("SELECT T_D0, COUNT(*)+1 FROM T GROUP BY T_D0 ORDER BY COUNT(*)+1",
+                true, false, true, true);
+        validatePlan("SELECT T_D0, abs(MAX(T_D1)) FROM T GROUP BY T_D0 ORDER BY abs(MAX(T_D1))",
+                true, false, true, true);
     }
 
     public void testEng450()
