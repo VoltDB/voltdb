@@ -1704,8 +1704,10 @@ public class DDLCompiler {
         for (i++; i < displayColCount; i++) {
             ParsedSelectStmt.ParsedColInfo outcol = stmt.displayColumns.get(i);
             if ((outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_COUNT) &&
-                    (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_SUM)) {
-                msg += "must have non-group by columns aggregated by sum or count.";
+                    (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_SUM) &&
+                    (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MIN) &&
+                    (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MAX)) {
+                msg += "must have non-group by columns aggregated by sum, count, min or max.";
                 throw m_compiler.new VoltCompilerException(msg);
             }
         }

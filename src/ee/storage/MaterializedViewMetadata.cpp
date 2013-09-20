@@ -28,6 +28,9 @@
 #include "catalog/materializedviewinfo.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
+#include "expressions/tuplevalueexpression.h"
+#include "expressions/constantvalueexpression.h"
+#include "expressions/comparisonexpression.h"
 #include "indexes/tableindex.h"
 #include "storage/persistenttable.h"
 #include "storage/MaterializedViewMetadata.h"
@@ -38,7 +41,7 @@ namespace voltdb {
 
 MaterializedViewMetadata::MaterializedViewMetadata(
         PersistentTable *srcTable, PersistentTable *destTable, catalog::MaterializedViewInfo *mvInfo)
-        : m_target(destTable), m_filterPredicate(NULL)
+        : m_srcTable(srcTable), m_target(destTable), m_filterPredicate(NULL)
 {
 // DEBUG_STREAM_HERE("New mat view on source table " << srcTable->name() << " @" << srcTable << " view table " << m_target->name() << " @" << m_target);
     // best not to have to worry about the destination table disappearing out from under the source table that feeds it.
@@ -95,6 +98,8 @@ MaterializedViewMetadata::MaterializedViewMetadata(
     }
 
     m_index = m_target->primaryKeyIndex();
+
+    srcTable->addIndexForMaterializedView(this);
 
     // When updateTupleWithSpecificIndexes needs to be called,
     // the context is lost that identifies which base table columns potentially changed.
@@ -276,6 +281,28 @@ void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple, bool fal
         else if (m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
             m_updatedTuple.setNValue(i, existingValue.op_increment());
         }
+        else if (m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_MIN) {
+            if (exists) {
+                if (newValue.compare(existingValue) < 0) {
+                     m_updatedTuple.setNValue(i, newValue);
+                } else {
+                    m_updatedTuple.setNValue(i, existingValue);
+                }
+            } else {
+                m_updatedTuple.setNValue(i, newValue);
+            }
+        }
+        else if (m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_MAX) {
+            if (exists) {
+                if (newValue.compare(existingValue) > 0) {
+                     m_updatedTuple.setNValue(i, newValue);
+                } else {
+                    m_updatedTuple.setNValue(i, existingValue);
+                }
+            } else {
+                m_updatedTuple.setNValue(i, newValue);
+            }
+        }
         else {
             char message[128];
             snprintf(message, 128, "Error in materialized view table update for"
@@ -353,6 +380,40 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
         }
         else if (m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
             m_updatedTuple.setNValue(i, existingValue.op_decrement());
+        }
+        else if (m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_MIN ||
+                m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_MAX) {
+            if (existingValue.compare(oldValue) == 0) {
+                // re-calculate MIN / MAX
+                m_groupbyIndex->moveToKey(&m_searchKey);
+                NValue current, min, max;
+                min = min.castAs(m_target->schema()->columnType(i));
+                max = max.castAs(m_target->schema()->columnType(i));
+                TableTuple tuple;
+                VOLT_TRACE("Starting to scan grouped tuples using groupby index %s\n", groupbyIndex->debug().c_str());
+                while (!(tuple = m_groupbyIndex->nextValueAtKey()).isNullTuple()) {
+                    VOLT_TRACE("Scanning tuple: %s\n", tuple.debugNoHeader().c_str());
+                    if (m_aggregationExprs.size() != 0) {
+                        AbstractExpression * expr = m_aggregationExprs.at(i-colindex);
+                        current = expr->eval(&tuple, NULL);
+                    } else {
+                        current = tuple.getNValue(m_outputColumnSrcTableIndexes[i]);
+                    }
+                    VOLT_TRACE("Check tuple: %s\n", tuple.debugNoHeader().c_str());
+                    if (min.isNull() || max.isNull()) {
+                        min = current;
+                        max = current;
+                    } else {
+                        min = min.op_min(current);
+                        max = max.op_max(current);
+                    }
+                }
+                if (m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_MIN) {
+                    m_updatedTuple.setNValue(i, min);
+                } else {
+                    m_updatedTuple.setNValue(i, max);
+                }
+            }
         }
         else {
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,

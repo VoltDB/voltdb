@@ -26,8 +26,8 @@ namespace voltdb {
 
 class PersistentTableUndoDeleteAction: public UndoAction {
 public:
-    inline PersistentTableUndoDeleteAction(char *deletedTuple, PersistentTable *table)
-        : m_tuple(deletedTuple), m_table(table)
+    inline PersistentTableUndoDeleteAction(char *deletedTuple, PersistentTable *table, bool matViewIndexesChanged)
+        : m_tuple(deletedTuple), m_table(table), m_changedViewIndexes(matViewIndexesChanged)
     {}
 
 private:
@@ -36,7 +36,7 @@ private:
     /*
      * Undo whatever this undo action was created to undo. In this case reinsert the tuple into the table.
      */
-    virtual void undo() { m_table->insertTupleForUndo(m_tuple); }
+    virtual void undo() { m_table->insertTupleForUndo(m_tuple, m_changedViewIndexes); }
 
     /*
      * Release any resources held by the undo action. It will not need to be undone in the future.
@@ -47,6 +47,7 @@ private:
 private:
     char *m_tuple;
     PersistentTable *m_table;
+    bool m_changedViewIndexes;
 };
 
 }
