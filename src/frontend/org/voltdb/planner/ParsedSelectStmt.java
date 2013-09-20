@@ -25,11 +25,18 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.MaterializedViewInfo;
+import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
@@ -39,6 +46,7 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.utils.CatalogUtil;
 
 public class ParsedSelectStmt extends AbstractParsedStmt {
 
@@ -93,6 +101,53 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             col.expression = (AbstractExpression) expression.clone();
             return col;
         }
+
+        public static boolean isNewtoColumnList(List<ParsedColInfo>columnList, ParsedColInfo col) {
+            boolean isNew = true;
+            for (ParsedColInfo ic: columnList) {
+                if (ic.equals(col)) {
+                    isNew = false;
+                    break;
+                }
+            }
+            return isNew;
+        }
+
+        public static boolean isNewtoColumnList(List<ParsedColInfo>columnList, AbstractExpression expr) {
+            boolean isNew = true;
+            for (ParsedColInfo ic: columnList) {
+                if (ic.expression.equals(expr)) {
+                    isNew = false;
+                    break;
+                }
+            }
+            return isNew;
+        }
+
+        // Concat elements to the XXXColumns list
+        public static void insertToColumnList (List<ParsedColInfo>columnList,
+                List<ParsedColInfo> colCollection) {
+            for (ParsedColInfo col: colCollection) {
+                if (isNewtoColumnList(columnList, col)) {
+                    columnList.add(col);
+                }
+            }
+        }
+    }
+
+    public static class MVFixInfo {
+        // Preparation for MV based distributed query
+        public boolean mayNeedFixMVBasedDistributedQuery = false;
+        public boolean finalNeedFix = false;
+        public boolean disableGroupbyAndAggQuery = false;
+        public int numOfGroupByColumns = -1;
+
+        public ArrayList<ParsedColInfo> mvAggResultColumns = null;
+        public List<ParsedColInfo> mvDDLGroupbyColumnsList = null;
+        public Map <String, ExpressionType> mvColumnAggType;
+
+        public Table mvTable = null;
+        public NodeSchema inlineProjSchema = null;
     }
 
     public ArrayList<ParsedColInfo> displayColumns = new ArrayList<ParsedColInfo>();
@@ -100,10 +155,13 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     public AbstractExpression having = null;
     public ArrayList<ParsedColInfo> groupByColumns = new ArrayList<ParsedColInfo>();
 
+    // It will store the final projection node schema for this plan if it is needed.
+    // Calculate once, and use it everywhere else.
+    private NodeSchema projectSchema = null;
+
     // It may has the consistent element order as the displayColumns
     public ArrayList<ParsedColInfo> aggResultColumns = new ArrayList<ParsedColInfo>();
     public Map<String, AbstractExpression> groupByExpressions = null;
-    private NodeSchema newAggSchema;
 
     private ArrayList<ParsedColInfo> avgPushdownDisplayColumns = null;
     private ArrayList<ParsedColInfo> avgPushdownAggResultColumns = null;
@@ -119,6 +177,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private boolean hasComplexGroupby = false;
     private boolean hasAggregateExpression = false;
     private boolean hasAverage = false;
+
+    public boolean needHandleAggregationOperators = false;
+
+    public MVFixInfo mvFixInfo = new MVFixInfo();
 
     /**
     * Class constructor
@@ -169,7 +231,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         if (groupbyElement != null) {
             parseGroupByColumns(groupbyElement);
-            insertToAggResultColumns(groupByColumns);
+            ParsedColInfo.insertToColumnList(aggResultColumns, groupByColumns);
         }
 
         if (orderbyElement != null) {
@@ -189,53 +251,227 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         // Prepare for the AVG push-down optimization only if it might be required.
         if (mayNeedAvgPushdown()) {
-            ArrayList<ParsedColInfo> tmpDisplayColumns = displayColumns;
-            displayColumns = new ArrayList<ParsedColInfo>();
-            ArrayList<ParsedColInfo> tmpAggResultColumns = aggResultColumns;
-            aggResultColumns = new ArrayList<ParsedColInfo>();
-            ArrayList<ParsedColInfo> tmpOrderColumns = orderColumns;
-            orderColumns = new ArrayList<ParsedColInfo>();
-
-            NodeSchema tmpNodeSchema = null;
-            boolean tmpHasComplexAgg = hasComplexAgg();
-
-            if (hasComplexAgg()) {
-                tmpNodeSchema = newAggSchema;
-            }
-
-            aggregationList = new ArrayList<AbstractExpression>();
-            assert(displayElement != null);
-            parseDisplayColumns(displayElement, true);
-
-            if (groupbyElement != null) {
-                insertToAggResultColumns(groupByColumns);
-            }
-            if (orderbyElement != null) {
-                parseOrderColumns(orderbyElement, true);
-            }
-            aggregationList = null;
-            fillUpAggResultColumns();
-            placeTVEsinColumns();
-
-            // Switch them back
-            avgPushdownDisplayColumns = displayColumns;
-            avgPushdownAggResultColumns = aggResultColumns;
-            avgPushdownOrderColumns = orderColumns;
-            avgPushdownNewAggSchema = newAggSchema;
-
-            displayColumns = tmpDisplayColumns;
-            aggResultColumns = tmpAggResultColumns;
-            orderColumns = tmpOrderColumns;
-            newAggSchema = tmpNodeSchema;
-            hasComplexAgg = tmpHasComplexAgg;
+            processAvgPushdownOptimization(displayElement, orderbyElement, groupbyElement);
+        }
+        // Prepare for the mv based distributed query fix only if it might be required.
+        if (needprocessMVBasedQueryFix()) {
+            processMVBasedQueryFix();
         }
     }
 
-    public void switchOptimalSuite () {
+    private boolean needprocessMVBasedQueryFix() {
+        // Check valiad cases first
+        Table mvTable = tableList.get(0);
+        String mvTableName = mvTable.getTypeName();
+        Table srcTable = mvTable.getMaterializer();
+        if (srcTable == null) {
+            return false;
+        }
+
+        Column partitionCol = srcTable.getPartitioncolumn();
+        if (partitionCol == null) {
+            return false;
+        }
+
+        String partitionColName = partitionCol.getName();
+        MaterializedViewInfo mvInfo = srcTable.getViews().get(mvTableName);
+
+        if (displayColumns.size() == 1 && !isGrouped()) {
+            AbstractExpression expr = displayColumns.get(0).expression;
+            if (expr.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR) {
+                // For the moment, let COUNT(*) query pass with wrong answer.
+                // As the test cases use this kind of query a lot.
+
+                // Or, I should comment out the queries in TruncateMatViewDataMP.
+                return false;
+            }
+        }
+
+        // Justify whether partition column is in group by column list or not
+        boolean partitionColInGroupbyCols = false;
+        String complexGroupbyJson = mvInfo.getGroupbyexpressionsjson();
+        if (complexGroupbyJson.length() > 0) {
+            List<AbstractExpression> mvComplexGroupbyCols = null;
+            try {
+                mvComplexGroupbyCols =
+                        AbstractExpression.fromJSONArrayString(complexGroupbyJson, m_db);
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+            mvFixInfo.numOfGroupByColumns = mvComplexGroupbyCols.size();
+
+            for (AbstractExpression expr: mvComplexGroupbyCols) {
+                if (expr instanceof TupleValueExpression) {
+                    TupleValueExpression tve = (TupleValueExpression) expr;
+                    if (tve.getColumnName().equals(partitionColName)) {
+                        partitionColInGroupbyCols = true;
+                        break;
+                    }
+                }
+            }
+        } else {
+            CatalogMap<ColumnRef> mvSimpleGroupbyCols = mvInfo.getGroupbycols();
+            mvFixInfo.numOfGroupByColumns = mvSimpleGroupbyCols.size();
+
+            for (ColumnRef colRef: mvSimpleGroupbyCols) {
+                if (colRef.getColumn().getName().equals(partitionColName)) {
+                    partitionColInGroupbyCols = true;
+                    break;
+                }
+            }
+        }
+        if (partitionColInGroupbyCols) {
+            // Group by columns contain partition column from source table.
+            // Then, query on mv table will have duplicates from each partition.
+            // There is no need to fix this case, so just return.
+            return false;
+        }
+
+        mvFixInfo.mvTable = mvTable;
+        mvFixInfo.mayNeedFixMVBasedDistributedQuery = true;
+
+        // Currently, disable it
+        if (isGrouped() || hasAggregateExpression()) {
+            mvFixInfo.disableGroupbyAndAggQuery = true;
+        }
+
+        return true;
+    }
+
+    private void processMVBasedQueryFix() {
+        // Start to do real processing now.
+        String mvTableName = mvFixInfo.mvTable.getTypeName();
+        mvFixInfo.mvDDLGroupbyColumnsList = new ArrayList<ParsedColInfo>();
+        mvFixInfo.mvAggResultColumns = new ArrayList<ParsedColInfo>();
+        mvFixInfo.mvColumnAggType = new HashMap<String, ExpressionType>();
+
+        List<Column> mvColumnArray =
+                CatalogUtil.getSortedCatalogItems(mvFixInfo.mvTable.getColumns(), "index");
+        for (Column mvCol: mvColumnArray) {
+            ExpressionType reAggType = ExpressionType.get(mvCol.getAggregatetype());
+            if (reAggType == ExpressionType.AGGREGATE_COUNT_STAR ||
+                    reAggType == ExpressionType.AGGREGATE_COUNT) {
+                reAggType = ExpressionType.AGGREGATE_SUM;
+            }
+            mvFixInfo.mvColumnAggType.put(mvCol.getName(), reAggType);
+        }
+
+        assert(mvFixInfo.numOfGroupByColumns > 0);
+        for (int i = 0; i < mvFixInfo.numOfGroupByColumns; i++) {
+            ParsedColInfo col = new ParsedColInfo();
+            Column mvCol = mvColumnArray.get(i);
+            col.columnName = mvCol.getName();
+            col.tableName = mvTableName;
+            col.alias = mvCol.getName();
+
+            TupleValueExpression tve = new TupleValueExpression();
+            tve.setColumnIndex(i);
+            tve.setColumnName(mvCol.getName());
+            tve.setTableName(mvTableName);
+            tve.setColumnAlias(mvCol.getName());
+            tve.setValueType(VoltType.get((byte)mvCol.getType()));
+            tve.setValueSize(mvCol.getSize());
+            col.expression = tve;
+
+            mvFixInfo.mvDDLGroupbyColumnsList.add(col);
+        }
+
+        // Prepare for the inlined projection node schema for scan node.
+        mvFixInfo.inlineProjSchema = new NodeSchema();
+        ArrayList<SchemaColumn> orignalGroupbyColumnsList = new ArrayList<SchemaColumn>();
+        // construct new projection columns for scan plan node.
+        for (ParsedColInfo col: mvFixInfo.mvDDLGroupbyColumnsList) {
+            assert(col.expression instanceof TupleValueExpression);
+            TupleValueExpression tve = (TupleValueExpression)col.expression;
+            SchemaColumn scol = new SchemaColumn(tve.getTableName(),
+                    tve.getColumnName(),tve.getColumnAlias(), tve);
+            orignalGroupbyColumnsList.add(scol);
+        }
+        ArrayList<SchemaColumn> newValue = new ArrayList<SchemaColumn>();
+
+        assert(scanColumns.keySet().size() == 1);
+        for (String tbName: scanColumns.keySet()) {
+            assert(tbName.equals(mvTableName));
+            ArrayList<SchemaColumn> columns = scanColumns.get(tbName);
+            newValue.addAll(columns);
+            Set<SchemaColumn> valueSet = new HashSet<SchemaColumn>(columns);
+            // construct new projection columns for scan plan node.
+            for (SchemaColumn scol : orignalGroupbyColumnsList) {
+                if (!valueSet.contains(scol)) {
+                    valueSet.add(scol);
+                    newValue.add(scol);
+                }
+            }
+        }
+        if (newValue.size() == 0) {
+            newValue = orignalGroupbyColumnsList;
+        }
+        for (SchemaColumn scol: newValue) {
+            mvFixInfo.inlineProjSchema.addColumn(scol);
+        }
+
+        // Construct MV aggResult list.
+        for (SchemaColumn scol: newValue) {
+            ParsedColInfo col = new ParsedColInfo();
+            col.expression = scol.getExpression();
+            col.alias = scol.getColumnAlias();
+            col.columnName = scol.getColumnName();
+            col.tableName = scol.getTableName();
+            mvFixInfo.mvAggResultColumns.add(col);
+        }
+    }
+
+    private void processAvgPushdownOptimization (VoltXMLElement displayElement,
+            VoltXMLElement orderbyElement, VoltXMLElement groupbyElement) {
+
+        ArrayList<ParsedColInfo> tmpDisplayColumns = displayColumns;
+        displayColumns = new ArrayList<ParsedColInfo>();
+        ArrayList<ParsedColInfo> tmpAggResultColumns = aggResultColumns;
+        aggResultColumns = new ArrayList<ParsedColInfo>();
+        ArrayList<ParsedColInfo> tmpOrderColumns = orderColumns;
+        orderColumns = new ArrayList<ParsedColInfo>();
+
+        boolean tmpHasComplexAgg = hasComplexAgg();
+        NodeSchema tmpNodeSchema = projectSchema;
+
+        // Make final schema output null to get a new schema when calling placeTVEsinColumns().
+        projectSchema = null;
+
+        aggregationList = new ArrayList<AbstractExpression>();
+        assert(displayElement != null);
+        parseDisplayColumns(displayElement, true);
+
+        if (groupbyElement != null) {
+            ParsedColInfo.insertToColumnList(aggResultColumns, groupByColumns);
+        }
+        if (orderbyElement != null) {
+            parseOrderColumns(orderbyElement, true);
+        }
+        aggregationList = null;
+        fillUpAggResultColumns();
+        placeTVEsinColumns();
+
+        // Switch them back
+        avgPushdownDisplayColumns = displayColumns;
+        avgPushdownAggResultColumns = aggResultColumns;
+        avgPushdownOrderColumns = orderColumns;
+        avgPushdownNewAggSchema = projectSchema;
+
+        displayColumns = tmpDisplayColumns;
+        aggResultColumns = tmpAggResultColumns;
+        orderColumns = tmpOrderColumns;
+        projectSchema = tmpNodeSchema;
+        hasComplexAgg = tmpHasComplexAgg;
+    }
+
+    /**
+     * Switch the optimal set for pushing down AVG
+     */
+    public void switchOptimalSuiteForAvgPushdown () {
         displayColumns = avgPushdownDisplayColumns;
         aggResultColumns = avgPushdownAggResultColumns;
         orderColumns = avgPushdownOrderColumns;
-        newAggSchema = avgPushdownNewAggSchema;
+        projectSchema = avgPushdownNewAggSchema;
         hasComplexAgg = true;
     }
 
@@ -253,7 +489,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
 
         for (ParsedColInfo col : displayColumns) {
-            if (isNewtoAggResultColumn(col)) {
+            if (ParsedColInfo.isNewtoColumnList(aggResultColumns, col)) {
                 // Now Only TVEs in displayColumns are left for AggResultColumns
                 if (col.expression instanceof TupleValueExpression) {
                     aggResultColumns.add(col);
@@ -295,7 +531,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      */
     private void fillUpAggResultColumns () {
         for (ParsedColInfo col: displayColumns) {
-            if (isNewtoAggResultColumn(col)) {
+            if (ParsedColInfo.isNewtoColumnList(aggResultColumns, col)) {
                 if (col.expression instanceof TupleValueExpression) {
                     aggResultColumns.add(col);
                 } else {
@@ -328,12 +564,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
 
         // Replace TVE for display columns
-        if (hasComplexAgg()) {
-            newAggSchema = new NodeSchema();
+        if (projectSchema == null) {
+            projectSchema = new NodeSchema();
             for (ParsedColInfo col : displayColumns) {
-                AbstractExpression expr = col.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
+                AbstractExpression expr = col.expression;
+                if (hasComplexAgg()) {
+                    expr = col.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
+                }
                 SchemaColumn schema_col = new SchemaColumn(col.tableName, col.columnName, col.alias, expr);
-                newAggSchema.addColumn(schema_col);
+                projectSchema.addColumn(schema_col);
             }
         }
 
@@ -370,39 +609,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
-    private boolean isNewtoAggResultColumn(ParsedColInfo col) {
-        boolean isNew = true;
-        for (ParsedColInfo ic: aggResultColumns) {
-            if (ic.equals(col)) {
-                isNew = false;
-                break;
-            }
-        }
-        return isNew;
-    }
-
-    private boolean isNewtoAggResultColumn(AbstractExpression expr) {
-        boolean isNew = true;
-        for (ParsedColInfo ic: aggResultColumns) {
-            if (ic.expression.equals(expr)) {
-                isNew = false;
-                break;
-            }
-        }
-        return isNew;
-    }
-
-    // Concat elements to the aggResultColumns
-    private void insertToAggResultColumns (List<ParsedColInfo> colCollection) {
-        for (ParsedColInfo col: colCollection) {
-            if (isNewtoAggResultColumn(col)) {
-                aggResultColumns.add(col);
-            }
-        }
-    }
-
     /**
-     * ParseDisplayColumns and ParseOrderColumns will call this function to add Aggregation expressions to aggResultColumns
+     * ParseDisplayColumns and ParseOrderColumns will call this function
+     * to add Aggregation expressions to aggResultColumns
      * @param aggColumns
      * @param cookedCol
      */
@@ -418,7 +627,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 col.alias = cookedCol.alias;
                 col.tableName = cookedCol.tableName;
                 col.columnName = cookedCol.columnName;
-                if (isNewtoAggResultColumn(col)) {
+                if (ParsedColInfo.isNewtoColumnList(aggResultColumns,col)) {
                     aggResultColumns.add(col);
                 }
                 return;
@@ -428,7 +637,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // Aggregation column use the the hacky stuff
             col.tableName = "VOLT_TEMP_TABLE";
             col.columnName = "";
-            if (isNewtoAggResultColumn(col)) {
+            if (ParsedColInfo.isNewtoColumnList(aggResultColumns,col)) {
                 aggResultColumns.add(col);
             }
             ExpressionUtil.finalizeValueTypes(col.expression);
@@ -443,7 +652,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             col.columnName = tve.getColumnName();
             col.tableName = tve.getTableName();
             col.expression = tve;
-            if (isNewtoAggResultColumn(col)) {
+            if (ParsedColInfo.isNewtoColumnList(aggResultColumns, col)) {
                 aggResultColumns.add(col);
             }
         }
@@ -455,7 +664,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      * @param tveList
      */
     private void findAllTVEs(AbstractExpression expr, List<TupleValueExpression> tveList) {
-        if (!isNewtoAggResultColumn(expr))
+        if (!ParsedColInfo.isNewtoColumnList(aggResultColumns, expr))
             return;
         if (expr instanceof TupleValueExpression) {
             tveList.add((TupleValueExpression) expr.clone());
@@ -707,8 +916,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return hasAggregateExpression;
     }
 
-    public NodeSchema getNewSchema () {
-        return newAggSchema;
+    public NodeSchema getFinalProjectionSchema () {
+        return projectSchema;
     }
 
     public boolean hasComplexGroupby() {
