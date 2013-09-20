@@ -228,7 +228,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         processMVBasedQueryFix(mvFixInfo, m_db, scanColumns);
     }
 
-    private void processMVBasedQueryFix(MVFixInfo mvFixInfo, Database db,
+    private static void processMVBasedQueryFix(MVFixInfo mvFixInfo, Database db,
             Map<String, ArrayList<SchemaColumn>> scanColumns)
     {
         // Check valid cases first

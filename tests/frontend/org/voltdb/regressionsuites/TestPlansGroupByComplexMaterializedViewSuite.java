@@ -506,23 +506,27 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         }
     }
 
-    private void loadTableForP1() throws Exception {
+    private void loadTableForMVFixSuite() throws Exception {
         Client client = this.getClient();
-        // empty the table first.
-        client.callProcedure("@AdHoc", "Delete from P1");
+        String[] tbs = {"P1", "P2", "R4"};
 
-        // id, wage, dept, age, rent.
-        String insert = "P1.insert";
-        client.callProcedure(insert, 1,  10,  1 , 21, 5);
-        client.callProcedure(insert, 2,  20,  2 , 22, 6);
-        client.callProcedure(insert, 3,  20,  2 , 23, 7 );
-        client.callProcedure(insert, 4,  30,  2 , 24, 8);
-        client.callProcedure(insert, 5,  10,  1 , 25, 9);
-        client.callProcedure(insert, 6,  30,  3 , 26, 10);
-        client.callProcedure(insert, 7,  10,  1 , 27, 11);
-        client.callProcedure(insert, 8,  10,  1 , 28, 12);
-        client.callProcedure(insert, 9,  30,  3 , 29, 13);
-        client.callProcedure(insert, 10, 30,  3 , 30, 14);
+        for (String tb: tbs) {
+            // empty the table first.
+            client.callProcedure("@AdHoc", "Delete from " + tb);
+
+            // id, wage, dept, age, rent.
+            String insert = tb + ".insert";
+            client.callProcedure(insert, 1,  10,  1 , 21, 5);
+            client.callProcedure(insert, 2,  20,  2 , 22, 6);
+            client.callProcedure(insert, 3,  20,  2 , 23, 7 );
+            client.callProcedure(insert, 4,  30,  2 , 24, 8);
+            client.callProcedure(insert, 5,  10,  1 , 25, 9);
+            client.callProcedure(insert, 6,  30,  3 , 26, 10);
+            client.callProcedure(insert, 7,  10,  1 , 27, 11);
+            client.callProcedure(insert, 8,  10,  1 , 28, 12);
+            client.callProcedure(insert, 9,  30,  3 , 29, 13);
+            client.callProcedure(insert, 10, 30,  3 , 30, 14);
+        }
         /*
          * View Definition:
          * "CREATE VIEW V_P1 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) " +
@@ -546,9 +550,9 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         vt = client.callProcedure("@AdHoc", "Select count(*) from V_P1").getResults()[0];
         assertEquals(0, vt.asScalarLong());
         // Load data
-        loadTableForP1();
+        loadTableForMVFixSuite();
 
-        String[] tbs = {"V_P1", "V_P1_ABS"};
+        String[] tbs = {"V_P1", "V_P1_ABS", "V_P2", "V_R4"};
         for (String tb: tbs) {
             // (1) Select *
             vt = client.callProcedure("@AdHoc", "Select * from " + tb +
@@ -597,8 +601,8 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         vt = client.callProcedure("@AdHoc", "Select count(*) from V_P1").getResults()[0];
         assertEquals(0, vt.asScalarLong());
         // Load data
-        loadTableForP1();
-        String[] tbs = {"V_P1", "V_P1_ABS"};
+        loadTableForMVFixSuite();
+        String[] tbs = {"V_P1", "V_P1_ABS", "V_P2", "V_R4"};
         /*
         * Current expected data:
         * V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent
@@ -626,10 +630,22 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                     + tb).getResults()[0];
             assertEquals(60, vt.asScalarLong());
 
+            vt = client.callProcedure("@AdHoc", "Select MAX(V_G1), MAX(v_sum_age), " +
+                    "MIN(v_sum_rent) from " + tb).getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{30, 101, 8}});
+
             // non-group by keys aggregated.
             vt = client.callProcedure("@AdHoc", "Select sum(V_sum_rent) from "
                     + tb).getResults()[0];
             assertEquals(95, vt.asScalarLong());
+
+            vt = client.callProcedure("@AdHoc", "Select max(V_sum_rent) from "
+                    + tb).getResults()[0];
+            assertEquals(37, vt.asScalarLong());
+
+            vt = client.callProcedure("@AdHoc", "Select min(V_sum_rent) from "
+                    + tb).getResults()[0];
+            assertEquals(8, vt.asScalarLong());
 
             vt = client.callProcedure("@AdHoc", "Select count(V_sum_rent) from "
                     + tb).getResults()[0];
@@ -652,39 +668,39 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
 
             // (2) Aggregation with group by.
             // Group by group by keys
-            vt = client.callProcedure("@AdHoc", "Select V_G1, sum(V_CNT) " +
+            vt = client.callProcedure("@AdHoc", "Select V_G1, sum(V_CNT), max(v_sum_age), min(v_sum_rent) " +
                     "from " + tb + " group by V_G1 " +
                     "order by V_G1").getResults()[0];
-            validateTableOfLongs(vt, new long[][]{{10, 4},{20, 2}, {30, 4}});
+            validateTableOfLongs(vt, new long[][]{{10, 4, 101, 37},{20, 2, 45, 13}, {30, 4, 85, 8}});
 
-            vt = client.callProcedure("@AdHoc", "Select V_G1, V_G2, sum(V_CNT) " +
+            vt = client.callProcedure("@AdHoc", "Select V_G1, V_G2, sum(V_CNT), min(v_sum_age) " +
                     "from " + tb + " group by V_G1, V_G2 " +
                     "order by V_G1, V_G2").getResults()[0];
-            validateTableOfLongs(vt, new long[][]{{10,1, 4},{20, 2, 2}, {30, 2, 1}, {30, 3, 3}});
+            validateTableOfLongs(vt, new long[][]{{10,1, 4, 101},{20, 2, 2, 45}, {30, 2, 1, 24}, {30, 3, 3, 85}});
 
             // Group by non-group by keys.
-            vt = client.callProcedure("@AdHoc", "Select V_sum_rent, sum(V_CNT) " +
+            vt = client.callProcedure("@AdHoc", "Select V_sum_rent, sum(V_CNT), max(v_sum_age) " +
                     "from " + tb + " group by V_sum_rent order by V_sum_rent").getResults()[0];
-            validateTableOfLongs(vt, new long[][]{{8, 1},{13,2}, {37, 7}});
+            validateTableOfLongs(vt, new long[][]{{8, 1, 24},{13,2, 45}, {37, 7, 101}});
 
             // Group by mixed.
-            vt = client.callProcedure("@AdHoc", "Select V_G1, V_sum_rent, sum(V_CNT) " +
+            vt = client.callProcedure("@AdHoc", "Select V_G1, V_sum_rent, sum(V_CNT), max(v_sum_age) " +
                     "from " + tb + " group by V_G1, V_sum_rent " +
                     "order by V_G1, V_sum_rent").getResults()[0];
-            validateTableOfLongs(vt, new long[][]{{10, 37, 4},{20, 13, 2}, {30, 8, 1}, {30, 37, 3}});
+            validateTableOfLongs(vt, new long[][]{{10, 37, 4, 101},{20, 13, 2, 45},
+                    {30, 8, 1, 24}, {30, 37, 3, 85}});
 
             // (3) complex group by with complex aggregation.
-            vt = client.callProcedure("@AdHoc", "Select V_G1/V_G2, sum(V_CNT) " +
+            vt = client.callProcedure("@AdHoc", "Select V_G1/V_G2, sum(V_CNT), min(v_sum_rent) " +
                     "from " + tb + " group by V_G1/V_G2 " +
                     "order by V_G1/V_G2").getResults()[0];
-            validateTableOfLongs(vt, new long[][]{{10, 9}, {15, 1}});
+            validateTableOfLongs(vt, new long[][]{{10, 9, 13}, {15, 1, 8}});
 
             vt = client.callProcedure("@AdHoc", "Select V_G1, sum(V_sum_age)/sum(V_CNT), " +
-                    "sum(V_sum_rent)/sum(V_CNT) " +
-                    ", sum(V_sum_age/V_sum_rent) + 1 " +
+                    "sum(V_sum_rent)/sum(V_CNT), sum(V_sum_age/V_sum_rent) + 1, min(v_sum_age) " +
                     "from " + tb + " group by V_G1 " +
                     "order by V_G1").getResults()[0];
-            validateTableOfLongs(vt, new long[][]{{10, 25, 9, 3}, {20, 22, 6, 4}, {30, 27, 11, 6} });
+            validateTableOfLongs(vt, new long[][]{{10, 25, 9, 3, 101}, {20, 22, 6, 4, 45}, {30, 27, 11, 6, 24} });
         }
     }
 
@@ -844,6 +860,33 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "CREATE VIEW V_P1_ABS (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) " +
                 "AS SELECT abs(wage), dept, count(*), sum(age), sum(rent)  FROM P1 " +
                 "GROUP BY abs(wage), dept;" +
+
+                // NO Need to fix mv query
+                "CREATE TABLE P2 ( " +
+                "id INTEGER DEFAULT '0' NOT NULL, " +
+                "wage INTEGER, " +
+                "dept INTEGER NOT NULL, " +
+                "age INTEGER,  " +
+                "rent INTEGER, " +
+                "PRIMARY KEY (id) );" +
+                "PARTITION TABLE P2 ON COLUMN dept;" +
+
+                "CREATE VIEW V_P2 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) " +
+                "AS SELECT wage, dept, count(*), sum(age), sum(rent)  FROM P2 " +
+                "GROUP BY wage, dept;" +
+
+                // NO Need to fix mv query
+                "CREATE TABLE R4 ( " +
+                "id INTEGER DEFAULT '0' NOT NULL, " +
+                "wage INTEGER, " +
+                "dept INTEGER, " +
+                "age INTEGER,  " +
+                "rent INTEGER, " +
+                "PRIMARY KEY (id) );" +
+
+                "CREATE VIEW V_R4 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) " +
+                "AS SELECT wage, dept, count(*), sum(age), sum(rent)  FROM R4 " +
+                "GROUP BY wage, dept;" +
                 ""
                 ;
         try {
