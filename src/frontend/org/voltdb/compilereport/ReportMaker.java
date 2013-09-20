@@ -35,6 +35,8 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Connector;
+import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.GroupRef;
@@ -148,7 +150,7 @@ public class ReportMaker {
         return sb.toString();
     }
 
-    static String generateSchemaRow(Table table) {
+    static String generateSchemaRow(Table table, boolean isExportTable) {
         StringBuilder sb = new StringBuilder();
         sb.append("<tr class='primaryrow'>");
 
@@ -165,7 +167,11 @@ public class ReportMaker {
             tag(sb, "info", "Materialized View");
         }
         else {
-            tag(sb, null, "Table");
+            if (isExportTable) {
+                tag(sb, null, "Export Table");
+            } else {
+                tag(sb, null, "Table");
+            }
         }
         sb.append("</td>");
 
@@ -268,10 +274,11 @@ public class ReportMaker {
         return sb.toString();
     }
 
-    static String generateSchemaTable(CatalogMap<Table> tables) {
+    static String generateSchemaTable(CatalogMap<Table> tables, CatalogMap<Connector> connectors) {
         StringBuilder sb = new StringBuilder();
+        List<Table> exportTables = getExportTables(connectors);
         for (Table table : tables) {
-            sb.append(generateSchemaRow(table));
+            sb.append(generateSchemaRow(table, exportTables.contains(table) ? true : false));
         }
         return sb.toString();
     }
@@ -653,7 +660,7 @@ public class ReportMaker {
         String statsData = getStatsHTML(db);
         contents = contents.replace("##STATS##", statsData);
 
-        String schemaData = generateSchemaTable(db.getTables());
+        String schemaData = generateSchemaTable(db.getTables(), db.getConnectors());
         contents = contents.replace("##SCHEMA##", schemaData);
 
         String procData = generateProceduresTable(db.getProcedures());
@@ -671,6 +678,17 @@ public class ReportMaker {
         contents = contents.replace("get.py?a=KEY&", String.format("get.py?a=%s&", msg));
 
         return contents;
+    }
+
+    private static List<Table> getExportTables(CatalogMap<Connector> connectors) {
+        List<Table> retval = new ArrayList<Table>();
+
+        for (Connector conn : connectors) {
+            for (ConnectorTableInfo cti : conn.getTableinfo()) {
+                retval.add(cti.getTable());
+            }
+        }
+        return retval;
     }
 
     public static String getLiveSystemOverview()
