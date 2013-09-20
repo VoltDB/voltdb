@@ -186,6 +186,7 @@ public class CSVLoader {
         }
     }
 
+    //main is directly used by tests as well be sure to reset statics that you need to start over.
     public static void main(String[] args) throws IOException,
             InterruptedException {
         start = System.currentTimeMillis();
@@ -285,6 +286,7 @@ public class CSVLoader {
             csvClient.drain();
             csvClient.close();
             long insertCount = 0;
+            //Sum up all the partition processed count i.e the number of rows we sent to server.
             for (CSVPartitionProcessor pp : processors) {
                 insertCount += pp.m_partitionProcessedCount.get();
             }
@@ -296,7 +298,8 @@ public class CSVLoader {
             produceFiles(ackCount, insertCount);
             close_cleanup();
         } catch (Exception ex) {
-            ex.printStackTrace();
+            m_log.error("Exception Happened while loading CSV data: " + ex);
+            System.exit(1);
         }
     }
 
@@ -365,8 +368,7 @@ public class CSVLoader {
             for (Long irow : errorInfo.keySet()) {
                 String info[] = errorInfo.get(irow);
                 if (info.length != 2) {
-                    System.out
-                            .println("internal error, information is not enough");
+                    System.out.println("internal error, information is not enough");
                 }
                 linect++;
                 out_invaliderowfile.write(info[0] + "\n");
@@ -395,7 +397,8 @@ public class CSVLoader {
             out_reportfile.write("Number of lines read from input: "
                     + (CSVFileReader.m_totalLineCount.get() - trueSkip) + "\n");
             if (config.limitrows == -1) {
-                out_reportfile.write("Input stopped after " + CSVFileReader.m_totalRowCount.get() + " rows read" + "\n");
+                out_reportfile.write("Input stopped after "
+                        + CSVFileReader.m_totalRowCount.get() + " rows read" + "\n");
             }
             out_reportfile.write("Number of rows discovered: "
                     + CSVFileReader.m_totalLineCount.get() + "\n");

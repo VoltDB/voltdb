@@ -66,7 +66,7 @@ class CSVFileReader implements Runnable {
         m_blankValues.put(VoltType.VARBINARY, "");
     }
     //Errors we keep track only upto maxerrors
-    static Map<Long, String[]> m_errorInfo = new TreeMap<Long, String[]>();
+    final static Map<Long, String[]> m_errorInfo = new TreeMap<Long, String[]>();
 
     @Override
     public void run() {
@@ -135,13 +135,13 @@ class CSVFileReader implements Runnable {
             } catch (SuperCsvException e) {
                 //Catch rows that can not be read by superCSV m_listReader.
                 // e.g. items without quotes when strictquotes is enabled.
-                e.printStackTrace();
+                m_log.error("Failed to process CSV line: " + e);
                 String[] info = {e.getMessage(), ""};
                 if (synchronizeErrorInfo(m_totalLineCount.get() + 1, info)) {
                     break;
                 }
-            } catch (IOException ioex) {
-                ioex.printStackTrace();
+            } catch (IOException ex) {
+                m_log.error("Failed to read CSV line from file: " + ex);
                 break;
             }
         }
@@ -155,7 +155,7 @@ class CSVFileReader implements Runnable {
         //Close the reader and push m_endOfData lines to indicate Partition Processor to wind down.
         try {
             m_listReader.close();
-        } catch (IOException ex) {
+        } catch (Exception ex) {
             m_log.error("Error cloging Reader: " + ex);
         } finally {
             for (BlockingQueue<CSVLineWithMetaData> q : m_processorQueues.values()) {
@@ -167,6 +167,8 @@ class CSVFileReader implements Runnable {
             }
             m_log.info("Rows Queued by Reader: " + m_totalRowCount.get());
         }
+
+        //Now wait for processors to see endOfData and count down. After that drain to finish all callbacks
         try {
             m_log.info("Waiting for partition processors to finish.");
             CSVPartitionProcessor.m_processor_cdl.await();

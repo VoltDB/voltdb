@@ -97,6 +97,7 @@ class CSVPartitionProcessor implements Runnable {
         m_processorName = "PartitionProcessor-" + partitionId;
     }
 
+    //Check if the procedure you are using with -p option is multipart.
     private static boolean isProcedureMp(Client csvClient)
             throws IOException, org.voltdb.client.ProcCallException {
         boolean procedure_is_mp = false;
@@ -114,7 +115,8 @@ class CSVPartitionProcessor implements Runnable {
         return procedure_is_mp;
     }
 
-    // Based on method of loading do sanity check and setup info for loading.
+    // Based on method of loading do sanity check and setup info for loading. if this method returns false
+    // you have not enough information to continue and we must exit.
     public static boolean initializeProcessorInformation(CSVLoader.CSVConfig config, Client csvClient)
             throws IOException, ProcCallException, InterruptedException {
         VoltTable procInfo;
@@ -135,6 +137,7 @@ class CSVPartitionProcessor implements Runnable {
                 }
             }
             if (isProcExist == false) {
+                //csvloader will exit
                 m_log.error("No matching insert procedure available");
                 return false;
             }
@@ -165,6 +168,7 @@ class CSVPartitionProcessor implements Runnable {
             }
 
             if (m_columnTypes.isEmpty()) {
+                //csvloader will exit.
                 m_log.error("Table " + m_config.table + " Not found");
                 return false;
             }
@@ -227,6 +231,7 @@ class CSVPartitionProcessor implements Runnable {
 
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
+            //one insert at a time callback
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 String[] info = {m_csvLine.rawLine.toString(), response.getStatusString()};
                 if (CSVFileReader.synchronizeErrorInfo(m_csvLine.lineNumber, info)) {
@@ -244,17 +249,15 @@ class CSVPartitionProcessor implements Runnable {
         }
     }
 
+    //This is the thread which processes one insert at a time if the batch fails
     private class FailedBatchProcessor extends Thread {
 
         private final CSVPartitionProcessor m_processor;
         private final String m_procName;
-        private final String m_tableName;
 
-        public FailedBatchProcessor(CSVPartitionProcessor pp, String procName,
-                String tableName) {
+        public FailedBatchProcessor(CSVPartitionProcessor pp, String procName) {
             m_processor = pp;
             m_procName = procName;
-            m_tableName = tableName;
         }
 
         @Override
@@ -282,21 +285,25 @@ class CSVPartitionProcessor implements Runnable {
                                 new PartitionSingleExecuteProcedureCallback(lineList, m_processor);
                         submitWorkToServer(table, m_procName, cbmt);
                     } catch (IOException ioex) {
+                        //Put this processor in error so we exit
                         m_log.warn("Failure Processor failed, failures will not be processed: " + ioex);
                         m_failedQueue.clear();
                         m_failedQueue = null;
+                        m_processor.m_errored = true;
                         break;
                     }
                 } catch (InterruptedException ex) {
+                    //Put this processor in error so we exit
                     m_log.info("Stopped failure processor.");
                     m_failedQueue.clear();
                     m_failedQueue = null;
+                    m_processor.m_errored = true;
                     break;
                 }
             }
         }
     }
-
+    //This is to keep track of when to report how many rows inserted, shared by all processors.
     static int lastMultiple = 0;
     // Callback for batch invoke when table has more than 1 entries. The callback on failure feeds m_failedQueue for
     // one row at a time processing.
@@ -358,6 +365,7 @@ class CSVPartitionProcessor implements Runnable {
         if (success) {
             m_partitionProcessedCount.addAndGet(table.getRowCount());
         } else {
+            //We failed to send work to cluster lets exit.
             m_log.fatal("Failed to send procedure request to server.");
             System.exit(1);
         }
@@ -425,6 +433,7 @@ class CSVPartitionProcessor implements Runnable {
     }
 
     // while there are rows and m_endOfData not seen batch and call procedure supplied by user.
+    // When -p option is used only 1 processor is created.
     private void processUserSuppliedProcedure(String procName) {
         while (true) {
             if (m_errored) {
@@ -434,6 +443,7 @@ class CSVPartitionProcessor implements Runnable {
             }
             List<CSVLineWithMetaData> mlineList = new ArrayList<CSVLineWithMetaData>();
             m_partitionQueue.drainTo(mlineList, m_config.batch);
+            //Go over lines we collected and submit one insert at a time as this is with -p option.
             for (CSVLineWithMetaData lineList : mlineList) {
                 if (lineList == m_endOfData) {
                     return;
@@ -494,7 +504,7 @@ class CSVPartitionProcessor implements Runnable {
 
                 //Launch failureProcessor
                 m_failedQueue = new LinkedBlockingQueue<CSVLineWithMetaData>();
-                failureProcessor = new FailedBatchProcessor(this, procName, m_tableName);
+                failureProcessor = new FailedBatchProcessor(this, procName);
                 failureProcessor.start();
 
                 processLoadTable(table, procName);
@@ -509,7 +519,9 @@ class CSVPartitionProcessor implements Runnable {
                 failureProcessor.join();
             }
         } catch (Exception ex) {
+            //Let the CSV reader know that dont read any more lines we are exiting.
             CSVFileReader.m_errored = true;
+            m_log.error("Failed to process partitioned data: " + ex);
         } finally {
             CSVPartitionProcessor.m_processor_cdl.countDown();
             m_log.info("Done Processing partition: " + m_partitionId + " Processed: " + m_partitionProcessedCount);
