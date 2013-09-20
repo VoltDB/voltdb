@@ -250,5 +250,5 @@ with settings(user=username,host_string=volt5f[1],disable_known_hosts=True,key_f
         get("voltdb-ent-%s-1.x86_64.rpm" % (versionVolt5f), releaseDir)
 
 computeChecksums(releaseDir)
-archiveDir = os.path.join(os.getenv('HOME'), "releases", "archive", voltdbTreeish, versionVolt5f)
-backupReleaseDir(releaseDir, archiveDir, versionVolt5f)
+#archiveDir = os.path.join(os.getenv('HOME'), "releases", "archive", voltdbTreeish, versionVolt5f)
+#backupReleaseDir(releaseDir, archiveDir, versionVolt5f)
