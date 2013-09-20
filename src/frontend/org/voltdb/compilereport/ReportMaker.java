@@ -304,7 +304,7 @@ public class ReportMaker {
         List<StmtParameter> params = CatalogUtil.getSortedCatalogItems(statement.getParameters(), "index");
         List<String> paramTypes = new ArrayList<String>();
         for (StmtParameter param : params) {
-            paramTypes.add(VoltType.get((byte) param.getSqltype()).name());
+            paramTypes.add(VoltType.get((byte) param.getJavatype()).name());
         }
         if (paramTypes.size() == 0) {
             sb.append("<i>None</i>");
