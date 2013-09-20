@@ -8,6 +8,7 @@
 {@columnpredicate = "_numericcolumnpredicate"}
 {@dmlcolumnpredicate = "_variable[numeric] _cmp _value[int16]"}
 {@updatecolumn = "NUM"}
+{@updatesource = "ID"}
 {@updatevalue = "_value[int:0,100]"}
 {@optionalfn = "_numfun"}
 <advanced-template.sql>

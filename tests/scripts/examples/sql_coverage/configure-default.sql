@@ -17,4 +17,5 @@
 {@insertvals = "_id, _value[string], _value[int16], _value[float]"}
 {@optionalfn = "_numfun"}
 {@updatecolumn = "NUM"}
+{@updatesource = "ID"}
 {@updatevalue = "_value[int:0,100]"}
