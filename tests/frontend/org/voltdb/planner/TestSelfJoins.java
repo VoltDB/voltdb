@@ -23,15 +23,17 @@
 
 package org.voltdb.planner;
 
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.types.ExpressionType;
 
 public class TestSelfJoins  extends PlannerTestCase {
 
     public void testSelfJoin() {
-        AbstractPlanNode pn = compile("select * FROM R1 A JOIN R1 B ON A.C = B.C");
+        AbstractPlanNode pn = compile("select * FROM R1 A JOIN R1 B ON A.C = B.C WHERE B.A > 0 AND A.C < 3");
         pn = pn.getChild(0).getChild(0);
         assertTrue(pn instanceof NestLoopPlanNode);
         assertEquals(4, pn.getOutputSchema().getColumns().size());
@@ -41,11 +43,13 @@ public class TestSelfJoins  extends PlannerTestCase {
         SeqScanPlanNode ss = (SeqScanPlanNode) c;
         assertEquals("R1", ss.getTargetTableName());
         assertEquals("A", ss.getTargetTableAlias());
+        assertEquals(ExpressionType.COMPARE_LESSTHAN, ss.getPredicate().getExpressionType());
         c = pn.getChild(1);
         assertTrue(c instanceof SeqScanPlanNode);
         ss = (SeqScanPlanNode) c;
         assertEquals("R1", ss.getTargetTableName());
         assertEquals("B", ss.getTargetTableAlias());
+        assertEquals(ExpressionType.COMPARE_GREATERTHAN, ss.getPredicate().getExpressionType());
 
         pn = compile("select * FROM R1 JOIN R1 B ON R1.C = B.C");
         pn = pn.getChild(0).getChild(0);
@@ -68,6 +72,30 @@ public class TestSelfJoins  extends PlannerTestCase {
         assertTrue(pn instanceof NestLoopPlanNode);
         assertEquals(4, pn.getOutputSchema().getColumns().size());
 
+    }
+
+    public void testOuterSelfJoin() {
+        // A.C = B.C Inner-Outer join Expr stays at the NLJ as Join predicate
+        // A.A > 1 Outer Join Expr stays at the the NLJ as pre-join predicate
+        // B.A < 0 Inner Join Expr is pushed down to the inner SeqScan node
+        AbstractPlanNode pn = compile("select * FROM R1 A LEFT JOIN R1 B ON A.C = B.C AND A.A > 1 AND B.A < 0");
+        pn = pn.getChild(0).getChild(0);
+        assertTrue(pn instanceof NestLoopPlanNode);
+        NestLoopPlanNode nl = (NestLoopPlanNode) pn;
+        assertNotNull(nl.getPreJoinPredicate());
+        AbstractExpression p = nl.getPreJoinPredicate();
+        assertEquals(ExpressionType.COMPARE_GREATERTHAN, p.getExpressionType());
+        assertNotNull(nl.getJoinPredicate());
+        p = nl.getJoinPredicate();
+        assertEquals(ExpressionType.COMPARE_EQUAL, p.getExpressionType());
+        assertNull(nl.getWherePredicate());
+        assertEquals(2, nl.getChildCount());
+        SeqScanPlanNode c = (SeqScanPlanNode) nl.getChild(0);
+        assertNull(c.getPredicate());
+        c = (SeqScanPlanNode) nl.getChild(1);
+        assertNotNull(c.getPredicate());
+        p = c.getPredicate();
+        assertEquals(ExpressionType.COMPARE_LESSTHAN, p.getExpressionType());
     }
 
     public void testPartitionedSelfJoin() {
