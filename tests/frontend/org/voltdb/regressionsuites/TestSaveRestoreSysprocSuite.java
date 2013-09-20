@@ -50,6 +50,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.BackendTarget;
 import org.voltdb.DefaultSnapshotDataTarget;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -84,6 +85,8 @@ import com.google.common.collect.ImmutableSet;
  */
 public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     private final static VoltLogger LOG = new VoltLogger("CONSOLE");
+    boolean m_expectHashinator = TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.ELASTIC;
+
 
     public TestSaveRestoreSysprocSuite(String name) {
         super(name);
@@ -340,7 +343,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     }
 
     private void validateSnapshot(boolean expectSuccess) {
-        validateSnapshot(expectSuccess, false, true, TESTNONCE);
+        validateSnapshot(expectSuccess, false, m_expectHashinator, TESTNONCE);
     }
 
     private void validateSnapshot(boolean expectSuccess, boolean expectHashinator) {
@@ -421,6 +424,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         loadTable(client, "PARTITION_TESTER", false, partition_table);
 
         saveTablesWithDefaultOptions(client);
+        validateSnapshot(true);
 
         JSONObject digest = SnapshotUtil.CRCCheck(new VoltFile(TMPDIR, TESTNONCE + "-host_0.digest"), LOG);
         JSONObject transactionIds = digest.getJSONObject("partitionTransactionIds");
@@ -625,7 +629,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         boolean hadSuccess = false;
         for (int ii = 0; ii < 5; ii++) {
             Thread.sleep(2000);
-            hadSuccess = validateSnapshot(true, true, true, TESTNONCE + "2");
+            hadSuccess = validateSnapshot(true, true, m_expectHashinator, TESTNONCE + "2");
             if (hadSuccess) break;
         }
         assertTrue(hadSuccess);
@@ -710,7 +714,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         while (result.advanceRow()) {
             assertTrue(result.getString("RESULT").equals("SUCCESS"));
         }
-        validateSnapshot(true, false, true, TESTNONCE + "2");
+        validateSnapshot(true, false, m_expectHashinator, TESTNONCE + "2");
     }
 
     public void testRestore12Snapshot()
@@ -2534,6 +2538,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testRestoreHashinatorWithAddedPartition()
             throws IOException, InterruptedException, ProcCallException
     {
+        if (!m_expectHashinator) return; // don't run in legacy hashinator mode
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
 
         System.out.println("Starting testDistributeReplicatedTable");
@@ -2562,6 +2567,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                     loadTable(client, "REPLICATED_TESTER", true, repl_table);
                     loadTable(client, "PARTITION_TESTER", false, partition_table);
                     saveTablesWithDefaultOptions(client);
+                    validateSnapshot(true, true);
                 }
                 finally {
                     client.close();
