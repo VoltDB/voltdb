@@ -250,6 +250,7 @@ public class DDLCompiler {
             "LANGUAGE" +                            // LANGUAGE token
             "\\s+" +                                // one or more spaces
             "(GROOVY)" +                            // (4) language name
+            "\\s*" +                                // zero or more spaces
             ";" +                                   // semi-colon terminator
             "\\z",                                  // end of DDL statement
             Pattern.CASE_INSENSITIVE|Pattern.MULTILINE|Pattern.DOTALL
