@@ -539,11 +539,12 @@ public class PlanAssembler {
             }
 
             if (m_parsedSelect.mvFixInfo.needed) {
-                if (m_parsedSelect.tableList.size() != 1) {
-                    String errorMsg = String.format("Unsupported query joined with materialized table %s",
-                            m_parsedSelect.mvFixInfo.mvTable.getTypeName());
-                    throw new PlanningErrorException(errorMsg);
-                }
+                // Continue give wrong answers possibly for joined query on MV.
+//                if (m_parsedSelect.tableList.size() != 1) {
+//                    String errorMsg = String.format("Unsupported query joined with materialized table %s",
+//                            m_parsedSelect.mvFixInfo.mvTable.getTypeName());
+//                    throw new PlanningErrorException(errorMsg);
+//                }
 
                 AbstractExpression whereExpr = m_parsedSelect.getSingleTableFilterExpression();
                 if (whereExpr != null) {
@@ -561,7 +562,6 @@ public class PlanAssembler {
          * Establish the output columns for the sub select plan.
          */
         root = handleAggregationOperators(root);
-
 
         // Process the re-aggregate plan node and insert it into the plan.
         boolean mvFixNeedsProjection = false;

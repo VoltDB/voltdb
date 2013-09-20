@@ -425,12 +425,13 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertTrue(p instanceof SendPlanNode);
         p = p.getChild(0);
 
-        if (p instanceof LimitPlanNode) {
-            // No limit pushed down.
-            p = p.getChild(0);
-        }
         if (projectionNode) {
             assertTrue(p instanceof ProjectionPlanNode);
+            p = p.getChild(0);
+        }
+
+        if (p instanceof LimitPlanNode) {
+            // No limit pushed down.
             p = p.getChild(0);
         }
 
