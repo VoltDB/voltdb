@@ -91,9 +91,6 @@ public class OrderByPlanNode extends AbstractPlanNode {
     public boolean isOrderDeterministic() {
         AbstractPlanNode child = m_children.get(0);
         if (child.isContentDeterministic()) {
-            if (orderingByAllColumns()) {
-                return true;
-            }
             if (orderingByUniqueColumns()) {
                 return true;
             }
@@ -102,23 +99,6 @@ public class OrderByPlanNode extends AbstractPlanNode {
             m_nondeterminismDetail = m_children.get(0).nondeterminismDetail();
         }
         return false;
-    }
-
-    private boolean orderingByAllColumns() {
-        NodeSchema schema = getOutputSchema();
-        for (SchemaColumn col : schema.getColumns()) {
-            boolean found = false;
-            for (AbstractExpression expr : m_sortExpressions) {
-                if (col.getExpression().equals(expr)) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                return false;
-            }
-        }
-        return true;
     }
 
     private boolean orderingByUniqueColumns() {

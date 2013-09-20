@@ -442,7 +442,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             m_context.cluster.getDeployment().get("deployment").
                             getSystemsettings().get("systemsettings").getMaxtemptablesize(),
                             m_backend,
-                            VoltDB.instance().getConfig().m_ipcPorts.remove(0),
+                            VoltDB.instance().getConfig().m_ipcPort,
                             TheHashinator.getConfiguredHashinatorType(),
                             TheHashinator.getConfigureBytes(m_numberOfPartitions));
                 eeTemp.loadCatalog( timestamp, serializedCatalog);
