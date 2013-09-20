@@ -173,9 +173,11 @@ class CSVFileReader implements Runnable {
             m_csvClient.drain();
             m_log.info("Partition Processors Done.");
         } catch (InterruptedException ex) {
-            ex.printStackTrace();
+            m_log.warn("Stopped processing because of connection error. "
+                    + "A report will be generated with what we processed so far. Error: " + ex);
         } catch (NoConnectionsException ex) {
-            ex.printStackTrace();
+            m_log.warn("Stopped processing because of connection error. "
+                    + "A report will be generated with what we processed so far. Error: " + ex);
         }
     }
 

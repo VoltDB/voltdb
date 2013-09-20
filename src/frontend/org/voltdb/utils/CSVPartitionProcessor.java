@@ -280,21 +280,7 @@ class CSVPartitionProcessor implements Runnable {
 
                         PartitionSingleExecuteProcedureCallback cbmt =
                                 new PartitionSingleExecuteProcedureCallback(lineList, m_processor);
-                        boolean success;
-                        if (!CSVPartitionProcessor.m_isMP) {
-                            //If transaction is restarted because of wrong partition client will retry
-                            Object rpartitionParam =
-                                    TheHashinator.valueToBytes(table.fetchRow(0).get(
-                                    CSVPartitionProcessor.m_partitionedColumnIndex, m_partitionColumnType));
-                            success = m_csvClient.callProcedure(cbmt, m_procName, rpartitionParam, m_tableName, table);
-                        } else {
-                            success = m_csvClient.callProcedure(cbmt, m_procName, m_tableName, table);
-                        }
-                        if (success) {
-                            m_partitionProcessedCount.addAndGet(table.getRowCount());
-                        } else {
-                            m_log.error("Failed to send failure queue procedure request.");
-                        }
+                        submitWorkToServer(table, m_procName, cbmt);
                     } catch (IOException ioex) {
                         m_log.warn("Failure Processor failed, failures will not be processed: " + ioex);
                         m_failedQueue.clear();
@@ -350,10 +336,27 @@ class CSVPartitionProcessor implements Runnable {
         }
     }
 
+    private void submitWorkToServer(VoltTable table, String procName, ProcedureCallback cbmt) throws IOException {
+        boolean success;
+        if (!CSVPartitionProcessor.m_isMP) {
+            //If transaction is restarted because of wrong partition client will retry
+            Object rpartitionParam =
+                    TheHashinator.valueToBytes(table.fetchRow(0).get(
+                    CSVPartitionProcessor.m_partitionedColumnIndex, m_partitionColumnType));
+            success = m_csvClient.callProcedure(cbmt, procName, rpartitionParam, m_tableName, table);
+        } else {
+            success = m_csvClient.callProcedure(cbmt, procName, m_tableName, table);
+        }
+        if (success) {
+            m_partitionProcessedCount.addAndGet(table.getRowCount());
+        } else {
+            m_log.error("Failed to send insert procedure request to server.");
+        }
+    }
+
     // while there are rows and m_endOfData not seen batch and call procedure for insert.
     private void processLoadTable(VoltTable table, String procName) {
         List<CSVLineWithMetaData> batchList = new ArrayList<CSVLineWithMetaData>();
-        Object rpartitionParam = null;
         while (true) {
             if (m_errored) {
                 //Let file reader know not to read any more. All Partition Processors will quit processing.
@@ -368,22 +371,7 @@ class CSVPartitionProcessor implements Runnable {
                     if (table.getRowCount() > 0) {
                         PartitionProcedureCallback cbmt = new PartitionProcedureCallback(batchList, this);
                         try {
-                            boolean success;
-                            if (!m_isMP) {
-                                rpartitionParam =
-                                        TheHashinator.valueToBytes(
-                                        table.fetchRow(0).get(CSVPartitionProcessor.m_partitionedColumnIndex,
-                                        m_partitionColumnType));
-                                success = m_csvClient.callProcedure(cbmt, procName,
-                                        rpartitionParam, m_tableName, table);
-                            } else {
-                                success = m_csvClient.callProcedure(cbmt, procName, m_tableName, table);
-                            }
-                            if (success) {
-                                m_partitionProcessedCount.addAndGet(table.getRowCount());
-                            } else {
-                                m_log.error("Failed to send last batch to procedure request.");
-                            }
+                            submitWorkToServer(table, procName, cbmt);
                         } catch (IOException ex) {
                             String[] info = {lineList.rawLine.toString(), ex.toString()};
                             m_errored = synchronizeErrorInfo(lineList.lineNumber, info);
@@ -410,22 +398,10 @@ class CSVPartitionProcessor implements Runnable {
                 if (table.getRowCount() >= m_config.batch) {
                     try {
                         PartitionProcedureCallback cbmt = new PartitionProcedureCallback(batchList, this);
-                        boolean success;
-                        if (!m_isMP) {
-                            rpartitionParam =
-                                    TheHashinator.valueToBytes(table.fetchRow(0).get(
-                                    CSVPartitionProcessor.m_partitionedColumnIndex, m_partitionColumnType));
-                            success = m_csvClient.callProcedure(cbmt, procName, rpartitionParam, m_tableName, table);
-                        } else {
-                            success = m_csvClient.callProcedure(cbmt, procName, m_tableName, table);
-                        }
-                        if (success) {
-                            m_partitionProcessedCount.addAndGet(table.getRowCount());
-                        } else {
-                            m_log.error("Failed to send batch procedure request.");
-                        }
+                        submitWorkToServer(table, procName, cbmt);
                         //Clear table data as we start building new table with new rows.
                         table.clearRowData();
+                        batchList = new ArrayList<CSVLineWithMetaData>();
                     } catch (IOException ex) {
                         //We lost network.
                         table.clearRowData();
@@ -434,7 +410,6 @@ class CSVPartitionProcessor implements Runnable {
                         CSVFileReader.m_errored = true;
                         return;
                     }
-                    batchList = new ArrayList<CSVLineWithMetaData>();
                 }
             }
         }
