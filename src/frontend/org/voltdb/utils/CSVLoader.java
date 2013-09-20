@@ -249,8 +249,8 @@ public class CSVLoader {
                 LinkedBlockingQueue<CSVLineWithMetaData> partitionQueue =
                         new LinkedBlockingQueue<CSVLineWithMetaData>(Integer.MAX_VALUE);
                 lineq.put(i, partitionQueue);
-                CSVPartitionProcessor processor = new CSVPartitionProcessor(csvClient, i, CSVPartitionProcessor.m_partitionedColumnIndex,
-                        partitionQueue, endOfData);
+                CSVPartitionProcessor processor = new CSVPartitionProcessor(csvClient, i,
+                        CSVPartitionProcessor.m_partitionedColumnIndex, partitionQueue, endOfData);
                 processors.add(processor);
 
                 Thread th = new Thread(processor);

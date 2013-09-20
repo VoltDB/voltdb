@@ -115,7 +115,8 @@ class CSVPartitionProcessor implements Runnable {
     }
 
     // Based on method of loading do sanity check and setup info for loading.
-    public static boolean initializeProcessorInformation(CSVLoader.CSVConfig config, Client csvClient) throws IOException, ProcCallException, InterruptedException {
+    public static boolean initializeProcessorInformation(CSVLoader.CSVConfig config, Client csvClient)
+            throws IOException, ProcCallException, InterruptedException {
         VoltTable procInfo;
         m_config = config;
         if (m_config.useSuppliedProcedure) {
@@ -156,7 +157,8 @@ class CSVPartitionProcessor implements Runnable {
                     if (remarks != null && remarks.equalsIgnoreCase("PARTITION_COLUMN")) {
                         m_partitionColumnType = vtype;
                         m_partitionedColumnIndex = idx;
-                        m_log.info("Table " + m_config.table + " Partition Column Name is: " + procInfo.getString("COLUMN_NAME"));
+                        m_log.info("Table " + m_config.table + " Partition Column Name is: "
+                                + procInfo.getString("COLUMN_NAME"));
                         m_log.info("Table " + m_config.table + " Partition Column Type is: " + vtype.toString());
                     }
                 }
@@ -281,7 +283,9 @@ class CSVPartitionProcessor implements Runnable {
                         boolean success;
                         if (!CSVPartitionProcessor.m_isMP) {
                             //If transaction is restarted because of wrong partition client will retry
-                            Object rpartitionParam = TheHashinator.valueToBytes(table.fetchRow(0).get(CSVPartitionProcessor.m_partitionedColumnIndex, m_partitionColumnType));
+                            Object rpartitionParam =
+                                    TheHashinator.valueToBytes(table.fetchRow(0).get(
+                                    CSVPartitionProcessor.m_partitionedColumnIndex, m_partitionColumnType));
                             success = m_csvClient.callProcedure(cbmt, m_procName, rpartitionParam, m_tableName, table);
                         } else {
                             success = m_csvClient.callProcedure(cbmt, m_procName, m_tableName, table);
@@ -366,8 +370,12 @@ class CSVPartitionProcessor implements Runnable {
                         try {
                             boolean success;
                             if (!m_isMP) {
-                                rpartitionParam = TheHashinator.valueToBytes(table.fetchRow(0).get(CSVPartitionProcessor.m_partitionedColumnIndex, m_partitionColumnType));
-                                success = m_csvClient.callProcedure(cbmt, procName, rpartitionParam, m_tableName, table);
+                                rpartitionParam =
+                                        TheHashinator.valueToBytes(
+                                        table.fetchRow(0).get(CSVPartitionProcessor.m_partitionedColumnIndex,
+                                        m_partitionColumnType));
+                                success = m_csvClient.callProcedure(cbmt, procName,
+                                        rpartitionParam, m_tableName, table);
                             } else {
                                 success = m_csvClient.callProcedure(cbmt, procName, m_tableName, table);
                             }
@@ -404,7 +412,9 @@ class CSVPartitionProcessor implements Runnable {
                         PartitionProcedureCallback cbmt = new PartitionProcedureCallback(batchList, this);
                         boolean success;
                         if (!m_isMP) {
-                            rpartitionParam = TheHashinator.valueToBytes(table.fetchRow(0).get(CSVPartitionProcessor.m_partitionedColumnIndex, m_partitionColumnType));
+                            rpartitionParam =
+                                    TheHashinator.valueToBytes(table.fetchRow(0).get(
+                                    CSVPartitionProcessor.m_partitionedColumnIndex, m_partitionColumnType));
                             success = m_csvClient.callProcedure(cbmt, procName, rpartitionParam, m_tableName, table);
                         } else {
                             success = m_csvClient.callProcedure(cbmt, procName, m_tableName, table);

@@ -115,7 +115,9 @@ class CSVFileReader implements Runnable {
                 //If Parser got error and we have reached limit this loop will exit and no more elements
                 //will be pushed to queue. Queues will break out as well after seeing endOfData
                 if (!CSVPartitionProcessor.m_isMP && !m_config.useSuppliedProcedure) {
-                    partitionId = TheHashinator.getPartitionForParameter(CSVPartitionProcessor.m_partitionColumnType.getValue(),
+                    partitionId =
+                            TheHashinator.getPartitionForParameter(
+                            CSVPartitionProcessor.m_partitionColumnType.getValue(),
                             (Object) lineData.correctedLine[CSVPartitionProcessor.m_partitionedColumnIndex]);
                 }
                 BlockingQueue<CSVLineWithMetaData> q = m_processorQueues.get(partitionId);
