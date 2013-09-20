@@ -23,7 +23,11 @@
 
 package org.voltdb.iv2;
 
-import static org.mockito.Matchers.*;
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertFalse;
+import static junit.framework.Assert.assertTrue;
+import static junit.framework.Assert.fail;
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -39,18 +43,19 @@ import java.util.Random;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import junit.framework.TestCase;
-
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.InOrder;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.Pair;
+import org.voltdb.TheHashinator;
+import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 
-public class TestSpPromoteAlgo extends TestCase
+public class TestSpPromoteAlgo
 {
     Iv2RepairLogResponseMessage makeResponse(long spHandle)
     {
@@ -68,6 +73,12 @@ public class TestSpPromoteAlgo extends TestCase
         Iv2InitiateTaskMessage im = mock(Iv2InitiateTaskMessage.class);
         when(m.getPayload()).thenReturn(im);
         return m;
+    }
+
+    @BeforeClass
+    static public void initializeHashinator() {
+        TheHashinator.setConfiguredHashinatorType(HashinatorType.ELASTIC);
+        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(8));
     }
 
     // verify that responses are correctly unioned and ordered.
@@ -333,7 +344,7 @@ public class TestSpPromoteAlgo extends TestCase
             List<Iv2RepairLogResponseMessage> stuff = logs[i].contents(dut.getRequestId(), false);
             System.out.println("Repair log size from: " + i + ": " + stuff.size());
             for (Iv2RepairLogResponseMessage msg : stuff) {
-                msg.m_sourceHSId = (long)i;
+                msg.m_sourceHSId = i;
                 dut.deliver(msg);
                 // First message is metadata only, skip it in validation stream
                 if (msg.getSequence() > 0) {
