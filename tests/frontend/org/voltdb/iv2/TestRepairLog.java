@@ -23,6 +23,9 @@
 
 package org.voltdb.iv2;
 
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertFalse;
+import static junit.framework.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -30,17 +33,18 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 
-import junit.framework.TestCase;
-
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
+import org.voltdb.TheHashinator;
+import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 
-public class TestRepairLog extends TestCase
+public class TestRepairLog
 {
     VoltMessage truncInitMsg(long truncPt, long handle)
     {
@@ -81,6 +85,12 @@ public class TestRepairLog extends TestCase
         @Override
         public void flattenToBuffer(ByteBuffer buf) throws IOException {
         }
+    }
+
+    @BeforeClass
+    static public void initializeHashinator() {
+        TheHashinator.setConfiguredHashinatorType(HashinatorType.ELASTIC);
+        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(8));
     }
 
     @Test
