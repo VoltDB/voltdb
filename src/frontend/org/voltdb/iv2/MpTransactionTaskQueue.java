@@ -132,8 +132,9 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         Iterator<TransactionTask> iter = m_backlog.iterator();
         while (iter.hasNext()) {
             TransactionTask tt = iter.next();
-            if (task instanceof MpProcedureTask) {
+            if (tt instanceof MpProcedureTask) {
                 MpProcedureTask next = (MpProcedureTask)tt;
+                tmLog.debug("Repair updating write task: " + next + " with masters: " + masters);
                 next.updateMasters(masters, partitionMasters);
             }
             else {
@@ -145,8 +146,9 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         iter = m_readBacklog.iterator();
         while (iter.hasNext()) {
             TransactionTask tt = iter.next();
-            if (task instanceof MpProcedureTask) {
+            if (tt instanceof MpProcedureTask) {
                 MpProcedureTask next = (MpProcedureTask)tt;
+                tmLog.debug("Repair updating write task: " + next + " with masters: " + masters);
                 next.updateMasters(masters, partitionMasters);
             }
             else {
