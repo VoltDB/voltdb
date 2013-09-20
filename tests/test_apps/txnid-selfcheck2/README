@@ -19,9 +19,11 @@ The following is a list of features this app has:
 - A thread runs adhoc DML that changes both replicated and partitioned tables.
   The most recent entry is read and re-stored by the main procedures. This means
   the order AdHoc and regular procs run in is critical.
+- Another thread calls non-existent/dropped stored procedures.
 - Secondary tables that get loaded with dummy data to ensure snapshots, rejoins
   and DR syncs are non-trivial.
 - MP and SP read operations that validate data.
+- An export table in the DDL (but no actual inserts into that table)
 
 If a transaction is run out of order, missing or run twice, these mechanisms
 should fail. This failure should be detected by:
