@@ -336,6 +336,14 @@ class CSVPartitionProcessor implements Runnable {
         }
     }
 
+    /**
+     * Submit work to server if this fails for any reason bail.
+     *
+     * @param table That contains rows to be sent in case of table load
+     * @param procName procedure name we are using.
+     * @param cbmt callback.
+     * @throws IOException
+     */
     private void submitWorkToServer(VoltTable table, String procName, ProcedureCallback cbmt) throws IOException {
         boolean success;
         if (!CSVPartitionProcessor.m_isMP) {
@@ -350,7 +358,8 @@ class CSVPartitionProcessor implements Runnable {
         if (success) {
             m_partitionProcessedCount.addAndGet(table.getRowCount());
         } else {
-            m_log.error("Failed to send insert procedure request to server.");
+            m_log.fatal("Failed to send procedure request to server.");
+            System.exit(1);
         }
     }
 
@@ -435,6 +444,9 @@ class CSVPartitionProcessor implements Runnable {
                             new PartitionSingleExecuteProcedureCallback(lineList, this);
                     if (m_csvClient.callProcedure(cbmt, procName, (Object[]) lineList.correctedLine)) {
                         m_partitionProcessedCount.incrementAndGet();
+                    } else {
+                        m_log.fatal("Failed to send procedure request to server.");
+                        System.exit(1);
                     }
                 } catch (IOException ex) {
                     String[] info = {lineList.rawLine.toString(), ex.toString()};
