@@ -60,10 +60,19 @@ import org.voltdb.client.ClientFactory;
  */
 public class CSVLoader {
 
-    public static String pathInvalidrowfile = "";
-    public static String pathReportfile = "csvloaderReport.log";
-    public static String pathLogfile = "csvloaderLog.log";
-    protected static final VoltLogger m_log = new VoltLogger("CONSOLE");
+    /**
+     * Path of invalid row file that will be created.
+     */
+    static String pathInvalidrowfile = "";
+    /**
+     * report file name
+     */
+    static String pathReportfile = "csvloaderReport.log";
+    /**
+     * log file name
+     */
+    static String pathLogfile = "csvloaderLog.log";
+    private static final VoltLogger m_log = new VoltLogger("CONSOLE");
     private static CSVConfig config = null;
     private static long latency = 0;
     private static long start = 0;
@@ -73,14 +82,38 @@ public class CSVLoader {
     private static BufferedWriter out_reportfile;
     private static String insertProcedure = "";
     private static CsvPreference csvPreference = null;
+    /**
+     * default CSV separator
+     */
     public static final char DEFAULT_SEPARATOR = ',';
+    /**
+     * default quote char
+     */
     public static final char DEFAULT_QUOTE_CHARACTER = '\"';
+    /**
+     * default escape char
+     */
     public static final char DEFAULT_ESCAPE_CHARACTER = '\\';
+    /**
+     * Are we using strict quotes
+     */
     public static final boolean DEFAULT_STRICT_QUOTES = false;
+    /**
+     * Number of lines to skip in CSV
+     */
     public static final int DEFAULT_SKIP_LINES = 0;
+    /**
+     * Allow whitespace?
+     */
     public static final boolean DEFAULT_NO_WHITESPACE = false;
+    /**
+     * Size limit for each column.
+     */
     public static final long DEFAULT_COLUMN_LIMIT_SIZE = 16777216;
 
+    /**
+     * Configuration options.
+     */
     public static class CSVConfig extends CLIConfig {
 
         @Option(shortOpt = "f", desc = "location of CSV input file")
@@ -134,14 +167,23 @@ public class CSVLoader {
         @Option(desc = "port to use when connecting to database (default: 21212)")
         int port = Client.VOLTDB_SERVER_PORT;
 
+        /**
+         * Batch size for processing batched operations.
+         */
         @Option(desc = "Batch Size for processing.")
         public int batch = 200;
 
+        /**
+         * Table name to insert CSV data into.
+         */
         @AdditionalArgs(desc = "insert the data into database by TABLENAME.insert procedure by default")
         public String table = "";
         // This is set to true when -p option us used.
         boolean useSuppliedProcedure = false;
 
+        /**
+         * Validate command line options.
+         */
         @Override
         public void validate() {
             if (maxerrors < 0) {
@@ -155,10 +197,6 @@ public class CSVLoader {
             }
             if (skip < 0) {
                 exitWithMessageAndUsage("skipline must be >= 0");
-            }
-            if (limitrows > Integer.MAX_VALUE) {
-                exitWithMessageAndUsage("limitrows to read must be < "
-                        + Integer.MAX_VALUE);
             }
             if (port < 0) {
                 exitWithMessageAndUsage("port number must be >= 0");
@@ -176,6 +214,9 @@ public class CSVLoader {
             }
         }
 
+        /**
+         * Usage
+         */
         @Override
         public void printUsage() {
             System.out
@@ -186,7 +227,14 @@ public class CSVLoader {
         }
     }
 
-    //main is directly used by tests as well be sure to reset statics that you need to start over.
+    /**
+     * csvloader main. (main is directly used by tests as well be sure to reset statics that you need to start over)
+     *
+     * @param args
+     * @throws IOException
+     * @throws InterruptedException
+     *
+     */
     public static void main(String[] args) throws IOException,
             InterruptedException {
         start = System.currentTimeMillis();
@@ -346,6 +394,15 @@ public class CSVLoader {
         }
     }
 
+    /**
+     * Get connection to servers in cluster.
+     *
+     * @param config
+     * @param servers
+     * @param port
+     * @return
+     * @throws Exception
+     */
     public static Client getClient(ClientConfig config, String[] servers,
             int port) throws Exception {
         final Client client = ClientFactory.createClient(config);
@@ -385,7 +442,7 @@ public class CSVLoader {
             float elapsedTimeSec = latency / 1000F;
             out_reportfile.write("CSVLoader elaspsed: " + elapsedTimeSec
                     + " seconds\n");
-            long trueSkip = 0;
+            long trueSkip;
             //get the actuall number of lines skipped
             if (config.skip < CSVFileReader.m_totalLineCount.get()) {
                 trueSkip = config.skip;

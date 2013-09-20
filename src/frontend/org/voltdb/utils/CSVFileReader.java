@@ -25,12 +25,12 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import org.supercsv.exception.SuperCsvException;
 import org.supercsv.io.ICsvListReader;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
-import static org.voltdb.utils.CSVLoader.m_log;
 
 /**
  *
@@ -52,7 +52,9 @@ class CSVFileReader implements Runnable {
     static CSVLineWithMetaData m_endOfData;
     static boolean m_errored = false;
     long m_parsingTime = 0;
-    private static Map<VoltType, String> m_blankValues = new EnumMap<VoltType, String>(VoltType.class);
+    private static final Map<VoltType, String> m_blankValues = new EnumMap<VoltType, String>(VoltType.class);
+    private static final VoltLogger m_log = new VoltLogger("CONSOLE");
+
     static {
         m_blankValues.put(VoltType.NUMERIC, "0");
         m_blankValues.put(VoltType.TINYINT, "0");
@@ -70,7 +72,7 @@ class CSVFileReader implements Runnable {
 
     @Override
     public void run() {
-        List<String> lineList = null;
+        List<String> lineList;
         m_log.debug("Using Hashinator: " + TheHashinator.getConfiguredHashinatorType().name());
         while ((m_config.limitrows-- > 0)) {
             if (m_errored) {
@@ -95,7 +97,7 @@ class CSVFileReader implements Runnable {
                 }
                 m_totalRowCount.incrementAndGet();
 
-                String[] correctedLine = lineList.toArray(new String[0]);
+                String[] correctedLine = lineList.toArray(new String[lineList.size()]);
 
                 String lineCheckResult;
                 if ((lineCheckResult = checkparams_trimspace(correctedLine,
@@ -131,7 +133,10 @@ class CSVFileReader implements Runnable {
                     }
                     continue;
                 }
-                q.offer(lineData);
+                if (!q.offer(lineData)) {
+                    m_log.info("Failed to insert linedata in processor, waiting and doing put.");
+                    q.put(lineData);
+                }
             } catch (SuperCsvException e) {
                 //Catch rows that can not be read by superCSV m_listReader.
                 // e.g. items without quotes when strictquotes is enabled.
@@ -141,6 +146,9 @@ class CSVFileReader implements Runnable {
                     break;
                 }
             } catch (IOException ex) {
+                m_log.error("Failed to read CSV line from file: " + ex);
+                break;
+            } catch (InterruptedException ex) {
                 m_log.error("Failed to read CSV line from file: " + ex);
                 break;
             }

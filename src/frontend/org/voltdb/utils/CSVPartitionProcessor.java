@@ -46,7 +46,6 @@ class CSVPartitionProcessor implements Runnable {
     final Client m_csvClient;
     //Queue for processing for this partition.
     final BlockingQueue<CSVLineWithMetaData> m_partitionQueue;
-    final int m_partitionColumnIndex;
     final CSVLineWithMetaData m_endOfData;
     //Partition for which this processor thread is processing.
     final long m_partitionId;
@@ -92,7 +91,6 @@ class CSVPartitionProcessor implements Runnable {
         m_csvClient = client;
         m_partitionId = partitionId;
         m_partitionQueue = partitionQueue;
-        m_partitionColumnIndex = partitionColumnIndex;
         m_endOfData = eod;
         m_processorName = "PartitionProcessor-" + partitionId;
     }
@@ -304,7 +302,7 @@ class CSVPartitionProcessor implements Runnable {
         }
     }
     //This is to keep track of when to report how many rows inserted, shared by all processors.
-    static int lastMultiple = 0;
+    static AtomicLong lastMultiple = new AtomicLong(0);
     // Callback for batch invoke when table has more than 1 entries. The callback on failure feeds m_failedQueue for
     // one row at a time processing.
     public class PartitionProcedureCallback implements ProcedureCallback {
@@ -336,8 +334,8 @@ class CSVPartitionProcessor implements Runnable {
             long executed = response.getResults()[0].asScalarLong();
             long currentCount = CSVPartitionProcessor.m_partitionAcknowledgedCount.addAndGet(executed);
             int newMultiple = (int) currentCount / m_reportEveryNRows;
-            if (newMultiple != lastMultiple) {
-                lastMultiple = newMultiple;
+            if (newMultiple != lastMultiple.get()) {
+                lastMultiple.set(newMultiple);
                 m_log.info("Inserted " + currentCount + " rows");
             }
         }
