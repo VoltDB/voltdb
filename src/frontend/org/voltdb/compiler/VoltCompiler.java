@@ -568,7 +568,7 @@ public class VoltCompiler {
 
         // generate the catalog report and write it to disk
         try {
-            m_report = ReportMaker.report(m_catalog);
+            m_report = ReportMaker.report(m_catalog, m_warnings);
             File file = new File("catalog-report.html");
             FileWriter fw = new FileWriter(file);
             fw.write(m_report);
@@ -1848,7 +1848,7 @@ public class VoltCompiler {
                         "\thttp://voltdb.com/docs/UsingVoltDB/ChapAppDesign.php\n\n");
             }
             outputStream.println("------------------------------------------\n");
-            outputStream.println("[REPORT] Full catalog report can be found at file://" + m_reportPath + "\n" +
+            outputStream.println("Full catalog report can be found at file://" + m_reportPath + "\n" +
                         "\t or can be viewed at \"http://localhost:8080\" when the server is running.\n");
             outputStream.println("------------------------------------------\n");
         }

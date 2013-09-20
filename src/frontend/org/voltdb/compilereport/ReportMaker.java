@@ -46,6 +46,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.catalog.Table;
+import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
@@ -168,7 +169,7 @@ public class ReportMaker {
         }
         else {
             if (isExportTable) {
-                tag(sb, null, "Export Table");
+                tag(sb, "inverse", "Export Table");
             } else {
                 tag(sb, null, "Table");
             }
@@ -554,7 +555,7 @@ public class ReportMaker {
      * Get some embeddable HTML of some generic catalog/application stats
      * that is drawn on the first page of the report.
      */
-    static String getStatsHTML(Database db) {
+    static String getStatsHTML(Database db, ArrayList<Feedback> warnings) {
         StringBuilder sb = new StringBuilder();
         sb.append("<table class='table table-condensed'>\n");
 
@@ -632,6 +633,17 @@ public class ReportMaker {
         // statements
         sb.append("<tr><td>SQL Statement Count</td><td>").append(statements).append("</td></tr>\n");
 
+        // warnings
+        if (warnings.size() > 0){
+            sb.append("<tr><td>Warnings</td><td>").append("<table class='table table-condensed'>\n");
+            for (Feedback warning : warnings) {
+                String procName = warning.getFileName().replace(".class", "");
+                String procedure = "<a href='#p-" + procName.toLowerCase() + "'>" + procName + "</a>";
+                sb.append("<tr><td>").append(procedure).append("</td><td>").append(warning.getMessage()).append("</td></tr>\n");
+            }
+            sb.append("").append("</table>\n").append("</td></tr>\n");
+        }
+
         sb.append("</table>\n");
         return sb.toString();
     }
@@ -639,7 +651,7 @@ public class ReportMaker {
     /**
      * Generate the HTML catalog report from a newly compiled VoltDB catalog
      */
-    public static String report(Catalog catalog) throws IOException {
+    public static String report(Catalog catalog, ArrayList<Feedback> warnings) throws IOException {
         // asynchronously get platform properties
         new Thread() {
             @Override
@@ -657,7 +669,7 @@ public class ReportMaker {
         Database db = cluster.getDatabases().get("database");
         assert(db != null);
 
-        String statsData = getStatsHTML(db);
+        String statsData = getStatsHTML(db, warnings);
         contents = contents.replace("##STATS##", statsData);
 
         String schemaData = generateSchemaTable(db.getTables(), db.getConnectors());
