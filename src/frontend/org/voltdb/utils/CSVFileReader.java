@@ -29,6 +29,7 @@ import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
+import org.voltdb.client.NoConnectionsException;
 import static org.voltdb.utils.CSVLoader.m_log;
 
 /**
@@ -167,8 +168,11 @@ class CSVFileReader implements Runnable {
         try {
             m_log.info("Waiting for partition processors to finish.");
             CSVPartitionProcessor.m_processor_cdl.await();
+            m_csvClient.drain();
             m_log.info("Partition Processors Done.");
         } catch (InterruptedException ex) {
+            ex.printStackTrace();
+        } catch (NoConnectionsException ex) {
             ex.printStackTrace();
         }
     }
