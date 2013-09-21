@@ -224,8 +224,13 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             processAvgPushdownOptimization(displayElement, orderbyElement, groupbyElement);
         }
         // Prepare for the mv based distributed query fix only if it might be required.
-        mvFixInfo.mvTable = tableList.get(0);
-        processMVBasedQueryFix(mvFixInfo, m_db, scanColumns);
+        if (tableList.size() == 1) {
+            if (getSingleTableFilterExpression() == null) {
+                // Do not handle joined query case and where clause case.
+                mvFixInfo.mvTable = tableList.get(0);
+                processMVBasedQueryFix(mvFixInfo, m_db, scanColumns);
+            }
+        }
     }
 
     private static void processMVBasedQueryFix(MVFixInfo mvFixInfo, Database db,
