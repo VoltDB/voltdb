@@ -539,6 +539,7 @@ public class PlanAssembler {
             }
 
             if (m_parsedSelect.mvFixInfo.needed) {
+                // Guard to prevent wrong answer queries.
                 // Continue give wrong answers possibly for joined query on MV.
 //                if (m_parsedSelect.tableList.size() != 1) {
 //                    String errorMsg = String.format("Unsupported query joined with materialized table %s",
@@ -546,12 +547,12 @@ public class PlanAssembler {
 //                    throw new PlanningErrorException(errorMsg);
 //                }
 
-                AbstractExpression whereExpr = m_parsedSelect.getSingleTableFilterExpression();
-                if (whereExpr != null) {
-                    String errorMsg = String.format("Unsupported query materialized table %s has filter " +
-                            "on the table", m_parsedSelect.mvFixInfo.mvTable.getTypeName());
-                    throw new PlanningErrorException(errorMsg);
-                }
+//                AbstractExpression whereExpr = m_parsedSelect.getSingleTableFilterExpression();
+//                if (whereExpr != null) {
+//                    String errorMsg = String.format("Unsupported query materialized table %s has filter " +
+//                            "on the table", m_parsedSelect.mvFixInfo.mvTable.getTypeName());
+//                    throw new PlanningErrorException(errorMsg);
+//                }
             }
         } else {
             m_parsedSelect.mvFixInfo.needed = false;
