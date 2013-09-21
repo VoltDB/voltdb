@@ -1,3 +1,16 @@
+create table text_all_with_idx (
+      a bigint NOT NULL
+    , b varchar(512)
+    , c int
+    , d timestamp
+    , e varchar(1024)
+);
+PARTITION TABLE text_all_with_idx ON COLUMN a;
+CREATE UNIQUE INDEX idx_col_u ON text_all_with_idx(a);
+CREATE INDEX idx_col_one ON text_all_with_idx(a,c);
+CREATE INDEX idx_col_two ON text_all_with_idx(a,b);
+CREATE INDEX idx_col_three ON text_all_with_idx(a,d);
+
 create table narrow_short_noix (
       a integer NOT NULL
     , b smallint
