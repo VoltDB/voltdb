@@ -124,18 +124,6 @@ public abstract class TheHashinator {
     }
 
     /**
-     * Given a long value, pick a partition to store the data. It's only called for legacy hashinator, elastic
-     * hashinator hashes all types the same way through hashinateBytes().
-     *
-     * @param value The value to hash.
-     * @param partitionCount The number of partitions to choose from.
-     * @return A value between 0 and partitionCount-1, hopefully pretty evenly distributed.
-     */
-    int hashinateLong(TheHashinator hashinator, long value) {
-        return hashinator.pHashinateLong(value);
-    }
-
-    /**
      * Given an byte[] bytes, pick a partition to store the data.
      *
      * @param value The value to hash.
@@ -143,60 +131,18 @@ public abstract class TheHashinator {
      * @return A value between 0 and partitionCount-1, hopefully pretty evenly
      * distributed.
      */
-    static int hashinateBytes(byte[] bytes) {
+    int hashinateBytes(byte[] bytes) {
         if (bytes == null) {
             return 0;
         } else {
-            return instance.get().getSecond().pHashinateBytes(bytes);
+            return pHashinateBytes(bytes);
         }
-    }
-
-    /**
-     * Given an byte[] bytes, pick a partition to store the data.
-     *
-     * @param value The value to hash.
-     * @param partitionCount The number of partitions to choose from.
-     * @return A value between 0 and partitionCount-1, hopefully pretty evenly distributed.
-     */
-    int hashinateBytes(TheHashinator hashinator, byte[] bytes) {
-        if (bytes == null) {
-            return 0;
-        } else {
-            return hashinator.pHashinateBytes(bytes);
-        }
-    }
-
-    /**
-     * Given an object, map it to a partition.
-     * DON'T EVER MAKE ME PUBLIC
-     */
-    private static int hashToPartition(Object obj) {
-        HashinatorType type = getConfiguredHashinatorType();
-        if (type == HashinatorType.LEGACY) {
-            // Annoying, legacy hashes numbers and bytes differently, need to preserve that.
-            if (obj == null || VoltType.isNullVoltType(obj)) {
-                return 0;
-            } else if (obj instanceof Long) {
-                long value = ((Long) obj).longValue();
-                return hashinateLong(value);
-            } else if (obj instanceof Integer) {
-                long value = ((Integer)obj).intValue();
-                return hashinateLong(value);
-            } else if (obj instanceof Short) {
-                long value = ((Short)obj).shortValue();
-                return hashinateLong(value);
-            } else if (obj instanceof Byte) {
-                long value = ((Byte)obj).byteValue();
-                return hashinateLong(value);
-            }
-        }
-        return hashinateBytes(valueToBytes(obj));
     }
 
     /**
      * Given an object, map it to a partition. DON'T EVER MAKE ME PUBLIC
      */
-    private int hashToPartition(TheHashinator hashinator, Object obj) {
+    private static int hashToPartition(TheHashinator hashinator, Object obj) {
         HashinatorType type = getConfiguredHashinatorType();
         if (type == HashinatorType.LEGACY) {
             // Annoying, legacy hashes numbers and bytes differently, need to preserve that.
@@ -204,19 +150,20 @@ public abstract class TheHashinator {
                 return 0;
             } else if (obj instanceof Long) {
                 long value = ((Long) obj).longValue();
-                return hashinateLong(hashinator, value);
+                return hashinator.pHashinateLong(value);
             } else if (obj instanceof Integer) {
                 long value = ((Integer) obj).intValue();
-                return hashinateLong(hashinator, value);
+                return hashinator.pHashinateLong(value);
             } else if (obj instanceof Short) {
                 long value = ((Short) obj).shortValue();
-                return hashinateLong(hashinator, value);
+                return hashinator.pHashinateLong(value);
             } else if (obj instanceof Byte) {
                 long value = ((Byte) obj).byteValue();
-                return hashinateLong(hashinator, value);
+                return hashinator.pHashinateLong(value);
             }
         }
-        return hashinator.hashinateBytes(hashinator, valueToBytes(obj));
+        return hashinator.hashinateBytes(valueToBytes(obj));
+
     }
 
     /**
@@ -326,7 +273,7 @@ public abstract class TheHashinator {
             }
         }
 
-        return hashToPartition(invocationParameter);
+        return hashToPartition(instance.get().getSecond(), invocationParameter);
     }
 
     /**
