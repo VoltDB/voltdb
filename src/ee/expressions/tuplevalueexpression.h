@@ -62,7 +62,7 @@ class TupleValueExpression : public AbstractExpression {
     TupleValueExpression(const int tableIdx, const int valueIdx)
         : AbstractExpression(EXPRESSION_TYPE_VALUE_TUPLE), tuple_idx(tableIdx), value_idx(valueIdx)
     {
-        VOLT_TRACE("OptimizedTupleValueExpression %d using tupleIdx %d valueIdx", m_type, tableIdx, valueIdx);
+        VOLT_TRACE("OptimizedTupleValueExpression %d using tupleIdx %d valueIdx %d", m_type, tableIdx, valueIdx);
     };
 
     virtual voltdb::NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {

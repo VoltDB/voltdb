@@ -25,13 +25,7 @@ import java.util.Map;
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.DependencyPair;
-import org.voltdb.ParameterSet;
-import org.voltdb.SiteProcedureConnection;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltSystemProcedure;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
+import org.voltdb.*;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -41,6 +35,7 @@ import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTableUtil;
+import org.voltdb.VoltProcedure.VoltAbortException;
 
 public class SysprocFragmentTask extends TransactionTask
 {
@@ -178,6 +173,10 @@ public class SysprocFragmentTask extends TransactionTask
                 hostLog.l7dlog(Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(),
                         new Object[] { Encoder.hexEncode(m_fragmentMsg.getFragmentPlan(frag)) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                break;
+            } catch (final VoltAbortException e) {
+                hostLog.warn("Error running system procedure plan fragment", e);
+                currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, null);
                 break;
             }
         }

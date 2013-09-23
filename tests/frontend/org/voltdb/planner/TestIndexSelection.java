@@ -94,9 +94,10 @@ public class TestIndexSelection extends PlannerTestCase {
         AbstractPlanNode pn = compile("select id from a where deleted=? and updated_date <= ? order by id limit ?;");
         // System.out.println("DEBUG: " + pn.toExplainPlanString());
         pn = pn.getChild(0);
-        assertTrue(pn instanceof LimitPlanNode);
-        pn = pn.getChild(0);
+        // ENG-5066: now Limit is pushed under Projection
         assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof LimitPlanNode);
         pn = pn.getChild(0);
         assertTrue(pn instanceof OrderByPlanNode);
         pn = pn.getChild(0);

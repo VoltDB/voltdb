@@ -1260,7 +1260,11 @@ void VoltDBIPC::executeTask(struct ipc_command *cmd) {
 }
 
 void *eethread(void *ptr) {
-    int fd = (int)(*(int*)ptr);
+    // copy and free the file descriptor ptr allocated by the select thread
+    int *fdPtr = static_cast<int*>(ptr);
+    int fd = *fdPtr;
+    delete fdPtr;
+    fdPtr = NULL;
 
     /* max message size that can be read from java */
     int max_ipc_message_size = (1024 * 1024 * 2);
@@ -1423,7 +1427,11 @@ int main(int argc, char **argv) {
             exit( EXIT_FAILURE );
         }
 
-        int status = pthread_create(&eeThreads[ee], NULL, eethread, &fd);
+        // make a heap file descriptor to pass to the thread (which it will free)
+        int *fdPtr = new int;
+        *fdPtr = fd;
+
+        int status = pthread_create(&eeThreads[ee], NULL, eethread, fdPtr);
         if (status) {
             // error
         }
