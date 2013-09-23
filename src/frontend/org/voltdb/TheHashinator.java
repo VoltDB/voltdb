@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -26,6 +27,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
+import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Throwables;
@@ -51,9 +53,22 @@ public abstract class TheHashinator {
         }
     };
 
-    private static final VoltLogger hostLogger = new VoltLogger("HOST");
+    /**
+     * Uncompressed configuration data accessor.
+     * @return configuration data bytes
+     */
+    public abstract byte[] getConfigBytes();
 
-    /*
+    /**
+     * Implementer should return compressed (cooked) bytes for serialization.
+     * @return config bytes
+     * @throws IOException
+     */
+    public abstract byte[] getCookedBytes() throws IOException;
+
+    protected static final VoltLogger hostLogger = new VoltLogger("HOST");
+
+     /*
      * Stamped instance, version associated with hash function, only update for newer versions
      */
     private static final AtomicReference<Pair<Long, ? extends TheHashinator>> instance =
@@ -64,20 +79,25 @@ public abstract class TheHashinator {
      * The starting version number will be 0.
      */
     public static void initialize(Class<? extends TheHashinator> hashinatorImplementation, byte config[]) {
-        instance.set(Pair.of(0L, constructHashinator( hashinatorImplementation, config)));
+        instance.set(Pair.of(0L, constructHashinator( hashinatorImplementation, config, false)));
     }
 
     /**
      * Helper method to do the reflection boilerplate to call the constructor
      * of the selected hashinator and convert the exceptions to runtime exceptions.
+     * @param hashinatorImplementation  hashinator class
+     * @param configBytes  config data (raw or cooked)
+     * @param cooked  true if configBytes is cooked, i.e. in wire serialization format
+     * @return  the constructed hashinator
      */
     public static TheHashinator
         constructHashinator(
                 Class<? extends TheHashinator> hashinatorImplementation,
-                byte config[]) {
+                byte configBytes[], boolean cooked) {
         try {
-            Constructor<? extends TheHashinator> constructor = hashinatorImplementation.getConstructor(byte[].class);
-            return constructor.newInstance(config);
+            Constructor<? extends TheHashinator> constructor =
+                    hashinatorImplementation.getConstructor(byte[].class, boolean.class);
+            return constructor.newInstance(configBytes, cooked);
         } catch (Exception e) {
             Throwables.propagate(e);
         }
@@ -95,7 +115,7 @@ public abstract class TheHashinator {
     abstract public int pHashinateLong(long value);
     abstract public int pHashinateBytes(byte[] bytes);
     abstract public long pGetConfigurationSignature();
-    abstract public Pair<HashinatorType, byte[]> pGetCurrentConfig();
+    abstract protected Pair<HashinatorType, byte[]> pGetCurrentConfig();
     abstract public Map<Long, Integer> pPredecessors(int partition);
     abstract public Pair<Long, Integer> pPredecessor(int partition, long token);
     abstract public Map<Long, Long> pGetRanges(int partition);
@@ -289,17 +309,30 @@ public abstract class TheHashinator {
      * Update the hashinator in a thread safe manner with a newer version of the hash function.
      * A version number must be provided and the new config will only be used if it is greater than
      * the current version of the hash function.
+     * @param hashinatorImplementation  hashinator class
+     * @param version  hashinator version/txn id
+     * @param configBytes  config data (format determined by cooked flag)
+     * @param cooked  compressible wire serialization format if true
      */
-    public static void updateHashinator(
-            Class<? extends TheHashinator> hashinatorImplementation, long version, byte config[]) {
+    public static byte[] updateHashinator(
+            Class<? extends TheHashinator> hashinatorImplementation,
+            long version,
+            byte configBytes[],
+            boolean cooked) {
         while (true) {
             final Pair<Long, ? extends TheHashinator> snapshot = instance.get();
             if (version > snapshot.getFirst()) {
                 Pair<Long, ? extends TheHashinator> update =
-                        Pair.of(version, constructHashinator(hashinatorImplementation, config));
-                if (instance.compareAndSet(snapshot, update)) return;
-            } else {
-                return;
+                        Pair.of(version, constructHashinator(hashinatorImplementation,
+                                                             configBytes,
+                                                             cooked));
+                if (instance.compareAndSet(snapshot, update)) {
+                    // Always stored and returned in standard (non-wire) format.
+                    return update.getSecond().getConfigBytes();
+                }
+            }
+            else {
+                return snapshot.getSecond().getConfigBytes();
             }
         }
     }
@@ -380,6 +413,38 @@ public abstract class TheHashinator {
      */
     public static Map<Long, Long> getRanges(int partition) {
         return instance.get().getSecond().pGetRanges(partition);
+    }
+
+    /**
+     * Get optimized configuration data for wire serialization.
+     * @return optimized configuration data
+     * @throws IOException
+     */
+    public static synchronized HashinatorSnapshotData serializeConfiguredHashinator()
+            throws IOException
+    {
+        HashinatorSnapshotData hashData = null;
+        Pair<Long, ? extends TheHashinator> currentInstance = instance.get();
+        switch (getConfiguredHashinatorType()) {
+          case LEGACY:
+            break;
+          case ELASTIC: {
+            byte[] cookedData = currentInstance.getSecond().getCookedBytes();
+            hashData = new HashinatorSnapshotData(cookedData, currentInstance.getFirst());
+            break;
+          }
+        }
+        return hashData;
+    }
+
+    /**
+     * Update the current configured hashinator class. Used by snapshot restore.
+     * @param version
+     * @param config
+     * @return config data after unpacking
+     */
+    public static byte[] updateConfiguredHashinator(long version, byte config[]) {
+        return updateHashinator(getConfiguredHashinatorClass(), version, config, true);
     }
 
     public static Pair<Long, byte[]> getCurrentVersionedConfig()

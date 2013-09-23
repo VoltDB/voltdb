@@ -54,13 +54,13 @@ class BaseOption(object):
         # A help message of None makes it a hidden option.
         if help_msg is not None:
             self.kwargs['help'] = help_msg
+            if 'default' in self.kwargs:
+                if utility.is_string(kwargs['default']):
+                    self.kwargs['help'] += ' (default="%s")' % self.kwargs['default']
+                else:
+                    self.kwargs['help'] += ' (default=%s)' % self.kwargs['default']
         else:
             self.kwargs['help'] = optparse.SUPPRESS_HELP
-        if 'default' in self.kwargs:
-            if utility.is_string(kwargs['default']):
-                self.kwargs['help'] += ' (default="%s")' % self.kwargs['default']
-            else:
-                self.kwargs['help'] += ' (default=%s)' % self.kwargs['default']
 
     def get_option_names(self):
         return [a for a in (self.short_opt, self.long_opt) if a is not None]

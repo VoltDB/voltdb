@@ -909,9 +909,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 assert(catProc != null);
 
                 // before rehashing, update the hashinator
-                TheHashinator.updateHashinator(TheHashinator.getConfiguredHashinatorClass(),
-                                               response.getCurrentHashinatorConfig().getFirst(), // version
-                                               response.getCurrentHashinatorConfig().getSecond()); // config bytes
+                TheHashinator.updateHashinator(
+                        TheHashinator.getConfiguredHashinatorClass(),
+                        response.getCurrentHashinatorConfig().getFirst(), // version
+                        response.getCurrentHashinatorConfig().getSecond(), // config bytes
+                        false); // cooked (true for snapshot serialization only)
 
                 // if we are recovering, the mispartitioned txn must come from the log,
                 // don't restart it. The correct txn will be replayed by another node.
