@@ -23,7 +23,6 @@ import java.util.Map;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
-import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
 
 public class LegacyHashinator extends TheHashinator {
     private final int catalogPartitionCount;
