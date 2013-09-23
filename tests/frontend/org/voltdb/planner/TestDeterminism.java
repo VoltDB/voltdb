@@ -92,8 +92,6 @@ public class TestDeterminism extends PlannerTestCase {
 
     public void testDeterminismOfJoin() {
         assertPlanDeterminism("select X.a, X.z, Y.z from ttree X, tunique Y where X.a = Y.a;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT);
-        assertPlanDeterminism("select X.a, X.z, Y.z from ttree X, tunique Y where X.a = Y.a;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT);
-        assertPlanDeterminism("select X.a, X.z, Y.z from ttree X, tunique Y where X.a = Y.a;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT);
     }
 
     public void testDeterminismOfSelectStarOrderOne() {
