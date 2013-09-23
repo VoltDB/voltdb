@@ -703,15 +703,17 @@ class Distributer {
 
             /*
              * Check if the master for the partition is known. No back pressure check to ensure correct
-             * routing, but backpressure will be managed anyways.
+             * routing, but backpressure will be managed anyways. This is where we guess partition based on client
+             * affinity and known topology (hashinator initialized).
              */
-            if (m_useClientAffinity) {
+            if (m_useClientAffinity && (m_hashinator != null)) {
                 final Procedure procedureInfo = m_procedureInfo.get(invocation.getProcName());
 
                 if (procedureInfo != null) {
                     Integer hashedPartition = MpInitiator.MP_INIT_PID;
                     if (!procedureInfo.multiPart) {
-                        hashedPartition = m_hashinator.getHashedPartitionForParameter(procedureInfo.partitionParameterType,
+                        hashedPartition = m_hashinator.getHashedPartitionForParameter(
+                                procedureInfo.partitionParameterType,
                                 invocation.getPartitionParamValue(procedureInfo.partitionParameter));
                     }
                     /*
