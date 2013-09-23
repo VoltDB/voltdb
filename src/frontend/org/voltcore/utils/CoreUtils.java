@@ -48,10 +48,13 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.base.Supplier;
+import com.google.common.base.Suppliers;
 import jsr166y.LinkedTransferQueue;
 
 import org.voltcore.logging.VoltLogger;
 
+import org.voltcore.network.ReverseDNSCache;
 import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 import com.google.common.collect.ImmutableList;
@@ -276,6 +279,15 @@ public class CoreUtils {
         };
     }
 
+    private static final Supplier<String> m_localHostnameOrAddressSupplier =
+            Suppliers.memoizeWithExpiration(new Supplier<String>() {
+                @Override
+                public String get() {
+                    final InetAddress addr = m_localAddressSupplier.get();
+                    return ReverseDNSCache.hostnameOrAddress(addr);
+                }
+            }, 300, TimeUnit.SECONDS);
+
     /**
      * Return the local hostname, if it's resolvable.  If not,
      * return the IPv4 address on the first interface we find, if it exists.
@@ -284,35 +296,41 @@ public class CoreUtils {
      *         if we can find one; the empty string otherwise
      */
     public static String getHostnameOrAddress() {
-        try {
-            final InetAddress addr = InetAddress.getLocalHost();
-            return addr.getHostName();
-        } catch (UnknownHostException e) {
-            try {
-                // XXX-izzy Won't we randomly pull localhost here sometimes?
-                Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
-                if (interfaces == null) {
-                    return "";
-                }
-                NetworkInterface intf = interfaces.nextElement();
-                Enumeration<InetAddress> addresses = intf.getInetAddresses();
-                while (addresses.hasMoreElements()) {
-                    InetAddress address = addresses.nextElement();
-                    if (address instanceof Inet4Address) {
-                        return address.getHostAddress();
+        return m_localHostnameOrAddressSupplier.get();
+    }
+
+    private static final Supplier<InetAddress> m_localAddressSupplier =
+            Suppliers.memoizeWithExpiration(new Supplier<InetAddress>() {
+                @Override
+                public InetAddress get() {
+                    try {
+                        final InetAddress addr = InetAddress.getLocalHost();
+                        return addr;
+                    } catch (UnknownHostException e) {
+                        try {
+                            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+                            if (interfaces == null) {
+                                return null;
+                            }
+                            NetworkInterface intf = interfaces.nextElement();
+                            Enumeration<InetAddress> addresses = intf.getInetAddresses();
+                            while (addresses.hasMoreElements()) {
+                                InetAddress address = addresses.nextElement();
+                                if (address instanceof Inet4Address) {
+                                    return address;
+                                }
+                            }
+                            addresses = intf.getInetAddresses();
+                            if (addresses.hasMoreElements()) {
+                                return addresses.nextElement();
+                            }
+                            return null;
+                        } catch (SocketException e1) {
+                            return null;
+                        }
                     }
                 }
-                addresses = intf.getInetAddresses();
-                if (addresses.hasMoreElements())
-                {
-                    return addresses.nextElement().getHostAddress();
-                }
-                return "";
-            } catch (SocketException e1) {
-                return "";
-            }
-        }
-    }
+            }, 3600, TimeUnit.SECONDS);
 
     /**
      * Return the local IP address, if it's resolvable.  If not,
@@ -322,32 +340,7 @@ public class CoreUtils {
      *         if we can find one; the empty string otherwise
      */
     public static InetAddress getLocalAddress() {
-        try {
-            final InetAddress addr = InetAddress.getLocalHost();
-            return addr;
-        } catch (UnknownHostException e) {
-            try {
-                Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
-                if (interfaces == null) {
-                    return null;
-                }
-                NetworkInterface intf = interfaces.nextElement();
-                Enumeration<InetAddress> addresses = intf.getInetAddresses();
-                while (addresses.hasMoreElements()) {
-                    InetAddress address = addresses.nextElement();
-                    if (address instanceof Inet4Address) {
-                        return address;
-                    }
-                }
-                addresses = intf.getInetAddresses();
-                if (addresses.hasMoreElements()) {
-                    return addresses.nextElement();
-                }
-                return null;
-            } catch (SocketException e1) {
-                return null;
-            }
-        }
+        return m_localAddressSupplier.get();
     }
 
     public static long getHSIdFromHostAndSite(int host, int site) {
