@@ -916,18 +916,15 @@ public class ParameterSet implements JSONString {
      * This behavior is optimistic but will not fail if this returned value is wrong, since
      * the client is just using this to attempt to route the transaction to the SPI master for
      * the returned partition ID.  If this routing is incorrect, the cluster will forward it
-     * correct, at the cost of an additional network round-trip */
-    public Integer getHashinatedParam(TheHashinator hashinator, int type, int index) {
+     * correct, at the cost of an additional network round-trip
+     *
+     * This is called by Procedure Invocation to get value in parameter set which it thinks is the partition value.
+     */
+    public Object getParam(int index) {
         if (m_params.length > 0) {
-            try {
-                return hashinator.getHashedPartitionForParameter(type, m_params[index]);
-            }
-            catch (Exception e) {
-                // This should never happen.  If it does, just pick a partition ID to give to
-                // the client and let the cluster figure out the right thing.
-                return 0;
-            }
+            return m_params[index];
+        } else {
+            return null;
         }
-        return null;
     }
 }

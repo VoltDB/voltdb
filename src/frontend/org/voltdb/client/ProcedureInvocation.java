@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltdb.ParameterSet;
-import org.voltdb.TheHashinator;
 import org.voltdb.messaging.FastSerializer;
 
 /**
@@ -80,8 +79,8 @@ public class ProcedureInvocation {
         return size;
     }
 
-    public Integer getHashinatedParam(TheHashinator hashinator, int type, int index) {
-        return m_parameters.getHashinatedParam(hashinator, type, index);
+    public Object getPartitionParamValue(int index) {
+        return m_parameters.getParam(index);
     }
 
     public ByteBuffer flattenToBuffer(ByteBuffer buf) throws IOException {
