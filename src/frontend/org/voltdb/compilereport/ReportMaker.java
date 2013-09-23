@@ -632,10 +632,12 @@ public class ReportMaker {
 
         // statements
         sb.append("<tr><td>SQL Statement Count</td><td>").append(statements).append("</td></tr>\n");
+        sb.append("</table>\n\n");
 
-        // warnings
+        // warnings, add warning section if any
         if (warnings.size() > 0){
-            sb.append("<tr><td>Warnings</td><td>").append("<table class='table table-condensed'>\n");
+            sb.append("<h4>Warnings</h4>");
+            sb.append("<table class='table table-condensed'>\n");
             for (Feedback warning : warnings) {
                 String procName = warning.getFileName().replace(".class", "");
                 String nameLink = "";
@@ -658,7 +660,6 @@ public class ReportMaker {
             sb.append("").append("</table>\n").append("</td></tr>\n");
         }
 
-        sb.append("</table>\n");
         return sb.toString();
     }
 

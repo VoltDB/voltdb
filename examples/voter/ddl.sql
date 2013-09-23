@@ -1,3 +1,7 @@
+create table test(a int not null, b int);
+partition table test on column a;
+create unique index b_tree on test (b);
+
 -- contestants table holds the contestants numbers (for voting) and names
 CREATE TABLE contestants
 (
