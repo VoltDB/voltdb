@@ -66,8 +66,15 @@ public abstract class TheHashinator {
         instance.set(Pair.of(0L, constructHashinator( hashinatorImplementation, config)));
     }
 
+    /**
+     * Get TheHashinator instanced based on knwon implementation and configuration. Used by client after asking server
+     * what it is running.
+     *
+     * @param hashinatorImplementation
+     * @param config
+     * @return
+     */
     public static TheHashinator getHashinator(Class<? extends TheHashinator> hashinatorImplementation, byte config[]) {
-        System.out.println("Creating new hashinator");
         return constructHashinator(hashinatorImplementation, config);
     }
 
