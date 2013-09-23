@@ -62,9 +62,8 @@ public abstract class TheHashinator {
     /**
      * Implementer should return compressed (cooked) bytes for serialization.
      * @return config bytes
-     * @throws IOException
      */
-    public abstract byte[] getCookedBytes() throws IOException;
+    public abstract byte[] getCookedBytes();
 
     protected static final VoltLogger hostLogger = new VoltLogger("HOST");
 
@@ -80,6 +79,15 @@ public abstract class TheHashinator {
      */
     public static void initialize(Class<? extends TheHashinator> hashinatorImplementation, byte config[]) {
         instance.set(Pair.of(0L, constructHashinator( hashinatorImplementation, config, false)));
+    }
+
+    /**
+     * Initialize TheHashinator with the specified implementation class and
+     * configuration optimized for wire transmission.
+     * The starting version number will be 0.
+     */
+    public static void initializeCooked(Class<? extends TheHashinator> hashinatorImplementation, byte config[]) {
+        instance.set(Pair.of(0L, constructHashinator( hashinatorImplementation, config, true)));
     }
 
     /**
@@ -314,7 +322,7 @@ public abstract class TheHashinator {
      * @param configBytes  config data (format determined by cooked flag)
      * @param cooked  compressible wire serialization format if true
      */
-    public static byte[] updateHashinator(
+    public static void updateHashinator(
             Class<? extends TheHashinator> hashinatorImplementation,
             long version,
             byte configBytes[],
@@ -326,13 +334,9 @@ public abstract class TheHashinator {
                         Pair.of(version, constructHashinator(hashinatorImplementation,
                                                              configBytes,
                                                              cooked));
-                if (instance.compareAndSet(snapshot, update)) {
-                    // Always stored and returned in standard (non-wire) format.
-                    return update.getSecond().getConfigBytes();
-                }
-            }
-            else {
-                return snapshot.getSecond().getConfigBytes();
+                if (instance.compareAndSet(snapshot, update)) return;
+            } else {
+                return;
             }
         }
     }
@@ -420,7 +424,7 @@ public abstract class TheHashinator {
      * @return optimized configuration data
      * @throws IOException
      */
-    public static synchronized HashinatorSnapshotData serializeConfiguredHashinator()
+    public static HashinatorSnapshotData serializeConfiguredHashinator()
             throws IOException
     {
         HashinatorSnapshotData hashData = null;
@@ -443,13 +447,25 @@ public abstract class TheHashinator {
      * @param config
      * @return config data after unpacking
      */
-    public static byte[] updateConfiguredHashinator(long version, byte config[]) {
-        return updateHashinator(getConfiguredHashinatorClass(), version, config, true);
+    public static void updateConfiguredHashinator(long version, byte config[]) {
+        updateHashinator(getConfiguredHashinatorClass(), version, config, true);
     }
 
     public static Pair<Long, byte[]> getCurrentVersionedConfig()
     {
         Pair<Long, ? extends TheHashinator> currentHashinator = instance.get();
         return Pair.of(currentHashinator.getFirst(), currentHashinator.getSecond().pGetCurrentConfig().getSecond());
+    }
+
+    /**
+     * Get the current version/config in compressed (wire) format.
+     * @return version/config pair
+     */
+    public static Pair<Long, byte[]> getCurrentVersionedConfigCooked()
+    {
+        Pair<Long, ? extends TheHashinator> currentHashinator = instance.get();
+        Long version = currentHashinator.getFirst();
+        byte[] bytes = currentHashinator.getSecond().getCookedBytes();
+        return Pair.of(version, bytes);
     }
 }

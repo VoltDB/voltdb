@@ -110,10 +110,9 @@ public class LegacyHashinator extends TheHashinator {
     /**
      * Returns compressed config bytes (for serialization).
      * @return config bytes
-     * @throws IOException
      */
     @Override
-    public byte[] getCookedBytes() throws IOException
+    public byte[] getCookedBytes()
     {
         // The legacy hashinator because isn't saved in snapshots.
         return null;

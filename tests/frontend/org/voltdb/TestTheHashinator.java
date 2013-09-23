@@ -785,6 +785,7 @@ public class TestTheHashinator {
         byte[] b1 = h1.getCookedBytes();
         ElasticHashinator h2 = new ElasticHashinator(b1, true);
         byte[] b2 = h2.getCookedBytes();
+        assertEquals(b1.length, b2.length);
         assertTrue(Arrays.equals(b1, b2));
         assertEquals(h1.getTokens(), h2.getTokens());
     }

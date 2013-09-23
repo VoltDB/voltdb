@@ -48,6 +48,7 @@ import org.mockito.InOrder;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.Pair;
+import org.voltdb.ElasticHashinator;
 import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -59,6 +60,7 @@ import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 public class TestMpPromoteAlgo
 {
     Pair<Long,byte[]> m_hashinatorConfig;
+    Pair<Long,byte[]> m_hashinatorConfigCooked;
 
     long txnEgo(long handle)
     {
@@ -140,12 +142,16 @@ public class TestMpPromoteAlgo
     @BeforeClass
     static public void initializeHashinator() {
         TheHashinator.setConfiguredHashinatorType(HashinatorType.ELASTIC);
-        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(8));
+        byte[] rawBytes = TheHashinator.getConfigureBytes(8);
+        ElasticHashinator hashinator = new ElasticHashinator(rawBytes, false);
+        byte[] cookedBytes = hashinator.getCookedBytes();
+        TheHashinator.initializeCooked(TheHashinator.getConfiguredHashinatorClass(), cookedBytes);
     }
 
     @Before
     public void setUp() {
         m_hashinatorConfig = TheHashinator.getCurrentVersionedConfig();
+        m_hashinatorConfigCooked = TheHashinator.getCurrentVersionedConfigCooked();
     }
 
     // verify that responses are correctly unioned and ordered.
@@ -210,24 +216,24 @@ public class TestMpPromoteAlgo
         verify(mailbox, times(1)).send(any(long[].class), any(Iv2RepairLogRequestMessage.class));
 
         // has a frag for txn 1000. MP handle is 1000L
-        algo.deliver(makeRealAckResponse(requestId, 1L, 0, 2, txnEgo(1000L), m_hashinatorConfig));
+        algo.deliver(makeRealAckResponse(requestId, 1L, 0, 2, txnEgo(1000L), m_hashinatorConfigCooked));
         algo.deliver(makeRealFragResponse(requestId, 1L, 1, 2, txnEgo(1000L)));
 
         // has only the normal ack. Never saw an MP transaction.
-        algo.deliver(makeRealAckResponse(requestId, 2L, 0, 1, Long.MAX_VALUE, m_hashinatorConfig));
+        algo.deliver(makeRealAckResponse(requestId, 2L, 0, 1, Long.MAX_VALUE, m_hashinatorConfigCooked));
 
         // also has a complete. MP handle is 1000L
         // and deliver a newer version of the hashinator config
         Pair<Long,byte[]> torv3 = Pair.of(
-                m_hashinatorConfig.getFirst()+1,
-                m_hashinatorConfig.getSecond()
+                m_hashinatorConfigCooked.getFirst()+1,
+                m_hashinatorConfigCooked.getSecond()
                 );
         algo.deliver(makeRealAckResponse(requestId, 3L, 0, 3, txnEgo(1000L), torv3));
         algo.deliver(makeRealFragResponse(requestId, 3L, 1, 3, txnEgo(1000L)));
         algo.deliver(makeRealCompleteResponse(requestId, 3L, 2, 3, txnEgo(1000L)));
 
         // deliver the same complete from the MPI's repair log
-        algo.deliver(makeRealAckResponse(requestId, 4L, 0, 2, txnEgo(1000L), m_hashinatorConfig));
+        algo.deliver(makeRealAckResponse(requestId, 4L, 0, 2, txnEgo(1000L), m_hashinatorConfigCooked));
         algo.deliver(makeRealCompleteResponse(requestId, 4L, 1, 2, txnEgo(1000L)));
 
         // Verify that we send a complete to every site.
