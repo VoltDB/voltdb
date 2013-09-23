@@ -754,7 +754,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         lines = captured.split("\n");
 
         assertTrue(foundLineMatching(lines,
-                ".*V0.*Expressions with aggregate functions are not currently supported in views.*"));
+                ".*V0.*must have non-group by columns aggregated by sum or count.*"));
 
         VoltProjectBuilder project1 = new VoltProjectBuilder();
         project1.setCompilerDebugPrintStream(capturing);
@@ -784,6 +784,9 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         assertFalse(success);
         captured = capturer.toString("UTF-8");
         lines = captured.split("\n");
+
+        assertTrue(foundLineMatching(lines,
+                ".*V1.*is missing count(.*) as the column after the group by columns, a materialized view requirement.*"));
 
         // Real config for tests
         VoltProjectBuilder project = new VoltProjectBuilder();
