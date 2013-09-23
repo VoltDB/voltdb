@@ -971,14 +971,13 @@ class Distributer {
     }
 
     /**
-     * Return if Hashinator is initialed. This is useful only for non standard clients non standard client callProcedure
-     * will automatically go in back pressure if this is not initialized. This will only only ever return true if client
-     * affinity is set true.
+     * Return if Hashinator is initialed. This is useful only for non standard clients.
+     * This will only only ever return true if client affinity is turned on.
      *
      * @return
      */
     public boolean isHashinatorInitialized() {
-        return (this.m_hashinator != null);
+        return (m_hashinator != null);
     }
 
     /**
@@ -989,9 +988,9 @@ class Distributer {
      * @return
      */
     public long getPartitionForParameter(byte typeValue, Object value) {
-        if (this.m_hashinator == null) {
+        if (m_hashinator == null) {
             return -1;
         }
-        return this.m_hashinator.getHashedPartitionForParameter(typeValue, value);
+        return m_hashinator.getHashedPartitionForParameter(typeValue, value);
     }
 }
