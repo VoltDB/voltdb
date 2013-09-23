@@ -34,6 +34,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltcore.network.ReverseDNSCache;
 import org.voltdb.ClientInterface;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.messaging.FastSerializer;
@@ -149,14 +150,14 @@ public class ConnectionUtil {
         Object returnArray[] = new Object[3];
         boolean success = false;
         if (addr.isUnresolved()) {
-            throw new java.net.UnknownHostException(addr.getHostName());
+            throw new java.net.UnknownHostException(ReverseDNSCache.hostnameOrAddress(addr.getAddress()));
         }
         SocketChannel aChannel = SocketChannel.open(addr);
         returnArray[0] = aChannel;
         assert(aChannel.isConnected());
         if (!aChannel.isConnected()) {
             // TODO Can open() be asynchronous if configureBlocking(true)?
-            throw new IOException("Failed to open host " + addr.getHostName());
+            throw new IOException("Failed to open host " + ReverseDNSCache.hostnameOrAddress(addr.getAddress()));
         }
         final long retvals[] = new long[4];
         returnArray[1] = retvals;
