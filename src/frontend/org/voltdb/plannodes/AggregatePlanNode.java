@@ -34,7 +34,8 @@ import org.voltdb.types.PlanNodeType;
 public class AggregatePlanNode extends AbstractPlanNode {
 
     public enum Members {
-        PREDICATE,          // ENG-1565: to accelerate min() / max() using index purpose only
+        POST_PREDICATE,
+        PRE_PREDICATE,   // ENG-1565: to accelerate min() / max() using index purpose only
         AGGREGATE_COLUMNS,
         AGGREGATE_TYPE,
         AGGREGATE_DISTINCT,
@@ -63,7 +64,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
     // decide if other nodes can be pushed down / past this node.
     public boolean m_isCoordinatingAggregator = false;
 
-    protected AbstractExpression m_predicate;
+    protected AbstractExpression m_prePredicate;
+    protected AbstractExpression m_postPredicate;
 
     public AggregatePlanNode() {
         super();
@@ -131,8 +133,12 @@ public class AggregatePlanNode extends AbstractPlanNode {
     }
 
     // set predicate for SELECT MAX(X) FROM T WHERE X > / >= ? case
-    public void setPredicate(AbstractExpression predicate) {
-        m_predicate = predicate;
+    public void setPrePredicate(AbstractExpression predicate) {
+        m_prePredicate = predicate;
+    }
+
+    public void setPostPredicate(AbstractExpression predicate) {
+        m_postPredicate = predicate;
     }
 
     // for single min() / max(), return the single aggregate expression
@@ -300,8 +306,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
             }
             stringer.endArray();
         }
-        if (m_predicate != null) {
-            stringer.key(Members.PREDICATE.name()).value(m_predicate);
+        if (m_prePredicate != null) {
+            stringer.key(Members.PRE_PREDICATE.name()).value(m_prePredicate);
         }
     }
 
@@ -322,8 +328,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
         // trim the last ", " from the string
         sb.setLength(sb.length() - 2);
-        if (m_predicate != null) {
-            sb.append(" (" + m_predicate.explain(m_outputSchema.getColumns().get(0).getTableName()) + ")");
+        if (m_prePredicate != null) {
+            sb.append(" (" + m_prePredicate.explain(m_outputSchema.getColumns().get(0).getTableName()) + ")");
         }
         return sb.toString();
     }
@@ -357,8 +363,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
                         AbstractExpression.fromJSONObject( jarray.getJSONObject(i), db));
             }
         }
-        if(!jobj.isNull(Members.PREDICATE.name())) {
-            m_predicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.PREDICATE.name()), db);
+        if(!jobj.isNull(Members.PRE_PREDICATE.name())) {
+            m_prePredicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.PRE_PREDICATE.name()), db);
         }
     }
 }

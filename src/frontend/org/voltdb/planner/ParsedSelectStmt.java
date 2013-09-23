@@ -225,16 +225,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         // Prepare for the mv based distributed query fix only if it might be required.
         if (tableList.size() == 1) {
-            if (getSingleTableFilterExpression() == null) {
-                // Do not handle joined query case and where clause case.
-                mvFixInfo.mvTable = tableList.get(0);
-                processMVBasedQueryFix(mvFixInfo, m_db, scanColumns);
-            }
+            // Do not handle joined query case and where clause case.
+            mvFixInfo.mvTable = tableList.get(0);
+            processMVBasedQueryFix(mvFixInfo, m_db, scanColumns, joinTree);
         }
     }
 
     private static void processMVBasedQueryFix(MVFixInfo mvFixInfo, Database db,
-            Map<String, ArrayList<SchemaColumn>> scanColumns)
+            Map<String, ArrayList<SchemaColumn>> scanColumns, JoinNode joinTree)
     {
         // Check valid cases first
         String mvTableName = mvFixInfo.mvTable.getTypeName();
@@ -347,6 +345,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         // Construct the reAggregation plan node's aggSchema
         mvFixInfo.reAggNode = new HashAggregatePlanNode();
+        assert(joinTree != null);
+        AbstractExpression where = joinTree.getSimpleFilterExpression();
+        if (where != null) {
+            // Add more logic to determinse what expressions to push down to scan node.
+            joinTree.m_joinExpr = null;
+            joinTree.m_whereExpr = null;
+            mvFixInfo.reAggNode.setPostPredicate(where);
+        }
         int outputColumnIndex = 0;
         NodeSchema aggSchema = new NodeSchema();
 

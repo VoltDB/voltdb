@@ -336,12 +336,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testMultiPartitionMVBasedQuery_Where() {
-        try {
-            pns = compileToFragments("SELECT * FROM V_P1 where v_a1 = 1");
-            // Currently, allow the possible wrong answer query as it is used to be.
-            //fail();
-        } catch (Exception e) {
-            assertTrue(e.getMessage().contains("has filter on the table"));
+        pns = compileToFragments("SELECT COUNT(*) FROM V_P1 where v_cnt = 1");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
         }
     }
 
