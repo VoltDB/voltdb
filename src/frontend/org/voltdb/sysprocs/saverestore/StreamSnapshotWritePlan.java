@@ -90,7 +90,9 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             final int newPartitionCount = context.getNumberOfPartitions() + partitionsToAdd.size();
             coalesceTruncationSnapshotPlan(file_path, file_nonce, txnId, partitionTransactionIds,
                                            jsData, context, hostname, result,
-                                           exportSequenceNumbers, tracker, timestamp,
+                                           exportSequenceNumbers, tracker,
+                                           hashinatorData,
+                                           timestamp,
                                            newPartitionCount);
         }
 
@@ -185,14 +187,16 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                                                 SystemProcedureExecutionContext context,
                                                 String hostname, VoltTable result,
                                                 Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-                                                SiteTracker tracker, long timestamp,
+                                                SiteTracker tracker,
+                                                HashinatorSnapshotData hashinatorData,
+                                                long timestamp,
                                                 int newPartitionCount)
         throws IOException
     {
         NativeSnapshotWritePlan plan = new NativeSnapshotWritePlan();
         plan.createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds,
                                  jsData, context, hostname, result, exportSequenceNumbers,
-                                 tracker, null, timestamp, newPartitionCount);
+                                 tracker, hashinatorData, timestamp, newPartitionCount);
         m_targets.addAll(plan.m_targets);
         m_taskListsForHSIds.putAll(plan.m_taskListsForHSIds);
     }

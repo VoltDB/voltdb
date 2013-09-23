@@ -74,12 +74,6 @@ public abstract class TheHashinator {
     private static final AtomicReference<Pair<Long, ? extends TheHashinator>> instance =
             new AtomicReference<Pair<Long, ? extends TheHashinator>>();
 
-    /*
-     * Cached snapshot data.
-     */
-    private static final AtomicReference<HashinatorSnapshotData> optimizedSerializationDataCache =
-            new AtomicReference<HashinatorSnapshotData>();
-
     /**
      * Initialize TheHashinator with the specified implementation class and configuration.
      * The starting version number will be 0.
@@ -320,7 +314,7 @@ public abstract class TheHashinator {
      * @param configBytes  config data (format determined by cooked flag)
      * @param cooked  compressible wire serialization format if true
      */
-    public static byte[] deserializeHashinator(
+    public static byte[] updateHashinator(
             Class<? extends TheHashinator> hashinatorImplementation,
             long version,
             byte configBytes[],
@@ -429,21 +423,18 @@ public abstract class TheHashinator {
     public static synchronized HashinatorSnapshotData serializeConfiguredHashinator()
             throws IOException
     {
-        HashinatorSnapshotData optimizedSerializationData = null;
+        HashinatorSnapshotData hashData = null;
         Pair<Long, ? extends TheHashinator> currentInstance = instance.get();
         switch (getConfiguredHashinatorType()) {
           case LEGACY:
             break;
           case ELASTIC: {
-            if (optimizedSerializationDataCache.get() == null) {
-                byte[] serData = currentInstance.getSecond().serializeCooked();
-                optimizedSerializationDataCache.set(new HashinatorSnapshotData(serData, currentInstance.getFirst()));
-            }
-            optimizedSerializationData = optimizedSerializationDataCache.get();
+            byte[] cookedData = currentInstance.getSecond().serializeCooked();
+            hashData = new HashinatorSnapshotData(cookedData, currentInstance.getFirst());
             break;
           }
         }
-        return optimizedSerializationData;
+        return hashData;
     }
 
     /**
@@ -452,8 +443,8 @@ public abstract class TheHashinator {
      * @param config
      * @return config data after unpacking
      */
-    public static byte[] deserializeConfiguredHashinator(long version, byte config[]) {
-        return deserializeHashinator(getConfiguredHashinatorClass(), version, config, true);
+    public static byte[] updateConfiguredHashinator(long version, byte config[]) {
+        return updateHashinator(getConfiguredHashinatorClass(), version, config, true);
     }
 
     public static Pair<Long, byte[]> getCurrentVersionedConfig()

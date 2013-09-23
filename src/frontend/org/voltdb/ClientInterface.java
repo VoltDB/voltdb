@@ -909,7 +909,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 assert(catProc != null);
 
                 // before rehashing, update the hashinator
-                TheHashinator.deserializeHashinator(
+                TheHashinator.updateHashinator(
                         TheHashinator.getConfiguredHashinatorClass(),
                         response.getCurrentHashinatorConfig().getFirst(), // version
                         response.getCurrentHashinatorConfig().getSecond(), // config bytes

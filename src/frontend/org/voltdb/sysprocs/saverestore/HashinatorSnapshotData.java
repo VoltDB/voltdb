@@ -69,7 +69,6 @@ public class HashinatorSnapshotData
 
     /**
      * Save to output buffer, including header and config data.
-     * Compress (deflate) the config data.
      * @return  byte buffer ready to write to a file.
      * @throws I/O exception on failure
      */
@@ -83,15 +82,8 @@ public class HashinatorSnapshotData
             throw new IOException("Uninitialized hashinator snapshot data.");
         }
 
-        // Compress (deflate) the bytes.
-        ByteArrayOutputStream bos = new ByteArrayOutputStream(m_serData.length);
-        DeflaterOutputStream dos = new DeflaterOutputStream(bos);
-        dos.write(m_serData);
-        dos.close();
-        byte[] compressedData = bos.toByteArray();
-
         // Assume config data is the last field.
-        ByteBuffer buf = ByteBuffer.allocate(compressedData.length + OFFSET_DATA);
+        ByteBuffer buf = ByteBuffer.allocate(m_serData.length + OFFSET_DATA);
 
         // Make sure the CRC starts at zero since those bytes figure into the CRC calculation.
         buf.putLong(OFFSET_CRC, 0);
@@ -99,7 +91,7 @@ public class HashinatorSnapshotData
         buf.putLong(OFFSET_INSTID_TIMESTAMP, instId.getTimestamp());
         buf.putLong(OFFSET_VERSION, m_version);
         buf.position(OFFSET_DATA);
-        buf.put(compressedData);
+        buf.put(m_serData);
 
         // Finalize the CRC based on the entire buffer and reset the current position.
         final PureJavaCrc32 crc = new PureJavaCrc32();
@@ -141,16 +133,9 @@ public class HashinatorSnapshotData
         long timestamp = buf.getLong(OFFSET_INSTID_TIMESTAMP);
         InstanceId instId = new InstanceId(coord, timestamp);
         m_version = buf.getLong(OFFSET_VERSION);
-        byte[] compressedData = new byte[dataSize];
+        m_serData = new byte[dataSize];
         buf.position(OFFSET_DATA);
-        buf.get(compressedData);
-
-        // Uncompress (inflate) the bytes.
-        ByteArrayOutputStream bos = new ByteArrayOutputStream((int)(compressedData.length * 1.5));
-        InflaterOutputStream dos = new InflaterOutputStream(bos);
-        dos.write(compressedData);
-        dos.close();
-        m_serData = bos.toByteArray();
+        buf.get(m_serData);
 
         return instId;
     }

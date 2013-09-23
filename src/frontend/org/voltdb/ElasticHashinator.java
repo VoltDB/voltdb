@@ -17,6 +17,7 @@
 package org.voltdb;
 
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.NoSuchAlgorithmException;
@@ -29,10 +30,15 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.zip.DeflaterOutputStream;
+import java.util.zip.InflaterOutputStream;
 
 import com.google.common.collect.Maps;
+
 import org.apache.cassandra_voltpatches.MurmurHash3;
 import org.voltcore.utils.Pair;
+import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
@@ -61,6 +67,11 @@ public class ElasticHashinator extends TheHashinator {
     private final long m_signature;
 
     /**
+     * Cached data.
+     */
+    private static final AtomicReference<ByteBuffer> m_cookedDataCache = new AtomicReference<ByteBuffer>();
+
+    /**
      * The serialization format is big-endian and the first value is the number of tokens
      * Construct the hashinator from a binary description of the ring.
      * followed by the token values where each token value consists of the 8-byte position on the ring
@@ -69,8 +80,8 @@ public class ElasticHashinator extends TheHashinator {
      * @param cooked  compressible wire serialization format if true
      */
     public ElasticHashinator(byte configBytes[], boolean cooked) {
-        Map<Long, Integer> configMap = (cooked ? deserializeCooked(configBytes)
-                                               : deserializeRaw(configBytes));
+        Map<Long, Integer> configMap = (cooked ? updateCooked(configBytes)
+                : updateRaw(configBytes));
 
         ImmutableSortedMap.Builder<Long, Integer> builder = ImmutableSortedMap.naturalOrder();
         for (Map.Entry<Long, Integer> e : configMap.entrySet()) {
@@ -135,34 +146,6 @@ public class ElasticHashinator extends TheHashinator {
                     newConfig.put(candidateToken, pid);
                     break;
                 }
-            }
-        }
-
-        return new ElasticHashinator(newConfig).toBytes();
-    }
-
-    /**
-     * Given an existing elastic hashinator, add a set of new partitions to the existing hash ring
-     * with calculated ranges.
-     * @param oldHashinator An elastic hashinator
-     * @param partitionsAndRanges A set of new partitions and their associated ranges
-     * @return The config bytes of the new hash ring
-     */
-    public static byte[] addPartitions(TheHashinator oldHashinator,
-                                       Map<Long, Integer> tokensToPartitions) {
-        Preconditions.checkArgument(oldHashinator instanceof ElasticHashinator);
-        ElasticHashinator oldElasticHashinator = (ElasticHashinator) oldHashinator;
-        Map<Long, Integer> newConfig = new HashMap<Long, Integer>(oldElasticHashinator.m_tokens);
-        //Set<Integer> existingPartitions = new HashSet<Integer>(oldElasticHashinator.m_tokens.values());
-
-        for (Map.Entry<Long, Integer> entry : tokensToPartitions.entrySet()) {
-            long token = entry.getKey();
-            int pid = entry.getValue();
-
-            Integer oldPartition = newConfig.put(token, pid);
-            if (oldPartition != null && oldPartition != pid) {
-                throw new RuntimeException("Token " + token + " used to map to partition " +
-                                               oldPartition + " but now maps to " + pid);
             }
         }
 
@@ -402,7 +385,7 @@ public class ElasticHashinator extends TheHashinator {
     }
 
     /**
-     * Returns straight config bytes (not for serialization).
+     * Returns raw config bytes.
      * @return config bytes
      */
     @Override
@@ -412,34 +395,44 @@ public class ElasticHashinator extends TheHashinator {
     }
 
     /**
-     * Returns config bytes (for serialization).
+     * Returns compressed config bytes.
      * @return config bytes
      * @throws IOException
      */
     @Override
     public byte[] serializeCooked() throws IOException
     {
-        // Allocate for a long/int pair per token/partition ID entry, plus a size.
-        ByteBuffer buf = ByteBuffer.allocate(4 + (m_tokens.size() * 12));
+        // Use cached data or generate it now.
+        if (m_cookedDataCache.get() == null) {
+            // Allocate for a long/int pair per token/partition ID entry, plus a size.
+            ByteBuffer buf = ByteBuffer.allocate(4 + (m_tokens.size() * 12));
 
-        int numEntries = m_tokens.size();
-        buf.putInt(numEntries);
+            int numEntries = m_tokens.size();
+            buf.putInt(numEntries);
 
-        // Keep tokens and partition ids clustered to aid compression.
-        for (Map.Entry<Long, Integer> e : m_tokens.entrySet()) {
-            // Throw away the lower 4 bytes of zero.
-            long token = e.getKey();
-            buf.putLong(token);
+            // Keep tokens and partition ids separate to aid compression.
+            for (Map.Entry<Long, Integer> e : m_tokens.entrySet()) {
+                long token = e.getKey();
+                buf.putLong(token);
+            }
+            for (Map.Entry<Long, Integer> e : m_tokens.entrySet()) {
+                int partitionId = e.getValue();
+                buf.putInt(partitionId);
+            }
+
+            // Compress (deflate) the bytes and cache the results.
+            ByteArrayOutputStream bos = new ByteArrayOutputStream(buf.array().length);
+            DeflaterOutputStream dos = new DeflaterOutputStream(bos);
+            dos.write(buf.array());
+            dos.close();
+            m_cookedDataCache.set(ByteBuffer.wrap(bos.toByteArray()));
         }
-        for (Map.Entry<Long, Integer> e : m_tokens.entrySet()) {
-            int partitionId = e.getValue();
-            buf.putInt(partitionId);
-        }
-        return buf.array();
+
+        return m_cookedDataCache.get().array();
     }
 
     /**
-     * Deserialize raw config bytes.
+     * Update from raw config bytes.
      *      token-1/partition-1
      *      token-2/partition-2
      *      ...
@@ -447,7 +440,7 @@ public class ElasticHashinator extends TheHashinator {
      * @param configBytes  raw config data
      * @return  token/partition map
      */
-    private Map<Long, Integer> deserializeRaw(byte configBytes[]) {
+    private Map<Long, Integer> updateRaw(byte configBytes[]) {
         ByteBuffer buf = ByteBuffer.wrap(configBytes);
         int numEntries = buf.getInt();
         TreeMap<Long, Integer> buildMap = new TreeMap<Long, Integer>();
@@ -465,15 +458,27 @@ public class ElasticHashinator extends TheHashinator {
     }
 
     /**
-     * Deserialize the optimized (cooked) wire format.
+     * Update from optimized (cooked) wire format.
      *      token-1 token-2 ...
      *      partition-1 partition-2 ...
      *      tokens are 4 bytes
-     * @param cookedBytes  optimized config data
+     * @param compressedData  optimized and compressed config data
      * @return  token/partition map
      */
-    private Map<Long, Integer> deserializeCooked(byte[] cookedBytes)
+    private Map<Long, Integer> updateCooked(byte[] compressedData)
     {
+        // Uncompress (inflate) the bytes.
+        ByteArrayOutputStream bos = new ByteArrayOutputStream((int)(compressedData.length * 1.5));
+        InflaterOutputStream dos = new InflaterOutputStream(bos);
+        try {
+            dos.write(compressedData);
+            dos.close();
+        }
+        catch (IOException e) {
+            throw new RuntimeException("Unable to decompress elastic hashinator data.");
+        }
+        byte[] cookedBytes = bos.toByteArray();
+
         int numEntries = (cookedBytes.length >= 4
                                 ? ByteBuffer.wrap(cookedBytes).getInt()
                                 : 0);

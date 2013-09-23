@@ -232,9 +232,9 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
         if (hashinatorData != null) {
             completionTask = SnapshotUtil.writeHashinatorConfig(
                     instId, file_path, file_nonce, context.getHostId(), hashinatorData);
-        }
-        if (completionTask != null) {
-            SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
+            if (completionTask != null) {
+                SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
+            }
         }
         completionTask = SnapshotUtil.writeSnapshotCatalog(file_path, file_nonce);
         if (completionTask != null) {

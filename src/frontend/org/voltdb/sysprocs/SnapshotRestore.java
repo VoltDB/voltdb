@@ -463,7 +463,11 @@ public class SnapshotRestore extends VoltSystemProcedure
                             result.addRow(config.array(), "SUCCESS", null);
                         }
                     }
-                } catch (IOException e) {
+                }
+                catch (IOException e) {
+                    String errMsg = e.toString();
+                    SNAP_LOG.error(errMsg);
+                    result.addRow(null, "FAILURE", errMsg);
                 }
             }
             return new DependencyPair(DEP_restoreHashinatorScan, result);
@@ -481,14 +485,24 @@ public class SnapshotRestore extends VoltSystemProcedure
             assert(paramsArray.length == 1);
             assert(paramsArray[0] != null);
             assert(paramsArray[0] instanceof byte[]);
-            VoltTable result = new VoltTable(new VoltTable.ColumnInfo("RESULT", VoltType.STRING));
+            VoltTable result = new VoltTable(
+                    new VoltTable.ColumnInfo("RESULT", VoltType.STRING),
+                    new VoltTable.ColumnInfo("ERR_MSG", VoltType.STRING));
             // The config is serialized in a more compressible format.
             // Need to convert to the standard format for internal and EE use.
             byte[] hashConfig = (byte[])paramsArray[0];
-            TheHashinator.deserializeConfiguredHashinator(context.getCurrentTxnId(), hashConfig);
-            // Update C++ hashinator.
-            Pair<TheHashinator.HashinatorType, byte[]> updateData = TheHashinator.getCurrentConfig();
-            context.updateHashinator(updateData);
+            try {
+                TheHashinator.updateConfiguredHashinator(context.getCurrentTxnId(), hashConfig);
+                // Update C++ hashinator.
+                Pair<TheHashinator.HashinatorType, byte[]> updateData = TheHashinator.getCurrentConfig();
+                context.updateHashinator(updateData);
+                result.addRow("SUCCESS", null);
+            }
+            catch (RuntimeException e) {
+                String errMsg = e.toString();
+                SNAP_LOG.error(errMsg);
+                result.addRow("FAILURE", errMsg);
+            }
             return new DependencyPair(DEP_restoreDistributeHashinator, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_restoreDistributeHashinatorResults)
@@ -977,9 +991,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         final String path = jsObj.getString(JSON_PATH);
         final String nonce = jsObj.getString(JSON_NONCE);
         final String dupsPath = jsObj.optString(JSON_DUPLICATES_PATH, null);
-        final byte useHashinatorData = (byte)(   jsObj.has(JSON_HASHINATOR)
-                                              && jsObj.getBoolean(JSON_HASHINATOR)
-                                                  ? 1 : 0);
+        final boolean useHashinatorData = jsObj.optBoolean(JSON_HASHINATOR);
         final long startTime = System.currentTimeMillis();
         if (dupsPath != null) {
             CONSOLE_LOG.info("Restoring from path: " + path + " with nonce: " +
@@ -1008,14 +1020,14 @@ public class SnapshotRestore extends VoltSystemProcedure
 
             // Hashinator scan and distribution.
             // Missing digests will be officially handled later.
-            if (useHashinatorData != 0 && !digests.isEmpty()) {
+            if (useHashinatorData && !digests.isEmpty()) {
                 // Need the instance ID for sanity checks.
                 InstanceId iid = null;
                 if (digests.get(0).has("instanceId")) {
                     iid = new InstanceId(digests.get(0).getJSONObject("instanceId"));
                 }
                 byte[] hashConfig = performRestoreHashinatorScanWork(iid);
-                if (useHashinatorData != 0 && hashConfig != null) {
+                if (hashConfig != null) {
                      VoltTable[] hashinatorResults = performRestoreHashinatorDistributeWork(hashConfig);
                     while (hashinatorResults[0].advanceRow()) {
                         if (hashinatorResults[0].getString("RESULT").equals("FAILURE")) {

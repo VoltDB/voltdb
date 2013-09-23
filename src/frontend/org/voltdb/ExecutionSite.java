@@ -188,8 +188,8 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             Long.parseLong(System.getProperty("MAX_REJOIN_BEHIND_DURATION", "10000"));
     private long m_lastTimeMadeProgress = 0;
     private long m_remainingTasks = 0;
-    private final long m_executedTaskCount = 0;
-    private final long m_loggedTaskCount = 0;
+    private long m_executedTaskCount = 0;
+    private long m_loggedTaskCount = 0;
     private long m_taskExeStartTime = 0;
     private final SnapshotCompletionInterest m_snapshotCompletionHandler =
             new SnapshotCompletionInterest() {
