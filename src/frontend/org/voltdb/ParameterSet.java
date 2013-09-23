@@ -918,7 +918,8 @@ public class ParameterSet implements JSONString {
      * the returned partition ID.  If this routing is incorrect, the cluster will forward it
      * correct, at the cost of an additional network round-trip
      *
-     * This is called by Procedure Invocation to get value in parameter set which it thinks is the partition value.
+     * This is called by Procedure Invocation to get value in parameter set
+     * which it thinks is the index of partition value.
      */
     public Object getParam(int index) {
         if (m_params.length > 0) {
