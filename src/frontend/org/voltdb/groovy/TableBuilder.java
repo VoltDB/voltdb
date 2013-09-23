@@ -25,6 +25,18 @@ import java.util.Map;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 
+/**
+ * It allows a more fluent but yet terse way to build a VoltTable
+ * Example usage:
+ * <code><pre>
+ *   buildTable(id:INTEGER,name:STRING) {
+ *     row 1, John
+ *     row 2, Claire
+ *   }
+ *   </pre></code>
+ * @author stefano
+ *
+ */
 public class TableBuilder {
     private final VoltTable table;
 

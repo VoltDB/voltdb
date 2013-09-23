@@ -30,6 +30,30 @@ import org.voltdb.VoltType;
 
 import com.google.common.collect.ImmutableSortedMap;
 
+/**
+ * Groovy table access expediter. It allows you to easily navigate a VoltTable,
+ * and access its column values.
+ * <p>
+ * Example usage on a query that returns results for the :
+ * <code><pre>
+ * cr = client.callProcedure('@AdHoc','select INTEGER_COL, STRING_COL from FOO')
+ * tuplerator(cr.results[0]).eachRow {
+ *
+ *   integerColValueByIndex = it[0]
+ *   stringColValueByIndex = it[1]
+ *
+ *   integerColValueByName = it['integerCol']
+ *   stringColValyeByName = it['stringCol']
+ *
+ *   integerColValueByField = it.integerCol
+ *   stringColValyeByField = it.stringCol
+ * }
+ *
+ * </code></pre>
+ *
+ * @author stefano
+ *
+ */
 public class Tuplerator extends GroovyObjectSupport {
 
     private final VoltTable table;
@@ -72,6 +96,12 @@ public class Tuplerator extends GroovyObjectSupport {
         byName = byNameBuilder.build();
     }
 
+    /**
+     * It calls the given closure on each row of the underlying table by passing itself
+     * as the only closure parameter
+     *
+     * @param c the self instance of Tuplerator
+     */
     public void eachRow(Closure<Void> c) {
         while (table.advanceRow()) {
             c.call(this);
@@ -79,6 +109,13 @@ public class Tuplerator extends GroovyObjectSupport {
         table.resetRowPosition();
     }
 
+    /**
+     * It calls the given closure on each row of the underlying table for up to the specified limit,
+     * by passing itself as the only closure parameter
+     *
+     * @param maxRows maximum rows to call the closure on
+     * @param c closure
+     */
     public void eachRow(int maxRows, Closure<Void> c) {
         while (--maxRows >= 0 && table.advanceRow()) {
             c.call(this);
@@ -108,16 +145,29 @@ public class Tuplerator extends GroovyObjectSupport {
         return getAt(name);
     }
 
+    /**
+     * Sets the table row cursor to the given position
+     * @param num row number to set the row cursor to
+     * @return an instance of self
+     */
     public Tuplerator atRow(int num) {
         table.advanceToRow(num);
         return this;
     }
 
+    /**
+     * Resets the table row cursor
+     * @return an instance of self
+     */
     public Tuplerator reset() {
         table.resetRowPosition();
         return this;
     }
 
+    /**
+     * Returns the underlying table
+     * @return the underlying table
+     */
     public VoltTable getTable() {
         return table;
     }

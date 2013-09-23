@@ -25,6 +25,9 @@ package org.voltdb.groovy;
 import org.voltdb.BackendTarget;
 import org.voltdb.LegacyHashinator;
 import org.voltdb.TheHashinator;
+import org.voltdb.VoltTable;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
@@ -65,8 +68,21 @@ public class TestGroovyDeployment extends RegressionSuite {
         super(name);
     }
 
-    public void testDoesItStart() throws Exception {
+    public void testGroovyProcedureInvocation() throws Exception {
+        Client client = getClient();
+        ClientResponse cr = null;
 
+        cr = client.callProcedure("AddMamma", 1, "Una");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        cr = client.callProcedure("AddMamma", 2, "Due");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+
+        cr = client.callProcedure("GetMamma", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("Due",result.getString(1));
     }
 
     static public junit.framework.Test suite() throws Exception

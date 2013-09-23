@@ -908,6 +908,11 @@ public class ProcedureRunner {
             }
         };
 
+   /**
+    * Test whether or not the given stack frame is within a procedure invocation
+    * @param stel a stack trace element
+    * @return true if it is, false it is not
+    */
    protected boolean isProcedureStackTraceElement(StackTraceElement stel) {
        int lastPeriodPos = stel.getClassName().lastIndexOf('.');
 
@@ -917,6 +922,8 @@ public class ProcedureRunner {
            ++lastPeriodPos;
        }
 
+       // Account for inner classes too. Inner classes names comprise of the parent
+       // class path followed by a dollar sign
        String simpleName = stel.getClassName().substring(lastPeriodPos);
        return simpleName.equals(m_procedureName)
            || (simpleName.startsWith(m_procedureName) && simpleName.charAt(m_procedureName.length()) == '$');
