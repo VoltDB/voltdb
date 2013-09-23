@@ -67,14 +67,15 @@ public abstract class TheHashinator {
     }
 
     /**
-     * Get TheHashinator instanced based on knwon implementation and configuration. Used by client after asking server
-     * what it is running.
+     * Get TheHashinator instanced based on knwon implementation and configuration.
+     * Used by client after asking server what it is running.
      *
      * @param hashinatorImplementation
      * @param config
      * @return
      */
-    public static TheHashinator getHashinator(Class<? extends TheHashinator> hashinatorImplementation, byte config[]) {
+    public static TheHashinator getHashinator(Class<? extends TheHashinator> hashinatorImplementation,
+            byte config[]) {
         return constructHashinator(hashinatorImplementation, config);
     }
 
@@ -238,47 +239,25 @@ public abstract class TheHashinator {
     /**
      * Given the type of the targeting partition parameter and an object,
      * coerce the object to the correct type and hash it.
-     * NOTE NOTE NOTE NOTE!  THIS SHOULD BE THE ONLY WAY THAT YOU FIGURE OUT THE PARTITIONING
-     * FOR A PARAMETER!
+     * NOTE NOTE NOTE NOTE! THIS SHOULD BE THE ONLY WAY THAT
+     * YOU FIGURE OUT THE PARTITIONING FOR A PARAMETER! ON SERVER
+     *
      * @return The partition best set up to execute the procedure.
      * @throws VoltTypeException
      */
     public static int getPartitionForParameter(int partitionType, Object invocationParameter)
         throws VoltTypeException
     {
-        final VoltType partitionParamType = VoltType.get((byte)partitionType);
-
-        // Special cases:
-        // 1) if the user supplied a string for a number column,
-        // try to do the conversion. This makes it substantially easier to
-        // load CSV data or other untyped inputs that match DDL without
-        // requiring the loader to know precise the schema.
-        // 2) For legacy hashinators, if we have a numeric column but the param is in a byte
-        // array, convert the byte array back to the numeric value
-        if (invocationParameter != null && partitionParamType.isPartitionableNumber()) {
-            if (invocationParameter.getClass() == String.class) {
-                {
-                    Object tempParam = ParameterConverter.stringToLong(
-                            invocationParameter,
-                            partitionParamType.classFromType());
-                    // Just in case someone managed to feed us a non integer
-                    if (tempParam != null) {
-                        invocationParameter = tempParam;
-                    }
-                }
-            }
-            else if (getConfiguredHashinatorType() == HashinatorType.LEGACY &&
-                     invocationParameter.getClass() == byte[].class) {
-                invocationParameter = bytesToValue(partitionParamType, (byte[])invocationParameter);
-            }
-        }
-
-        return hashToPartition(instance.get().getSecond(), invocationParameter);
+        return instance.get().getSecond().getHashedPartitionForParameter(partitionType, invocationParameter);
     }
 
     /**
-     * Given the type of the targeting partition parameter and an object, coerce the object to the correct type and hash
-     * it. NOTE NOTE NOTE NOTE! THIS SHOULD BE THE ONLY WAY THAT YOU FIGURE OUT THE PARTITIONING FOR A PARAMETER!
+     * Given the type of the targeting partition parameter and an object,
+     * coerce the object to the correct type and hash it.
+     * NOTE NOTE NOTE NOTE! THIS SHOULD BE THE ONLY WAY THAT YOU FIGURE OUT
+     * THE PARTITIONING FOR A PARAMETER! THIS IS SHARED BY SERVER AND CLIENT
+     * CLIENT USES direct instance method as it initializes its own per connection
+     * Hashinator.
      *
      * @return The partition best set up to execute the procedure.
      * @throws VoltTypeException
