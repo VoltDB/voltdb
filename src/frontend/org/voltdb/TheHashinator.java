@@ -83,15 +83,6 @@ public abstract class TheHashinator {
     }
 
     /**
-     * Initialize TheHashinator with the specified implementation class and
-     * configuration optimized for wire transmission.
-     * The starting version number will be 0.
-     */
-    public static void initializeCooked(Class<? extends TheHashinator> hashinatorImplementation, byte config[]) {
-        instance.set(Pair.of(0L, constructHashinator( hashinatorImplementation, config, true)));
-    }
-
-    /**
      * Helper method to do the reflection boilerplate to call the constructor
      * of the selected hashinator and convert the exceptions to runtime exceptions.
      * @param hashinatorImplementation  hashinator class
