@@ -67,7 +67,16 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         }
     }
 
-    public void testMVInsertDeleteR1() throws IOException, ProcCallException {
+    public void testMVComplexGroupbyAndComplexAggregation() throws Exception {
+        mvInsertDeleteR1();
+        mvUpdateR1();
+        mvInsertDeleteR2();
+        mvUpdateR2();
+        mvInsertDeleteR3();
+        mvUpdateR3();
+    }
+
+    private void mvInsertDeleteR1() throws IOException, ProcCallException {
         System.out.println("Test R1 insert and delete...");
         String mvTable = "V_R1";
         String orderbyStmt = mvTable+"_G1";
@@ -75,6 +84,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         // ID, wage, dept
         // SELECT ABS(dept), count(*), SUM(wage) FROM R1 GROUP BY ABS(dept)
         Client client = this.getClient();
+        client.callProcedure("@AdHoc", "Delete from R1");
 
         compareMVcontentsOfLongs(client, mvTable, null, orderbyStmt);
 
@@ -162,10 +172,12 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         compareMVcontentsOfLongs(client, mvTable, null, orderbyStmt);
     }
 
-    public void testMVUpdateR1() throws IOException, ProcCallException {
+    private void mvUpdateR1() throws IOException, ProcCallException {
         System.out.println("Test R1 update...");
 
         Client client = this.getClient();
+        client.callProcedure("@AdHoc", "Delete from R1");
+
         String tb = "R1.insert";
         client.callProcedure(tb, 1,  10,  -1 );
         client.callProcedure(tb, 2,  20,  1 );
@@ -224,7 +236,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
     }
 
 
-    public void testMVInsertDeleteR2() throws Exception {
+    private void mvInsertDeleteR2() throws Exception {
         System.out.println("Test R2 insert and delete...");
         String mvTable = "V_R2";
         String orderbyStmt = mvTable+"_G1, " + mvTable + "_G2";
@@ -240,6 +252,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         // "AS SELECT truncate(month,tm), dept count(*), SUM(wage) " +
         // "FROM R2 GROUP BY truncate(month,tm), dept;" +
         Client client = this.getClient();
+        client.callProcedure("@AdHoc", "Delete from R2");
 
         if (!isHSQL()) {
             compareMVcontentsOfLongs(client, mvTable, null, orderbyStmt);
@@ -308,11 +321,14 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         }
     }
 
-    public void testMVUpdateR2() throws Exception {
+    private void mvUpdateR2() throws Exception {
         System.out.println("Test R2 update...");
 
+        // Truncate function does not work for HSQL.
         if (!isHSQL()) {
             Client client = this.getClient();
+            client.callProcedure("@AdHoc", "Delete from R2");
+
             client.callProcedure("R2.insert", 1,  10,  1 , "2013-06-11 02:00:00.123457");
             client.callProcedure("R2.insert", 2,  20,  1 , "2013-07-12 03:00:00.123457");
             client.callProcedure("R2.insert", 3,  30,  1 , "2013-07-14 05:00:00.123457");
@@ -413,13 +429,15 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         compareTableR3(client, mvTable+"_test4", expected24, orderbyStmt);
     }
 
-    public void testMVInsertDeleteR3() throws Exception {
+    private void mvInsertDeleteR3() throws Exception {
         System.out.println("Test R3 insert and delete...");
         String orderbyStmt = "V_R3_CNT, V_R3_sum_wage";
-        Client client = this.getClient();
 
         if (!isHSQL()) {
-         // null result for initial mv tables
+            Client client = this.getClient();
+            client.callProcedure("@AdHoc", "Delete from R3");
+
+            // null result for initial mv tables
             verifyMVTestR3(client, null, null, orderbyStmt);
 
             client.callProcedure("R3.insert", 1,  10,  "VoltDB", "VoltDB");
@@ -472,13 +490,15 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
     }
 
 
-    public void testMVUpdateR3() throws Exception {
+    private void mvUpdateR3() throws Exception {
         System.out.println("Test R3 update...");
 
-        String orderbyStmt = "V_R3_CNT, V_R3_sum_wage";
-
-        Client client = this.getClient();
         if (!isHSQL()) {
+            String orderbyStmt = "V_R3_CNT, V_R3_sum_wage";
+
+            Client client = this.getClient();
+            client.callProcedure("@AdHoc", "Delete from R3");
+
             client.callProcedure("R3.insert", 1,  10,  "VoltDB", "VoltDB");
             client.callProcedure("R3.insert", 2,  20,  "IBM", "IBM");
             client.callProcedure("R3.insert", 3,  30,  "VoltDB", "VoltDB");
@@ -508,12 +528,24 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
 
     private void loadTableForMVFixSuite() throws Exception {
         Client client = this.getClient();
+        VoltTable vt = null;
         String[] tbs = {"P1", "P2", "R4"};
+
+        String[] mvtbs = {"V_P1", "V_P1_ABS", "V_P2", "V_R4"};
 
         for (String tb: tbs) {
             // empty the table first.
             client.callProcedure("@AdHoc", "Delete from " + tb);
 
+            for (String mv: mvtbs) {
+                if (mv.contains(tb)) {
+                    // check zero rows in the mv tables.
+                    vt = client.callProcedure("@AdHoc", "Select count(*) from " + mv).getResults()[0];
+                    assertEquals(0, vt.asScalarLong());
+                }
+            }
+
+            // Start to insert data into table tb.
             // id, wage, dept, age, rent.
             String insert = tb + ".insert";
             client.callProcedure(insert, 1,  10,  1 , 21, 5);
@@ -542,13 +574,16 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
          * */
     }
 
-    public void testMVBasedP1_NoAgg() throws Exception {
+    public void testPartitionedMVQueries() throws Exception {
+        mvBasedP1_NoAgg();
+        mvBasedP1_Agg();
+    }
+
+    private void mvBasedP1_NoAgg() throws Exception {
         System.out.println("Test MV partition no agg query...");
         VoltTable vt = null;
         Client client = this.getClient();
 
-        vt = client.callProcedure("@AdHoc", "Select count(*) from V_P1").getResults()[0];
-        assertEquals(0, vt.asScalarLong());
         // Load data
         loadTableForMVFixSuite();
 
@@ -594,12 +629,11 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         }
     }
 
-    public void testMVBasedP1_Agg() throws Exception {
+    private void mvBasedP1_Agg() throws Exception {
         System.out.println("Test MV partition agg query...");
         VoltTable vt = null;
         Client client = this.getClient();
-        vt = client.callProcedure("@AdHoc", "Select count(*) from V_P1").getResults()[0];
-        assertEquals(0, vt.asScalarLong());
+
         // Load data
         loadTableForMVFixSuite();
         String[] tbs = {"V_P1", "V_P1_ABS", "V_P2", "V_R4"};
