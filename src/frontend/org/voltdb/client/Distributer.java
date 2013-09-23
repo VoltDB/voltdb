@@ -655,7 +655,7 @@ class Distributer {
             m_connections.add(cxn);
         }
 
-        if (m_useClientAffinity || (this.m_hashinator == null)) {
+        if (m_useClientAffinity) {
             synchronized (this) {
                 m_hostIdToConnection.put(hostId, cxn);
             }
@@ -705,15 +705,14 @@ class Distributer {
              * Check if the master for the partition is known. No back pressure check to ensure correct
              * routing, but backpressure will be managed anyways.
              */
-            if (m_useClientAffinity && m_hashinator != null) {
+            if (m_useClientAffinity) {
                 final Procedure procedureInfo = m_procedureInfo.get(invocation.getProcName());
 
                 if (procedureInfo != null) {
                     Integer hashedPartition = MpInitiator.MP_INIT_PID;
                     if (!procedureInfo.multiPart) {
-                        hashedPartition =
-                                invocation.getHashinatedParam(m_hashinator, procedureInfo.partitionParameterType,
-                                procedureInfo.partitionParameter);
+                        hashedPartition = m_hashinator.getHashedPartitionForParameter(procedureInfo.partitionParameterType,
+                                invocation.getPartitionParamValue(procedureInfo.partitionParameter));
                     }
                     /*
                      * If the procedure is read only and single part, load balance across replicas
@@ -972,8 +971,9 @@ class Distributer {
     }
 
     /**
-     * Return if hashinator is initialed. This is useful only for non standard clients non standard client callProcedure
-     * will automatically go in back pressure if this is not initialized.
+     * Return if Hashinator is initialed. This is useful only for non standard clients non standard client callProcedure
+     * will automatically go in back pressure if this is not initialized. This will only only ever return true if client
+     * affinity is set true.
      *
      * @return
      */
