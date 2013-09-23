@@ -234,6 +234,14 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         }
     }
 
+    public boolean isContentDeterministic() {
+        LimitPlanNode limit = (LimitPlanNode) getInlinePlanNode(PlanNodeType.LIMIT);
+        if (super.isContentDeterministic() && limit != null) {
+            return isOrderDeterministic();
+        }
+        return super.isContentDeterministic();
+    }
+
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException
     {
