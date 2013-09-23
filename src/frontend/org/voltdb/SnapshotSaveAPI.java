@@ -21,9 +21,6 @@ import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -32,7 +29,9 @@ import java.util.Map;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -50,13 +49,13 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.TxnEgo;
-
+import org.voltdb.sysprocs.SnapshotSave;
 import org.voltdb.sysprocs.saverestore.CSVSnapshotWritePlan;
+import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
 import org.voltdb.sysprocs.saverestore.IndexSnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.NativeSnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.SnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.StreamSnapshotWritePlan;
-import org.voltdb.sysprocs.SnapshotSave;
 
 import com.google.common.base.Charsets;
 
@@ -118,6 +117,7 @@ public class SnapshotSaveAPI
             final String file_path, final String file_nonce, final SnapshotFormat format, final byte block,
             final long multiPartTxnId, final long partitionTxnId, final long legacyPerPartitionTxnIds[],
             final String data, final SystemProcedureExecutionContext context, final String hostname,
+            final HashinatorSnapshotData hashinatorData,
             final long timestamp)
     {
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
@@ -167,6 +167,7 @@ public class SnapshotSaveAPI
                             result,
                             exportSequenceNumbers,
                             context.getSiteTrackerForSnapshot(),
+                            hashinatorData,
                             timestamp);
                 }
             });
@@ -541,7 +542,9 @@ public class SnapshotSaveAPI
             String data, SystemProcedureExecutionContext context,
             String hostname, final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            SiteTracker tracker, long timestamp)
+            SiteTracker tracker,
+            HashinatorSnapshotData hashinatorData,
+            long timestamp)
     {
         JSONObject jsData = null;
         String truncReqId = "";
@@ -574,7 +577,8 @@ public class SnapshotSaveAPI
             throw new RuntimeException("BAD BAD BAD");
         }
         boolean abort = plan.createSetup(file_path, file_nonce, txnId, partitionTransactionIds,
-                jsData, context, hostname, result, exportSequenceNumbers, tracker, timestamp);
+                jsData, context, hostname, result, exportSequenceNumbers, tracker,
+                hashinatorData, timestamp);
         synchronized (m_createLock) {
             //Seems like this should be cleared out just in case
             //Log if there is actually anything to clear since it is unexpected

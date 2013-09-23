@@ -16,10 +16,12 @@
  */
 package org.voltdb;
 
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -27,14 +29,16 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.zip.DeflaterOutputStream;
+import java.util.zip.InflaterOutputStream;
 
-import com.google.common.collect.Maps;
 import org.apache.cassandra_voltpatches.MurmurHash3;
 import org.voltcore.utils.Pair;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSortedMap;
+import com.google.common.collect.Maps;
 import com.google.common.collect.UnmodifiableIterator;
 
 /**
@@ -54,38 +58,42 @@ public class ElasticHashinator extends TheHashinator {
      * Tokens on the ring. A value hashes to a token if the token is the first value <=
      * the value's hash
      */
-    private final ImmutableSortedMap<Long, Integer> tokens;
+    private final ImmutableSortedMap<Long, Integer> m_tokens;
     private final byte m_configBytes[];
     private final long m_signature;
 
     /**
-     * Initialize the hashinator from a binary description of the ring.
+     * Cached data in format optimized for wire transmission.
+     */
+    private final byte[] m_cookedBytes;
+
+    /**
      * The serialization format is big-endian and the first value is the number of tokens
+     * Construct the hashinator from a binary description of the ring.
      * followed by the token values where each token value consists of the 8-byte position on the ring
      * and and the 4-byte partition id. All values are signed.
+     * @param configBytes  config data
+     * @param cooked  compressible wire serialization format if true
      */
-    public ElasticHashinator(byte configureBytes[]) {
-        m_configBytes = Arrays.copyOf(configureBytes, configureBytes.length);
-        m_signature = TheHashinator.computeConfigurationSignature(m_configBytes);
+    public ElasticHashinator(byte configBytes[], boolean cooked) {
+        Map<Long, Integer> configMap = (cooked ? updateCooked(configBytes)
+                : updateRaw(configBytes));
 
-        ByteBuffer buf = ByteBuffer.wrap(configureBytes);
-        int numEntries = buf.getInt();
-        TreeMap<Long, Integer> buildMap = new TreeMap<Long, Integer>();
-        for (int ii = 0; ii < numEntries; ii++) {
-            final long token = buf.getLong();
-            final int partitionId = buf.getInt();
-            if (buildMap.containsKey(token)) {
-                throw new RuntimeException(
-                        "Duplicate token " + token + " partition "
-                        + partitionId + " and " + buildMap.get(token));
-            }
-            buildMap.put( token, partitionId);
-        }
         ImmutableSortedMap.Builder<Long, Integer> builder = ImmutableSortedMap.naturalOrder();
-        for (Map.Entry<Long, Integer> e : buildMap.entrySet()) {
+        for (Map.Entry<Long, Integer> e : configMap.entrySet()) {
             builder.put(e.getKey(), e.getValue());
         }
-        tokens = builder.build();
+
+        m_tokens = builder.build();
+
+        m_configBytes = toBytes();
+        try {
+            m_cookedBytes = toCookedBytes();
+        }
+        catch (IOException e1) {
+            throw new RuntimeException(String.format("Failed to serialize cooked hashinator bytes: %s", e1.toString()));
+        }
+        m_signature = TheHashinator.computeConfigurationSignature(m_configBytes);
     }
 
     /**
@@ -94,8 +102,14 @@ public class ElasticHashinator extends TheHashinator {
      * @param tokens
      */
     private ElasticHashinator(Map<Long, Integer> tokens) {
-        this.tokens = ImmutableSortedMap.copyOf(tokens);
+        this.m_tokens = ImmutableSortedMap.copyOf(tokens);
         m_configBytes = toBytes();
+        try {
+            m_cookedBytes = toCookedBytes();
+        }
+        catch (IOException e1) {
+            throw new RuntimeException(String.format("Failed to serialize cooked hashinator bytes: %s", e1.toString()));
+        }
 
         m_signature = TheHashinator.computeConfigurationSignature(m_configBytes);
     }
@@ -121,9 +135,9 @@ public class ElasticHashinator extends TheHashinator {
             throw new RuntimeException("Unable to initialize secure random generator", ex);
         }
 
-        Map<Long, Integer> newConfig = new HashMap<Long, Integer>(oldElasticHashinator.tokens);
-        Set<Integer> existingPartitions = new HashSet<Integer>(oldElasticHashinator.tokens.values());
-        Set<Long> checkSet = new HashSet<Long>(oldElasticHashinator.tokens.keySet());
+        Map<Long, Integer> newConfig = new HashMap<Long, Integer>(oldElasticHashinator.m_tokens);
+        Set<Integer> existingPartitions = new HashSet<Integer>(oldElasticHashinator.m_tokens.values());
+        Set<Long> checkSet = new HashSet<Long>(oldElasticHashinator.m_tokens.keySet());
 
         for (int pid : newPartitions) {
             if (existingPartitions.contains(pid)) {
@@ -143,7 +157,7 @@ public class ElasticHashinator extends TheHashinator {
             }
         }
 
-        return new ElasticHashinator(newConfig).m_configBytes;
+        return new ElasticHashinator(newConfig).toBytes();
     }
 
     /**
@@ -169,10 +183,10 @@ public class ElasticHashinator extends TheHashinator {
      * @return The byte[] of the current configuration.
      */
     public byte[] toBytes() {
-        ByteBuffer buf = ByteBuffer.allocate(4 + (tokens.size() * 12));//long and an int per
-        buf.putInt(tokens.size());
+        ByteBuffer buf = ByteBuffer.allocate(4 + (m_tokens.size() * 12));//long and an int per
+        buf.putInt(m_tokens.size());
 
-        for (Map.Entry<Long, Integer> e : tokens.entrySet()) {
+        for (Map.Entry<Long, Integer> e : m_tokens.entrySet()) {
             long token = e.getKey();
             int pid = e.getValue();
             buf.putLong(token);
@@ -188,7 +202,7 @@ public class ElasticHashinator extends TheHashinator {
      * it wraps around to the last token in the ring closest to Long.MAX_VALUE
      */
     public int partitionForToken(long hash) {
-        Map.Entry<Long, Integer> entry = tokens.floorEntry(hash);
+        Map.Entry<Long, Integer> entry = m_tokens.floorEntry(hash);
         //System.out.println("Finding partition for token " + token);
         /*
          * Because the tokens are randomly distributed it is likely there is a range
@@ -200,7 +214,7 @@ public class ElasticHashinator extends TheHashinator {
             return entry.getValue();
         } else {
             //System.out.println("Last entry token " + tokens.lastEntry().getKey());
-            return tokens.lastEntry().getValue();
+            return m_tokens.lastEntry().getValue();
         }
     }
 
@@ -209,7 +223,7 @@ public class ElasticHashinator extends TheHashinator {
      */
     public ImmutableSortedMap<Long, Integer> getTokens()
     {
-        return tokens;
+        return m_tokens;
     }
 
     /**
@@ -220,7 +234,7 @@ public class ElasticHashinator extends TheHashinator {
      */
     public ElasticHashinator addToken(long token, int partition)
     {
-        HashMap<Long, Integer> newTokens = Maps.newHashMap(tokens);
+        HashMap<Long, Integer> newTokens = Maps.newHashMap(m_tokens);
         newTokens.put(token, partition);
         return new ElasticHashinator(newTokens);
     }
@@ -240,7 +254,7 @@ public class ElasticHashinator extends TheHashinator {
     }
 
     @Override
-    public Pair<HashinatorType, byte[]> pGetCurrentConfig() {
+    protected Pair<HashinatorType, byte[]> pGetCurrentConfig() {
         return Pair.of(HashinatorType.ELASTIC, m_configBytes);
     }
 
@@ -255,7 +269,7 @@ public class ElasticHashinator extends TheHashinator {
     @Override
     public Map<Long, Integer> pPredecessors(int partition) {
         Map<Long, Integer> predecessors = new TreeMap<Long, Integer>();
-        UnmodifiableIterator<Map.Entry<Long,Integer>> iter = tokens.entrySet().iterator();
+        UnmodifiableIterator<Map.Entry<Long,Integer>> iter = m_tokens.entrySet().iterator();
         Set<Long> pTokens = new HashSet<Long>();
         while (iter.hasNext()) {
             Map.Entry<Long, Integer> next = iter.next();
@@ -267,11 +281,11 @@ public class ElasticHashinator extends TheHashinator {
         for (Long token : pTokens) {
             Map.Entry<Long, Integer> predecessor = null;
             if (token != null) {
-                predecessor = tokens.headMap(token).lastEntry();
+                predecessor = m_tokens.headMap(token).lastEntry();
                 // If null, it means partition is the first one on the ring, so predecessor
                 // should be the last entry on the ring because it wraps around.
                 if (predecessor == null) {
-                    predecessor = tokens.lastEntry();
+                    predecessor = m_tokens.lastEntry();
                 }
             }
 
@@ -291,12 +305,12 @@ public class ElasticHashinator extends TheHashinator {
      */
     @Override
     public Pair<Long, Integer> pPredecessor(int partition, long token) {
-        Integer partForToken = tokens.get(token);
+        Integer partForToken = m_tokens.get(token);
         if (partForToken != null && partForToken == partition) {
-            Map.Entry<Long, Integer> predecessor = tokens.headMap(token).lastEntry();
+            Map.Entry<Long, Integer> predecessor = m_tokens.headMap(token).lastEntry();
 
             if (predecessor == null) {
-                predecessor = tokens.lastEntry();
+                predecessor = m_tokens.lastEntry();
             }
 
             if (predecessor.getKey() != token) {
@@ -320,7 +334,7 @@ public class ElasticHashinator extends TheHashinator {
         Map<Long, Long> ranges = new TreeMap<Long, Long>();
         Long first = null; // start of the very first token on the ring
         Long start = null; // start of a range
-        UnmodifiableIterator<Map.Entry<Long,Integer>> iter = tokens.entrySet().iterator();
+        UnmodifiableIterator<Map.Entry<Long,Integer>> iter = m_tokens.entrySet().iterator();
 
         // Iterate through the token map to find the ranges assigned to
         // the given partition
@@ -372,9 +386,133 @@ public class ElasticHashinator extends TheHashinator {
     {
         StringBuilder sb = new StringBuilder();
         sb.append(" Token               ").append("   Partition\n");
-        for (Map.Entry<Long, Integer> entry : tokens.entrySet()) {
+        for (Map.Entry<Long, Integer> entry : m_tokens.entrySet()) {
             sb.append(String.format("[%20d => %8d]\n", entry.getKey(), entry.getValue()));
         }
         return sb.toString();
+    }
+
+    /**
+     * Returns raw config bytes.
+     * @return config bytes
+     */
+    @Override
+    public byte[] getConfigBytes()
+    {
+        return m_configBytes;
+    }
+
+    /**
+     * Returns compressed config bytes.
+     * @return config bytes
+     * @throws IOException
+     */
+    public byte[] toCookedBytes() throws IOException
+    {
+        // Allocate for a long/int pair per token/partition ID entry, plus a size.
+        ByteBuffer buf = ByteBuffer.allocate(4 + (m_tokens.size() * 12));
+
+        int numEntries = m_tokens.size();
+        buf.putInt(numEntries);
+
+        // Keep tokens and partition ids separate to aid compression.
+        for (Map.Entry<Long, Integer> e : m_tokens.entrySet()) {
+            long token = e.getKey();
+            buf.putLong(token);
+        }
+        for (Map.Entry<Long, Integer> e : m_tokens.entrySet()) {
+            int partitionId = e.getValue();
+            buf.putInt(partitionId);
+        }
+
+        // Compress (deflate) the bytes and cache the results.
+        ByteArrayOutputStream bos = new ByteArrayOutputStream(buf.array().length);
+        DeflaterOutputStream dos = new DeflaterOutputStream(bos);
+        dos.write(buf.array());
+        dos.close();
+        return bos.toByteArray();
+    }
+
+    /**
+     * Update from raw config bytes.
+     *      token-1/partition-1
+     *      token-2/partition-2
+     *      ...
+     *      tokens are 8 bytes
+     * @param configBytes  raw config data
+     * @return  token/partition map
+     */
+    private Map<Long, Integer> updateRaw(byte configBytes[]) {
+        ByteBuffer buf = ByteBuffer.wrap(configBytes);
+        int numEntries = buf.getInt();
+        TreeMap<Long, Integer> buildMap = new TreeMap<Long, Integer>();
+        for (int ii = 0; ii < numEntries; ii++) {
+            final long token = buf.getLong();
+            final int partitionId = buf.getInt();
+            if (buildMap.containsKey(token)) {
+                throw new RuntimeException(
+                        String.format("Duplicate token %d: partitions %d and %d",
+                                      token, partitionId, buildMap.get(token)));
+            }
+            buildMap.put( token, partitionId);
+        }
+        return buildMap;
+    }
+
+    /**
+     * Update from optimized (cooked) wire format.
+     *      token-1 token-2 ...
+     *      partition-1 partition-2 ...
+     *      tokens are 4 bytes
+     * @param compressedData  optimized and compressed config data
+     * @return  token/partition map
+     */
+    private Map<Long, Integer> updateCooked(byte[] compressedData)
+    {
+        // Uncompress (inflate) the bytes.
+        ByteArrayOutputStream bos = new ByteArrayOutputStream((int)(compressedData.length * 1.5));
+        InflaterOutputStream dos = new InflaterOutputStream(bos);
+        try {
+            dos.write(compressedData);
+            dos.close();
+        }
+        catch (IOException e) {
+            throw new RuntimeException("Unable to decompress elastic hashinator data.");
+        }
+        byte[] cookedBytes = bos.toByteArray();
+
+        int numEntries = (cookedBytes.length >= 4
+                                ? ByteBuffer.wrap(cookedBytes).getInt()
+                                : 0);
+        int tokensSize = 8 * numEntries;
+        int partitionsSize = 4 * numEntries;
+        if (numEntries <= 0 || cookedBytes.length != 4 + tokensSize + partitionsSize) {
+            throw new RuntimeException("Bad elastic hashinator cooked config size.");
+        }
+        ByteBuffer tokenBuf = ByteBuffer.wrap(cookedBytes, 4, tokensSize);
+        ByteBuffer partitionBuf = ByteBuffer.wrap(cookedBytes, 4 + tokensSize, partitionsSize);
+        TreeMap<Long, Integer> buildMap = new TreeMap<Long, Integer>();
+        for (int ii = 0; ii < numEntries; ii++) {
+            final long token = tokenBuf.getLong();
+            final int partitionId = partitionBuf.getInt();
+            if (buildMap.containsKey(token)) {
+                throw new RuntimeException(
+                        String.format("Duplicate token %d: partition %d and %d",
+                                      token, partitionId, buildMap.get(token)));
+            }
+            buildMap.put( token, partitionId);
+        }
+        return buildMap;
+    }
+
+    /**
+     * Return (cooked) bytes optimized for serialization.
+     * @return optimized config bytes
+     * @throws IOException
+     */
+    @Override
+    public byte[] getCookedBytes() throws IOException
+    {
+        return m_cookedBytes;
     }
 }
