@@ -107,7 +107,6 @@ class Distributer {
     private final Map<Integer, NodeConnection> m_hostIdToConnection = new HashMap<Integer, NodeConnection>();
     private final Map<String, Procedure> m_procedureInfo = new HashMap<String, Procedure>();
 
-    private boolean m_hashinatorInitialized = false;
     private TheHashinator m_hashinator = null;
     // timeout for individual procedure calls
     private final long m_procedureCallTimeoutMS;
@@ -656,7 +655,7 @@ class Distributer {
             m_connections.add(cxn);
         }
 
-        if (m_useClientAffinity || !this.m_hashinatorInitialized) {
+        if (m_useClientAffinity || (this.m_hashinator == null)) {
             synchronized (this) {
                 m_hostIdToConnection.put(hostId, cxn);
             }
@@ -706,7 +705,7 @@ class Distributer {
              * Check if the master for the partition is known. No back pressure check to ensure correct
              * routing, but backpressure will be managed anyways.
              */
-            if (m_useClientAffinity && m_hashinatorInitialized) {
+            if (m_useClientAffinity && m_hashinator != null) {
                 final Procedure procedureInfo = m_procedureInfo.get(invocation.getProcName());
 
                 if (procedureInfo != null) {
@@ -920,7 +919,6 @@ class Distributer {
                     HashinatorType.valueOf(tables[1].getString("HASHTYPE")).hashinatorClass,
                     tables[1].getVarbinary("HASHCONFIG"));
         }
-        m_hashinatorInitialized = true;
         m_partitionMasters.clear();
         m_partitionReplicas.clear();
         // The MPI's partition ID is 16383 (MpInitiator.MP_INIT_PID), so we shouldn't inadvertently
@@ -971,5 +969,29 @@ class Distributer {
                 e.printStackTrace();
             }
         }
+    }
+
+    /**
+     * Return if hashinator is initialed. This is useful only for non standard clients non standard client callProcedure
+     * will automatically go in back pressure if this is not initialized.
+     *
+     * @return
+     */
+    public boolean isHashinatorInitialized() {
+        return (this.m_hashinator != null);
+    }
+
+    /**
+     * This is used by clients such as CSVLoader which puts processing into buckets.
+     *
+     * @param typeValue volt Type
+     * @param value the representative value
+     * @return
+     */
+    public long getPartitionForParameter(byte typeValue, Object value) {
+        if (this.m_hashinator == null) {
+            return -1;
+        }
+        return this.m_hashinator.getHashedPartitionForParameter(typeValue, value);
     }
 }
