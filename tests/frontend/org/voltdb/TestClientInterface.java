@@ -587,7 +587,8 @@ public class TestClientInterface {
     {
         // restart will update the hashinator config, initialize it now
         TheHashinator.constructHashinator(TheHashinator.getConfiguredHashinatorClass(),
-                                          TheHashinator.getConfigureBytes(3));
+                                          TheHashinator.getConfigureBytes(3),
+                                          false);
         Pair<Long, byte[]> hashinatorConfig = TheHashinator.getCurrentVersionedConfig();
         long newHashinatorVersion = hashinatorConfig.getFirst() + 1;
 

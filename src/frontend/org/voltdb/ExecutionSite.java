@@ -1263,6 +1263,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                                       null,
                                       m_systemProcedureContext,
                                       CoreUtils.getHostnameOrAddress(),
+                                      null,
                                       TransactionIdManager
                                           .getTimestampFromTransactionId(snapshotMsg.m_roadblockTransactionId));
             if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty() &&

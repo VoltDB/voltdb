@@ -36,6 +36,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
+import org.voltdb.iv2.MpTransactionState;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 
@@ -421,5 +422,14 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
     protected void registerUndoAction(UndoAction action) {
         m_runner.getTxnState().registerUndoAction(action);
+    }
+
+    protected long getMasterHSId(int partition) {
+        TransactionState txnState = m_runner.getTxnState();
+        if (txnState instanceof MpTransactionState) {
+            return ((MpTransactionState) txnState).getMasterHSId(partition);
+        } else {
+            throw new RuntimeException("SP sysproc doesn't support getting the master HSID");
+        }
     }
 }

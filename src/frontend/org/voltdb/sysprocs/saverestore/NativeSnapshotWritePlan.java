@@ -19,35 +19,29 @@ package org.voltdb.sysprocs.saverestore;
 
 import java.io.File;
 import java.io.IOException;
-
 import java.util.ArrayList;
-
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.json_voltpatches.JSONObject;
-
+import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
-
-import org.voltdb.catalog.Table;
-
 import org.voltdb.DefaultSnapshotDataTarget;
-
-import org.voltdb.dtxn.SiteTracker;
-
 import org.voltdb.SnapshotDataFilter;
 import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
-
-import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.SystemProcedureExecutionContext;
-
-import org.voltdb.utils.CatalogUtil;
+import org.voltdb.TheHashinator;
+import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.catalog.Table;
+import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.sysprocs.SnapshotRegistry;
+import org.voltdb.utils.CatalogUtil;
 
 /**
  * Create a snapshot write plan for a native snapshot.  This will attempt to
@@ -59,15 +53,19 @@ import org.voltdb.VoltTable;
  */
 public class NativeSnapshotWritePlan extends SnapshotWritePlan
 {
+    @Override
     protected boolean createSetupInternal(String file_path, String file_nonce,
                                           long txnId, Map<Integer, Long> partitionTransactionIds,
                                           JSONObject jsData, SystemProcedureExecutionContext context,
                                           String hostname, final VoltTable result,
                                           Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-                                          SiteTracker tracker, long timestamp) throws IOException
+                                          SiteTracker tracker,
+                                          HashinatorSnapshotData hashinatorData,
+                                          long timestamp) throws IOException
     {
         return createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds, jsData,
                                    context, hostname, result, exportSequenceNumbers, tracker,
+                                   hashinatorData,
                                    timestamp, context.getNumberOfPartitions());
     }
 
@@ -77,12 +75,20 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             JSONObject jsData, SystemProcedureExecutionContext context,
             String hostname, final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            SiteTracker tracker, long timestamp, int newPartitionCount) throws IOException
+            SiteTracker tracker,
+            HashinatorSnapshotData hashinatorData,
+            long timestamp, int newPartitionCount) throws IOException
     {
         assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty());
 
+        if (TheHashinator.getConfiguredHashinatorType() == HashinatorType.ELASTIC && hashinatorData == null) {
+            throw new RuntimeException("No hashinator data provided for elastic hashinator type.");
+        }
+
         NativeSnapshotWritePlan.createFileBasedCompletionTasks(file_path, file_nonce,
-                txnId, partitionTransactionIds, context, exportSequenceNumbers, timestamp,
+                txnId, partitionTransactionIds, context, exportSequenceNumbers,
+                hashinatorData,
+                timestamp,
                 newPartitionCount);
 
         final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
@@ -203,9 +209,11 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             long txnId, Map<Integer, Long> partitionTransactionIds,
             SystemProcedureExecutionContext context,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            HashinatorSnapshotData hashinatorData,
             long timestamp, int newPartitionCount) throws IOException
     {
         final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
+        InstanceId instId = VoltDB.instance().getHostMessenger().getInstanceId();
         Runnable completionTask = SnapshotUtil.writeSnapshotDigest(
                 txnId,
                 context.getCatalogCRC(),
@@ -215,11 +223,18 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 context.getHostId(),
                 exportSequenceNumbers,
                 partitionTransactionIds,
-                VoltDB.instance().getHostMessenger().getInstanceId(),
+                instId,
                 timestamp,
                 newPartitionCount);
         if (completionTask != null) {
             SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
+        }
+        if (hashinatorData != null) {
+            completionTask = SnapshotUtil.writeHashinatorConfig(
+                    instId, file_path, file_nonce, context.getHostId(), hashinatorData);
+            if (completionTask != null) {
+                SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
+            }
         }
         completionTask = SnapshotUtil.writeSnapshotCatalog(file_path, file_nonce);
         if (completionTask != null) {

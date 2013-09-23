@@ -1284,7 +1284,7 @@ SnapshotCompletionInterest
         FileFilter filter = new SnapshotUtil.SnapshotFilter();
 
         for (String path : paths) {
-            SnapshotUtil.retrieveSnapshotFiles(new File(path), snapshots, filter, 0, false, LOG);
+            SnapshotUtil.retrieveSnapshotFiles(new File(path), snapshots, filter, false, LOG);
         }
 
         return snapshots;

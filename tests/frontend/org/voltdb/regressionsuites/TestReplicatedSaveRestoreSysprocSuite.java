@@ -39,7 +39,7 @@ import org.voltdb_testprocs.regressionsuites.saverestore.SaveRestoreTestProjectB
  * with no partitioned tables. Run as many of the tests as is practical without taking forever.
  */
 public class TestReplicatedSaveRestoreSysprocSuite extends TestSaveRestoreSysprocSuite {
-    private Set<String> skippedTests = new HashSet<String>(Arrays.asList(
+    private final Set<String> skippedTests = new HashSet<String>(Arrays.asList(
             "testSaveRestoreJumboRows",
             "testSaveAndRestorePartitionedTable",
             "testCorruptedFiles",

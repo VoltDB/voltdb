@@ -23,10 +23,18 @@
 
 package org.voltdb.sysprocs.saverestore;
 
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-import com.google.common.primitives.Longs;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -42,17 +50,10 @@ import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.sysprocs.SnapshotSave;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
+import com.google.common.primitives.Longs;
 
 public class TestIndexSnapshotWritePlan {
     protected static Database database;
@@ -108,6 +109,7 @@ public class TestIndexSnapshotWritePlan {
                                  result,       // result table
                                  null,         // export seq num
                                  tracker,      // site tracker
+                                 null,         // hashinator data
                                  0);           // ts
 
         // check

@@ -195,7 +195,7 @@ public class TestSpSchedulerDedupe extends TestCase
 
         createObjs();
         dut.setLeaderState(true);
-        dut.updateReplicas(new ArrayList<Long>());
+        dut.updateReplicas(new ArrayList<Long>(), null);
         Iv2InitiateTaskMessage sptask = createMsg(txnid, true, true, primary_hsid);
         dut.deliver(sptask);
         // verify no response sent yet
@@ -214,7 +214,7 @@ public class TestSpSchedulerDedupe extends TestCase
 
         createObjs();
         dut.setLeaderState(true);
-        dut.updateReplicas(new ArrayList<Long>());
+        dut.updateReplicas(new ArrayList<Long>(), null);
         FragmentTaskMessage sptask = createFrag(txnid, true, primary_hsid);
         dut.deliver(sptask);
         // verify no response sent yet
@@ -235,7 +235,7 @@ public class TestSpSchedulerDedupe extends TestCase
         dut.setLeaderState(true);
         List<Long> replicas = new ArrayList<Long>();
         replicas.add(2l);
-        dut.updateReplicas(replicas);
+        dut.updateReplicas(replicas, null);
         Iv2InitiateTaskMessage sptask = createMsg(txnid, false, true, primary_hsid);
         dut.deliver(sptask);
         verify(mbox, times(0)).send(anyLong(), (VoltMessage)anyObject());
@@ -264,7 +264,7 @@ public class TestSpSchedulerDedupe extends TestCase
         dut.setLeaderState(true);
         List<Long> replicas = new ArrayList<Long>();
         replicas.add(2l);
-        dut.updateReplicas(replicas);
+        dut.updateReplicas(replicas, null);
         FragmentTaskMessage sptask = createFrag(txnid, false, primary_hsid);
         dut.deliver(sptask);
         // verify no response sent yet

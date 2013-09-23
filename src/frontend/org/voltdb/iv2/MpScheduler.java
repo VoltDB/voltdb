@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import com.google.common.collect.Maps;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
@@ -52,6 +54,7 @@ public class MpScheduler extends Scheduler
         new HashMap<Long, DuplicateCounter>();
 
     private final List<Long> m_iv2Masters;
+    private final Map<Integer, Long> m_partitionMasters;
     private final long m_buddyHSId;
     //Generator of pre-IV2ish timestamp based unique IDs
     private final UniqueIdGenerator m_uniqueIdGenerator;
@@ -68,6 +71,7 @@ public class MpScheduler extends Scheduler
         super(partitionId, taskQueue);
         m_buddyHSId = buddyHSId;
         m_iv2Masters = new ArrayList<Long>();
+        m_partitionMasters = Maps.newHashMap();
         m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
     }
 
@@ -78,16 +82,18 @@ public class MpScheduler extends Scheduler
         // response to roll back. This function must be called with
         // the deliver lock held to be correct. The null task should
         // never run; the site thread is expected to be told to stop.
-        m_pendingTasks.repair(m_nullTask, m_iv2Masters);
+        m_pendingTasks.repair(m_nullTask, m_iv2Masters, m_partitionMasters);
     }
 
 
     @Override
-    public void updateReplicas(final List<Long> replicas)
+    public void updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters)
     {
         // Handle startup and promotion semi-gracefully
         m_iv2Masters.clear();
         m_iv2Masters.addAll(replicas);
+        m_partitionMasters.clear();
+        m_partitionMasters.putAll(partitionMasters);
         if (!m_isLeader) {
             return;
         }
@@ -131,7 +137,7 @@ public class MpScheduler extends Scheduler
                 throw new RuntimeException("Rejoin while repairing the MPI should be impossible.");
             }
         };
-        m_pendingTasks.repair(repairTask, replicaCopy);
+        m_pendingTasks.repair(repairTask, replicaCopy, partitionMasters);
     }
 
     /**
@@ -270,7 +276,7 @@ public class MpScheduler extends Scheduler
         // Multi-partition initiation (at the MPI)
         final MpProcedureTask task =
             new MpProcedureTask(m_mailbox, procedureName,
-                    m_pendingTasks, mp, m_iv2Masters, m_buddyHSId, false);
+                    m_pendingTasks, mp, m_iv2Masters, m_partitionMasters, m_buddyHSId, false);
         m_outstandingTxns.put(task.m_txnState.txnId, task.m_txnState);
         m_pendingTasks.offer(task);
     }
@@ -310,7 +316,7 @@ public class MpScheduler extends Scheduler
         // Multi-partition initiation (at the MPI)
         final MpProcedureTask task =
             new MpProcedureTask(m_mailbox, procedureName,
-                    m_pendingTasks, mp, m_iv2Masters, m_buddyHSId, true);
+                    m_pendingTasks, mp, m_iv2Masters, m_partitionMasters, m_buddyHSId, true);
         m_outstandingTxns.put(task.m_txnState.txnId, task.m_txnState);
         m_pendingTasks.offer(task);
     }
