@@ -400,9 +400,8 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
                 m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_MAX) {
             if (existingValue.compare(oldValue) == 0) {
                 // re-calculate MIN / MAX
-                NValue current, min, max;
-                min = min.castAs(m_target->schema()->columnType(i));
-                max = max.castAs(m_target->schema()->columnType(i));
+                NValue current, newVal;
+                newVal = newVal.castAs(m_target->schema()->columnType(i));
                 TableTuple tuple;
 
                 // indexscan if an index is available, otherwise tablescan
@@ -422,12 +421,11 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
                         } else {
                             current = tuple.getNValue(m_outputColumnSrcTableIndexes[i]);
                         }
-                        if (min.isNull() || max.isNull()) {
-                            min = current;
-                            max = current;
+                        if (newVal.isNull()) {
+                            newVal = current;
                         } else {
-                            min = min.op_min(current);
-                            max = max.op_max(current);
+                            newVal = (m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_MIN) ?
+                                            newVal.op_min(current) : newVal.op_max(current);
                         }
                     }
                 } else {
@@ -479,21 +477,16 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
                         }
                         VOLT_TRACE("Checking tuple: %s\n", scannedTuple.debugNoHeader().c_str());
                         VOLT_TRACE("\tBefore: current %s, min %s, max %s\n", current.debug().c_str(), min.debug().c_str(), max.debug().c_str());
-                        if (min.isNull() || max.isNull()) {
-                            min = current;
-                            max = current;
+                        if (newVal.isNull()) {
+                            newVal = current;
                         } else {
-                            min = min.op_min(current);
-                            max = max.op_max(current);
+                            newVal = (m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_MIN) ?
+                                            newVal.op_min(current) : newVal.op_max(current);
                         }
                         VOLT_TRACE("\tAfter: current %s, min %s, max %s\n", current.debug().c_str(), min.debug().c_str(), max.debug().c_str());
                     }
                 }
-                if (m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_MIN) {
-                    m_updatedTuple.setNValue(i, min);
-                } else {
-                    m_updatedTuple.setNValue(i, max);
-                }
+                m_updatedTuple.setNValue(i, newVal);
             } else {
                 m_updatedTuple.setNValue(i, existingValue);
             }
