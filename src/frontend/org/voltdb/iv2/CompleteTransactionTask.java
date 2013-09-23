@@ -55,7 +55,8 @@ public class CompleteTransactionTask extends TransactionTask
             siteConnection.truncateUndoLog(m_completeMsg.isRollback(),
                     m_txnState.getBeginUndoToken(),
                     m_txnState.txnId,
-                    m_txnState.m_spHandle);
+                    m_txnState.m_spHandle,
+                    m_txnState.getUndoLog());
         }
         if (!m_completeMsg.isRestart()) {
             doCommonSPICompleteActions();
@@ -105,7 +106,8 @@ public class CompleteTransactionTask extends TransactionTask
             siteConnection.truncateUndoLog(m_completeMsg.isRollback(),
                     m_txnState.getBeginUndoToken(),
                     m_txnState.txnId,
-                    m_txnState.m_spHandle);
+                    m_txnState.m_spHandle,
+                    m_txnState.getUndoLog());
         }
         if (!m_completeMsg.isRestart()) {
             // this call does the right thing with a null TransactionTaskQueue
