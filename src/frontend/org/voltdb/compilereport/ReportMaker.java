@@ -643,17 +643,16 @@ public class ReportMaker {
                 String nameLink = "";
                 // not a warning during compiling procedures, must from the schema
                 if (procName.compareToIgnoreCase("null") == 0) {
-                    nameLink += "<a href='#s-";
                     String schemaName = "";
                     String warningMsg = warning.getMessage().toLowerCase();
                     if (warningMsg.contains("table ")) {
                         int begin = warningMsg.indexOf("table ") + 6;
                         int end = (warningMsg.substring(begin)).indexOf(" ");
-                        schemaName += warningMsg.substring(begin, begin + end);
+                        schemaName = warningMsg.substring(begin, begin + end);
                     }
-                    nameLink += schemaName + "'>" + schemaName.toUpperCase() + "</a>";
+                    nameLink = "<a href='#s-" + schemaName + "'>" + schemaName.toUpperCase() + "</a>";
                 } else {
-                    nameLink += "<a href='#p-" + procName.toLowerCase() + "'>" + procName + "</a>";
+                    nameLink = "<a href='#p-" + procName.toLowerCase() + "'>" + procName + "</a>";
                 }
                 sb.append("<tr><td>").append(nameLink).append("</td><td>").append(warning.getMessage()).append("</td></tr>\n");
             }
