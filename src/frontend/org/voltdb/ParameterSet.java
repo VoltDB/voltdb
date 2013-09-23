@@ -917,10 +917,10 @@ public class ParameterSet implements JSONString {
      * the client is just using this to attempt to route the transaction to the SPI master for
      * the returned partition ID.  If this routing is incorrect, the cluster will forward it
      * correct, at the cost of an additional network round-trip */
-    public Integer getHashinatedParam(int type, int index) {
+    public Integer getHashinatedParam(TheHashinator hashinator, int type, int index) {
         if (m_params.length > 0) {
             try {
-                return TheHashinator.getPartitionForParameter(type, m_params[index]);
+                return hashinator.getHashedPartitionForParameter(type, m_params[index]);
             }
             catch (Exception e) {
                 // This should never happen.  If it does, just pick a partition ID to give to
