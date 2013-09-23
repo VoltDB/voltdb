@@ -28,6 +28,8 @@ import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.compiler.JvmProbe;
+import org.voltdb.compiler.Language;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
@@ -64,11 +66,22 @@ public class TestGroovyDeployment extends RegressionSuite {
             "PARTITION PROCEDURE GetMamma ON TABLE MAMMA_MIA COLUMN MAMMA\n" +
             ";\n";
 
+    static final String NON_JAVA_7_SCHEMA = "CREATE TABLE MAMMA_MIA (\n" +
+            "  MAMMA INTEGER NOT NULL,\n" +
+            "  MIA VARCHAR(32) NOT NULL,\n" +
+            "  CONSTRAINT PK_MAMMA_MIA PRIMARY KEY(MAMMA)\n" +
+            ")\n" +
+            ";\n";
+
     public TestGroovyDeployment(String name) {
         super(name);
     }
 
     public void testGroovyProcedureInvocation() throws Exception {
+        if (!JvmProbe.mayLoad(Language.GROOVY)) {
+            return;
+        }
+
         Client client = getClient();
         ClientResponse cr = null;
 
@@ -94,7 +107,11 @@ public class TestGroovyDeployment extends RegressionSuite {
             new MultiConfigSuiteBuilder(TestGroovyDeployment.class);
 
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addLiteralSchema(SCHEMA);
+        if (JvmProbe.mayLoad(Language.GROOVY)) {
+            project.addLiteralSchema(SCHEMA);
+        } else {
+            project.addLiteralSchema(NON_JAVA_7_SCHEMA);
+        }
 
         /*
          * compile the catalog all tests start with
