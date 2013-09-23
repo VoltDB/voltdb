@@ -31,6 +31,7 @@ import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Throwables;
+import org.voltdb.dtxn.UndoAction;
 
 /**
  * Class that maps object values to partitions. It's rather simple
@@ -309,12 +310,14 @@ public abstract class TheHashinator {
      * Update the hashinator in a thread safe manner with a newer version of the hash function.
      * A version number must be provided and the new config will only be used if it is greater than
      * the current version of the hash function.
+     *
+     * Returns an action for undoing the hashinator update
      * @param hashinatorImplementation  hashinator class
      * @param version  hashinator version/txn id
      * @param configBytes  config data (format determined by cooked flag)
      * @param cooked  compressible wire serialization format if true
      */
-    public static byte[] updateHashinator(
+    public static UndoAction updateHashinator(
             Class<? extends TheHashinator> hashinatorImplementation,
             long version,
             byte configBytes[],
@@ -323,16 +326,27 @@ public abstract class TheHashinator {
             final Pair<Long, ? extends TheHashinator> snapshot = instance.get();
             if (version > snapshot.getFirst()) {
                 Pair<Long, ? extends TheHashinator> update =
-                        Pair.of(version, constructHashinator(hashinatorImplementation,
-                                                             configBytes,
-                                                             cooked));
+                        Pair.of(version, constructHashinator(hashinatorImplementation, configBytes, cooked));
                 if (instance.compareAndSet(snapshot, update)) {
-                    // Always stored and returned in standard (non-wire) format.
-                    return update.getSecond().getConfigBytes();
+                    return new UndoAction() {
+                        @Override
+                        public void release() {}
+
+                        @Override
+                        public void undo() {
+                            instance.set(snapshot);
+                        }
+                    };
                 }
-            }
-            else {
-                return snapshot.getSecond().getConfigBytes();
+            } else {
+                return new UndoAction() {
+
+                    @Override
+                    public void release() {}
+
+                    @Override
+                    public void undo() {}
+                };
             }
         }
     }
@@ -441,9 +455,9 @@ public abstract class TheHashinator {
      * Update the current configured hashinator class. Used by snapshot restore.
      * @param version
      * @param config
-     * @return config data after unpacking
+     * @return UndoAction Undo action to revert hashinator update
      */
-    public static byte[] updateConfiguredHashinator(long version, byte config[]) {
+    public static UndoAction updateConfiguredHashinator(long version, byte config[]) {
         return updateHashinator(getConfiguredHashinatorClass(), version, config, true);
     }
 

@@ -17,6 +17,7 @@
 
 package org.voltdb.dtxn;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -50,6 +51,7 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected int m_hash = -1; // -1 shows where the value comes from (they only have to match)
     // IZZY: make me protected/private
     public final long m_spHandle;
+    private ArrayList<UndoAction> m_undoLog;
 
     /**
      * Set up the final member variables from the parameters. This will
@@ -180,5 +182,16 @@ public abstract class TransactionState extends OrderableTransaction  {
     public Map<Integer, List<VoltTable>> recursableRun(SiteProcedureConnection siteConnection)
     {
         return null;
+    }
+
+    public void registerUndoAction(UndoAction action) {
+        if (m_undoLog == null) {
+            m_undoLog = new ArrayList<UndoAction>();
+        }
+        m_undoLog.add(action);
+    }
+
+    public List<UndoAction> getUndoLog() {
+        return m_undoLog;
     }
 }
