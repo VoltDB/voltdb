@@ -66,6 +66,11 @@ public abstract class TheHashinator {
         instance.set(Pair.of(0L, constructHashinator( hashinatorImplementation, config)));
     }
 
+    public static TheHashinator getHashinator(Class<? extends TheHashinator> hashinatorImplementation, byte config[]) {
+        System.out.println("Creating new hashinator");
+        return constructHashinator(hashinatorImplementation, config);
+    }
+
     /**
      * Helper method to do the reflection boilerplate to call the constructor
      * of the selected hashinator and convert the exceptions to runtime exceptions.
@@ -112,6 +117,18 @@ public abstract class TheHashinator {
     }
 
     /**
+     * Given a long value, pick a partition to store the data. It's only called for legacy hashinator, elastic
+     * hashinator hashes all types the same way through hashinateBytes().
+     *
+     * @param value The value to hash.
+     * @param partitionCount The number of partitions to choose from.
+     * @return A value between 0 and partitionCount-1, hopefully pretty evenly distributed.
+     */
+    int hashinateLong(TheHashinator hashinator, long value) {
+        return hashinator.pHashinateLong(value);
+    }
+
+    /**
      * Given an byte[] bytes, pick a partition to store the data.
      *
      * @param value The value to hash.
@@ -124,6 +141,21 @@ public abstract class TheHashinator {
             return 0;
         } else {
             return instance.get().getSecond().pHashinateBytes(bytes);
+        }
+    }
+
+    /**
+     * Given an byte[] bytes, pick a partition to store the data.
+     *
+     * @param value The value to hash.
+     * @param partitionCount The number of partitions to choose from.
+     * @return A value between 0 and partitionCount-1, hopefully pretty evenly distributed.
+     */
+    int hashinateBytes(TheHashinator hashinator, byte[] bytes) {
+        if (bytes == null) {
+            return 0;
+        } else {
+            return hashinator.pHashinateBytes(bytes);
         }
     }
 
@@ -152,6 +184,32 @@ public abstract class TheHashinator {
             }
         }
         return hashinateBytes(valueToBytes(obj));
+    }
+
+    /**
+     * Given an object, map it to a partition. DON'T EVER MAKE ME PUBLIC
+     */
+    private int hashToPartition(TheHashinator hashinator, Object obj) {
+        HashinatorType type = getConfiguredHashinatorType();
+        if (type == HashinatorType.LEGACY) {
+            // Annoying, legacy hashes numbers and bytes differently, need to preserve that.
+            if (obj == null || VoltType.isNullVoltType(obj)) {
+                return 0;
+            } else if (obj instanceof Long) {
+                long value = ((Long) obj).longValue();
+                return hashinateLong(hashinator, value);
+            } else if (obj instanceof Integer) {
+                long value = ((Integer) obj).intValue();
+                return hashinateLong(hashinator, value);
+            } else if (obj instanceof Short) {
+                long value = ((Short) obj).shortValue();
+                return hashinateLong(hashinator, value);
+            } else if (obj instanceof Byte) {
+                long value = ((Byte) obj).byteValue();
+                return hashinateLong(hashinator, value);
+            }
+        }
+        return hashinator.hashinateBytes(hashinator, valueToBytes(obj));
     }
 
     /**
@@ -262,6 +320,44 @@ public abstract class TheHashinator {
         }
 
         return hashToPartition(invocationParameter);
+    }
+
+    /**
+     * Given the type of the targeting partition parameter and an object, coerce the object to the correct type and hash
+     * it. NOTE NOTE NOTE NOTE! THIS SHOULD BE THE ONLY WAY THAT YOU FIGURE OUT THE PARTITIONING FOR A PARAMETER!
+     *
+     * @return The partition best set up to execute the procedure.
+     * @throws VoltTypeException
+     */
+    public int getHashedPartitionForParameter(int partitionType, Object invocationParameter)
+            throws VoltTypeException {
+        final VoltType partitionParamType = VoltType.get((byte) partitionType);
+
+        // Special cases:
+        // 1) if the user supplied a string for a number column,
+        // try to do the conversion. This makes it substantially easier to
+        // load CSV data or other untyped inputs that match DDL without
+        // requiring the loader to know precise the schema.
+        // 2) For legacy hashinators, if we have a numeric column but the param is in a byte
+        // array, convert the byte array back to the numeric value
+        if (invocationParameter != null && partitionParamType.isPartitionableNumber()) {
+            if (invocationParameter.getClass() == String.class) {
+                {
+                    Object tempParam = ParameterConverter.stringToLong(
+                            invocationParameter,
+                            partitionParamType.classFromType());
+                    // Just in case someone managed to feed us a non integer
+                    if (tempParam != null) {
+                        invocationParameter = tempParam;
+                    }
+                }
+            } else if (getConfiguredHashinatorType() == HashinatorType.LEGACY
+                    && invocationParameter.getClass() == byte[].class) {
+                invocationParameter = bytesToValue(partitionParamType, (byte[]) invocationParameter);
+            }
+        }
+
+        return hashToPartition(this, invocationParameter);
     }
 
     /**

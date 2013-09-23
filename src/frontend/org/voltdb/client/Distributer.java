@@ -108,7 +108,7 @@ class Distributer {
     private final Map<String, Procedure> m_procedureInfo = new HashMap<String, Procedure>();
 
     private boolean m_hashinatorInitialized = false;
-
+    private TheHashinator m_hashinator = null;
     // timeout for individual procedure calls
     private final long m_procedureCallTimeoutMS;
     private static final long MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
@@ -656,7 +656,7 @@ class Distributer {
             m_connections.add(cxn);
         }
 
-        if (m_useClientAffinity) {
+        if (m_useClientAffinity || !this.m_hashinatorInitialized) {
             synchronized (this) {
                 m_hostIdToConnection.put(hostId, cxn);
             }
@@ -713,7 +713,7 @@ class Distributer {
                     Integer hashedPartition = MpInitiator.MP_INIT_PID;
                     if (!procedureInfo.multiPart) {
                         hashedPartition =
-                            invocation.getHashinatedParam(procedureInfo.partitionParameterType,
+                                invocation.getHashinatedParam(m_hashinator, procedureInfo.partitionParameterType,
                                 procedureInfo.partitionParameter);
                     }
                     /*
@@ -907,7 +907,7 @@ class Distributer {
             //Just in case the new client connects to the old version of Volt that only returns 1 topology table
             // We're going to get the MPI back in this table, so subtract it out from the number of partitions.
             int numPartitions = vt.getRowCount() - 1;
-            TheHashinator.initialize(LegacyHashinator.class, LegacyHashinator.getConfigureBytes(numPartitions));
+            m_hashinator = TheHashinator.getHashinator(LegacyHashinator.class, LegacyHashinator.getConfigureBytes(numPartitions));
         } else {
             //Second table contains the hash function
             boolean advanced = tables[1].advanceRow();
@@ -916,7 +916,7 @@ class Distributer {
                                    "performance will be lower because transactions can't be routed at this client");
                 return;
             }
-            TheHashinator.initialize(
+            m_hashinator = TheHashinator.getHashinator(
                     HashinatorType.valueOf(tables[1].getString("HASHTYPE")).hashinatorClass,
                     tables[1].getVarbinary("HASHCONFIG"));
         }
