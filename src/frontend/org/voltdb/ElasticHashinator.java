@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -30,19 +29,16 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.InflaterOutputStream;
 
-import com.google.common.collect.Maps;
-
 import org.apache.cassandra_voltpatches.MurmurHash3;
 import org.voltcore.utils.Pair;
-import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSortedMap;
+import com.google.common.collect.Maps;
 import com.google.common.collect.UnmodifiableIterator;
 
 /**
@@ -67,9 +63,9 @@ public class ElasticHashinator extends TheHashinator {
     private final long m_signature;
 
     /**
-     * Cached data.
+     * Cached data in format optimized for wire transmission.
      */
-    private static final AtomicReference<ByteBuffer> m_cookedDataCache = new AtomicReference<ByteBuffer>();
+    private final byte[] m_cookedBytes;
 
     /**
      * The serialization format is big-endian and the first value is the number of tokens
@@ -91,6 +87,12 @@ public class ElasticHashinator extends TheHashinator {
         m_tokens = builder.build();
 
         m_configBytes = toBytes();
+        try {
+            m_cookedBytes = toCookedBytes();
+        }
+        catch (IOException e1) {
+            throw new RuntimeException(String.format("Failed to serialize cooked hashinator bytes: %s", e1.toString()));
+        }
         m_signature = TheHashinator.computeConfigurationSignature(m_configBytes);
     }
 
@@ -102,6 +104,12 @@ public class ElasticHashinator extends TheHashinator {
     private ElasticHashinator(Map<Long, Integer> tokens) {
         this.m_tokens = ImmutableSortedMap.copyOf(tokens);
         m_configBytes = toBytes();
+        try {
+            m_cookedBytes = toCookedBytes();
+        }
+        catch (IOException e1) {
+            throw new RuntimeException(String.format("Failed to serialize cooked hashinator bytes: %s", e1.toString()));
+        }
 
         m_signature = TheHashinator.computeConfigurationSignature(m_configBytes);
     }
@@ -399,36 +407,30 @@ public class ElasticHashinator extends TheHashinator {
      * @return config bytes
      * @throws IOException
      */
-    @Override
-    public byte[] serializeCooked() throws IOException
+    public byte[] toCookedBytes() throws IOException
     {
-        // Use cached data or generate it now.
-        if (m_cookedDataCache.get() == null) {
-            // Allocate for a long/int pair per token/partition ID entry, plus a size.
-            ByteBuffer buf = ByteBuffer.allocate(4 + (m_tokens.size() * 12));
+        // Allocate for a long/int pair per token/partition ID entry, plus a size.
+        ByteBuffer buf = ByteBuffer.allocate(4 + (m_tokens.size() * 12));
 
-            int numEntries = m_tokens.size();
-            buf.putInt(numEntries);
+        int numEntries = m_tokens.size();
+        buf.putInt(numEntries);
 
-            // Keep tokens and partition ids separate to aid compression.
-            for (Map.Entry<Long, Integer> e : m_tokens.entrySet()) {
-                long token = e.getKey();
-                buf.putLong(token);
-            }
-            for (Map.Entry<Long, Integer> e : m_tokens.entrySet()) {
-                int partitionId = e.getValue();
-                buf.putInt(partitionId);
-            }
-
-            // Compress (deflate) the bytes and cache the results.
-            ByteArrayOutputStream bos = new ByteArrayOutputStream(buf.array().length);
-            DeflaterOutputStream dos = new DeflaterOutputStream(bos);
-            dos.write(buf.array());
-            dos.close();
-            m_cookedDataCache.set(ByteBuffer.wrap(bos.toByteArray()));
+        // Keep tokens and partition ids separate to aid compression.
+        for (Map.Entry<Long, Integer> e : m_tokens.entrySet()) {
+            long token = e.getKey();
+            buf.putLong(token);
+        }
+        for (Map.Entry<Long, Integer> e : m_tokens.entrySet()) {
+            int partitionId = e.getValue();
+            buf.putInt(partitionId);
         }
 
-        return m_cookedDataCache.get().array();
+        // Compress (deflate) the bytes and cache the results.
+        ByteArrayOutputStream bos = new ByteArrayOutputStream(buf.array().length);
+        DeflaterOutputStream dos = new DeflaterOutputStream(bos);
+        dos.write(buf.array());
+        dos.close();
+        return bos.toByteArray();
     }
 
     /**
@@ -501,5 +503,16 @@ public class ElasticHashinator extends TheHashinator {
             buildMap.put( token, partitionId);
         }
         return buildMap;
+    }
+
+    /**
+     * Return (cooked) bytes optimized for serialization.
+     * @return optimized config bytes
+     * @throws IOException
+     */
+    @Override
+    public byte[] getCookedBytes() throws IOException
+    {
+        return m_cookedBytes;
     }
 }

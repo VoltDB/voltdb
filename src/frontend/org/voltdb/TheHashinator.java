@@ -64,7 +64,7 @@ public abstract class TheHashinator {
      * @return config bytes
      * @throws IOException
      */
-    public abstract byte[] serializeCooked() throws IOException;
+    public abstract byte[] getCookedBytes() throws IOException;
 
     protected static final VoltLogger hostLogger = new VoltLogger("HOST");
 
@@ -429,7 +429,7 @@ public abstract class TheHashinator {
           case LEGACY:
             break;
           case ELASTIC: {
-            byte[] cookedData = currentInstance.getSecond().serializeCooked();
+            byte[] cookedData = currentInstance.getSecond().getCookedBytes();
             hashData = new HashinatorSnapshotData(cookedData, currentInstance.getFirst());
             break;
           }

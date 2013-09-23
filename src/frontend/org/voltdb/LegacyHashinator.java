@@ -114,7 +114,7 @@ public class LegacyHashinator extends TheHashinator {
      * @throws IOException
      */
     @Override
-    public byte[] serializeCooked() throws IOException
+    public byte[] getCookedBytes() throws IOException
     {
         // The legacy hashinator because isn't saved in snapshots.
         return null;

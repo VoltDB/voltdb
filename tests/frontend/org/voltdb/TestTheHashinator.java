@@ -782,9 +782,9 @@ public class TestTheHashinator {
         ElasticHashinator h1 = new ElasticHashinator(
                 ElasticHashinator.getConfigureBytes(3,
                 ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION), false);
-        byte[] b1 = h1.serializeCooked();
+        byte[] b1 = h1.getCookedBytes();
         ElasticHashinator h2 = new ElasticHashinator(b1, true);
-        byte[] b2 = h2.serializeCooked();
+        byte[] b2 = h2.getCookedBytes();
         assertTrue(Arrays.equals(b1, b2));
         assertEquals(h1.getTokens(), h2.getTokens());
     }
