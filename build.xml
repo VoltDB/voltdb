@@ -207,8 +207,6 @@
     <!-- Recorded as ENG-4423 -->
     <exclude name="**/TestRejoinFuzz.class" />
     <exclude name="**/TestRejoinFuzz2.class" />
-    <!-- Recorded as ENG-3038 -->
-    <exclude name="**/TestMultipleOuterJoinPlans.class" />
 </patternset>
 
 <!-- Workload Tracer Properties -->
