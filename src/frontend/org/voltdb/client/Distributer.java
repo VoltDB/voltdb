@@ -903,11 +903,15 @@ class Distributer {
     private void updateAffinityTopology(VoltTable tables[]) {
         //First table contains the description of partition ids master/slave relationships
         VoltTable vt = tables[0];
+
+        //In future let TOPO return cooked bytes when cooked and we use correct recipie
+        boolean cooked = false;
         if (tables.length == 1) {
             //Just in case the new client connects to the old version of Volt that only returns 1 topology table
             // We're going to get the MPI back in this table, so subtract it out from the number of partitions.
             int numPartitions = vt.getRowCount() - 1;
-            m_hashinator = TheHashinator.getHashinator(LegacyHashinator.class, LegacyHashinator.getConfigureBytes(numPartitions));
+            m_hashinator = TheHashinator.getHashinator(LegacyHashinator.class,
+                    LegacyHashinator.getConfigureBytes(numPartitions), cooked);
         } else {
             //Second table contains the hash function
             boolean advanced = tables[1].advanceRow();
@@ -918,7 +922,7 @@ class Distributer {
             }
             m_hashinator = TheHashinator.getHashinator(
                     HashinatorType.valueOf(tables[1].getString("HASHTYPE")).hashinatorClass,
-                    tables[1].getVarbinary("HASHCONFIG"));
+                    tables[1].getVarbinary("HASHCONFIG"), cooked);
         }
         m_partitionMasters.clear();
         m_partitionReplicas.clear();
