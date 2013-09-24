@@ -40,8 +40,8 @@ public class ReverseDNSCache {
 
     public static final long DEFAULT_MAX_SUCCESS = 1000 * 10;
     public static final long DEFAULT_MAX_FAILURE = 1000 * 10;
-    public static final long DEFAULT_SUCCESS_TIMEOUT = 300L; //10 minutes
-    public static final long DEFAULT_FAILURE_TIMEOUT = 3600; //1 hr
+    public static final long DEFAULT_SUCCESS_TIMEOUT = 600L;  //10 minutes
+    public static final long DEFAULT_FAILURE_TIMEOUT = 3600L; //1 hr
     public static final TimeUnit DEFAULT_TIMEOUT_UNIT =  TimeUnit.SECONDS;
 
     private static final Function<InetAddress, String> DNS_RESOLVER = new Function<InetAddress, String>() {
