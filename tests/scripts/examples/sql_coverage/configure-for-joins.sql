@@ -17,6 +17,7 @@
 {@numcol = "NUM"}
 {@optionalfn = "_numfun"}
 {@updatecolumn = "NUM"}
+{@updatesource = "ID"}
 {@updatevalue = "_value[int:0,100]"}
 
 --{@jointype = "INNER"}

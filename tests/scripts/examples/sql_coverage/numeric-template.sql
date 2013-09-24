@@ -9,8 +9,6 @@
 -- {@comparableconstant = "42.42"}
 -- {@comparabletype = "numeric"}
 -- {@fromtables = "_table"}
--- {@updatecolumn = "CASH"}
--- {@updatevalue = "_value[decimal]"}
 
 -- DML, clean out and regenerate random data first.
 DELETE FROM @dmltable
