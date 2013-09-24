@@ -106,16 +106,4 @@ public class LegacyHashinator extends TheHashinator {
     {
         return m_configBytes;
     }
-
-    /**
-     * Returns compressed config bytes (for serialization).
-     * @return config bytes
-     * @throws IOException
-     */
-    @Override
-    public byte[] getCookedBytes() throws IOException
-    {
-        // The legacy hashinator because isn't saved in snapshots.
-        return null;
-    }
 }

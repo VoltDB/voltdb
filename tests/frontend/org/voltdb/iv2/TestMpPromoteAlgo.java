@@ -145,7 +145,7 @@ public class TestMpPromoteAlgo
 
     @Before
     public void setUp() {
-        m_hashinatorConfig = TheHashinator.getCurrentVersionedConfig();
+        m_hashinatorConfig = TheHashinator.getCurrentVersionedConfigCooked();
     }
 
     // verify that responses are correctly unioned and ordered.
