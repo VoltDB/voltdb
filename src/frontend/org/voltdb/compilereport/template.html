@@ -279,34 +279,34 @@
             });
 
             // tooltips
-            $('.l-Table').popover({trigger:'focus hover',delay:{show:500,hide:100},content:
+            $('.l-Table').popover({trigger:'focus hover',delay:{show:500,hide:100},placement:'top',content:
                 'Persistent Relational Table'});
-            $('.l-Materialized_View').popover({trigger:'focus hover',delay:{show:500,hide:100},content:
+            $('.l-Materialized_View').popover({trigger:'focus hover',delay:{show:500,hide:100},placement:'top',content:
                 'Views are always materialized and incrementally maintained.'});
-            $('.l-Replicated').popover({trigger:'focus hover',delay:{show:500,hide:100},content:
+            $('.l-Replicated').popover({trigger:'focus hover',delay:{show:500,hide:100},placement:'top',content:
                 'Table data is present at all partitions. Updates are a multi-partition operation.'});
-            $('.l-Partitioned').popover({trigger:'focus hover',delay:{show:500,hide:100},content:
+            $('.l-Partitioned').popover({trigger:'focus hover',delay:{show:500,hide:100},placement:'top',content:
                 'Table data is partitioned on the hash of a column. Data is replicated to k+1 hosts.'});
-            $('.l-Has-PKey').popover({trigger:'focus hover',delay:{show:500,hide:100},content:
+            $('.l-Has-PKey').popover({trigger:'focus hover',delay:{show:500,hide:100},placement:'top',content:
                 'The table has a primary key and corresponding index.'});
-            $('.l-No-PKey').popover({trigger:'focus hover',delay:{show:500,hide:100},content:
+            $('.l-No-PKey').popover({trigger:'focus hover',delay:{show:500,hide:100},placement:'top',content:
                 'The table has no primary key. Deletes and updates will require scans.'});
-            $('.l-Read').popover({trigger:'focus hover',delay:{show:500,hide:100},content:
+            $('.l-Read').popover({trigger:'focus hover',delay:{show:500,hide:100},placement:'top',content:
                 'This procedure doesn\'t alter the content of the database.'});
-            $('.l-Write').popover({trigger:'focus hover',delay:{show:500,hide:100},content:
+            $('.l-Write').popover({trigger:'focus hover',delay:{show:500,hide:100},placement:'top',content:
                 'This procedure can alter the contents of the database.'});
-            $('.l-Single').popover({trigger:'focus hover',delay:{show:500,hide:100},content:
+            $('.l-Single').popover({trigger:'focus hover',delay:{show:500,hide:100},placement:'top',content:
                 'This procedure only runs at one partition.'});
-            $('.l-Multi').popover({trigger:'focus hover',delay:{show:500,hide:100},content:
+            $('.l-Multi').popover({trigger:'focus hover',delay:{show:500,hide:100},placement:'top',content:
                 'This procedure runs at all partitions, which can affect performance.'});
-            $('.l-Java').popover({trigger:'focus hover',delay:{show:500,hide:100},content:
+            $('.l-Java').popover({trigger:'focus hover',delay:{show:500,hide:100},placement:'top',content:
                 'This procedure uses Java code for logic.'});
-            $('.l-Single-Stmt').popover({trigger:'focus hover',delay:{show:500,hide:100},content:
+            $('.l-Single-Stmt').popover({trigger:'focus hover',delay:{show:500,hide:100},placement:'top',content:
                 'This procedure was defined in the DDL file as a single SQL statement.'});
-            $('.l-Scans').popover({trigger:'focus hover',delay:{show:500,hide:100},content:
+            $('.l-Scans').popover({trigger:'focus hover',delay:{show:500,hide:100},placement:'top',content:
                 'This procedure or statement might be using full table scans. While this isn\'t ' +
                 'always bad, it\'s possible adding an index could improve performance.'});
-            $('.l-Determinism').popover({trigger:'focus hover',delay:{show:500,hide:100},content:
+            $('.l-Determinism').popover({trigger:'focus hover',delay:{show:500,hide:100},placement:'top',content:
                 'This statement or procedure could potentially use SQL that outputs non-deterministic ' +
                 'results which then may be used to modify state. If this happens, the cluster will ' +
                 'halt. Consider adding an ORDER BY clause to make a SELECT statement deterministic.'});
