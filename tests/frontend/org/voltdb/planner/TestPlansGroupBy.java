@@ -167,7 +167,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
             System.out.println(apn.toExplainPlanString());
         }
         assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
-        assertTrue(pns.get(1).getChild(0).getPlanNodeType() == PlanNodeType.AGGREGATE);
+        assertTrue(pns.get(1).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
         assertTrue(pns.get(1).getChild(0).getChild(0).getPlanNodeType() == PlanNodeType.INDEXSCAN);
 
         pns = compileToFragments("SELECT F_D1, COUNT(*) FROM F GROUP BY F_D1");
@@ -175,7 +175,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
             System.out.println(apn.toExplainPlanString());
         }
         assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
-        assertTrue(pns.get(1).getChild(0).getPlanNodeType() == PlanNodeType.AGGREGATE);
+        assertTrue(pns.get(1).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
         assertTrue(pns.get(1).getChild(0).getChild(0).getPlanNodeType() == PlanNodeType.INDEXSCAN);
 
         pns = compileToFragments("SELECT F_VAL1, SUM(F_VAL2) FROM F GROUP BY F_VAL1");
@@ -183,7 +183,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
             System.out.println(apn.toExplainPlanString());
         }
         assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
-        assertTrue(pns.get(1).getChild(0).getPlanNodeType() == PlanNodeType.AGGREGATE);
+        assertTrue(pns.get(1).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
         assertTrue(pns.get(1).getChild(0).getChild(0).getPlanNodeType() == PlanNodeType.INDEXSCAN);
 
         pns = compileToFragments("SELECT F_D1 + F_D2, COUNT(*) FROM F GROUP BY F_D1 + F_D2");
@@ -191,7 +191,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
             System.out.println(apn.toExplainPlanString());
         }
         assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
-        assertTrue(pns.get(1).getChild(0).getPlanNodeType() == PlanNodeType.AGGREGATE);
+        assertTrue(pns.get(1).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
         assertTrue(pns.get(1).getChild(0).getChild(0).getPlanNodeType() == PlanNodeType.INDEXSCAN);
 
         pns = compileToFragments("SELECT ABS(F_D1), COUNT(*) FROM F GROUP BY ABS(F_D1)");
@@ -199,7 +199,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
             System.out.println(apn.toExplainPlanString());
         }
         assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
-        assertTrue(pns.get(1).getChild(0).getPlanNodeType() == PlanNodeType.AGGREGATE);
+        assertTrue(pns.get(1).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
         assertTrue(pns.get(1).getChild(0).getChild(0).getPlanNodeType() == PlanNodeType.INDEXSCAN);
 
         pns = compileToFragments("SELECT F_D2 - F_D3, ABS(F_D1), COUNT(*) FROM F GROUP BY F_D2 - F_D3, ABS(F_D1)");
@@ -212,7 +212,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
             }
         }
         assertTrue(pns.get(0).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
-        assertTrue(pns.get(1).getChild(0).getPlanNodeType() == PlanNodeType.AGGREGATE);
+        assertTrue(pns.get(1).getChild(0).getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
         assertTrue(pns.get(1).getChild(0).getChild(0).getPlanNodeType() == PlanNodeType.INDEXSCAN);
 
         // unoptimized case (only use second col of the index), but will be replaced in

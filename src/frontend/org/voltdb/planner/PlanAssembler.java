@@ -1212,7 +1212,7 @@ public class PlanAssembler {
     AbstractPlanNode handleMVBasedMultiPartQuery (AbstractPlanNode root) {
         MVFixInfo mvFixInfo = m_parsedSelect.mvFixInfo;
 
-        AggregatePlanNode reAggNode = mvFixInfo.reAggNode;
+        HashAggregatePlanNode reAggNode = new HashAggregatePlanNode(mvFixInfo.reAggNode);
         reAggNode.clearChildren();
         reAggNode.clearParents();
 
@@ -1295,14 +1295,7 @@ public class PlanAssembler {
             if (m_parsedSelect.isGrouped() &&
                 (root.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
                  ((IndexScanPlanNode) root).getSortDirection() == SortDirectionType.INVALID)) {
-                if (!m_partitioning.requiresTwoFragments() ||
-                        m_parsedSelect.isGrouped() &&
-                        (root.getChild(0).getChild(0).getPlanNodeType() != PlanNodeType.INDEXSCAN ||
-                         ((IndexScanPlanNode) root.getChild(0).getChild(0)).getSortDirection() == SortDirectionType.INVALID)) {
-                    aggNode = new HashAggregatePlanNode();
-                } else {
-                    aggNode = new AggregatePlanNode();
-                }
+                aggNode = new HashAggregatePlanNode();
                 if (!m_parsedSelect.mvFixInfo.needed) {
                     topAggNode = new HashAggregatePlanNode();
                 }
