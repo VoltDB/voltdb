@@ -73,8 +73,9 @@ public class SaveRestoreBase extends RegressionSuite {
                 for (File f2 : f.listFiles()) {
                     System.err.println("    " + f2.getPath());
                 }
+                //Recurse until stack overflow trying to delete, y not rite?
+                deleteRecursively(f);
             }
-            assertTrue(deleted);
         } else  {
             boolean deleted = f.delete();
             if (!deleted) {
