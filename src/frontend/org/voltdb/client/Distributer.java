@@ -106,7 +106,7 @@ class Distributer {
     private final Map<Integer, NodeConnection[]> m_partitionReplicas = new HashMap<Integer, NodeConnection[]>();
     private final Map<Integer, NodeConnection> m_hostIdToConnection = new HashMap<Integer, NodeConnection>();
     private final Map<String, Procedure> m_procedureInfo = new HashMap<String, Procedure>();
-
+    //This is the instance of the Hashinator we picked from TOPO used only for client affinity.
     private TheHashinator m_hashinator = null;
     // timeout for individual procedure calls
     private final long m_procedureCallTimeoutMS;

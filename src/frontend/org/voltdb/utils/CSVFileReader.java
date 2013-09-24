@@ -74,13 +74,19 @@ class CSVFileReader implements Runnable {
     public void run() {
         List<String> lineList;
         ClientImpl clientImpl = (ClientImpl) m_csvClient;
-        while (!clientImpl.isHashinatorInitialized()) {
+        int sleptTimes = 0;
+        while (!clientImpl.isHashinatorInitialized() && sleptTimes < 120) {
             try {
-                Thread.sleep(300);
+                Thread.sleep(500);
+                sleptTimes++;
                 m_log.info("Waiting for Client Initialization.");
             } catch (InterruptedException ex) {
                 ;
             }
+        }
+        if (sleptTimes > 120 && CSVPartitionProcessor.m_isMP) {
+            m_log.warn("Failed to detect partition information, "
+                    + "client affinity will not be used and CSV loading could be slow.");
         }
         m_log.info("Client Initialization Done.");
 

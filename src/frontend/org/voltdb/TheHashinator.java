@@ -262,9 +262,9 @@ public abstract class TheHashinator {
      * @return The partition best set up to execute the procedure.
      * @throws VoltTypeException
      */
-    public int getHashedPartitionForParameter(int partitionType, Object invocationParameter)
+    public int getHashedPartitionForParameter(int partitionValueType, Object partitionValue)
             throws VoltTypeException {
-        final VoltType partitionParamType = VoltType.get((byte) partitionType);
+        final VoltType partitionParamType = VoltType.get((byte) partitionValueType);
 
         // Special cases:
         // 1) if the user supplied a string for a number column,
@@ -273,24 +273,25 @@ public abstract class TheHashinator {
         // requiring the loader to know precise the schema.
         // 2) For legacy hashinators, if we have a numeric column but the param is in a byte
         // array, convert the byte array back to the numeric value
-        if (invocationParameter != null && partitionParamType.isPartitionableNumber()) {
-            if (invocationParameter.getClass() == String.class) {
+        if (partitionValue != null && partitionParamType.isPartitionableNumber()) {
+            if (partitionValue.getClass() == String.class) {
                 {
                     Object tempParam = ParameterConverter.stringToLong(
-                            invocationParameter,
+                            partitionValue,
                             partitionParamType.classFromType());
                     // Just in case someone managed to feed us a non integer
                     if (tempParam != null) {
-                        invocationParameter = tempParam;
+                        partitionValue = tempParam;
                     }
                 }
-            } else if (getConfiguredHashinatorType() == HashinatorType.LEGACY
-                    && invocationParameter.getClass() == byte[].class) {
-                invocationParameter = bytesToValue(partitionParamType, (byte[]) invocationParameter);
+            }
+            else if (getConfiguredHashinatorType() == HashinatorType.LEGACY
+                    && partitionValue.getClass() == byte[].class) {
+                partitionValue = bytesToValue(partitionParamType, (byte[]) partitionValue);
             }
         }
 
-        return hashToPartition(this, invocationParameter);
+        return hashToPartition(this, partitionValue);
     }
 
     /**
