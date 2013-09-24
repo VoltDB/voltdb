@@ -128,11 +128,11 @@ public class SystemProcedureCatalog {
         builder.put("@Pause",                   new Config("org.voltdb.sysprocs.Pause",                    false, false, true,  0, VoltType.INVALID,   false, false, true,  true));
         builder.put("@Resume",                  new Config("org.voltdb.sysprocs.Resume",                   false, false, true,  0, VoltType.INVALID,   false, false, true,  true));
         builder.put("@Quiesce",                 new Config("org.voltdb.sysprocs.Quiesce",                  false, false, false, 0, VoltType.INVALID,   false, false, true,  true));
-        builder.put("@SnapshotSave",            new Config("org.voltdb.sysprocs.SnapshotSave",             false, false, false, 0, VoltType.INVALID,   false, false, true,  true));
-        builder.put("@SnapshotRestore",         new Config("org.voltdb.sysprocs.SnapshotRestore",          false, false, false, 0, VoltType.INVALID,   false, true,  true,  false));
-        builder.put("@SnapshotStatus",          new Config("org.voltdb.sysprocs.SnapshotStatus",           false, false, false, 0, VoltType.INVALID,   false, false, true,  true));
-        builder.put("@SnapshotScan",            new Config("org.voltdb.sysprocs.SnapshotScan",             false, false, false, 0, VoltType.INVALID,   false, false, true,  true));
-        builder.put("@SnapshotDelete",          new Config("org.voltdb.sysprocs.SnapshotDelete",           false, false, false, 0, VoltType.INVALID,   false, false, true,  true));
+        builder.put("@SnapshotSave",            new Config("org.voltdb.sysprocs.SnapshotSave",             false, false, false, 0, VoltType.INVALID,   true,  false, true,  true));
+        builder.put("@SnapshotRestore",         new Config("org.voltdb.sysprocs.SnapshotRestore",          false, false, false, 0, VoltType.INVALID,   true,  true,  true,  false));
+        builder.put("@SnapshotStatus",          new Config("org.voltdb.sysprocs.SnapshotStatus",           false, false, false, 0, VoltType.INVALID,   true,  false, true,  true));
+        builder.put("@SnapshotScan",            new Config("org.voltdb.sysprocs.SnapshotScan",             false, false, false, 0, VoltType.INVALID,   true,  false, true,  true));
+        builder.put("@SnapshotDelete",          new Config("org.voltdb.sysprocs.SnapshotDelete",           false, false, false, 0, VoltType.INVALID,   true,  false, true,  true));
         builder.put("@Shutdown",                new Config("org.voltdb.sysprocs.Shutdown",                 false, false, false, 0, VoltType.INVALID,   false, false, true,  true));
         builder.put("@ProfCtl",                 new Config("org.voltdb.sysprocs.ProfCtl",                  false, false, true,  0, VoltType.INVALID,   false, false, true,  true));
         builder.put("@Statistics",              new Config("org.voltdb.sysprocs.Statistics",               false, true,  false, 0, VoltType.INVALID,   false, false, true,  true));
