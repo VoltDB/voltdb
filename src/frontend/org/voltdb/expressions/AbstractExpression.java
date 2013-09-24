@@ -593,32 +593,6 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         }
     }
 
-    private static boolean areOverloads(List<AbstractExpression> list1,
-                                        List<AbstractExpression> list2)
-    {
-        int sz = list1.size();
-        if (sz != list2.size()) {
-            return false;
-        }
-        for (int ii = 0; ii < sz; ++ii) {
-            if ( ! list1.get(ii).isAnOverloadOf(list2.get(ii))) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    public static boolean areOverloadedJSONExpressionLists(String jsontext1, String jsontext2)
-    {
-        try {
-            List<AbstractExpression> list1 = fromJSONArrayString(jsontext1);
-            List<AbstractExpression> list2 = fromJSONArrayString(jsontext2);
-            return areOverloads(list1, list2);
-        } catch (JSONException je) {
-            return false;
-        }
-    }
-
     /**
      * This function recursively replace any Expression that in the aggTableIndexMap to a TVEs. Its column index and alias are also built up here.
      * @param aggTableIndexMap
