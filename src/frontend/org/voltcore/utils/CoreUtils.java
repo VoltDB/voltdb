@@ -279,15 +279,6 @@ public class CoreUtils {
         };
     }
 
-    private static final Supplier<String> m_localHostnameOrAddressSupplier =
-            Suppliers.memoizeWithExpiration(new Supplier<String>() {
-                @Override
-                public String get() {
-                    final InetAddress addr = m_localAddressSupplier.get();
-                    return ReverseDNSCache.hostnameOrAddress(addr);
-                }
-            }, 300, TimeUnit.SECONDS);
-
     /**
      * Return the local hostname, if it's resolvable.  If not,
      * return the IPv4 address on the first interface we find, if it exists.
@@ -296,7 +287,9 @@ public class CoreUtils {
      *         if we can find one; the empty string otherwise
      */
     public static String getHostnameOrAddress() {
-        return m_localHostnameOrAddressSupplier.get();
+        final InetAddress addr = m_localAddressSupplier.get();
+        if (addr == null) return "";
+        return ReverseDNSCache.hostnameOrAddress(addr);
     }
 
     private static final Supplier<InetAddress> m_localAddressSupplier =
