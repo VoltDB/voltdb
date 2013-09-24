@@ -80,7 +80,7 @@ public class ProcedureInvocation {
     }
 
     public Object getPartitionParamValue(int index) {
-        return m_parameters.getParam(index);
+        return m_parameters.toArray()[index];
     }
 
     public ByteBuffer flattenToBuffer(ByteBuffer buf) throws IOException {

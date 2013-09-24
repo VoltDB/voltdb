@@ -911,21 +911,4 @@ public class ParameterSet implements JSONString {
         assert false : "hashCode not designed";
         return 42; // any arbitrary constant will do
     }
-
-    /* This method is only ever used by clients for client affinity.
-     * This behavior is optimistic but will not fail if this returned value is wrong, since
-     * the client is just using this to attempt to route the transaction to the SPI master for
-     * the returned partition ID.  If this routing is incorrect, the cluster will forward it
-     * correct, at the cost of an additional network round-trip
-     *
-     * This is called by Procedure Invocation to get value in parameter set
-     * which it thinks is the index of partition value.
-     */
-    public Object getParam(int index) {
-        if (m_params.length > 0) {
-            return m_params[index];
-        } else {
-            return null;
-        }
-    }
 }
