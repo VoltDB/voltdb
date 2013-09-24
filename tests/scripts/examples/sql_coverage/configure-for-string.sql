@@ -17,4 +17,5 @@
 {@insertvals = "_id, _value[string], _value[string], _value[float]"}
 {@optionalfn = "_stringfun"}
 {@updatecolumn = "DESC"}
+{@updatesource = "DESC_INLINE"}
 {@updatevalue = "_value[string]"}

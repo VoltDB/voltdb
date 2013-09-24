@@ -37,7 +37,7 @@ UPDATE _table SET @updatecolumn = @updatevalue WHERE (@updatecolumn _cmp @compar
 UPDATE _table SET @updatecolumn = @updatevalue WHERE (_variable[@comparabletype] @aftermath) _cmp @comparableconstant
 -- test set expression
 --- test arithmetic (+, -, *, /) ops
-UPDATE _table SET @updatecolumn = @updatecolumn @aftermath
+UPDATE _table SET @updatecolumn = @updatesource @aftermath
 -- test type casting
 -- These fail with an odd message and kill the volt run.
 --UPDATE _table SET @updatecolumn = _variable _math _value[byte]
