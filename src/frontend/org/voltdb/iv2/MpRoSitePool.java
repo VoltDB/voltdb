@@ -84,6 +84,14 @@ class MpRoSitePool {
 
         void shutdown() {
             m_site.startShutdown();
+            m_queue.offer(Scheduler.m_nullTask);
+        }
+
+        void joinThread() {
+            try {
+                m_siteThread.join();
+            } catch (InterruptedException e) {
+            }
         }
     }
 
@@ -231,6 +239,18 @@ class MpRoSitePool {
         }
         else {
             site.shutdown();
+        }
+    }
+
+    void shutdown()
+    {
+        for (MpRoSiteContext site : m_idleSites) {
+            site.shutdown();
+            site.joinThread();
+        }
+        for (MpRoSiteContext site : m_busySites.values()) {
+            site.shutdown();
+            site.joinThread();
         }
     }
 }

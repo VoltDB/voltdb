@@ -58,6 +58,11 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         m_sitePool.updateCatalog(diffCmds, context, csp);
     }
 
+    void shutdown()
+    {
+        m_sitePool.shutdown();
+    }
+
     /**
      * If necessary, stick this task in the backlog.
      * Many network threads may be racing to reach here, synchronize to

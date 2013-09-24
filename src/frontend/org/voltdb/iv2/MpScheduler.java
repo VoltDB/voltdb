@@ -97,6 +97,7 @@ public class MpScheduler extends Scheduler
         // response to roll back. This function must be called with
         // the deliver lock held to be correct. The null task should
         // never run; the site thread is expected to be told to stop.
+        m_pendingTasks.shutdown();
         m_pendingTasks.repair(m_nullTask, m_iv2Masters, m_partitionMasters);
     }
 

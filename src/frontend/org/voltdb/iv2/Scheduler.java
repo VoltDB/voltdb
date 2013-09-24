@@ -56,7 +56,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
     protected VoltLogger hostLog = new VoltLogger("HOST");
 
     // A null task that unblocks the site task queue, used during shutdown
-    protected static final SiteTasker m_nullTask = new SiteTasker() {
+    static final SiteTasker m_nullTask = new SiteTasker() {
         @Override
         public void run(SiteProcedureConnection siteConnection)
         {
