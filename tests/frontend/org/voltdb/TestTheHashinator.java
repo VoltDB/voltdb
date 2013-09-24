@@ -350,7 +350,7 @@ public class TestTheHashinator {
          *  Run with 10k of random values and make sure C++ and Java hash to
          *  the same value.
          */
-        for (int i = 0; i < 2500; i++) {
+        for (int i = 0; i < 1500; i++) {
             final int partitionCount = r.nextInt(1000) + 1;
             configBytes = getConfigBytes(partitionCount);
             TheHashinator.initialize(getHashinatorClass(), configBytes);
@@ -384,7 +384,7 @@ public class TestTheHashinator {
                         hashinatorType,
                         configBytes);
 
-        for (int i = 0; i < 2500; i++) {
+        for (int i = 0; i < 1500; i++) {
             int partitionCount = r.nextInt(1000) + 1;
             configBytes = getConfigBytes(partitionCount);
             String valueToHash = Long.toString(r.nextLong());
@@ -411,7 +411,7 @@ public class TestTheHashinator {
     public void testNumberCoercionHash() throws Exception {
         System.out.println("=======================");
         System.out.println("NUMBER COERCION");
-        for (int i = 0; i < 25000; i++) {
+        for (int i = 0; i < 1500; i++) {
             int partitionCount = r.nextInt(1000) + 1;
             byte[] configBytes = getConfigBytes(partitionCount);
             long longToHash = r.nextLong();
