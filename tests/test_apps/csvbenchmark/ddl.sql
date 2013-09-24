@@ -1,3 +1,16 @@
+create table text_all_with_idx (
+      a bigint NOT NULL
+    , b varchar(512)
+    , c int
+    , d timestamp
+    , e varchar(1024)
+);
+PARTITION TABLE text_all_with_idx ON COLUMN a;
+CREATE UNIQUE INDEX idx_col_u ON text_all_with_idx(a);
+CREATE INDEX idx_col_one ON text_all_with_idx(a,c);
+CREATE INDEX idx_col_two ON text_all_with_idx(a,b);
+CREATE INDEX idx_col_three ON text_all_with_idx(a,d);
+
 create table narrow_short_noix (
       a integer NOT NULL
     , b smallint
@@ -57,7 +70,10 @@ create table narrow_long_ix (
     , e varchar(512)
 );
 PARTITION TABLE narrow_long_ix ON COLUMN a;
-CREATE INDEX IX_narrow_long_ix on narrow_long_ix (a);
+CREATE UNIQUE INDEX IX_narrow_long_ix_a on narrow_long_ix (a);
+CREATE INDEX IX_narrow_long_ix_b on narrow_long_ix (a,b);
+CREATE INDEX IX_narrow_long_ix_d on narrow_long_ix (a,d);
+CREATE INDEX IX_narrow_long_ix_e on narrow_long_ix (a,e);
 
 create table narrow_long_cmpix (
       a integer NOT NULL
@@ -127,7 +143,12 @@ create table generic_ix (
     --, u decimal(32,4)
 );
 PARTITION TABLE generic_ix ON COLUMN a;
-CREATE INDEX IX_generic_ix on generic_ix (a);
+CREATE UNIQUE INDEX IX_generic_ix_a on generic_ix (a);
+CREATE INDEX IX_generic_ix_e on generic_ix (a,e);
+CREATE INDEX IX_generic_ix_h on generic_ix (a,h);
+CREATE INDEX IX_generic_ix_k on generic_ix (a,k);
+CREATE INDEX IX_generic_ix_o on generic_ix (a,o);
+CREATE INDEX IX_generic_ix_b on generic_ix (b,c,i,k);
 
 --CREATE PROCEDURE FROM CLASS csvbenchmark.procedures.DoNothingProcedure;
 
