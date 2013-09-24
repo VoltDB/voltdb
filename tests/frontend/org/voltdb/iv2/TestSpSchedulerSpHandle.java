@@ -112,7 +112,7 @@ public class TestSpSchedulerSpHandle extends TestCase
         dut.setLeaderState(true);
         List<Long> replicas = new ArrayList<Long>();
         replicas.add(2l);
-        dut.updateReplicas(replicas);
+        dut.updateReplicas(replicas, null);
         int msgcount = 0;
         for (int i = 0; i < 4000; i++) {
             TransactionInfoBaseMessage msg = msgGen.generateRandomMessageInStream();

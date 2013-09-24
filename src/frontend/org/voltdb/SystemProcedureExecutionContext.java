@@ -17,12 +17,15 @@
 
 package org.voltdb;
 
+import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.dtxn.SiteTracker;
 
 import com.google.common.collect.ImmutableMap;
+
+import java.util.List;
 
 public interface SystemProcedureExecutionContext {
     public Database getDatabase();
@@ -74,4 +77,9 @@ public interface SystemProcedureExecutionContext {
      * Update the EE hashinator with the given configuration.
      */
     public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config);
+
+    boolean activateTableStream(int tableId, TableStreamType type, long undoToken, byte[] predicates);
+
+    Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
+                                               List<DBBPool.BBContainer> outputBuffers);
 }

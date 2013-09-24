@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.google.common.base.Preconditions;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -41,7 +42,7 @@ import org.voltdb.utils.FixedDBBPool;
 public class StreamSnapshotSink {
     private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
 
-    private Mailbox m_mb = null;
+    private final Mailbox m_mb;
     private StreamSnapshotDataReceiver m_in = null;
     private Thread m_inThread = null;
     private StreamSnapshotAckSender m_ack = null;
@@ -52,10 +53,13 @@ public class StreamSnapshotSink {
     private final Map<Integer, byte[]> m_schemas = new HashMap<Integer, byte[]>();
     private long m_bytesReceived = 0;
 
-    public long initialize(int sourceCount, FixedDBBPool bufferPool) {
-        // Mailbox used to transfer snapshot data
-        m_mb = VoltDB.instance().getHostMessenger().createMailbox();
+    public StreamSnapshotSink(Mailbox mb)
+    {
+        Preconditions.checkArgument(mb != null);
+        m_mb = mb;
+    }
 
+    public long initialize(int sourceCount, FixedDBBPool bufferPool) {
         // Expect sourceCount number of EOFs at the end
         m_expectedEOFs.set(sourceCount);
 
@@ -93,10 +97,6 @@ public class StreamSnapshotSink {
 
         m_in = null;
         m_ack = null;
-
-        if (m_mb != null) {
-            VoltDB.instance().getHostMessenger().removeMailbox(m_mb.getHSId());
-        }
     }
 
     /**
@@ -106,9 +106,8 @@ public class StreamSnapshotSink {
      * @param buf
      * @return
      */
-    private ByteBuffer getNextChunk(int tableId, ByteBuffer buf,
-                                    CachedByteBufferAllocator resultBufferAllocator) {
-        byte[] schemaBytes = m_schemas.get(tableId);
+    public static ByteBuffer getNextChunk(byte[] schemaBytes, ByteBuffer buf,
+                                          CachedByteBufferAllocator resultBufferAllocator) {
         buf.position(buf.position() + 4);//skip partition id
         int length = schemaBytes.length + buf.remaining();
 
@@ -163,12 +162,14 @@ public class StreamSnapshotSink {
             return null;
         }
 
+        Pair<Integer, ByteBuffer> processed = null;
         long hsId = msg.getFirst();
         long targetId = msg.getSecond().getFirst();
         BBContainer container = msg.getSecond().getSecond();
         try {
             ByteBuffer block = container.b;
             byte typeByte = block.get(StreamSnapshotDataTarget.typeOffset);
+            final int blockIndex = block.getInt(StreamSnapshotDataTarget.blockIndexOffset);
             StreamSnapshotMessageType type = StreamSnapshotMessageType.values()[typeByte];
             if (type == StreamSnapshotMessageType.FAILURE) {
                 VoltDB.crashLocalVoltDB("Rejoin source sent failure message.", false, null);
@@ -177,47 +178,48 @@ public class StreamSnapshotSink {
                 if (m_expectedEOFs.decrementAndGet() == 0) {
                     m_EOF = true;
                 }
-                return null;
             }
-            if (type == StreamSnapshotMessageType.END) {
-                rejoinLog.trace("Got END message");
+            else if (type == StreamSnapshotMessageType.END) {
+                if (rejoinLog.isTraceEnabled()) {
+                    rejoinLog.trace("Got END message " + blockIndex);
+                }
 
                 // End of stream, no need to ack this buffer
                 if (m_expectedEOFs.decrementAndGet() == 0) {
                     m_EOF = true;
                 }
-                return null;
             }
             else if (type == StreamSnapshotMessageType.SCHEMA) {
                 rejoinLog.trace("Got SCHEMA message");
 
-                block.position(block.position() + 1 + 4);
+                block.position(StreamSnapshotDataTarget.contentOffset);
                 byte[] schemaBytes = new byte[block.remaining()];
                 block.get(schemaBytes);
                 m_schemas.put(block.getInt(StreamSnapshotDataTarget.tableIdOffset),
                               schemaBytes);
-                return null;
             }
+            else {
+                // It's normal snapshot data afterwards
 
-            // It's normal snapshot data afterwards
+                final int tableId = block.getInt(StreamSnapshotDataTarget.tableIdOffset);
 
-            final int tableId = block.getInt(StreamSnapshotDataTarget.tableIdOffset);
-            final int blockIndex = block.getInt(StreamSnapshotDataTarget.blockIndexOffset);
+                if (!m_schemas.containsKey(tableId)) {
+                    VoltDB.crashLocalVoltDB("No schema for table with ID " + tableId,
+                                            false, null);
+                }
 
-            if (!m_schemas.containsKey(tableId)) {
-                VoltDB.crashLocalVoltDB("No schema for table with ID " + tableId,
-                                        false, null);
+                // Get the byte buffer ready to be consumed
+                block.position(StreamSnapshotDataTarget.contentOffset);
+                ByteBuffer nextChunk = getNextChunk(m_schemas.get(tableId), block, resultBufferAllocator);
+                m_bytesReceived += nextChunk.remaining();
+
+                processed = Pair.of(tableId, nextChunk);
             }
-
-            // Get the byte buffer ready to be consumed
-            block.position(StreamSnapshotDataTarget.contentOffset);
-            ByteBuffer nextChunk = getNextChunk(tableId, block, resultBufferAllocator);
-            m_bytesReceived += nextChunk.remaining();
 
             // Queue ack to this block
-            m_ack.ack(hsId, targetId, blockIndex);
+            m_ack.ack(hsId, m_EOF, targetId, blockIndex);
 
-            return Pair.of(tableId, nextChunk);
+            return processed;
         } finally {
             container.discard();
         }

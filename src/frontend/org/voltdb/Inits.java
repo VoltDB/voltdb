@@ -622,9 +622,19 @@ public class Inits {
         @Override
         public void run() {
             // Initialize the complex partitioning scheme
+            int partitionCount;
+            if (m_config.m_startAction == StartAction.JOIN) {
+                // Initialize the hashinator with the existing partition count in the cluster,
+                // don't include the partitions that we're adding because they shouldn't contain
+                // any ranges yet.
+                partitionCount = m_rvdb.m_cartographer.getPartitionCount();
+            } else {
+                partitionCount = m_rvdb.m_configuredNumberOfPartitions;
+            }
+
             TheHashinator.initialize(
-                    TheHashinator.getConfiguredHashinatorClass(),
-                    TheHashinator.getConfigureBytes(m_rvdb.m_configuredNumberOfPartitions));
+                TheHashinator.getConfiguredHashinatorClass(),
+                TheHashinator.getConfigureBytes(partitionCount));
         }
     }
 

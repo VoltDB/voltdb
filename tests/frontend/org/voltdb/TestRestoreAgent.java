@@ -285,21 +285,6 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         }
 
         @Override
-        public void setSendHeartbeats(boolean val) {
-
-        }
-
-        @Override
-        public void sendHeartbeat(long txnId) {
-
-        }
-
-        @Override
-        public boolean isOnBackPressure() {
-            return false;
-        }
-
-        @Override
         public void removeConnectionStats(long connectionId) {
 
         }
@@ -498,7 +483,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
     @Before
     public void setUp() throws Exception {
-        RestoreAdapter.m_testConnectionIdGenerator = new AtomicLong(Long.MIN_VALUE);
+        SimpleClientResponseAdapter.m_testConnectionIdGenerator = new AtomicLong(Long.MIN_VALUE);
         m_count.set(0);
         m_done = false;
         snapshotted = false;

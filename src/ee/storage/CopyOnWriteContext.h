@@ -35,18 +35,13 @@ class TupleIterator;
 class TempTable;
 class ParsedPredicate;
 class TupleOutputStreamProcessor;
+class PersistentTableSurgeon;
 
 class CopyOnWriteContext : public TableStreamerContext {
 
-    friend bool TableStreamer::activateStream(PersistentTable&, CatalogId);
+    friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TupleSerializer&, TableStreamType, std::vector<std::string>&);
 
 public:
-
-    /**
-     * Serialize tuples to the provided output until no more tuples can be serialized.
-     * Return remaining tuple count, 0 if done, or -1 on error.
-     */
-    int64_t serializeMore(TupleOutputStreamProcessor &output_targets);
 
     /**
      * Mark a tuple as dirty and make a copy if necessary. The new tuple param indicates
@@ -58,6 +53,11 @@ public:
     void markTupleDirty(TableTuple tuple, bool newTuple);
 
     virtual ~CopyOnWriteContext();
+
+    /**
+     * Activation handler.
+     */
+    virtual ActivationReturnCode handleActivation(TableStreamType streamType, bool reactivate);
 
     /**
      * Mandatory TableStreamContext override.
@@ -94,6 +94,7 @@ private:
      * Private so that only TableStreamer::activateStream() can call.
      */
     CopyOnWriteContext(PersistentTable &table,
+                       PersistentTableSurgeon &surgeon,
                        TupleSerializer &serializer,
                        int32_t partitionId,
                        const std::vector<std::string> &predicateStrings,
@@ -103,11 +104,6 @@ private:
      * Temp table for copies of tuples that were dirtied.
      */
     boost::scoped_ptr<TempTable> m_backedUpTuples;
-
-    /**
-     * Serializer for tuples
-     */
-    TupleSerializer &m_serializer;
 
     /**
      * Memory pool for string allocations
@@ -126,18 +122,9 @@ private:
      */
     boost::scoped_ptr<TupleIterator> m_iterator;
 
-    /**
-     * Maximum serialized length of a tuple
-     */
-    const int m_maxTupleLength;
-
     TableTuple m_tuple;
 
     bool m_finishedTableScan;
-
-    const int32_t m_partitionId;
-
-    StreamPredicateList m_predicates;
 
     int64_t m_totalTuples;
     int64_t m_tuplesRemaining;

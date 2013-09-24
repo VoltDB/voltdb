@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -198,11 +199,11 @@ public class MpInitiatorMailbox extends InitiatorMailbox
 
 
     @Override
-    public void updateReplicas(final List<Long> replicas) {
+    public void updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters) {
         m_taskQueue.offer(new Runnable() {
             @Override
             public void run() {
-                updateReplicasInternal(replicas);
+                updateReplicasInternal(replicas, partitionMasters);
             }
         });
     }

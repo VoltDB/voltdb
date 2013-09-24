@@ -28,11 +28,12 @@
  */
 namespace voltdb {
 class PersistentTable;
+class PersistentTableSurgeon;
 class ReferenceSerializeOutput;
 
 class RecoveryContext : public TableStreamerContext {
 
-    friend bool TableStreamer::activateStream(PersistentTable&, CatalogId);
+    friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TupleSerializer&, TableStreamType, std::vector<std::string>&);
 
 public:
 
@@ -54,7 +55,11 @@ private:
     /**
      * Constructor - private so that only TableStreamer::activateStream() can call.
      */
-    RecoveryContext(PersistentTable &table, int32_t tableId);
+    RecoveryContext(PersistentTable &table,
+                    PersistentTableSurgeon &surgeon,
+                    int32_t partitionId,
+                    TupleSerializer &serializer,
+                    int32_t tableId);
 
     bool m_firstMessage;
     /*

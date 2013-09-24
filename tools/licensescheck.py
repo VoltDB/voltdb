@@ -163,7 +163,7 @@ def fixTabs(f, content):
     cleanlines = []
     for line in content.split("\n"):
         while '\t' in line:
-            (pre, post) = line.split('\t')
+            (pre, post) = line.split('\t', 1)
             # replace each tab with a complement of up to 4 spaces -- I suppose this could be made adjustable.
             # go ahead and allow trailing whitespace -- clean it up later
             line = pre + ("    "[(len(pre) % 4 ): 4]) + post

@@ -413,7 +413,7 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
             TupleOutputStreamProcessor outs( serializationBuffer, serializationBufferSize);
             TupleOutputStream &out = outs.at(0);
             std::vector<int> retPositions;
-            m_table->streamMore(outs, retPositions);
+            m_table->streamMore(outs, TABLE_STREAM_SNAPSHOT, retPositions);
             const int serialized = static_cast<int>(out.position());
             if (out.position() == 0) {
                 break;
@@ -559,7 +559,7 @@ TEST_F(CompactionTest, TestENG897) {
         TupleOutputStreamProcessor outs( serializationBuffer, 2097152);
         TupleOutputStream &out = outs.at(0);
         std::vector<int> retPositions;
-        m_table->streamMore(outs, retPositions);
+        m_table->streamMore(outs, TABLE_STREAM_SNAPSHOT, retPositions);
         if (out.position() == 0) {
             break;
         }

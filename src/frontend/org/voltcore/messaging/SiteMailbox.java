@@ -27,7 +27,7 @@ public class SiteMailbox implements Mailbox {
     final ArrayList<Deque<VoltMessage>> m_messages = new ArrayList<Deque<VoltMessage>>();
     final long m_hsId;
 
-    SiteMailbox(HostMessenger hostMessenger, long hsId) {
+    public SiteMailbox(HostMessenger hostMessenger, long hsId) {
         this.m_hostMessenger = hostMessenger;
         this.m_hsId = hsId;
         for (Subject s : Subject.values()) {

@@ -19,13 +19,13 @@
 
 #include <vector>
 #include <string>
-#include "storage/ElasticIndex.h"
 #include "storage/ElasticScanner.h"
 #include "storage/TableStreamer.h"
 #include "storage/TableStreamerContext.h"
 #include "storage/TupleBlock.h"
 
 class DummyElasticTableStreamer;
+class CopyOnWriteTest;
 
 namespace voltdb {
 
@@ -35,8 +35,9 @@ class TupleOutputStreamProcessor;
 class ElasticContext : public TableStreamerContext
 {
 
-    friend bool TableStreamer::activateStream(PersistentTable&, CatalogId);
+    friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TupleSerializer&, TableStreamType, std::vector<std::string>&);
     friend class ::DummyElasticTableStreamer;
+    friend class ::CopyOnWriteTest;
 
 public:
 
@@ -44,6 +45,16 @@ public:
      * Destructor.
      */
     virtual ~ElasticContext();
+
+    /**
+     * Activation/reactivation handler.
+     */
+    virtual ActivationReturnCode handleActivation(TableStreamType streamType, bool reactivate);
+
+    /**
+     * Deactivation handler.
+     */
+    virtual bool handleDeactivation(TableStreamType streamType);
 
     /**
      * Mandatory streamMore() handler.
@@ -77,18 +88,32 @@ private:
     /**
      * Constructor - private so that only TableStreamer::activateStream() can call.
      */
-    ElasticContext(PersistentTable &table, const std::vector<std::string> &predicateStrings);
+    ElasticContext(PersistentTable &table,
+                   PersistentTableSurgeon &surgeon,
+                   int32_t partitionId,
+                   TupleSerializer &serializer,
+                   const std::vector<std::string> &predicateStrings,
+                   size_t nTuplesPerCall = DEFAULT_TUPLES_PER_CALL);
 
     /**
-     * Scanner for retrieveing rows.
+     * Allow overriding how often index creation is throttled.
+     */
+    void setTuplesPerCall(size_t nTuplesPerCall) {
+        m_nTuplesPerCall = nTuplesPerCall;
+    }
+
+    /**
+     * Scanner for retrieving rows.
      */
     ElasticScanner m_scanner;
 
     /**
-     * Elastic index.
+     * The maximum number of tuples to index per handleStreamMore() call.
+     * It's non-const to allow tests to manipulate (e.g. CopyOnWriteTest).
      */
-    ElasticIndex m_index;
+    size_t m_nTuplesPerCall;
 
+    static const size_t DEFAULT_TUPLES_PER_CALL = 10000;
 };
 
 } // namespace voltdb

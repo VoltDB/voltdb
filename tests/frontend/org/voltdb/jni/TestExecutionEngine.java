@@ -25,25 +25,16 @@ package org.voltdb.jni;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import junit.framework.TestCase;
 
-import org.voltcore.messaging.MockMailbox;
-import org.voltcore.messaging.RecoveryMessage;
 import org.voltcore.messaging.RecoveryMessageType;
-import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltcore.utils.Pair;
 import org.voltdb.LegacyHashinator;
 import org.voltdb.PrivateVoltTableFactory;
-import org.voltdb.RecoverySiteProcessor.MessageHandler;
-import org.voltdb.RecoverySiteProcessorDestination;
-import org.voltdb.RecoverySiteProcessorSource;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorType;
@@ -53,6 +44,7 @@ import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.expressions.HashRangeExpressionBuilder;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 
 /**
@@ -185,8 +177,10 @@ public class TestExecutionEngine extends TestCase {
 
         loadTestTables( sourceEngine, m_catalog);
 
-        sourceEngine.activateTableStream( WAREHOUSE_TABLEID, TableStreamType.RECOVERY, new SnapshotPredicates());
-        sourceEngine.activateTableStream( STOCK_TABLEID, TableStreamType.RECOVERY, new SnapshotPredicates());
+        sourceEngine.activateTableStream( WAREHOUSE_TABLEID, TableStreamType.RECOVERY, Long.MAX_VALUE,
+                                          new SnapshotPredicates(-1).toBytes());
+        sourceEngine.activateTableStream( STOCK_TABLEID, TableStreamType.RECOVERY, Long.MAX_VALUE,
+                                          new SnapshotPredicates(-1).toBytes());
 
         BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
         try {
@@ -202,7 +196,7 @@ public class TestExecutionEngine extends TestCase {
             output.add(container);
             int serialized = sourceEngine.tableStreamSerializeMore(WAREHOUSE_TABLEID,
                                                                    TableStreamType.RECOVERY,
-                                                                   output)[0];
+                                                                   output).getSecond()[0];
             assertTrue(serialized > 0);
             container.b.limit(serialized);
             destinationEngine.get().processRecoveryMessage( container.b, container.address);
@@ -210,7 +204,7 @@ public class TestExecutionEngine extends TestCase {
 
             serialized = sourceEngine.tableStreamSerializeMore(WAREHOUSE_TABLEID,
                                                                TableStreamType.RECOVERY,
-                                                               output)[0];
+                                                               output).getSecond()[0];
             assertEquals( 5, serialized);
             assertEquals( RecoveryMessageType.Complete.ordinal(), container.b.get());
 
@@ -219,7 +213,7 @@ public class TestExecutionEngine extends TestCase {
             container.b.clear();
             serialized = sourceEngine.tableStreamSerializeMore(STOCK_TABLEID,
                                                                TableStreamType.RECOVERY,
-                                                               output)[0];
+                                                               output).getSecond()[0];
             assertTrue(serialized > 0);
             container.b.limit(serialized);
             destinationEngine.get().processRecoveryMessage( container.b, container.address);
@@ -227,7 +221,7 @@ public class TestExecutionEngine extends TestCase {
 
             serialized = sourceEngine.tableStreamSerializeMore(STOCK_TABLEID,
                                                                TableStreamType.RECOVERY,
-                                                               output)[0];
+                                                               output).getSecond()[0];
             assertEquals( 5, serialized);
             assertEquals( RecoveryMessageType.Complete.ordinal(), container.b.get());
             assertEquals( STOCK_TABLEID, container.b.getInt());
@@ -236,167 +230,6 @@ public class TestExecutionEngine extends TestCase {
         } finally {
             origin.discard();
         }
-    }
-
-    public void testRecoveryProcessors() throws Exception {
-        final long sourceId = 0;
-        final long sourceDataId = 1;
-        final long destinationId = 32;
-        final long destinationDataId = 33;
-        final AtomicReference<Boolean> sourceCompleted = new AtomicReference<Boolean>(false);
-        final AtomicReference<Boolean> destinationCompleted = new AtomicReference<Boolean>(false);
-        final String serializedCatalog = m_catalog.serialize();
-
-        int WAREHOUSE_TABLEID = warehouseTableId(m_catalog);
-        int STOCK_TABLEID = stockTableId(m_catalog);
-
-        final HashMap<Pair<String, Integer>, HashSet<Long>> tablesAndDestinations =
-            new HashMap<Pair<String, Integer>, HashSet<Long>>();
-        HashSet<Long> destinations = new HashSet<Long>();
-        destinations.add(destinationId);
-        tablesAndDestinations.put(Pair.of( "STOCK", STOCK_TABLEID), destinations);
-        tablesAndDestinations.put(Pair.of( "WAREHOUSE", WAREHOUSE_TABLEID), destinations);
-
-        final MockMailbox sourceMailbox = new MockMailbox();
-        MockMailbox.registerMailbox(sourceId, sourceMailbox);
-
-        final MockMailbox sourceDataMailbox = new MockMailbox();
-        sourceDataMailbox.setHSId(sourceDataId);
-        MockMailbox.registerMailbox(sourceDataId, sourceDataMailbox);
-
-        final Runnable onSourceCompletion = new Runnable() {
-            @Override
-            public void run() {
-                sourceCompleted.set(true);
-            }
-        };
-
-        final MessageHandler mh = new MessageHandler() {
-
-            @Override
-            public void handleMessage(VoltMessage message, long txnId) {
-                fail();
-            }
-        };
-
-        final Runnable onDestinationCompletion = new Runnable() {
-            @Override
-            public void run() {
-                destinationCompleted.set(true);
-            }
-        };
-
-        final AtomicReference<ExecutionEngine> destinationReference= new AtomicReference<ExecutionEngine>();
-
-
-        final HashMap<Pair<String, Integer>, Long> tablesAndSources =
-            new HashMap<Pair<String, Integer>, Long>();
-        tablesAndSources.put(Pair.of( "STOCK", STOCK_TABLEID), sourceId);
-        tablesAndSources.put(Pair.of( "WAREHOUSE", WAREHOUSE_TABLEID), sourceId);
-
-        final MockMailbox destinationMailbox = new MockMailbox();
-        MockMailbox.registerMailbox(destinationId, destinationMailbox);
-
-        final MockMailbox destinationDataMailbox = new MockMailbox();
-        destinationDataMailbox.setHSId(destinationDataId);
-        MockMailbox.registerMailbox(destinationDataId, destinationDataMailbox);
-        final byte configBytes[] = LegacyHashinator.getConfigureBytes(1);
-
-        Thread destinationThread = new Thread("Destination thread") {
-            @Override
-            public void run() {
-                final ExecutionEngine destinationEngine =
-                    new ExecutionEngineJNI(
-                            CLUSTER_ID,
-                            NODE_ID,
-                            (int)destinationId,
-                            (int)destinationId,
-                            "",
-                            100,
-                            HashinatorType.LEGACY,
-                            configBytes);
-                destinationReference.set(destinationEngine);
-                destinationEngine.loadCatalog( 0, serializedCatalog);
-                RecoverySiteProcessorDestination destinationProcess =
-                    new RecoverySiteProcessorDestination(
-                            tablesAndSources,
-                            destinationEngine,
-                            destinationMailbox,
-                            destinationDataMailbox,
-                            destinationId,
-                            0,
-                            onDestinationCompletion,
-                            mh);
-                /*
-                 * Do a lot of craziness so we can intercept the mailbox calls
-                 * and discard the buffer so it is returned to the source
-                 */
-                destinationProcess.doRecoveryWork(-1);
-                destinationProcess.doRecoveryWork(0);
-                assert(destinationCompleted.get());
-            }
-        };
-        destinationThread.start();
-
-        Thread.sleep(1000);
-
-        final AtomicReference<ExecutionEngine> sourceReference = new AtomicReference<ExecutionEngine>();
-
-        Thread sourceThread = new Thread("Source thread") {
-            @Override
-            public void run() {
-                final ExecutionEngine sourceEngine =
-                        new ExecutionEngineJNI(
-                                CLUSTER_ID,
-                                NODE_ID,
-                                (int)sourceId,
-                                (int)sourceId,
-                                "",
-                                100,
-                                HashinatorType.LEGACY,
-                                configBytes);
-                sourceReference.set(sourceEngine);
-                sourceEngine.loadCatalog( 0, serializedCatalog);
-
-                try {
-                    loadTestTables( sourceEngine, m_catalog);
-                } catch (Exception e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
-
-                VoltMessage message = sourceMailbox.recvBlocking();
-                assertTrue(message != null);
-                assertTrue(message instanceof RecoveryMessage);
-                RecoveryMessage rm = (RecoveryMessage)message;
-                final RecoverySiteProcessorSource sourceProcessor =
-                        new RecoverySiteProcessorSource(
-                                                        null,
-                                                        rm.txnId(),
-                                                        rm.sourceSite(),
-                                                        rm.getHSId(),
-                                                        tablesAndDestinations,
-                                                        sourceEngine,
-                                                        sourceMailbox,
-                                                        sourceDataMailbox,
-                                                        sourceId,
-                                                        onSourceCompletion,
-                                                        mh);
-                sourceProcessor.doRecoveryWork(0);
-            }
-        };
-        sourceThread.start();
-
-        destinationThread.join();
-        sourceThread.join();
-
-        assertEquals( sourceReference.get().tableHashCode(STOCK_TABLEID), destinationReference.get().tableHashCode(STOCK_TABLEID));
-        assertEquals( sourceReference.get().tableHashCode(WAREHOUSE_TABLEID), destinationReference.get().tableHashCode(WAREHOUSE_TABLEID));
-
-        assertEquals(200, sourceReference.get().serializeTable(WAREHOUSE_TABLEID).getRowCount());
-        assertEquals(1000, sourceReference.get().serializeTable(STOCK_TABLEID).getRowCount());
-        assertEquals(200, destinationReference.get().serializeTable(WAREHOUSE_TABLEID).getRowCount());
-        assertEquals(1000, destinationReference.get().serializeTable(STOCK_TABLEID).getRowCount());
     }
 
     private int warehouseTableId(Catalog catalog) {
@@ -424,6 +257,63 @@ public class TestExecutionEngine extends TestCase {
             assertTrue(tn.equals("WAREHOUSE") || tn.equals("STOCK"));
         }
     }
+
+    public void testStreamIndex() throws Exception {
+        sourceEngine.loadCatalog( 0, m_catalog.serialize());
+
+        // Each EE needs its own thread for correct initialization.
+        final AtomicReference<ExecutionEngine> destinationEngine = new AtomicReference<ExecutionEngine>();
+        final byte configBytes[] = LegacyHashinator.getConfigureBytes(1);
+        Thread destEEThread = new Thread() {
+            @Override
+            public void run() {
+                destinationEngine.set(
+                        new ExecutionEngineJNI(
+                                CLUSTER_ID,
+                                NODE_ID,
+                                0,
+                                0,
+                                "",
+                                100,
+                                HashinatorType.LEGACY,
+                                configBytes));
+            }
+        };
+        destEEThread.start();
+        destEEThread.join();
+
+        destinationEngine.get().loadCatalog( 0, m_catalog.serialize());
+
+        int STOCK_TABLEID = stockTableId(m_catalog);
+
+        loadTestTables( sourceEngine, m_catalog);
+
+        SnapshotPredicates predicates = new SnapshotPredicates(-1);
+        predicates.addPredicate(new HashRangeExpressionBuilder()
+                                        .put(0x0000000000000000L, 0x7fffffffffffffffL)
+                                        .build(0),
+                                true);
+
+        // Build the index
+        sourceEngine.activateTableStream(STOCK_TABLEID, TableStreamType.ELASTIC_INDEX, Long.MAX_VALUE, predicates.toBytes());
+
+        // Humor serializeMore() by providing a buffer, even though it's not used.
+        BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
+        try {
+            origin.b.clear();
+            long address = org.voltcore.utils.DBBPool.getBufferAddress(origin.b);
+            BBContainer container = new BBContainer(origin.b, address){
+                @Override
+                public void discard() {}
+            };
+            List<BBContainer> output = new ArrayList<BBContainer>();
+            output.add(container);
+            assertEquals(0, sourceEngine.tableStreamSerializeMore(STOCK_TABLEID, TableStreamType.ELASTIC_INDEX, output).getSecond()[0]);
+        } finally {
+            origin.discard();
+        }
+    }
+
 
     private ExecutionEngine sourceEngine;
     private static final int CLUSTER_ID = 2;

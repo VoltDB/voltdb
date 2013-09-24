@@ -17,17 +17,21 @@
 
 package org.voltdb;
 
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
+import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Throwables;
+import org.voltdb.dtxn.UndoAction;
 
 /**
  * Class that maps object values to partitions. It's rather simple
@@ -50,9 +54,22 @@ public abstract class TheHashinator {
         }
     };
 
-    private static final VoltLogger hostLogger = new VoltLogger("HOST");
+    /**
+     * Uncompressed configuration data accessor.
+     * @return configuration data bytes
+     */
+    public abstract byte[] getConfigBytes();
 
-    /*
+    /**
+     * Implementer should return compressed (cooked) bytes for serialization.
+     * @return config bytes
+     * @throws IOException
+     */
+    public abstract byte[] getCookedBytes() throws IOException;
+
+    protected static final VoltLogger hostLogger = new VoltLogger("HOST");
+
+     /*
      * Stamped instance, version associated with hash function, only update for newer versions
      */
     private static final AtomicReference<Pair<Long, ? extends TheHashinator>> instance =
@@ -63,7 +80,7 @@ public abstract class TheHashinator {
      * The starting version number will be 0.
      */
     public static void initialize(Class<? extends TheHashinator> hashinatorImplementation, byte config[]) {
-        instance.set(Pair.of(0L, constructHashinator( hashinatorImplementation, config)));
+        instance.set(Pair.of(0L, constructHashinator( hashinatorImplementation, config, false)));
     }
 
     /**
@@ -82,14 +99,19 @@ public abstract class TheHashinator {
     /**
      * Helper method to do the reflection boilerplate to call the constructor
      * of the selected hashinator and convert the exceptions to runtime exceptions.
+     * @param hashinatorImplementation  hashinator class
+     * @param configBytes  config data (raw or cooked)
+     * @param cooked  true if configBytes is cooked, i.e. in wire serialization format
+     * @return  the constructed hashinator
      */
     public static TheHashinator
         constructHashinator(
                 Class<? extends TheHashinator> hashinatorImplementation,
-                byte config[]) {
+                byte configBytes[], boolean cooked) {
         try {
-            Constructor<? extends TheHashinator> constructor = hashinatorImplementation.getConstructor(byte[].class);
-            return constructor.newInstance(config);
+            Constructor<? extends TheHashinator> constructor =
+                    hashinatorImplementation.getConstructor(byte[].class, boolean.class);
+            return constructor.newInstance(configBytes, cooked);
         } catch (Exception e) {
             Throwables.propagate(e);
         }
@@ -104,12 +126,32 @@ public abstract class TheHashinator {
      *
      * Longs are converted to bytes in little endian order for elastic, modulus for legacy.
      */
-    abstract protected int pHashinateLong(long value);
-    abstract protected int pHashinateBytes(byte[] bytes);
+    abstract public int pHashinateLong(long value);
+    abstract public int pHashinateBytes(byte[] bytes);
+    abstract public long pGetConfigurationSignature();
     abstract protected Pair<HashinatorType, byte[]> pGetCurrentConfig();
-    abstract protected Map<Long, Integer> pPredecessors(int partition);
-    abstract protected Pair<Long, Integer> pPredecessor(int partition, long token);
-    abstract protected Map<Long, Long> pGetRanges(int partition);
+    abstract public Map<Long, Integer> pPredecessors(int partition);
+    abstract public Pair<Long, Integer> pPredecessor(int partition, long token);
+    abstract public Map<Long, Long> pGetRanges(int partition);
+
+    /**
+     * Returns the configuration signature
+     * @return the configuration signature
+     */
+    static public long getConfigurationSignature() {
+        return instance.get().getSecond().pGetConfigurationSignature();
+    }
+
+    /**
+     * It computes a signature from the given configuration bytes
+     * @param config configuration byte array
+     * @return signature from the given configuration bytes
+     */
+    static public long computeConfigurationSignature(byte [] config) {
+        PureJavaCrc32C crc = new PureJavaCrc32C();
+        crc.update(config);
+        return crc.getValue();
+    }
 
     /**
      * Given a long value, pick a partition to store the data. It's only called for legacy
@@ -297,17 +339,43 @@ public abstract class TheHashinator {
      * Update the hashinator in a thread safe manner with a newer version of the hash function.
      * A version number must be provided and the new config will only be used if it is greater than
      * the current version of the hash function.
+     *
+     * Returns an action for undoing the hashinator update
+     * @param hashinatorImplementation  hashinator class
+     * @param version  hashinator version/txn id
+     * @param configBytes  config data (format determined by cooked flag)
+     * @param cooked  compressible wire serialization format if true
      */
-    public static void updateHashinator(
-            Class<? extends TheHashinator> hashinatorImplementation, long version, byte config[]) {
+    public static UndoAction updateHashinator(
+            Class<? extends TheHashinator> hashinatorImplementation,
+            long version,
+            byte configBytes[],
+            boolean cooked) {
         while (true) {
             final Pair<Long, ? extends TheHashinator> snapshot = instance.get();
             if (version > snapshot.getFirst()) {
                 Pair<Long, ? extends TheHashinator> update =
-                        Pair.of(version, constructHashinator(hashinatorImplementation, config));
-                if (instance.compareAndSet(snapshot, update)) return;
+                        Pair.of(version, constructHashinator(hashinatorImplementation, configBytes, cooked));
+                if (instance.compareAndSet(snapshot, update)) {
+                    return new UndoAction() {
+                        @Override
+                        public void release() {}
+
+                        @Override
+                        public void undo() {
+                            instance.set(snapshot);
+                        }
+                    };
+                }
             } else {
-                return;
+                return new UndoAction() {
+
+                    @Override
+                    public void release() {}
+
+                    @Override
+                    public void undo() {}
+                };
             }
         }
     }
@@ -353,20 +421,6 @@ public abstract class TheHashinator {
     }
 
     /**
-     * Add new partitions to create a new hashinator configuration.
-     */
-    public static byte[] addPartitions(Map<Long, Integer> tokensToPartitions) {
-        HashinatorType type = getConfiguredHashinatorType();
-        switch (type) {
-        case LEGACY:
-            throw new RuntimeException("Legacy hashinator doesn't support adding partitions");
-        case ELASTIC:
-            return ElasticHashinator.addPartitions(instance.get().getSecond(), tokensToPartitions);
-        }
-        throw new RuntimeException("Should not reach here");
-    }
-
-    /**
      * Get a basic configuration for the currently selected hashinator type based
      * on the current partition count. If Elastic is in play
      */
@@ -402,5 +456,43 @@ public abstract class TheHashinator {
      */
     public static Map<Long, Long> getRanges(int partition) {
         return instance.get().getSecond().pGetRanges(partition);
+    }
+
+    /**
+     * Get optimized configuration data for wire serialization.
+     * @return optimized configuration data
+     * @throws IOException
+     */
+    public static synchronized HashinatorSnapshotData serializeConfiguredHashinator()
+            throws IOException
+    {
+        HashinatorSnapshotData hashData = null;
+        Pair<Long, ? extends TheHashinator> currentInstance = instance.get();
+        switch (getConfiguredHashinatorType()) {
+          case LEGACY:
+            break;
+          case ELASTIC: {
+            byte[] cookedData = currentInstance.getSecond().getCookedBytes();
+            hashData = new HashinatorSnapshotData(cookedData, currentInstance.getFirst());
+            break;
+          }
+        }
+        return hashData;
+    }
+
+    /**
+     * Update the current configured hashinator class. Used by snapshot restore.
+     * @param version
+     * @param config
+     * @return UndoAction Undo action to revert hashinator update
+     */
+    public static UndoAction updateConfiguredHashinator(long version, byte config[]) {
+        return updateHashinator(getConfiguredHashinatorClass(), version, config, true);
+    }
+
+    public static Pair<Long, byte[]> getCurrentVersionedConfig()
+    {
+        Pair<Long, ? extends TheHashinator> currentHashinator = instance.get();
+        return Pair.of(currentHashinator.getFirst(), currentHashinator.getSecond().pGetCurrentConfig().getSecond());
     }
 }

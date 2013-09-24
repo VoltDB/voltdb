@@ -25,7 +25,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.SnapshotTableTask;
 
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -69,7 +68,7 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
     }
 
     @Override
-    public ListenableFuture<?> write(final Callable<BBContainer> tupleData, SnapshotTableTask context) {
+    public ListenableFuture<?> write(final Callable<BBContainer> tupleData, int tableId) {
         final ListenableFuture<BBContainer> computedData = VoltDB.instance().getComputationService().submit(tupleData);
 
         return m_es.submit(new Callable<Object>() {

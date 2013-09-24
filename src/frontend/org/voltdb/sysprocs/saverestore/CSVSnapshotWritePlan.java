@@ -19,40 +19,31 @@ package org.voltdb.sysprocs.saverestore;
 
 import java.io.File;
 import java.io.IOException;
-
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.json_voltpatches.JSONObject;
-
 import org.voltcore.utils.Pair;
-
-import org.voltdb.catalog.Table;
-
 import org.voltdb.CSVSnapshotFilter;
-
-import org.voltdb.dtxn.SiteTracker;
-
 import org.voltdb.SimpleFileSnapshotDataTarget;
 import org.voltdb.SnapshotDataFilter;
 import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
-
-import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.SystemProcedureExecutionContext;
-
-import org.voltdb.utils.CatalogUtil;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
+import org.voltdb.catalog.Table;
+import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.sysprocs.SnapshotRegistry;
+import org.voltdb.utils.CatalogUtil;
 
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
@@ -70,13 +61,16 @@ import com.google.common.primitives.Longs;
  * site on a node. */
 public class CSVSnapshotWritePlan extends SnapshotWritePlan
 {
+    @Override
     protected boolean createSetupInternal(
             String file_path, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
             JSONObject jsData, SystemProcedureExecutionContext context,
             String hostname, final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            SiteTracker tracker, long timestamp) throws IOException
+            SiteTracker tracker,
+            HashinatorSnapshotData hashinatorData,
+            long timestamp) throws IOException
     {
         assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty());
 
@@ -94,7 +88,7 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
         }
 
         NativeSnapshotWritePlan.createFileBasedCompletionTasks(file_path, file_nonce,
-                txnId, partitionTransactionIds, context, exportSequenceNumbers, timestamp,
+                txnId, partitionTransactionIds, context, exportSequenceNumbers, null, timestamp,
                 context.getNumberOfPartitions());
 
         final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());

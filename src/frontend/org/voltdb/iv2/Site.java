@@ -19,10 +19,7 @@ package org.voltdb.iv2;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Deque;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -30,6 +27,7 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
@@ -46,6 +44,7 @@ import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
 import org.voltdb.SnapshotDataTarget;
+import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.StartAction;
@@ -53,6 +52,7 @@ import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStats;
+import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -63,6 +63,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngine.TaskType;
@@ -91,7 +92,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     final int m_snapshotPriority;
 
-    // Partition count is important for some reason.
+    // Partition count is important on SPIs, MPI doesn't use it.
     int m_numberOfPartitions;
 
     // What type of EE is controlled
@@ -318,6 +319,19 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         {
             Site.this.updateHashinator(config);
         }
+
+        @Override
+        public boolean activateTableStream(final int tableId, TableStreamType type, long undoToken, byte[] predicates)
+        {
+            return m_ee.activateTableStream(tableId, type, undoToken, predicates);
+        }
+
+        @Override
+        public Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
+                                                          List<DBBPool.BBContainer> outputBuffers)
+        {
+            return m_ee.tableStreamSerializeMore(tableId, type, outputBuffers);
+        }
     };
 
     /** Create a new execution site and the corresponding EE */
@@ -414,6 +428,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     ExecutionEngine initializeEE(String serializedCatalog, final long timestamp)
     {
         String hostname = CoreUtils.getHostnameOrAddress();
+        Pair<TheHashinator.HashinatorType, byte[]> hashinatorConfig = TheHashinator.getCurrentConfig();
         ExecutionEngine eeTemp = null;
         try {
             if (m_backend == BackendTarget.NATIVE_EE_JNI) {
@@ -426,8 +441,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         hostname,
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getMaxtemptablesize(),
-                        TheHashinator.getConfiguredHashinatorType(),
-                        TheHashinator.getConfigureBytes(m_numberOfPartitions));
+                        hashinatorConfig.getFirst(),
+                        hashinatorConfig.getSecond());
                 eeTemp.loadCatalog( timestamp, serializedCatalog);
             }
             else {
@@ -443,8 +458,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             getSystemsettings().get("systemsettings").getMaxtemptablesize(),
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPort,
-                            TheHashinator.getConfiguredHashinatorType(),
-                            TheHashinator.getConfigureBytes(m_numberOfPartitions));
+                            hashinatorConfig.getFirst(),
+                            hashinatorConfig.getSecond());
                 eeTemp.loadCatalog( timestamp, serializedCatalog);
             }
         }
@@ -635,12 +650,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     //
     @Override
     public void initiateSnapshots(
+            SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
             List<SnapshotDataTarget> targets,
             long txnId,
             int numLiveHosts,
             Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers) {
-        m_snapshotter.initiateSnapshots(m_ee, tasks, targets, txnId, numLiveHosts, exportSequenceNumbers);
+        m_snapshotter.initiateSnapshots(m_sysprocContext, format, tasks, targets, txnId, numLiveHosts,
+                                        exportSequenceNumbers);
     }
 
     /*
@@ -649,7 +666,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      */
     @Override
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException {
-        return m_snapshotter.completeSnapshotWork(m_sysprocContext, m_ee);
+        return m_snapshotter.completeSnapshotWork(m_sysprocContext);
     }
 
     //
@@ -724,11 +741,24 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         return currentTxnState.recursableRun(this);
     }
 
+    private static void handleUndoLog(List<UndoAction> undoLog, boolean undo) {
+        if (undoLog == null) return;
+
+        for (final ListIterator<UndoAction> iterator = undoLog.listIterator(undoLog.size()); iterator.hasPrevious();) {
+            final UndoAction action = iterator.previous();
+            if (undo)
+                action.undo();
+            else
+                action.release();
+        }
+    }
+
     @Override
-    public void truncateUndoLog(boolean rollback, long beginUndoToken, long txnId, long spHandle)
+    public void truncateUndoLog(boolean rollback, long beginUndoToken, long txnId, long spHandle, List<UndoAction> undoLog)
     {
         if (rollback) {
             m_ee.undoUndoToken(beginUndoToken);
+            handleUndoLog(undoLog, true);
         }
         else {
             assert(latestUndoToken != Site.kInvalidUndoToken);
@@ -743,6 +773,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         TxnEgo.getPartitionId(spHandle), true, null);
             }
             m_lastCommittedSpHandle = spHandle;
+            handleUndoLog(undoLog, false);
         }
     }
 
@@ -896,7 +927,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public Future<?> doSnapshotWork()
     {
-        return m_snapshotter.doSnapshotWork(m_sysprocContext, m_ee);
+        return m_snapshotter.doSnapshotWork(m_sysprocContext);
     }
 
     @Override
@@ -993,7 +1024,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             hostLog.info(String.format("Site %d performing schema change operation must block until snapshot is locally complete.",
                     CoreUtils.getSiteIdFromHSId(m_siteId)));
             try {
-                m_snapshotter.completeSnapshotWork(m_sysprocContext, m_ee);
+                m_snapshotter.completeSnapshotWork(m_sysprocContext);
                 hostLog.info(String.format("Site %d locally finished snapshot. Will update catalog now.",
                         CoreUtils.getSiteIdFromHSId(m_siteId)));
             }

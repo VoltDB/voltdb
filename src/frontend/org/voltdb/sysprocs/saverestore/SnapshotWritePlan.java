@@ -20,32 +20,25 @@ package org.voltdb.sysprocs.saverestore;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-
 import java.util.Collection;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.json_voltpatches.JSONObject;
-
 import org.voltcore.logging.VoltLogger;
-
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
-
-import org.voltdb.dtxn.SiteTracker;
-
 import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotTableTask;
-
-import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltTable;
+import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.sysprocs.SnapshotRegistry;
 
 /**
  * This class was a crude initial effort to tease apart the code in
@@ -144,13 +137,15 @@ public abstract class SnapshotWritePlan
             JSONObject jsData, SystemProcedureExecutionContext context,
             String hostname, final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            SiteTracker tracker, long timestamp)
+            SiteTracker tracker,
+            HashinatorSnapshotData hashinatorData,
+            long timestamp)
     {
         try {
             boolean aborted = createSetupInternal(file_path, file_nonce,
                     txnId, partitionTransactionIds, jsData, context,
                     hostname, result, exportSequenceNumbers,
-                    tracker, timestamp);
+                    tracker, hashinatorData, timestamp);
             return aborted;
         }
         catch (Exception ex) {
@@ -198,7 +193,9 @@ public abstract class SnapshotWritePlan
             JSONObject jsData, SystemProcedureExecutionContext context,
             String hostname, final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            SiteTracker tracker, long timestamp) throws IOException;
+            SiteTracker tracker,
+            HashinatorSnapshotData hashinatorData,
+            long timestamp) throws IOException;
 
     /**
      * Get the task lists for each site.  Will only be useful after

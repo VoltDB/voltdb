@@ -21,6 +21,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.exceptions.TransactionRestartException;
@@ -93,7 +94,7 @@ public class TransactionTaskQueue
     // SiteTaskerQueue.  Before it does this, it unblocks the MP transaction
     // that may be running in the Site thread and causes it to rollback by
     // faking an unsuccessful FragmentResponseMessage.
-    synchronized void repair(SiteTasker task, List<Long> masters)
+    synchronized void repair(SiteTasker task, List<Long> masters, Map<Integer, Long> partitionMasters)
     {
         // At the MPI's TransactionTaskQueue, we know that there can only be
         // one transaction in the SiteTaskerQueue at a time, because the
@@ -105,7 +106,7 @@ public class TransactionTaskQueue
         Iterator<TransactionTask> iter = m_backlog.iterator();
         if (iter.hasNext()) {
             MpProcedureTask next = (MpProcedureTask)iter.next();
-            next.doRestart(masters);
+            next.doRestart(masters, partitionMasters);
             // get head
             // Only the MPI's TransactionTaskQueue is ever called in this way, so we know
             // that the TransactionTasks we pull out of it have to be MP transactions, so this
@@ -127,7 +128,7 @@ public class TransactionTaskQueue
             while (iter.hasNext())
             {
                 next = (MpProcedureTask)iter.next();
-                next.updateMasters(masters);
+                next.updateMasters(masters, partitionMasters);
             }
         }
     }

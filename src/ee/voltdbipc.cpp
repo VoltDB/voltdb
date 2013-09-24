@@ -133,6 +133,7 @@ typedef struct {
     struct ipc_command cmd;
     voltdb::CatalogId tableId;
     voltdb::TableStreamType streamType;
+    int64_t undoToken;
     char data[0];
 }__attribute__((packed)) activate_tablestream;
 
@@ -933,10 +934,11 @@ int8_t VoltDBIPC::activateTableStream(struct ipc_command *cmd) {
     // Provide access to the serialized message data, i.e. the predicates.
     void* offset = activateTableStreamCommand->data;
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(activate_tablestream));
+    int64_t undoToken = ntohll(activateTableStreamCommand->undoToken);
     ReferenceSerializeInput serialize_in(offset, sz);
 
     try {
-        if (m_engine->activateTableStream(tableId, streamType, serialize_in)) {
+        if (m_engine->activateTableStream(tableId, streamType, undoToken, serialize_in)) {
             return kErrorCode_Success;
         } else {
             return kErrorCode_Error;
