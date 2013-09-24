@@ -332,6 +332,42 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         return true;
     }
 
+    private static boolean areOverloads(List<AbstractExpression> list1,
+                                        List<AbstractExpression> list2)
+    {
+        int sz = list1.size();
+        if (sz != list2.size()) {
+            return false;
+        }
+        for (int ii = 0; ii < sz; ++ii) {
+            if ( ! list1.get(ii).isAnOverloadOf(list2.get(ii))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Deserialize 2 lists of AbstractExpressions from JSON format strings
+     * and determine whether the expressions at each position correspond to each other
+     * -- that they are either equal or that they differ only in the value types they reference
+     * -- like application of two overloads of the same function or operator applied to columns
+     * with the same name but different types.
+     * These overloads are sometimes allowable in live schema updates where more general changes
+     * might be forbidden.
+     * @return true iff the two strings represent lists of the same expressions, allowing for types
+     */
+    public static boolean areOverloadedJSONExpressionLists(String jsontext1, String jsontext2)
+    {
+        try {
+            List<AbstractExpression> list1 = fromJSONArrayString(jsontext1);
+            List<AbstractExpression> list2 = fromJSONArrayString(jsontext2);
+            return areOverloads(list1, list2);
+        } catch (JSONException je) {
+            return false;
+        }
+    }
+
     // Derived classes that define attributes should compare them in their refinements of this method.
     // This implementation is provided as a convenience for Operators et. al. that have no attributes that could differ.
     protected boolean hasEqualAttributes(AbstractExpression expr) {
