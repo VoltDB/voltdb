@@ -112,6 +112,10 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         return m_payload;
     }
 
+    /**
+     * Get version/config with the config in compressed (wire) format.
+     * @return version/config pair
+     */
     public Pair<Long, byte[]> getHashinatorVersionedConfig()
     {
         return Pair.of(m_hashinatorVersion, m_hashinatorConfig);
