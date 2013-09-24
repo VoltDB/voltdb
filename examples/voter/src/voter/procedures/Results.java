@@ -37,8 +37,6 @@ import org.voltdb.VoltTable;
 )
 public class Results extends VoltProcedure
 {
-    public final SQLStmt tablescan = new SQLStmt("select * from contestants;");
-
     // Gets the results
     public final SQLStmt resultStmt = new SQLStmt( "   SELECT a.contestant_name   AS contestant_name"
                                                  + "        , a.contestant_number AS contestant_number"
