@@ -112,6 +112,13 @@ def verifyGetHostName(f, content):
         else:
             return 0
 
+    if f.endswith('/ConnectionUtil.java'):
+        if num != 1:
+            print(errorfmt % (f, 1, num))
+            return 1
+        else:
+            return 0
+
     if f.endswith('/ExportOnServerVerifier.java'):
         return 0
 
