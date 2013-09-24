@@ -76,7 +76,7 @@ public abstract class TheHashinator {
      */
     public static TheHashinator getHashinator(Class<? extends TheHashinator> hashinatorImplementation,
             byte config[]) {
-        return constructHashinator(hashinatorImplementation, config);
+        return constructHashinator(hashinatorImplementation, config, false);
     }
 
     /**
