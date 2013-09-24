@@ -140,12 +140,13 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         builder.addStmtProcedure("StmtSPNoncandidate1", "select count(*) from blah where sval = ?", null);
         builder.addStmtProcedure("StmtSPNoncandidate2", "select count(*) from blah where sval = '12345678'", null);
         builder.addStmtProcedure("StmtSPNoncandidate3", "select count(*) from indexed_replicated_blah where ival = ?", null);
-
+        builder.addStmtProcedure("FullIndexScan", "select ival, sval from indexed_replicated_blah", null);
 
 
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("annotations.jar"));
         assert(success);
         String captured = capturer.toString("UTF-8");
+        System.out.println(captured);
         String[] lines = captured.split("\n");
 
         assertTrue(foundLineMatching(lines, ".*\\[READ].*NondeterministicROProc.*"));
@@ -156,6 +157,7 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         assertTrue(foundLineMatching(lines, ".*\\[WRITE].*BLAH.insert.*"));
         assertTrue(foundLineMatching(lines, ".*\\[WRITE].*NondeterministicRWProc.*"));
         assertTrue(foundLineMatching(lines, ".*\\[WRITE].*DeterministicRWProc.*"));
+        assertTrue(foundLineMatching(lines, ".*\\[TABLE SCAN].*select ival, sval from indexed_replicated_blah.*"));
 
         assertEquals(1, countLinesMatching(lines, ".*\\[NDC].*NDC=true.*"));
 
