@@ -30,6 +30,7 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.ArrayList;
 
+import org.voltcore.network.ReverseDNSCache;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -263,7 +264,7 @@ public class ClusterMonitor {
         int successfulConnections = 0;
         for (InetSocketAddress host : voltHosts) {
             try {
-                m_client.createConnection(host.getHostName());
+                m_client.createConnection(ReverseDNSCache.hostnameOrAddress(host.getAddress()));
                 successfulConnections++;
             } catch (IOException e) {
                 e.printStackTrace();
