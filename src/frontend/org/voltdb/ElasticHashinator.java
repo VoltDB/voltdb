@@ -37,6 +37,8 @@ import org.voltcore.utils.Pair;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Supplier;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.UnmodifiableIterator;
@@ -52,8 +54,6 @@ public class ElasticHashinator extends TheHashinator {
     static final String SECURE_RANDOM_ALGORITHM = "SHA1PRNG";
     static final byte [] SECURE_RANDON_SEED = "Festina Lente".getBytes(Charsets.UTF_8);
 
-    public final static long TOKEN_MASK = 0xFFFFFFFF00000000L;
-
     /**
      * Tokens on the ring. A value hashes to a token if the token is the first value <=
      * the value's hash
@@ -65,7 +65,45 @@ public class ElasticHashinator extends TheHashinator {
     /**
      * Cached data in format optimized for wire transmission.
      */
-    private final byte[] m_cookedBytes;
+    private final Supplier<byte[]> m_cookedBytesSupplier = new Supplier<byte[]>() {
+        @Override
+        public byte[] get() {
+            return toCookedBytes();
+        }
+    };
+    private final Supplier<byte[]> m_cookedBytesCache = Suppliers.memoize(m_cookedBytesSupplier);
+
+    /**
+     * Encapsulates all knowledge of how to compress/uncompress hash tokens.
+     */
+    private static class TokenCompressor {
+        final static long TOKEN_MASK = 0xFFFFFFFF00000000L;
+        final static int COMPRESSED_SIZE = 4;
+
+        /**
+         * Prepare token for compression.
+         * @return cleaned up token
+         */
+        static long prepare(long token) {
+            return token & TOKEN_MASK;
+        }
+
+        /**
+         * Compress token.
+         * @return compressed token
+         */
+        static int compress(long token) {
+            return (int)(token >>> 32);
+        }
+
+        /**
+         * Uncompress token.
+         * @return uncompressed token
+         */
+        static long uncompress(int token) {
+            return (long)token << 32;
+        }
+    }
 
     /**
      * The serialization format is big-endian and the first value is the number of tokens
@@ -87,12 +125,6 @@ public class ElasticHashinator extends TheHashinator {
         m_tokens = builder.build();
 
         m_configBytes = toBytes();
-        try {
-            m_cookedBytes = toCookedBytes();
-        }
-        catch (IOException e1) {
-            throw new RuntimeException(String.format("Failed to serialize cooked hashinator bytes: %s", e1.toString()));
-        }
         m_signature = TheHashinator.computeConfigurationSignature(m_configBytes);
     }
 
@@ -104,12 +136,6 @@ public class ElasticHashinator extends TheHashinator {
     private ElasticHashinator(Map<Long, Integer> tokens) {
         this.m_tokens = ImmutableSortedMap.copyOf(tokens);
         m_configBytes = toBytes();
-        try {
-            m_cookedBytes = toCookedBytes();
-        }
-        catch (IOException e1) {
-            throw new RuntimeException(String.format("Failed to serialize cooked hashinator bytes: %s", e1.toString()));
-        }
 
         m_signature = TheHashinator.computeConfigurationSignature(m_configBytes);
     }
@@ -147,7 +173,7 @@ public class ElasticHashinator extends TheHashinator {
 
             for (int i = 0; i < tokensPerPartition; i++) {
                 while (true) {
-                    long candidateToken = sr.nextLong() & TOKEN_MASK;
+                    long candidateToken = TokenCompressor.prepare(sr.nextLong());
                     if (!checkSet.add(candidateToken)) {
                         continue;
                     }
@@ -183,7 +209,7 @@ public class ElasticHashinator extends TheHashinator {
      * @return The byte[] of the current configuration.
      */
     public byte[] toBytes() {
-        ByteBuffer buf = ByteBuffer.allocate(4 + (m_tokens.size() * 12));//long and an int per
+        ByteBuffer buf = ByteBuffer.allocate(4 + (m_tokens.size() * (8 + TokenCompressor.COMPRESSED_SIZE)));
         buf.putInt(m_tokens.size());
 
         for (Map.Entry<Long, Integer> e : m_tokens.entrySet()) {
@@ -407,18 +433,18 @@ public class ElasticHashinator extends TheHashinator {
      * @return config bytes
      * @throws IOException
      */
-    public byte[] toCookedBytes() throws IOException
+    public byte[] toCookedBytes()
     {
-        // Allocate for a long/int pair per token/partition ID entry, plus a size.
-        ByteBuffer buf = ByteBuffer.allocate(4 + (m_tokens.size() * 12));
+        // Allocate for a int pair per token/partition ID entry, plus a size.
+        ByteBuffer buf = ByteBuffer.allocate(4 + (m_tokens.size() * (4 + TokenCompressor.COMPRESSED_SIZE)));
 
         int numEntries = m_tokens.size();
         buf.putInt(numEntries);
 
         // Keep tokens and partition ids separate to aid compression.
         for (Map.Entry<Long, Integer> e : m_tokens.entrySet()) {
-            long token = e.getKey();
-            buf.putLong(token);
+            int optimizedToken = TokenCompressor.compress(e.getKey());
+            buf.putInt(optimizedToken);
         }
         for (Map.Entry<Long, Integer> e : m_tokens.entrySet()) {
             int partitionId = e.getValue();
@@ -428,8 +454,14 @@ public class ElasticHashinator extends TheHashinator {
         // Compress (deflate) the bytes and cache the results.
         ByteArrayOutputStream bos = new ByteArrayOutputStream(buf.array().length);
         DeflaterOutputStream dos = new DeflaterOutputStream(bos);
-        dos.write(buf.array());
-        dos.close();
+        try {
+            dos.write(buf.array());
+            dos.close();
+        }
+        catch (IOException e) {
+            throw new RuntimeException(String.format(
+                    "Failed to deflate cooked bytes: %s", e.toString()));
+        }
         return bos.toByteArray();
     }
 
@@ -484,7 +516,7 @@ public class ElasticHashinator extends TheHashinator {
         int numEntries = (cookedBytes.length >= 4
                                 ? ByteBuffer.wrap(cookedBytes).getInt()
                                 : 0);
-        int tokensSize = 8 * numEntries;
+        int tokensSize = TokenCompressor.COMPRESSED_SIZE * numEntries;
         int partitionsSize = 4 * numEntries;
         if (numEntries <= 0 || cookedBytes.length != 4 + tokensSize + partitionsSize) {
             throw new RuntimeException("Bad elastic hashinator cooked config size.");
@@ -493,7 +525,7 @@ public class ElasticHashinator extends TheHashinator {
         ByteBuffer partitionBuf = ByteBuffer.wrap(cookedBytes, 4 + tokensSize, partitionsSize);
         TreeMap<Long, Integer> buildMap = new TreeMap<Long, Integer>();
         for (int ii = 0; ii < numEntries; ii++) {
-            final long token = tokenBuf.getLong();
+            final long token = TokenCompressor.uncompress(tokenBuf.getInt());
             final int partitionId = partitionBuf.getInt();
             if (buildMap.containsKey(token)) {
                 throw new RuntimeException(
@@ -508,11 +540,10 @@ public class ElasticHashinator extends TheHashinator {
     /**
      * Return (cooked) bytes optimized for serialization.
      * @return optimized config bytes
-     * @throws IOException
      */
     @Override
-    public byte[] getCookedBytes() throws IOException
+    public byte[] getCookedBytes()
     {
-        return m_cookedBytes;
+        return m_cookedBytesCache.get();
     }
 }

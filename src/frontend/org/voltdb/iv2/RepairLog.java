@@ -222,7 +222,7 @@ public class RepairLog
                         ofTotal,
                         m_lastSpHandle,
                         m_lastMpHandle,
-                        TheHashinator.getCurrentVersionedConfig());
+                        TheHashinator.getCurrentVersionedConfigCooked());
         responses.add(hheader);
 
         int seq = responses.size();
