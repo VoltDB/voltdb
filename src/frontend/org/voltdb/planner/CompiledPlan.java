@@ -22,8 +22,8 @@ import java.util.BitSet;
 import java.util.List;
 
 import org.voltdb.ParameterSet;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
+import org.voltdb.common.Constants;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -65,8 +65,9 @@ public class CompiledPlan {
      */
     public String explainedPlan = null;
 
-    /** Parameter types in parameter index order */
-    public VoltType[] parameters = null;
+    /** Parameters and their types in parameter index order */
+    public ParameterValueExpression[] parameters = null;
+    private VoltType[] m_parameterTypes = null;
 
     /** Parameter values, if the planner pulled constants out of the plan */
     public ParameterSet extractedParamValues = ParameterSet.emptyParameterSet();
@@ -213,7 +214,7 @@ public class CompiledPlan {
         }
 
         PlanNodeList planList = new PlanNodeList(planGraph);
-        return planList.toJSONString().getBytes(VoltDB.UTF8ENCODING);
+        return planList.toJSONString().getBytes(Constants.UTF8ENCODING);
     }
 
     // A reusable step extracted from boundParamIndexes so it can be applied to two different
@@ -272,6 +273,18 @@ public class CompiledPlan {
             setParamIndexes(ints, ixc.getBindings());
         }
         return bitSetToIntVector(ints);
+    }
+
+    // This is assumed to be called only after parameters has been fully initialized.
+    public VoltType[] parameterTypes() {
+        if (m_parameterTypes == null) {
+            m_parameterTypes = new VoltType[parameters.length];
+            int ii = 0;
+            for (ParameterValueExpression param : parameters) {
+                m_parameterTypes[ii++] = param.getValueType();
+            }
+        }
+        return m_parameterTypes;
     }
 
 }

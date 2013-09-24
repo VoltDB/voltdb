@@ -96,7 +96,8 @@ public class SnapshotUtil {
         Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
         Map<Integer, Long> partitionTransactionIds,
         InstanceId instanceId,
-        long timestamp)
+        long timestamp,
+        int newPartitionCount)
     throws IOException
     {
         final File f = new VoltFile(path, constructDigestFilenameForNonce(nonce, hostId));
@@ -116,6 +117,7 @@ public class SnapshotUtil {
                 stringer.key("txnId").value(txnId);
                 stringer.key("timestamp").value(timestamp);
                 stringer.key("timestampString").value(SnapshotUtil.formatHumanReadableDate(timestamp));
+                stringer.key("newPartitionCount").value(newPartitionCount);
                 stringer.key("tables").array();
                 for (int ii = 0; ii < tables.size(); ii++) {
                     stringer.value(tables.get(ii).getTypeName());

@@ -16,7 +16,6 @@ class BuildContext:
         self.THIRD_PARTY_INPUT_PREFIX = ""
         self.OUTPUT_PREFIX = ""
         self.TEST_PREFIX = ""
-        self.TEST_EXTRAFLAGS = ""
         self.INPUT = {}
         self.THIRD_PARTY_INPUT = {}
         self.TESTS = {}
@@ -224,7 +223,7 @@ def buildMakefile(CTX):
 
     makefile.write("# voltdb execution engine that accepts work on a tcp socket (vs. jni)\n")
     makefile.write("prod/voltdbipc: $(SRC)/voltdbipc.cpp " + " objects/volt.a\n")
-    makefile.write("\t$(LINK.cpp) %s -o $@ $^ %s\n" % (CTX.TEST_EXTRAFLAGS, CTX.LASTLDFLAGS))
+    makefile.write("\t$(LINK.cpp) -o $@ $^ %s\n" % (CTX.LASTLDFLAGS))
     makefile.write("\n")
 
 
@@ -246,7 +245,7 @@ def buildMakefile(CTX):
     makefile.write("\t$(CCACHE) $(COMPILE.cpp) -o $@ $^\n")
     makefile.write("\n")
 
-    LOCALTESTCPPFLAGS = LOCALCPPFLAGS + " -I%s" % (TEST_PREFIX) + CTX.TEST_EXTRAFLAGS
+    LOCALTESTCPPFLAGS = LOCALCPPFLAGS + " -I%s" % (TEST_PREFIX)
     allsources = []
     for filename in input_paths:
         allsources += [(filename, LOCALCPPFLAGS, IGNORE_SYS_PREFIXES)]
@@ -296,11 +295,11 @@ def buildMakefile(CTX):
         for dep in mydeps:
             makefile.write(" ../../%s" % (dep))
         makefile.write("\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I../../%s %s -o $@ ../../%s\n" % (TEST_PREFIX, CTX.TEST_EXTRAFLAGS, sourcename))
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I../../%s -o $@ ../../%s\n" % (TEST_PREFIX, sourcename))
 
         # link the test
         makefile.write("%s: %s objects/volt.a\n" % (binname, objectname))
-        makefile.write("\t$(LINK.cpp) %s -o %s %s objects/volt.a\n" % (CTX.TEST_EXTRAFLAGS, binname, objectname))
+        makefile.write("\t$(LINK.cpp) -o %s %s objects/volt.a\n" % (binname, objectname))
         targetpath = OUTPUT_PREFIX + "/" + "/".join(binname.split("/")[:-1])
         os.system("mkdir -p %s" % (targetpath))
 

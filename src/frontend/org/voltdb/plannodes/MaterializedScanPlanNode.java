@@ -25,9 +25,11 @@ import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SortDirectionType;
 
 /**
  * Used for SQL-IN that are accelerated with indexes.
@@ -40,9 +42,11 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
 
     private AbstractExpression m_tableData;
     private final TupleValueExpression m_outputExpression = new TupleValueExpression();
+    private SortDirectionType m_sortDirection = SortDirectionType.INVALID;
 
     public enum Members {
-        TABLE_DATA;
+        TABLE_DATA,
+        SORT_DIRECTION;
     }
 
     public MaterializedScanPlanNode() {
@@ -55,13 +59,21 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
     }
 
     public void setRowData(AbstractExpression tableData) {
-        assert(tableData instanceof VectorValueExpression);
+        assert(tableData instanceof VectorValueExpression || tableData instanceof ParameterValueExpression);
         m_tableData = tableData;
         m_outputExpression.setColumnIndex(0);
         m_outputExpression.setColumnName("list_element");
         m_outputExpression.setTableName("materialized_temp_table");
         m_outputExpression.setValueType(m_tableData.getValueType());
         m_outputExpression.setValueSize(m_tableData.getValueSize());
+    }
+
+    public void setSortDirection(SortDirectionType direction) {
+        m_sortDirection = direction;
+    }
+
+    public SortDirectionType getSortDirection() {
+        return m_sortDirection;
     }
 
     // Extract a TVE for the single column of a MaterializedScan for use as a join key for an IndexScan
@@ -89,7 +101,7 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
 
     @Override
     protected String explainPlanForNode(String indent) {
-        return "MATERIALIZED SCAN of SQL-IN-LIST";
+        return "MATERIALIZED SCAN of SQL-IN-LIST (Sort " + m_sortDirection.toString() + ")";
     }
 
     @Override
@@ -124,6 +136,10 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
         assert(m_tableData != null);
         m_tableData.toJSONString(stringer);
         stringer.endObject();
+
+        if (m_sortDirection == SortDirectionType.DESC) {
+            stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirection.toString());
+        }
     }
 
     @Override
@@ -133,6 +149,10 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
         assert(!obj.isNull(Members.TABLE_DATA.name()));
         JSONObject tableDataObj = obj.getJSONObject(Members.TABLE_DATA.name());
         m_tableData = AbstractExpression.fromJSONObject(tableDataObj, db);
+
+        if (!obj.isNull(Members.SORT_DIRECTION.name())) {
+            m_sortDirection = SortDirectionType.get(obj.getString( Members.SORT_DIRECTION.name()));
+        }
     }
 
 }

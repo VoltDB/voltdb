@@ -17,34 +17,27 @@
 
 package org.voltdb.sysprocs.saverestore;
 
-import com.google.common.base.Charsets;
-import com.google.common.collect.ImmutableList;
-import org.voltdb.expressions.AbstractExpression;
-
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+
+import org.json_voltpatches.JSONStringer;
+import org.voltcore.utils.Pair;
+import org.voltdb.VoltDB;
+import org.voltdb.expressions.AbstractExpression;
+
+import com.google.common.base.Charsets;
 
 /**
  * A helper class to encapsulate the serialization of snapshot predicates.
  */
 public class SnapshotPredicates {
-    private final List<AbstractExpression> m_predicates = new ArrayList<AbstractExpression>();
-    private final boolean m_deleteTuples;
+    private final List<Pair<AbstractExpression, Boolean>> m_predicates =
+            new ArrayList<Pair<AbstractExpression, Boolean>>();
 
-    public SnapshotPredicates()
+    public void addPredicate(AbstractExpression predicate, boolean deleteTuples)
     {
-        m_deleteTuples = false;
-    }
-
-    public SnapshotPredicates(boolean deleteTuples)
-    {
-        m_deleteTuples = deleteTuples;
-    }
-
-    public void addPredicate(AbstractExpression predicate)
-    {
-        m_predicates.add(predicate);
+        m_predicates.add(Pair.of(predicate, deleteTuples));
     }
 
     public byte[] toBytes()
@@ -52,18 +45,34 @@ public class SnapshotPredicates {
         byte[][] predicates = new byte[m_predicates.size()][];
         int i = 0;
         int size = 0;
-        for (AbstractExpression predicate : m_predicates) {
-            predicates[i] = predicate.toJSONString().getBytes(Charsets.UTF_8);
-            size += predicates[i].length;
-            i++;
+        try {
+            for (Pair<AbstractExpression, Boolean> p : m_predicates) {
+                final AbstractExpression predicate = p.getFirst();
+                JSONStringer stringer = new JSONStringer();
+                stringer.object();
+                stringer.key("triggersDelete").value(p.getSecond());
+                // If the predicate is null, EE will serialize all rows to the corresponding data
+                // target. It's the same as passing an always-true expression,
+                // but without the overhead of the evaluating the expression. This avoids the
+                // overhead when there is only one data target that wants all the rows.
+                if (predicate != null) {
+                    stringer.key("predicateExpression").object();
+                    predicate.toJSONString(stringer);
+                    stringer.endObject();
+                }
+                stringer.endObject();
+                predicates[i] = stringer.toString().getBytes(Charsets.UTF_8);
+                size += predicates[i].length;
+                i++;
+            }
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Failed to serialize snapshot predicates", true, e);
         }
 
-        ByteBuffer buf = ByteBuffer.allocate(1 + // deleteTuples
-                                             4 + // predicate count
+        ByteBuffer buf = ByteBuffer.allocate(4 + // predicate count
                                              4 * predicates.length + // predicate byte lengths
                                              size); // predicate bytes
 
-        buf.put(m_deleteTuples ? 1 : (byte) 0);
         buf.putInt(m_predicates.size());
         for (byte[] predicate : predicates) {
             buf.putInt(predicate.length);

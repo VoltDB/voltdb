@@ -23,6 +23,8 @@ import java.io.PrintStream;
 import java.util.Set;
 import java.util.TreeSet;
 
+import org.voltdb.compiler.VoltCompiler;
+
 /**
  * This class just lets you get a PrintStream backed by a file
  * in a standard-ish place. It will create the directory structure
@@ -31,23 +33,48 @@ import java.util.TreeSet;
  */
 public abstract class BuildDirectoryUtils {
 
-    public static final String rootPath = "debugoutput/";
+    public static final String userRootPrefix = "statement-plans/";
+    public static final String debugRootPrefix = "debugoutput/";
 
     static String m_debugRoot = null;
+    static String m_userRoot = null;
     static Set<String> m_seenPaths = new TreeSet<String>();
 
-    public static void writeFile(final String dir, final String filename, String content) {
-        // cache the root of the folder
+    /**
+     * Write a file to disk during compilation that has some neato info generated during compilation.
+     * If the debug flag is true, that means this file should only be written if the compiler is
+     * running in debug mode.
+     */
+    public static void writeFile(final String dir, final String filename, String content, boolean debug) {
+        // skip debug files when not in debug mode
+        if (debug && !VoltCompiler.DEBUG_MODE) {
+            return;
+        }
+
+        // cache the root of the folder for the debugoutput and the statement-plans folder
         if (m_debugRoot == null) {
             if (System.getenv("TEST_DIR") != null) {
-                m_debugRoot = System.getenv("TEST_DIR") + File.separator + rootPath;
+                m_debugRoot = System.getenv("TEST_DIR") + File.separator + debugRootPrefix;
             } else {
-                m_debugRoot = rootPath;
+                m_debugRoot = debugRootPrefix;
+            }
+        }
+        if (m_userRoot == null) {
+            if (System.getenv("TEST_DIR") != null) {
+                m_userRoot = System.getenv("TEST_DIR") + File.separator + userRootPrefix;
+            } else {
+                m_userRoot = userRootPrefix;
             }
         }
 
+        // pic a place for the file based on debugness of the file in question
+        String root = debug ? m_debugRoot : m_userRoot;
+
         // don't call mkdirs more than once per subdir, so keep a cache
-        String subFolderPath = m_debugRoot + File.separator + dir;
+        String subFolderPath = root;
+        if (dir != null) {
+            subFolderPath += File.separator + dir;
+        }
         if (!m_seenPaths.contains(subFolderPath)) {
             File f = new File(subFolderPath);
             f.mkdirs();

@@ -419,25 +419,25 @@ public class TestFixedSQLSuite extends RegressionSuite {
         // join on the (5-id), (id) columns
         String query = "select * from P1, R1 where P1.NUM = R1.NUM";
         VoltTable vts[] = client.callProcedure("@AdHoc", query).getResults();
-        testNestLoopJoinPredicates_verify(vts);
+        nestLoopJoinPredicates_verify(vts);
 
         // same thing using inner join syntax
         query = "select * from P1 INNER JOIN R1 on P1.NUM = R1.NUM";
         vts = client.callProcedure("@AdHoc", query).getResults();
-        testNestLoopJoinPredicates_verify(vts);
+        nestLoopJoinPredicates_verify(vts);
 
         // join on ID and verify NUM. (ID is indexed)
         query = "select * from P1, R1 where P1.ID = R1.ID";
         vts = client.callProcedure("@AdHoc", query).getResults();
-        testNestLoopJoinPredicates_verifyid(vts);
+        nestLoopJoinPredicates_verifyid(vts);
 
         // as above with inner join syntax
         query = "select * from P1 INNER JOIN R1 on P1.ID = R1.ID";
         vts = client.callProcedure("@AdHoc", query).getResults();
-        testNestLoopJoinPredicates_verifyid(vts);
+        nestLoopJoinPredicates_verifyid(vts);
     }
 
-    private void testNestLoopJoinPredicates_verifyid(VoltTable[] vts) {
+    private void nestLoopJoinPredicates_verifyid(VoltTable[] vts) {
         assertEquals(1, vts.length);
         System.out.println("verifyid: " + vts[0]);
         assertTrue(vts[0].getRowCount() == 5);
@@ -453,7 +453,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
     }
 
-    private void testNestLoopJoinPredicates_verify(VoltTable[] vts)
+    private void nestLoopJoinPredicates_verify(VoltTable[] vts)
     {
         assertEquals(1, vts.length);
         System.out.println(vts[0]);
@@ -477,7 +477,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
     // Select a complex expression (not just a TupleValueExpression)
     // to verify that non-root TVEs are correctly offset.
     //
-    public void testNestLoopJoinPredicatesWithExpressions()
+    public void nestLoopJoinPredicatesWithExpressions()
     throws IOException, ProcCallException
     {
         Client client = getClient();
@@ -490,15 +490,15 @@ public class TestFixedSQLSuite extends RegressionSuite {
         // join on the (5-id), (id) columns and select a value modified by an expression
         String query = "select (P1.ID + 20), (R1.ID + 40) from P1, R1 where P1.NUM = R1.NUM";
         VoltTable vts[] = client.callProcedure("@AdHoc", query).getResults();
-        testNestLoopJoinPredicatesWithExpressions_verify(vts);
+        nestLoopJoinPredicatesWithExpressions_verify(vts);
 
         // same thing using inner join syntax
         query = "select (P1.ID + 20), (R1.ID + 40) from P1 INNER JOIN R1 on P1.NUM = R1.NUM";
         vts = client.callProcedure("@AdHoc", query).getResults();
-        testNestLoopJoinPredicatesWithExpressions_verify(vts);
+        nestLoopJoinPredicatesWithExpressions_verify(vts);
     }
 
-    private void testNestLoopJoinPredicatesWithExpressions_verify(
+    private void nestLoopJoinPredicatesWithExpressions_verify(
             VoltTable[] vts) {
         assertEquals(1, vts.length);
         System.out.println(vts[0]);
@@ -539,15 +539,15 @@ public class TestFixedSQLSuite extends RegressionSuite {
         // use an alias that would select an invalid column. (be a jerk).
         String query = "select R1.ID AS DESC, (P1.ID + 20) AS THOMAS from P1, R1 where P1.NUM = R1.NUM";
         VoltTable vts[] = client.callProcedure("@AdHoc", query).getResults();
-        testNestLoopJoinPredicatesWithAliases_verify(vts);
+        nestLoopJoinPredicatesWithAliases_verify(vts);
 
         // same thing using inner join syntax
         query = "select R1.ID AS DESC, (P1.ID + 20) AS THOMAS from P1 INNER JOIN R1 on P1.NUM = R1.NUM";
         vts = client.callProcedure("@AdHoc", query).getResults();
-        testNestLoopJoinPredicatesWithAliases_verify(vts);
+        nestLoopJoinPredicatesWithAliases_verify(vts);
     }
 
-    private void testNestLoopJoinPredicatesWithAliases_verify(VoltTable[] vts) {
+    private void nestLoopJoinPredicatesWithAliases_verify(VoltTable[] vts) {
         assertEquals(1, vts.length);
         System.out.println(vts[0]);
         assertTrue(vts[0].getRowCount() == 4);
@@ -948,11 +948,14 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("Insert", table, id++, "desc", 200, 15.5);
             client.callProcedure("Insert", table, id++, "desc", 300, 16.5);
         }
-        String query = "select P1.ID from R1, P1 group by P1.ID";
+        String query = "select P1.ID from R1, P1 group by P1.ID order by P1.ID";
         VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
         results = client.callProcedure("@AdHoc", query).getResults();
         assertEquals(3, results[0].getRowCount());
         assertEquals(1, results[0].getColumnCount());
+
+        System.err.println(results[0].toFormattedString());
+
         for (int i = 0; results[0].advanceRow(); i++)
         {
             assertEquals(i, results[0].getLong(0));
@@ -1117,7 +1120,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             fail();
         }
         catch (Exception e) {
-            assertTrue(e.getMessage().contains("Constant value cannot"));
+            assertTrue(e.getMessage().contains("invalid format for a constant"));
         }
         // test that parameters don't work (ENG-1000)
         try {
@@ -1219,7 +1222,9 @@ public class TestFixedSQLSuite extends RegressionSuite {
         project.addPartitionInfo("STRINGPART", "NAME");
         project.addProcedures(PROCEDURES);
 
-        project.addStmtProcedure("Crap", "insert into COUNT_NULL values (" + Long.MIN_VALUE + ", 1, 200)");
+        //TODO: Now that this fails to compile with an overflow error, it should be migrated to a
+        // Failures suite.
+        //project.addStmtProcedure("Crap", "insert into COUNT_NULL values (" + Long.MIN_VALUE + ", 1, 200)");
 
         project.addStmtProcedure("Eng397Limit1", "Select P1.NUM from P1 order by P1.NUM limit ?;");
         //project.addStmtProcedure("Eng490Select", "SELECT A.ASSET_ID, A.OBJECT_DETAIL_ID,  OD.OBJECT_DETAIL_ID FROM ASSET A, OBJECT_DETAIL OD WHERE A.OBJECT_DETAIL_ID = OD.OBJECT_DETAIL_ID;");

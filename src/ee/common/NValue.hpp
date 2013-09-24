@@ -31,7 +31,7 @@
 #include <vector>
 
 #include "boost/scoped_ptr.hpp"
-#include "boost/unordered_map.hpp"
+#include "boost/functional/hash.hpp"
 #include "ttmath/ttmathint.h"
 
 #include "common/ExportSerializeIo.h"
@@ -528,34 +528,6 @@ class NValue {
     // The array size is predetermined in allocateANewNValueList.
     void setArrayElements(std::vector<NValue> &args) const;
 
-  private:
-    /*
-     * Private methods are private for a reason. Don't expose the raw
-     * data so that it can be operated on directly.
-     */
-
-    // Function declarations for NValue.cpp definitions.
-    void createDecimalFromString(const std::string &txt);
-    std::string createStringFromDecimal() const;
-    NValue opDivideDecimals(const NValue lhs, const NValue rhs) const;
-    NValue opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const;
-
-    // Helpers for inList.
-    // These are purposely not inlines to avoid exposure of NValueList details.
-    void deserializeIntoANewNValueList(SerializeInput &input, Pool *dataPool);
-    void allocateANewNValueList(size_t elementCount, ValueType elementType);
-
-    // Promotion Rules. Initialized in NValue.cpp
-    static ValueType s_intPromotionTable[];
-    static ValueType s_decimalPromotionTable[];
-    static ValueType s_doublePromotionTable[];
-    static TTInt s_maxDecimalValue;
-    static TTInt s_minDecimalValue;
-    // These initializers give the unique double values that are
-    // closest but not equal to +/-1E26 within the accuracy of a double.
-    static const double s_gtMaxDecimalAsDouble;
-    static const double s_ltMinDecimalAsDouble;
-
     static ValueType promoteForOp(ValueType vta, ValueType vtb) {
         ValueType rt;
         switch (vta) {
@@ -592,6 +564,34 @@ class NValue {
         // assert(rt != VALUE_TYPE_INVALID);
         return rt;
     }
+
+  private:
+    /*
+     * Private methods are private for a reason. Don't expose the raw
+     * data so that it can be operated on directly.
+     */
+
+    // Function declarations for NValue.cpp definitions.
+    void createDecimalFromString(const std::string &txt);
+    std::string createStringFromDecimal() const;
+    NValue opDivideDecimals(const NValue lhs, const NValue rhs) const;
+    NValue opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const;
+
+    // Helpers for inList.
+    // These are purposely not inlines to avoid exposure of NValueList details.
+    void deserializeIntoANewNValueList(SerializeInput &input, Pool *dataPool);
+    void allocateANewNValueList(size_t elementCount, ValueType elementType);
+
+    // Promotion Rules. Initialized in NValue.cpp
+    static ValueType s_intPromotionTable[];
+    static ValueType s_decimalPromotionTable[];
+    static ValueType s_doublePromotionTable[];
+    static TTInt s_maxDecimalValue;
+    static TTInt s_minDecimalValue;
+    // These initializers give the unique double values that are
+    // closest but not equal to +/-1E26 within the accuracy of a double.
+    static const double s_gtMaxDecimalAsDouble;
+    static const double s_ltMinDecimalAsDouble;
 
     /**
      * 16 bytes of storage for NValue data.
@@ -1498,6 +1498,9 @@ class NValue {
         else {
             const int32_t objectLength = getObjectLength();
             if (objectLength > maxLength) {
+                if (maxLength == 0) {
+                    throwFatalLogicErrorStreamed("Zero maxLength for object type " << valueToString(getValueType()));
+                }
                 char msg[1024];
                 snprintf(msg, 1024,
                          "In NValue::inlineCopyObject, Object exceeds specified size. Size is %d and max is %d",
@@ -2902,7 +2905,20 @@ inline void NValue::hashCombine(std::size_t &seed) const {
       case VALUE_TYPE_TIMESTAMP:
         boost::hash_combine( seed, getBigInt()); break;
       case VALUE_TYPE_DOUBLE:
+        // This method was observed to fail on Centos 5 / GCC 4.1.2, returning different hashes
+        // for identical inputs, so the conditional was added,
+        // mutated from the one in boost/type_traits/intrinsics.hpp,
+        // and the broken overload for "double" was by-passed in favor of the more reliable
+        // one for int64 -- even if this may give sub-optimal hashes for typical collections of double.
+        // This conditional can be dropped when Centos 5 support is dropped.
+#if defined(__GNUC__) && ((__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 2) && !defined(__GCCXML__))) && !defined(BOOST_CLANG)
         boost::hash_combine( seed, getDouble()); break;
+#else
+        {
+        const int64_t proxyForDouble =  *reinterpret_cast<const int64_t*>(m_data);
+        boost::hash_combine( seed, proxyForDouble); break;
+        }
+#endif
       case VALUE_TYPE_VARCHAR: {
         if (getObjectValue() == NULL) {
             boost::hash_combine( seed, std::string(""));

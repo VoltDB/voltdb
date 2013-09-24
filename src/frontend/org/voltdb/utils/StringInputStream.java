@@ -20,7 +20,7 @@ package org.voltdb.utils;
 import java.io.IOException;
 import java.io.InputStream;
 
-import org.voltdb.VoltDB;
+import org.voltdb.common.Constants;
 
 /**
  * Create an <code>InputStream</code> from a Java string so it can
@@ -36,7 +36,7 @@ public class StringInputStream extends InputStream {
      * @param value The string value to turn into an InputStream.
      */
     public StringInputStream(String value) {
-        m_strBytes = value.getBytes(VoltDB.UTF8ENCODING);
+        m_strBytes = value.getBytes(Constants.UTF8ENCODING);
     }
 
     /**

@@ -38,18 +38,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListenableFutureTask;
 import jsr166y.LinkedTransferQueue;
 
 import org.voltcore.logging.VoltLogger;
@@ -64,7 +62,8 @@ import com.google.common.util.concurrent.MoreExecutors;
 public class CoreUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    public static final int SMALL_STACK_SIZE = 1024 * 128;
+    public static final int SMALL_STACK_SIZE = 1024 * 256;
+    public static final int MEDIUM_STACK_SIZE = 1024 * 512;
 
     /**
      * Get a single thread executor that caches it's thread meaning that the thread will terminate
@@ -89,6 +88,12 @@ public class CoreUtils {
     public static ListeningExecutorService getSingleThreadExecutor(String name) {
         ExecutorService ste =
                 Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null));
+        return MoreExecutors.listeningDecorator(ste);
+    }
+
+    public static ListeningExecutorService getSingleThreadExecutor(String name, int size) {
+        ExecutorService ste =
+                Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory(null, name, size, false, null));
         return MoreExecutors.listeningDecorator(ste);
     }
 
@@ -191,7 +196,8 @@ public class CoreUtils {
     }
 
     /**
-     * Create a bounded thread pool executor
+     * Create a bounded thread pool executor. The work queue is synchronous and can cause
+     * RejectedExecutionException if there is no available thread to take a new task.
      * @param maxPoolSize: the maximum number of threads to allow in the pool.
      * @param keepAliveTime: when the number of threads is greater than the core, this is the maximum
      *                       time that excess idle threads will wait for new tasks before terminating.
@@ -200,7 +206,7 @@ public class CoreUtils {
      */
     public static ThreadPoolExecutor getBoundedThreadPoolExecutor(int maxPoolSize, long keepAliveTime, TimeUnit unit, ThreadFactory tFactory) {
         return new ThreadPoolExecutor(0, maxPoolSize, keepAliveTime, unit,
-                                      new LinkedBlockingQueue<Runnable>(), tFactory);
+                                      new SynchronousQueue<Runnable>(), tFactory);
     }
 
     public static ThreadFactory getThreadFactory(String name) {
@@ -445,6 +451,20 @@ public class CoreUtils {
             first = false;
             sb.append(CoreUtils.hsIdToString(entry.getKey()));
             sb.append(entry.getValue());
+        }
+        sb.append('}');
+        return sb.toString();
+    }
+
+    public static String hsIdEntriesToString(Collection<Map.Entry<Long, Long>> entries) {
+        StringBuilder sb = new StringBuilder();
+        sb.append('{');
+        boolean first = true;
+        for (Map.Entry<Long, Long> entry : entries) {
+            if (!first) sb.append(", ");
+            first = false;
+            sb.append(CoreUtils.hsIdToString(entry.getKey())).append(" -> ");
+            sb.append(CoreUtils.hsIdToString(entry.getValue()));
         }
         sb.append('}');
         return sb.toString();

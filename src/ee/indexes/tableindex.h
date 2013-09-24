@@ -268,6 +268,16 @@ public:
         throwFatalException("Invoked TableIndex virtual method moveToGreaterThanKey which has no implementation");
     };
 
+    virtual void moveToLessThanKey(const TableTuple *searchKey)
+    {
+        throwFatalException("Invoked TableIndex virtual method moveToLessThanKey which has no implementation");
+    };
+
+    virtual void moveToBeforePriorEntry()
+    {
+        throwFatalException("Invoked TableIndex virtual method moveToBeforePriorEntry which has no implementation");
+    }
+
     /**
      * This method moves to the beginning or the end of the indexes.
      * Use this with nextValue().

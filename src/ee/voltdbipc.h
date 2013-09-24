@@ -134,6 +134,8 @@ private:
 
     void threadLocalPoolAllocations();
 
+    void executeTask(struct ipc_command*);
+
     void sendException( int8_t errorCode);
 
     int8_t activateTableStream(struct ipc_command *cmd);

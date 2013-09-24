@@ -70,44 +70,33 @@ public class Insert extends InsertBase {
             BigDecimal a_decimal
             )
     {
-
-        // these types are converted to instances of Long when processed
-        // from the wire protocol serialization to the stored procedure
-        // run prototype arguments. Convert them back to the underlying
-        // java mappings of the SQL types here to test EE handling of non-long
-        // values.
-
-        byte v_tinyint = new Long(a_tinyint).byteValue();
-        short v_smallint = new Long(a_smallint).shortValue();
-        int v_integer = new Long(a_integer).intValue();
-
         if (tablename.equals("NO_NULLS")) {
-            voltQueueSQL(i_no_nulls, pkey, v_tinyint, v_smallint, v_integer,
+            voltQueueSQL(i_no_nulls, pkey, a_tinyint, a_smallint, a_integer,
                          a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
                          a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
         }
         else if (tablename.equals("ALLOW_NULLS")) {
-            voltQueueSQL(i_allow_nulls, pkey, v_tinyint, v_smallint, v_integer,
+            voltQueueSQL(i_allow_nulls, pkey, a_tinyint, a_smallint, a_integer,
                          a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
                          a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
         }
         else if (tablename.equals("ALLOW_NULLS and use sql.Timestamp")) {
-            java.sql.Timestamp v_sqltimestamp = new java.sql.Timestamp(a_timestamp.getTime()/1000);
-            v_sqltimestamp.setNanos(((int) (a_timestamp.getTime() % 1000000)) * 1000);
-            voltQueueSQL(i_allow_nulls, pkey, v_tinyint, v_smallint, v_integer,
-                         a_bigint, a_float, v_sqltimestamp, a_inline_s1, a_inline_s2,
+            java.sql.Timestamp a_sqltimestamp = new java.sql.Timestamp(a_timestamp.getTime()/1000);
+            a_sqltimestamp.setNanos(((int) (a_timestamp.getTime() % 1000000)) * 1000);
+            voltQueueSQL(i_allow_nulls, pkey, a_tinyint, a_smallint, a_integer,
+                         a_bigint, a_float, a_sqltimestamp, a_inline_s1, a_inline_s2,
                          a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
         }
         else if (tablename.equals("ALLOW_NULLS and use sql.Date")) {
-            java.sql.Date v_sqldate = new java.sql.Date(a_timestamp.getTime()/1000);
-            voltQueueSQL(i_allow_nulls, pkey, v_tinyint, v_smallint, v_integer,
-                         a_bigint, a_float, v_sqldate, a_inline_s1, a_inline_s2,
+            java.sql.Date a_sqldate = new java.sql.Date(a_timestamp.getTime()/1000);
+            voltQueueSQL(i_allow_nulls, pkey, a_tinyint, a_smallint, a_integer,
+                         a_bigint, a_float, a_sqldate, a_inline_s1, a_inline_s2,
                          a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
         }
         else if (tablename.equals("ALLOW_NULLS and use util.Date")) {
-            java.util.Date v_utildate = new java.util.Date(a_timestamp.getTime()/1000);
-            voltQueueSQL(i_allow_nulls, pkey, v_tinyint, v_smallint, v_integer,
-                         a_bigint, a_float, v_utildate, a_inline_s1, a_inline_s2,
+            java.util.Date a_utildate = new java.util.Date(a_timestamp.getTime()/1000);
+            voltQueueSQL(i_allow_nulls, pkey, a_tinyint, a_smallint, a_integer,
+                         a_bigint, a_float, a_utildate, a_inline_s1, a_inline_s2,
                          a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
         }
         else if (tablename.equals("WITH_DEFAULTS")) {
@@ -117,12 +106,12 @@ public class Insert extends InsertBase {
             voltQueueSQL(i_with_null_defaults, pkey);
         }
         else if (tablename.equals("EXPRESSIONS_WITH_NULLS")) {
-            voltQueueSQL(i_expressions_with_nulls, pkey, v_tinyint, v_smallint, v_integer,
+            voltQueueSQL(i_expressions_with_nulls, pkey, a_tinyint, a_smallint, a_integer,
                          a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
                          a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
         }
         else if (tablename.equals("EXPRESSIONS_NO_NULLS")) {
-            voltQueueSQL(i_expressions_no_nulls, pkey, v_tinyint, v_smallint, v_integer,
+            voltQueueSQL(i_expressions_no_nulls, pkey, a_tinyint, a_smallint, a_integer,
                          a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
                          a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
         } else if (tablename.equals("JUMBO_ROW")) {

@@ -51,6 +51,7 @@ import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
+import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
@@ -239,6 +240,21 @@ public class DDLCompiler {
             );
 
     /**
+     * Regex to match CREATE TABLE or CREATE VIEW statements.
+     * Unlike the other matchers, this is just designed to pull out the
+     * name of the table or view, not the whole statement.
+     * It's used to preserve as-entered schema for each table/view
+     * for the catalog report generator for the moment.
+     * Capture group (1) is ignored, but (2) is used.
+     */
+    static final Pattern createTablePattern = Pattern.compile(
+            "(?i)" +                            // (ignore case)
+            "\\A" +                             // (start statement)
+            "CREATE\\s+(TABLE|VIEW)\\s+" +      // (1) CREATE TABLE
+            "([\\w.$]+)"                        // (2) <table name>
+            );
+
+    /**
      * NB supports only unquoted table and column names
      *
      * Regex Description:
@@ -334,6 +350,12 @@ public class DDLCompiler {
     HashMap<String, Index> indexMap = new HashMap<String, Index>();
     HashMap<Table, String> matViewMap = new HashMap<Table, String>();
 
+    // Track the original CREATE TABLE statement for each table
+    // Currently used for catalog report generation.
+    // There's specifically no cleanup here because I don't think
+    // any is needed.
+    Map<String, String> m_tableNameToDDL = new TreeMap<String, String>();
+
     private class DDLStatement {
         public DDLStatement() {
         }
@@ -382,10 +404,16 @@ public class DDLCompiler {
 
         DDLStatement stmt = getNextStatement(reader, m_compiler);
         while (stmt != null) {
+            // We sometimes choke at parsing statements with newlines, so
+            // make a version without newlines for most of the processing,
+            // but leave the original around because the formatting has
+            // value in the catalog report and perhaps elsewhere in the future.
+            String oneLinerStmt = stmt.statement.replace("\n", " ");
+
             // Some statements are processed by VoltDB and the rest are handled by HSQL.
             boolean processed = false;
             try {
-                processed = processVoltDBStatement(stmt.statement, db);
+                processed = processVoltDBStatement(oneLinerStmt, db);
             } catch (VoltCompilerException e) {
                 // Reformat the message thrown by VoltDB DDL processing to have a line number.
                 String msg = "VoltDB DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
@@ -393,11 +421,18 @@ public class DDLCompiler {
             }
             if (!processed) {
                 try {
+                    // check for CREATE TABLE or CREATE VIEW
+                    Matcher tableMatcher = createTablePattern.matcher(oneLinerStmt);
+                    if (tableMatcher.find()) {
+                        String tableName = tableMatcher.group(2);
+                        m_tableNameToDDL.put(tableName.toUpperCase(), stmt.statement);
+                    }
+
                     // kind of ugly.  We hex-encode each statement so we can
                     // avoid embedded newlines so we can delimit statements
                     // with newline.
-                    m_fullDDL += Encoder.hexEncode(stmt.statement) + "\n";
-                    m_hsql.runDDLCommand(stmt.statement);
+                    m_fullDDL += Encoder.hexEncode(oneLinerStmt) + "\n";
+                    m_hsql.runDDLCommand(oneLinerStmt);
                 } catch (HSQLParseException e) {
                     String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
                     throw m_compiler.new VoltCompilerException(msg, stmt.lineNo);
@@ -707,7 +742,7 @@ public class DDLCompiler {
         }
 
         // output the xml catalog to disk
-        BuildDirectoryUtils.writeFile("schema-xml", "hsql-catalog-output.xml", xmlCatalog.toString());
+        BuildDirectoryUtils.writeFile("schema-xml", "hsql-catalog-output.xml", xmlCatalog.toString(), true);
 
         // build the local catalog from the xml catalog
         fillCatalogFromXML(db, xmlCatalog);
@@ -743,7 +778,7 @@ public class DDLCompiler {
         else if (nchar[0] == '\n') {
             // normalize newlines to spaces
             m_currLineNo += 1;
-            retval.statement += " ";
+            retval.statement += "\n";
         }
         else if (nchar[0] == '\r') {
             // ignore carriage returns
@@ -940,7 +975,13 @@ public class DDLCompiler {
 
         String name = node.attributes.get("name");
 
+        // create a table node in the catalog
         Table table = db.getTables().add(name);
+
+        // add the original DDL to the table (or null if it's not there)
+        TableAnnotation annotation = new TableAnnotation();
+        table.setAnnotation(annotation);
+        annotation.ddl = m_tableNameToDDL.get(name.toUpperCase());
 
         // handle the case where this is a materialized view
         String query = node.attributes.get("query");
@@ -981,7 +1022,7 @@ public class DDLCompiler {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
                     if (indexName.startsWith("SYS_IDX_SYS_") == false) {
-                        addIndexToCatalog(table, indexNode, indexReplacementMap);
+                        addIndexToCatalog(db, table, indexNode, indexReplacementMap);
                     }
                 }
 
@@ -990,7 +1031,7 @@ public class DDLCompiler {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
                     if (indexName.startsWith("SYS_IDX_SYS_") == true) {
-                        addIndexToCatalog(table, indexNode, indexReplacementMap);
+                        addIndexToCatalog(db, table, indexNode, indexReplacementMap);
                     }
                 }
             }
@@ -1071,14 +1112,6 @@ public class DDLCompiler {
         // fyi: Historically, VoltType class initialization errors get reported on this line (?).
         VoltType type = VoltType.typeFromString(typename);
         columnTypes.add(type);
-        int size = Integer.parseInt(sizeString);
-        // check valid length if varchar
-        if (type == VoltType.STRING) {
-            if ((size == 0) || (size > VoltType.MAX_VALUE_LENGTH)) {
-                String msg = "VARCHAR Column " + name + " in table " + table.getTypeName() + " has unsupported length " + sizeString;
-                throw m_compiler.new VoltCompilerException(msg);
-            }
-        }
         if (defaultvalue != null && (type == VoltType.DECIMAL || type == VoltType.NUMERIC))
         {
             // Until we support deserializing scientific notation in the EE, we'll
@@ -1094,6 +1127,15 @@ public class DDLCompiler {
 
         column.setType(type.getValue());
         column.setNullable(nullable.toLowerCase().startsWith("t") ? true : false);
+        int size = type.getMaxLengthInBytes();
+        // Require a valid length if variable length is supported for a type
+        if (type == VoltType.STRING || type == VoltType.VARBINARY) {
+            size = Integer.parseInt(sizeString);
+            if ((size == 0) || (size > VoltType.MAX_VALUE_LENGTH)) {
+                String msg = type.toSQLString() + " column " + name + " in table " + table.getTypeName() + " has unsupported length " + sizeString;
+                throw m_compiler.new VoltCompilerException(msg);
+            }
+        }
         column.setSize(size);
 
         column.setDefaultvalue(defaultvalue);
@@ -1155,13 +1197,15 @@ public class DDLCompiler {
         return Arrays.equals(idx1baseTableOrder, idx2baseTableOrder);
     }
 
-    void addIndexToCatalog(Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
+    void addIndexToCatalog(Database db, Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
             throws VoltCompilerException
     {
         assert node.name.equals("index");
 
         String name = node.attributes.get("name");
         boolean unique = Boolean.parseBoolean(node.attributes.get("unique"));
+        AbstractParsedStmt dummy = new ParsedSelectStmt(null, db);
+        dummy.setTable(table);
 
         // "parse" the expression trees for an expression-based index (vs. a simple column value index)
         AbstractExpression[] exprs = null;
@@ -1170,7 +1214,7 @@ public class DDLCompiler {
                 exprs = new AbstractExpression[subNode.children.size()];
                 int j = 0;
                 for (VoltXMLElement exprNode : subNode.children) {
-                    exprs[j] = AbstractParsedStmt.parseExpressionTree(null, exprNode);
+                    exprs[j] = dummy.parseExpressionTree(exprNode);
                     exprs[j].resolveForTable(table);
                     exprs[j].finalizeValueTypes();
                     ++j;
@@ -1522,6 +1566,19 @@ public class DDLCompiler {
             msg += "has too few columns.";
             throw m_compiler.new VoltCompilerException(msg);
         }
+
+        if (stmt.hasComplexGroupby()) {
+            msg += "contains an expression involving a group by. " +
+                    "Expressions with group by are not currently supported in views.";
+            throw m_compiler.new VoltCompilerException(msg);
+        }
+
+        if (stmt.hasComplexAgg()) {
+            msg += "contains an expression involving an aggregate function. " +
+                    "Expressions with aggregate functions are not currently supported in views.";
+            throw m_compiler.new VoltCompilerException(msg);
+        }
+
 
         int i;
         for (i = 0; i < groupColCount; i++) {

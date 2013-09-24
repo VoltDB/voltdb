@@ -56,7 +56,6 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.VoltTableUtil;
 
 public class ProcedureRunner {
 
@@ -83,9 +82,6 @@ public class ProcedureRunner {
     protected final VoltProcedure m_procedure;
     protected Method m_procMethod;
     protected Class<?>[] m_paramTypes;
-    protected boolean m_paramTypeIsPrimitive[];
-    protected boolean m_paramTypeIsArray[];
-    protected Class<?> m_paramTypeComponentType[];
 
     // per txn state (are reset after call)
     //
@@ -232,13 +228,9 @@ public class ProcedureRunner {
 
             for (int i = 0; i < m_paramTypes.length; i++) {
                 try {
-                    paramList[i] =
-                        ParameterConverter.tryToMakeCompatible(
-                            m_paramTypeIsPrimitive[i],
-                            m_paramTypeIsArray[i],
-                            m_paramTypes[i],
-                            m_paramTypeComponentType[i],
-                            paramList[i]);
+                    paramList[i] = ParameterConverter.tryToMakeCompatible(m_paramTypes[i], paramList[i]);
+                    // check the result type in an assert
+                    assert(ParameterConverter.verifyParameterConversion(paramList[i], m_paramTypes[i]));
                 } catch (Exception e) {
                     m_statsCollector.endProcedure(false, true, null, null);
                     String msg = "PROCEDURE " + m_procedureName + " TYPE ERROR FOR PARAMETER " + i +
@@ -652,17 +644,17 @@ public class ProcedureRunner {
         return results;
     }
 
-    public void voltLoadTable(String clusterName, String databaseName,
-                              String tableName, VoltTable data)
+    public byte[] voltLoadTable(String clusterName, String databaseName,
+                              String tableName, VoltTable data, boolean returnUniqueViolations)
     throws VoltAbortException
     {
         if (data == null || data.getRowCount() == 0) {
-            return;
+            return null;
         }
         try {
-            m_site.loadTable(m_txnState.txnId,
+            return m_site.loadTable(m_txnState.txnId,
                              clusterName, databaseName,
-                             tableName, data);
+                             tableName, data, returnUniqueViolations);
         }
         catch (EEException e) {
             throw new VoltAbortException("Failed to load table: " + tableName);
@@ -768,12 +760,17 @@ public class ProcedureRunner {
 
                 int numParams = m_catProc.getParameters().size();
                 m_paramTypes = new Class<?>[numParams];
-                m_paramTypeIsPrimitive = new boolean[numParams];
-                m_paramTypeIsArray = new boolean[numParams];
-                m_paramTypeComponentType = new Class<?>[numParams];
 
                 for (ProcParameter param : m_catProc.getParameters()) {
                     VoltType type = VoltType.get((byte) param.getType());
+                    if (param.getIsarray()) {
+                        m_paramTypes[param.getIndex()] = type.vectorClassFromType();
+                        continue;
+                    }
+                    // Paul doesn't understand why single-statement procedures
+                    // need to have their input parameter types widened here.
+                    // Is it not better to catch too-wide values in the ProcedureRunner
+                    // (ParameterConverter.tryToMakeCompatible) before falling through to the EE?
                     if (type == VoltType.INTEGER) {
                         type = VoltType.BIGINT;
                     } else if (type == VoltType.SMALLINT) {
@@ -785,17 +782,6 @@ public class ProcedureRunner {
                     }
 
                     m_paramTypes[param.getIndex()] = type.classFromType();
-                    m_paramTypeIsPrimitive[param.getIndex()] = m_paramTypes[param.getIndex()].isPrimitive();
-                    m_paramTypeIsArray[param.getIndex()] = param.getIsarray();
-                    assert(m_paramTypeIsArray[param.getIndex()] == false);
-                    m_paramTypeComponentType[param.getIndex()] = null;
-
-                    // rtb: what is broken (ambiguous?) that is being patched here?
-                    // hack to fixup varbinary support for statement procedures
-                    if (m_paramTypes[param.getIndex()] == byte[].class) {
-                        m_paramTypeComponentType[param.getIndex()] = byte.class;
-                        m_paramTypeIsArray[param.getIndex()] = true;
-                    }
                 }
             } catch (Exception e) {
                 // shouldn't throw anything outside of the compiler
@@ -813,16 +799,6 @@ public class ProcedureRunner {
                         continue;
                     m_procMethod = m;
                     m_paramTypes = m.getParameterTypes();
-                    int tempParamTypesLength = m_paramTypes.length;
-
-                    m_paramTypeIsPrimitive = new boolean[tempParamTypesLength];
-                    m_paramTypeIsArray = new boolean[tempParamTypesLength];
-                    m_paramTypeComponentType = new Class<?>[tempParamTypesLength];
-                    for (int ii = 0; ii < tempParamTypesLength; ii++) {
-                        m_paramTypeIsPrimitive[ii] = m_paramTypes[ii].isPrimitive();
-                        m_paramTypeIsArray[ii] = m_paramTypes[ii].isArray();
-                        m_paramTypeComponentType[ii] = m_paramTypes[ii].getComponentType();
-                    }
                 }
             }
 

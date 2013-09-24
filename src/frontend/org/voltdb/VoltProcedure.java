@@ -322,12 +322,13 @@ public abstract class VoltProcedure {
      * @param data {@link org.voltdb.VoltTable VoltTable} containing the records to be loaded.
      *             {@link org.voltdb.VoltTable.ColumnInfo VoltTable.ColumnInfo} schema must match the schema of the table being
      *             loaded.
+     * @param returnUniqueViolations If true will not fail on unique violations, will return the violating rows
      * @throws VoltAbortException
      */
-    public void voltLoadTable(String clusterName, String databaseName,
-                              String tableName, VoltTable data)
+    public byte[] voltLoadTable(String clusterName, String databaseName,
+                              String tableName, VoltTable data, boolean returnUniqueViolations)
     throws VoltAbortException
     {
-        m_runner.voltLoadTable(clusterName, databaseName, tableName, data);
+        return m_runner.voltLoadTable(clusterName, databaseName, tableName, data, returnUniqueViolations);
     }
 }

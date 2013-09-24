@@ -225,7 +225,7 @@ var IVoltDB = (function(){
                           , '@Resume': { '0' : [] }
                           , '@Shutdown': { '0' : [] }
                           , '@SnapshotDelete': { '2' : ['varchar', 'varchar'] }
-                          , '@SnapshotRestore': { '2' : ['varchar', 'varchar'] }
+                          , '@SnapshotRestore': { '1' : ['varchar'],'2' : ['varchar', 'varchar'] }
                           , '@SnapshotSave': { '3' : ['varchar', 'varchar', 'bit'], '1' : ['varchar'] }
                           , '@SnapshotScan': { '1' : ['varchar'] }
                           , '@SnapshotStatus': { '0' : [] }
@@ -293,7 +293,7 @@ var IVoltDB = (function(){
                                                   , '@Resume': { '0' : ['Returns bit'] }
                                                   , '@Shutdown': { '0' : ['Returns bit'] }
                                                   , '@SnapshotDelete': { '2' : ['DirectoryPath (varchar)', 'UniqueId (varchar)', 'Returns Table[]'] }
-                                                  , '@SnapshotRestore': { '2' : ['DirectoryPath (varchar)', 'UniqueId (varchar)', 'Returns Table[]'] }
+                                                  , '@SnapshotRestore': { '2' : ['DirectoryPath (varchar)', 'UniqueId (varchar)', 'Returns Table[]'], '1' : ['JSON (varchar)', 'Returns Table[]'] }
                                                   , '@SnapshotSave': { '3' : ['DirectoryPath (varchar)', 'UniqueId (varchar)', 'Blocking (bit)', 'Returns Table[]'], '1' : ['JSON (varchar)', 'Returns Table[]']  }
                                                   , '@SnapshotScan': { '1' : ['DirectoryPath (varchar)', 'Returns Table[]'] }
                                                   , '@SnapshotStatus': { '0' : ['Returns Table[]'] }
@@ -310,6 +310,7 @@ var IVoltDB = (function(){
                  * c.Metadata[rawColumns] is the output from @SystemCatalog Columns.
                  * Walk those rows and fill in table or view column name and type.
                  */
+
                 for(var i = 0; i < connection.Metadata['rawColumns'].data.length; i++)
                 {
                     var Type = 'tables';
@@ -318,7 +319,7 @@ var IVoltDB = (function(){
                         if (connection.Metadata['tables'][TableName].columns == null) {
                             connection.Metadata['tables'][TableName].columns = [];
                         }
-                        connection.Metadata['tables'][TableName].columns[connection.Metadata['rawColumns'].data[i][3].toUpperCase()] =
+                        connection.Metadata['tables'][TableName].columns[connection.Metadata['rawColumns'].data[i][16]] = 
                             connection.Metadata['rawColumns'].data[i][3].toUpperCase() +
                             ' (' + connection.Metadata['rawColumns'].data[i][5].toLowerCase() + ')';
                     }
@@ -331,6 +332,7 @@ var IVoltDB = (function(){
                             ' (' + connection.Metadata['rawColumns'].data[i][5].toLowerCase() + ')';
                     }
                 }
+                
 
                  // User Procedures
                  for (var i = 0; i < connection.Metadata['procedures'].data.length; ++i)
@@ -344,11 +346,10 @@ var IVoltDB = (function(){
                         {
                             paramType = connection.Metadata['procedurecolumns'].data[p][6];
                             paramName = connection.Metadata['procedurecolumns'].data[p][3];
-                            procParams[procParams.length] = {'name': paramName, 'type': paramType.toLowerCase()};
+                            paramOrder = connection.Metadata['procedurecolumns'].data[p][17] - 1;
+                            procParams[paramOrder] = {'name': paramName, 'type': paramType.toLowerCase()};
                         }
                     }
-                    // the name field is really ordinal position: 1, 2, 3...
-                    procParams.sort(function(a,b) {return a.name - b.name;});
 
                     for (var p = 0; p < procParams.length; ++p) {
                         connTypeParams[connTypeParams.length] = procParams[p].type;
@@ -358,13 +359,13 @@ var IVoltDB = (function(){
                     connection.Procedures[procName] = {};
                     connection.Procedures[procName]['' + connTypeParams.length] = connTypeParams;
                  }
+                 
 
                 var childConnectionQueue = connection.getQueue();
                 childConnectionQueue.Start(true);
                 childConnectionQueue.End(function(state) { connection.Ready = true; if (onconnectionready != null) onconnectionready(connection, state); }, null);
             }, null);
     }
-
 
     this.TestConnection = function(server, port, admin, user, password, isHashedPassword, onConnectionTested)
     {

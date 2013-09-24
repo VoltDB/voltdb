@@ -138,10 +138,11 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void loadTable(final int tableId, final VoltTable table, final long txnId,
-        final long lastCommittedTxnId)
+    public byte[] loadTable(final int tableId, final VoltTable table, final long txnId,
+        final long lastCommittedTxnId, boolean returnUniqueViolations)
     throws EEException
     {
+        return null;
     }
 
     @Override
@@ -227,5 +228,10 @@ public class MockExecutionEngine extends ExecutionEngine {
     @Override
     public long getThreadLocalPoolAllocations() {
         return 0L;
+    }
+
+    @Override
+    public byte[] executeTask(TaskType taskType, byte[] task) {
+        throw new UnsupportedOperationException();
     }
 }

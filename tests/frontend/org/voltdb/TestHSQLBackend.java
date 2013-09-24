@@ -23,25 +23,17 @@
 
 package org.voltdb;
 
-import java.io.File;
-import java.io.IOException;
-import java.net.UnknownHostException;
-
 import junit.framework.TestCase;
 
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.MiscUtils;
 
 public class TestHSQLBackend extends TestCase {
-
+/*
     public void testAdHocEmptyQuery() throws Exception {
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
         builder.addDefaultSchema();
@@ -140,12 +132,12 @@ public class TestHSQLBackend extends TestCase {
         server.join();
         client.close();
     }
-
+*/
     public void testVarbinary() throws Exception {
         String simpleSchema =
             "create table blah (" +
             "ival bigint default 0 not null, " +
-            "b varbinary default null, " +
+            "b varbinary(1) default null, " +
             "PRIMARY KEY(ival));";
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
@@ -174,7 +166,7 @@ public class TestHSQLBackend extends TestCase {
         // stop execution
         VoltDB.instance().shutdown(localServer);
     }
-
+/*
     public void testTimestamp() throws Exception {
         // ts1_millis is used for the default value, ts2_millis is inserted directly.
         long ts1_millis = 1346794571099L;
@@ -231,5 +223,5 @@ public class TestHSQLBackend extends TestCase {
 
         // stop execution
         VoltDB.instance().shutdown(localServer);
-    }
+    }*/
 }
