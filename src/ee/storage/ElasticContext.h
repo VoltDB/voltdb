@@ -19,6 +19,7 @@
 
 #include <vector>
 #include <string>
+#include <boost/scoped_ptr.hpp>
 #include "storage/ElasticScanner.h"
 #include "storage/TableStreamer.h"
 #include "storage/TableStreamerContext.h"
@@ -105,7 +106,7 @@ private:
     /**
      * Scanner for retrieving rows.
      */
-    ElasticScanner m_scanner;
+    boost::scoped_ptr<ElasticScanner> m_scanner;
 
     /**
      * The maximum number of tuples to index per handleStreamMore() call.

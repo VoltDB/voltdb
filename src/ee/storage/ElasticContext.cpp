@@ -30,7 +30,6 @@ ElasticContext::ElasticContext(PersistentTable &table,
                                const std::vector<std::string> &predicateStrings,
                                size_t nTuplesPerCall) :
     TableStreamerContext(table, surgeon, partitionId, serializer, predicateStrings),
-    m_scanner(table, surgeon.getData()),
     m_nTuplesPerCall(nTuplesPerCall)
 {
     if (predicateStrings.size() != 1) {
@@ -62,6 +61,7 @@ ElasticContext::handleActivation(TableStreamType streamType, bool reactivate)
             return ACTIVATION_FAILED;
         }
         m_surgeon.createIndex();
+        m_scanner.reset(new ElasticScanner(getTable(), m_surgeon.getData()));
         return ACTIVATION_SUCCEEDED;
     }
 
@@ -73,6 +73,7 @@ ElasticContext::handleActivation(TableStreamType streamType, bool reactivate)
             return ACTIVATION_FAILED;
         }
         m_surgeon.dropIndex();
+        m_scanner.reset();
         return ACTIVATION_SUCCEEDED;
     }
 
@@ -109,7 +110,7 @@ int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStrea
     // Table changes are tracked through notifications.
     size_t i = 0;
     TableTuple tuple(getTable().schema());
-    while (m_scanner.next(tuple)) {
+    while (m_scanner->next(tuple)) {
         if (getPredicates()[0].eval(&tuple).isTrue()) {
             m_surgeon.indexAdd(tuple);
         }
@@ -120,7 +121,7 @@ int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStrea
     }
 
     // Done with indexing?
-    bool indexingComplete = m_scanner.isScanComplete();
+    bool indexingComplete = m_scanner->isScanComplete();
     if (indexingComplete) {
         m_surgeon.setIndexingComplete();
     }

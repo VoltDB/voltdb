@@ -956,9 +956,10 @@ public:
         return false;
     }
 
-    void streamElasticIndex() {
+    void streamElasticIndex(bool checkCalls) {
         boost::shared_ptr<ReferenceSerializeInput> predicateInput = getPredicateSerializeInput(m_predicateStrings);
-        m_table->activateStream(m_serializer, TABLE_STREAM_ELASTIC_INDEX, 0, m_tableId, *predicateInput);
+        bool ok = m_table->activateStream(m_serializer, TABLE_STREAM_ELASTIC_INDEX, 0, m_tableId, *predicateInput);
+        ASSERT_TRUE(ok);
 
         // Force index streaming to need multiple streamMore() calls.
         voltdb::ElasticContext *context = getElasticContext();
@@ -972,7 +973,9 @@ public:
             nCalls++;
         }
         // Make sure we forced more than one streamMore() call.
-        ASSERT_LE(2, nCalls);
+        if (checkCalls) {
+            ASSERT_LE(2, nCalls);
+        }
     }
 
     void streamSnapshot(int numMutationsDuring, int numMutationsAfter, T_ValueSet &COWTuples, int &totalInserted) {
@@ -1872,7 +1875,7 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
         parsePredicates();
 
         // Generate the elastic index.
-        streamElasticIndex();
+        streamElasticIndex(true);
 
         // Do some scrambling.
         for (size_t icycle = 0; icycle < NUM_CYCLES; icycle++) {
@@ -1904,7 +1907,7 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
             ASSERT_EQ(tableSizeAfter, tableSizeBefore);
         }
         else {
-            ASSERT_LT(indexSizeAfter, indexSizeBefore);
+            ASSERT_EQ(0, indexSizeAfter);
             ASSERT_LT(tableSizeAfter, tableSizeBefore);
         }
         if (!undo) {
@@ -1915,7 +1918,15 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
         if (!undo) {
             clearIndex(testRange, true);
             ASSERT_EQ(NULL, getElasticIndex());
-        } else if (undo && itest == 1) {
+
+            // Also make sure we can re-stream the index.
+            ElasticIndex streamedIndex2;
+            size_t totalStreamed2;
+            streamElasticIndex(false);
+            materializeIndex(streamedIndex2, testRange, false, totalStreamed2);
+            checkIndex(testRange.label("streamed"), &streamedIndex2, m_predicates, true);
+        }
+        else if (undo && itest == 1) {
             clearIndex(testRange, false);
             ASSERT_NE(NULL, getElasticIndex());
         }
