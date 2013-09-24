@@ -61,10 +61,14 @@ public abstract class TheHashinator {
     public abstract byte[] getConfigBytes();
 
     /**
-     * Implementer should return compressed (cooked) bytes for serialization.
-     * @return config bytes
+     * Return compressed (cooked) bytes for serialization.
+     * Defaults to providing raw bytes, e.g. for legacy.
+     * @return cooked config bytes
      */
-    public abstract byte[] getCookedBytes();
+    public byte[] getCookedBytes()
+    {
+        return getConfigBytes();
+    }
 
     protected static final VoltLogger hostLogger = new VoltLogger("HOST");
 
