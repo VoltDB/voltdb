@@ -100,6 +100,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         subtestMinMaxSinglePartitionWithPredicate();
         subtestIndexMinMaxSinglePartition();
         subtestIndexMinMaxSinglePartitionWithPredicate();
+        subtestNullMinMaxSinglePartition();
     }
 
 
@@ -619,6 +620,72 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(2, t.getLong(2));
         assertEquals(9, t.getLong(3));
 
+    }
+
+    private void subtestNullMinMaxSinglePartition() throws IOException, ProcCallException
+    {
+        Client client = getClient();
+        truncateBeforeTest(client);
+        VoltTable[] results = null;
+        VoltTable t;
+
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE2").getResults();
+        assert(results != null);
+        assertEquals(1, results.length);
+        assertEquals(0, results[0].getRowCount());
+
+        results = client.callProcedure("AddPerson", 1, 1L, 31L, 1000.0, 3, NORMALLY).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+        results = client.callProcedure("AddPerson", 1, 2L, 31L, 900.0, 5, NORMALLY).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+        results = client.callProcedure("AddPerson", 1, 3L, 31L, 900.0, 1, NORMALLY).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+        results = client.callProcedure("AddPerson", 1, 4L, 31L, 2500.0, 5, NORMALLY).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+        results = client.callProcedure("AddPerson", 1, 5L, 31L, null, null, NORMALLY).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE2").getResults();
+        assert(results != null);
+        assertEquals(1, results.length);
+        t = results[0];
+        assertEquals(1, t.getRowCount());
+        System.out.println(t.toString());
+        t.advanceRow();
+        assertEquals(5, t.getLong(2));
+        assertEquals(900, (int)(t.getDouble(3)));
+        assertEquals(5, t.getLong(4));
+
+        results = client.callProcedure("DeletePerson", 1, 2L, NORMALLY).getResults();
+
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE2").getResults();
+        assert(results != null);
+        assertEquals(1, results.length);
+        t = results[0];
+        assertEquals(1, t.getRowCount());
+        System.out.println(t.toString());
+        t.advanceRow();
+        assertEquals(4, t.getLong(2));
+        assertEquals(900, (int)(t.getDouble(3)));
+        assertEquals(5, t.getLong(4));
+
+        results = client.callProcedure("UpdatePerson", 1, 3L, 31L, 200, 9).getResults();
+
+        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE2").getResults();
+        assert(results != null);
+        assertEquals(1, results.length);
+        t = results[0];
+        assertEquals(1, t.getRowCount());
+        System.out.println(t.toString());
+        t.advanceRow();
+        assertEquals(4, t.getLong(2));
+        assertEquals(200, (int)(t.getDouble(3)));
+        assertEquals(9, t.getLong(4));
     }
 
 

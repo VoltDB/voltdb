@@ -1648,9 +1648,9 @@ public class DDLCompiler {
                     matviewinfo.setIndexforminmax(found.getTypeName());
                 } else {
                     matviewinfo.setIndexforminmax("");
-                    m_compiler.addWarn("No index found for min() / max() support in Materialized View " +
+                    m_compiler.addWarn("No index found to support min() / max() UPDATE and DELETE on Materialized View " +
                             matviewinfo.getTypeName() +
-                            ", and could cause sequential scan.");
+                            ", and a sequential scan might be issued when current min / max value is updated / deleted.");
                 }
             } else {
                 matviewinfo.setIndexforminmax("");
@@ -1676,7 +1676,7 @@ public class DDLCompiler {
         }
     }
 
-    private Index findBestMatchIndexForMatviewMinOrMax(MaterializedViewInfo matviewinfo, Table srcTable, List<AbstractExpression> groupbyExprs) {
+    private static Index findBestMatchIndexForMatviewMinOrMax(MaterializedViewInfo matviewinfo, Table srcTable, List<AbstractExpression> groupbyExprs) {
         CatalogMap<Index> allIndexes = srcTable.getIndexes();
 
         ArrayList<Index> candidates = new ArrayList<Index>();
@@ -1746,7 +1746,7 @@ public class DDLCompiler {
     }
 
     // srcExprs is the prefix of destExprs
-    private boolean prefixCompatibleExprs(List<AbstractExpression> srcExprs, List<AbstractExpression> destExprs) {
+    private static boolean prefixCompatibleExprs(List<AbstractExpression> srcExprs, List<AbstractExpression> destExprs) {
         for (int i = 0; i < srcExprs.size(); i ++) {
             if (!srcExprs.contains(destExprs.get(i))) {
                 return false;

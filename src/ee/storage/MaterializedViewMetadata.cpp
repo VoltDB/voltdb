@@ -298,7 +298,7 @@ void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple, bool fal
         }
         else if (m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_MIN) {
             if (exists) {
-                if (newValue.compare(existingValue) < 0) {
+                if (!newValue.isNull() && newValue.compare(existingValue) < 0) {
                      m_updatedTuple.setNValue(i, newValue);
                 } else {
                     m_updatedTuple.setNValue(i, existingValue);
@@ -309,7 +309,7 @@ void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple, bool fal
         }
         else if (m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_MAX) {
             if (exists) {
-                if (newValue.compare(existingValue) > 0) {
+                if (!newValue.isNull() && newValue.compare(existingValue) > 0) {
                      m_updatedTuple.setNValue(i, newValue);
                 } else {
                     m_updatedTuple.setNValue(i, existingValue);
@@ -404,6 +404,13 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
                 newVal = newVal.castAs(m_target->schema()->columnType(i));
                 TableTuple tuple;
 
+                bool isAggregationExpr = (m_aggregationExprs.size() != 0);
+                int srcTableColIdx = m_outputColumnSrcTableIndexes[i];
+                AbstractExpression *aggExpr;
+                if (isAggregationExpr) {
+                    aggExpr = m_aggregationExprs.at(i - colindex);
+                }
+
                 // indexscan if an index is available, otherwise tablescan
                 if (m_indexForMinMax != NULL) {
                     m_indexForMinMax->moveToKey(&m_searchKey);
@@ -415,11 +422,17 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
                             continue;
                         }
                         VOLT_TRACE("Scanning tuple: %s\n", tuple.debugNoHeader().c_str());
-                        if (m_aggregationExprs.size() != 0) {
-                            AbstractExpression * expr = m_aggregationExprs.at(i-colindex);
-                            current = expr->eval(&tuple, NULL);
+                        if (isAggregationExpr) {
+                            current = aggExpr->eval(&tuple, NULL);
                         } else {
-                            current = tuple.getNValue(m_outputColumnSrcTableIndexes[i]);
+                            current = tuple.getNValue(srcTableColIdx);
+                        }
+                        if (current.isNull()) {
+                            continue;
+                        }
+                        if (current.compare(existingValue) == 0) {
+                            newVal = current;
+                            break;
                         }
                         if (newVal.isNull()) {
                             newVal = current;
@@ -464,11 +477,10 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
                         if(m_filterPredicate && m_filterPredicate->eval(&scannedTuple, NULL).isFalse()) {
                             continue;
                         }
-                        if (m_aggregationExprs.size() != 0) {
-                            AbstractExpression * expr = m_aggregationExprs.at(i-colindex);
-                            current = expr->eval(&scannedTuple, NULL);
+                        if (isAggregationExpr) {
+                            current = aggExpr->eval(&scannedTuple, NULL);
                         } else {
-                            current = scannedTuple.getNValue(m_outputColumnSrcTableIndexes[i]);
+                            current = scannedTuple.getNValue(srcTableColIdx);
                         }
                         if (!skippedOne && current.compare(existingValue) == 0) {
                             VOLT_TRACE("Skip tuple: %s\n", scannedTuple.debugNoHeader().c_str());
@@ -477,6 +489,13 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
                         }
                         VOLT_TRACE("Checking tuple: %s\n", scannedTuple.debugNoHeader().c_str());
                         VOLT_TRACE("\tBefore: current %s, min %s, max %s\n", current.debug().c_str(), min.debug().c_str(), max.debug().c_str());
+                        if (current.isNull()) {
+                            continue;
+                        }
+                        if (current.compare(existingValue) == 0) {
+                            newVal = current;
+                            break;
+                        }
                         if (newVal.isNull()) {
                             newVal = current;
                         } else {
