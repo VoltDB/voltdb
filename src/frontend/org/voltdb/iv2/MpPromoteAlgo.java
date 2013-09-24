@@ -194,7 +194,7 @@ public class MpPromoteAlgo implements RepairAlgo
                 if (areRepairLogsComplete()) {
 
                     TheHashinator.updateHashinator(TheHashinator.getConfiguredHashinatorType().hashinatorClass,
-                            m_newestHashinatorConfig.getFirst(), m_newestHashinatorConfig.getSecond(), false);
+                            m_newestHashinatorConfig.getFirst(), m_newestHashinatorConfig.getSecond(), true);
 
                     repairSurvivors();
                 }
