@@ -79,13 +79,12 @@ class CSVFileReader implements Runnable {
             try {
                 Thread.sleep(500);
                 sleptTimes++;
-                m_log.info("Waiting for Client Initialization.");
             } catch (InterruptedException ex) {
                 ;
             }
         }
-        if (sleptTimes > 120 && CSVPartitionProcessor.m_isMP) {
-            m_log.warn("Failed to detect partition information, "
+        if (sleptTimes >= 120 && CSVPartitionProcessor.m_isMP) {
+            m_log.debug("Failed to detect partition information, "
                     + "client affinity will not be used and CSV loading could be slow.");
         }
         m_log.info("Client Initialization Done.");
