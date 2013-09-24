@@ -1106,8 +1106,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
                 if (shutdown) {
                     VoltDB.crashLocalVoltDB("This process will exit. " +
-                    		"Please re-try with VoltDB a community edition-compatible deployment file.",
-                    		false, null);
+                            "Please re-try with VoltDB a community edition-compatible deployment file.",
+                            false, null);
                 }
 
                 // check the start action for the community edition
