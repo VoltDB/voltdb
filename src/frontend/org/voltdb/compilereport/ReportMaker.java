@@ -35,6 +35,8 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Connector;
+import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.GroupRef;
@@ -44,6 +46,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.catalog.Table;
+import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
@@ -148,7 +151,7 @@ public class ReportMaker {
         return sb.toString();
     }
 
-    static String generateSchemaRow(Table table) {
+    static String generateSchemaRow(Table table, boolean isExportTable) {
         StringBuilder sb = new StringBuilder();
         sb.append("<tr class='primaryrow'>");
 
@@ -165,7 +168,11 @@ public class ReportMaker {
             tag(sb, "info", "Materialized View");
         }
         else {
-            tag(sb, null, "Table");
+            if (isExportTable) {
+                tag(sb, "inverse", "Export Table");
+            } else {
+                tag(sb, null, "Table");
+            }
         }
         sb.append("</td>");
 
@@ -268,10 +275,11 @@ public class ReportMaker {
         return sb.toString();
     }
 
-    static String generateSchemaTable(CatalogMap<Table> tables) {
+    static String generateSchemaTable(CatalogMap<Table> tables, CatalogMap<Connector> connectors) {
         StringBuilder sb = new StringBuilder();
+        List<Table> exportTables = getExportTables(connectors);
         for (Table table : tables) {
-            sb.append(generateSchemaRow(table));
+            sb.append(generateSchemaRow(table, exportTables.contains(table) ? true : false));
         }
         return sb.toString();
     }
@@ -297,7 +305,7 @@ public class ReportMaker {
         List<StmtParameter> params = CatalogUtil.getSortedCatalogItems(statement.getParameters(), "index");
         List<String> paramTypes = new ArrayList<String>();
         for (StmtParameter param : params) {
-            paramTypes.add(VoltType.get((byte) param.getSqltype()).name());
+            paramTypes.add(VoltType.get((byte) param.getJavatype()).name());
         }
         if (paramTypes.size() == 0) {
             sb.append("<i>None</i>");
@@ -547,7 +555,7 @@ public class ReportMaker {
      * Get some embeddable HTML of some generic catalog/application stats
      * that is drawn on the first page of the report.
      */
-    static String getStatsHTML(Database db) {
+    static String getStatsHTML(Database db, ArrayList<Feedback> warnings) {
         StringBuilder sb = new StringBuilder();
         sb.append("<table class='table table-condensed'>\n");
 
@@ -624,15 +632,40 @@ public class ReportMaker {
 
         // statements
         sb.append("<tr><td>SQL Statement Count</td><td>").append(statements).append("</td></tr>\n");
+        sb.append("</table>\n\n");
 
-        sb.append("</table>\n");
+        // warnings, add warning section if any
+        if (warnings.size() > 0){
+            sb.append("<h4>Warnings</h4>");
+            sb.append("<table class='table table-condensed'>\n");
+            for (Feedback warning : warnings) {
+                String procName = warning.getFileName().replace(".class", "");
+                String nameLink = "";
+                // not a warning during compiling procedures, must from the schema
+                if (procName.compareToIgnoreCase("null") == 0) {
+                    String schemaName = "";
+                    String warningMsg = warning.getMessage().toLowerCase();
+                    if (warningMsg.contains("table ")) {
+                        int begin = warningMsg.indexOf("table ") + 6;
+                        int end = (warningMsg.substring(begin)).indexOf(" ");
+                        schemaName = warningMsg.substring(begin, begin + end);
+                    }
+                    nameLink = "<a href='#s-" + schemaName + "'>" + schemaName.toUpperCase() + "</a>";
+                } else {
+                    nameLink = "<a href='#p-" + procName.toLowerCase() + "'>" + procName + "</a>";
+                }
+                sb.append("<tr><td>").append(nameLink).append("</td><td>").append(warning.getMessage()).append("</td></tr>\n");
+            }
+            sb.append("").append("</table>\n").append("</td></tr>\n");
+        }
+
         return sb.toString();
     }
 
     /**
      * Generate the HTML catalog report from a newly compiled VoltDB catalog
      */
-    public static String report(Catalog catalog) throws IOException {
+    public static String report(Catalog catalog, ArrayList<Feedback> warnings) throws IOException {
         // asynchronously get platform properties
         new Thread() {
             @Override
@@ -650,10 +683,10 @@ public class ReportMaker {
         Database db = cluster.getDatabases().get("database");
         assert(db != null);
 
-        String statsData = getStatsHTML(db);
+        String statsData = getStatsHTML(db, warnings);
         contents = contents.replace("##STATS##", statsData);
 
-        String schemaData = generateSchemaTable(db.getTables());
+        String schemaData = generateSchemaTable(db.getTables(), db.getConnectors());
         contents = contents.replace("##SCHEMA##", schemaData);
 
         String procData = generateProceduresTable(db.getProcedures());
@@ -671,6 +704,17 @@ public class ReportMaker {
         contents = contents.replace("get.py?a=KEY&", String.format("get.py?a=%s&", msg));
 
         return contents;
+    }
+
+    private static List<Table> getExportTables(CatalogMap<Connector> connectors) {
+        List<Table> retval = new ArrayList<Table>();
+
+        for (Connector conn : connectors) {
+            for (ConnectorTableInfo cti : conn.getTableinfo()) {
+                retval.add(cti.getTable());
+            }
+        }
+        return retval;
     }
 
     public static String getLiveSystemOverview()
