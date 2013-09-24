@@ -150,7 +150,7 @@ public class ConnectionUtil {
         Object returnArray[] = new Object[3];
         boolean success = false;
         if (addr.isUnresolved()) {
-            throw new java.net.UnknownHostException(ReverseDNSCache.hostnameOrAddress(addr.getAddress()));
+            throw new java.net.UnknownHostException(addr.getHostName());
         }
         SocketChannel aChannel = SocketChannel.open(addr);
         returnArray[0] = aChannel;
