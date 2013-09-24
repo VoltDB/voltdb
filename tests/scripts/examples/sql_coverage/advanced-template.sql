@@ -94,7 +94,7 @@ SELECT @agg(@optionalfn(_variable[@columntype])),                               
 -- compare two cols
 -- UPDATE @fromtables SET @updatecolumn = @updatevalue WHERE @optionalfn(_variable[@columntype]) _somecmp @optionalfn(_variable[@columntype])
 -- comparison with set expression
-UPDATE @fromtables SET @updatecolumn = @updatevalue @aftermath WHERE @optionalfn(_variable[@columntype]) _somecmp _variable[@comparabletype]
+UPDATE @fromtables SET @updatecolumn = @updatesource @aftermath WHERE @optionalfn(_variable[@columntype]) _somecmp _variable[@comparabletype]
 
 -- Save more exhaustive LIKE testing for advanced-strings.sql.
 -- This is mostly just to catch the error of applying different forms of LIKE to non-strings.
