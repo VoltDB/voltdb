@@ -336,7 +336,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testMultiPartitionMVBasedQuery_Where() {
-        pns = compileToFragments("SELECT COUNT(*) FROM V_P1 where v_cnt = 1");
+        pns = compileToFragments("SELECT * FROM V_P1 where v_cnt = v_a1");
         for (AbstractPlanNode apn: pns) {
             System.out.println(apn.toExplainPlanString());
         }

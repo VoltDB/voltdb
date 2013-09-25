@@ -345,14 +345,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         // Construct the reAggregation plan node's aggSchema
         mvFixInfo.reAggNode = new HashAggregatePlanNode();
-        assert(joinTree != null);
-        AbstractExpression where = joinTree.getSimpleFilterExpression();
-        if (where != null) {
-            // Add more logic to determinse what expressions to push down to scan node.
-            joinTree.m_joinExpr = null;
-            joinTree.m_whereExpr = null;
-            mvFixInfo.reAggNode.setPostPredicate(where);
-        }
         int outputColumnIndex = 0;
         NodeSchema aggSchema = new NodeSchema();
 
@@ -373,6 +365,50 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             outputColumnIndex++;
         }
         mvFixInfo.reAggNode.setOutputSchema(aggSchema);
+
+        assert(joinTree != null);
+        AbstractExpression where = joinTree.getSimpleFilterExpression();
+        if (where != null) {
+            // Collect all TVEs that need to be do re-aggregation in coordinator.
+            List<TupleValueExpression> needReAggTVEs = new ArrayList<TupleValueExpression>();
+            for (int i=numOfGroupByColumns; i < mvColumnArray.size(); i++) {
+                Column mvCol = mvColumnArray.get(i);
+                TupleValueExpression tve = new TupleValueExpression();
+                tve.setColumnIndex(i);
+                tve.setColumnName(mvCol.getName());
+                tve.setTableName(mvTableName);
+                tve.setColumnAlias(mvCol.getName());
+                tve.setValueType(VoltType.get((byte)mvCol.getType()));
+                tve.setValueSize(mvCol.getSize());
+
+                needReAggTVEs.add(tve);
+            }
+            List<AbstractExpression> exprs = ExpressionUtil.uncombine(where);
+            List<AbstractExpression> pushdownExprs = new ArrayList<AbstractExpression>();
+            List<AbstractExpression> aggPostExprs = new ArrayList<AbstractExpression>();
+            // Check where clause.
+            for (AbstractExpression expr: exprs) {
+                ArrayList<AbstractExpression> tves = expr.findBaseTVEs();
+                boolean pushdown = true;
+                for (TupleValueExpression needReAggTVE: needReAggTVEs) {
+                    if (tves.contains(needReAggTVE)) {
+                        pushdown = false;
+                        break;
+                    }
+                }
+                if (pushdown) {
+                    pushdownExprs.add(expr);
+                } else {
+                    aggPostExprs.add(expr);
+                }
+            }
+            AbstractExpression aggPostExpr = ExpressionUtil.combine(aggPostExprs);
+
+            mvFixInfo.reAggNode.setPostPredicate(aggPostExpr);
+            assert(joinTree.m_whereExpr == null);
+            joinTree.m_joinExpr = ExpressionUtil.combine(pushdownExprs);
+        }
+
     }
 
     private void processAvgPushdownOptimization (VoltXMLElement displayElement,

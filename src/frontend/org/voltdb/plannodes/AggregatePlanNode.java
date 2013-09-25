@@ -232,6 +232,15 @@ public class AggregatePlanNode extends AbstractPlanNode {
             int index = input_schema.getIndexOfTve(tve);
             tve.setColumnIndex(index);
         }
+
+        // Post filter also needs to resolve indexes.
+        List<TupleValueExpression> postFilter_tves =
+                ExpressionUtil.getTupleValueExpressions(m_postPredicate);
+        for (TupleValueExpression tve : postFilter_tves)
+        {
+            int index = m_outputSchema.getIndexOfTve(tve);
+            tve.setColumnIndex(index);
+        }
     }
 
     /**
@@ -309,6 +318,9 @@ public class AggregatePlanNode extends AbstractPlanNode {
         if (m_prePredicate != null) {
             stringer.key(Members.PRE_PREDICATE.name()).value(m_prePredicate);
         }
+        if (m_postPredicate != null) {
+            stringer.key(Members.POST_PREDICATE.name()).value(m_postPredicate);
+        }
     }
 
     @Override
@@ -330,6 +342,9 @@ public class AggregatePlanNode extends AbstractPlanNode {
         sb.setLength(sb.length() - 2);
         if (m_prePredicate != null) {
             sb.append(" (" + m_prePredicate.explain(m_outputSchema.getColumns().get(0).getTableName()) + ")");
+        }
+        if (m_postPredicate != null) {
+            sb.append(" (" + m_postPredicate.explain(m_outputSchema.getColumns().get(0).getTableName()) + ")");
         }
         return sb.toString();
     }
@@ -365,6 +380,9 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
         if(!jobj.isNull(Members.PRE_PREDICATE.name())) {
             m_prePredicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.PRE_PREDICATE.name()), db);
+        }
+        if(!jobj.isNull(Members.POST_PREDICATE.name())) {
+            m_postPredicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.POST_PREDICATE.name()), db);
         }
     }
 }

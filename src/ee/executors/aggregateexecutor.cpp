@@ -528,7 +528,9 @@ inline void AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
                          m_outputColumnExpressions[output_col_index]->eval(&(aggregateRow->m_passThroughTuple)));
         VOLT_TRACE("Passthrough columns: %d", output_col_index);
     }
-    output_table->insertTupleNonVirtual(tmptup);
+    if (m_postPredicate == NULL || m_postPredicate->eval(&tmptup, NULL).isTrue()) {
+        output_table->insertTupleNonVirtual(tmptup);
+    }
 
     VOLT_TRACE("output_table:\n%s", output_table->debug().c_str());
 }
@@ -599,21 +601,10 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
     }
 
     VOLT_TRACE("finalizing..");
-    // Using if/else to reduce # of m_predicate checkings.
-    if (m_postPredicate == NULL) {
-        for (HashAggregateMapType::const_iterator iter = hash.begin(); iter != hash.end(); iter++) {
-            AggregateRow *aggregateRow = iter->second;
-            insertOutputTuple(aggregateRow);
-            delete aggregateRow;
-        }
-    } else {
-        for (HashAggregateMapType::const_iterator iter = hash.begin(); iter != hash.end(); iter++) {
-            AggregateRow *aggregateRow = iter->second;
-            if (m_postPredicate->eval(&nxtTuple, NULL).isTrue()) {
-                insertOutputTuple(aggregateRow);
-            }
-            delete aggregateRow;
-        }
+    for (HashAggregateMapType::const_iterator iter = hash.begin(); iter != hash.end(); iter++) {
+        AggregateRow *aggregateRow = iter->second;
+        insertOutputTuple(aggregateRow);
+        delete aggregateRow;
     }
 
     return true;

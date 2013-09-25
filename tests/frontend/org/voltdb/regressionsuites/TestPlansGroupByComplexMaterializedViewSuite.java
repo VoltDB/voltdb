@@ -738,6 +738,58 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         }
     }
 
+    public void testPartitionedMVQueriesWhere() throws Exception {
+        System.out.println("Test MV partition agg query where...");
+        VoltTable vt = null;
+        Client client = this.getClient();
+
+        // Load data
+        loadTableForMVFixSuite();
+        String[] tbs = {"V_P1"};
+        /*
+        * Current expected data:
+        * V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent
+        * 10,   1,     4,     101,       37
+        * 20,   2,     2,     45,        13
+        * 30,   2,     1,     24,        8
+        * 30,   3,     3,     85,        37
+        * */
+        for (String tb: tbs) {
+            vt = client.callProcedure("@AdHoc", "Select V_CNT from "
+                    + tb + " where v_sum_rent = 37 Order by V_CNT;").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{3}, {4}});
+
+            vt = client.callProcedure("@AdHoc", "Select V_CNT from "
+                    + tb + " where V_G1 < 20 Order by V_CNT;").getResults()[0];
+            assertEquals(4, vt.asScalarLong());
+
+            vt = client.callProcedure("@AdHoc", "Select count(*) from "
+                    + tb + " where V_G1 > 10 Order by V_CNT;").getResults()[0];
+            assertEquals(3, vt.asScalarLong());
+
+            // Test AND
+            vt = client.callProcedure("@AdHoc", "Select V_CNT from "
+                    + tb + " where V_G1 > 10 AND v_sum_rent = 37 Order by V_CNT;").getResults()[0];
+            assertEquals(3, vt.asScalarLong());
+
+            // Test OR
+            vt = client.callProcedure("@AdHoc", "Select V_CNT from "
+                    + tb + " where V_G1 > 10 OR v_sum_rent = 37 Order by V_CNT;").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{1}, {2}, {3}, {4}});
+
+            vt = client.callProcedure("@AdHoc", "Select V_CNT from "
+                    + tb + " where V_G1 = 20 OR v_sum_rent = 37 Order by V_CNT;").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{2}, {3}, {4}});
+
+            // Test no push down.
+            vt = client.callProcedure("@AdHoc", "Select V_G1, V_CNT from "
+                    + tb + " where V_G1 = (v_sum_rent - 7) Order by V_CNT;").getResults()[0];
+            System.out.println(vt);
+            validateTableOfLongs(vt, new long[][]{{30,3}});
+        }
+
+    }
+
     //
     // Suite builder boilerplate
     //
