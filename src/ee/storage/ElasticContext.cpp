@@ -41,10 +41,10 @@ ElasticContext::~ElasticContext()
 {}
 
 /**
- * Activation/reactivation handler.
+ * Activation handler.
  */
 TableStreamerContext::ActivationReturnCode
-ElasticContext::handleActivation(TableStreamType streamType, bool reactivate)
+ElasticContext::handleActivation(TableStreamType streamType)
 {
     // Can't activate an indexing stream during a snapshot.
     if (m_surgeon.hasStreamType(TABLE_STREAM_SNAPSHOT)) {
@@ -79,6 +79,16 @@ ElasticContext::handleActivation(TableStreamType streamType, bool reactivate)
 
     // It wasn't one of the supported stream types.
     return ACTIVATION_UNSUPPORTED;
+}
+
+/**
+ * Reactivation handler.
+ */
+TableStreamerContext::ActivationReturnCode
+ElasticContext::handleReactivation(TableStreamType streamType,
+                                   const std::vector<std::string> &predicateStrings)
+{
+    return handleActivation(streamType);
 }
 
 /**

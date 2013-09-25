@@ -45,7 +45,7 @@ namespace voltdb
         virtual bool activateStream(PersistentTableSurgeon &surgeon,
                                     TupleSerializer &serializer,
                                     TableStreamType streamType,
-                                    std::vector<std::string> &predicateStrings) = 0;
+                                    const std::vector<std::string> &predicateStrings) = 0;
 
         /**
          * Continue streaming.

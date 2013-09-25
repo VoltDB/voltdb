@@ -36,7 +36,8 @@ class TupleOutputStreamProcessor;
 class ElasticContext : public TableStreamerContext
 {
 
-    friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TupleSerializer&, TableStreamType, std::vector<std::string>&);
+    friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TupleSerializer&,
+                                              TableStreamType, const std::vector<std::string>&);
     friend class ::DummyElasticTableStreamer;
     friend class ::CopyOnWriteTest;
 
@@ -48,9 +49,15 @@ public:
     virtual ~ElasticContext();
 
     /**
-     * Activation/reactivation handler.
+     * Activation handler.
      */
-    virtual ActivationReturnCode handleActivation(TableStreamType streamType, bool reactivate);
+    virtual ActivationReturnCode handleActivation(TableStreamType streamType);
+
+    /**
+     * Reactivation handler.
+     */
+    virtual ActivationReturnCode handleReactivation(TableStreamType streamType,
+                                                    const std::vector<std::string> &predicateStrings);
 
     /**
      * Deactivation handler.
