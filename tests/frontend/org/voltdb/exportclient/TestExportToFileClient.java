@@ -39,11 +39,14 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportToFileClient.ExportToFileDecoder;
 import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
 public class TestExportToFileClient extends TestCase {
 
     public void testEng1088() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         ExportToFileClient exportClient =
             new ExportToFileClient(
                 ',',
@@ -68,6 +71,8 @@ public class TestExportToFileClient extends TestCase {
     }
 
     public void testNoAutoDiscovery() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         final FileFilter filter = new FileFilter() {
             @Override
             public boolean accept(File pathname) {

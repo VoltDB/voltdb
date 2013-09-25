@@ -38,6 +38,7 @@ import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.export.ExportTestClient;
 import org.voltdb.exportclient.ExportClientException;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing1;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing2;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing3;
@@ -225,6 +226,8 @@ public class TestSecuritySuite extends RegressionSuite {
     }
 
     public void testAllowedExportConnectorPermissions() throws ExportClientException {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         // user1 can connect (in groups list)
         ExportTestClient eclient = new ExportTestClient(1, port(0));
         eclient.addCredentials("user1", "password");
@@ -236,6 +239,8 @@ public class TestSecuritySuite extends RegressionSuite {
     }
 
     public void testRejectedExportConnectorPermissions() {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         boolean caught = false;
         ExportTestClient eclient = new ExportTestClient(1, port(0));
         try {
@@ -329,7 +334,10 @@ public class TestSecuritySuite extends RegressionSuite {
         ArrayList<String> elgroups = new ArrayList<String>();
         elgroups.add("group1");
 
-        project.addExport("org.voltdb.export.processors.RawProcessor", true /*enabled*/, elgroups);
+        // export disabled in community
+        if (MiscUtils.isPro()) {
+            project.addExport("org.voltdb.export.processors.RawProcessor", true /*enabled*/, elgroups);
+        }
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 1 Local Site/Partitions running on JNI backend

@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import junit.framework.TestCase;
 
 import org.voltdb.client.ClientResponse;
+import org.voltdb.utils.MiscUtils;
 
 public class TestCtrlC extends TestCase {
 
@@ -186,6 +187,7 @@ public class TestCtrlC extends TestCase {
     }
 
     public void testSimple() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
 
         VoltDBFickleCluster.compile();
         Random r = new Random();

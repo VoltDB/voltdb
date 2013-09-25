@@ -37,6 +37,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.SnapshotVerifier;
 
 public class TestPartitionDetection extends TestCase
@@ -142,6 +143,8 @@ public class TestPartitionDetection extends TestCase
     }
 
     public void testPartitionAndVerifySnapshot() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         final Semaphore rateLimit = new Semaphore(10);
         final Client client = ClientFactory.createClient();
 

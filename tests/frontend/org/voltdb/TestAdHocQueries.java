@@ -716,6 +716,12 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
         TestEnv(String pathToCatalog, String pathToDeployment,
                      int siteCount, int hostCount, int kFactor) {
+
+            // hack for no k-safety in community version
+            if (!MiscUtils.isPro()) {
+                kFactor = 0;
+            }
+
             m_builder = new VoltProjectBuilder();
             try {
                 m_builder.addLiteralSchema("create table BLAH (" +

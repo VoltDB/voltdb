@@ -38,6 +38,8 @@ public class TestMidRejoinDeath extends RejoinTestBase {
 
     @Test
     public void testMidRejoinDeath() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         LocalCluster cluster = null;
         Client client = null;
 
