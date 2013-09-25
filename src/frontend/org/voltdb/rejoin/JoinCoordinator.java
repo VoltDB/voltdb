@@ -87,12 +87,7 @@ public abstract class JoinCoordinator extends LocalMailbox {
 
     public void initialize(int kfactor)
         throws JSONException, KeeperException, InterruptedException, ExecutionException {}
-    public void setClientInterface(ClientInterface ci) {}
     public void setPartitionsToHSIds(Map<Integer, Long> partsToHSIds) {}
-    public List<Integer> getPartitionsToAdd() {
-        throw new UnsupportedOperationException("getPartitionsToAdd is only supported for " +
-                "elastic join");
-    }
     public JSONObject getTopology() {
         throw new UnsupportedOperationException("getTopology is only supported for elastic join");
     }
@@ -100,10 +95,7 @@ public abstract class JoinCoordinator extends LocalMailbox {
     /**
      * Starts the rejoin process.
      */
-    public abstract boolean startJoin(Database catalog,
-                                      Cartographer cartographer,
-                                      String clSnapshotPath)
-            throws KeeperException, InterruptedException, JSONException;
+    public abstract boolean startJoin();
 
     /**
      * Discard the mailbox.

@@ -168,7 +168,7 @@ public class TestIv2RejoinCoordinator {
     @Test
     public void testBlockingBasic() throws Exception {
         createCoordinator(false);
-        m_coordinator.startJoin(null, null, null);
+        m_coordinator.startJoin();
         // verify the first site is started
         List<Long> hsids = new ArrayList<Long>();
         hsids.add(1l);
@@ -219,7 +219,7 @@ public class TestIv2RejoinCoordinator {
     @Test
     public void testReplayFinishedBeforeSnapshot() throws Exception {
         createCoordinator(false);
-        m_coordinator.startJoin(null, null, null);
+        m_coordinator.startJoin();
 
         // fake a replay finished response for site 2 before snapshot stream finishes
         RejoinMessage msg3 = new RejoinMessage(2l, RejoinMessage.Type.REPLAY_FINISHED);

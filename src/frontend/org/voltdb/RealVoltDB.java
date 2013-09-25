@@ -472,10 +472,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                                     "No more nodes can join.", false, null);
                         }
                     }
-                    else if (m_joining) {
-                        // Ask the joiner for the new partitions to create on this node.
-                        partitions = m_joinCoordinator.getPartitionsToAdd();
-                    }
                     else {
                         partitions = ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
                     }
@@ -1503,14 +1499,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         // Start the rejoin coordinator
         if (m_joinCoordinator != null) {
             try {
-                m_joinCoordinator.setClientInterface(m_clientInterfaces.get(0));
-
-                String clSnapshotPath = m_catalogContext.cluster.getLogconfig().get("log")
-                                                        .getInternalsnapshotpath();
-
-                if (!m_joinCoordinator.startJoin(m_catalogContext.database,
-                                                 m_cartographer,
-                                                 clSnapshotPath)) {
+                if (!m_joinCoordinator.startJoin()) {
                     VoltDB.crashLocalVoltDB("Failed to join the cluster", true, null);
                 }
             } catch (Exception e) {
