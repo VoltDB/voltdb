@@ -48,7 +48,7 @@ public class TestOrderBySuite extends RegressionSuite {
      * A_POOL_STR VARCHAR(1024), PRIMARY_KEY (PKEY) );
      */
 
-    static final Class<?>[] PROCEDURES = { InsertO1.class,
+    static final Class<?>[] PROCEDURES = {InsertO1.class,
                                           InsertO3.class,
                                           OrderByCountStarAlias.class,
                                           OrderByNonIndex.class,
@@ -92,7 +92,10 @@ public class TestOrderBySuite extends RegressionSuite {
 
     /** add 20 shuffled rows
      * @throws InterruptedException */
-    private void load(Client client) throws NoConnectionsException, ProcCallException, IOException, InterruptedException {
+    private void load(Client client)
+    throws NoConnectionsException, ProcCallException, IOException, InterruptedException
+    {
+        client.callProcedure("Truncate01");
         int pkey = 0;
         a_int.clear();
         a_inline_str.clear();
@@ -131,7 +134,10 @@ public class TestOrderBySuite extends RegressionSuite {
         client.drain();
     }
 
-    private void loadO3(Client client) throws NoConnectionsException, ProcCallException, IOException, InterruptedException {
+    private void loadO3(Client client)
+    throws NoConnectionsException, ProcCallException, IOException, InterruptedException
+    {
+        client.callProcedure("Truncate03");
         int pkey = 0;
         a_int.clear();
 
@@ -167,9 +173,10 @@ public class TestOrderBySuite extends RegressionSuite {
         client.drain();
     }
 
-    private void loadInOrder(Client client) throws NoConnectionsException,
-                                           ProcCallException,
-                                           IOException, InterruptedException {
+    private void loadInOrder(Client client)
+    throws NoConnectionsException, ProcCallException, IOException, InterruptedException
+    {
+        client.callProcedure("Truncate03");
         // if you want to test synchronous latency, this
         //  is a good variable to change
         boolean async = true;
@@ -186,7 +193,10 @@ public class TestOrderBySuite extends RegressionSuite {
         }
     }
 
-    private void loadWithDupes(Client client) throws Exception {
+    private void loadWithDupes(Client client) throws Exception
+    {
+        client.callProcedure("Truncate01");
+
         client.callProcedure("InsertO1", 1, new Long(1), "Alice", "AlphaBitters");
         client.callProcedure("InsertO1", 2, new Long(2), "Alice", "CrunchTubers");
         client.callProcedure("InsertO1", 3, new Long(3), "Alice", "BetaBuildingBlocks");
@@ -205,6 +215,8 @@ public class TestOrderBySuite extends RegressionSuite {
     private void loadWithDifferingDupes(Client client)
     throws NoConnectionsException, IOException, ProcCallException, InterruptedException
     {
+        client.callProcedure("Truncate01");
+
         client.callProcedure("InsertO1", 1, new Long(1), "Alice", "AlphaBitters");
         client.callProcedure("InsertO1", 2, new Long(2), "Alice", "CrunchTubers");
         client.callProcedure("InsertO1", 3, new Long(3), "Alice", "BetaBuildingBlocks");
@@ -223,7 +235,9 @@ public class TestOrderBySuite extends RegressionSuite {
      * @throws ProcCallException
      * @throws NoConnectionsException
      * @throws InterruptedException */
-    public void testOrderBySingleColumnAscending() throws NoConnectionsException, ProcCallException, IOException, InterruptedException {
+    private void subtestOrderBySingleColumnAscending()
+    throws NoConnectionsException, ProcCallException, IOException, InterruptedException
+    {
         VoltTable vt;
         Client client = this.getClient();
         load(client);
@@ -311,7 +325,9 @@ public class TestOrderBySuite extends RegressionSuite {
 
     }
 
-    public void testOrderBySingleColumnDescending() throws NoConnectionsException, ProcCallException, IOException, InterruptedException {
+    private void subtestOrderBySingleColumnDescending()
+    throws NoConnectionsException, ProcCallException, IOException, InterruptedException
+    {
         VoltTable vt;
         int it;
         Client client = this.getClient();
@@ -438,7 +454,7 @@ public class TestOrderBySuite extends RegressionSuite {
          *   9      3       Chris      AlphaBitters
          */
 
-    public void testMultiColumnOrderBy() throws Exception {
+    private void subtestMultiColumnOrderBy() throws Exception {
         VoltTable vt;
         Client client = this.getClient();
         loadWithDupes(client);
@@ -506,9 +522,9 @@ public class TestOrderBySuite extends RegressionSuite {
         assertEquals(c, "BetaBuildingBlocks");
     }
 
-    public void testOrderByUseIndex() throws NoConnectionsException,
-                                     ProcCallException,
-                                     IOException, InterruptedException {
+    private void subtestOrderByUseIndex()
+    throws NoConnectionsException, ProcCallException, IOException, InterruptedException
+    {
         @SuppressWarnings("unused")
         long start, elapsed;
         //long base;
@@ -547,7 +563,7 @@ public class TestOrderBySuite extends RegressionSuite {
         }
     }
 
-    public void testAggOrderByGroupBy() throws Exception
+    private void subtestAggOrderByGroupBy() throws Exception
     {
         VoltTable vt;
         Client client = this.getClient();
@@ -568,7 +584,7 @@ public class TestOrderBySuite extends RegressionSuite {
         assertEquals(24, vt.get(2, VoltType.INTEGER));
     }
 
-    public void testOrderByCountStarAlias()
+    private void subtestOrderByCountStarAlias()
     throws IOException, ProcCallException, InterruptedException
     {
         VoltTable vt;
@@ -591,7 +607,7 @@ public class TestOrderBySuite extends RegressionSuite {
         assertEquals(4L, vt.get("FOO", VoltType.BIGINT));
     }
 
-    public void testOrderByCountStarCardinal()
+    private void subtestOrderByCountStarCardinal()
     throws IOException, ProcCallException, InterruptedException
     {
         VoltTable vt;
@@ -614,7 +630,7 @@ public class TestOrderBySuite extends RegressionSuite {
         assertEquals(4L, vt.get(1, VoltType.BIGINT));
     }
 
-    public void testOrderByCountStarWithLimit()
+    private void subtestOrderByCountStarWithLimit()
     throws IOException, ProcCallException, InterruptedException
     {
         VoltTable vt;
@@ -628,7 +644,7 @@ public class TestOrderBySuite extends RegressionSuite {
         assertEquals(1L, vt.get("FOO", VoltType.BIGINT));
     }
 
-    public void testOrderByWithNewExpression() throws Exception
+    private void subtestOrderByWithNewExpression() throws Exception
     {
         VoltTable vt;
         Client client = getClient();
@@ -649,13 +665,16 @@ public class TestOrderBySuite extends RegressionSuite {
         }
     }
 
-    public void testEng1133() throws Exception
+    private void subtestEng1133() throws Exception
     {
         Client client = getClient();
+        client.callProcedure("TruncateA");
+        client.callProcedure("TruncateB");
+
         for(int a=0; a < 5; a++)
         {
-            client.callProcedure("InsertA", a);
-            client.callProcedure("InsertB", a);
+            client.callProcedure("A.insert", a);
+            client.callProcedure("B.insert", a);
         }
         VoltTable vt = client.callProcedure("@AdHoc", "select a.a, b.a from a, b where b.a >= 3 order by a.a, b.a").
                               getResults()[0];
@@ -666,9 +685,11 @@ public class TestOrderBySuite extends RegressionSuite {
         }
     }
 
-    public void testEng4676() throws Exception
+    private void subtestEng4676() throws Exception
     {
         Client client = getClient();
+        client.callProcedure("Truncate01");
+        client.callProcedure("Truncate03");
         /*
          * Column definition for O1 and O3:
          *   O1 (PKEY, A_INT, A_INLINE_STR, A_POOL_STR)
@@ -704,9 +725,10 @@ public class TestOrderBySuite extends RegressionSuite {
         assertEquals(7, vt.fetchRow(0).getLong(0));
     }
 
-    public void testEng5021() throws Exception
+    private void subtestEng5021() throws Exception
     {
         Client client = getClient();
+        client.callProcedure("Truncate03");
         client.callProcedure("InsertO3", 1,1,1,1);
         client.callProcedure("InsertO3", 1,2,1,1);
         client.callProcedure("InsertO3", 1,3,1,1);
@@ -735,6 +757,23 @@ public class TestOrderBySuite extends RegressionSuite {
 
     }
 
+    public void testAll()
+    throws Exception
+    {
+        subtestOrderBySingleColumnAscending();
+        subtestOrderBySingleColumnDescending();
+        subtestMultiColumnOrderBy();
+        subtestOrderByUseIndex();
+        subtestAggOrderByGroupBy();
+        subtestOrderByCountStarAlias();
+        subtestOrderByCountStarCardinal();
+        subtestOrderByCountStarWithLimit();
+        subtestOrderByWithNewExpression();
+        subtestEng1133();
+        subtestEng4676();
+        subtestEng5021();
+    }
+
     //
     // Suite builder boilerplate
     //
@@ -743,33 +782,38 @@ public class TestOrderBySuite extends RegressionSuite {
     }
 
     static public junit.framework.Test suite() {
-        VoltServerConfig config = null;
+        LocalCluster config = null;
+        boolean success;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
                 TestOrderBySuite.class);
         VoltProjectBuilder project = new VoltProjectBuilder();
 
         project.addSchema(TestOrderBySuite.class.getResource("testorderby-ddl.sql"));
-        project.addPartitionInfo("O1", "PKEY");
-        project.addPartitionInfo("a", "a");
-        project.addStmtProcedure("InsertA", "INSERT INTO A VALUES(?);");
-        project.addStmtProcedure("InsertB", "INSERT INTO B VALUES(?);");
         project.addProcedures(PROCEDURES);
 
+        //* Single-server configuration  -- please do not remove or corrupt this structured comment
         config = new LocalCluster("testorderby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        boolean success = config.compile(project);
+        success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
+        // End single-server configuration  -- please do not remove or corrupt this structured comment */
 
+        //* HSQL backend server configuration  -- please do not remove or corrupt this structured comment
         config = new LocalCluster("testorderby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
+        // End HSQL backend server configuration  -- please do not remove or corrupt this structured comment */
 
-        // Cluster
+        //* Multi-server configuration  -- please do not remove or corrupt this structured comment
         config = new LocalCluster("testorderby-cluster.jar", 3, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        // Disable hasLocalServer -- with hasLocalServer enabled,
+        // multi-server pro configs mysteriously hang at startup under eclipse.
+        config.setHasLocalServer(false);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
+        // End multi-server configuration  -- please do not remove or corrupt this structured comment */
 
         return builder;
     }

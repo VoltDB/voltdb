@@ -179,6 +179,16 @@ public class CompiledPlan {
         if (subPlanGraph != null) {
             total += subPlanGraph.findAllNodesOfType(PlanNodeType.SEQSCAN).size();
         }
+        // add full index scans
+        ArrayList<AbstractPlanNode> indexScanNodes = rootPlanGraph.findAllNodesOfType(PlanNodeType.INDEXSCAN);
+        if (subPlanGraph != null) {
+            indexScanNodes.addAll(subPlanGraph.findAllNodesOfType(PlanNodeType.INDEXSCAN));
+        }
+        for (AbstractPlanNode node : indexScanNodes) {
+            if (((IndexScanPlanNode)node).getSearchKeyExpressions().isEmpty()) {
+                total++;
+            }
+        }
         return total;
     }
 

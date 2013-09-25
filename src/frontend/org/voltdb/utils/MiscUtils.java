@@ -160,7 +160,11 @@ public class MiscUtils {
         // verify the license file exists.
         File licenseFile = new File(pathToLicense);
         if (licenseFile.exists() == false) {
-            hostLog.fatal("Unable to open license file: " + pathToLicense);
+            String canonicalName = "path unknown?";
+            try {
+                canonicalName = licenseFile.getCanonicalPath();
+            } catch (IOException ioexc) {}
+            hostLog.fatal("Unable to open license file: " + pathToLicense + " (" + canonicalName + ")");
             hostLog.fatal("Please contact sales@voltdb.com to request a license.");
             return null;
         }
