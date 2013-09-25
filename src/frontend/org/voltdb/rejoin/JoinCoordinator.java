@@ -22,20 +22,12 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.messaging.HostMessenger;
-import org.voltdb.ClientInterface;
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
-import org.voltdb.catalog.Database;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.iv2.Cartographer;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.sysprocs.saverestore.SnapshotRequestConfig;
-import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.VoltFile;
 
 import java.io.File;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
@@ -44,41 +36,6 @@ import java.util.concurrent.ExecutionException;
  */
 public abstract class JoinCoordinator extends LocalMailbox {
     protected final HostMessenger m_messenger;
-
-    /*
-     * m_handler is called when a SnapshotUtil.requestSnapshot response occurs.
-     * This callback runs on the snapshot daemon thread.
-     */
-    protected static final SnapshotUtil.SnapshotResponseHandler m_handler =
-            new SnapshotUtil.SnapshotResponseHandler() {
-        @Override
-        public void handleResponse(ClientResponse resp)
-        {
-            if (resp == null) {
-                VoltDB.crashLocalVoltDB("Failed to initiate rejoin snapshot",
-                        false, null);
-            } else if (resp.getStatus() != ClientResponseImpl.SUCCESS) {
-                VoltDB.crashLocalVoltDB("Failed to initiate rejoin snapshot: "
-                        + resp.getStatusString(), true, resp.getException());
-            }
-
-            VoltTable[] results = resp.getResults();
-            if (SnapshotUtil.didSnapshotRequestSucceed(results)) {
-                String appStatus = resp.getAppStatusString();
-                if (appStatus == null) {
-                    VoltDB.crashLocalVoltDB("Rejoin snapshot request failed: "
-                            + resp.getStatusString(), false, null);
-                }
-                else {
-                    // success is buried down here...
-                    return;
-                }
-            } else {
-                VoltDB.crashLocalVoltDB("Snapshot request for rejoin failed: " + results[0].toJSONString(),
-                        false, null);
-            }
-        }
-    };
 
     public JoinCoordinator(HostMessenger hostMessenger) {
         super(hostMessenger, hostMessenger.generateMailboxId(null));

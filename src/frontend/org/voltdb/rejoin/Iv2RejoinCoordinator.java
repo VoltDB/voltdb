@@ -36,11 +36,9 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 
 import org.voltdb.SnapshotSiteProcessor;
-import org.voltdb.catalog.Database;
 
 import org.voltdb.SnapshotFormat;
 
-import org.voltdb.iv2.Cartographer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.messaging.RejoinMessage;
@@ -265,7 +263,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         if (data != null) {
             REJOINLOG.debug("Snapshot request: " + data);
             SnapshotUtil.requestSnapshot(0l, "", nonce, !m_liveRejoin, SnapshotFormat.STREAM, data,
-                    m_handler, true);
+                    SnapshotUtil.fatalSnapshotResponseHandler, true);
         }
     }
 
