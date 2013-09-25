@@ -26,10 +26,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.supercsv.exception.SuperCsvException;
 import org.supercsv.io.ICsvListReader;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientImpl;
 import org.voltdb.client.NoConnectionsException;
 
 /**
@@ -73,7 +73,22 @@ class CSVFileReader implements Runnable {
     @Override
     public void run() {
         List<String> lineList;
-        m_log.debug("Using Hashinator: " + TheHashinator.getConfiguredHashinatorType().name());
+        ClientImpl clientImpl = (ClientImpl) m_csvClient;
+        int sleptTimes = 0;
+        while (!clientImpl.isHashinatorInitialized() && sleptTimes < 120) {
+            try {
+                Thread.sleep(500);
+                sleptTimes++;
+            } catch (InterruptedException ex) {
+                ;
+            }
+        }
+        if (sleptTimes >= 120 && CSVPartitionProcessor.m_isMP) {
+            m_log.debug("Failed to detect partition information, "
+                    + "client affinity will not be used and CSV loading could be slow.");
+        }
+        m_log.info("Client Initialization Done.");
+
         while ((m_config.limitrows-- > 0)) {
             if (m_errored) {
                 break;
@@ -118,7 +133,7 @@ class CSVFileReader implements Runnable {
                 //will be pushed to queue. Queues will break out as well after seeing endOfData
                 if (!CSVPartitionProcessor.m_isMP && !m_config.useSuppliedProcedure) {
                     partitionId =
-                            TheHashinator.getPartitionForParameter(
+                            clientImpl.getPartitionForParameter(
                             CSVPartitionProcessor.m_partitionColumnType.getValue(),
                             (Object) lineData.correctedLine[CSVPartitionProcessor.m_partitionedColumnIndex]);
                 }
