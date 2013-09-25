@@ -1079,6 +1079,47 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         + m_config.m_pathToDeployment, false, null);
             }
 
+
+            if (!m_config.m_isEnterprise) {
+                boolean shutdown = false;
+
+                // check license features for community version
+                if ((m_deployment.getCluster() != null) && (m_deployment.getCluster().getKfactor() > 0)) {
+                    consoleLog.error("K-Saftey (intra-cluster redundancy) is not supported " +
+                            "in the community edition of VoltDB.");
+                    shutdown = true;
+                }
+                if ((m_deployment.getSnapshot() != null) && (m_deployment.getSnapshot().isEnabled())) {
+                    consoleLog.error("Snapshots (periodic and on-demand) are not supported " +
+                            "in the community edition of VoltDB.");
+                    shutdown = true;
+                }
+                if ((m_deployment.getCommandlog() != null) && (m_deployment.getCommandlog().isEnabled())) {
+                    consoleLog.error("Command logging is not supported " +
+                            "in the community edition of VoltDB.");
+                    shutdown = true;
+                }
+                if ((m_deployment.getExport() != null) && (m_deployment.getExport().isEnabled())) {
+                    consoleLog.error("Export is not supported " +
+                            "in the community edition of VoltDB.");
+                    shutdown = true;
+                }
+                if (shutdown) {
+                    VoltDB.crashLocalVoltDB("This process will exit. " +
+                            "Please re-try with VoltDB a community edition-compatible deployment file.",
+                            false, null);
+                }
+
+                // check the start action for the community edition
+                if (m_config.m_startAction != StartAction.CREATE) {
+                    consoleLog.error("Start action \"" + m_config.m_startAction.getClass().getSimpleName() +
+                            "\" is not supported in the community edition of VoltDB.");
+                    VoltDB.crashLocalVoltDB("This process will exit. " +
+                            "Please re-try with the enterprise edition or with the CREATE start action.",
+                            false, null);
+                }
+            }
+
             // note the heart beats are specified in seconds in xml, but ms internally
             HeartbeatType hbt = m_deployment.getHeartbeat();
             if (hbt != null) {

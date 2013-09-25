@@ -39,6 +39,8 @@ public class TestExportOpsEvents extends TestCase {
 
     @Override
     protected void setUp() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         VoltDBFickleCluster.compile();
     }
 
@@ -69,6 +71,8 @@ public class TestExportOpsEvents extends TestCase {
     }
 
     public void testConnectingToNothing() throws ExportClientException {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         System.out.println("testConnectToNothing");
         NullExportClient client = new NullExportClient();
         client.addServerInfo(new InetSocketAddress("localhost", 21212));
@@ -83,6 +87,8 @@ public class TestExportOpsEvents extends TestCase {
     }
 
     public void testConnectingToExportDisabledServer() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         System.out.println("testConnectingToExportDisabledServer");
 
         // compile a trivial voltdb catalog/deployment (no export)
@@ -119,6 +125,8 @@ public class TestExportOpsEvents extends TestCase {
     }
 
     public void testConnectingToLateServer() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         System.out.println("testConnectingToLateServer");
         NullExportClient client = new NullExportClient();
         client.addServerInfo(new InetSocketAddress("localhost", 21212));

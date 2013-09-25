@@ -66,7 +66,6 @@ import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
-import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.zk.ZKTestBase;
@@ -87,6 +86,7 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.sysprocs.SnapshotRestore;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
 @RunWith(Parameterized.class)
@@ -565,6 +565,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
     @Test
     public void testSingleHostEmptyRestore() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         m_hostCount = 1;
         buildCatalog(m_hostCount, 8, 0, newVoltRoot(null), false, true);
         MockInitiator initiator = new MockInitiator(null);
@@ -578,6 +580,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
     @Test
     public void testMultipleHostEmptyRestore() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         m_hostCount = 3;
         buildCatalog(m_hostCount, 8, 0, newVoltRoot(null), false, true);
         MockInitiator initiator = new MockInitiator(null);
@@ -618,6 +622,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
     @Test
     public void testMultipleHostAgreementFailure() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         // Don't run this test if we are in recovery mode
         if (action.doesRecover()) {
             return;
@@ -667,6 +673,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
     @Test
     public void testSingleHostSnapshotRestoreNewestSnapshot() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         m_hostCount = 1;
         buildCatalog(m_hostCount, 8, 0, newVoltRoot(null), false, true);
         ServerThread server = new ServerThread(catalogJarFile.getAbsolutePath(),
@@ -722,6 +730,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
     @Test
     public void testSingleHostSnapshotRestore() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         m_hostCount = 1;
         buildCatalog(m_hostCount, 8, 0, newVoltRoot(null), false, true);
         ServerThread server = new ServerThread(catalogJarFile.getAbsolutePath(),
@@ -757,6 +767,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     }
     @Test
     public void testSingleHostSnapshotRestoreCatalogChange() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         m_hostCount = 1;
         String voltroot = newVoltRoot(null);
         buildCatalog(m_hostCount, 8, 0, voltroot, false, true);
@@ -794,6 +806,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
     @Test
     public void testMultiHostSnapshotRestore() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         m_hostCount = 1;
         String voltroot = newVoltRoot(null);
         buildCatalog(m_hostCount, 8, 0, voltroot, false, true);
@@ -839,6 +853,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
     @Test
     public void testConsistentRestorePlan() {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         List<SnapshotInfo> infos = new ArrayList<SnapshotInfo>();
         InstanceId id = new InstanceId(0, 0);
         SnapshotInfo info1 = new SnapshotInfo(0, "blah", "nonce", 3, 3, 0, 0, id);
@@ -889,8 +905,9 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     }
 
     @Test
-    public void testSnapshotInfoRoundTrip() throws JSONException
-    {
+    public void testSnapshotInfoRoundTrip() throws JSONException {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         InstanceId id = new InstanceId(1234, 4321);
         RestoreAgent.SnapshotInfo dut = new RestoreAgent.SnapshotInfo(1234L, "dummy", "stupid",
                                                                       11, 11, 4321L, 13, id);
@@ -905,6 +922,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
     @Test
     public void testMissingDigestSnapshotConsistency() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         m_hostCount = 1;
         buildCatalog(m_hostCount, 8, 0, newVoltRoot(null), false, true);
         ServerThread server = new ServerThread(catalogJarFile.getAbsolutePath(),
@@ -948,6 +967,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
     @Test
     public void testMissingCatalogSnapshotConsistency() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         m_hostCount = 1;
         buildCatalog(m_hostCount, 8, 0, newVoltRoot(null), false, true);
         ServerThread server = new ServerThread(catalogJarFile.getAbsolutePath(),
@@ -996,6 +1017,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
     @Test
     public void testCorruptCatalogSnapshotConsistency() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         m_hostCount = 1;
         buildCatalog(m_hostCount, 8, 0, newVoltRoot(null), false, true);
         ServerThread server = new ServerThread(catalogJarFile.getAbsolutePath(),
