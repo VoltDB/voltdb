@@ -2159,7 +2159,7 @@ UTILITIES
     </exec>
 </target>
 
-<target name='setversion-recompile-mockjars'
+<target name='setversion-recompile-mockjars' depends='default'
         description="Set the version string and recompile some test catalogs">
     <exec dir='${voltpro}/tests/mocktests/catalogs' executable='python'
           output="/dev/null" logError="True">
@@ -2168,7 +2168,7 @@ UTILITIES
     </exec>
 </target>
 
-<target name='setversion' depends='setversion-changestrings, default, setversion-recompile-mockjars'
+<target name='setversion' depends='setversion-changestrings, setversion-recompile-mockjars'
         description="Set the version string and recompile some test catalogsin VOLTPRO. Specify version as -Dversion=4.1.1">
     <echo message='Be sure to commit both repositories'/>
 </target>
