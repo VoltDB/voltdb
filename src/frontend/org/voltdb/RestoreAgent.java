@@ -56,7 +56,6 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
 import org.voltdb.dtxn.TransactionCreator;
-import org.voltdb.sysprocs.SnapshotRestore;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.TableFiles;
@@ -221,10 +220,10 @@ SnapshotCompletionInterest
                         LOG.debug("Initiating snapshot " + m_snapshotToRestore.nonce +
                                 " in " + m_snapshotToRestore.path);
                         JSONObject jsObj = new JSONObject();
-                        jsObj.put(SnapshotRestore.JSON_PATH, m_snapshotToRestore.path);
-                        jsObj.put(SnapshotRestore.JSON_NONCE, m_snapshotToRestore.nonce);
+                        jsObj.put(SnapshotUtil.JSON_PATH, m_snapshotToRestore.path);
+                        jsObj.put(SnapshotUtil.JSON_NONCE, m_snapshotToRestore.nonce);
                         if (m_action == StartAction.SAFE_RECOVER) {
-                            jsObj.put(SnapshotRestore.JSON_DUPLICATES_PATH, m_voltdbrootPath);
+                            jsObj.put(SnapshotUtil.JSON_DUPLICATES_PATH, m_voltdbrootPath);
                         }
                         Object[] params = new Object[] { jsObj.toString() };
                         initSnapshotWork(RESTORE_TXNID, params);
