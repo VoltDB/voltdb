@@ -128,7 +128,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public long getNextUndo() {
-            return getNextUndoToken();
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
 
         @Override
