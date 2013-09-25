@@ -104,7 +104,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         m_ackReceiver = ackReceiver;
         m_ackReceiver.setCallback(m_targetId, this);
 
-        rejoinLog.info(String.format("Initializing snapshot stream processor " +
+        rejoinLog.debug(String.format("Initializing snapshot stream processor " +
                 "for source site id: %s, and with processorid: %d",
                 CoreUtils.hsIdToString(HSId), m_targetId));
 
