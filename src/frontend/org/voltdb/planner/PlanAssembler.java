@@ -1260,13 +1260,16 @@ public class PlanAssembler {
          */
         if (containsAggregateExpression || m_parsedSelect.isGrouped()) {
             AggregatePlanNode topAggNode = null;
-            if (m_partitioning.requiresTwoFragments()) {
+            if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
                 AbstractPlanNode candidate = root.getChild(0).getChild(0);
-                candidate = indexAccessForGroupByExprs(candidate);
-                if (candidate.getPlanNodeType() == PlanNodeType.INDEXSCAN) {
-                    candidate.clearParents();
-                    root.getChild(0).clearChildren();
-                    root.getChild(0).addAndLinkChild(candidate);
+                // do the type check here, no need to find substitute if it is already an IndexScan node
+                if (candidate.getPlanNodeType() == PlanNodeType.SEQSCAN) {
+                    candidate = indexAccessForGroupByExprs(candidate);
+                    if (candidate.getPlanNodeType() == PlanNodeType.INDEXSCAN) {
+                        candidate.clearParents();
+                        root.getChild(0).clearChildren();
+                        root.getChild(0).addAndLinkChild(candidate);
+                    }
                 }
             } else {
                 root = indexAccessForGroupByExprs(root);
@@ -1491,7 +1494,7 @@ public class PlanAssembler {
                         // ignore order of keys in GROUP BY expr
                         boolean foundMatch = false;
                         for (int j = 0; j < groupBys.size(); j++) {
-                            if (indexedColRefs.get(i).getColumn().getName().equals(groupBys.get(i).columnName)) {
+                            if (indexedColRefs.get(j).getColumn().getName().equals(groupBys.get(i).columnName)) {
                                 foundMatch = true;
                                 break;
                             }
