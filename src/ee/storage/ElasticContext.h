@@ -121,6 +121,11 @@ private:
      */
     size_t m_nTuplesPerCall;
 
+    /**
+     * True when there's a valid index that hasn't been cleared yet.
+     */
+    bool m_indexActive;
+
     static const size_t DEFAULT_TUPLES_PER_CALL = 10000;
 };
 

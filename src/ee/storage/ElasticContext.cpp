@@ -30,7 +30,8 @@ ElasticContext::ElasticContext(PersistentTable &table,
                                const std::vector<std::string> &predicateStrings,
                                size_t nTuplesPerCall) :
     TableStreamerContext(table, surgeon, partitionId, serializer, predicateStrings),
-    m_nTuplesPerCall(nTuplesPerCall)
+    m_nTuplesPerCall(nTuplesPerCall),
+    m_indexActive(false)
 {
     if (predicateStrings.size() != 1) {
         throwFatalException("ElasticContext::ElasticContext() expects a single predicate.");
@@ -62,6 +63,7 @@ ElasticContext::handleActivation(TableStreamType streamType)
         }
         m_surgeon.createIndex();
         m_scanner.reset(new ElasticScanner(getTable(), m_surgeon.getData()));
+        m_indexActive = true;
         return ACTIVATION_SUCCEEDED;
     }
 
@@ -74,6 +76,7 @@ ElasticContext::handleActivation(TableStreamType streamType)
         }
         m_surgeon.dropIndex();
         m_scanner.reset();
+        m_indexActive = false;
         return ACTIVATION_SUCCEEDED;
     }
 
@@ -143,8 +146,12 @@ int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStrea
  */
 bool ElasticContext::notifyTupleInsert(TableTuple &tuple)
 {
-    if (getPredicates()[0].eval(&tuple).isTrue()) {
-        m_surgeon.indexAdd(tuple);
+    if (m_indexActive) {
+        StreamPredicateList &predicates = getPredicates();
+        assert(predicates.size() > 0);
+        if (predicates[0].eval(&tuple).isTrue()) {
+            m_surgeon.indexAdd(tuple);
+        }
     }
     return true;
 }
@@ -162,9 +169,11 @@ bool ElasticContext::notifyTupleUpdate(TableTuple &tuple)
  */
 bool ElasticContext::notifyTupleDelete(TableTuple &tuple)
 {
-    if (m_surgeon.indexHas(tuple)) {
-        bool removed = m_surgeon.indexRemove(tuple);
-        assert(removed);
+    if (m_indexActive) {
+        if (m_surgeon.indexHas(tuple)) {
+            bool removed = m_surgeon.indexRemove(tuple);
+            assert(removed);
+        }
     }
     return true;
 }
@@ -177,13 +186,17 @@ void ElasticContext::notifyTupleMovement(TBPtr sourceBlock,
                                          TableTuple &sourceTuple,
                                          TableTuple &targetTuple)
 {
-    if (m_surgeon.indexHas(sourceTuple)) {
-        bool removed = m_surgeon.indexRemove(sourceTuple);
-        assert(removed);
-    }
-    if (getPredicates()[0].eval(&targetTuple).isTrue()) {
-        bool added = m_surgeon.indexAdd(targetTuple);
-        assert(added);
+    if (m_indexActive) {
+        StreamPredicateList &predicates = getPredicates();
+        assert(predicates.size() > 0);
+        if (m_surgeon.indexHas(sourceTuple)) {
+            bool removed = m_surgeon.indexRemove(sourceTuple);
+            assert(removed);
+        }
+        if (getPredicates()[0].eval(&targetTuple).isTrue()) {
+            bool added = m_surgeon.indexAdd(targetTuple);
+            assert(added);
+        }
     }
 }
 
