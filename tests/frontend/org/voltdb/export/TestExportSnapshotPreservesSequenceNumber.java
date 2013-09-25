@@ -25,8 +25,6 @@ package org.voltdb.export;
 import java.io.File;
 import java.util.Properties;
 
-import com.google.common.collect.ImmutableMap;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.LegacyHashinator;
 import org.voltdb.TheHashinator;
@@ -35,7 +33,10 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.TestSQLTypesSuite;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
+
+import com.google.common.collect.ImmutableMap;
 
 public class TestExportSnapshotPreservesSequenceNumber extends TestExportBase {
 
@@ -53,6 +54,8 @@ public class TestExportSnapshotPreservesSequenceNumber extends TestExportBase {
     @Override
     public void setUp() throws Exception
     {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         m_username = "default";
         m_password = "password";
         VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
@@ -72,6 +75,8 @@ public class TestExportSnapshotPreservesSequenceNumber extends TestExportBase {
     }
 
     public void testExportSnapshotPreservesSequenceNumber() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         System.out.println("testExportSnapshotPreservesSequenceNumber");
         Client client = getClient();
         for (int i=0; i < 1000; i++) {

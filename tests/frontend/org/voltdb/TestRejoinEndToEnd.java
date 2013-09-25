@@ -24,6 +24,7 @@
 package org.voltdb;
 
 import java.net.InetSocketAddress;
+
 import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
@@ -47,6 +48,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
     @Test
     public void testRejoinWithMultipartLoad() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         ExecutionSite.m_recoveryPermit.drainPermits();
         ExecutionSite.m_recoveryPermit.release();
         try {
@@ -233,6 +236,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
     @Test
     public void testLocalClusterRecoveringMode() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         VoltProjectBuilder builder = getBuilderForTest();
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1,
@@ -270,6 +275,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
     @Test
     public void testRejoinInlineStringBug() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         VoltProjectBuilder builder = getBuilderForTest();
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 1, 2, 1,
@@ -328,6 +335,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
     @Test
     public void testRejoin() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         //Reset the VoltFile prefix that may have been set by previous tests in this suite
         org.voltdb.utils.VoltFile.resetSubrootForThisProcess();
         VoltProjectBuilder builder = getBuilderForTest();
@@ -410,6 +419,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
     @Test
     public void testRejoinPropogateAdminMode() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         //Reset the VoltFile prefix that may have been set by previous tests in this suite
         org.voltdb.utils.VoltFile.resetSubrootForThisProcess();
         VoltProjectBuilder builder = getBuilderForTest();
@@ -504,6 +515,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
     @Test
     public void testRejoinWithExportWithActuallyExportedTables() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         VoltProjectBuilder builder = getBuilderForTest();
 
         builder.setTableAsExportOnly("export_ok_blah_with_no_pk");
@@ -614,6 +627,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
     @Test
     public void testRejoinWithExport() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         VoltProjectBuilder builder = getBuilderForTest();
         //builder.setTableAsExportOnly("blah",false);
         //builder.setTableAsExportOnly("blah_replicated", false);
@@ -726,6 +741,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
     @Test
     public void testRejoinDataTransfer() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         System.out.println("testRejoinDataTransfer");
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true);

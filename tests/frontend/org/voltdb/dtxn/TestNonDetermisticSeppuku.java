@@ -26,12 +26,12 @@ package org.voltdb.dtxn;
 import junit.framework.TestCase;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.VoltDB;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.utils.MiscUtils;
 
 public class TestNonDetermisticSeppuku extends TestCase {
 
@@ -46,8 +46,9 @@ public class TestNonDetermisticSeppuku extends TestCase {
 
 
     @Override
-    public void setUp()
-    {
+    public void setUp() {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         try {
             VoltProjectBuilder builder = new VoltProjectBuilder();
             builder.addLiteralSchema(SCHEMA);
@@ -79,37 +80,19 @@ public class TestNonDetermisticSeppuku extends TestCase {
 
     @Override
     public void tearDown() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         client.close();
         cluster.shutDown();
         assertTrue(cluster.areAllNonLocalProcessesDead());
     }
 
     /**
-     * Call a single partition proc that returns a table with
-     * one row, but with different values at different replicas.
-     */
-    public void testMismatchValueDeath() throws Exception {
-        // iv2 no longer does this check
-        if (VoltDB.checkTestEnvForIv2()) return;
-
-        try {
-            client.callProcedure(
-                    "NonDeterministicSPProc",
-                    0,
-                    0,
-                    NonDeterministicSPProc.MISMATCH_VALUES);
-            fail("R/W value mismatch didn't fail?!");
-        }
-        catch (ProcCallException e) {
-            assertTrue(e.getMessage().contains("Connection to database"));
-            // success!
-        }
-    }
-
-    /**
      * Do a non-deterministic insertion
      */
     public void testNonDeterministicInsert() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         try {
             client.callProcedure(
                     "NonDeterministicSPProc",
@@ -130,6 +113,8 @@ public class TestNonDetermisticSeppuku extends TestCase {
      * ENG-3288 - Expect non-deterministic read-only queries to succeed.
      */
     public void testNonDeterministic_RO_SP() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         client.callProcedure(
                 "NonDeterministicSPProc",
                 0,
@@ -148,6 +133,8 @@ public class TestNonDetermisticSeppuku extends TestCase {
      * Negative test that expects a deterministic proc to fail due to mismatched results.
      */
     public void testDeterministicProc() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         client.callProcedure(
                 "NonDeterministicSPProc",
                 0,
@@ -166,6 +153,8 @@ public class TestNonDetermisticSeppuku extends TestCase {
      * Test that different whitespace fails the determinism CRC check on SQL
      */
     public void testWhitespaceChanges() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         try {
             client.callProcedure(
                 "NonDeterministicSPProc",
