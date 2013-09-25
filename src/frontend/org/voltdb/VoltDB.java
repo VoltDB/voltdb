@@ -540,7 +540,8 @@ public class VoltDB {
                 message = "Usage: voltdb create catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
                         + "       voltdb replica catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml> \n"
                         + "       voltdb recover [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
-                        + "       voltdb [live] rejoin host <hostname>\n";
+                        + "       voltdb [live] rejoin host <hostname>\n"
+                        + "       voltdb add host <hostname>\n";
             } else {
                 message = "Usage: voltdb create  catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>]\n"
                         + "       voltdb recover [host <hostname>] [deployment <deployment.xml>]\n"
