@@ -1289,8 +1289,8 @@ public class SnapshotUtil {
         final SnapshotInitiationInfo snapInfo = new SnapshotInitiationInfo(path, nonce, blocking, format, data);
         final Exchanger<ClientResponse> responseExchanger = new Exchanger<ClientResponse>();
         final SimpleClientResponseAdapter adapter =
-            new SimpleClientResponseAdapter(ClientInterface.SNAPSHOT_UTIL_CID,
-                                            new SimpleClientResponseAdapter.Callback() {
+            new SimpleClientResponseAdapter(ClientInterface.SNAPSHOT_UTIL_CID, "SnapshotUtilAdapter");
+        adapter.setCallback(new SimpleClientResponseAdapter.Callback() {
             @Override
             public void handleResponse(ClientResponse response)
             {
@@ -1300,9 +1300,7 @@ public class SnapshotUtil {
                     throw new RuntimeException(e);
                 }
             }
-        },
-           "SnapshotUtilAdapter"
-            );
+        });
 
         final SnapshotDaemon sd = VoltDB.instance().getClientInterfaces().get(0).getSnapshotDaemon();
         Runnable work = new Runnable() {
