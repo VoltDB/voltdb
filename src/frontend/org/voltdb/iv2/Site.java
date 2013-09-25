@@ -166,11 +166,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // Undo token state for the corresponding EE.
     public final static long kInvalidUndoToken = -1L;
     long latestUndoToken = 0L;
+    long latestUndoTxnId = Long.MIN_VALUE;
 
-    @Override
-    public long getNextUndoToken()
+    private long getNextUndoToken(long txnId)
     {
-        return ++latestUndoToken;
+        if (txnId != latestUndoTxnId) {
+            latestUndoTxnId = txnId;
+            return ++latestUndoToken;
+        } else {
+            return latestUndoToken;
+        }
     }
 
     @Override
@@ -214,11 +219,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public long getCurrentTxnId() {
             return m_currentTxnId;
-        }
-
-        @Override
-        public long getNextUndo() {
-            return getNextUndoToken();
         }
 
         @Override
@@ -321,9 +321,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public boolean activateTableStream(final int tableId, TableStreamType type, long undoToken, byte[] predicates)
+        public boolean activateTableStream(final int tableId, TableStreamType type, boolean undo, byte[] predicates)
         {
-            return m_ee.activateTableStream(tableId, type, undoToken, predicates);
+            return m_ee.activateTableStream(tableId, type, getNextUndoToken(m_currentTxnId), predicates);
         }
 
         @Override
@@ -693,7 +693,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public byte[] loadTable(long txnId, String clusterName, String databaseName,
             String tableName, VoltTable data,
-            boolean returnUniqueViolations, long undoToken) throws VoltAbortException
+            boolean returnUniqueViolations, boolean undo) throws VoltAbortException
     {
         Cluster cluster = m_context.cluster;
         if (cluster == null) {
@@ -708,18 +708,18 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
         }
 
-        return loadTable(txnId, table.getRelativeIndex(), data, returnUniqueViolations, undoToken);
+        return loadTable(txnId, table.getRelativeIndex(), data, returnUniqueViolations, undo);
     }
 
     @Override
     public byte[] loadTable(long spHandle, int tableId,
             VoltTable data, boolean returnUniqueViolations,
-            long undoToken)
+            boolean undo)
     {
         // Long.MAX_VALUE is a no-op don't track undo token
         return m_ee.loadTable(tableId, data,
                 spHandle,
-                m_lastCommittedSpHandle, returnUniqueViolations, undoToken);
+                m_lastCommittedSpHandle, returnUniqueViolations, getNextUndoToken(m_currentTxnId));
     }
 
     @Override
@@ -995,7 +995,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 spHandle,
                 m_lastCommittedSpHandle,
                 uniqueId,
-                readOnly ? Long.MAX_VALUE : getNextUndoToken());
+                readOnly ? Long.MAX_VALUE : getNextUndoToken(m_currentTxnId));
     }
 
     @Override

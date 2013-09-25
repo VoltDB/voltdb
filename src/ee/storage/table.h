@@ -383,7 +383,9 @@ protected:
     void resetTable();
 
     bool compactionPredicate() {
-        assert(m_tuplesPinnedByUndo == 0);
+        if (m_tuplesPinnedByUndo != 0) {
+            throwFatalException("Attempted to do compaction when tuples are pinned by undo %jd", (intmax_t)m_tuplesPinnedByUndo);
+        }
         return allocatedTupleCount() - activeTupleCount() > (m_tuplesPerBlock * 3) && loadFactor() < .95;
     }
 
