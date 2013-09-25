@@ -238,7 +238,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
 //        AS SELECT A1, B1, COUNT(*), SUM(C1), COUNT(D1)
 //        FROM P1  GROUP BY A1, B1;
 
-        String[] tbs = {"V_P1"};
+        String[] tbs = {"V_P1", "V_P1_ABS"};
         for (String tb: tbs) {
             checkMVFix_reAgg("SELECT * FROM " + tb, 2, 3);
             checkMVFix_reAgg("SELECT * FROM " + tb + " order by V_A1", 2, 3);
@@ -336,9 +336,54 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testMultiPartitionMVBasedQuery_Where() {
-        pns = compileToFragments("SELECT * FROM V_P1 where v_cnt = v_a1");
+//      CREATE VIEW V_P1 (V_A1, V_B1, V_CNT, V_SUM_C1, V_SUM_D1)
+//      AS SELECT A1, B1, COUNT(*), SUM(C1), COUNT(D1)
+//      FROM P1  GROUP BY A1, B1;
+
+        // Test
+        checkMVFixWithWhere("SELECT * FROM V_P1 where v_cnt = 1", "v_cnt = 1", null);
+        checkMVFixWithWhere("SELECT * FROM V_P1 where v_a1 = 9", null, "v_a1 = 9");
+        checkMVFixWithWhere("SELECT * FROM V_P1 where v_a1 = 9 AND v_cnt = 1", "v_cnt = 1", "v_a1 = 9");
+        checkMVFixWithWhere("SELECT * FROM V_P1 where v_a1 = 9 OR v_cnt = 1", "(v_a1 = 9) OR (v_cnt = 1)", null);
+        checkMVFixWithWhere("SELECT * FROM V_P1 where v_a1 = v_cnt + 1", "v_a1 = (v_cnt + 1)", null);
+    }
+
+    private void checkMVFixWithWhere(String sql, String aggFilter, String scanFilter) {
+        pns = compileToFragments(sql);
         for (AbstractPlanNode apn: pns) {
             System.out.println(apn.toExplainPlanString());
+        }
+        if (aggFilter != null) {
+            aggFilter = aggFilter.toLowerCase();
+        }
+        if (scanFilter != null) {
+            scanFilter = scanFilter.toLowerCase();
+        }
+
+        AbstractPlanNode p = pns.get(0);
+        while(p instanceof ReceivePlanNode == false) {
+            p = p.getChild(0);
+        }
+        // Find re-aggregation node.
+        assertTrue(p.getParent(0) instanceof HashAggregatePlanNode);
+        String reAggNodeStr = p.getParent(0).toExplainPlanString().toLowerCase();
+        if (aggFilter != null) {
+            assertTrue(reAggNodeStr.contains(aggFilter));
+        }
+        if (scanFilter != null) {
+            assertFalse(reAggNodeStr.contains(scanFilter));
+        }
+
+        // Find scan node.
+        p = pns.get(1);
+        assert(p.getScanNodeList().size() == 1);
+        p = p.getScanNodeList().get(0);
+        String scanNodeStr = p.toExplainPlanString().toLowerCase();
+        if (scanFilter != null) {
+            assertTrue(scanNodeStr.contains(scanFilter));
+        }
+        if (aggFilter != null) {
+            assertFalse(scanNodeStr.contains(aggFilter));
         }
     }
 
