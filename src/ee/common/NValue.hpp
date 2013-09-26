@@ -32,6 +32,8 @@
 
 #include "boost/scoped_ptr.hpp"
 #include "boost/functional/hash.hpp"
+#include "boost/date_time/posix_time/posix_time.hpp"
+#include "boost/date_time/gregorian/gregorian.hpp"
 #include "ttmath/ttmathint.h"
 
 #include "common/ExportSerializeIo.h"
@@ -1188,14 +1190,136 @@ class NValue {
             whole /= NValue::kMaxScaleFactor;
             retval.getTimestamp() = whole.ToInt(); break;
         }
-        case VALUE_TYPE_VARCHAR:
-            //TODO: Seems like we want to also allow actual date formatting OR? a numeric value, here? See ENG-4284.
-            retval.getTimestamp() = static_cast<int64_t>(getNumberFromString()); break;
+        case VALUE_TYPE_VARCHAR: {
+            std::string str (reinterpret_cast<const char*>(getObjectValue()));
+            // trim both end whitespaces
+            str.erase(str.begin(), std::find_if(str.begin(), str.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
+            str.erase(std::find_if(str.rbegin(), str.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), str.end());
+            retval.getTimestamp() = parseTimestampString(str);
+            break;
+        }
         case VALUE_TYPE_VARBINARY:
         default:
             throwCastSQLException(type, VALUE_TYPE_TIMESTAMP);
         }
         return retval;
+    }
+
+    int64_t parseTimestampString(std::string &str) const {
+        // tm structure
+        std::tm date_time;
+        int sep_pos = static_cast<int>(str.find(' '));
+        // date_str
+        std::string date_str = str.substr(0, sep_pos);
+        date_str.erase(date_str.begin(), std::find_if(date_str.begin(), date_str.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
+        date_str.erase(std::find_if(date_str.rbegin(), date_str.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), date_str.end());
+        // time_str
+        std::string time_str = str.substr(sep_pos + 1);
+        time_str.erase(time_str.begin(), std::find_if(time_str.begin(), time_str.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
+        time_str.erase(std::find_if(time_str.rbegin(), time_str.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), time_str.end());
+        // date and time spec strings
+        std::string date_spec_str = "YMD";
+        std::string time_spec_str = "HMSm";
+        char * pch;
+        long micro = 0;
+
+        char message[4096];
+        snprintf(message, 4096, "Attempted to cast %s to type %s failed. Supported format: YYYY-MM-DD HH:MM:SS.XXXXXX",
+                    str.c_str(), valueToString(VALUE_TYPE_TIMESTAMP).c_str());
+
+        // start to tokenize date_str: YYYY-MM-DD
+        for ( int i = 0; i < date_spec_str.length(); i++) {
+            pch = std::strtok((i == 0 ? const_cast<char*>(date_str.c_str()) : NULL), "-");
+            if (pch != NULL) {
+                switch (date_spec_str.at(i)) {
+                    case 'Y':
+                    {
+                        int year = atoi(pch);
+                        if (year > 9999 || year < 0) {
+                            throw SQLException(SQLException::dynamic_sql_error, message);
+                        }
+                        date_time.tm_year = year - 1900;
+                        break;
+                    }
+                    case 'M':
+                    {
+                        int month = atoi(pch);
+                        if (month > 12 || month < 1) {
+                            throw SQLException(SQLException::dynamic_sql_error, message);
+                        }
+                        date_time.tm_mon = atoi(pch) - 1;
+                        break;
+                    }
+                    case 'D':
+                    {
+                        int day = atoi(pch);
+                        // TODO: for now we only check the most common case
+                        if (day > 31 || day < 1) {
+                            throw SQLException(SQLException::dynamic_sql_error, message);
+                        }
+                        date_time.tm_mday = atoi(pch);
+                        break;
+                    }
+                    default: throw SQLException(SQLException::dynamic_sql_error, message);
+                } //switch
+            } else {
+                throw SQLException(SQLException::dynamic_sql_error, message);
+            }
+        }
+
+        // start to tokenize time_str: HH:MM:SS.mmmmmm
+        for ( int i = 0; i < time_spec_str.length(); i++) {
+            pch = std::strtok((i == 0 ? const_cast<char*>(time_str.c_str()) : NULL), ":.");
+            if (pch != NULL) {
+                switch (time_spec_str.at(i)) {
+                    case 'H':
+                    {
+                        int hour = atoi(pch);
+                        if (hour > 23 || hour < 0) {
+                            throw SQLException(SQLException::dynamic_sql_error, message);
+                        }
+                        date_time.tm_hour = atoi(pch);
+                        break;
+                    }
+                    case 'M':
+                    {
+                        int min = atoi(pch);
+                        if (min > 59 || min < 0) {
+                            throw SQLException(SQLException::dynamic_sql_error, message);
+                        }
+                        date_time.tm_min = atoi(pch);
+                        break;
+                    }
+                    case 'S':
+                    {
+                        int sec = atoi(pch);
+                        if (sec > 59 || sec < 0) {
+                            throw SQLException(SQLException::dynamic_sql_error, message);
+                        }
+                        date_time.tm_sec = atoi(pch);
+                        break;
+                    }
+                    case 'm':
+                    {
+                        if (sizeof(pch) > 6) {
+                            pch[6] = '\0';
+                        }
+                        if (sizeof(pch) < 6) {
+                            for (int i = sizeof(pch); i < 6; i++) {
+                                pch[i] = '0';
+                            }
+                            pch[6] = '\0';
+                        }
+                        micro = atoi(pch);
+                        break;
+                    }
+                    default: throw SQLException(SQLException::dynamic_sql_error, message);
+                } //switch
+            } else {
+                throw SQLException(SQLException::dynamic_sql_error, message);
+            }
+        }
+        return std::mktime(&date_time) * 1000000 + micro;
     }
 
     template <typename T>
@@ -1400,6 +1524,20 @@ class NValue {
             NValue retval(VALUE_TYPE_VARCHAR);
             memcpy(retval.m_data, m_data, sizeof(m_data));
             return retval;
+        }
+        case VALUE_TYPE_TIMESTAMP: {
+            std::time_t stdtime ( getTimestamp() / 1000000 );
+            long micro = getTimestamp() % 1000000;
+            char mbstr[20];    // Format: "YYYY-MM-DD HH:MM:SS."- 20 digits
+            std::strftime(mbstr, 20, "%Y-%m-%d %H:%M:%S.", std::localtime(&stdtime));
+            value << mbstr << micro;
+            // append rest ending 0s: total 26 digits
+            if (value.str().size() < 26) {
+                for (int i = 0; i < 26 - value.str().size(); i++) {
+                    value << "0";
+                }
+            }
+            break;
         }
         default:
             throwCastSQLException(type, VALUE_TYPE_VARCHAR);
