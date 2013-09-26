@@ -37,6 +37,8 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
 {
     protected static final VoltLogger tmLog = new VoltLogger("TM");
 
+    // Track the current writes and reads in progress.  If writes contains anything, reads must be empty,
+    // and vice versa
     private final Map<Long, TransactionTask> m_currentWrites = new HashMap<Long, TransactionTask>();
     private final Map<Long, TransactionTask> m_currentReads = new HashMap<Long, TransactionTask>();
     private Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
@@ -136,11 +138,9 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                 tmLog.debug("Repair updating task: " + next + " with masters: " + masters);
                 next.updateMasters(masters, partitionMasters);
             }
-            else {
-                // EveryPartitionTasks need the equivalent of updateMasters().
-                // SMASH for now
-                assert(false);
-            }
+            // EveryPartitionTasks don't need repair handling.
+            // MpScheduler should take care of the duplicate counter, there's no
+            // other maintenance to do here since they don't linger in the queue
         }
     }
 

@@ -19,9 +19,12 @@ package org.voltdb.iv2;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import com.google.common.collect.Maps;
 import org.voltcore.logging.VoltLogger;
@@ -113,6 +116,39 @@ public class MpScheduler extends Scheduler
         if (!m_isLeader) {
             return;
         }
+
+        // Stolen from SpScheduler.  Need to update the duplicate counters associated with any EveryPartitionTasks
+        // Cleanup duplicate counters and collect DONE counters
+        // in this list for further processing.
+        List<Long> doneCounters = new LinkedList<Long>();
+        for (Entry<Long, DuplicateCounter> entry : m_duplicateCounters.entrySet()) {
+            DuplicateCounter counter = entry.getValue();
+            int result = counter.updateReplicas(m_iv2Masters);
+            if (result == DuplicateCounter.DONE) {
+                doneCounters.add(entry.getKey());
+            }
+        }
+
+        // Maintain the CI invariant that responses arrive in txnid order.
+        Collections.sort(doneCounters);
+        for (Long key : doneCounters) {
+            DuplicateCounter counter = m_duplicateCounters.remove(key);
+            VoltMessage resp = counter.getLastResponse();
+            if (resp != null && resp instanceof InitiateResponseMessage) {
+                InitiateResponseMessage msg = (InitiateResponseMessage)resp;
+                if (msg.shouldCommit()) {
+                    m_repairLogTruncationHandle = m_repairLogAwaitingCommit;
+                    m_repairLogAwaitingCommit = msg.getTxnId();
+                }
+                m_outstandingTxns.remove(msg.getTxnId());
+                m_mailbox.send(counter.m_destinationId, resp);
+            }
+            else {
+                hostLog.warn("TXN " + counter.getTxnId() + " lost all replicas and " +
+                        "had no responses.  This should be impossible?");
+            }
+        }
+
 
         final List<Long> replicaCopy = new ArrayList<Long>(replicas);
 
