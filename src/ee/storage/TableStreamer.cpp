@@ -56,7 +56,7 @@ TableStreamer::~TableStreamer()
 bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                                    TupleSerializer &serializer,
                                    TableStreamType streamType,
-                                   std::vector<std::string> &predicateStrings)
+                                   const std::vector<std::string> &predicateStrings)
 {
     bool failed = false;
 
@@ -66,9 +66,10 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
     bool found = false;
     BOOST_FOREACH(StreamPtr &streamPtr, savedStreams) {
         assert(streamPtr != NULL);
-        switch (streamPtr->m_context->handleActivation(streamType, true)) {
+        switch (streamPtr->m_context->handleReactivation(streamType)) {
             case TableStreamerContext::ACTIVATION_SUCCEEDED:
                 m_streams.push_back(streamPtr);
+                streamPtr->m_context->updatePredicates(predicateStrings);
                 found = true;
                 break;
             case TableStreamerContext::ACTIVATION_FAILED:
@@ -117,7 +118,7 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                     assert(false);
             }
             if (context) {
-                TableStreamerContext::ActivationReturnCode retcode = context->handleActivation(streamType, false);
+                TableStreamerContext::ActivationReturnCode retcode = context->handleActivation(streamType);
                 switch (retcode) {
                     case TableStreamerContext::ACTIVATION_SUCCEEDED:
                         // Activation was accepted by the new context. Attach it to a stream.

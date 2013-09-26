@@ -40,7 +40,7 @@ class ElasticIndexReadContext : public TableStreamerContext
 {
 
     friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TupleSerializer&,
-                                              TableStreamType, std::vector<std::string>&);
+                                              TableStreamType, const std::vector<std::string>&);
 
 public:
 
@@ -52,7 +52,7 @@ public:
     /**
      * Activation handler.
      */
-    virtual ActivationReturnCode handleActivation(TableStreamType streamType, bool reactivate);
+    virtual ActivationReturnCode handleActivation(TableStreamType streamType);
 
     /**
      * Deactivation handler.
@@ -92,7 +92,7 @@ private:
      */
     void deleteStreamedTuples();
 
-    /// Predicate strings (parsed in handleActivation()).
+    /// Predicate strings (parsed in handleActivation()/handleReactivation()).
     const std::vector<std::string> &m_predicateStrings;
 
     /// Elastic index iterator
