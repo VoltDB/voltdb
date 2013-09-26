@@ -617,6 +617,10 @@ public abstract class CatalogUtil {
         int fsyncInterval = 200;
         int maxTxnsBeforeFsync = Integer.MAX_VALUE;
         boolean enabled = false;
+        // enterprise voltdb defaults to CL enabled if not specified in the XML
+        if (MiscUtils.isPro()) {
+            enabled = true;
+        }
         boolean sync = false;
         int logSizeMb = 1024;
         org.voltdb.catalog.CommandLog config = catalog.getClusters().get("cluster").getLogconfig().get("log");
