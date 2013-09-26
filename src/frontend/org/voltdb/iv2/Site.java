@@ -171,9 +171,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public final static long kInvalidUndoToken = -1L;
     long latestUndoToken = 0L;
 
-    // start action
-    public final StartAction m_startAction;
-
     @Override
     public long getNextUndoToken()
     {
@@ -366,7 +363,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_numberOfPartitions = numPartitions;
         m_scheduler = scheduler;
         m_backend = backend;
-        m_startAction = startAction;
         m_rejoinState = VoltDB.createForRejoin(startAction) || startAction == StartAction
                 .JOIN ? kStateRejoining :
                 kStateRunning;
@@ -941,7 +937,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction replayComplete,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            boolean requireExistingSequenceNumbers) {
         // transition from kStateRejoining to live rejoin replay.
         // pass through this transition in all cases; if not doing
         // live rejoin, will transfer to kStateRunning as usual
@@ -963,13 +960,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             Pair<Long,Long> sequenceNumbers = tableEntry.getValue().get(m_partitionId);
 
             if (sequenceNumbers == null) {
-                if (m_startAction == StartAction.JOIN) {
-                    sequenceNumbers = Pair.of(0L,0L);
-                } else {
+                if (requireExistingSequenceNumbers) {
                     VoltDB.crashLocalVoltDB(
                             "Could not find export sequence numbers for partition " +
                                     m_partitionId + " table " +
                                     tableEntry.getKey() + " have " + exportSequenceNumbers, false, null);
+                } else {
+                    sequenceNumbers = Pair.of(0L,0L);
                 }
             }
 
