@@ -178,6 +178,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
     }
 
+    /*
+     * Increment the undo token blindly to work around
+     * issues using a single token per transaction
+     * See ENG-5242
+     */
+    private long getNextUndoTokenBroken() {
+        latestUndoTxnId = m_currentTxnId;
+        return ++latestUndoToken;
+    }
+
     @Override
     public long getLatestUndoToken()
     {
@@ -323,7 +333,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public boolean activateTableStream(final int tableId, TableStreamType type, boolean undo, byte[] predicates)
         {
-            return m_ee.activateTableStream(tableId, type, getNextUndoToken(m_currentTxnId), predicates);
+            return m_ee.activateTableStream(tableId, type, undo ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE, predicates);
         }
 
         @Override
@@ -719,7 +729,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         // Long.MAX_VALUE is a no-op don't track undo token
         return m_ee.loadTable(tableId, data,
                 spHandle,
-                m_lastCommittedSpHandle, returnUniqueViolations, getNextUndoToken(m_currentTxnId));
+                m_lastCommittedSpHandle,
+                returnUniqueViolations,
+                undo ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE);
     }
 
     @Override
@@ -756,7 +768,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void truncateUndoLog(boolean rollback, long beginUndoToken, long txnId, long spHandle, List<UndoAction> undoLog)
     {
+        //Any new txnid will create a new undo quantum, including the same txnid again
+        latestUndoTxnId = Long.MIN_VALUE;
+        //If the begin undo token is not set the txn never did any work so there is nothing to undo/release
+        if (beginUndoToken == Site.kInvalidUndoToken) return;
         if (rollback) {
+
             m_ee.undoUndoToken(beginUndoToken);
             handleUndoLog(undoLog, true);
         }
@@ -995,7 +1012,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 spHandle,
                 m_lastCommittedSpHandle,
                 uniqueId,
-                readOnly ? Long.MAX_VALUE : getNextUndoToken(m_currentTxnId));
+                readOnly ? Long.MAX_VALUE : getNextUndoTokenBroken());
     }
 
     @Override

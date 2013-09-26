@@ -813,8 +813,6 @@ PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target)
             return;
         }
     }
-    DEBUG_STREAM_HERE("Failed to find mat view " << targetName << "@" << target <<
-                      " in " << m_views.size() << " on " << name() << "@" << this);
     assert(false); // Should have found an existing view for the table.
 }
 

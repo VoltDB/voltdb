@@ -383,8 +383,11 @@ protected:
     void resetTable();
 
     bool compactionPredicate() {
+        //Unfortunate work around for the fact that multiple undo quantums cause this to happen
+        //Ideally there would be one per transaction and we could hard fail or
+        //the undo log would only trigger compaction once per transaction
         if (m_tuplesPinnedByUndo != 0) {
-            throwFatalException("Attempted to do compaction when tuples are pinned by undo %jd", (intmax_t)m_tuplesPinnedByUndo);
+            return false;
         }
         return allocatedTupleCount() - activeTupleCount() > (m_tuplesPerBlock * 3) && loadFactor() < .95;
     }

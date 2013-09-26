@@ -824,6 +824,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
         m_hostCount = 3;
         buildCatalog(m_hostCount, 8, 1, voltroot, false, true);
+        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(12));
         HashSet<String> procs = new HashSet<String>();
         procs.add("@SnapshotRestore");
         MockInitiator initiator = new MockInitiator(procs);
