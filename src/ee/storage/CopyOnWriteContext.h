@@ -39,7 +39,8 @@ class PersistentTableSurgeon;
 
 class CopyOnWriteContext : public TableStreamerContext {
 
-    friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TupleSerializer&, TableStreamType, std::vector<std::string>&);
+    friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TupleSerializer&,
+                                              TableStreamType, const std::vector<std::string>&);
 
 public:
 
@@ -57,7 +58,7 @@ public:
     /**
      * Activation handler.
      */
-    virtual ActivationReturnCode handleActivation(TableStreamType streamType, bool reactivate);
+    virtual ActivationReturnCode handleActivation(TableStreamType streamType);
 
     /**
      * Mandatory TableStreamContext override.

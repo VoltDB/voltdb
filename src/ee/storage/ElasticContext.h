@@ -19,6 +19,7 @@
 
 #include <vector>
 #include <string>
+#include <boost/scoped_ptr.hpp>
 #include "storage/ElasticScanner.h"
 #include "storage/TableStreamer.h"
 #include "storage/TableStreamerContext.h"
@@ -35,7 +36,8 @@ class TupleOutputStreamProcessor;
 class ElasticContext : public TableStreamerContext
 {
 
-    friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TupleSerializer&, TableStreamType, std::vector<std::string>&);
+    friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TupleSerializer&,
+                                              TableStreamType, const std::vector<std::string>&);
     friend class ::DummyElasticTableStreamer;
     friend class ::CopyOnWriteTest;
 
@@ -47,9 +49,14 @@ public:
     virtual ~ElasticContext();
 
     /**
-     * Activation/reactivation handler.
+     * Activation handler.
      */
-    virtual ActivationReturnCode handleActivation(TableStreamType streamType, bool reactivate);
+    virtual ActivationReturnCode handleActivation(TableStreamType streamType);
+
+    /**
+     * Reactivation handler.
+     */
+    virtual ActivationReturnCode handleReactivation(TableStreamType streamType);
 
     /**
      * Deactivation handler.
@@ -105,13 +112,18 @@ private:
     /**
      * Scanner for retrieving rows.
      */
-    ElasticScanner m_scanner;
+    boost::scoped_ptr<ElasticScanner> m_scanner;
 
     /**
      * The maximum number of tuples to index per handleStreamMore() call.
      * It's non-const to allow tests to manipulate (e.g. CopyOnWriteTest).
      */
     size_t m_nTuplesPerCall;
+
+    /**
+     * True when there's a valid index that hasn't been cleared yet.
+     */
+    bool m_indexActive;
 
     static const size_t DEFAULT_TUPLES_PER_CALL = 10000;
 };
