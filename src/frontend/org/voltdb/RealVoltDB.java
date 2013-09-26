@@ -1090,12 +1090,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
                 // check license features for community version
                 if ((m_deployment.getCluster() != null) && (m_deployment.getCluster().getKfactor() > 0)) {
-                    consoleLog.error("K-Saftey (intra-cluster redundancy) is not supported " +
+                    consoleLog.error("K-Safety is not supported " +
                             "in the community edition of VoltDB.");
                     shutdownDeployment = true;
                 }
                 if ((m_deployment.getSnapshot() != null) && (m_deployment.getSnapshot().isEnabled())) {
-                    consoleLog.error("Snapshots (periodic and on-demand) are not supported " +
+                    consoleLog.error("Snapshots are not supported " +
                             "in the community edition of VoltDB.");
                     shutdownDeployment = true;
                 }
@@ -1113,9 +1113,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 if (m_config.m_startAction != StartAction.CREATE) {
                     consoleLog.error("Start action \"" + m_config.m_startAction.getClass().getSimpleName() +
                             "\" is not supported in the community edition of VoltDB.");
-                    VoltDB.crashLocalVoltDB("This process will exit. " +
-                            "Please re-try with the enterprise edition or with the CREATE start action.",
-                            false, null);
                     shutdownAction = true;
                 }
 
@@ -1123,7 +1120,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 if (shutdownAction || shutdownDeployment) {
                     String msg = "This process will exit. Please run VoltDB with ";
                     if (shutdownDeployment) {
-                        msg += "a community edition-compatible deployment file";
+                        msg += "a deployment file compatible with the community edition";
                     }
                     if (shutdownDeployment && shutdownAction) {
                         msg += " and ";
