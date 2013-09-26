@@ -50,16 +50,10 @@ ElasticIndexReadContext::~ElasticIndexReadContext()
  * Activation handler.
  */
 TableStreamerContext::ActivationReturnCode
-ElasticIndexReadContext::handleActivation(TableStreamType streamType, bool reactivate)
+ElasticIndexReadContext::handleActivation(TableStreamType streamType)
 {
     if (streamType != TABLE_STREAM_ELASTIC_INDEX_READ) {
         return ACTIVATION_UNSUPPORTED;
-    }
-
-    // Reactivation is not supported.
-    if (reactivate) {
-        VOLT_ERROR("Not allowed to reactivate an index read stream.");
-        return ACTIVATION_FAILED;
     }
 
     if (!m_surgeon.hasIndex()) {

@@ -67,15 +67,10 @@ CopyOnWriteContext::~CopyOnWriteContext()
  * Activation handler.
  */
 TableStreamerContext::ActivationReturnCode
-CopyOnWriteContext::handleActivation(TableStreamType streamType, bool reactivate)
+CopyOnWriteContext::handleActivation(TableStreamType streamType)
 {
     // Only support snapshot streams.
     if (streamType != TABLE_STREAM_SNAPSHOT) {
-        return ACTIVATION_UNSUPPORTED;
-    }
-
-    // Reactivation is not allowed, but rejecting it isn't a failure.
-    if (reactivate) {
         return ACTIVATION_UNSUPPORTED;
     }
 

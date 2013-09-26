@@ -43,7 +43,7 @@ class TableStreamerContext {
 public:
 
     /**
-     * handleActivation() return codes.
+     * handleActivation()/handleReactivation() return codes.
      */
     enum ActivationReturnCode {
         // (Re)Activation is not supported for this stream type by this context.
@@ -63,8 +63,19 @@ public:
      *  Return ACTIVATION_FAILED if (re)activation is allowed but failed.
      *  Return ACTIVATION_UNSUPPORTED if (re)activation is not supported for the stream type.
      */
-    virtual ActivationReturnCode handleActivation(TableStreamType streamType, bool reactivate) {
-        return (reactivate ? ACTIVATION_UNSUPPORTED : ACTIVATION_SUCCEEDED);
+    virtual ActivationReturnCode handleActivation(TableStreamType streamType) {
+        return ACTIVATION_SUCCEEDED;
+    }
+
+    /**
+     * Optional reactivation handler.
+     *  Called see if reactivation is allowed.
+     *  Return ACTIVATION_SUCCEEDED if reactivation is allowed and succeeded.
+     *  Return ACTIVATION_FAILED if reactivation is allowed but failed.
+     *  Return ACTIVATION_UNSUPPORTED if reactivation is not supported for the stream type.
+     */
+    virtual ActivationReturnCode handleReactivation(TableStreamType streamType) {
+        return ACTIVATION_UNSUPPORTED;
     }
 
     /**
@@ -150,6 +161,11 @@ public:
     {
         return m_partitionId;
     }
+
+    /**
+     * Parse and save predicates.
+     */
+    void updatePredicates(const std::vector<std::string> &predicateStrings);
 
 protected:
 

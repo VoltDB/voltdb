@@ -899,22 +899,12 @@ public:
 
     void resetTest() {
         m_tuplesInserted = m_tuplesDeleted = 0;
-        m_predicateStrings.clear();
-        m_predicates.clear();
-    }
-
-    void addHashRangePredicate(const T_HashRange &range) {
-        m_predicateStrings.push_back(generateHashRangePredicate(range));
     }
 
     void parsePredicateList(const std::vector<std::string> &predicateStrings, StreamPredicateList &predicates) {
         std::ostringstream errmsg;
         std::vector<bool> deleteFlags;
         ASSERT_TRUE(predicates.parseStrings(predicateStrings, errmsg, deleteFlags));
-    }
-
-    void parsePredicates() {
-        parsePredicateList(m_predicateStrings, m_predicates);
     }
 
     boost::shared_ptr<ReferenceSerializeInput> getPredicateSerializeInput(const std::vector<std::string> &predicateStrings) {
@@ -956,9 +946,10 @@ public:
         return false;
     }
 
-    void streamElasticIndex() {
-        boost::shared_ptr<ReferenceSerializeInput> predicateInput = getPredicateSerializeInput(m_predicateStrings);
-        m_table->activateStream(m_serializer, TABLE_STREAM_ELASTIC_INDEX, 0, m_tableId, *predicateInput);
+    void streamElasticIndex(std::vector<std::string> &predicateStrings, bool checkCalls) {
+        boost::shared_ptr<ReferenceSerializeInput> predicateInput = getPredicateSerializeInput(predicateStrings);
+        bool ok = m_table->activateStream(m_serializer, TABLE_STREAM_ELASTIC_INDEX, 0, m_tableId, *predicateInput);
+        ASSERT_TRUE(ok);
 
         // Force index streaming to need multiple streamMore() calls.
         voltdb::ElasticContext *context = getElasticContext();
@@ -972,7 +963,9 @@ public:
             nCalls++;
         }
         // Make sure we forced more than one streamMore() call.
-        ASSERT_LE(2, nCalls);
+        if (checkCalls) {
+            ASSERT_LE(2, nCalls);
+        }
     }
 
     void streamSnapshot(int numMutationsDuring, int numMutationsAfter, T_ValueSet &COWTuples, int &totalInserted) {
@@ -1102,8 +1095,6 @@ public:
     boost::shared_ptr<TupleOutputStreamProcessor> m_outputStreams;
     TupleOutputStream *m_outputStream;
     std::vector<int> m_retPositions;
-    std::vector<std::string> m_predicateStrings;
-    StreamPredicateList m_predicates;
 
     int32_t m_tuplesInserted;
     int32_t m_tuplesUpdated;
@@ -1573,7 +1564,7 @@ public:
     virtual bool activateStream(PersistentTableSurgeon &surgeon,
                                 TupleSerializer &tupleSerializer,
                                 TableStreamType streamType,
-                                std::vector<std::string> &predicateStrings) {
+                                const std::vector<std::string> &predicateStrings) {
         return false;
     }
 
@@ -1739,10 +1730,10 @@ public:
     virtual bool activateStream(PersistentTableSurgeon &surgeon,
                                 TupleSerializer &tupleSerializer,
                                 TableStreamType streamType,
-                                std::vector<std::string> &predicateStrings) {
+                                const std::vector<std::string> &predicateStrings) {
         m_context.reset(new ElasticContext(*m_test.m_table, surgeon, m_partitionId,
                                            tupleSerializer, m_predicateStrings));
-        return m_context->handleActivation(streamType, false) == TableStreamerContext::ACTIVATION_SUCCEEDED;
+        return m_context->handleActivation(streamType) == TableStreamerContext::ACTIVATION_SUCCEEDED;
     }
 
     virtual int64_t streamMore(TupleOutputStreamProcessor &outputStreams,
@@ -1856,8 +1847,7 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
     testRanges.push_back(T_HashRange(0, 0));
     testRanges.push_back(T_HashRange(maxint, maxint));
 
-    int itest = 0;
-    BOOST_FOREACH(T_HashRange &testRange, testRanges) {
+    for (int itest = 0; itest < testRanges.size(); ++itest) {
         resetTest();
 
         ElasticTableScrambler tableScrambler(*this,
@@ -1865,14 +1855,22 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
                                              FREQ_INSERT, FREQ_DELETE,
                                              FREQ_UPDATE, FREQ_COMPACTION);
 
+        // Clear and populate the table.
         tableScrambler.initialize();
 
-        // Generate the JSON predicates.
-        addHashRangePredicate(testRange);
-        parsePredicates();
+        // Generate separate predicates for two sequential index tests done in each iteration.
+        // Using a different predicate when regenerating assures that it isn't always empty.
+        T_HashRange &testRange1 = testRanges[itest];
+        T_HashRange &testRange2 = testRanges[(itest + 1) % testRanges.size()];
+        std::vector<std::string> predicateStrings1, predicateStrings2;
+        StreamPredicateList predicates1, predicates2;
+        predicateStrings1.push_back(generateHashRangePredicate(testRange1));
+        predicateStrings2.push_back(generateHashRangePredicate(testRange2));
+        parsePredicateList(predicateStrings1, predicates1);
+        parsePredicateList(predicateStrings2, predicates2);
 
         // Generate the elastic index.
-        streamElasticIndex();
+        streamElasticIndex(predicateStrings1, true);
 
         // Do some scrambling.
         for (size_t icycle = 0; icycle < NUM_CYCLES; icycle++) {
@@ -1887,7 +1885,7 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
         streamSnapshot(NUM_MUTATIONS, NUM_MUTATIONS, COWTuples, totalSnapped);
         checkTuples(NUM_INITIAL + (m_tuplesInserted - m_tuplesDeleted), originalTuples, COWTuples);
         ElasticIndex *directIndex = getElasticIndex();
-        checkIndex(testRange.label("direct"), directIndex, m_predicates, false);
+        checkIndex(testRange1.label("direct"), directIndex, predicates1, false);
         size_t indexSizeBefore = directIndex->size();
         size_t tableSizeBefore = m_table->activeTupleCount();
 
@@ -1895,16 +1893,16 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
         ElasticIndex streamedIndex;
         size_t totalStreamed;
         bool undo = (itest % 2 == 1);
-        materializeIndex(streamedIndex, testRange, undo, totalStreamed);
-        checkIndex(testRange.label("streamed"), &streamedIndex, m_predicates, true);
+        materializeIndex(streamedIndex, testRange1, undo, totalStreamed);
+        checkIndex(testRange1.label("streamed"), &streamedIndex, predicates1, true);
         size_t indexSizeAfter = directIndex->size();
         size_t tableSizeAfter = m_table->activeTupleCount();
-        if (testRange.m_empty || undo) {
+        if (testRange1.m_empty || undo) {
             ASSERT_EQ(indexSizeAfter, indexSizeBefore);
             ASSERT_EQ(tableSizeAfter, tableSizeBefore);
         }
         else {
-            ASSERT_LT(indexSizeAfter, indexSizeBefore);
+            ASSERT_EQ(0, indexSizeAfter);
             ASSERT_LT(tableSizeAfter, tableSizeBefore);
         }
         if (!undo) {
@@ -1913,11 +1911,21 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
 
         // Clear the index and validate.
         if (!undo) {
-            clearIndex(testRange, true);
+            clearIndex(testRange1, true);
             ASSERT_EQ(NULL, getElasticIndex());
-        } else if (undo && itest == 1) {
-            clearIndex(testRange, false);
+        }
+        else if (undo && itest == 1) {
+            clearIndex(testRange1, false);
             ASSERT_NE(NULL, getElasticIndex());
+        }
+
+        // Also make sure we can re-stream the index.
+        if (!undo) {
+            ElasticIndex streamedIndex2;
+            size_t totalStreamed2;
+            streamElasticIndex(predicateStrings2, false);
+            materializeIndex(streamedIndex2, testRange2, false, totalStreamed2);
+            checkIndex(testRange2.label("streamed"), &streamedIndex2, predicates2, true);
         }
 
         itest++;

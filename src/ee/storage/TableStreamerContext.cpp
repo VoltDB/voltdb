@@ -39,13 +39,7 @@ TableStreamerContext::TableStreamerContext(
     m_serializer(serializer),
     m_partitionId(partitionId)
 {
-    // Parse predicate strings. The factory type determines the kind of
-    // predicates that get generated.
-    // Throws an exception to be handled by caller on errors.
-    std::ostringstream errmsg;
-    if (!m_predicates.parseStrings(predicateStrings, errmsg, m_predicateDeleteFlags)) {
-        throwFatalException("TableStreamerContext() failed to parse predicate strings.");
-    }
+    updatePredicates(predicateStrings);
 }
 
 /**
@@ -62,5 +56,20 @@ TableStreamerContext::TableStreamerContext(
     m_serializer(serializer),
     m_partitionId(partitionId)
 {}
+
+/**
+ * Parse and save predicates.
+ */
+void TableStreamerContext::updatePredicates(const std::vector<std::string> &predicateStrings)
+{
+    // Parse predicate strings. The factory type determines the kind of
+    // predicates that get generated.
+    // Throws an exception to be handled by caller on errors.
+    std::ostringstream errmsg;
+    m_predicates.clear();
+    if (!m_predicates.parseStrings(predicateStrings, errmsg, m_predicateDeleteFlags)) {
+        throwFatalException("TableStreamerContext() failed to parse predicate strings.");
+    }
+}
 
 }
