@@ -337,13 +337,14 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         }
         assert(joinNode.m_leftNode != null);
         assert(joinNode.m_rightNode != null);
-        JoinNode leftNode = joinNode.m_leftNode;
-        JoinNode rightNode = joinNode.m_rightNode;
         JoinNode innerNode = null;
+        JoinNode outerNode = null;
         if (joinNode.m_joinType == JoinType.LEFT) {
-            innerNode = rightNode;
+            innerNode = joinNode.m_rightNode;
+            outerNode = joinNode.m_leftNode;
         } else if (joinNode.m_joinType == JoinType.RIGHT) {
-            innerNode = leftNode;
+            innerNode = joinNode.m_leftNode;
+            outerNode = joinNode.m_rightNode;
         } else if (joinNode.m_joinType == JoinType.FULL) {
             // Full joins are not supported
             assert(false);
@@ -377,20 +378,32 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         }
 
         // Now add this node expression to the list and descend
-        if (leftNode.m_joinExpr != null) {
-            exprs.add(leftNode.m_joinExpr);
+        // In case of outer join, the inner node adds its WHERE and JOIN expressions, while
+        // the outer node adds its WHERE ones only - the outer node does not introduce NULLs
+        List<AbstractExpression> newExprs = new ArrayList<AbstractExpression>(exprs);
+        if (joinNode.m_leftNode.m_joinExpr != null) {
+            newExprs.add(joinNode.m_leftNode.m_joinExpr);
         }
-        if (leftNode.m_whereExpr != null) {
-            exprs.add(leftNode.m_whereExpr);
+        if (joinNode.m_rightNode.m_joinExpr != null) {
+            newExprs.add(joinNode.m_rightNode.m_joinExpr);
         }
-        if (rightNode.m_joinExpr != null) {
-            exprs.add(rightNode.m_joinExpr);
+
+        if (joinNode.m_leftNode.m_whereExpr != null) {
+            exprs.add(joinNode.m_leftNode.m_whereExpr);
         }
-        if (rightNode.m_whereExpr != null) {
-            exprs.add(rightNode.m_whereExpr);
+        if (joinNode.m_rightNode.m_whereExpr != null) {
+            exprs.add(joinNode.m_rightNode.m_whereExpr);
         }
-        simplifyOuterJoinRecursively(joinNode.m_leftNode, exprs);
-        simplifyOuterJoinRecursively(joinNode.m_rightNode, exprs);
+
+        if (joinNode.m_joinType == JoinType.INNER) {
+            exprs.addAll(newExprs);
+            simplifyOuterJoinRecursively(joinNode.m_leftNode, exprs);
+            simplifyOuterJoinRecursively(joinNode.m_rightNode, exprs);
+        } else {
+            newExprs.addAll(exprs);
+            simplifyOuterJoinRecursively(innerNode, newExprs);
+            simplifyOuterJoinRecursively(outerNode, exprs);
+        }
     }
 
     /**
