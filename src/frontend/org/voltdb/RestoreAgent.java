@@ -113,45 +113,7 @@ SnapshotCompletionInterest
     };
 
     private final SimpleClientResponseAdapter m_restoreAdapter =
-        new SimpleClientResponseAdapter(ClientInterface.RESTORE_AGENT_CID, new SimpleClientResponseAdapter.Callback() {
-        @Override
-        public void handleResponse(ClientResponse res)
-        {
-            boolean failure = false;
-            if (res.getStatus() != ClientResponse.SUCCESS) {
-                failure = true;
-            }
-
-            VoltTable[] results = res.getResults();
-            if (results == null || results.length != 1) {
-                failure = true;
-            }
-
-            while (!failure && results[0].advanceRow()) {
-                String resultStatus = results[0].getString("RESULT");
-                if (!resultStatus.equalsIgnoreCase("success")) {
-                    failure = true;
-                }
-            }
-
-            if (failure) {
-                for (VoltTable result : results) {
-                    LOG.fatal(result);
-                }
-                VoltDB.crashGlobalVoltDB("Failed to restore from snapshot: " +
-                                         res.getStatusString(), false, null);
-            } else {
-                Thread networkHandoff = new Thread() {
-                    @Override
-                    public void run() {
-                        m_changeStateFunctor.run();
-                    }
-                };
-                networkHandoff.start();
-            }
-        }
-    },
-        "RestoreAgentAdapter");
+        new SimpleClientResponseAdapter(ClientInterface.RESTORE_AGENT_CID, "RestoreAgentAdapter");
 
     // RealVoltDB needs this to connect the ClientInterface and the Adapter.
     SimpleClientResponseAdapter getAdapter() {
@@ -429,6 +391,45 @@ SnapshotCompletionInterest
         m_allPartitions = allPartitions;
         m_liveHosts = liveHosts;
         m_voltdbrootPath = voltdbrootPath;
+
+        m_restoreAdapter.setCallback(new SimpleClientResponseAdapter.Callback() {
+            @Override
+            public void handleResponse(ClientResponse res)
+            {
+                boolean failure = false;
+                if (res.getStatus() != ClientResponse.SUCCESS) {
+                    failure = true;
+                }
+
+                VoltTable[] results = res.getResults();
+                if (results == null || results.length != 1) {
+                    failure = true;
+                }
+
+                while (!failure && results[0].advanceRow()) {
+                    String resultStatus = results[0].getString("RESULT");
+                    if (!resultStatus.equalsIgnoreCase("success")) {
+                        failure = true;
+                    }
+                }
+
+                if (failure) {
+                    for (VoltTable result : results) {
+                        LOG.fatal(result);
+                    }
+                    VoltDB.crashGlobalVoltDB("Failed to restore from snapshot: " +
+                                             res.getStatusString(), false, null);
+                } else {
+                    Thread networkHandoff = new Thread() {
+                        @Override
+                        public void run() {
+                            m_changeStateFunctor.run();
+                        }
+                    };
+                    networkHandoff.start();
+                }
+            }
+        });
 
         initialize();
     }
