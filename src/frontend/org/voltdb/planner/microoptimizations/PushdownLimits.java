@@ -22,11 +22,14 @@ import java.util.List;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.planner.CompiledPlan;
+import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
+import org.voltdb.plannodes.ProjectionPlanNode;
+import org.voltdb.types.JoinType;
 
-public class PushdownLimitsIntoScans extends MicroOptimization {
+public class PushdownLimits extends MicroOptimization {
 
     @Override
     public List<CompiledPlan> apply(CompiledPlan plan, Database db) {
@@ -68,13 +71,48 @@ public class PushdownLimitsIntoScans extends MicroOptimization {
             return plan;
 
         AbstractPlanNode child = plan.getChild(0);
-        if ((child instanceof AbstractScanPlanNode) == false)
-            return plan;
 
-        plan.clearChildren();
-        child.clearParents();
-        child.addInlinePlanNode(plan);
-        return child;
+        // push into Scans
+        if (child instanceof AbstractScanPlanNode) {
+            plan.clearChildren();
+            child.clearParents();
+            child.addInlinePlanNode(plan);
+            return recursivelyApply(child);
+        }
+
+        // push down to Projection
+        if (child instanceof ProjectionPlanNode) {
+            assert (child.getChildCount() == 1);
+            AbstractPlanNode leaf = child.getChild(0);
+            leaf.clearParents();
+            plan.clearChildren();
+            plan.addAndLinkChild(leaf);
+            child.clearChildren();
+            child.clearParents();
+            child.addAndLinkChild(plan);
+            return recursivelyApply(child);
+        }
+
+        // push into JOINs
+        if (child instanceof AbstractJoinPlanNode) {
+            plan.clearChildren();
+            child.clearParents();
+            child.addInlinePlanNode(plan);
+            if (((AbstractJoinPlanNode)child).getJoinType() == JoinType.LEFT) {
+                // for LEFT OUTER, also need to push down to the left child (OUTER table)
+                AbstractPlanNode leaf = child.getChild(0);
+                LimitPlanNode copy = new LimitPlanNode((LimitPlanNode)plan);
+                leaf.clearChildren();
+                leaf.clearParents();
+                copy.addAndLinkChild(leaf);
+                child.setAndLinkChild(0, copy);
+                // push down further in the left child if it's a Scan or a JOIN
+                child = recursivelyApply(child);
+            }
+            return child;
+        }
+
+        return plan;
 
     }
 
