@@ -743,7 +743,7 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "       <export enabled='true' >"
-                + "       <onserver exportto='custom' exportconnectorclass=\"org.voltdb.utils.NoOpTestExportClient\"  >"
+                + "       <onserver exportto='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\"  >"
                 + "            <configuration>"
                 + "                <property name=\"foo\">false</property>"
                 + "                <property name=\"type\">CSV</property>"
@@ -804,9 +804,9 @@ public class TestCatalogUtil extends TestCase {
         assertTrue(good_deployment.getExport().isEnabled());
         assertEquals(good_deployment.getExport().getOnserver().getExportto(), ServerExportEnum.CUSTOM);
         assertEquals(good_deployment.getExport().getOnserver().getExportconnectorclass(),
-                "org.voltdb.utils.NoOpTestExportClient");
+                "org.voltdb.exportclient.NoOpTestExportClient");
         ConnectorProperty prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
-        assertEquals(prop.getValue(), "org.voltdb.utils.NoOpTestExportClient");
+        assertEquals(prop.getValue(), "org.voltdb.exportclient.NoOpTestExportClient");
 
         // This is to test previous deployment with builtin export functionality.
         final File tmpBuiltin = VoltProjectBuilder.writeStringToTempFile(withBuiltinExport);
