@@ -85,73 +85,26 @@ public class TestJoinOrder extends PlannerTestCase {
     }
 
     public void testInnerOuterJoinOrder() {
-//        @TODO ENG_3038 Commented out until 2 table restriction for outer joins is there
-//        AbstractPlanNode pn = compileWithJoinOrder(
-//                "select * FROM T1, T2, T3 LEFT JOIN T4 ON T3.C = T4.D LEFT JOIN T5 ON T3.C = T5.E, T6,T7",
-//                "T2, T1, T3, T4, T5, T7, T6");
-//        AbstractPlanNode n = pn.getChild(0).getChild(0);
-//        String joinOrder[] = {"T2", "T1", "T3", "T4", "T5", "T7", "T6"};
-//        for (int i = 6; i > 0; i--) {
-//            assertTrue(n instanceof NestLoopPlanNode);
-//            assertTrue(n.getChild(1) instanceof SeqScanPlanNode);
-//            SeqScanPlanNode s = (SeqScanPlanNode) n.getChild(1);
-//            if (i == 1) {
-//                assertTrue(n.getChild(0) instanceof SeqScanPlanNode);
-//                assertTrue(joinOrder[i-1].equals(((SeqScanPlanNode) n.getChild(0)).getTargetTableName()));
-//            } else {
-//                assertTrue(n.getChild(0) instanceof NestLoopPlanNode);
-//                n = n.getChild(0);
-//            }
-//            assertTrue(joinOrder[i].equals(s.getTargetTableName()));
-//         }
-        try {
-            compileWithInvalidJoinOrder("select * FROM T1, T2, T3 LEFT JOIN T4 ON T3.C = T4.D LEFT JOIN T5 ON T3.C = T5.E, T6,T7",
-                    "T2, T1, T3, T4, T5, T7, T6");
-            fail();
-        } catch (Exception ex) {
-            assertTrue("VoltDB does not support outer joins with more than two tables involved".equals(ex.getMessage()));
+//      @TODO ENG_3038 Commented out until 2 table restriction for outer joins is there
+        AbstractPlanNode pn = compileWithJoinOrder(
+                "select * FROM T1, T2, T3 LEFT JOIN T4 ON T3.C = T4.D LEFT JOIN T5 ON T3.C = T5.E, T6,T7",
+                "T2, T1, T3, T4, T5, T7, T6");
+        AbstractPlanNode n = pn.getChild(0).getChild(0);
+        String joinOrder[] = {"T2", "T1", "T3", "T4", "T5", "T7", "T6"};
+        for (int i = 6; i > 0; i--) {
+            assertTrue(n instanceof NestLoopPlanNode);
+            assertTrue(n.getChild(1) instanceof SeqScanPlanNode);
+            SeqScanPlanNode s = (SeqScanPlanNode) n.getChild(1);
+            if (i == 1) {
+                assertTrue(n.getChild(0) instanceof SeqScanPlanNode);
+                assertTrue(joinOrder[i-1].equals(((SeqScanPlanNode) n.getChild(0)).getTargetTableName()));
+            } else {
+                assertTrue(n.getChild(0) instanceof NestLoopPlanNode);
+                n = n.getChild(0);
+            }
+            assertTrue(joinOrder[i].equals(s.getTargetTableName()));
         }
 
-
-        try {
-            compileWithInvalidJoinOrder("select * FROM T1, T2, T3 LEFT JOIN T4 ON T3.C = T4.D LEFT JOIN T5 ON T3.C = T5.E, T6,T7",
-                    "T2, T6, T3, T4, T5, T7, T1");
-            fail();
-        } catch (Exception ex) {
-            assertTrue("VoltDB does not support outer joins with more than two tables involved".equals(ex.getMessage()));
-//          @TODO ENG_3038 Commented out until 2 table restriction for outer joins is there
-//            assertTrue("The specified join order is invalid for the given query".equals(ex.getMessage()));
-        }
-
-        try {
-            compileWithInvalidJoinOrder("select * FROM T1, T2, T3 LEFT JOIN T4 ON T3.C = T4.D LEFT JOIN T5 ON T3.C = T5.E, T6,T7",
-                    "T1, T2, T4, T3, T5, T7, T6");
-            fail();
-        } catch (Exception ex) {
-            assertTrue("VoltDB does not support outer joins with more than two tables involved".equals(ex.getMessage()));
-//          @TODO ENG_3038 Commented out until 2 table restriction for outer joins is there
-//            assertTrue("The specified join order is invalid for the given query".equals(ex.getMessage()));
-        }
-
-        try {
-            compileWithInvalidJoinOrder("select * FROM T1, T2, T3 LEFT JOIN T4 ON T3.C = T4.D LEFT JOIN T5 ON T3.C = T5.E, T6,T7",
-                    "T1, T2, T3, T4, T5, T7");
-            fail();
-        } catch (Exception ex) {
-            assertTrue("VoltDB does not support outer joins with more than two tables involved".equals(ex.getMessage()));
-//          @TODO ENG_3038 Commented out until 2 table restriction for outer joins is there
-//            assertTrue(ex.getMessage().indexOf("does not contain the correct number of tables") != -1);
-        }
-
-        try {
-            compileWithInvalidJoinOrder("select * FROM T1, T2, T3 LEFT JOIN T4 ON T3.C = T4.D LEFT JOIN T5 ON T3.C = T5.E, T6,T7",
-                    "T1, T2, T3, T4, T5, T7, T6, T8");
-            fail();
-        } catch (Exception ex) {
-            assertTrue("VoltDB does not support outer joins with more than two tables involved".equals(ex.getMessage()));
-//          @TODO ENG_3038 Commented out until 2 table restriction for outer joins is there
-//            assertTrue(ex.getMessage().indexOf("does not contain the correct number of tables") != -1);
-        }
     }
 
     @Override

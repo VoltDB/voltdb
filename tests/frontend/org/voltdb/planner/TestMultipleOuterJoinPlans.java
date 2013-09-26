@@ -99,6 +99,26 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         nlj = (NestLoopPlanNode) n;
         assertTrue(JoinType.LEFT == nlj.getJoinType());
         assertTrue(nlj.getJoinPredicate() != null);
+
+        pn = compile("select * FROM R1 RIGHT JOIN R2 ON R1.A = R2.A LEFT JOIN R3 ON R3.C = R1.C");
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.LEFT == nlj.getJoinType());
+        n = nlj.getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.LEFT == nlj.getJoinType());
+
+        pn = compile("select * FROM R1 RIGHT JOIN R2 ON R1.A = R2.A LEFT JOIN R3 ON R3.C = R1.C WHERE R1.A > 0");
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.LEFT == nlj.getJoinType());
+        n = nlj.getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.INNER == nlj.getJoinType());
     }
 
     public void testMultiTableJoinExpressions() {
@@ -211,7 +231,7 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         n = nlj.getChild(0);
         assertTrue(n instanceof NestLoopPlanNode);
         nlj = (NestLoopPlanNode) n;
-        assertTrue(JoinType.INNER == nlj.getJoinType());
+        assertTrue(JoinType.LEFT == nlj.getJoinType());
         assertTrue(nlj.getJoinPredicate() != null);
 
         // The second R3.C = R2.C join condition is NULL-rejecting for the first LEFT join
