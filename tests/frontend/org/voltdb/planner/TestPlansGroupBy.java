@@ -148,6 +148,10 @@ public class TestPlansGroupBy extends PlannerTestCase {
         pns = compileToFragments("SELECT F_D2, COUNT(*) FROM RF GROUP BY F_D2");
         checkGroupByOnlyPlan(pns, false, true, true);
 
+        // unoptimized case: no prefix index found for (F_D1, F_D2)
+        pns = compileToFragments("SELECT F_D1, F_D2, COUNT(*) FROM RF GROUP BY F_D1, F_D2");
+        checkGroupByOnlyPlan(pns, false, true, true);
+
         // Partitioned Table
         pns = compileToFragments("SELECT F_D1 FROM F GROUP BY F_D1");
         checkGroupByOnlyPlan(pns, true, true, true);
