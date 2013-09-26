@@ -63,7 +63,7 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
-import org.voltdb.export.processors.RawProcessor;
+import org.voltdb.export.ExportInternalMessage;
 import org.voltdb.fault.FaultHandler;
 import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault;
@@ -72,7 +72,6 @@ import org.voltdb.iv2.JoinProducerBase;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.MockExecutionEngine;
 import org.voltdb.messaging.CompleteTransactionMessage;
-import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -1217,9 +1216,8 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             {
             }
         }
-        else if (message instanceof RawProcessor.ExportInternalMessage) {
-            RawProcessor.ExportInternalMessage exportm =
-                (RawProcessor.ExportInternalMessage) message;
+        else if (message instanceof ExportInternalMessage) {
+            ExportInternalMessage exportm = (ExportInternalMessage) message;
             ee.exportAction(exportm.m_m.isSync(),
                                 exportm.m_m.getAckOffset(),
                                 0,

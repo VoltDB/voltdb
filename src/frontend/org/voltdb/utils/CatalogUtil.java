@@ -105,9 +105,7 @@ import org.voltdb.compilereport.IndexAnnotation;
 import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.compilereport.StatementAnnotation;
 import org.voltdb.compilereport.TableAnnotation;
-import org.voltdb.export.processors.GuestProcessor;
-import org.voltdb.export.processors.RawProcessor;
-import org.voltdb.exportclient.ExportToFileClient;
+import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
@@ -1071,9 +1069,9 @@ public abstract class CatalogUtil {
         }
 
         boolean adminstate = exportType.isEnabled();
-        String connector = RawProcessor.class.getName();
+        String connector = "org.voltdb.export.processors.RawProcessor";
         if (exportType.getOnserver() != null) {
-            connector = GuestProcessor.class.getName();
+            connector = "org.voltdb.export.processors.GuestProcessor";
         }
 
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
@@ -1095,7 +1093,7 @@ public abstract class CatalogUtil {
             String exportClientClassName = null;
 
             switch( exportOnServer.getExportto()) {
-            case FILE: exportClientClassName = ExportToFileClient.class.getName(); break;
+            case FILE: exportClientClassName = "org.voltdb.exportclient.ExportToFileClient"; break;
             case JDBC: exportClientClassName = "org.voltdb.exportclient.JDBCExportClient"; break;
             //Validate that we can load the class.
             case CUSTOM:
@@ -1116,8 +1114,8 @@ public abstract class CatalogUtil {
             // this is OK as the deployment file XML schema does not allow for
             // export configuration property names that begin with underscores
             if (exportClientClassName != null && exportClientClassName.trim().length() > 0) {
-                ConnectorProperty prop = catconn.getConfig().add(GuestProcessor.EXPORT_TO_TYPE);
-                prop.setName(GuestProcessor.EXPORT_TO_TYPE);
+                ConnectorProperty prop = catconn.getConfig().add(ExportDataProcessor.EXPORT_TO_TYPE);
+                prop.setName(ExportDataProcessor.EXPORT_TO_TYPE);
                 prop.setValue(exportClientClassName);
             }
 

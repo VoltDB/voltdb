@@ -46,8 +46,6 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.common.Constants;
-import org.voltdb.export.processors.RawProcessor;
-import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
@@ -300,7 +298,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_firstUnpolledUso = Math.max(m_firstUnpolledUso, lastUso);
     }
 
-    private void exportActionImpl(RawProcessor.ExportInternalMessage m) {
+    private void exportActionImpl(ExportInternalMessage m) {
         assert(m.m_m.getGeneration() == m_generation);
         ExportProtoMessage message = m.m_m;
         ExportProtoMessage result =
@@ -406,7 +404,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     /**
      * Obtain next block of data from source
      */
-    public ListenableFuture<?> exportAction(final RawProcessor.ExportInternalMessage m) {
+    public ListenableFuture<?> exportAction(final ExportInternalMessage m) {
         return m_es.submit(new Runnable() {
                 @Override
                 public void run() {

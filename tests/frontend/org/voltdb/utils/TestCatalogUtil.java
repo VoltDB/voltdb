@@ -23,17 +23,14 @@
 
 package org.voltdb.utils;
 
-import com.google.common.base.Joiner;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import static junit.framework.Assert.assertEquals;
-import static junit.framework.Assert.assertFalse;
-import static junit.framework.Assert.assertNotNull;
-import static junit.framework.Assert.assertTrue;
+
 import junit.framework.TestCase;
+
 import org.voltdb.VoltDB;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
@@ -51,8 +48,10 @@ import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
-import org.voltdb.export.processors.GuestProcessor;
+import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.types.ConstraintType;
+
+import com.google.common.base.Joiner;
 
 public class TestCatalogUtil extends TestCase {
 
@@ -795,7 +794,7 @@ public class TestCatalogUtil extends TestCase {
         assertEquals(good_deployment.getExport().getOnserver().getExportto(), ServerExportEnum.CUSTOM);
         assertEquals(good_deployment.getExport().getOnserver().getExportconnectorclass(),
                 "org.voltdb.utils.NoOpTestExportClient");
-        ConnectorProperty prop = catconn.getConfig().get(GuestProcessor.EXPORT_TO_TYPE);
+        ConnectorProperty prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
         assertEquals(prop.getValue(), "org.voltdb.utils.NoOpTestExportClient");
 
         // This is to test previous deployment with builtin export functionality.
@@ -812,7 +811,7 @@ public class TestCatalogUtil extends TestCase {
 
         assertTrue(builtin_deployment.getExport().isEnabled());
         assertEquals(builtin_deployment.getExport().getOnserver().getExportto(), ServerExportEnum.FILE);
-        prop = catconn.getConfig().get(GuestProcessor.EXPORT_TO_TYPE);
+        prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
         assertEquals(prop.getValue(), "org.voltdb.exportclient.ExportToFileClient");
 
     }
