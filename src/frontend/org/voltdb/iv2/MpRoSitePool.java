@@ -84,6 +84,7 @@ class MpRoSitePool {
 
         void shutdown() {
             m_site.startShutdown();
+            // Need to unblock the site's run() loop on the take() call on the queue
             m_queue.offer(Scheduler.m_nullTask);
         }
 
@@ -155,7 +156,9 @@ class MpRoSitePool {
     {
         m_catalogContext = context;
         m_csp = csp;
-        // Wipe out all the idle sites with stale catalogs
+        // Wipe out all the idle sites with stale catalogs.
+        // Non-idle sites will get killed and replaced when they finish
+        // whatever they started before the catalog update
         Iterator<MpRoSiteContext> siterator = m_idleSites.iterator();
         while (siterator.hasNext()) {
             MpRoSiteContext site = siterator.next();
@@ -167,7 +170,7 @@ class MpRoSitePool {
     }
 
     /**
-     * Repair placeholder
+     * Repair
      */
     void repair(long txnId, SiteTasker task)
     {
@@ -176,8 +179,8 @@ class MpRoSitePool {
             site.offer(task);
         }
         else {
-            //bad
-            throw new RuntimeException("THIS IS BAD!");
+            // Should be impossible
+            throw new RuntimeException("MPI repair attempted to repair transaction: " + txnId);
         }
     }
 

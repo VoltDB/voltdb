@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
 
-//import org.voltcore.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
@@ -51,7 +51,8 @@ import org.voltdb.exceptions.EEException;
 
 public class MpRoSite implements Runnable, SiteProcedureConnection
 {
-    //private static final VoltLogger hostLog = new VoltLogger("HOST");
+    @SuppressWarnings("unused")
+    private static final VoltLogger tmLog = new VoltLogger("TM");
 
     // Set to false trigger shutdown.
     volatile boolean m_shouldContinue = true;
