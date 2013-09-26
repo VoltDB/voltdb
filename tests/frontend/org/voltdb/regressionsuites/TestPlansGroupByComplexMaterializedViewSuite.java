@@ -31,6 +31,7 @@ import java.text.SimpleDateFormat;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
@@ -48,8 +49,8 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
             vt = client.callProcedure("@AdHoc",
                     "select * from " + mvTable + " ORDER BY " + orderbyStmt).getResults()[0];
         } catch (Exception e) {
-            fail();
             e.printStackTrace();
+            fail();
         }
 
         if (vt.getRowCount() != 0) {
@@ -526,6 +527,48 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         }
     }
 
+    public void testMaterializedViewUpdateR4() throws IOException, ProcCallException {
+        System.out.println("Test R4 update...");
+
+        ClientResponse result;
+        Client client = this.getClient();
+        String insert = "R4.insert";
+        // ID, wage, dept, age, rent
+        client.callProcedure(insert, 1,  10, -1, 21, 5);
+        client.callProcedure(insert, 2,  20,  1, 22, 6);
+        client.callProcedure(insert, 3,  30,  1, 23, 7 );
+        client.callProcedure(insert, 4,  40,  2, 24, 8);
+        client.callProcedure(insert, 5,  50,  2, 25, 9);
+
+        String mvTable = "V2_R4";
+        String orderbyStmt = mvTable+"_G1";
+        // SELECT dept*dept, dept+dept, count(*), SUM(wage) FROM R4 GROUP BY dept*dept, dept+dept
+
+        // Check the current contents in MVs
+        compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, -2, 1, 10}, {1, 2, 2, 50}, {4, 4, 2, 90}}, orderbyStmt);
+
+        // Test update(id, wage, dept, age, rent, oldid)
+        result = client.callProcedure("R4.update", 2, 19, 1, 22, 6, 2);
+        assertEquals(ClientResponse.SUCCESS, result.getStatus());
+        assertEquals(1, result.getResults()[0].asScalarLong());
+        compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, -2, 1, 10}, {1, 2, 2, 49}, {4, 4, 2, 90}}, orderbyStmt);
+
+        result = client.callProcedure("R4.update", 4, 41, -1, 24, 8, 4);
+        assertEquals(ClientResponse.SUCCESS, result.getStatus());
+        assertEquals(1, result.getResults()[0].asScalarLong());
+        compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, -2, 2, 51}, {1, 2, 2, 49}, {4, 4, 1, 50}}, orderbyStmt);
+
+        result = client.callProcedure("R4.update", 5, 55, 1, 25, 9, 5);
+        assertEquals(ClientResponse.SUCCESS, result.getStatus());
+        assertEquals(1, result.getResults()[0].asScalarLong());
+        compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, -2, 2, 51}, {1, 2, 3, 104}}, orderbyStmt);
+
+        result = client.callProcedure("@AdHoc","Delete from R4");
+        assertEquals(ClientResponse.SUCCESS, result.getStatus());
+        assertEquals(5, result.getResults()[0].asScalarLong());
+        compareMVcontentsOfLongs(client, mvTable, null, orderbyStmt);
+    }
+
     private void loadTableForMVFixSuite() throws Exception {
         Client client = this.getClient();
         VoltTable vt = null;
@@ -747,7 +790,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
     }
 
     static public junit.framework.Test suite() throws Exception {
-        VoltServerConfig config = null;
+        LocalCluster config = null;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
                 TestPlansGroupByComplexMaterializedViewSuite.class);
         String literalSchema = null;
@@ -915,8 +958,8 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 // NO Need to fix mv query
                 "CREATE TABLE R4 ( " +
                 "id INTEGER DEFAULT '0' NOT NULL, " +
-                "wage INTEGER, " +
-                "dept INTEGER, " +
+                "wage BIGINT, " +
+                "dept BIGINT, " +
                 "age INTEGER,  " +
                 "rent INTEGER, " +
                 "PRIMARY KEY (id) );" +
@@ -924,29 +967,41 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "CREATE VIEW V_R4 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) " +
                 "AS SELECT wage, dept, count(*), sum(age), sum(rent)  FROM R4 " +
                 "GROUP BY wage, dept;" +
-                ""
-                ;
+
+                // This R4 mv tests bigint math result type
+                "CREATE VIEW V2_R4 (V2_R4_G1, V2_R4_G2, V2_R4_CNT, V2_R4_sum_wage) " +
+                "AS SELECT dept*dept, dept+dept, count(*), SUM(wage) " +
+                "FROM R4 GROUP BY dept*dept, dept+dept;" +
+                "";
         try {
             project.addLiteralSchema(literalSchema);
         } catch (IOException e) {
             assertFalse(true);
         }
 
+        //* Single-server configuration  -- please do not remove or corrupt this structured comment
         config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
+        // End single-server configuration  -- please do not remove or corrupt this structured comment */
 
+        //* HSQL backend server configuration  -- please do not remove or corrupt this structured comment
         config = new LocalCluster("plansgroupby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
+        // End HSQL backend server configuration  -- please do not remove or corrupt this structured comment */
 
-        // Cluster
+        //* Multi-server configuration  -- please do not remove or corrupt this structured comment
         config = new LocalCluster("plansgroupby-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        // Disable hasLocalServer -- with hasLocalServer enabled,
+        // multi-server pro configs mysteriously hang at startup under eclipse.
+        config.setHasLocalServer(false);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
+        // End multi-server configuration  -- please do not remove or corrupt this structured comment */
 
         return builder;
     }
