@@ -19,7 +19,11 @@ package org.voltdb.iv2;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.Deque;
+import java.util.HashSet;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -166,6 +170,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // Undo token state for the corresponding EE.
     public final static long kInvalidUndoToken = -1L;
     long latestUndoToken = 0L;
+
+    // start action
+    public final StartAction m_startAction;
 
     @Override
     public long getNextUndoToken()
@@ -359,6 +366,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_numberOfPartitions = numPartitions;
         m_scheduler = scheduler;
         m_backend = backend;
+        m_startAction = startAction;
         m_rejoinState = VoltDB.createForRejoin(startAction) || startAction == StartAction
                 .JOIN ? kStateRejoining :
                 kStateRunning;
@@ -953,12 +961,18 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         null);
             }
             Pair<Long,Long> sequenceNumbers = tableEntry.getValue().get(m_partitionId);
+
             if (sequenceNumbers == null) {
-                VoltDB.crashLocalVoltDB(
-                        "Could not find export sequence numbers for partition " +
-                                m_partitionId + " table " +
-                                tableEntry.getKey() + " have " + exportSequenceNumbers, false, null);
+                if (m_startAction == StartAction.JOIN) {
+                    sequenceNumbers = Pair.of(0L,0L);
+                } else {
+                    VoltDB.crashLocalVoltDB(
+                            "Could not find export sequence numbers for partition " +
+                                    m_partitionId + " table " +
+                                    tableEntry.getKey() + " have " + exportSequenceNumbers, false, null);
+                }
             }
+
             exportAction(
                     true,
                     sequenceNumbers.getFirst().longValue(),
