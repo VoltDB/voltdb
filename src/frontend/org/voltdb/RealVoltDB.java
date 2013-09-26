@@ -749,18 +749,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
                 Class<?> elasticServiceClass =
                     MiscUtils.loadProClass("org.voltdb.join.ElasticJoinCoordinator", "Elastic", false);
-                Constructor<?> constructor =
-                    elasticServiceClass.getConstructor(HostMessenger.class,
-                                                       ClientInterface.class,
-                                                       Cartographer.class,
-                                                       String.class,
-                                                       int.class);
-                m_elasticJoinService =
-                    (ElasticJoinService) constructor.newInstance(m_messenger,
-                                                                 m_clientInterfaces.get(0),
-                                                                 m_cartographer,
-                                                                 clSnapshotPath,
-                                                                 m_deployment.getCluster().getKfactor());
+
+                if (elasticServiceClass != null && TheHashinator.getCurrentConfig().getFirst() == HashinatorType.ELASTIC) {
+                    Constructor<?> constructor =
+                        elasticServiceClass.getConstructor(HostMessenger.class,
+                                                           ClientInterface.class,
+                                                           Cartographer.class,
+                                                           String.class,
+                                                           int.class);
+                    m_elasticJoinService =
+                        (ElasticJoinService) constructor.newInstance(m_messenger,
+                                                                     m_clientInterfaces.get(0),
+                                                                     m_cartographer,
+                                                                     clSnapshotPath,
+                                                                     m_deployment.getCluster().getKfactor());
+                }
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Failed to instantiate elastic join service", false, e);
             }
