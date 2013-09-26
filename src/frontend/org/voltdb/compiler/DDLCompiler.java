@@ -1147,8 +1147,6 @@ public class DDLCompiler {
                 }
             }
         }
-        if (defaultvalue != null && defaultvalue.equals("NULL"))
-            defaultvalue = null;
         if (defaulttype != null) {
             // fyi: Historically, VoltType class initialization errors get reported on this line (?).
             defaulttype = Integer.toString(VoltType.typeFromString(defaulttype).getValue());
