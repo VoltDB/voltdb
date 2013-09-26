@@ -66,7 +66,7 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
     bool found = false;
     BOOST_FOREACH(StreamPtr &streamPtr, savedStreams) {
         assert(streamPtr != NULL);
-        switch (streamPtr->m_context->handleReactivation(streamType, predicateStrings)) {
+        switch (streamPtr->m_context->handleReactivation(streamType)) {
             case TableStreamerContext::ACTIVATION_SUCCEEDED:
                 m_streams.push_back(streamPtr);
                 streamPtr->m_context->updatePredicates(predicateStrings);

@@ -88,8 +88,7 @@ ElasticContext::handleActivation(TableStreamType streamType)
  * Reactivation handler.
  */
 TableStreamerContext::ActivationReturnCode
-ElasticContext::handleReactivation(TableStreamType streamType,
-                                   const std::vector<std::string> &predicateStrings)
+ElasticContext::handleReactivation(TableStreamType streamType)
 {
     return handleActivation(streamType);
 }

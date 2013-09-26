@@ -56,8 +56,7 @@ public:
     /**
      * Reactivation handler.
      */
-    virtual ActivationReturnCode handleReactivation(TableStreamType streamType,
-                                                    const std::vector<std::string> &predicateStrings);
+    virtual ActivationReturnCode handleReactivation(TableStreamType streamType);
 
     /**
      * Deactivation handler.

@@ -74,8 +74,7 @@ public:
      *  Return ACTIVATION_FAILED if reactivation is allowed but failed.
      *  Return ACTIVATION_UNSUPPORTED if reactivation is not supported for the stream type.
      */
-    virtual ActivationReturnCode handleReactivation(TableStreamType streamType,
-                                                    const std::vector<std::string> &predicateStrings) {
+    virtual ActivationReturnCode handleReactivation(TableStreamType streamType) {
         return ACTIVATION_UNSUPPORTED;
     }
 
