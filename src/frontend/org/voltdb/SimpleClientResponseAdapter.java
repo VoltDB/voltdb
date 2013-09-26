@@ -28,6 +28,8 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Exchanger;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -43,9 +45,13 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
     public static final class SyncCallback implements Callback {
         private final Exchanger<ClientResponse> m_responseExchanger = new Exchanger<ClientResponse>();
 
-        public ClientResponse getResponse() throws InterruptedException
+        public ClientResponse getResponse(long timeoutMs) throws InterruptedException
         {
-            return m_responseExchanger.exchange(null);
+            try {
+                return m_responseExchanger.exchange(null, timeoutMs, TimeUnit.MILLISECONDS);
+            } catch (TimeoutException e) {
+                return null;
+            }
         }
 
         @Override
