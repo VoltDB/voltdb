@@ -24,8 +24,6 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.SettableFuture;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -39,6 +37,9 @@ import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.TaskLog;
+
+import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.SettableFuture;
 
 /**
  * Manages the lifecycle of snapshot serialization to a site
@@ -349,7 +350,11 @@ public class RejoinProducer extends JoinProducerBase {
                         "Unexpected exception awaiting snapshot completion.",
                         true, e);
             }
-            setJoinComplete(siteConnection, event.exportSequenceNumbers);
+            setJoinComplete(
+                    siteConnection,
+                    event.exportSequenceNumbers,
+                    true /* requireExistingSequenceNumbers */
+                    );
         }
     }
 
@@ -426,6 +431,9 @@ public class RejoinProducer extends JoinProducerBase {
                     "Unexpected exception awaiting snapshot completion.", true,
                     e);
         }
-        setJoinComplete(siteConnection, event.exportSequenceNumbers);
+        setJoinComplete(
+                siteConnection,
+                event.exportSequenceNumbers,
+                true /* requireExistingSequenceNumbers */);
     }
 }
