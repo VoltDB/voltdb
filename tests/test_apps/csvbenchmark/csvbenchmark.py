@@ -351,7 +351,7 @@ def data_narrow_short(rebuild=False):
     if rebuild or not os.path.exists(data_file):
         with open(data_file, "w") as f:
             for I in range(0, options.ROW_COUNT):
-                print >>f, "%d,%d,%d,%d,%s" % (genint(4), genint(2), genint(1), genint(8), gentext(60))
+                print >>f, "%d,%d,%d,%d,%s" % (I, genint(2), genint(1), genint(8), gentext(60))
         print "data file %s was written" % data_file
     return data_file
 
@@ -361,7 +361,7 @@ def data_narrow_long(rebuild=False):
     if rebuild or not os.path.exists(data_file):
         with open(data_file, "w") as f:
             for I in range(0, options.ROW_COUNT):
-                print >>f, "%d,%d,%d,%d,%s" % (genint(4) ,randint(-32766,32767),randint(-127,127),randint(-2**63,2**63),gentext(512))
+                print >>f, "%d,%d,%d,%d,%s" % (I, randint(-32766,32767),randint(-127,127),randint(-2**63,2**63),gentext(512))
         print "data file %s was written" % data_file
     return data_file
 

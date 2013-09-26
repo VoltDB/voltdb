@@ -16,6 +16,7 @@
  */
 
 #include "storage/ElasticContext.h"
+#include "storage/ElasticIndex.h"
 #include "storage/persistenttable.h"
 #include "common/TupleOutputStreamProcessor.h"
 #include "common/FixUnusedAssertHack.h"
@@ -23,34 +24,120 @@
 namespace voltdb {
 
 ElasticContext::ElasticContext(PersistentTable &table,
-                               const std::vector<std::string> &predicateStrings) :
-    TableStreamerContext(table, predicateStrings),
-    m_scanner(table)
+                               PersistentTableSurgeon &surgeon,
+                               int32_t partitionId,
+                               TupleSerializer &serializer,
+                               const std::vector<std::string> &predicateStrings,
+                               size_t nTuplesPerCall) :
+    TableStreamerContext(table, surgeon, partitionId, serializer, predicateStrings),
+    m_nTuplesPerCall(nTuplesPerCall),
+    m_indexActive(false)
 {
     if (predicateStrings.size() != 1) {
-        throwFatalException("ElasticContext() expects a single predicate");
+        throwFatalException("ElasticContext::ElasticContext() expects a single predicate.");
     }
 }
 
 ElasticContext::~ElasticContext()
+{}
+
+/**
+ * Activation handler.
+ */
+TableStreamerContext::ActivationReturnCode
+ElasticContext::handleActivation(TableStreamType streamType)
 {
+    // Can't activate an indexing stream during a snapshot.
+    if (m_surgeon.hasStreamType(TABLE_STREAM_SNAPSHOT)) {
+        VOLT_ERROR("Elastic context activation is not allowed while a snapshot is in progress.");
+        return ACTIVATION_FAILED;
+    }
+
+    // Create the index?
+    if (streamType == TABLE_STREAM_ELASTIC_INDEX) {
+        // Don't allow activation if there's an existing index.
+        if (m_surgeon.hasIndex()) {
+            VOLT_ERROR("Elastic context activation is not allowed while an index is "
+                       "present that has not been completely consumed.");
+            return ACTIVATION_FAILED;
+        }
+        m_surgeon.createIndex();
+        m_scanner.reset(new ElasticScanner(getTable(), m_surgeon.getData()));
+        m_indexActive = true;
+        return ACTIVATION_SUCCEEDED;
+    }
+
+    // Clear the index?
+    if (streamType == TABLE_STREAM_ELASTIC_INDEX_CLEAR) {
+        if (!m_surgeon.isIndexEmpty()) {
+            VOLT_ERROR("Elastic index clear is not allowed while an index is "
+                       "present that has not been completely consumed.");
+            return ACTIVATION_FAILED;
+        }
+        m_surgeon.dropIndex();
+        m_scanner.reset();
+        m_indexActive = false;
+        return ACTIVATION_SUCCEEDED;
+    }
+
+    // It wasn't one of the supported stream types.
+    return ACTIVATION_UNSUPPORTED;
+}
+
+/**
+ * Reactivation handler.
+ */
+TableStreamerContext::ActivationReturnCode
+ElasticContext::handleReactivation(TableStreamType streamType)
+{
+    return handleActivation(streamType);
+}
+
+/**
+ * Deactivation handler.
+ */
+bool ElasticContext::handleDeactivation(TableStreamType streamType)
+{
+    // Keep this context around to maintain the index.
+    return true;
 }
 
 /*
- * Serialize to multiple output streams.
- * Return remaining tuple count, 0 if done, or -1 on error.
+ * Serialize to output stream.
+ * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
  */
 int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStreams,
                                          std::vector<int> &retPositions)
 {
-    PersistentTable &table = getTable();
-    TableTuple tuple(table.schema());
-    while (m_scanner.next(tuple)) {
+    if (!m_surgeon.hasIndex()) {
+        VOLT_ERROR("Elastic streaming was invoked without proper activation.");
+        return TABLE_STREAM_SERIALIZATION_ERROR;
+    }
+    if (m_surgeon.isIndexingComplete()) {
+        VOLT_ERROR("Elastic streaming was called after indexing had already completed.");
+        return TABLE_STREAM_SERIALIZATION_ERROR;
+    }
+
+    // Populate index with current tuples.
+    // Table changes are tracked through notifications.
+    size_t i = 0;
+    TableTuple tuple(getTable().schema());
+    while (m_scanner->next(tuple)) {
         if (getPredicates()[0].eval(&tuple).isTrue()) {
-            m_index.add(table, tuple);
+            m_surgeon.indexAdd(tuple);
+        }
+        // Take a breather after every chunk of m_nTuplesPerCall tuples.
+        if (++i == m_nTuplesPerCall) {
+            break;
         }
     }
-    return 0;
+
+    // Done with indexing?
+    bool indexingComplete = m_scanner->isScanComplete();
+    if (indexingComplete) {
+        m_surgeon.setIndexingComplete();
+    }
+    return indexingComplete ? 0 : 1;
 }
 
 /**
@@ -58,9 +145,12 @@ int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStrea
  */
 bool ElasticContext::notifyTupleInsert(TableTuple &tuple)
 {
-    PersistentTable &table = getTable();
-    if (getPredicates()[0].eval(&tuple).isTrue()) {
-        m_index.add(table, tuple);
+    if (m_indexActive) {
+        StreamPredicateList &predicates = getPredicates();
+        assert(predicates.size() > 0);
+        if (predicates[0].eval(&tuple).isTrue()) {
+            m_surgeon.indexAdd(tuple);
+        }
     }
     return true;
 }
@@ -78,10 +168,11 @@ bool ElasticContext::notifyTupleUpdate(TableTuple &tuple)
  */
 bool ElasticContext::notifyTupleDelete(TableTuple &tuple)
 {
-    PersistentTable &table = getTable();
-    if (m_index.has(table, tuple)) {
-        bool removed = m_index.remove(table, tuple);
-        assert(removed);
+    if (m_indexActive) {
+        if (m_surgeon.indexHas(tuple)) {
+            bool removed = m_surgeon.indexRemove(tuple);
+            assert(removed);
+        }
     }
     return true;
 }
@@ -94,14 +185,17 @@ void ElasticContext::notifyTupleMovement(TBPtr sourceBlock,
                                          TableTuple &sourceTuple,
                                          TableTuple &targetTuple)
 {
-    PersistentTable &table = getTable();
-    if (m_index.has(table, sourceTuple)) {
-        bool removed = m_index.remove(getTable(), sourceTuple);
-        assert(removed);
-    }
-    if (getPredicates()[0].eval(&targetTuple).isTrue()) {
-        bool added = m_index.add(getTable(), targetTuple);
-        assert(added);
+    if (m_indexActive) {
+        StreamPredicateList &predicates = getPredicates();
+        assert(predicates.size() > 0);
+        if (m_surgeon.indexHas(sourceTuple)) {
+            bool removed = m_surgeon.indexRemove(sourceTuple);
+            assert(removed);
+        }
+        if (getPredicates()[0].eval(&targetTuple).isTrue()) {
+            bool added = m_surgeon.indexAdd(targetTuple);
+            assert(added);
+        }
     }
 }
 

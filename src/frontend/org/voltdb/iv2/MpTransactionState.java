@@ -29,6 +29,8 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingDeque;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -67,6 +69,7 @@ public class MpTransactionState extends TransactionState
     Map<Integer, List<VoltTable>> m_remoteDepTables =
         new HashMap<Integer, List<VoltTable>>();
     final List<Long> m_useHSIds = new ArrayList<Long>();
+    final Map<Integer, Long> m_masterHSIds = Maps.newHashMap();
     long m_buddyHSId;
     FragmentTaskMessage m_remoteWork = null;
     FragmentTaskMessage m_localWork = null;
@@ -75,19 +78,24 @@ public class MpTransactionState extends TransactionState
 
     MpTransactionState(Mailbox mailbox,
                        TransactionInfoBaseMessage notice,
-                       List<Long> useHSIds, long buddyHSId, boolean isRestart)
+                       List<Long> useHSIds, Map<Integer, Long> partitionMasters,
+                       long buddyHSId, boolean isRestart)
     {
         super(mailbox, notice);
         m_initiationMsg = (Iv2InitiateTaskMessage)notice;
         m_useHSIds.addAll(useHSIds);
+        m_masterHSIds.putAll(partitionMasters);
         m_buddyHSId = buddyHSId;
         m_isRestart = isRestart;
     }
 
-    public void updateMasters(List<Long> masters)
+    public void updateMasters(List<Long> masters, Map<Integer, Long> partitionMasters)
     {
         m_useHSIds.clear();
         m_useHSIds.addAll(masters);
+
+        m_masterHSIds.clear();
+        m_masterHSIds.putAll(partitionMasters);
     }
 
     /**
@@ -382,5 +390,16 @@ public class MpTransactionState extends TransactionState
     void terminateTransaction()
     {
         throw new RuntimeException("terminateTransaction is not yet implemented.");
+    }
+
+    /**
+     * For @BalancePartitions, get the master HSID for the given partition so that the MPI can plan who to send data
+     * to whom.
+     */
+    public long getMasterHSId(int partition)
+    {
+        Preconditions.checkArgument(m_masterHSIds.values().containsAll(m_useHSIds) &&
+                                    m_useHSIds.containsAll(m_masterHSIds.values()));
+        return m_masterHSIds.get(partition);
     }
 }

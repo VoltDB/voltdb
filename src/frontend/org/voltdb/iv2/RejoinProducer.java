@@ -24,8 +24,10 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.SettableFuture;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
@@ -47,6 +49,7 @@ public class RejoinProducer extends JoinProducerBase {
 
     private final AtomicBoolean m_currentlyRejoining;
     private ScheduledFuture<?> m_timeFuture;
+    private Mailbox m_streamSnapshotMb = null;
     private StreamSnapshotSink m_rejoinSiteProcessor;
     private final SettableFuture<SnapshotCompletionEvent> m_completionMonitorAwait =
             SettableFuture.create();
@@ -240,7 +243,8 @@ public class RejoinProducer extends JoinProducerBase {
     void doInitiation(RejoinMessage message)
     {
         m_coordinatorHsId = message.m_sourceHSId;
-        m_rejoinSiteProcessor = new StreamSnapshotSink();
+        m_streamSnapshotMb = VoltDB.instance().getHostMessenger().createMailbox();
+        m_rejoinSiteProcessor = new StreamSnapshotSink(m_streamSnapshotMb);
         String snapshotNonce = message.getSnapshotNonce();
 
         // MUST choose the leader as the source.
@@ -312,6 +316,9 @@ public class RejoinProducer extends JoinProducerBase {
             REJOINLOG.debug(m_whoami + "Rejoin snapshot transfer is finished");
             m_rejoinSiteProcessor.close();
 
+            Preconditions.checkNotNull(m_streamSnapshotMb);
+            VoltDB.instance().getHostMessenger().removeMailbox(m_streamSnapshotMb.getHSId());
+
             // m_rejoinSnapshotBytes = m_rejoinSiteProcessor.bytesTransferred();
             // m_rejoinSiteProcessor = null;
 
@@ -375,6 +382,9 @@ public class RejoinProducer extends JoinProducerBase {
         }
         REJOINLOG.debug(m_whoami + "Rejoin snapshot transfer is finished");
         m_rejoinSiteProcessor.close();
+
+        Preconditions.checkNotNull(m_streamSnapshotMb);
+        VoltDB.instance().getHostMessenger().removeMailbox(m_streamSnapshotMb.getHSId());
 
         // m_rejoinSnapshotBytes = m_rejoinSiteProcessor.bytesTransferred();
         // m_rejoinSiteProcessor = null;

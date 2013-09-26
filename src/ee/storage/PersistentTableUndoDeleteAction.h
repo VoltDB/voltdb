@@ -26,7 +26,7 @@ namespace voltdb {
 
 class PersistentTableUndoDeleteAction: public UndoAction {
 public:
-    inline PersistentTableUndoDeleteAction(char *deletedTuple, PersistentTable *table)
+    inline PersistentTableUndoDeleteAction(char *deletedTuple, PersistentTableSurgeon *table)
         : m_tuple(deletedTuple), m_table(table)
     {}
 
@@ -46,7 +46,7 @@ private:
 
 private:
     char *m_tuple;
-    PersistentTable *m_table;
+    PersistentTableSurgeon *m_table;
 };
 
 }

@@ -228,12 +228,24 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                                                             boolean isReadOnly,
                                                             byte[] planHash,
                                                             int outputDepId,
-                                                            ByteBuffer parameterSet,
+                                                            ParameterSet params,
                                                             boolean isFinal,
                                                             boolean isForReplay) {
+        ByteBuffer parambytes = null;
+        if (params != null) {
+            FastSerializer fs = new FastSerializer();
+            try {
+                params.writeExternal(fs);
+            }
+            catch (IOException e) {
+                VoltDB.crashLocalVoltDB("Failed to serialize parameter for fragment: " + params.toString(), true, e);
+            }
+            parambytes = fs.getBuffer();
+        }
+
         FragmentTaskMessage ret = new FragmentTaskMessage(initiatorHSId, coordinatorHSId,
                                                           txnId, uniqueId, isReadOnly, isFinal, isForReplay);
-        ret.addFragment(planHash, outputDepId, parameterSet);
+        ret.addFragment(planHash, outputDepId, parambytes);
         return ret;
     }
 

@@ -28,6 +28,7 @@ import java.util.Map.Entry;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.Pair;
 import org.voltdb.ExecutionSite;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
@@ -40,7 +41,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTableUtil;
@@ -319,17 +319,22 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Interface frontend invokes to communicate to CPP execution engine.
      */
 
-    abstract public boolean activateTableStream(final int tableId, TableStreamType type, SnapshotPredicates predicates);
+    abstract public boolean activateTableStream(final int tableId,
+                                                TableStreamType type,
+                                                long undoQuantumToken,
+                                                byte[] predicates);
 
     /**
      * Serialize more tuples from the specified table that already has a stream enabled
+     *
      * @param tableId Catalog ID of the table to serialize
      * @param outputBuffers Buffers to receive serialized tuple data
-     * @return A positive number indicating the number of bytes serialized or 0 if there is no more data.
-     *        -1 is returned if there is an error (such as the table not having the specified stream type activated).
+     * @return The first number in the pair indicates that there is more data if it's positive,
+     * 0 if it's the end of stream, or -1 if there was an error. The second value of the pair is the serialized bytes
+     * for each output buffer.
      */
-    public abstract int[] tableStreamSerializeMore(int tableId, TableStreamType type,
-                                                   List<DBBPool.BBContainer> outputBuffers);
+    public abstract Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
+                                                               List<DBBPool.BBContainer> outputBuffers);
 
     public abstract void processRecoveryMessage( ByteBuffer buffer, long pointer);
 
@@ -695,10 +700,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param pointer Pointer to an engine instance
      * @param tableId Catalog ID of the table
      * @param streamType type of stream to activate
+     * @param undoQuantumToken Undo quantum allowing destructive index clearing to be undone
      * @param data serialized predicates
      * @return <code>true</code> on success and <code>false</code> on failure
      */
-    protected native boolean nativeActivateTableStream(long pointer, int tableId, int streamType, byte[] data);
+    protected native boolean nativeActivateTableStream(long pointer, int tableId, int streamType, long undoQuantumToken, byte[] data);
 
     /**
      * Serialize more tuples from the specified table that has an active stream of the specified type

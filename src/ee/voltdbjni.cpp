@@ -963,10 +963,10 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeS
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    nativeActivateTableStream
- * Signature: (JIII[B)Z
+ * Signature: (JIIIJ[B)Z
  */
 SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeActivateTableStream(
-        JNIEnv *env, jobject obj, jlong engine_ptr, jint tableId, jint streamType,
+        JNIEnv *env, jobject obj, jlong engine_ptr, jint tableId, jint streamType, jlong undoToken,
         jbyteArray serialized_predicates)
 {
     VOLT_DEBUG("nativeActivateTableStream in C++ called");
@@ -981,7 +981,7 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeA
     try {
         try {
             voltdb::TableStreamType tableStreamType = static_cast<voltdb::TableStreamType>(streamType);
-            bool success = engine->activateTableStream(tableId, tableStreamType, serialize_in);
+            bool success = engine->activateTableStream(tableId, tableStreamType, undoToken, serialize_in);
             env->ReleaseByteArrayElements(serialized_predicates, bytes, JNI_ABORT);
             VOLT_DEBUG("deserialized predicates (success=%d)", (int)success);
             return success;
@@ -1040,7 +1040,7 @@ static bool getArrayElements(
 
 /*
  * Serialize more tuples to one or more output streams.
- * Returns a long for the remaining tuple count, -1 when done, or -2 for an error.
+ * Returns a long for the remaining tuple count, -1 for an error.
  * Streams an int position array through the reused result buffer.
  * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    nativeTableStreamSerializeMore
@@ -1071,8 +1071,8 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTabl
     } catch (const FatalException &e) {
         topend->crashVoltDB(e);
     }
-    // Won't get here, but -2 is an error.
-    return -2;
+    // Won't get here.
+    return TABLE_STREAM_SERIALIZATION_ERROR;
 }
 
 /*
