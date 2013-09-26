@@ -66,7 +66,7 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
     }
 
     private final long m_connectionId;
-    private final AtomicReference<Callback> m_callback = new AtomicReference<Callback>();
+    private volatile Callback m_callback = null;
     private final String m_name;
     public static volatile AtomicLong m_testConnectionIdGenerator;
 
@@ -86,7 +86,7 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
     }
 
     public void setCallback(Callback callback) {
-        m_callback.set(callback);
+        m_callback = callback;
     }
 
     @Override
@@ -125,7 +125,7 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
             b.position(4);
             resp.initFromBuffer(b);
 
-            Callback callback = m_callback.get();
+            Callback callback = m_callback;
             if (callback != null) {
                 callback.handleResponse(resp);
             }
