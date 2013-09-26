@@ -155,7 +155,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    private static final String m_defaultVersionString = "3.6.1";
+    private static final String m_defaultVersionString = "4.0";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
@@ -1079,44 +1079,59 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         + m_config.m_pathToDeployment, false, null);
             }
 
-
+            /*
+             * Check for invalid deployment file settings (enterprise-only) in the community edition.
+             * Trick here is to print out all applicable problems and then stop, rather than stopping
+             * after the first one is found.
+             */
             if (!m_config.m_isEnterprise) {
-                boolean shutdown = false;
+                boolean shutdownDeployment = false;
+                boolean shutdownAction = false;
 
                 // check license features for community version
                 if ((m_deployment.getCluster() != null) && (m_deployment.getCluster().getKfactor() > 0)) {
-                    consoleLog.error("K-Saftey (intra-cluster redundancy) is not supported " +
+                    consoleLog.error("K-Safety is not supported " +
                             "in the community edition of VoltDB.");
-                    shutdown = true;
+                    shutdownDeployment = true;
                 }
                 if ((m_deployment.getSnapshot() != null) && (m_deployment.getSnapshot().isEnabled())) {
-                    consoleLog.error("Snapshots (periodic and on-demand) are not supported " +
+                    consoleLog.error("Snapshots are not supported " +
                             "in the community edition of VoltDB.");
-                    shutdown = true;
+                    shutdownDeployment = true;
                 }
                 if ((m_deployment.getCommandlog() != null) && (m_deployment.getCommandlog().isEnabled())) {
                     consoleLog.error("Command logging is not supported " +
                             "in the community edition of VoltDB.");
-                    shutdown = true;
+                    shutdownDeployment = true;
                 }
                 if ((m_deployment.getExport() != null) && (m_deployment.getExport().isEnabled())) {
                     consoleLog.error("Export is not supported " +
                             "in the community edition of VoltDB.");
-                    shutdown = true;
+                    shutdownDeployment = true;
                 }
-                if (shutdown) {
-                    VoltDB.crashLocalVoltDB("This process will exit. " +
-                            "Please re-try with VoltDB a community edition-compatible deployment file.",
-                            false, null);
-                }
-
                 // check the start action for the community edition
                 if (m_config.m_startAction != StartAction.CREATE) {
                     consoleLog.error("Start action \"" + m_config.m_startAction.getClass().getSimpleName() +
                             "\" is not supported in the community edition of VoltDB.");
-                    VoltDB.crashLocalVoltDB("This process will exit. " +
-                            "Please re-try with the enterprise edition or with the CREATE start action.",
-                            false, null);
+                    shutdownAction = true;
+                }
+
+                // if the process needs to stop, try to be helpful
+                if (shutdownAction || shutdownDeployment) {
+                    String msg = "This process will exit. Please run VoltDB with ";
+                    if (shutdownDeployment) {
+                        msg += "a deployment file compatible with the community edition";
+                    }
+                    if (shutdownDeployment && shutdownAction) {
+                        msg += " and ";
+                    }
+
+                    if (shutdownAction && !shutdownDeployment) {
+                        msg += "the CREATE start action";
+                    }
+                    msg += ".";
+
+                    VoltDB.crashLocalVoltDB(msg, false, null);
                 }
             }
 

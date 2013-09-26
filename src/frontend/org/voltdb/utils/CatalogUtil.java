@@ -105,9 +105,7 @@ import org.voltdb.compilereport.IndexAnnotation;
 import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.compilereport.StatementAnnotation;
 import org.voltdb.compilereport.TableAnnotation;
-import org.voltdb.export.processors.GuestProcessor;
-import org.voltdb.export.processors.RawProcessor;
-import org.voltdb.exportclient.ExportToFileClient;
+import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
@@ -122,9 +120,6 @@ import com.google.common.base.Charsets;
 public abstract class CatalogUtil {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
-
-    // The minimum version of catalog that's compatible with this version of Volt
-    public static final int[] minCompatibleVersion = {3, 6, 1};
 
     public static final String CATALOG_FILENAME = "catalog.txt";
     public static final String CATALOG_BUILDINFO_FILENAME = "buildinfo.txt";
@@ -167,7 +162,7 @@ public abstract class CatalogUtil {
 
         // Check if it's compatible
         if (!isCatalogCompatible(voltVersionString)) {
-            throw new IOException("Catalog compiled with " + voltVersionString + " is not compatible with the current version of VoltDB (" +
+            throw new IOException("Catalog compiled with '" + voltVersionString + "' is not compatible with the current version of VoltDB (" +
                     VoltDB.instance().getVersionString() + ") - " + " please build your application using the current version of VoltDB.");
         }
 
@@ -526,31 +521,24 @@ public abstract class CatalogUtil {
      * Check if a catalog compiled with the given version of VoltDB is
      * compatible with the current version of VoltDB.
      *
-     * The rule is that the catalog must be compiled with a version of VoltDB
-     * that's within the range [minCompatibleVersion, currentVersion],
-     * inclusive.
-     *
      * @param catalogVersionStr
      *            The version string of the VoltDB that compiled the catalog.
      * @return true if it's compatible, false otherwise.
      */
+
     public static boolean isCatalogCompatible(String catalogVersionStr)
     {
         if (catalogVersionStr == null || catalogVersionStr.isEmpty()) {
             return false;
         }
 
+        //Check that it is a properly formed verstion string
         int[] catalogVersion = MiscUtils.parseVersionString(catalogVersionStr);
-        int[] currentVersion = MiscUtils.parseVersionString(VoltDB.instance().getVersionString());
-
         if (catalogVersion == null) {
             throw new IllegalArgumentException("Invalid version string " + catalogVersionStr);
         }
 
-        int maxCmpResult = MiscUtils.compareVersions(catalogVersion, currentVersion);
-        int minCmpResult = MiscUtils.compareVersions(catalogVersion, minCompatibleVersion);
-
-        if (minCmpResult == -1 || maxCmpResult == 1) {
+        if (!catalogVersionStr.equals(VoltDB.instance().getVersionString())) {
             return false;
         }
 
@@ -1071,9 +1059,9 @@ public abstract class CatalogUtil {
         }
 
         boolean adminstate = exportType.isEnabled();
-        String connector = RawProcessor.class.getName();
+        String connector = "org.voltdb.export.processors.RawProcessor";
         if (exportType.getOnserver() != null) {
-            connector = GuestProcessor.class.getName();
+            connector = "org.voltdb.export.processors.GuestProcessor";
         }
 
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
@@ -1095,7 +1083,7 @@ public abstract class CatalogUtil {
             String exportClientClassName = null;
 
             switch( exportOnServer.getExportto()) {
-            case FILE: exportClientClassName = ExportToFileClient.class.getName(); break;
+            case FILE: exportClientClassName = "org.voltdb.exportclient.ExportToFileClient"; break;
             case JDBC: exportClientClassName = "org.voltdb.exportclient.JDBCExportClient"; break;
             //Validate that we can load the class.
             case CUSTOM:
@@ -1116,8 +1104,8 @@ public abstract class CatalogUtil {
             // this is OK as the deployment file XML schema does not allow for
             // export configuration property names that begin with underscores
             if (exportClientClassName != null && exportClientClassName.trim().length() > 0) {
-                ConnectorProperty prop = catconn.getConfig().add(GuestProcessor.EXPORT_TO_TYPE);
-                prop.setName(GuestProcessor.EXPORT_TO_TYPE);
+                ConnectorProperty prop = catconn.getConfig().add(ExportDataProcessor.EXPORT_TO_TYPE);
+                prop.setName(ExportDataProcessor.EXPORT_TO_TYPE);
                 prop.setValue(exportClientClassName);
             }
 
