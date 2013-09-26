@@ -713,6 +713,8 @@ public class TestCatalogUtil extends TestCase {
     }
 
     public void testCustomExportClientSettings() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+
         final String withBadCustomExport =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
