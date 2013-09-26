@@ -67,16 +67,23 @@ var IVoltDB = (function(){
                             params += '"' + localParameters[i] + '"';
                             break;
                         case 'bit':
-                            if (localParameters[i] == "'true'" || localParameters[i] == 'true' || localParameters[i] == "'yes'" || localParameters[i] == 'yes' || localParameters[i] == '1' || localParameters[i] == 1)
+                            if (localParameters[i] == "'true'" || localParameters[i] == 'true' ||
+                                localParameters[i] == "'yes'" || localParameters[i] == 'yes' ||
+                                localParameters[i] == '1' || localParameters[i] == 1)
                                 params += '1';
                             else
                                 params += '0';
+                            break;
+                        case 'varbinary':
+                            params += localParameters[i];
                             break;
                         default:
                             if (procedure == '@SnapshotDelete')
                                 params += '["' + localParameters[i].replace(/^'|'$/g,'') + '"]';
                             else
-                                params += (typeof(localParameters[i]) == 'string' ? '"' + localParameters[i].replace(/^'|'$/g,'') + '"' : localParameters[i]).replace(/''/g,"'");
+                                params += (typeof(localParameters[i]) == 'string'
+                                            ? '"' + localParameters[i].replace(/^'|'$/g,'') + '"'
+                                            : localParameters[i]).replace(/''/g,"'");
                     }
                 }
                 params += ']';
@@ -221,6 +228,7 @@ var IVoltDB = (function(){
                           , '@Explain': { '1' : ['varchar'] }
                           , '@ExplainProc': { '1' : ['varchar'] }
                           , '@Pause': { '0' : [] }
+                          , '@Promote': { '0' : [] }
                           , '@Quiesce': { '0' : [] }
                           , '@Resume': { '0' : [] }
                           , '@Shutdown': { '0' : [] }
@@ -234,7 +242,7 @@ var IVoltDB = (function(){
                           , '@SystemInformation': { '1' : ['SysInfoSelector'] }
                           , '@UpdateApplicationCatalog': { '2' : ['varchar', 'varchar'] }
                           , '@UpdateLogging': { '1' : ['xml'] }
-                          , '@Promote': { '0' : [] }
+                          , '@ValidatePartitioning': { '2': ['int', 'varbinary']}
                         };
         return this;
     }
@@ -303,6 +311,7 @@ var IVoltDB = (function(){
                                                   , '@UpdateApplicationCatalog': { '2' : ['CatalogPath (varchar)', 'DeploymentConfigPath (varchar)', 'Returns Table[]'] }
                                                   , '@UpdateLogging': { '1' : ['Configuration (xml)', 'Returns Table[]'] }
                                                   , '@Promote': { '0' : ['Returns bit'] }
+                                                  , '@ValidatePartitioning': { '2' : ['HashinatorType (int)', 'Config (varbinary', 'Returns Table[]'] }
                                                   };
 
                 /*
@@ -319,7 +328,7 @@ var IVoltDB = (function(){
                         if (connection.Metadata['tables'][TableName].columns == null) {
                             connection.Metadata['tables'][TableName].columns = [];
                         }
-                        connection.Metadata['tables'][TableName].columns[connection.Metadata['rawColumns'].data[i][16]] = 
+                        connection.Metadata['tables'][TableName].columns[connection.Metadata['rawColumns'].data[i][16]] =
                             connection.Metadata['rawColumns'].data[i][3].toUpperCase() +
                             ' (' + connection.Metadata['rawColumns'].data[i][5].toLowerCase() + ')';
                     }
@@ -332,7 +341,7 @@ var IVoltDB = (function(){
                             ' (' + connection.Metadata['rawColumns'].data[i][5].toLowerCase() + ')';
                     }
                 }
-                
+
 
                  // User Procedures
                  for (var i = 0; i < connection.Metadata['procedures'].data.length; ++i)
@@ -359,7 +368,7 @@ var IVoltDB = (function(){
                     connection.Procedures[procName] = {};
                     connection.Procedures[procName]['' + connTypeParams.length] = connTypeParams;
                  }
-                 
+
 
                 var childConnectionQueue = connection.getQueue();
                 childConnectionQueue.Start(true);
