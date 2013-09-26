@@ -291,78 +291,25 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         return true;
     }
 
-    private boolean isAnOverloadOf(AbstractExpression expr)
-    {
-        if (m_type != expr.m_type) {
-            return false;
-        }
-        if ( ! hasEqualAttributes(expr)) {
-            return false;
-        }
-        // The derived classes have verified that any added attributes are identical.
-
-        // Check that the presence, or lack, of children is the same
-        if ((m_left == null) != (expr.m_left == null)) {
-            return false;
-        }
-        if ((m_right == null) != (expr.m_right == null)) {
-            return false;
-        }
-        if ((m_args == null) != (expr.m_args == null)) {
-            return false;
-        }
-
-        // Check that the children identify themselves as overloads
-        if (expr.m_left != null) {
-            if ( ! expr.m_left.isAnOverloadOf(m_left)) {
-                return false;
-            }
-        }
-        if (expr.m_right != null) {
-            if ( ! expr.m_right.isAnOverloadOf(m_right)) {
-                return false;
-            }
-        }
-        if (expr.m_args != null) {
-            if ( ! areOverloads(expr.m_args, m_args)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static boolean areOverloads(List<AbstractExpression> list1,
-                                        List<AbstractExpression> list2)
-    {
-        int sz = list1.size();
-        if (sz != list2.size()) {
-            return false;
-        }
-        for (int ii = 0; ii < sz; ++ii) {
-            if ( ! list1.get(ii).isAnOverloadOf(list2.get(ii))) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     /**
      * Deserialize 2 lists of AbstractExpressions from JSON format strings
-     * and determine whether the expressions at each position correspond to each other
-     * -- that they are either equal or that they differ only in the value types they reference
-     * -- like application of two overloads of the same function or operator applied to columns
+     * and determine whether the expressions at each position are equal.
+     * The issue that must be worked around is that json format string equality is sensitive
+     * to the valuetype and valuesize of each expression and its subexpressions,
+     * but AbstractExpression.equals is not -- overloaded abstract expressions are equal
+     * -- like applications of two overloads of the same function or operator applied to columns
      * with the same name but different types.
      * These overloads are sometimes allowable in live schema updates where more general changes
      * might be forbidden.
-     * @return true iff the two strings represent lists of the same expressions, allowing for types
+     * @return true iff the two strings represent lists of the same expressions,
+     * allowing for value type differences
      */
     public static boolean areOverloadedJSONExpressionLists(String jsontext1, String jsontext2)
     {
         try {
             List<AbstractExpression> list1 = fromJSONArrayString(jsontext1);
             List<AbstractExpression> list2 = fromJSONArrayString(jsontext2);
-            return areOverloads(list1, list2);
+            return list1.equals(list2);
         } catch (JSONException je) {
             return false;
         }

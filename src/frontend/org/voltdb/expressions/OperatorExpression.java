@@ -18,7 +18,6 @@
 package org.voltdb.expressions;
 
 import org.voltdb.VoltType;
-import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.utils.VoltTypeUtil;
 
