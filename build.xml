@@ -2149,6 +2149,31 @@ UTILITIES
     </java>
 </target>
 
+<target name='setversion-changestrings'
+        description="Set the version string and recompile some test catalogs">
+    <fail unless="newversion" message="ERROR: -Dnewversion=n.m must be set"/>
+    <exec dir='.' executable='/usr/bin/env'>
+      <arg value="bash" />
+      <arg value="tools/change-version.sh"/>
+      <arg value='${newversion}' />
+    </exec>
+</target>
+
+<target name='setversion-recompile-mockjars' depends='default'
+        description="Set the version string and recompile some test catalogs">
+    <exec dir='${voltpro}/tests/mocktests/catalogs' executable='python'
+          output="/dev/null" logError="True">
+      <env key='VOLTCORE' value='${base.dir}'/>
+      <arg line='regen.py' />
+    </exec>
+</target>
+
+<target name='setversion' depends='setversion-changestrings, setversion-recompile-mockjars'
+        description="Set the version string and recompile some test catalogsin VOLTPRO. Specify version as -Dversion=4.1.1">
+    <echo message='Be sure to commit both repositories'/>
+</target>
+
+
 <!--
 ***************************************
 PROJECT FILE SCHEMA CODE GENERATION

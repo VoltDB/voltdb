@@ -121,9 +121,6 @@ public abstract class CatalogUtil {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    // The minimum version of catalog that's compatible with this version of Volt
-    public static final int[] minCompatibleVersion = {3, 6, 1};
-
     public static final String CATALOG_FILENAME = "catalog.txt";
     public static final String CATALOG_BUILDINFO_FILENAME = "buildinfo.txt";
 
@@ -165,7 +162,7 @@ public abstract class CatalogUtil {
 
         // Check if it's compatible
         if (!isCatalogCompatible(voltVersionString)) {
-            throw new IOException("Catalog compiled with " + voltVersionString + " is not compatible with the current version of VoltDB (" +
+            throw new IOException("Catalog compiled with '" + voltVersionString + "' is not compatible with the current version of VoltDB (" +
                     VoltDB.instance().getVersionString() + ") - " + " please build your application using the current version of VoltDB.");
         }
 
@@ -524,31 +521,24 @@ public abstract class CatalogUtil {
      * Check if a catalog compiled with the given version of VoltDB is
      * compatible with the current version of VoltDB.
      *
-     * The rule is that the catalog must be compiled with a version of VoltDB
-     * that's within the range [minCompatibleVersion, currentVersion],
-     * inclusive.
-     *
      * @param catalogVersionStr
      *            The version string of the VoltDB that compiled the catalog.
      * @return true if it's compatible, false otherwise.
      */
+
     public static boolean isCatalogCompatible(String catalogVersionStr)
     {
         if (catalogVersionStr == null || catalogVersionStr.isEmpty()) {
             return false;
         }
 
+        //Check that it is a properly formed verstion string
         int[] catalogVersion = MiscUtils.parseVersionString(catalogVersionStr);
-        int[] currentVersion = MiscUtils.parseVersionString(VoltDB.instance().getVersionString());
-
         if (catalogVersion == null) {
             throw new IllegalArgumentException("Invalid version string " + catalogVersionStr);
         }
 
-        int maxCmpResult = MiscUtils.compareVersions(catalogVersion, currentVersion);
-        int minCmpResult = MiscUtils.compareVersions(catalogVersion, minCompatibleVersion);
-
-        if (minCmpResult == -1 || maxCmpResult == 1) {
+        if (!catalogVersionStr.equals(VoltDB.instance().getVersionString())) {
             return false;
         }
 
