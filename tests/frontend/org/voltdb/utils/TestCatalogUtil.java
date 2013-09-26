@@ -604,9 +604,18 @@ public class TestCatalogUtil extends TestCase {
         // really old version shouldn't work
         assertFalse(CatalogUtil.isCatalogCompatible("0.3"));
 
+        // non-sensical version shouldn't work
+        try {
+            CatalogUtil.isCatalogCompatible("nonsense");
+            fail("No exception thrown when bad version string given");
+        }
+        catch (IllegalArgumentException ex) {
+            //
+        }
+
         // one minor version older than the min supported
-        int[] minCompatibleVersion = Arrays.copyOf(CatalogUtil.minCompatibleVersion,
-                                                   CatalogUtil.minCompatibleVersion.length);
+        int[] minCompatibleVersion = MiscUtils.parseVersionString(VoltDB.instance().getVersionString());
+
         for (int i = minCompatibleVersion.length - 1; i >= 0; i--) {
             if (minCompatibleVersion[i] != 0) {
                 minCompatibleVersion[i]--;
