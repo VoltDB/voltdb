@@ -69,12 +69,8 @@ AggregatePlanNode::~AggregatePlanNode()
     {
         delete m_groupByExpressions[i];
     }
-    if (m_prePredicate != NULL) {
-        delete m_prePredicate;
-    }
-    if (m_postPredicate != NULL) {
-        delete m_postPredicate;
-    }
+    delete m_prePredicate;
+    delete m_postPredicate;
 }
 
 string AggregatePlanNode::debugInfo(const string &spacer) const {

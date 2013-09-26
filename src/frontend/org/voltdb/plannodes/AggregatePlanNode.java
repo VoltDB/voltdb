@@ -34,8 +34,8 @@ import org.voltdb.types.PlanNodeType;
 public class AggregatePlanNode extends AbstractPlanNode {
 
     public enum Members {
-        POST_PREDICATE,
         PRE_PREDICATE,   // ENG-1565: to accelerate min() / max() using index purpose only
+        POST_PREDICATE,
         AGGREGATE_COLUMNS,
         AGGREGATE_TYPE,
         AGGREGATE_DISTINCT,

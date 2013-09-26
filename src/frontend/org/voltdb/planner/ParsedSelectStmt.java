@@ -225,7 +225,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         // Prepare for the mv based distributed query fix only if it might be required.
         if (tableList.size() == 1) {
-            // Do not handle joined query case and where clause case.
+            // Do not handle joined query case case.
             mvFixInfo.mvTable = tableList.get(0);
             processMVBasedQueryFix(mvFixInfo, m_db, scanColumns, joinTree);
         }
@@ -367,7 +367,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         mvFixInfo.reAggNode.setOutputSchema(aggSchema);
 
         assert(joinTree != null);
-        AbstractExpression where = joinTree.getSimpleFilterExpression();
+        assert(joinTree.m_whereExpr == null);
+        // Follow HSQL's logic to store the where expression in joinExpr for single table.
+        AbstractExpression where = joinTree.m_joinExpr;
         if (where != null) {
             // Collect all TVEs that need to be do re-aggregation in coordinator.
             List<TupleValueExpression> needReAggTVEs = new ArrayList<TupleValueExpression>();
