@@ -320,10 +320,11 @@ public class LeaderAppointer implements Promotable
         }
         else if (m_state.get() == AppointerState.INIT) {
             try {
-                if ((m_iv2appointees.pointInTimeCache().size() != getInitialPartitionCount()) ||
-                        (m_iv2masters.pointInTimeCache().size() != getInitialPartitionCount())) {
+                if ((m_iv2appointees.pointInTimeCache().size() < getInitialPartitionCount()) ||
+                        (m_iv2masters.pointInTimeCache().size() < getInitialPartitionCount()) ||
+                        (m_iv2appointees.pointInTimeCache().size() != m_iv2masters.pointInTimeCache().size())) {
                     // If we are promoted and the appointees or masters set is partial, the previous appointer failed
-                    // during startup (at least for now, until we add add/remove a partition on the fly).
+                    // during startup (at least for now, until we add remove a partition on the fly).
                     VoltDB.crashGlobalVoltDB("Detected failure during startup, unable to start", false, null);
                 }
             } catch (IllegalAccessException e) {
