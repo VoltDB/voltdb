@@ -918,7 +918,7 @@ TableStats* PersistentTable::getTableStats() {
 }
 
 /** Prepare table for streaming from serialized data. */
-bool PersistentTable::activateStream(
+int64_t PersistentTable::activateStream(
     TupleSerializer &tupleSerializer,
     TableStreamType streamType,
     int32_t partitionId,
@@ -947,7 +947,10 @@ bool PersistentTable::activateStream(
         }
     }
 
-    return m_tableStreamer->activateStream(m_surgeon, tupleSerializer, streamType, predicateStrings);
+    if (m_tableStreamer->activateStream(m_surgeon, tupleSerializer, streamType, predicateStrings)) {
+        return activeTupleCount();
+    }
+    return -1;
 }
 
 /**

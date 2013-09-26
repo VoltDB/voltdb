@@ -78,7 +78,7 @@ public interface SystemProcedureExecutionContext {
      */
     public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config);
 
-    boolean activateTableStream(int tableId, TableStreamType type, long undoToken, byte[] predicates);
+    long activateTableStream(int tableId, TableStreamType type, long undoToken, byte[] predicates);
 
     Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
                                                List<DBBPool.BBContainer> outputBuffers);

@@ -179,8 +179,8 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateTableStream(int tableId, TableStreamType type, long undoQuantumToken, byte[] predicates) {
-        return false;
+    public long activateTableStream(int tableId, TableStreamType type, long undoQuantumToken, byte[] predicates) {
+        return -1;
     }
 
     @Override

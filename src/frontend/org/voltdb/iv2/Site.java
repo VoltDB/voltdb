@@ -321,8 +321,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public boolean activateTableStream(final int tableId, TableStreamType type, long undoToken, byte[] predicates)
-        {
+        public long activateTableStream(final int tableId, TableStreamType type, long undoToken, byte[] predicates)        {
             return m_ee.activateTableStream(tableId, type, undoToken, predicates);
         }
 

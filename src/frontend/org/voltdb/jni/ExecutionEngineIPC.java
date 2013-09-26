@@ -1086,7 +1086,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateTableStream(
+    public long activateTableStream(
             int tableId,
             TableStreamType streamType,
             long undoQuantumToken,
@@ -1115,9 +1115,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         }
 
         if (result != ExecutionEngine.ERRORCODE_SUCCESS) {
-            return false;
+            return -1;
         }
-        return true;
+        return predicates.length;
     }
 
     @Override

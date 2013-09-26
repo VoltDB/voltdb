@@ -457,9 +457,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateTableStream(int tableId, TableStreamType streamType,
-                                       long undoQuantumToken,
-                                       byte[] predicates) {
+    public long activateTableStream(int tableId, TableStreamType streamType, long undoQuantumToken,
+            byte[] predicates) {
         return nativeActivateTableStream(pointer, tableId, streamType.ordinal(),
                                          undoQuantumToken, predicates);
     }

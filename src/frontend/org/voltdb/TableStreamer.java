@@ -69,13 +69,15 @@ public class TableStreamer {
      * @param undoToken     The undo token
      * @param predicates    Predicates associated with the stream
      */
-    public void activate(SystemProcedureExecutionContext context, long undoToken, byte[] predicates)
-    {
-        if (!context.activateTableStream(m_tableId, m_type, undoToken, predicates)) {
+    public long activate(SystemProcedureExecutionContext context, long undoToken, byte[] predicates) {
+        long ret_val = context.activateTableStream(m_tableId, m_type, undoToken, predicates);
+        if (ret_val == -1) {
             String tableName = CatalogUtil.getTableNameFromId(context.getDatabase(), m_tableId);
             VoltDB.crashLocalVoltDB("Attempted to activate a table stream of type " + m_type +
                                     "for table " + tableName + " and failed", false, null);
         }
+        System.out.println("Streaming started with tuples: " + ret_val);
+        return ret_val;
     }
 
     /**
