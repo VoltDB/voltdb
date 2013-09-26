@@ -28,3 +28,7 @@ SELECT * FROM _table LHS37 @jointype JOIN _table RHS USING(      @idcol,        
 SELECT @idcol, @numcol FROM _table LHS38 @jointype JOIN _table RHS USING(     @idcol,            @numcol)              WHERE     @idcol > 10 AND       @numcol < 30 AND       @numcol >=     @idcol
 SELECT @idcol, @numcol FROM _table LHS39 @jointype JOIN _table RHS USING(     @idcol,            @numcol)              WHERE     @idcol > 10 AND       @numcol < 30 AND       @idcol  =      @numcol
 
+
+--- Three or more table outer join test
+SELECT * FROM _table LHS40 @jointype JOIN _table MHS ON  LHS40.@idcol = MHS.@idcol  @jointype JOIN _table RHS ON LHS40.@numcol = RHS.@numcol
+SELECT @idcol, @numcol FROM _table LHS40 @jointype JOIN _table MHS ON  LHS40.@idcol = MHS.@idcol  @jointype JOIN _table RHS ON LHS40.@numcol = RHS.@numcol

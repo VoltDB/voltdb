@@ -72,6 +72,7 @@ import org.apache.zookeeper_voltpatches.proto.WatcherEvent;
 import org.apache.zookeeper_voltpatches.server.ByteBufferInputStream;
 import org.apache.zookeeper_voltpatches.server.ZooTrace;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.network.ReverseDNSCache;
 
 /**
  * This class manages the socket i/o for the client. ClientCnxn maintains a list
@@ -1055,7 +1056,7 @@ public class ClientCnxn {
             sock.socket().setSoLinger(false, -1);
             sock.socket().setTcpNoDelay(true);
             setName(getName().replaceAll("\\(.*\\)",
-                    "(" + addr.getHostName() + ":" + addr.getPort() + ")"));
+                    "(" + ReverseDNSCache.hostnameOrAddress(addr.getAddress()) + ":" + addr.getPort() + ")"));
             sockKey = sock.register(selector, SelectionKey.OP_CONNECT);
             if (sock.connect(addr)) {
                 primeConnection(sockKey);

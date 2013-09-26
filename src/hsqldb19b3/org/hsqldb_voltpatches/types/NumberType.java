@@ -53,12 +53,12 @@ import org.hsqldb_voltpatches.store.ValuePool;
  */
 public final class NumberType extends Type {
 
-    static final int tinyintPrecision             = 1;
-    static final int smallintPrecision            = 2;
-    static final int integerPrecision             = 4;
-    static final int bigintPrecision              = 8;
-    static final int doublePrecision              = 8;
-    static final int defaultNumericPrecision      = 26;
+    static final int tinyintPrecision             = 3;
+    static final int smallintPrecision            = 5;
+    static final int integerPrecision             = 10;
+    static final int bigintPrecision              = 19;
+    static final int doublePrecision              = 0;
+    static final int defaultNumericPrecision      = 100;
     // BEGIN Cherry-picked code change from hsqldb-2.2.8
     public static final int defaultNumericScale          = 32;
     // END Cherry-picked code change from hsqldb-2.2.8
@@ -69,8 +69,8 @@ public final class NumberType extends Type {
     static final int SMALLINT_WIDTH = 16;
     static final int INTEGER_WIDTH  = 32;
     static final int BIGINT_WIDTH   = 64;
-    static final int DOUBLE_WIDTH   = 64;    // nominal width
-    static final int DECIMAL_WIDTH  = 128;    // nominal width
+    static final int DOUBLE_WIDTH   = 128;    // nominal width
+    static final int DECIMAL_WIDTH  = 256;    // nominal width
 
     //
     public static final Type SQL_NUMERIC_DEFAULT_INT =
@@ -140,18 +140,15 @@ public final class NumberType extends Type {
         switch (typeCode) {
 
             case Types.TINYINT :
-                return 1;
             case Types.SQL_SMALLINT :
-                return 2;
             case Types.SQL_INTEGER :
-                return 4;
             case Types.SQL_BIGINT :
-                return 8;
+                return typeWidth;
 
             case Types.SQL_REAL :
             case Types.SQL_FLOAT :
             case Types.SQL_DOUBLE :
-                return 8;
+                return 64;
 
             case Types.SQL_NUMERIC :
             case Types.SQL_DECIMAL :
@@ -457,8 +454,10 @@ public final class NumberType extends Type {
 
         switch (operation) {
 
+            /* VOLTDB dropped this special case handling of ADD -- wasn't sql compliant ...
             case OpTypes.ADD :
                 break;
+            ... VOLTDB dropped this special case handling of ADD */
 
             case OpTypes.MULTIPLY :
                 if (other.isIntervalType()) {
