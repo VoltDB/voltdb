@@ -32,15 +32,16 @@ def validate_partitioning(runner):
     columns = [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_VARBINARY]
     response = runner.call_proc('@ValidatePartitioning', columns, [1, None])
     mispartitioned_tuples = sum([t[4] for t in response.table(0).tuples()])
-    matched_hashes = sum([t[3] for t in response.table(1).tuples()])
+    total_hashes = response.table(1).tuple_count()
+    mismatched_hashes = total_hashes - sum([t[3] for t in response.table(1).tuples()])
     print ''
-    if mispartitioned_tuples == 0 and matched_hashes == response.table(1).tuple_count():
+    if mispartitioned_tuples == 0 and mismatched_hashes == 0:
         print 'Partitioning is correct.'
-    if runner.opts.full or mispartitioned_tuples != 0 or matched_hashes != 0:
+    if runner.opts.full or mispartitioned_tuples != 0 or mismatched_hashes != 0:
         if mispartitioned_tuples > 0:
             print 'Mispartitioned tuples: %d' % mispartitioned_tuples
-        if matched_hashes != response.table(1).tuple_count():
-            print 'Mismatched hashes: %d' % (response.table(1).tuple_count() - matched_hashes)
+        if mismatched_hashes != 0:
+            print 'Mismatched hashes: %d' % (response.table(1).tuple_count() - mismatched_hashes)
         print response.table(0).format_table(caption='Partition Validation Results')
         print response.table(1).format_table(caption='Hash Validation Results')
 
@@ -49,7 +50,7 @@ def validate_partitioning(runner):
     description = 'Validate the operation of a live database.',
     options = (
         VOLT.BooleanOption('-f', '--full', 'full',
-                          'display full results, even when validation passes'),
+                           'display full results, even when validation passes'),
     ),
 )
 def validate(runner):
