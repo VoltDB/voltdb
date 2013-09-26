@@ -50,9 +50,10 @@ public class ReadThread extends Thread {
     final AtomicBoolean m_needsBlock = new AtomicBoolean(false);
     final Semaphore txnsOutstanding = new Semaphore(100);
     final boolean allowInProcAdhoc;
+    final float mpRatio;
 
     public ReadThread(Client client, int threadCount, int threadOffset,
-            boolean allowInProcAdhoc)
+            boolean allowInProcAdhoc, float mpRatio)
     {
         setName("ReadThread");
 
@@ -60,6 +61,7 @@ public class ReadThread extends Thread {
         this.threadCount = threadCount;
         this.threadOffset = threadOffset;
         this.allowInProcAdhoc = allowInProcAdhoc;
+        this.mpRatio = mpRatio;
     }
 
     void shutdown() {
@@ -116,7 +118,7 @@ public class ReadThread extends Thread {
             }
 
             // 1/5 of all reads are MP
-            boolean replicated = (counter % 5) == 0;
+            boolean replicated = (counter % 100) < (this.mpRatio * 100.);
             // 1/23th of all SP reads are in-proc adhoc
             boolean inprocAdhoc = (counter % 23) == 0;
             counter++;
