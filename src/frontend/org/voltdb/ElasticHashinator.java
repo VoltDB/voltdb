@@ -60,8 +60,25 @@ public class ElasticHashinator extends TheHashinator {
      */
     private final ImmutableSortedMap<Long, Integer> m_tokens;
     private final Supplier<byte[]> m_configBytes;
+    private final Supplier<byte[]> m_configBytesSupplier = Suppliers.memoize(new Supplier<byte[]>() {
+        @Override
+        public byte[] get() {
+            return toBytes();
+        }
+    });
     private final Supplier<byte[]> m_cookedBytes;
-    private final Supplier<Long> m_signature;
+    private final Supplier<byte[]> m_cookedBytesSupplier = Suppliers.memoize(new Supplier<byte[]>() {
+        @Override
+        public byte[] get() {
+            return toCookedBytes();
+        }
+    });
+    private final Supplier<Long> m_signature = Suppliers.memoize(new Supplier<Long>() {
+        @Override
+        public Long get() {
+            return TheHashinator.computeConfigurationSignature(m_configBytes.get());
+        }
+    });
 
 
     /**
@@ -107,28 +124,8 @@ public class ElasticHashinator extends TheHashinator {
     public ElasticHashinator(byte configBytes[], boolean cooked) {
         m_tokens = (cooked ? updateCooked(configBytes)
                 : updateRaw(configBytes));
-
-
-        m_configBytes = !cooked ? Suppliers.ofInstance(configBytes) : Suppliers.memoize(new Supplier<byte[]>() {
-            @Override
-            public byte[] get() {
-                return toBytes();
-            }
-        });
-
-        m_cookedBytes = cooked ? Suppliers.ofInstance(configBytes) : Suppliers.memoize(new Supplier<byte[]>() {
-            @Override
-            public byte[] get() {
-                return toCookedBytes();
-            }
-        });
-
-        m_signature = Suppliers.memoize(new Supplier<Long>() {
-            @Override
-            public Long get() {
-                return TheHashinator.computeConfigurationSignature(m_configBytes.get());
-            }
-        });
+        m_configBytes = !cooked ? Suppliers.ofInstance(configBytes) : m_configBytesSupplier;
+        m_cookedBytes = cooked ? Suppliers.ofInstance(configBytes) : m_cookedBytesSupplier;
     }
 
     /**
@@ -138,26 +135,8 @@ public class ElasticHashinator extends TheHashinator {
      */
     private ElasticHashinator(Map<Long, Integer> tokens) {
         this.m_tokens = ImmutableSortedMap.copyOf(tokens);
-        m_configBytes = Suppliers.memoize(new Supplier<byte[]>() {
-            @Override
-            public byte[] get() {
-                return toBytes();
-            }
-        });
-
-        m_cookedBytes = Suppliers.memoize(new Supplier<byte[]>() {
-            @Override
-            public byte[] get() {
-                return toCookedBytes();
-            }
-        });
-
-        m_signature = Suppliers.memoize(new Supplier<Long>() {
-            @Override
-            public Long get() {
-                return TheHashinator.computeConfigurationSignature(m_configBytes.get());
-            }
-        });
+        m_configBytes = m_configBytesSupplier;
+        m_cookedBytes = m_cookedBytesSupplier;
     }
 
     /**
