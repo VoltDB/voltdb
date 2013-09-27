@@ -547,12 +547,6 @@ public class PlanAssembler {
 //                    throw new PlanningErrorException(errorMsg);
 //                }
 
-//                AbstractExpression whereExpr = m_parsedSelect.getSingleTableFilterExpression();
-//                if (whereExpr != null) {
-//                    String errorMsg = String.format("Unsupported query materialized table %s has filter " +
-//                            "on the table", m_parsedSelect.mvFixInfo.mvTable.getTypeName());
-//                    throw new PlanningErrorException(errorMsg);
-//                }
             }
         } else {
             m_parsedSelect.mvFixInfo.needed = false;

@@ -69,9 +69,8 @@ AggregatePlanNode::~AggregatePlanNode()
     {
         delete m_groupByExpressions[i];
     }
-    if (m_predicate != NULL) {
-        delete m_predicate;
-    }
+    delete m_prePredicate;
+    delete m_postPredicate;
 }
 
 string AggregatePlanNode::debugInfo(const string &spacer) const {
@@ -156,8 +155,12 @@ AggregatePlanNode::loadFromJSONObject(PlannerDomValue obj)
         }
     }
 
-    if (obj.hasNonNullKey("PREDICATE")) {
-        m_predicate = AbstractExpression::buildExpressionTree(obj.valueForKey("PREDICATE"));
+    if (obj.hasNonNullKey("PRE_PREDICATE")) {
+        m_prePredicate = AbstractExpression::buildExpressionTree(obj.valueForKey("PRE_PREDICATE"));
+    }
+
+    if (obj.hasNonNullKey("POST_PREDICATE")) {
+        m_postPredicate = AbstractExpression::buildExpressionTree(obj.valueForKey("POST_PREDICATE"));
     }
 }
 
