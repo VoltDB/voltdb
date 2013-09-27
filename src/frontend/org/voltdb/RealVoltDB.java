@@ -938,7 +938,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             assert(joinCoordinator != null);
             topo = joinCoordinator.getTopology();
         }
-        else if (!VoltDB.createForRejoin(startAction)) {
+        else if (!startAction.doesRejoin()) {
             int sitesperhost = m_deployment.getCluster().getSitesperhost();
             int hostcount = m_deployment.getCluster().getHostcount();
             int kfactor = m_deployment.getCluster().getKfactor();
