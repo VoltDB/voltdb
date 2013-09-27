@@ -27,6 +27,9 @@
 #include "catalog/table.h"
 #include "catalog/materializedviewinfo.h"
 #include "expressions/abstractexpression.h"
+#include "expressions/tuplevalueexpression.h"
+#include "expressions/constantvalueexpression.h"
+#include "expressions/comparisonexpression.h"
 #include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
 #include "storage/persistenttable.h"
@@ -38,7 +41,7 @@ namespace voltdb {
 
 MaterializedViewMetadata::MaterializedViewMetadata(
         PersistentTable *srcTable, PersistentTable *destTable, catalog::MaterializedViewInfo *mvInfo)
-        : m_target(destTable), m_filterPredicate(NULL)
+        : m_srcTable(srcTable), m_target(destTable), m_filterPredicate(NULL)
 {
 // DEBUG_STREAM_HERE("New mat view on source table " << srcTable->name() << " @" << srcTable << " view table " << m_target->name() << " @" << m_target);
     // best not to have to worry about the destination table disappearing out from under the source table that feeds it.
@@ -109,6 +112,9 @@ MaterializedViewMetadata::MaterializedViewMetadata(
         }
     }
 
+    // handle index for min / max support
+    setIndexForMinMax(mvInfo->indexForMinMax());
+
     allocateBackedTuples();
 
     // Catch up on pre-existing source tuples UNLESS target tuples have already been migrated in.
@@ -152,6 +158,20 @@ void MaterializedViewMetadata::setTargetTable(PersistentTable * target)
     allocateBackedTuples();
 
     oldTarget->decrementRefcount();
+}
+
+void MaterializedViewMetadata::setIndexForMinMax(std::string indexForMinOrMax)
+{
+    m_indexForMinMax = NULL;
+    if (indexForMinOrMax.compare("") != 0) {
+        std::vector<TableIndex*> candidates = m_srcTable->allIndexes();
+        for (int i = 0; i < candidates.size(); i++) {
+            if (indexForMinOrMax.compare(candidates[i]->getName()) == 0) {
+                m_indexForMinMax = candidates[i];
+                break;
+            }
+        }
+    }
 }
 
 void MaterializedViewMetadata::freeBackedTuples()
@@ -276,6 +296,28 @@ void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple, bool fal
         else if (m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
             m_updatedTuple.setNValue(i, existingValue.op_increment());
         }
+        else if (m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_MIN) {
+            if (exists) {
+                if (!newValue.isNull() && newValue.compare(existingValue) < 0) {
+                     m_updatedTuple.setNValue(i, newValue);
+                } else {
+                    m_updatedTuple.setNValue(i, existingValue);
+                }
+            } else {
+                m_updatedTuple.setNValue(i, newValue);
+            }
+        }
+        else if (m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_MAX) {
+            if (exists) {
+                if (!newValue.isNull() && newValue.compare(existingValue) > 0) {
+                     m_updatedTuple.setNValue(i, newValue);
+                } else {
+                    m_updatedTuple.setNValue(i, existingValue);
+                }
+            } else {
+                m_updatedTuple.setNValue(i, newValue);
+            }
+        }
         else {
             char message[128];
             snprintf(message, 128, "Error in materialized view table update for"
@@ -353,6 +395,123 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
         }
         else if (m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
             m_updatedTuple.setNValue(i, existingValue.op_decrement());
+        }
+        else if (m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_MIN ||
+                m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_MAX) {
+            if (existingValue.compare(oldValue) == 0) {
+                // re-calculate MIN / MAX
+                NValue current, newVal;
+                newVal = newVal.castAs(m_target->schema()->columnType(i));
+                TableTuple tuple;
+
+                int srcTableColIdx = -1;
+                AbstractExpression *aggExpr = NULL;
+                if (m_aggregationExprs.size() != 0) {
+                    aggExpr = m_aggregationExprs.at(i - colindex);
+                } else {
+                    srcTableColIdx = m_outputColumnSrcTableIndexes[i];
+                }
+
+                // indexscan if an index is available, otherwise tablescan
+                if (m_indexForMinMax != NULL) {
+                    m_indexForMinMax->moveToKey(&m_searchKey);
+                    VOLT_TRACE("Starting to scan tuples using index %s\n", m_indexForMinMax->debug().c_str());
+                    while (!(tuple = m_indexForMinMax->nextValueAtKey()).isNullTuple()) {
+                        // skip the oldTuple and apply post filter
+                        if (tuple.equals(oldTuple) ||
+                                (m_filterPredicate && m_filterPredicate->eval(&tuple, NULL).isFalse())) {
+                            continue;
+                        }
+                        VOLT_TRACE("Scanning tuple: %s\n", tuple.debugNoHeader().c_str());
+                        if (aggExpr != NULL) {
+                            current = aggExpr->eval(&tuple, NULL);
+                        } else {
+                            current = tuple.getNValue(srcTableColIdx);
+                        }
+                        if (current.isNull()) {
+                            continue;
+                        }
+                        if (current.compare(existingValue) == 0) {
+                            newVal = current;
+                            break;
+                        }
+                        if (newVal.isNull()) {
+                            newVal = current;
+                        } else {
+                            newVal = (m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_MIN) ?
+                                            newVal.op_min(current) : newVal.op_max(current);
+                        }
+                    }
+                } else {
+                    // build a filter to find tuples belongs to this group
+                    AbstractExpression* filter = NULL;
+                    for (int idx = 0; idx < m_groupByColumnCount; idx++) {
+                        AbstractExpression * cmpExpr = NULL;
+                        AbstractExpression* left = NULL;
+                        AbstractExpression* right = NULL;
+                        if (m_groupbyExprs.size() != 0) {
+                            left = m_groupbyExprs.at(idx);
+                            right = new ConstantValueExpression(left->eval(&oldTuple, NULL));
+                            cmpExpr = new ComparisonExpression<CmpEq>(EXPRESSION_TYPE_COMPARE_EQUAL, left, right);
+                            VOLT_TRACE("left: %s, right: %s, current: %s\n", left->debugInfo("").c_str(), right->debugInfo("").c_str(), cmpExpr->debugInfo("").c_str());
+                        } else {
+                            left = new TupleValueExpression(0, m_groupByColumns[idx]);
+                            right = new ConstantValueExpression(oldTuple.getNValue(m_groupByColumns[idx]));
+                            cmpExpr = new ComparisonExpression<CmpEq>(EXPRESSION_TYPE_COMPARE_EQUAL, left, right);
+                            VOLT_TRACE("left: %s, right: %s, current: %s\n", left->debugInfo("").c_str(), right->debugInfo("").c_str(), cmpExpr->debugInfo("").c_str());
+                        }
+                        if (filter == NULL) {
+                            filter = cmpExpr;
+                        } else {
+                            filter = ExpressionUtil::conjunctionFactory(EXPRESSION_TYPE_CONJUNCTION_AND, filter, cmpExpr);
+                        }
+                    }
+
+                    VOLT_TRACE("Constructed filter: %s\n", filter->debug().c_str());
+
+                    // loop through tuples to find the MIN / MAX
+                    bool skippedOne = false;
+                    TableTuple scannedTuple(m_srcTable->schema());
+                    TableIterator &iterator = m_srcTable->iterator();
+
+                    while (iterator.next(scannedTuple) && filter->eval(&scannedTuple, NULL).isTrue()) {
+                        // apply post filter
+                        if(m_filterPredicate && m_filterPredicate->eval(&scannedTuple, NULL).isFalse()) {
+                            continue;
+                        }
+                        VOLT_TRACE("Checking tuple: %s\n", scannedTuple.debugNoHeader().c_str());
+                        if (aggExpr != NULL) {
+                            current = aggExpr->eval(&scannedTuple, NULL);
+                        } else {
+                            current = scannedTuple.getNValue(srcTableColIdx);
+                        }
+                        if (current.isNull()) {
+                            continue;
+                        }
+                        if (current.compare(existingValue) == 0) {
+                            if (!skippedOne) {
+                                VOLT_TRACE("Skip tuple: %s\n", scannedTuple.debugNoHeader().c_str());
+                                skippedOne = true;
+                                continue;
+                            }
+                            VOLT_TRACE("Found another tuple with same min / max value, breaking the loop.\n");
+                            newVal = current;
+                            break;
+                        }
+                        VOLT_TRACE("\tBefore: current %s, min %s, max %s\n", current.debug().c_str(), min.debug().c_str(), max.debug().c_str());
+                        if (newVal.isNull()) {
+                            newVal = current;
+                        } else {
+                            newVal = (m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_MIN) ?
+                                            newVal.op_min(current) : newVal.op_max(current);
+                        }
+                        VOLT_TRACE("\tAfter: current %s, min %s, max %s\n", current.debug().c_str(), min.debug().c_str(), max.debug().c_str());
+                    }
+                }
+                m_updatedTuple.setNValue(i, newVal);
+            } else {
+                m_updatedTuple.setNValue(i, existingValue);
+            }
         }
         else {
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
