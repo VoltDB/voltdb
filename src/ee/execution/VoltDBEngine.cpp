@@ -1159,7 +1159,7 @@ void VoltDBEngine::initMaterializedViews(bool addAll) {
                 new MaterializedViewMetadata(srcTable, destTable, catalogView);
             } else {
                 // Ensure that the materialized view is using the latest version of the target table.
-                srcTable->updateMaterializedViewTargetTable(destTable);
+                srcTable->updateMaterializedViewTargetTable(destTable, catalogView);
             }
         }
     }

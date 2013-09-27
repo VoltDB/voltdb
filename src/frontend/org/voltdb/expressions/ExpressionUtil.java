@@ -180,7 +180,6 @@ public abstract class ExpressionUtil {
     collectPartitioningFilters(Collection<AbstractExpression> filterList,
                                HashMap<AbstractExpression, Set<AbstractExpression> > equivalenceSet)
     {
-        ArrayList<AbstractExpression> output = new ArrayList<AbstractExpression>();
         for (AbstractExpression expr : filterList) {
             if ( ! isColumnEquivalenceFilter(expr)) {
                 continue;
