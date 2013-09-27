@@ -189,15 +189,14 @@ public class InitiateResponseMessage extends VoltMessage {
             + 8 // client connection id
             + 1 // read only
             + 1 // node recovering indication
-            + 1; // mispartitioned invocation
+            + 1 // mispartitioned invocation
+            + m_response.getSerializedSize();
 
         if (m_mispartitioned) {
             msgsize += m_invocation.getSerializedSize()
                        + 8 // current hashinator version
                        + 4 // hashinator config length
                        + m_currentHashinatorConfig.getSecond().length; // hashinator config
-        } else {
-            msgsize += m_response.getSerializedSize();
         }
 
         return msgsize;
@@ -216,13 +215,12 @@ public class InitiateResponseMessage extends VoltMessage {
         buf.put((byte) (m_readOnly == true ? 1 : 0));
         buf.put((byte) (m_recovering == true ? 1 : 0));
         buf.put((byte) (m_mispartitioned == true ? 1 : 0));
+        m_response.flattenToBuffer(buf);
         if (m_mispartitioned) {
-            m_invocation.flattenToBuffer(buf);
             buf.putLong(m_currentHashinatorConfig.getFirst());
             buf.putInt(m_currentHashinatorConfig.getSecond().length);
             buf.put(m_currentHashinatorConfig.getSecond());
-        } else {
-            m_response.flattenToBuffer(buf);
+            m_invocation.flattenToBuffer(buf);
         }
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
@@ -240,20 +238,19 @@ public class InitiateResponseMessage extends VoltMessage {
         m_readOnly = buf.get() == 1;
         m_recovering = buf.get() == 1;
         m_mispartitioned = buf.get() == 1;
+        m_response = new ClientResponseImpl();
+        m_response.initFromBuffer(buf);
+        m_commit = (m_response.getStatus() == ClientResponseImpl.SUCCESS);
         if (m_mispartitioned) {
-            m_invocation = new StoredProcedureInvocation();
-            m_invocation.initFromBuffer(buf);
             long hashinatorVersion = buf.getLong();
             byte[] hashinatorBytes = new byte[buf.getInt()];
             buf.get(hashinatorBytes);
             m_currentHashinatorConfig = Pair.of(hashinatorVersion, hashinatorBytes);
+            // SPI must be the last to deserialize, it will take the remaining as parameter bytes
+            m_invocation = new StoredProcedureInvocation();
+            m_invocation.initFromBuffer(buf);
             m_commit = false;
-        } else {
-            m_response = new ClientResponseImpl();
-            m_response.initFromBuffer(buf);
-            m_commit = (m_response.getStatus() == ClientResponseImpl.SUCCESS);
         }
-        assert(buf.capacity() == buf.position());
     }
 
     @Override
