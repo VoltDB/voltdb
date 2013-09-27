@@ -1676,6 +1676,8 @@ public class DDLCompiler {
         }
     }
 
+    // if the materialized view has MIN / MAX, try to find an index defined on the source table
+    // covering all group by cols / exprs to avoid expensive tablescan, must be full key coverage
     private static Index findBestMatchIndexForMatviewMinOrMax(MaterializedViewInfo matviewinfo, Table srcTable, List<AbstractExpression> groupbyExprs) {
         CatalogMap<Index> allIndexes = srcTable.getIndexes();
 
@@ -1709,7 +1711,12 @@ public class DDLCompiler {
             // simple group by cols
             else {
                 indexedColRefs = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
-                List<ColumnRef> groupbyColRefs =  CatalogUtil.getSortedCatalogItems(matviewinfo.getGroupbycols(), "index");
+                List<ColumnRef> groupbyColRefs = CatalogUtil.getSortedCatalogItems(matviewinfo.getGroupbycols(), "index");
+
+                if (indexedColRefs.size() > groupbyColRefs.size()) {
+                    continue;
+                }
+
                 List<Integer> indexedColIds = new ArrayList<Integer>();
                 List<Integer> groupbyColIds = new ArrayList<Integer>();
 
@@ -1747,6 +1754,9 @@ public class DDLCompiler {
 
     // srcExprs is the prefix of destExprs
     private static boolean prefixCompatibleExprs(List<AbstractExpression> srcExprs, List<AbstractExpression> destExprs) {
+        if (srcExprs.size() > destExprs.size()) {
+            return false;
+        }
         for (int i = 0; i < srcExprs.size(); i ++) {
             if (!srcExprs.contains(destExprs.get(i))) {
                 return false;

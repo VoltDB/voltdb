@@ -404,12 +404,15 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
                 newVal = newVal.castAs(m_target->schema()->columnType(i));
                 TableTuple tuple;
 
-                bool isAggregationExpr = (m_aggregationExprs.size() != 0);
-                int srcTableColIdx = m_outputColumnSrcTableIndexes[i];
-                AbstractExpression *aggExpr;
-                if (isAggregationExpr) {
+                int srcTableColIdx = -1;
+                AbstractExpression *aggExpr = NULL;
+                if (m_aggregationExprs.size() != 0) {
                     aggExpr = m_aggregationExprs.at(i - colindex);
+                } else {
+                    srcTableColIdx = m_outputColumnSrcTableIndexes[i];
                 }
+
+                bool skippedOne = false;
 
                 // indexscan if an index is available, otherwise tablescan
                 if (m_indexForMinMax != NULL) {
@@ -417,12 +420,11 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
                     VOLT_TRACE("Starting to scan tuples using index %s\n", m_indexForMinMax->debug().c_str());
                     while (!(tuple = m_indexForMinMax->nextValueAtKey()).isNullTuple()) {
                         // skip the oldTuple and apply post filter
-                        if (tuple.equals(oldTuple) ||
-                                (m_filterPredicate && m_filterPredicate->eval(&tuple, NULL).isFalse())) {
+                        if (m_filterPredicate && m_filterPredicate->eval(&tuple, NULL).isFalse()) {
                             continue;
                         }
                         VOLT_TRACE("Scanning tuple: %s\n", tuple.debugNoHeader().c_str());
-                        if (isAggregationExpr) {
+                        if (aggExpr != NULL) {
                             current = aggExpr->eval(&tuple, NULL);
                         } else {
                             current = tuple.getNValue(srcTableColIdx);
@@ -431,6 +433,12 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
                             continue;
                         }
                         if (current.compare(existingValue) == 0) {
+                            if (!skippedOne) {
+                                VOLT_TRACE("Skip tuple: %s\n", tuple.debugNoHeader().c_str());
+                                skippedOne = true;
+                                continue;
+                            }
+                            VOLT_TRACE("Found another tuple with same min / max value, breaking the loop.\n");
                             newVal = current;
                             break;
                         }
@@ -471,31 +479,32 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
                     // loop through tuples to find the MIN / MAX
                     TableTuple scannedTuple(m_srcTable->schema());
                     TableIterator &iterator = m_srcTable->iterator();
-                    bool skippedOne = false;
+
                     while (iterator.next(scannedTuple) && filter->eval(&scannedTuple, NULL).isTrue()) {
                         // apply post filter
                         if(m_filterPredicate && m_filterPredicate->eval(&scannedTuple, NULL).isFalse()) {
                             continue;
                         }
-                        if (isAggregationExpr) {
+                        VOLT_TRACE("Checking tuple: %s\n", scannedTuple.debugNoHeader().c_str());
+                        if (aggExpr != NULL) {
                             current = aggExpr->eval(&scannedTuple, NULL);
                         } else {
                             current = scannedTuple.getNValue(srcTableColIdx);
                         }
-                        if (!skippedOne && current.compare(existingValue) == 0) {
-                            VOLT_TRACE("Skip tuple: %s\n", scannedTuple.debugNoHeader().c_str());
-                            skippedOne = true;
-                            continue;
-                        }
-                        VOLT_TRACE("Checking tuple: %s\n", scannedTuple.debugNoHeader().c_str());
-                        VOLT_TRACE("\tBefore: current %s, min %s, max %s\n", current.debug().c_str(), min.debug().c_str(), max.debug().c_str());
                         if (current.isNull()) {
                             continue;
                         }
                         if (current.compare(existingValue) == 0) {
+                            if (!skippedOne) {
+                                VOLT_TRACE("Skip tuple: %s\n", scannedTuple.debugNoHeader().c_str());
+                                skippedOne = true;
+                                continue;
+                            }
+                            VOLT_TRACE("Found another tuple with same min / max value, breaking the loop.\n");
                             newVal = current;
                             break;
                         }
+                        VOLT_TRACE("\tBefore: current %s, min %s, max %s\n", current.debug().c_str(), min.debug().c_str(), max.debug().c_str());
                         if (newVal.isNull()) {
                             newVal = current;
                         } else {
