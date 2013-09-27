@@ -412,15 +412,14 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
                     srcTableColIdx = m_outputColumnSrcTableIndexes[i];
                 }
 
-                bool skippedOne = false;
-
                 // indexscan if an index is available, otherwise tablescan
                 if (m_indexForMinMax != NULL) {
                     m_indexForMinMax->moveToKey(&m_searchKey);
-                    VOLT_TRACE("Starting to scan tuples using index %s\n", m_indexForMinMax->debug().c_str());
+                    printf("Starting to scan tuples using index %s\n", m_indexForMinMax->debug().c_str());
                     while (!(tuple = m_indexForMinMax->nextValueAtKey()).isNullTuple()) {
                         // skip the oldTuple and apply post filter
-                        if (m_filterPredicate && m_filterPredicate->eval(&tuple, NULL).isFalse()) {
+                        if (tuple.equals(oldTuple) ||
+                                (m_filterPredicate && m_filterPredicate->eval(&tuple, NULL).isFalse())) {
                             continue;
                         }
                         VOLT_TRACE("Scanning tuple: %s\n", tuple.debugNoHeader().c_str());
@@ -433,12 +432,6 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
                             continue;
                         }
                         if (current.compare(existingValue) == 0) {
-                            if (!skippedOne) {
-                                VOLT_TRACE("Skip tuple: %s\n", tuple.debugNoHeader().c_str());
-                                skippedOne = true;
-                                continue;
-                            }
-                            VOLT_TRACE("Found another tuple with same min / max value, breaking the loop.\n");
                             newVal = current;
                             break;
                         }
@@ -477,6 +470,7 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
                     VOLT_TRACE("Constructed filter: %s\n", filter->debug().c_str());
 
                     // loop through tuples to find the MIN / MAX
+                    bool skippedOne = false;
                     TableTuple scannedTuple(m_srcTable->schema());
                     TableIterator &iterator = m_srcTable->iterator();
 
