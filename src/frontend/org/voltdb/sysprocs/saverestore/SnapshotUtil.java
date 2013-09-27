@@ -30,7 +30,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -59,16 +58,21 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientInterface;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.SimpleClientResponseAdapter;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotDaemon;
 import org.voltdb.SnapshotDaemon.ForwardClientException;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotInitiationInfo;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
@@ -76,12 +80,46 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
+import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 
 public class SnapshotUtil {
 
     public final static String HASH_EXTENSION = ".hash";
+
+    public static final String JSON_PATH = "path";
+    public static final String JSON_NONCE = "nonce";
+    public static final String JSON_DUPLICATES_PATH = "duplicatesPath";
+    public static final String JSON_HASHINATOR = "hashinator";
+
+    public static final ColumnInfo nodeResultsColumns[] =
+    new ColumnInfo[] {
+        new ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID, VoltSystemProcedure.CTYPE_ID),
+        new ColumnInfo("HOSTNAME", VoltType.STRING),
+        new ColumnInfo("TABLE", VoltType.STRING),
+        new ColumnInfo("RESULT", VoltType.STRING),
+        new ColumnInfo("ERR_MSG", VoltType.STRING)
+    };
+
+    public static final ColumnInfo partitionResultsColumns[] =
+    new ColumnInfo[] {
+        new ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID, VoltSystemProcedure.CTYPE_ID),
+        new ColumnInfo("HOSTNAME", VoltType.STRING),
+        new ColumnInfo(VoltSystemProcedure.CNAME_SITE_ID, VoltSystemProcedure.CTYPE_ID),
+        new ColumnInfo("RESULT", VoltType.STRING),
+        new ColumnInfo("ERR_MSG", VoltType.STRING)
+    };
+
+    public static final VoltTable constructNodeResultsTable()
+    {
+        return new VoltTable(nodeResultsColumns);
+    }
+
+    public static final VoltTable constructPartitionResultsTable()
+    {
+        return new VoltTable(partitionResultsColumns);
+    }
 
     /**
      * Create a digest for a snapshot
@@ -1401,5 +1439,57 @@ public class SnapshotUtil {
             throw new IOException("Missing hashinator data in snapshot");
         }
         return hashData;
+    }
+
+    /*
+     * Do parameter checking for the pre-JSON version of @SnapshotRestore old version
+     */
+    public static ClientResponseImpl transformRestoreParamsToJSON(StoredProcedureInvocation task) {
+        Object params[] = task.getParams().toArray();
+        if (params.length == 1) {
+            return null;
+        } else if (params.length == 2) {
+            if (params[0] == null) {
+                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                              new VoltTable[0],
+                                              "@SnapshotRestore parameter 0 was null",
+                                              task.getClientHandle());
+            }
+            if (params[1] == null) {
+                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                              new VoltTable[0],
+                                              "@SnapshotRestore parameter 1 was null",
+                                              task.getClientHandle());
+            }
+            if (!(params[0] instanceof String)) {
+                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                              new VoltTable[0],
+                                              "@SnapshotRestore param 0 (path) needs to be a string, but was type "
+                                              + params[0].getClass().getSimpleName(),
+                                              task.getClientHandle());
+            }
+            if (!(params[1] instanceof String)) {
+                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                              new VoltTable[0],
+                                              "@SnapshotRestore param 1 (nonce) needs to be a string, but was type "
+                                              + params[1].getClass().getSimpleName(),
+                                              task.getClientHandle());
+            }
+            JSONObject jsObj = new JSONObject();
+            try {
+                jsObj.put(SnapshotUtil.JSON_PATH, params[0]);
+                jsObj.put(SnapshotUtil.JSON_NONCE, params[1]);
+            } catch (JSONException e) {
+                Throwables.propagate(e);
+            }
+            task.setParams( jsObj.toString() );
+            return null;
+        } else {
+            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                          new VoltTable[0],
+                                          "@SnapshotRestore supports a single json document parameter or two parameters (path, nonce), " +
+                                          params.length + " parameters provided",
+                                          task.getClientHandle());
+        }
     }
 }

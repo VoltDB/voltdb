@@ -79,6 +79,8 @@ public class TestCSVLoader extends TestCase {
 
 
     public void testSnapshotAndLoad () throws Exception {
+        if (!MiscUtils.isPro()) { return; } // feature disabled in community
+
         String my_schema =
                 "create table BLAH (" +
                         "clm_integer integer default 0 not null, " + // column that is partitioned on

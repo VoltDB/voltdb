@@ -64,7 +64,7 @@ public:
     virtual bool activateStream(PersistentTableSurgeon &surgeon,
                                 TupleSerializer &serializer,
                                 TableStreamType streamType,
-                                std::vector<std::string> &predicateStrings);
+                                const std::vector<std::string> &predicateStrings);
 
     /**
      * Continue streaming.

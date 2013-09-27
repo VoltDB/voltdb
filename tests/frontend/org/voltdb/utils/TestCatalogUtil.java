@@ -23,17 +23,14 @@
 
 package org.voltdb.utils;
 
-import com.google.common.base.Joiner;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import static junit.framework.Assert.assertEquals;
-import static junit.framework.Assert.assertFalse;
-import static junit.framework.Assert.assertNotNull;
-import static junit.framework.Assert.assertTrue;
+
 import junit.framework.TestCase;
+
 import org.voltdb.VoltDB;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
@@ -51,8 +48,10 @@ import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
-import org.voltdb.export.processors.GuestProcessor;
+import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.types.ConstraintType;
+
+import com.google.common.base.Joiner;
 
 public class TestCatalogUtil extends TestCase {
 
@@ -604,9 +603,18 @@ public class TestCatalogUtil extends TestCase {
         // really old version shouldn't work
         assertFalse(CatalogUtil.isCatalogCompatible("0.3"));
 
+        // non-sensical version shouldn't work
+        try {
+            CatalogUtil.isCatalogCompatible("nonsense");
+            fail("No exception thrown when bad version string given");
+        }
+        catch (IllegalArgumentException ex) {
+            //
+        }
+
         // one minor version older than the min supported
-        int[] minCompatibleVersion = Arrays.copyOf(CatalogUtil.minCompatibleVersion,
-                                                   CatalogUtil.minCompatibleVersion.length);
+        int[] minCompatibleVersion = MiscUtils.parseVersionString(VoltDB.instance().getVersionString());
+
         for (int i = minCompatibleVersion.length - 1; i >= 0; i--) {
             if (minCompatibleVersion[i] != 0) {
                 minCompatibleVersion[i]--;
@@ -714,6 +722,8 @@ public class TestCatalogUtil extends TestCase {
     }
 
     public void testCustomExportClientSettings() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+
         final String withBadCustomExport =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
@@ -733,7 +743,7 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "       <export enabled='true' >"
-                + "       <onserver exportto='custom' exportconnectorclass=\"org.voltdb.utils.NoOpTestExportClient\"  >"
+                + "       <onserver exportto='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\"  >"
                 + "            <configuration>"
                 + "                <property name=\"foo\">false</property>"
                 + "                <property name=\"type\">CSV</property>"
@@ -794,9 +804,9 @@ public class TestCatalogUtil extends TestCase {
         assertTrue(good_deployment.getExport().isEnabled());
         assertEquals(good_deployment.getExport().getOnserver().getExportto(), ServerExportEnum.CUSTOM);
         assertEquals(good_deployment.getExport().getOnserver().getExportconnectorclass(),
-                "org.voltdb.utils.NoOpTestExportClient");
-        ConnectorProperty prop = catconn.getConfig().get(GuestProcessor.EXPORT_TO_TYPE);
-        assertEquals(prop.getValue(), "org.voltdb.utils.NoOpTestExportClient");
+                "org.voltdb.exportclient.NoOpTestExportClient");
+        ConnectorProperty prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
+        assertEquals(prop.getValue(), "org.voltdb.exportclient.NoOpTestExportClient");
 
         // This is to test previous deployment with builtin export functionality.
         final File tmpBuiltin = VoltProjectBuilder.writeStringToTempFile(withBuiltinExport);
@@ -812,7 +822,7 @@ public class TestCatalogUtil extends TestCase {
 
         assertTrue(builtin_deployment.getExport().isEnabled());
         assertEquals(builtin_deployment.getExport().getOnserver().getExportto(), ServerExportEnum.FILE);
-        prop = catconn.getConfig().get(GuestProcessor.EXPORT_TO_TYPE);
+        prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
         assertEquals(prop.getValue(), "org.voltdb.exportclient.ExportToFileClient");
 
     }

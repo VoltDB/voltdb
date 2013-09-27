@@ -161,6 +161,9 @@ public class OneShotBenchmark {
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
+        @Option(desc = "Choose which stats to export.")
+        boolean exportStatsfalseSPtrueMP=false;
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -386,7 +389,8 @@ public class OneShotBenchmark {
             System.out.printf("99th percentile latency:       %,9d ms\n", e.getValue().kPercentileLatency(.99));
         }
 
-        mpFullStatsContext.fetch();
+        ClientStats mpstats = mpFullStatsContext.fetch().getStats();
+
         for (Entry<String, ClientStats> e : mpFullStatsContext.getStatsByProc().entrySet()) {
             System.out.println("\nMP PROC: " + e.getKey());
             System.out.printf("Average throughput:            %,9d txns/sec\n", e.getValue().getTxnThroughput());
@@ -404,7 +408,13 @@ public class OneShotBenchmark {
                 mpFullStatsContext.getStats().getAverageInternalLatency());
 
         // 3. Write stats to file if requested
-        client.writeSummaryCSV(stats, config.statsfile);
+        if (!config.exportStatsfalseSPtrueMP) {
+            System.out.println("Exporting SP stats context");
+            client.writeSummaryCSV(stats, config.statsfile);
+        } else {
+            System.out.println("Exporting MP stats context");
+            mpClient.writeSummaryCSV(mpstats, config.statsfile);
+        }
     }
 
     /**

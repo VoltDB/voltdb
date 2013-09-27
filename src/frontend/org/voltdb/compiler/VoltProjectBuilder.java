@@ -77,7 +77,6 @@ import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
-import org.voltdb.export.processors.GuestProcessor;
 import org.voltdb.utils.NotImplementedException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -489,7 +488,7 @@ public class VoltProjectBuilder {
     }
 
     public void addOnServerExport(boolean enabled, List<String> groups, String exportTo, Properties config) {
-        m_elloader = GuestProcessor.class.getName();
+        m_elloader = "org.voltdb.export.processors.GuestProcessor";
         m_elenabled = enabled;
         m_elAuthGroups = groups;
         m_elOnServer = true;

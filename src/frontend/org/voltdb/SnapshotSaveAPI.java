@@ -49,11 +49,11 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.TxnEgo;
-import org.voltdb.sysprocs.SnapshotSave;
 import org.voltdb.sysprocs.saverestore.CSVSnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
 import org.voltdb.sysprocs.saverestore.IndexSnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.NativeSnapshotWritePlan;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.StreamSnapshotWritePlan;
 
@@ -121,7 +121,7 @@ public class SnapshotSaveAPI
             final long timestamp)
     {
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
-        final VoltTable result = SnapshotSave.constructNodeResultsTable();
+        final VoltTable result = SnapshotUtil.constructNodeResultsTable();
         final int numLocalSites = context.getCluster().getDeployment().get("deployment").getSitesperhost();
 
         // One site wins the race to create the snapshot targets, populating
@@ -212,7 +212,7 @@ public class SnapshotSaveAPI
                         else {
                             // We returned a non-empty NodeResultsTable with the failures in it,
                             // every other site needs to return a NodeResultsTable as well.
-                            earlyResultTable = SnapshotSave.constructNodeResultsTable();
+                            earlyResultTable = SnapshotUtil.constructNodeResultsTable();
                         }
                     }
                     else if (taskList == null) {
@@ -221,10 +221,10 @@ public class SnapshotSaveAPI
                         // Send back an appropriate empty table based on the block flag
                         if (block != 0) {
                             runPostTasks = true;
-                            earlyResultTable = SnapshotSave.constructPartitionResultsTable();
+                            earlyResultTable = SnapshotUtil.constructPartitionResultsTable();
                         }
                         else {
-                            earlyResultTable = SnapshotSave.constructNodeResultsTable();
+                            earlyResultTable = SnapshotUtil.constructNodeResultsTable();
                         }
                     }
                     else {
@@ -283,7 +283,7 @@ public class SnapshotSaveAPI
                 failures = new HashSet<Exception>();
                 failures.add(e);
             }
-            final VoltTable blockingResult = SnapshotSave.constructPartitionResultsTable();
+            final VoltTable blockingResult = SnapshotUtil.constructPartitionResultsTable();
 
             if (failures.isEmpty()) {
                 blockingResult.addRow(
