@@ -82,6 +82,7 @@ import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.compiler.AdHocCompilerCache;
 import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.ClusterConfig;
@@ -595,8 +596,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             /*
              * Configure and start all the IV2 sites
              */
+            boolean usingCommandLog = false;
             try {
-                boolean usingCommandLog = m_config.m_isEnterprise &&
+                usingCommandLog = m_config.m_isEnterprise &&
                     m_catalogContext.cluster.getLogconfig().get("log").getEnabled();
                 m_leaderAppointer = new LeaderAppointer(
                         m_messenger,
@@ -726,8 +728,26 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // print out a bunch of useful system info
             logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
 
+
+            // warn the user on the console if k=0 or if no command logging
             if (clusterConfig.getReplicationFactor() == 0) {
-                hostLog.warn("Running without redundancy (k=0) is not recommended for production use.");
+                consoleLog.warn("This is not a highly available cluster. K-Safety is set to 0.");
+            }
+            if (!usingCommandLog) {
+                // figure out if using a snapshot schedule
+                boolean usingPeridoicSnapshots = false;
+                for (SnapshotSchedule ss : m_catalogContext.database.getSnapshotschedule()) {
+                    if (ss.getEnabled()) {
+                        usingPeridoicSnapshots = true;
+                    }
+                }
+                // print the right warning depending on durability settings
+                if (usingPeridoicSnapshots) {
+                    consoleLog.warn("Durability is limited to periodic snapshots. Command logging is off.");
+                }
+                else {
+                    consoleLog.warn("Durability is turned off. Command logging is off.");
+                }
             }
 
             // warn if cluster is partitionable, but partition detection is off
