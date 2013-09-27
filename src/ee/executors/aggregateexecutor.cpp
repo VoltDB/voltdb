@@ -443,7 +443,8 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
     m_groupByExpressions = node->getGroupByExpressions();
     node->collectOutputExpressions(m_outputColumnExpressions);
     m_aggregateOutputColumns = node->getAggregateOutputColumns();
-    m_predicate = node->getPredicate();
+    m_prePredicate = node->getPrePredicate();
+    m_postPredicate = node->getPostPredicate();
 
     std::vector<ValueType> groupByColumnTypes;
     std::vector<int32_t> groupByColumnSizes;
@@ -480,8 +481,11 @@ inline void AggregateExecutorBase::executeAggBase(const NValueArray& params)
     BOOST_FOREACH(AbstractExpression* outputColumnExpression, m_outputColumnExpressions) {
         outputColumnExpression->substitute(params);
     }
-    if (m_predicate != NULL && m_predicate->hasParameter()) {
-        m_predicate->substitute(params);
+    if (m_prePredicate != NULL && m_prePredicate->hasParameter()) {
+        m_prePredicate->substitute(params);
+    }
+    if (m_postPredicate != NULL && m_postPredicate->hasParameter()) {
+        m_postPredicate->substitute(params);
     }
 }
 
@@ -524,7 +528,9 @@ inline void AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
                          m_outputColumnExpressions[output_col_index]->eval(&(aggregateRow->m_passThroughTuple)));
         VOLT_TRACE("Passthrough columns: %d", output_col_index);
     }
-    output_table->insertTupleNonVirtual(tmptup);
+    if (m_postPredicate == NULL || m_postPredicate->eval(&tmptup, NULL).isTrue()) {
+        output_table->insertTupleNonVirtual(tmptup);
+    }
 
     VOLT_TRACE("output_table:\n%s", output_table->debug().c_str());
 }
@@ -600,6 +606,7 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
         insertOutputTuple(aggregateRow);
         delete aggregateRow;
     }
+
     return true;
 }
 
@@ -620,7 +627,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     Table* input_table = m_abstractNode->getInputTables()[0];
     assert(input_table);
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
-    if (m_predicate != NULL) {
+    if (m_prePredicate != NULL) {
         assert(input_table->activeTupleCount() <= 1);
     }
     TableIterator it = input_table->iterator();
@@ -630,7 +637,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     VOLT_TRACE("looping..");
     // Use the first input tuple to "prime" the system.
     // ENG-1565: for this special case, can have only one input row, apply the predicate here
-    if (it.next(nxtTuple) && (m_predicate == NULL || m_predicate->eval(&nxtTuple, NULL).isTrue())) {
+    if (it.next(nxtTuple) && (m_prePredicate == NULL || m_prePredicate->eval(&nxtTuple, NULL).isTrue())) {
         initGroupByKeyTuple(nextGroupByKeyStorage, nxtTuple);
         // Start the aggregation calculation.
         initAggInstances(aggregateRow);

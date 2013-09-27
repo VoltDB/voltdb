@@ -19,7 +19,11 @@ package org.voltdb.iv2;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.Deque;
+import java.util.HashSet;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -359,9 +363,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_numberOfPartitions = numPartitions;
         m_scheduler = scheduler;
         m_backend = backend;
-        m_rejoinState = VoltDB.createForRejoin(startAction) || startAction == StartAction
-                .JOIN ? kStateRejoining :
-                kStateRunning;
+        m_rejoinState = startAction.doesJoin() ? kStateRejoining : kStateRunning;
         m_snapshotPriority = snapshotPriority;
         // need this later when running in the final thread.
         m_startupConfig = new StartupConfig(serializedCatalog, context.m_uniqueId);
@@ -933,7 +935,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction replayComplete,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            boolean requireExistingSequenceNumbers) {
         // transition from kStateRejoining to live rejoin replay.
         // pass through this transition in all cases; if not doing
         // live rejoin, will transfer to kStateRunning as usual
@@ -953,12 +956,18 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         null);
             }
             Pair<Long,Long> sequenceNumbers = tableEntry.getValue().get(m_partitionId);
+
             if (sequenceNumbers == null) {
-                VoltDB.crashLocalVoltDB(
-                        "Could not find export sequence numbers for partition " +
-                                m_partitionId + " table " +
-                                tableEntry.getKey() + " have " + exportSequenceNumbers, false, null);
+                if (requireExistingSequenceNumbers) {
+                    VoltDB.crashLocalVoltDB(
+                            "Could not find export sequence numbers for partition " +
+                                    m_partitionId + " table " +
+                                    tableEntry.getKey() + " have " + exportSequenceNumbers, false, null);
+                } else {
+                    sequenceNumbers = Pair.of(0L,0L);
+                }
             }
+
             exportAction(
                     true,
                     sequenceNumbers.getFirst().longValue(),

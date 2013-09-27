@@ -119,7 +119,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // New inlined projection node for the scan node, contain extra group by columns.
         public ProjectionPlanNode scanInlinedProjectionNode = null;
         // New re-Aggregation plan node on the coordinator to eliminate the duplicated rows.
-        public AggregatePlanNode reAggNode = null;
+        public HashAggregatePlanNode reAggNode = null;
     }
 
     public ArrayList<ParsedColInfo> displayColumns = new ArrayList<ParsedColInfo>();
@@ -225,16 +225,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         // Prepare for the mv based distributed query fix only if it might be required.
         if (tableList.size() == 1) {
-            if (getSingleTableFilterExpression() == null) {
-                // Do not handle joined query case and where clause case.
-                mvFixInfo.mvTable = tableList.get(0);
-                processMVBasedQueryFix(mvFixInfo, m_db, scanColumns);
-            }
+            // Do not handle joined query case case.
+            mvFixInfo.mvTable = tableList.get(0);
+            processMVBasedQueryFix(mvFixInfo, m_db, scanColumns, joinTree);
         }
     }
 
     private static void processMVBasedQueryFix(MVFixInfo mvFixInfo, Database db,
-            Map<String, ArrayList<SchemaColumn>> scanColumns)
+            Map<String, ArrayList<SchemaColumn>> scanColumns, JoinNode joinTree)
     {
         // Check valid cases first
         String mvTableName = mvFixInfo.mvTable.getTypeName();
@@ -367,6 +365,52 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             outputColumnIndex++;
         }
         mvFixInfo.reAggNode.setOutputSchema(aggSchema);
+
+        assert(joinTree != null);
+        assert(joinTree.m_whereExpr == null);
+        // Follow HSQL's logic to store the where expression in joinExpr for single table.
+        AbstractExpression where = joinTree.m_joinExpr;
+        if (where != null) {
+            // Collect all TVEs that need to be do re-aggregation in coordinator.
+            List<TupleValueExpression> needReAggTVEs = new ArrayList<TupleValueExpression>();
+            for (int i=numOfGroupByColumns; i < mvColumnArray.size(); i++) {
+                Column mvCol = mvColumnArray.get(i);
+                TupleValueExpression tve = new TupleValueExpression();
+                tve.setColumnIndex(i);
+                tve.setColumnName(mvCol.getName());
+                tve.setTableName(mvTableName);
+                tve.setColumnAlias(mvCol.getName());
+                tve.setValueType(VoltType.get((byte)mvCol.getType()));
+                tve.setValueSize(mvCol.getSize());
+
+                needReAggTVEs.add(tve);
+            }
+            List<AbstractExpression> exprs = ExpressionUtil.uncombine(where);
+            List<AbstractExpression> pushdownExprs = new ArrayList<AbstractExpression>();
+            List<AbstractExpression> aggPostExprs = new ArrayList<AbstractExpression>();
+            // Check where clause.
+            for (AbstractExpression expr: exprs) {
+                ArrayList<AbstractExpression> tves = expr.findBaseTVEs();
+                boolean pushdown = true;
+                for (TupleValueExpression needReAggTVE: needReAggTVEs) {
+                    if (tves.contains(needReAggTVE)) {
+                        pushdown = false;
+                        break;
+                    }
+                }
+                if (pushdown) {
+                    pushdownExprs.add(expr);
+                } else {
+                    aggPostExprs.add(expr);
+                }
+            }
+            AbstractExpression aggPostExpr = ExpressionUtil.combine(aggPostExprs);
+
+            mvFixInfo.reAggNode.setPostPredicate(aggPostExpr);
+            assert(joinTree.m_whereExpr == null);
+            joinTree.m_joinExpr = ExpressionUtil.combine(pushdownExprs);
+        }
+
     }
 
     private void processAvgPushdownOptimization (VoltXMLElement displayElement,

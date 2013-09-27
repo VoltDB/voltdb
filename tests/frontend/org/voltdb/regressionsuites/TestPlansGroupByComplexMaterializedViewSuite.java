@@ -75,6 +75,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         mvUpdateR2();
         mvInsertDeleteR3();
         mvUpdateR3();
+        mvUpdateR4();
     }
 
     private void mvInsertDeleteR1() throws IOException, ProcCallException {
@@ -527,7 +528,72 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         }
     }
 
-    public void testMaterializedViewUpdateR4() throws IOException, ProcCallException {
+    public void testMaterializedViewMinMax() throws IOException, ProcCallException, Exception {
+        System.out.println("Test Min and Max...");
+        if (isHSQL()) {
+            return;
+        }
+        Client client = getClient();
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSSSS");
+
+        client.callProcedure("R2.insert", 1, 10, 1 , "2013-06-11 02:00:00.123456");
+        client.callProcedure("R2.insert", 2, 20, -1 , "2012-06-11 02:00:00.123456");
+        client.callProcedure("R2.insert", 3, 30, 1 , "2011-06-11 02:00:00.123456");
+        client.callProcedure("R2.insert", 4, 20, -1 , "2012-06-11 02:00:00.123456");
+        client.callProcedure("R2.insert", 5, 10, 1 , "2013-06-11 02:00:00.123456");
+
+        VoltTable table;
+        table = client.callProcedure("@AdHoc", "SELECT * FROM V_R2_MIN_MAX").getResults()[0];
+        assertEquals(1, table.getRowCount());
+        System.out.println(table.toString());
+        table.advanceRow();
+        assertEquals(1, table.getLong(0));
+        assertEquals(5, table.getLong(1));
+        assertEquals(60, table.getLong(2));
+        long expectedTM = dateFormat.parse("2011-06-11 02:00:00.123456").getTime();
+        long realTM = dateFormat.parse(table.getTimestampAsTimestamp(3).toString()).getTime();
+        assertEquals(expectedTM, realTM);
+
+        client.callProcedure("R2.delete", 3);
+
+        table = client.callProcedure("@AdHoc", "SELECT * FROM V_R2_MIN_MAX").getResults()[0];
+        assertEquals(1, table.getRowCount());
+        System.out.println(table.toString());
+        table.advanceRow();
+        assertEquals(1, table.getLong(0));
+        assertEquals(4, table.getLong(1));
+        assertEquals(40, table.getLong(2));
+        expectedTM = dateFormat.parse("2012-06-11 02:00:00.123456").getTime();
+        realTM = dateFormat.parse(table.getTimestampAsTimestamp(3).toString()).getTime();
+        assertEquals(expectedTM, realTM);
+
+        client.callProcedure("R2.delete", 2);
+
+        table = client.callProcedure("@AdHoc", "SELECT * FROM V_R2_MIN_MAX").getResults()[0];
+        assertEquals(1, table.getRowCount());
+        System.out.println(table.toString());
+        table.advanceRow();
+        assertEquals(1, table.getLong(0));
+        assertEquals(3, table.getLong(1));
+        assertEquals(40, table.getLong(2));
+        expectedTM = dateFormat.parse("2012-06-11 02:00:00.123456").getTime();
+        assertEquals(expectedTM, realTM);
+
+        client.callProcedure("R2.insert", 6, 30, 1 , "2011-06-11 02:00:00.123456");
+
+        table = client.callProcedure("@AdHoc", "SELECT * FROM V_R2_MIN_MAX").getResults()[0];
+        assertEquals(1, table.getRowCount());
+        System.out.println(table.toString());
+        table.advanceRow();
+        assertEquals(1, table.getLong(0));
+        assertEquals(4, table.getLong(1));
+        assertEquals(60, table.getLong(2));
+        expectedTM = dateFormat.parse("2011-06-11 02:00:00.123456").getTime();
+        realTM = dateFormat.parse(table.getTimestampAsTimestamp(3).toString()).getTime();
+        assertEquals(expectedTM, realTM);
+    }
+
+    private void mvUpdateR4() throws IOException, ProcCallException {
         System.out.println("Test R4 update...");
 
         ClientResponse result;
@@ -781,6 +847,63 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         }
     }
 
+    public void testPartitionedMVQueriesWhere() throws Exception {
+        System.out.println("Test MV partition agg query where...");
+        VoltTable vt = null;
+        Client client = this.getClient();
+
+        // Load data
+        loadTableForMVFixSuite();
+        String[] tbs = {"V_P1", "V_P1_ABS", "V_P2", "V_R4"};
+        /*
+        * Current expected data:
+        * V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent
+        * 10,   1,     4,     101,       37
+        * 20,   2,     2,     45,        13
+        * 30,   2,     1,     24,        8
+        * 30,   3,     3,     85,        37
+        * */
+        for (String tb: tbs) {
+            vt = client.callProcedure("@AdHoc", "Select V_CNT from "
+                    + tb + " where v_sum_rent = 37 Order by V_CNT;").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{3}, {4}});
+
+            vt = client.callProcedure("@AdHoc", "Select V_CNT from "
+                    + tb + " where V_G1 < 20 Order by V_CNT;").getResults()[0];
+            assertEquals(4, vt.asScalarLong());
+
+            vt = client.callProcedure("@AdHoc", "Select count(*) from "
+                    + tb + " where V_G1 > 10 ;").getResults()[0];
+            assertEquals(3, vt.asScalarLong());
+
+            // ENG-5241: Add order by V_CNT will crash the system for table V_P2 on multi-server config.
+            // When it is fixed, enable the next query to test.
+//            vt = client.callProcedure("@AdHoc", "Select count(*) from "
+//                    + tb + " where V_G1 > 10 ORDER BY V_CNT;").getResults()[0];
+//            assertEquals(3, vt.asScalarLong());
+
+            // Test AND
+            vt = client.callProcedure("@AdHoc", "Select V_CNT from "
+                    + tb + " where V_G1 > 10 AND v_sum_rent = 37 Order by V_CNT;").getResults()[0];
+            assertEquals(3, vt.asScalarLong());
+
+            // Test OR
+            vt = client.callProcedure("@AdHoc", "Select V_CNT from "
+                    + tb + " where V_G1 > 10 OR v_sum_rent = 37 Order by V_CNT;").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{1}, {2}, {3}, {4}});
+
+            vt = client.callProcedure("@AdHoc", "Select V_CNT from "
+                    + tb + " where V_G1 = 20 OR v_sum_rent = 37 Order by V_CNT;").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{2}, {3}, {4}});
+
+            // Test no push down.
+            vt = client.callProcedure("@AdHoc", "Select V_G1, V_CNT from "
+                    + tb + " where V_G1 = (v_sum_rent - 7) Order by V_CNT;").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{30,3}});
+        }
+
+    }
+
     //
     // Suite builder boilerplate
     //
@@ -831,7 +954,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         lines = captured.split("\n");
 
         assertTrue(foundLineMatching(lines,
-                ".*V0.*must have non-group by columns aggregated by sum or count.*"));
+                ".*V0.*must have non-group by columns aggregated by sum, count, min or max.*"));
 
         VoltProjectBuilder project1 = new VoltProjectBuilder();
         project1.setCompilerDebugPrintStream(capturing);
@@ -896,6 +1019,10 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "CREATE VIEW V_R2 (V_R2_G1, V_R2_G2, V_R2_CNT, V_R2_sum_wage) " +
                 "AS SELECT truncate(month,tm), dept, count(*), SUM(wage) " +
                 "FROM R2 GROUP BY truncate(month,tm), dept;" +
+
+                "CREATE VIEW V_R2_MIN_MAX (DEPT, CNT, MAX_WAGE, MIN_TM) " +
+                "AS SELECT ABS(DEPT), COUNT (*), MAX(WAGE * 2), MIN(TM) " +
+                "FROM R2 GROUP BY ABS(DEPT);" +
 
                 // R3 mv tests are mainly for memory concerns
                 "CREATE TABLE R3 ( " +

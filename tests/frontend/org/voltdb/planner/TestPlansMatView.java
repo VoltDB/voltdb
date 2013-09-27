@@ -135,4 +135,33 @@ public class TestPlansMatView extends PlannerTestCase {
         // TODO: gloves-off MP testing of VP
     }
 
+    public void testMinMaxMatViews() {
+        System.out.println("Running testMinMaxMatViews:");
+        List<AbstractPlanNode> pns;
+
+        pns = compileToFragments("SELECT * FROM VPM WHERE V_D1 = 1");
+        assertEquals(2, pns.size());
+        System.out.println(pns.get(0).toExplainPlanString());
+        System.out.println(pns.get(1).toExplainPlanString());
+
+        pns = compileToFragments("SELECT * FROM VPM WHERE V_D2 = 1");
+        assertEquals(2, pns.size());
+        System.out.println(pns.get(0).toExplainPlanString());
+        System.out.println(pns.get(1).toExplainPlanString());
+
+        pns = compileToFragments("SELECT * FROM VRM WHERE V_D1 = 1");
+        assertEquals(1, pns.size());
+        System.out.println(pns.get(0).toExplainPlanString());
+
+        pns = compileToFragments("SELECT * FROM VRM WHERE V_D2 = 1");
+        assertEquals(1, pns.size());
+        System.out.println(pns.get(0).toExplainPlanString());
+
+        pns = compileToFragments("SELECT * FROM VPM, VRM WHERE VPM.V_D2 = VRM.V_D1");
+        assertEquals(2, pns.size());
+        System.out.println(pns.get(0).toExplainPlanString());
+        System.out.println(pns.get(1).toExplainPlanString());
+
+    }
+
 }

@@ -167,10 +167,11 @@ public abstract class JoinProducerBase extends SiteTasker {
 
     // Completed all criteria: Kill the watchdog and inform the site.
     protected void setJoinComplete(SiteProcedureConnection siteConnection,
-                                     Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers)
+                                     Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+                                     boolean requireExistingSequenceNumbers)
     {
         kickWatchdog(false);
-        siteConnection.setRejoinComplete(m_completionAction, exportSequenceNumbers);
+        siteConnection.setRejoinComplete(m_completionAction, exportSequenceNumbers, requireExistingSequenceNumbers);
     }
 
     // cancel and maybe rearm the snapshot data-segment watchdog.
