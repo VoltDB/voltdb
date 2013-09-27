@@ -415,7 +415,7 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
                 // indexscan if an index is available, otherwise tablescan
                 if (m_indexForMinMax != NULL) {
                     m_indexForMinMax->moveToKey(&m_searchKey);
-                    printf("Starting to scan tuples using index %s\n", m_indexForMinMax->debug().c_str());
+                    VOLT_TRACE("Starting to scan tuples using index %s\n", m_indexForMinMax->debug().c_str());
                     while (!(tuple = m_indexForMinMax->nextValueAtKey()).isNullTuple()) {
                         // skip the oldTuple and apply post filter
                         if (tuple.equals(oldTuple) ||
