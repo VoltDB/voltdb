@@ -90,3 +90,10 @@ create index eng1850_tree_pid_aid on ENG1850 (
   pid, aid
 );
 
+CREATE TABLE DEFAULT_NULL (
+  ID INTEGER DEFAULT '0' NOT NULL,
+  num1 INTEGER DEFAULT NULL,
+  num2 INTEGER ,
+  ratio FLOAT DEFAULT NULL,
+  PRIMARY KEY (ID)
+);
