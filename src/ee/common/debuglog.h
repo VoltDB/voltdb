@@ -179,13 +179,4 @@ inline void outputLogHeader_(const char *file, int line, const char *func, int l
     printf("[%s] [%s:%d:%s()] %s - ", type, file, line, func, time_str);
 }
 
-#ifdef DEBUG
-    #define DEBUG_STREAM_HERE(STREAMABLES) { \
-        std::cout << "DEBUG_STREAM_HERE: " << STREAMABLES << " in: " << __PRETTY_FUNCTION__ \
-                  << " @ " << __FILE__ << ":" << __LINE__ << std::endl; \
-    }
-#else
-    #define DEBUG_STREAM_HERE(STREAMABLES) { }
-#endif
-
 #endif // HSTOREDEBUGLOG_H
