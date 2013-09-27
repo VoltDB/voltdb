@@ -54,7 +54,7 @@ namespace voltdb
 class AggregatePlanNode : public AbstractPlanNode
 {
 public:
-    AggregatePlanNode(PlanNodeType type) : m_type(type), m_predicate(NULL) { }
+    AggregatePlanNode(PlanNodeType type) : m_type(type), m_prePredicate(NULL), m_postPredicate(NULL) { }
     ~AggregatePlanNode();
 
     virtual PlanNodeType getPlanNodeType() const { return m_type; }
@@ -78,8 +78,11 @@ public:
     const std::vector<AbstractExpression*>& getGroupByExpressions() const
     { return m_groupByExpressions; }
 
-    AbstractExpression* getPredicate() const
-    { return m_predicate; }
+    AbstractExpression* getPrePredicate() const
+    { return m_prePredicate; }
+
+    AbstractExpression* getPostPredicate() const
+    { return m_postPredicate; }
 
     void collectOutputExpressions(std::vector<AbstractExpression*>& outputColumnExpressions) const;
 
@@ -107,7 +110,10 @@ protected:
 
     PlanNodeType m_type; //AGGREGATE OR HASHAGGREGATE
 
-    AbstractExpression* m_predicate;    // ENG-1565: for accelerating min() / max() using index purpose only
+    // ENG-1565: for accelerating min() / max() using index purpose only
+    AbstractExpression* m_prePredicate;
+
+    AbstractExpression* m_postPredicate;
 };
 
 }
