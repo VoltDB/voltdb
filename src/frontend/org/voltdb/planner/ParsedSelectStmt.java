@@ -119,7 +119,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // New inlined projection node for the scan node, contain extra group by columns.
         public ProjectionPlanNode scanInlinedProjectionNode = null;
         // New re-Aggregation plan node on the coordinator to eliminate the duplicated rows.
-        public AggregatePlanNode reAggNode = null;
+        public HashAggregatePlanNode reAggNode = null;
     }
 
     public ArrayList<ParsedColInfo> displayColumns = new ArrayList<ParsedColInfo>();

@@ -36,6 +36,7 @@ import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SendPlanNode;
+import org.voltdb.types.PlanNodeType;
 
 public class TestPlansGroupBy extends PlannerTestCase {
     @Override
@@ -85,6 +86,99 @@ public class TestPlansGroupBy extends PlannerTestCase {
         for (AbstractPlanNode apn: pns) {
             System.out.println(apn.toExplainPlanString());
         }
+    }
+
+    private void checkGroupByOnlyPlan(List<AbstractPlanNode> pns, boolean twoFragments, boolean isHashAggregator, boolean isIndexScan) {
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+            while (apn.getChildCount() > 0) {
+                apn = apn.getChild(0);
+                System.out.println(apn.toExplainPlanString());
+            }
+        }
+
+        AbstractPlanNode apn = pns.get(0).getChild(0);
+        if (twoFragments) {
+            assertTrue(apn.getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+            apn = pns.get(1).getChild(0);
+        }
+        assertTrue(apn.getPlanNodeType() == (isHashAggregator ? PlanNodeType.HASHAGGREGATE : PlanNodeType.AGGREGATE));
+        assertTrue(apn.getChild(0).getPlanNodeType() == (isIndexScan ? PlanNodeType.INDEXSCAN : PlanNodeType.SEQSCAN));
+    }
+
+    public void testGroupByOnly() {
+        // Replicated Table
+
+        // only GROUP BY cols in SELECT clause
+        pns = compileToFragments("SELECT F_D1 FROM RF GROUP BY F_D1");
+        checkGroupByOnlyPlan(pns, false, false, true);
+
+        // SELECT cols in GROUP BY and other aggregate cols
+        pns = compileToFragments("SELECT F_D1, COUNT(*) FROM RF GROUP BY F_D1");
+        checkGroupByOnlyPlan(pns, false, false, true);
+
+        // aggregate cols are part of keys of used index
+        pns = compileToFragments("SELECT F_VAL1, SUM(F_VAL2) FROM RF GROUP BY F_VAL1");
+        checkGroupByOnlyPlan(pns, false, false, true);
+
+        // expr index, full indexed case
+        pns = compileToFragments("SELECT F_D1 + F_D2, COUNT(*) FROM RF GROUP BY F_D1 + F_D2");
+        checkGroupByOnlyPlan(pns, false, false, true);
+
+        // function index, prefix indexed case
+        pns = compileToFragments("SELECT ABS(F_D1), COUNT(*) FROM RF GROUP BY ABS(F_D1)");
+        checkGroupByOnlyPlan(pns, false, false, true);
+
+        // order of GROUP BY cols is different of them in index definition
+        // index on (ABS(F_D1), F_D2 - F_D3), GROUP BY on (F_D2 - F_D3, ABS(F_D1))
+        pns = compileToFragments("SELECT F_D2 - F_D3, ABS(F_D1), COUNT(*) FROM RF GROUP BY F_D2 - F_D3, ABS(F_D1)");
+        checkGroupByOnlyPlan(pns, false, false, true);
+
+        // unoptimized case (only use second col of the index), but will be replaced in
+        // SeqScanToIndexScan optimization for deterministic reason
+        // use EXPR_RF_TREE1 not EXPR_RF_TREE2
+        pns = compileToFragments("SELECT F_D2 - F_D3, COUNT(*) FROM RF GROUP BY F_D2 - F_D3");
+        checkGroupByOnlyPlan(pns, false, true, true);
+
+        // unoptimized case: index is not scannable
+        pns = compileToFragments("SELECT F_VAL3, COUNT(*) FROM RF GROUP BY F_VAL3");
+        checkGroupByOnlyPlan(pns, false, true, true);
+
+        // unoptimized case: F_D2 is not prefix indexable
+        pns = compileToFragments("SELECT F_D2, COUNT(*) FROM RF GROUP BY F_D2");
+        checkGroupByOnlyPlan(pns, false, true, true);
+
+        // unoptimized case: no prefix index found for (F_D1, F_D2)
+        pns = compileToFragments("SELECT F_D1, F_D2, COUNT(*) FROM RF GROUP BY F_D1, F_D2");
+        checkGroupByOnlyPlan(pns, false, true, true);
+
+        // Partitioned Table
+        pns = compileToFragments("SELECT F_D1 FROM F GROUP BY F_D1");
+        checkGroupByOnlyPlan(pns, true, true, true);
+
+        pns = compileToFragments("SELECT F_D1, COUNT(*) FROM F GROUP BY F_D1");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        checkGroupByOnlyPlan(pns, true, true, true);
+
+        pns = compileToFragments("SELECT F_VAL1, SUM(F_VAL2) FROM F GROUP BY F_VAL1");
+        checkGroupByOnlyPlan(pns, true, true, true);
+
+        pns = compileToFragments("SELECT F_D1 + F_D2, COUNT(*) FROM F GROUP BY F_D1 + F_D2");
+        checkGroupByOnlyPlan(pns, true, true, true);
+
+        pns = compileToFragments("SELECT ABS(F_D1), COUNT(*) FROM F GROUP BY ABS(F_D1)");
+        checkGroupByOnlyPlan(pns, true, true, true);
+
+        pns = compileToFragments("SELECT F_D2 - F_D3, ABS(F_D1), COUNT(*) FROM F GROUP BY F_D2 - F_D3, ABS(F_D1)");
+        checkGroupByOnlyPlan(pns, true, true, true);
+
+        // unoptimized case (only use second col of the index), but will be replaced in
+        // SeqScanToIndexScan optimization for deterministic reason
+        // use EXPR_F_TREE1 not EXPR_F_TREE2
+        pns = compileToFragments("SELECT F_D2 - F_D3, COUNT(*) FROM F GROUP BY F_D2 - F_D3");
+        checkGroupByOnlyPlan(pns, true, true, true);
     }
 
     public void testEdgeComplexRelatedCases() {
