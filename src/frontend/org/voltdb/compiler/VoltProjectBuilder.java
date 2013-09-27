@@ -260,7 +260,7 @@ public class VoltProjectBuilder {
     private String m_internalSnapshotPath;
     private String m_commandLogPath;
     private Boolean m_commandLogSync;
-    private Boolean m_commandLogEnabled;
+    private boolean m_commandLogEnabled = false;
     private Integer m_commandLogSize;
     private Integer m_commandLogFsyncInterval;
     private Integer m_commandLogMaxTxnsBeforeFsync;
@@ -997,31 +997,26 @@ public class VoltProjectBuilder {
         deployment.setSecurity(security);
         security.setEnabled(m_securityEnabled);
 
-        if (m_commandLogSync != null || m_commandLogEnabled != null ||
-                m_commandLogFsyncInterval != null || m_commandLogMaxTxnsBeforeFsync != null ||
-                m_commandLogSize != null) {
-            CommandLogType commandLogType = factory.createCommandLogType();
-            if (m_commandLogSync != null) {
-                commandLogType.setSynchronous(m_commandLogSync.booleanValue());
-            }
-            if (m_commandLogEnabled != null) {
-                commandLogType.setEnabled(m_commandLogEnabled);
-            }
-            if (m_commandLogSize != null) {
-                commandLogType.setLogsize(m_commandLogSize);
-            }
-            if (m_commandLogFsyncInterval != null || m_commandLogMaxTxnsBeforeFsync != null) {
-                CommandLogType.Frequency frequency = factory.createCommandLogTypeFrequency();
-                if (m_commandLogFsyncInterval != null) {
-                    frequency.setTime(m_commandLogFsyncInterval);
-                }
-                if (m_commandLogMaxTxnsBeforeFsync != null) {
-                    frequency.setTransactions(m_commandLogMaxTxnsBeforeFsync);
-                }
-                commandLogType.setFrequency(frequency);
-            }
-            deployment.setCommandlog(commandLogType);
+        // set the command log (which defaults to off)
+        CommandLogType commandLogType = factory.createCommandLogType();
+        commandLogType.setEnabled(m_commandLogEnabled);
+        if (m_commandLogSync != null) {
+            commandLogType.setSynchronous(m_commandLogSync.booleanValue());
         }
+        if (m_commandLogSize != null) {
+            commandLogType.setLogsize(m_commandLogSize);
+        }
+        if (m_commandLogFsyncInterval != null || m_commandLogMaxTxnsBeforeFsync != null) {
+            CommandLogType.Frequency frequency = factory.createCommandLogTypeFrequency();
+            if (m_commandLogFsyncInterval != null) {
+                frequency.setTime(m_commandLogFsyncInterval);
+            }
+            if (m_commandLogMaxTxnsBeforeFsync != null) {
+                frequency.setTransactions(m_commandLogMaxTxnsBeforeFsync);
+            }
+            commandLogType.setFrequency(frequency);
+        }
+        deployment.setCommandlog(commandLogType);
 
         // <partition-detection>/<snapshot>
         PartitionDetectionType ppd = factory.createPartitionDetectionType();
