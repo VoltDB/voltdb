@@ -991,11 +991,32 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             assertEquals(1, results[0].getLong(1));
         }
 
+        /**
+         * Current data in MV table: V_TEAM_MEMBERSHIP.
+         *  header size: 39
+             status code: -128 column count: 3
+             cols (RUNNER_CLASS:STRING), (TEAM:STRING), (TOTAL:INTEGER),
+             rows -
+              Senior,Boston,4
+              Senior,Cambridge,4
+              Senior,Concord,3
+              Senior,Lexington,2
+         */
+        // ENG-5241: Add order by V_CNT will crash the system for table V_P2 on multi-server config.
+        // When it is fixed, enable the next query to test.
+//        results = client.callProcedure("@AdHoc",
+//                "SELECT count(*) FROM V_TEAM_MEMBERSHIP where team > 'Cambridge' order by total").getResults();
+//        assertEquals(1, results.length);
+//        System.out.println(results[0]);
+//        assertEquals(2L, results[0].asScalarLong());
+
         results = client.callProcedure("@AdHoc",
                 "SELECT count(*) FROM V_TEAM_MEMBERSHIP where total > 3 ").getResults();
         assertEquals(1, results.length);
         System.out.println(results[0]);
         assertEquals(2L, results[0].asScalarLong());
+
+
 
         results = client.callProcedure("@AdHoc",
                 "SELECT team, finish FROM V_TEAM_TIMES ORDER BY finish DESC limit 3").getResults();

@@ -1534,7 +1534,6 @@ public class Expression {
     }
 
     /**
-     * DONE(Xin): add a new function to do operator overloading
      * @param session
      * @return
      * @throws HSQLParseException
