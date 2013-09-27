@@ -42,6 +42,9 @@ public enum StartAction {
     final static EnumSet<StartAction> rejoinSet =
             EnumSet.of(REJOIN,LIVE_REJOIN);
 
+    final static EnumSet<StartAction> joinSet =
+            EnumSet.of(REJOIN,LIVE_REJOIN,JOIN);
+
     final String m_verb;
 
     static {
@@ -70,5 +73,9 @@ public enum StartAction {
 
     public boolean doesRejoin() {
         return rejoinSet.contains(this);
+    }
+
+    public boolean doesJoin() {
+        return joinSet.contains(this);
     }
 }
