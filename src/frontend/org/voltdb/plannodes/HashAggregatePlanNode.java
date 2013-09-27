@@ -35,8 +35,11 @@ public class HashAggregatePlanNode extends AggregatePlanNode {
     public HashAggregatePlanNode(HashAggregatePlanNode origin) {
         super();
         m_isCoordinatingAggregator = origin.m_isCoordinatingAggregator;
-        if (origin.m_predicate != null) {
-            m_predicate = (AbstractExpression) origin.m_predicate.clone();
+        if (origin.m_prePredicate != null) {
+            m_prePredicate = (AbstractExpression) origin.m_prePredicate.clone();
+        }
+        if (origin.m_postPredicate != null) {
+            m_postPredicate = (AbstractExpression) origin.m_postPredicate.clone();
         }
         for (AbstractExpression expr : origin.m_groupByExpressions) {
             addGroupByExpression(expr);
