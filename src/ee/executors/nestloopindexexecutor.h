@@ -51,6 +51,7 @@
 #include "common/tabletuple.h"
 #include "expressions/abstractexpression.h"
 #include "executors/abstractexecutor.h"
+#include "indexes/tableindex.h"
 
 
 namespace voltdb {

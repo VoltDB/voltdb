@@ -25,11 +25,13 @@ import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ParameterSet;
+import org.voltdb.RunningProcedureContext;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.exceptions.InterruptException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -44,6 +46,7 @@ public class FragmentTask extends TransactionTask
     final Mailbox m_initiator;
     final FragmentTaskMessage m_fragmentMsg;
     final Map<Integer, List<VoltTable>> m_inputDeps;
+    public RunningProcedureContext m_procContext;
 
     // This constructor is used during live rejoin log replay.
     FragmentTask(Mailbox mailbox,
@@ -213,6 +216,10 @@ public class FragmentTask extends TransactionTask
                     fragmentId = ActivePlanRepository.getFragmentIdForPlanHash(planHash);
                 }
 
+                if(m_fragmentMsg.getProcNameInBytes().length != 0) {
+                    m_procContext = new RunningProcedureContext();
+                    m_procContext.m_procedureName = new String(m_fragmentMsg.getProcNameInBytes());
+                }
                 dependency = siteConnection.executePlanFragments(
                         1,
                         new long[] { fragmentId },
@@ -220,7 +227,8 @@ public class FragmentTask extends TransactionTask
                         new ParameterSet[] { params },
                         m_txnState.m_spHandle,
                         m_txnState.uniqueId,
-                        m_txnState.isReadOnly())[0];
+                        m_txnState.isReadOnly(),
+                        m_procContext)[0];
 
                 if (hostLog.isTraceEnabled()) {
                     hostLog.l7dlog(Level.TRACE,
@@ -233,6 +241,11 @@ public class FragmentTask extends TransactionTask
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 break;
             } catch (final SQLException e) {
+                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
+                currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                break;
+            }
+            catch (final InterruptException e) {
                 hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 break;

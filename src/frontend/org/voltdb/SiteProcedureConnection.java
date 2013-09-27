@@ -98,7 +98,8 @@ public interface SiteProcedureConnection {
             Object[] parameterSets,
             long spHandle,
             long uniqueId,
-            boolean readOnly) throws EEException;
+            boolean readOnly,
+            RunningProcedureContext rProcContext) throws EEException;
 
     /**
      * For test cases that need to mimic a plan fragment being invoked

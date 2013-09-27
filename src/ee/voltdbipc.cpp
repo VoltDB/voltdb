@@ -568,7 +568,6 @@ int8_t VoltDBIPC::quiesce(struct ipc_command *cmd) {
 
 void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
     int errors = 0;
-    NValueArray &params = m_engine->getParameterContainer();
 
     querypfs *queryCommand = (querypfs*) cmd;
 
@@ -582,38 +581,32 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
                   << " numFragIds=" << numFrags << std::endl;
 
     // data has binary packed fragmentIds first
-    int64_t *fragmentId = (int64_t*) (&(queryCommand->data));
-    int64_t *inputDepId = fragmentId + numFrags;
+    int64_t *fragmentIds = (int64_t*) (&(queryCommand->data));
+    int64_t *inputDepIds = fragmentIds + numFrags;
+
+    // fix network byte order
+    for (int i = 0; i < numFrags; ++i) {
+        fragmentIds[i] = ntohll(fragmentIds[i]);
+        inputDepIds[i] = ntohll(inputDepIds[i]);
+    }
 
     // ...and fast serialized parameter sets last.
     void* offset = queryCommand->data + (sizeof(int64_t) * numFrags * 2);
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(querypfs) - sizeof(int32_t) * ntohl(queryCommand->numFragmentIds));
     ReferenceSerializeInput serialize_in(offset, sz);
 
-    try {
-        // and reset to space for the results output
-        m_engine->resetReusedResultOutputBuffer(1);//1 byte to add status code
-        m_engine->setUndoToken(ntohll(queryCommand->undoToken));
-        Pool *pool = m_engine->getStringPool();
-        for (int i = 0; i < numFrags; ++i) {
-            int cnt = serialize_in.readShort();
-            assert(cnt> -1);
+    // and reset to space for the results output
+    m_engine->resetReusedResultOutputBuffer(1);//1 byte to add status code
 
-            deserializeParameterSetCommon(cnt, serialize_in, params, pool);
-            m_engine->setUsedParamcnt(cnt);
-            if (m_engine->executeQuery(ntohll(fragmentId[i]),
-                                       1,
-                                       (int32_t)(ntohll(inputDepId[i])), // Java sends int64 but EE wants int32
-                                       params,
-                                       ntohll(queryCommand->spHandle),
-                                       ntohll(queryCommand->lastCommittedSpHandle),
-                                       ntohll(queryCommand->uniqueId),
-                                       i == 0 ? true : false, //first
-                                       i == numFrags - 1 ? true : false)) { //last
-                ++errors;
-            }
-        }
-        pool->purge();
+    try {
+        errors = m_engine->executePlanFragments(numFrags,
+                                                fragmentIds,
+                                                inputDepIds,
+                                                serialize_in,
+                                                ntohll(queryCommand->spHandle),
+                                                ntohll(queryCommand->lastCommittedSpHandle),
+                                                ntohll(queryCommand->uniqueId),
+                                                ntohll(queryCommand->undoToken));
     }
     catch (const FatalException &e) {
         crashVoltDB(e);
@@ -765,6 +758,58 @@ char *VoltDBIPC::retrieveDependency(int32_t dependencyId, size_t *dependencySz) 
         exit(-1);
     }
     return dependencyData;
+}
+
+bool VoltDBIPC::fragmentProgressUpdate(int32_t batchIndex,
+        std::string planNodeName,
+        std::string targetTableName,
+        int64_t targetTableSize,
+        int64_t tuplesFound) {
+    char message[sizeof(int8_t) + sizeof(int32_t) + sizeof(planNodeName) + sizeof(targetTableName) +
+                 sizeof(targetTableSize) + sizeof(tuplesFound)];
+    message[0] = static_cast<int8_t>(kErrorCode_progressUpdate);
+    *reinterpret_cast<int32_t*>(&message[1]) = htonl(batchIndex);
+
+    int16_t strSize = static_cast<int16_t>(planNodeName.size());
+    *reinterpret_cast<int16_t*>(&message[5]) = htons(strSize);
+    ::memcpy( &message[7], planNodeName.c_str(), strSize);
+    int offset = 7 + strSize;
+
+    strSize = static_cast<int16_t>(targetTableName.size());
+    *reinterpret_cast<int16_t*>(&message[offset]) = htons(strSize);
+    offset += 2;
+    ::memcpy( &message[offset], targetTableName.c_str(), strSize);
+    offset += strSize;
+
+    *reinterpret_cast<int64_t*>(&message[offset]) = htonll(targetTableSize);
+    offset += 8;
+
+    *reinterpret_cast<int64_t*>(&message[offset]) = htonll(tuplesFound);
+
+    int32_t length;
+    ssize_t bytes = read(m_fd, &length, sizeof(int32_t));
+    if (bytes != sizeof(int32_t)) {
+        printf("Error - blocking read failed. %jd read %jd attempted",
+                (intmax_t)bytes, (intmax_t)sizeof(int32_t));
+        fflush(stdout);
+        assert(false);
+        exit(-1);
+    }
+    length = static_cast<int32_t>(ntohl(length) - sizeof(int32_t));
+    assert(length > 0);
+
+    int16_t isCancel;
+    bytes = read(m_fd, &isCancel, sizeof(int16_t));
+    if (bytes != sizeof(int16_t)) {
+        printf("Error - blocking read failed. %jd read %jd attempted",
+                (intmax_t)bytes, (intmax_t)sizeof(int16_t));
+        fflush(stdout);
+        assert(false);
+        exit(-1);
+    }
+    isCancel = static_cast<int16_t>(ntohs(isCancel));
+
+    return (isCancel == 1);
 }
 
 std::string VoltDBIPC::planForFragmentId(int64_t fragmentId) {

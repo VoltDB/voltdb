@@ -45,6 +45,7 @@ import org.voltdb.MemoryStats;
 import org.voltdb.ParameterSet;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProcedureRunner;
+import org.voltdb.RunningProcedureContext;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
 import org.voltdb.SnapshotDataTarget;
@@ -996,7 +997,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public VoltTable[] executePlanFragments(int numFragmentIds,
             long[] planFragmentIds, long[] inputDepIds,
-            Object[] parameterSets, long spHandle, long uniqueId, boolean readOnly)
+            Object[] parameterSets, long spHandle, long uniqueId, boolean readOnly, RunningProcedureContext rProcContext)
             throws EEException {
         return m_ee.executePlanFragments(
                 numFragmentIds,
@@ -1006,7 +1007,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 spHandle,
                 m_lastCommittedSpHandle,
                 uniqueId,
-                readOnly ? Long.MAX_VALUE : getNextUndoToken());
+                readOnly ? Long.MAX_VALUE : getNextUndoToken(),
+                rProcContext);
     }
 
     @Override

@@ -77,6 +77,11 @@ class MockTopend : public Topend {
         return 0;
     }
 
+    virtual bool fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
+            std::string targetTableName, int64_t targetTableSize, int64_t tuplesFound) {
+        return false;
+    }
+
     virtual std::string planForFragmentId(int64_t fragmentId) {
         return "";
     }

@@ -49,6 +49,7 @@
 #include "common/common.h"
 #include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
+#include "execution/VoltDBEngine.h"
 
 namespace voltdb
 {

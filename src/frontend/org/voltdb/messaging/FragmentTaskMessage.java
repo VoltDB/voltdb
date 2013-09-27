@@ -125,6 +125,26 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     Iv2InitiateTaskMessage m_initiateTask;
     ByteBuffer m_initiateTaskBuffer;
 
+    byte[] m_procNameInBytes = "".getBytes();
+    short m_voltExecuteSQLIndex;
+    short m_batchIndexBase;
+    public void setRunningProcedureContext(String procName,
+                short voltExecuteSQLIndex,
+                short batchIndexBase) {
+        m_procNameInBytes = procName.getBytes();
+        m_voltExecuteSQLIndex = voltExecuteSQLIndex;
+        m_batchIndexBase = batchIndexBase;
+    }
+    public byte[] getProcNameInBytes() {
+        return m_procNameInBytes;
+    }
+    public short getVoltExecuteSQLIndex() {
+        return m_voltExecuteSQLIndex;
+    }
+    public short getBatchIndexBase() {
+        return m_batchIndexBase;
+    }
+
     /** Empty constructor for de-serialization */
     FragmentTaskMessage() {
         m_subject = Subject.DEFAULT.getId();
@@ -151,6 +171,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         assert(selfCheck());
     }
 
+    // If you add a new field to the message and you don't want to lose information at all point,
+    // remember to add it to the constructor below, Because this constructor is used to copy a message at some place.
+    // for example, in SpScheduler.handleFragmentTaskMessage()
     // The parameter sets are .duplicate()'d in flattenToBuffer,
     // so we can make a shallow copy here and still be thread-safe
     // when we serialize the copy.
@@ -168,6 +191,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_items = ftask.m_items;
         m_initiateTask = ftask.m_initiateTask;
         m_emptyForRestart = ftask.m_emptyForRestart;
+        m_procNameInBytes = ftask.m_procNameInBytes;
+        m_voltExecuteSQLIndex = ftask.m_voltExecuteSQLIndex;
+        m_batchIndexBase = ftask.m_batchIndexBase;
         if (ftask.m_initiateTaskBuffer != null) {
             m_initiateTaskBuffer = ftask.m_initiateTaskBuffer.duplicate();
         }
@@ -426,6 +452,12 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
      * Fragment ID block (1 per item):
      *     fragment ID: long: 8 * nitems
      *
+     * Porcedure name: byte: length of the name string.
+     *
+     * voltExecuteIndex: short: 2
+     *
+     * batchIndexBase: short: 2
+     *
      * Parameter set block (1 per item):
      *     parameter buffer size: int: 4 * nitems
      *     parameter buffer: bytes: ? * nitems
@@ -457,6 +489,18 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         // Fragment ID block (20 bytes per sha1-hash)
         msgsize += 20 * m_items.size();
+
+        // Procedure name gets an length (2) and the name (.length)
+        msgsize += 2;
+        if(m_procNameInBytes.length != 0) {
+                msgsize += m_procNameInBytes.length;
+        }
+
+        // voltDBExecuteSQLIndex gets an length (2)
+        msgsize += 2;
+
+        // batchIndexBase gets an length (2)
+        msgsize += 2;
 
         //nested initiate task message length prefix
         msgsize += 4;
@@ -579,6 +623,20 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             }
         }
 
+        // Procedure name
+        if (m_procNameInBytes.length != 0) {
+            buf.putShort((short)m_procNameInBytes.length);
+            buf.put(m_procNameInBytes);
+        } else {
+           buf.putShort((short)0);
+        }
+
+        // voltExecuteIndex
+        buf.putShort(m_voltExecuteSQLIndex);
+
+        // batchIndexBase
+        buf.putShort(m_batchIndexBase);
+
         if (m_initiateTaskBuffer != null) {
             ByteBuffer dup = m_initiateTaskBuffer.duplicate();
             buf.putInt(dup.remaining());
@@ -669,6 +727,19 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             }
         }
 
+        // Procedure name
+        short procNameLen = buf.getShort();
+        if(procNameLen > 0) {
+            m_procNameInBytes = new byte[procNameLen];
+            buf.get(m_procNameInBytes);
+        }
+
+        // votExecuteSQLIndex
+        m_voltExecuteSQLIndex = buf.getShort();
+
+        // batchIndexBase
+        m_batchIndexBase = buf.getShort();
+
         int initiateTaskMessageLength = buf.getInt();
         if (initiateTaskMessageLength > 0) {
             int startPosition = buf.position();
@@ -711,7 +782,6 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 buf.get(item.m_fragmentPlan);
             }
         }
-
     }
 
     @Override

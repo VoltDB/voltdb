@@ -27,11 +27,13 @@ import java.util.Map.Entry;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltdb.ExecutionSite;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
+import org.voltdb.RunningProcedureContext;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
@@ -70,6 +72,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public static final int ERRORCODE_ERROR = 1; // just error or not so far.
     public static final int ERRORCODE_WRONG_SERIALIZED_BYTES = 101;
     public static final int ERRORCODE_NEED_PLAN = 110;
+    public static final int ERRORCODE_PROGRESS_UPDATE = 111;
 
     /** For now sync this value with the value in the EE C++ code to get good stats. */
     public static final int EE_PLAN_CACHE_SIZE = 1000;
@@ -77,12 +80,25 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Partition ID */
     protected final int m_partitionId;
 
+    /** Host ID */
+    protected final long m_siteId;
+
     /** Statistics collector (provided later) */
     private PlannerStatsCollector m_plannerStats = null;
 
     // used for tracking statistics about the plan cache in the EE
     private int m_cacheMisses = 0;
     private int m_eeCacheSize = 0;
+
+    /** Context information of the current running procedure*/
+    private RunningProcedureContext m_rProcContext = new RunningProcedureContext();
+    private boolean m_readOnly;
+    private long m_startTime;
+    private long m_logDuration = 1000;
+
+    /** information about EE calls back to JAVA. For test.*/
+    public int m_callsFromEE = 0;
+    public long m_lastTuplesAccessed = 0;
 
     /** Make the EE clean and ready to do new transactional work. */
     public void resetDirtyStatus() {
@@ -115,6 +131,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Create an ee and load the volt shared library */
     public ExecutionEngine(long siteId, int partitionId) {
         m_partitionId = partitionId;
+        m_siteId = siteId;
         org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
         // In mock test environments there may be no stats agent.
         final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
@@ -127,6 +144,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Alternate constructor without planner statistics tracking. */
     public ExecutionEngine() {
         m_partitionId = 0;  // not used
+        m_siteId = 0; // not used
         m_plannerStats = null;
     }
 
@@ -302,6 +320,28 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
     }
 
+    public boolean fragmentProgressUpdate(int batchIndex,
+            String planNodeName,
+            String lastAccessedTable,
+            long lastAccessedTableSize,
+            long tuplesFound) {
+        ++m_callsFromEE;
+        m_lastTuplesAccessed = tuplesFound;
+
+        long currentTime = System.currentTimeMillis();
+        long duration = currentTime - m_startTime;
+
+        if(duration > m_logDuration) {
+            VoltLogger log = new VoltLogger("CONSOLE");
+            log.info("Procedure "+m_rProcContext.m_procedureName+" is taking a long time to execute -- "+duration/1000.0+" seconds spent accessing "
+                    +tuplesFound+" tuples. Current plan fragment "+planNodeName+" in query "+(m_rProcContext.m_batchIndexBase+batchIndex+1)
+                    +" of batch "+(m_rProcContext.m_voltExecuteSQLIndex+1)+" on site "+CoreUtils.hsIdToString(m_siteId)+".");
+            m_logDuration = (m_logDuration < 30000) ? 2*m_logDuration : 30000;
+        }
+        // Return true if we want to interrupt ee. Otherwise return false
+        return false;
+    }
+
     /**
      * Called from the execution engine to fetch a plan for a given hash.
      * Also update cache stats.
@@ -355,9 +395,17 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                             long spHandle,
                                             long lastCommittedSpHandle,
                                             long uniqueId,
-                                            long undoQuantumToken) throws EEException
+                                            long undoQuantumToken,
+                                            RunningProcedureContext rProcContext) throws EEException
     {
         try {
+            if(rProcContext != null) {
+                m_rProcContext = rProcContext;
+            }
+            // For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
+            m_readOnly = (undoQuantumToken == Long.MAX_VALUE) ? true : false;
+            // Consider put the following line in EEJNI.coreExecutePlanFrag... before where the native method is called?
+            m_startTime = System.currentTimeMillis();
             VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
                     parameterSets, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
             m_plannerStats.updateEECacheStats(m_eeCacheSize, numFragmentIds - m_cacheMisses,
@@ -369,6 +417,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             // will still be used to estimate the cache size, but it's hard to count cache hits
             // during an exception, so we don't count cache misses either to get the right ratio.
             m_cacheMisses = 0;
+            m_logDuration = 0;
         }
     }
 
