@@ -41,6 +41,7 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.planner.ParsedSelectStmt.MVFixInfo;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -63,6 +64,7 @@ import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.types.IndexType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 import org.voltdb.utils.CatalogUtil;
@@ -1204,7 +1206,7 @@ public class PlanAssembler {
     AbstractPlanNode handleMVBasedMultiPartQuery (AbstractPlanNode root) {
         MVFixInfo mvFixInfo = m_parsedSelect.mvFixInfo;
 
-        AggregatePlanNode reAggNode = mvFixInfo.reAggNode;
+        HashAggregatePlanNode reAggNode = new HashAggregatePlanNode(mvFixInfo.reAggNode);
         reAggNode.clearChildren();
         reAggNode.clearParents();
 
@@ -1251,8 +1253,21 @@ public class PlanAssembler {
          * expressions. Catch that case by checking the grouped flag
          */
         if (containsAggregateExpression || m_parsedSelect.isGrouped()) {
-
             AggregatePlanNode topAggNode = null;
+            if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
+                AbstractPlanNode candidate = root.getChild(0).getChild(0);
+                // do the type check here, no need to find substitute if it is already an IndexScan node
+                if (candidate.getPlanNodeType() == PlanNodeType.SEQSCAN) {
+                    candidate = indexAccessForGroupByExprs(candidate);
+                    if (candidate.getPlanNodeType() == PlanNodeType.INDEXSCAN) {
+                        candidate.clearParents();
+                        root.getChild(0).clearChildren();
+                        root.getChild(0).addAndLinkChild(candidate);
+                    }
+                }
+            } else {
+                root = indexAccessForGroupByExprs(root);
+            }
             // A hash is required to build up per-group aggregates in parallel vs.
             // when there is only one aggregation over the entire table OR when the
             // per-group aggregates are being built serially from the ordered output
@@ -1444,6 +1459,84 @@ public class PlanAssembler {
 
         // Handle DISTINCT if it is not redundant with aggregation/grouping.
         return handleDistinct(root);
+    }
+
+    AbstractPlanNode indexAccessForGroupByExprs(AbstractPlanNode root) {
+        if (root.getPlanNodeType() == PlanNodeType.SEQSCAN && m_parsedSelect.isGrouped()) {
+            Table targetTable = m_catalogDb.getTables().get(((SeqScanPlanNode)root).getTargetTableName());
+            CatalogMap<Index> allIndexes = targetTable.getIndexes();
+            ArrayList<ParsedColInfo> groupBys = m_parsedSelect.groupByColumns;
+
+            for (Index index : allIndexes) {
+                if (!IndexType.isScannable(index.getType())) {
+                    continue;
+                }
+
+                boolean replacable = true;
+                String exprsjson = index.getExpressionsjson();
+                if (exprsjson.isEmpty()) {
+                    List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
+                    if (groupBys.size() > indexedColRefs.size()) {
+                        continue;
+                    }
+                    for (int i = 0; i < groupBys.size(); i++) {
+                        // don't compare column idx here, because resolveColumnIndex is not yet called
+                        if (groupBys.get(i).expression.getExpressionType() != ExpressionType.VALUE_TUPLE) {
+                            replacable = false;
+                            break;
+                        }
+                        // ignore order of keys in GROUP BY expr
+                        boolean foundMatch = false;
+                        for (int j = 0; j < groupBys.size(); j++) {
+                            if (indexedColRefs.get(j).getColumn().getName().equals(groupBys.get(i).columnName)) {
+                                foundMatch = true;
+                                break;
+                            }
+                        }
+                        if (!foundMatch) {
+                            replacable = false;
+                            break;
+                        }
+                    }
+                    if (replacable) {
+                        IndexScanPlanNode indexScanNode = new IndexScanPlanNode((SeqScanPlanNode)root, null, index, SortDirectionType.ASC);
+                        return indexScanNode;
+                    }
+                } else {
+                    // either pure expression index or mix of expressions and simple columns
+                    List<AbstractExpression> indexedExprs = null;
+                    try {
+                        indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, null);
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                        assert(false);
+                        return root;
+                    }
+                    if (groupBys.size() > indexedExprs.size()) {
+                        continue;
+                    }
+                    for (int i = 0; i < groupBys.size(); i++) {
+                        // ignore order of keys in GROUP BY expr
+                        boolean foundMatch = false;
+                        for (int j = 0; j < groupBys.size(); j++) {
+                            if (groupBys.get(i).expression.equals(indexedExprs.get(j))) {
+                                foundMatch = true;
+                                break;
+                            }
+                        }
+                        if (!foundMatch) {
+                            replacable = false;
+                            break;
+                        }
+                    }
+                    if (replacable) {
+                        IndexScanPlanNode indexScanNode = new IndexScanPlanNode((SeqScanPlanNode)root, null, index, SortDirectionType.ASC);
+                        return indexScanNode;
+                    }
+                }
+            }
+        }
+        return root;
     }
 
     /**
