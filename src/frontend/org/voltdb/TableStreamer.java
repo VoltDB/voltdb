@@ -58,9 +58,8 @@ public class TableStreamer {
      * @param context       Context
      * @param predicates    Predicates associated with the stream
      */
-    public void activate(SystemProcedureExecutionContext context, byte[] predicates)
-    {
-        activate(context, Long.MAX_VALUE, predicates);
+    public long activate(SystemProcedureExecutionContext context, byte[] predicates)    {
+        return activate(context, Long.MAX_VALUE, predicates);
     }
 
     /**
@@ -76,7 +75,6 @@ public class TableStreamer {
             VoltDB.crashLocalVoltDB("Attempted to activate a table stream of type " + m_type +
                                     "for table " + tableName + " and failed", false, null);
         }
-        System.out.println("Streaming started with tuples: " + ret_val);
         return ret_val;
     }
 
@@ -107,7 +105,6 @@ public class TableStreamer {
                 container.discard();
             }
         }
-
         return Pair.of(writeFuture, serializeResult.getFirst() > 0);
     }
 

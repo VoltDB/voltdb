@@ -186,6 +186,7 @@ public class SnapshotSaveAPI
 
         boolean runPostTasks = false;
         VoltTable earlyResultTable = null;
+        long total = 0;
         try {
             SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.await();
             try {
@@ -228,7 +229,7 @@ public class SnapshotSaveAPI
                         }
                     }
                     else {
-                        context.getSiteSnapshotConnection().initiateSnapshots(
+                        total += context.getSiteSnapshotConnection().initiateSnapshots(
                                 format,
                                 taskList,
                                 targetList,

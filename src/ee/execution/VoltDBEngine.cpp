@@ -1366,7 +1366,7 @@ ExecutorContext * VoltDBEngine::getExecutorContext() {
  *  string: predicate #2
  *  ...
  */
-bool VoltDBEngine::activateTableStream(
+int64_t VoltDBEngine::activateTableStream(
         const CatalogId tableId,
         TableStreamType streamType,
         int64_t undoToken,
@@ -1379,14 +1379,15 @@ bool VoltDBEngine::activateTableStream(
     PersistentTable *table = dynamic_cast<PersistentTable*>(found);
     if (table == NULL) {
         assert(table != NULL);
-        return false;
+        return -1;
     }
 
     setUndoToken(undoToken);
 
     // Crank up the necessary persistent table streaming mechanism(s).
-    if (!table->activateStream(m_tupleSerializer, streamType, m_partitionId, tableId, serializeIn)) {
-        return false;
+    int64_t count = table->activateStream(m_tupleSerializer, streamType, m_partitionId, tableId, serializeIn);
+    if (count == -1) {
+        return -1;
     }
 
     // keep track of snapshotting tables. a table already in cow mode
@@ -1394,14 +1395,14 @@ bool VoltDBEngine::activateTableStream(
     if (tableStreamTypeIsSnapshot(streamType)) {
         if (m_snapshottingTables.find(tableId) != m_snapshottingTables.end()) {
             assert(false);
-            return false;
+            return -1;
         }
 
         table->incrementRefcount();
         m_snapshottingTables[tableId] = table;
     }
 
-    return true;
+    return count;
 }
 
 /**

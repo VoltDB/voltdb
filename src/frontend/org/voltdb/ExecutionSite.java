@@ -1349,15 +1349,15 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     }
 
     @Override
-    public void initiateSnapshots(
+    public long initiateSnapshots(
             SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
             List<SnapshotDataTarget> targets,
             long txnId,
             int numLiveHosts,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
-        m_snapshotter.initiateSnapshots(m_systemProcedureContext, format, tasks, targets, txnId, numLiveHosts,
-                                        exportSequenceNumbers);
+        return m_snapshotter.initiateSnapshots(m_systemProcedureContext, format, tasks, targets,
+                txnId, numLiveHosts, exportSequenceNumbers);
     }
 
     /*

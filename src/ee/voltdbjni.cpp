@@ -981,9 +981,9 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeActi
     try {
         try {
             voltdb::TableStreamType tableStreamType = static_cast<voltdb::TableStreamType>(streamType);
-            int64_t count = engine->activateTableStream(tableId, tableStreamType, undoToken, serialize_in);
+            jlong count = engine->activateTableStream(tableId, tableStreamType, undoToken, serialize_in);
             env->ReleaseByteArrayElements(serialized_predicates, bytes, JNI_ABORT);
-            VOLT_DEBUG("deserialized predicates (success=%d)", (int)count);
+            VOLT_DEBUG("deserialized predicates (success=%d)", count);
             return count;
         } catch (SerializableEEException &e) {
             engine->resetReusedResultOutputBuffer();
