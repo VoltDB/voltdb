@@ -55,8 +55,10 @@ public:
     void processTupleDelete(TableTuple &oldTuple, bool fallible);
 
     PersistentTable * targetTable() const { return m_target; }
+    std::string indexForMinMax() const { return m_indexForMinMax == NULL ? "" : m_indexForMinMax->getName(); }
 
     void setTargetTable(PersistentTable * target);
+    void setIndexForMinMax(std::string index);
 private:
 
     void freeBackedTuples();
@@ -74,6 +76,8 @@ private:
      */
     bool findExistingTuple(TableTuple &oldTuple, bool expected = false);
 
+    // the source persistent table
+    PersistentTable *m_srcTable;
     // the materialized view table
     PersistentTable *m_target;
     // space to hold the search key for the view table
@@ -83,6 +87,9 @@ private:
     // the primary index on the view table whose columns
     // are the same as the group by in the view query
     TableIndex *m_index;
+
+    // the index on srcTable which can be used to maintain min/max
+    TableIndex *m_indexForMinMax;
 
     // space to store temp view tuples
     TableTuple m_existingTuple;
