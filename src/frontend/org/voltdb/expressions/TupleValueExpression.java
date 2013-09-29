@@ -17,6 +17,9 @@
 
 package org.voltdb.expressions;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -24,6 +27,7 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -47,6 +51,8 @@ public class TupleValueExpression extends AbstractValueExpression {
     protected int m_tableIdx = 0;
 
     private boolean m_hasAggregate = false;
+
+    private List<TupleValueExpression> m_childrenTVE = null;
 
     /**
      * Create a new TupleValueExpression
@@ -106,6 +112,12 @@ public class TupleValueExpression extends AbstractValueExpression {
         clone.m_tableAlias = m_tableAlias;
         clone.m_columnName = m_columnName;
         clone.m_columnAlias = m_columnAlias;
+        if (m_childrenTVE != null) {
+            clone.m_childrenTVE = new ArrayList<TupleValueExpression>();
+            for (TupleValueExpression childTVE : m_childrenTVE) {
+                clone.m_childrenTVE.add((TupleValueExpression) childTVE.clone());
+            }
+        }
         return clone;
     }
 
@@ -200,6 +212,14 @@ public class TupleValueExpression extends AbstractValueExpression {
         m_tableIdx = idx;
     }
 
+    public List<TupleValueExpression> getChildExpressions() {
+        return m_childrenTVE;
+    }
+
+    public void setChildExpressions(List<TupleValueExpression> childrenTVE) {
+        m_childrenTVE = childrenTVE;
+    }
+
     @Override
     public boolean equals(Object obj) {
         if (obj instanceof TupleValueExpression == false) {
@@ -292,6 +312,11 @@ public class TupleValueExpression extends AbstractValueExpression {
         // TODO(XIN): getIgnoreCase takes 2% of Planner CPU, Optimize it later
         Table table = db.getTables().getIgnoreCase(m_tableName);
         resolveForTable(table);
+        if (m_childrenTVE != null) {
+            for (TupleValueExpression childTVE : m_childrenTVE) {
+                childTVE.resolveForDB(db);
+            }
+        }
     }
 
     @Override
@@ -307,6 +332,24 @@ public class TupleValueExpression extends AbstractValueExpression {
         m_columnIndex = column.getIndex();
         setValueType(VoltType.get((byte)column.getType()));
         setValueSize(column.getSize());
+    }
+
+    /**
+     * Given an input schema, resolve the TVE
+     * expressions.
+     */
+    public int resolveColumnIndexesUsingSchema(NodeSchema inputSchema) {
+        int index = inputSchema.getIndexOfTve(this);
+        if (index == -1 && m_childrenTVE != null) {
+            // Try to resolve column index using nested TVE
+            for (TupleValueExpression childTVE : m_childrenTVE) {
+                index = inputSchema.getIndexOfTve(childTVE);
+                if (index != -1) {
+                    break;
+                }
+            }
+        }
+        return index;
     }
 
     // Even though this function applies generally to expressions and tables and not just to TVEs as such,

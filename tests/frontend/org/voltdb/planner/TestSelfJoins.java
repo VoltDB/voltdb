@@ -24,7 +24,11 @@
 package org.voltdb.planner;
 
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.NodeSchema;
+import org.voltdb.plannodes.ProjectionPlanNode;
+import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
@@ -72,6 +76,16 @@ public class TestSelfJoins  extends PlannerTestCase {
         assertTrue(pn instanceof NestLoopPlanNode);
         assertEquals(4, pn.getOutputSchema().getColumns().size());
 
+        pn = compile("select A,C  FROM R1 A JOIN R2 B USING(A)");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        NodeSchema ns = pn.getOutputSchema();
+        for (SchemaColumn sc : ns.getColumns()) {
+            AbstractExpression e = sc.getExpression();
+            assertTrue(e instanceof TupleValueExpression);
+            TupleValueExpression tve = (TupleValueExpression) e;
+            assertNotSame(-1, tve.getColumnIndex());
+        }
     }
 
     public void testOuterSelfJoin() {

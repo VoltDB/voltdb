@@ -358,7 +358,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         // and update their indexes against the table schema
         for (TupleValueExpression tve : index_tves)
         {
-            int index = m_tableSchema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(m_tableSchema);
             tve.setColumnIndex(index);
         }
         // now do the common scan node work

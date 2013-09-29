@@ -456,9 +456,13 @@ public class JoinNode implements Cloneable {
                 // Terminate the sub-tree
                 leafNodes.add(child);
                 // Replace the join node with the temporary node having the id negated
-                // This will help to distinguish it from a real node and to reassemble the tree at the later stage
+                // the tree at the later stage
+                // We also need to generate a dummy alias index to preserve JoinNode invariant
+                // that a node represent either a table (m_tableAliasIndex != StmtCatalogCache.NULL_ALIAS_INDEX) or
+                // a join of two nodes m_leftNode != null && m_rightNode != null
+                int tempAliasIdx = StmtCatalogCache.NULL_ALIAS_INDEX - 1 - child.m_id;
                 JoinNode tempNode = new JoinNode(
-                        -child.m_id, child.m_joinType, child.m_tableAliasIndex, child.m_joinExpr, child.m_whereExpr);
+                        -child.m_id, child.m_joinType, tempAliasIdx, child.m_joinExpr, child.m_whereExpr);
                 if (child == m_leftNode) {
                     m_leftNode = tempNode;
                 } else {

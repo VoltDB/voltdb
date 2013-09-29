@@ -184,10 +184,10 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
             // Right now these all need to be TVEs
             assert(col.getExpression() instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = outer_schema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(outer_schema);
             if (index == -1)
             {
-                index = inner_schema.getIndexOfTve(tve);
+                index = tve.resolveColumnIndexesUsingSchema(inner_schema);
                 if (index == -1)
                 {
                     throw new RuntimeException("Unable to find index for column: " +
@@ -270,11 +270,11 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
                 ExpressionUtil.getTupleValueExpressions(predicate);
         for (TupleValueExpression tve : predicate_tves)
         {
-            int index = outer_schema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(outer_schema);
             int tableIdx = 0;   // 0 for outer table
             if (index == -1)
             {
-                index = inner_schema.getIndexOfTve(tve);
+                index = tve.resolveColumnIndexesUsingSchema(inner_schema);
                 if (index == -1)
                 {
                     throw new RuntimeException("Unable to find index for join TVE: " +

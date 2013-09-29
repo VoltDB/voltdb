@@ -90,7 +90,7 @@ public class NodeSchema
      *  AbstractExpression in a plan node needs to have its column_idx updated
      *  during the column index resolution phase.
      */
-    int getIndexOfTve(TupleValueExpression tve)
+    public int getIndexOfTve(TupleValueExpression tve)
     {
         SchemaColumn col = new SchemaColumn(tve.getTableName(), tve.getTableAlias(),
                 tve.getColumnName(), tve.getColumnAlias());

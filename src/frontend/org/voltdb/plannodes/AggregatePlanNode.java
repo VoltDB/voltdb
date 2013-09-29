@@ -174,7 +174,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
         for (TupleValueExpression tve : output_tves)
         {
-            int index = input_schema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
             if (index == -1)
             {
                 // check to see if this TVE is the aggregate output
@@ -202,7 +202,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
         for (TupleValueExpression tve : agg_tves)
         {
-            int index = input_schema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
             tve.setColumnIndex(index);
         }
 
@@ -215,7 +215,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
         for (TupleValueExpression tve : group_tves)
         {
-            int index = input_schema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
             tve.setColumnIndex(index);
         }
     }

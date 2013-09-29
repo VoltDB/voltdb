@@ -319,23 +319,33 @@ public abstract class AbstractParsedStmt {
      * @param exprNode
      * @return
      */
-    private AbstractExpression parseColumnRefExpression(VoltXMLElement exprNode) {
+    private TupleValueExpression parseColumnRefExpression(VoltXMLElement exprNode) {
         String alias = exprNode.attributes.get("alias");
         String tableName = exprNode.attributes.get("table");
         // When the column lacks required detail,
         // use the more detailed column that got attached to it as a columnref child.
         // This is the convention specific to the case of a column referenced in JOIN ... USING ...
-        if (tableName == null && !exprNode.children.isEmpty()) {
-            VoltXMLElement childExpr = exprNode.children.get(0);
-            if (childExpr.name.toLowerCase().equals("columnref")) {
-                    return parseColumnRefExpression(childExpr);
+        List<TupleValueExpression> childExprs = null;
+        if (!exprNode.children.isEmpty()) {
+            childExprs = new ArrayList<TupleValueExpression>();
+            for (VoltXMLElement childRefExpr : exprNode.children) {
+                if (childRefExpr.name.toLowerCase().equals("columnref")) {
+                    childExprs.add(parseColumnRefExpression(childRefExpr));
+                }
             }
         }
         String columnName = exprNode.attributes.get("column");
 
         if (tableName == null) {
-            assert(m_DDLIndexedTable != null);
-            tableName = m_DDLIndexedTable.getTypeName();
+            // Try to get table name from the first nested columnref expression if any
+            if (childExprs != null && !childExprs.isEmpty()) {
+                tableName = childExprs.get(0).getTableName();
+            }
+            // One last try
+            if (tableName == null) {
+                assert(m_DDLIndexedTable != null);
+                tableName = m_DDLIndexedTable.getTypeName();
+            }
         }
         assert(tableName != null);
         String tableAlias = exprNode.attributes.get("tablealias");
@@ -347,7 +357,9 @@ public abstract class AbstractParsedStmt {
         addTableToQueryCache(tableName, tableAlias);
 
         TupleValueExpression expr = new TupleValueExpression(tableName, tableAlias, columnName, alias);
-
+        if (childExprs != null && !childExprs.isEmpty()) {
+            expr.setChildExpressions(childExprs);
+        }
         expr.resolveForDB(m_db);
         return expr;
     }
@@ -657,9 +669,9 @@ public abstract class AbstractParsedStmt {
                 parseTable(node);
                 visited.add(visitedTable);
                 ++tableCount;                                                                   //        2nd of 2 ALLOWED differences
-                if (joinTree.hasOuterJoin() && tableCount > 2) {                                //     between AbstractParsedStmt.java
-                    throw new PlanningErrorException("VoltDB does not support outer joins with more than two tables involved"); // and
-                }                                                                               // AbstractParsedStmt.java_multi_table
+//                if (joinTree.hasOuterJoin() && tableCount > 2) {                                //     between AbstractParsedStmt.java
+//                    throw new PlanningErrorException("VoltDB does not support outer joins with more than two tables involved"); // and
+//                }                                                                               // AbstractParsedStmt.java_multi_table
             }
         }
     }

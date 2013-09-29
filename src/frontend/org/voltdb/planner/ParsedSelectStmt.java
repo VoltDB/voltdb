@@ -504,66 +504,51 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     private void parseDisplayColumns(VoltXMLElement columnsNode, boolean isDistributed) {
         for (VoltXMLElement child : columnsNode.children) {
-            ParsedColInfo col = parseDisplayColumnReferences(child, isDistributed);
-            // display schema must have only the top level columnref
+            ParsedColInfo col = new ParsedColInfo();
+            aggregationList.clear();
+            col.expression = parseExpressionTree(child);
+            if (col.expression instanceof ConstantValueExpression) {
+                assert(col.expression.getValueType() != VoltType.NUMERIC);
+            }
+            assert(col.expression != null);
+            if (isDistributed) {
+                col.expression = col.expression.replaceAVG();
+                updateAvgExpresions();
+            }
+            ExpressionUtil.finalizeValueTypes(col.expression);
+
+            col.alias = child.attributes.get("alias");
+            if (child.name.equals("columnref")) {
+                col.columnName =
+                        child.attributes.get("column");
+                col.tableName =
+                        child.attributes.get("table");
+                col.tableAlias =
+                        child.attributes.get("tablealias");
+                if (col.tableAlias == null) {
+                    col.tableAlias = col.tableName;
+                }
+            }
+            else
+            {
+                // XXX hacky, assume all non-column refs come from a temp table
+                col.tableName = "VOLT_TEMP_TABLE";
+                col.tableAlias = "VOLT_TEMP_TABLE";
+                col.columnName = "";
+            }
+            // This index calculation is only used for sanity checking
+            // materialized views (which use the parsed select statement but
+            // don't go through the planner pass that does more involved
+            // column index resolution).
+            col.index = displayColumns.size();
+
+            insertAggExpressionsToAggResultColumns(aggregationList, col);
+            if (aggregationList.size() >= 1) {
+                hasAggregateExpression = true;
+            }
+
             displayColumns.add(col);
         }
-    }
-
-
-    private ParsedColInfo parseDisplayColumnReferences(VoltXMLElement columnRef, boolean isDistributed) {
-        for (VoltXMLElement child : columnRef.children) {
-            // In case of "select * from T1, T2" if multiple tables have columns with the same name
-            // the top level columnref element will have nested columnref elements for each table
-            // having the same column name.
-            if (child.name.equals("columnref")) {
-                parseDisplayColumnReferences(child, isDistributed);
-            }
-        }
-        ParsedColInfo col = new ParsedColInfo();
-        aggregationList.clear();
-        col.expression = parseExpressionTree(columnRef);
-        if (col.expression instanceof ConstantValueExpression) {
-            assert(col.expression.getValueType() != VoltType.NUMERIC);
-        }
-        assert(col.expression != null);
-        if (isDistributed) {
-            col.expression = col.expression.replaceAVG();
-            updateAvgExpresions();
-        }
-        ExpressionUtil.finalizeValueTypes(col.expression);
-
-        col.alias = columnRef.attributes.get("alias");
-        if (columnRef.name.equals("columnref")) {
-            col.columnName =
-                    columnRef.attributes.get("column");
-            col.tableName =
-                    columnRef.attributes.get("table");
-            col.tableAlias =
-                    columnRef.attributes.get("tablealias");
-            if (col.tableAlias == null) {
-                col.tableAlias = col.tableName;
-            }
-        }
-        else
-        {
-            // XXX hacky, assume all non-column refs come from a temp table
-            col.tableName = "VOLT_TEMP_TABLE";
-            col.tableAlias = "VOLT_TEMP_TABLE";
-            col.columnName = "";
-        }
-        // This index calculation is only used for sanity checking
-        // materialized views (which use the parsed select statement but
-        // don't go through the planner pass that does more involved
-        // column index resolution).
-        col.index = displayColumns.size();
-
-        insertAggExpressionsToAggResultColumns(aggregationList, col);
-        if (aggregationList.size() >= 1) {
-            hasAggregateExpression = true;
-        }
-
-        return col;
     }
 
     private void parseGroupByColumns(VoltXMLElement columnsNode) {

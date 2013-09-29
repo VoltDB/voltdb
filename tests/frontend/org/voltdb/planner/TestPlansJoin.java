@@ -26,13 +26,20 @@ package org.voltdb.planner;
 import java.util.List;
 
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
+import org.voltdb.plannodes.AggregatePlanNode;
+import org.voltdb.plannodes.DistinctPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
+import org.voltdb.plannodes.NodeSchema;
+import org.voltdb.plannodes.OrderByPlanNode;
+import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
+import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
@@ -240,6 +247,60 @@ public class TestPlansJoin extends PlannerTestCase {
         assertTrue(((AbstractScanPlanNode) n).getTargetTableName().equalsIgnoreCase("R1"));
         p = ((AbstractScanPlanNode) n).getPredicate();
         assertEquals(ExpressionType.COMPARE_GREATERTHAN, p.getExpressionType());
+    }
+
+    public void testDisplayColumnFromUsingCondition() {
+        AbstractPlanNode pn = compile("select  max(A)  FROM R1 A JOIN R2 B USING(A)");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof AggregatePlanNode);
+        NodeSchema ns = pn.getOutputSchema();
+        for (SchemaColumn sc : ns.getColumns()) {
+            AbstractExpression e = sc.getExpression();
+            assertTrue(e instanceof TupleValueExpression);
+            TupleValueExpression tve = (TupleValueExpression) e;
+            assertNotSame(-1, tve.getColumnIndex());
+        }
+
+        pn = compile("select  distinct(A)  FROM R1 A JOIN R2 B USING(A)");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        ns = pn.getOutputSchema();
+        for (SchemaColumn sc : ns.getColumns()) {
+            AbstractExpression e = sc.getExpression();
+            assertTrue(e instanceof TupleValueExpression);
+            TupleValueExpression tve = (TupleValueExpression) e;
+            assertNotSame(-1, tve.getColumnIndex());
+        }
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof DistinctPlanNode);
+        ns = pn.getOutputSchema();
+        for (SchemaColumn sc : ns.getColumns()) {
+            AbstractExpression e = sc.getExpression();
+            assertTrue(e instanceof TupleValueExpression);
+            TupleValueExpression tve = (TupleValueExpression) e;
+            assertNotSame(-1, tve.getColumnIndex());
+        }
+
+        pn = compile("select  A  FROM R1 A JOIN R2 B USING(A) ORDER BY A");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        ns = pn.getOutputSchema();
+        for (SchemaColumn sc : ns.getColumns()) {
+            AbstractExpression e = sc.getExpression();
+            assertTrue(e instanceof TupleValueExpression);
+            TupleValueExpression tve = (TupleValueExpression) e;
+            assertNotSame(-1, tve.getColumnIndex());
+        }
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof OrderByPlanNode);
+        ns = pn.getOutputSchema();
+        for (SchemaColumn sc : ns.getColumns()) {
+            AbstractExpression e = sc.getExpression();
+            assertTrue(e instanceof TupleValueExpression);
+            TupleValueExpression tve = (TupleValueExpression) e;
+            assertNotSame(-1, tve.getColumnIndex());
+        }
+
     }
 
     public void testTransitiveValueEquivalenceConditions() {
@@ -923,16 +984,16 @@ public class TestPlansJoin extends PlannerTestCase {
                      "VoltDB does not support full outer joins");
        // OUTER JOIN with >5 tables.
        // Temporary commented out
-       //failToCompile("select R1.C FROM R3,R2, P1, P2, P3 LEFT OUTER JOIN R1 ON R1.C = R2.C WHERE R3.A = R2.A and R2.A = P1.A and P1.A = P2.A and P3.A = P2.A",
-       //              "join of > 5 tables was requested without specifying a join order");
+       failToCompile("select R1.C FROM R3,R2, P1, P2, P3 LEFT OUTER JOIN R1 ON R1.C = R2.C WHERE R3.A = R2.A and R2.A = P1.A and P1.A = P2.A and P3.A = P2.A",
+                     "join of > 5 tables was requested without specifying a join order");
        // INNER JOIN with >5 tables.
        failToCompile("select R1.C FROM R3,R2, P1, P2, P3, R1 WHERE R3.A = R2.A and R2.A = P1.A and P1.A = P2.A and P3.A = P2.A and R1.C = R2.C",
                      "join of > 5 tables was requested without specifying a join order");
-       // OUTER JOIN with more then two tables. Temporary restriction
-       failToCompile("select R1.C FROM R1 LEFT OUTER JOIN R2 ON R1.C = R2.C RIGHT JOIN R3 ON R3.C = R1.C",
-                     "VoltDB does not support outer joins with more than two tables involved");
-       failToCompile("select R1.C FROM R1 LEFT JOIN R2 ON R1.C = R2.C, R3 WHERE R3.C = R1.C",
-                     "VoltDB does not support outer joins with more than two tables involved");
+//       // OUTER JOIN with more then two tables. Temporary restriction
+//       failToCompile("select R1.C FROM R1 LEFT OUTER JOIN R2 ON R1.C = R2.C RIGHT JOIN R3 ON R3.C = R1.C",
+//                     "VoltDB does not support outer joins with more than two tables involved");
+//       failToCompile("select R1.C FROM R1 LEFT JOIN R2 ON R1.C = R2.C, R3 WHERE R3.C = R1.C",
+//                     "VoltDB does not support outer joins with more than two tables involved");
    }
 
 

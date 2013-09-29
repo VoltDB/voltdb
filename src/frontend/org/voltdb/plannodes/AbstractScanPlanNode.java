@@ -247,7 +247,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 // and update their indexes against the table schema
                 for (TupleValueExpression tve : scan_tves)
                 {
-                    int index = m_tableSchema.getIndexOfTve(tve);
+                    int index = tve.resolveColumnIndexesUsingSchema(m_tableSchema);
                     tve.setColumnIndex(index);
                 }
                 m_tableScanSchema.sortByTveIndex();
@@ -279,7 +279,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             ExpressionUtil.getTupleValueExpressions(m_predicate);
         for (TupleValueExpression tve : predicate_tves)
         {
-            int index = m_tableSchema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(m_tableSchema);
             tve.setColumnIndex(index);
         }
 
@@ -304,7 +304,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 // At this point, they'd better all be TVEs.
                 assert(col.getExpression() instanceof TupleValueExpression);
                 TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-                int index = m_tableSchema.getIndexOfTve(tve);
+                int index = tve.resolveColumnIndexesUsingSchema(m_tableSchema);
                 tve.setColumnIndex(index);
             }
             m_outputSchema.sortByTveIndex();
