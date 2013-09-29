@@ -345,6 +345,9 @@ public class TupleValueExpression extends AbstractValueExpression {
             for (TupleValueExpression childTVE : m_childrenTVE) {
                 index = inputSchema.getIndexOfTve(childTVE);
                 if (index != -1) {
+                    // reset parent TVE table name and alias to the child ones.
+                    m_tableName = childTVE.m_tableName;
+                    m_tableAlias = childTVE.m_tableAlias;
                     break;
                 }
             }
