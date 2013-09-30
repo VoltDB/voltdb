@@ -521,4 +521,16 @@ public class TestZK extends ZKTestBase {
         zk.create("/foo", bytes, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         zk.getData("/foo", false, null);
     }
+
+    @Test
+    public void testRecursivelyDelete() throws Exception
+    {
+        ZooKeeper zk = getClient(0);
+        zk.create("/a", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        zk.create("/a/b", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        zk.create("/a/b/c", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+
+        ZKUtil.deleteRecursively(zk, "/a");
+        assertNull(zk.exists("/a", false));
+    }
 }
