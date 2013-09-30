@@ -23,6 +23,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Callable;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltdb.utils.CatalogUtil;
@@ -39,6 +40,8 @@ import com.google.common.util.concurrent.ListenableFuture;
  * errors related to table data streaming using the table stream API.
  */
 public class TableStreamer {
+    private static final VoltLogger log = new VoltLogger("HOST");
+
     // Error code returned by EE.tableStreamSerializeMore().
     private static final byte SERIALIZATION_ERROR = -1;
 
@@ -57,6 +60,7 @@ public class TableStreamer {
      * Activate the stream with the given predicates on the given table.
      * @param context       Context
      * @param predicates    Predicates associated with the stream
+     * @return true if activation succeeded.
      */
     public long activate(SystemProcedureExecutionContext context, byte[] predicates)    {
         return activate(context, false, predicates);
@@ -67,13 +71,14 @@ public class TableStreamer {
      * @param context       Context
      * @param undoToken     The undo token
      * @param predicates    Predicates associated with the stream
+     * @return true if activation succeeded.
      */
     public long activate(SystemProcedureExecutionContext context, boolean undo, byte[] predicates) {
         long cnt = context.activateTableStream(m_tableId, m_type, undo, predicates);
         if (cnt == -1) {
             String tableName = CatalogUtil.getTableNameFromId(context.getDatabase(), m_tableId);
-            VoltDB.crashLocalVoltDB("Attempted to activate a table stream of type " + m_type +
-                                    "for table " + tableName + " and failed", false, null);
+            log.error("Attempted to activate a table stream of type " + m_type +
+                      "for table " + tableName + " and failed");
         }
         return cnt;
     }

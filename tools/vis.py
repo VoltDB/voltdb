@@ -48,6 +48,19 @@ def get_branches(hostname, port, days):
 
     return branches
 
+def get_min_date(hostname, port):
+
+    query = "select min(date) from app_stats"
+
+    conn = FastSerializer(hostname, port)
+    proc = VoltProcedure(conn, '@AdHoc',
+                         [FastSerializer.VOLTTYPE_STRING])
+    resp = proc.call([query])
+    conn.close()
+
+    ndays = datetime.datetime.today()-resp.tables[0].tuples[0][0]
+    return ndays.days+1
+
 def get_stats(hostname, port, days, branch):
     """Get statistics of all runs
 
@@ -115,15 +128,11 @@ class Plot:
     def close(self):
         formatter = matplotlib.dates.DateFormatter("%b %d %y")
         self.ax.xaxis.set_major_formatter(formatter)
-        locator = matplotlib.dates.DayLocator(interval=7)
-        self.ax.xaxis.set_major_locator(locator)
-        minlocator = matplotlib.dates.DayLocator(interval=1)
-        self.ax.xaxis.set_minor_locator(minlocator)
         ymin, ymax = plt.ylim()
         plt.ylim((ymin-(ymax-ymin)*0.1, ymax+(ymax-ymin)*0.1))
         xmax = datetime.datetime.today().toordinal()
         plt.xlim((xmax-self.ndays, xmax))
-        plt.legend(prop={'size': 10}, loc=0)
+        plt.legend(prop={'size': 10}, loc=2)
         plt.savefig(self.filename, format="png", transparent=False,
                     bbox_inches="tight", pad_inches=0.2)
 
@@ -184,7 +193,7 @@ def generate_index_file(filenames):
      </table>
      <table frame="box">
      <tr>
-         <th colspan="4">%s</th>
+         <th colspan="4"><a name="%s">%s</a></th>
      </tr>
 """
 
@@ -205,7 +214,7 @@ def generate_index_file(filenames):
     last_app = None
     for i in filenames:
         if i[0] != last_app:
-            rows.append(sep % i[0])
+            rows.append(sep % (i[0], i[0]))
             last_app = i[0]
         rows.append(row % (i[4], i[1], i[1], i[2], i[2], i[3], i[3]))
 
@@ -230,9 +239,10 @@ def main():
 
     prefix = sys.argv[2]
     path = os.path.join(sys.argv[1], sys.argv[2])
-    ndays = 2000
     if len(sys.argv) >=4:
         ndays = int(sys.argv[3])
+    else:
+        ndays = get_min_date(STATS_SERVER, 21212)
     width = None
     height = None
     if len(sys.argv) >= 5:
@@ -270,15 +280,15 @@ def main():
             throughput_filename = '%s-throughput-%s.png' % (prefix, app_filename)
             filenames.append((app, latency95_filename, latency99_filename, throughput_filename, branch, iorder))
 
-            plot(app + " latency95", "Time", "Latency (ms)",
+            plot(app + " latency95 on " + branch, "Time", "Latency (ms)",
                  path + "-latency95-" + app_filename + ".png", width, height, app,
                  data, 'lat95', ndays)
 
-            plot(app + " latency99", "Time", "Latency (ms)",
+            plot(app + " latency99 on " + branch, "Time", "Latency (ms)",
                  path + "-latency99-" + app_filename + ".png", width, height, app,
                  data, 'lat99', ndays)
 
-            plot(app + " throughput(best)", "Time", "Throughput (txns/sec)",
+            plot(app + " throughput(best) on " + branch, "Time", "Throughput (txns/sec)",
                  path + "-throughput-" + app_filename + ".png", width, height, app,
                  data, 'tps', ndays)
 

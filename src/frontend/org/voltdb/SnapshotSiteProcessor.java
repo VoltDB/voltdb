@@ -409,8 +409,12 @@ public class SnapshotSiteProcessor {
         for (Map.Entry<Integer, byte[]> tablePredicates : makeTablesAndPredicatesToSnapshot(tasks).entrySet()) {
             int tableId = tablePredicates.getKey();
             TableStreamer streamer =
-                new TableStreamer(tableId, format.getStreamType(), m_snapshotTableTasks.get(tableId));
-            total += streamer.activate(context, tablePredicates.getValue());
+                    new TableStreamer(tableId, format.getStreamType(), m_snapshotTableTasks.get(tableId));
+            long cnt = streamer.activate(context, tablePredicates.getValue());
+            if (cnt == -1) {
+                VoltDB.crashLocalVoltDB("Failed to activate snapshot stream", false, null);
+            }
+            total += cnt;
             m_streamers.put(tableId, streamer);
         }
 
