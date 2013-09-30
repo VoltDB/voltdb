@@ -218,6 +218,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
      * This is not safe to use after restore because it doesn't do failure handling that would deal with
      * dropped plan fragments
      */
+    //Anish Use a callback to track responses on coordinator side.
     public VoltTable[] executeSysProcPlanFragments(SynthesizedPlanFragment pfs[], Mailbox m) {
         Set<Integer> dependencyIds = new HashSet<Integer>();
         VoltTable results[] = new VoltTable[1];
@@ -268,6 +269,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
          * This loop will wait for all the responses to the fragment that was sent out,
          * but will also respond to incoming fragment tasks by executing them.
          */
+        long total = 0;
         while (true) {
             //Lightly spinning makes debugging easier by allowing inspection
             //of stuff on the stack
@@ -305,6 +307,15 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                 FragmentResponseMessage frm = (FragmentResponseMessage)vm;
                 final int dependencyId = frm.getTableDependencyIdAtIndex(0);
                 if (dependencyIds.contains(dependencyId)) {
+                    VoltTable table = frm.getTableAtIndex(0);
+                    if (table != null) {
+                        table.advanceRow();
+                        Long count = table.getLong("COUNT");
+                        total += count;
+                        if (count != 0) {
+                            System.out.println("Processed: " + total);
+                        }
+                    }
                     receivedDependencyIds.put(
                             dependencyId,
                             Arrays.asList(new VoltTable[] {frm.getTableAtIndex(0)}));
