@@ -762,7 +762,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             assert(m_clientInterfaces.size() > 0);
             ClientInterface ci = m_clientInterfaces.get(0);
-            ci.initializeSnapshotDaemon(m_messenger.getZK(), m_globalServiceElector);
+            if (!m_rejoining) {
+                ci.initializeSnapshotDaemon(m_messenger.getZK(), m_globalServiceElector);
+            }
 
             // set additional restore agent stuff
             if (m_restoreAgent != null) {
@@ -2070,6 +2072,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             final ZooKeeper zk = m_messenger.getZK();
             boolean logRecoveryCompleted = false;
             if (getCommandLog().getClass().getName().equals("org.voltdb.CommandLogImpl")) {
+                ClientInterface ci = m_clientInterfaces.get(0);
+                ci.initializeSnapshotDaemon(m_messenger.getZK(), m_globalServiceElector);
                 try {
                     if (m_rejoinTruncationReqId == null) {
                         m_rejoinTruncationReqId = java.util.UUID.randomUUID().toString();

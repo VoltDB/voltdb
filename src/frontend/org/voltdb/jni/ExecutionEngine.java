@@ -318,7 +318,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /*
      * Interface frontend invokes to communicate to CPP execution engine.
      */
-
     abstract public long activateTableStream(final int tableId,
             TableStreamType type, long undoQuantumToken, byte[] predicates);
 

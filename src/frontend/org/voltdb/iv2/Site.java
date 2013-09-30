@@ -335,8 +335,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public boolean activateTableStream(final int tableId, TableStreamType type, boolean undo, byte[] predicates)
-        {
+        public long activateTableStream(final int tableId, TableStreamType type, boolean undo, byte[] predicates)        {
             return m_ee.activateTableStream(tableId, type, undo ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE, predicates);
         }
 
@@ -661,15 +660,15 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // SiteSnapshotConnection interface
     //
     @Override
-    public void initiateSnapshots(
+    public long initiateSnapshots(
             SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
             List<SnapshotDataTarget> targets,
             long txnId,
             int numLiveHosts,
             Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers) {
-        m_snapshotter.initiateSnapshots(m_sysprocContext, format, tasks, targets, txnId, numLiveHosts,
-                                        exportSequenceNumbers);
+        return m_snapshotter.initiateSnapshots(m_sysprocContext, format, tasks, targets, txnId,
+                numLiveHosts, exportSequenceNumbers);
     }
 
     /*
