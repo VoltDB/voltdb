@@ -1211,6 +1211,34 @@ public class TestFixedSQLSuite extends RegressionSuite {
         client.callProcedure("TestFixedSQLSuite$InnerProc");
     }
 
+    // Ticket: ENG-5151
+    public void testColumnDefaultNull() throws IOException, ProcCallException {
+        System.out.println("STARTING default null test...");
+        Client client = getClient();
+        VoltTable result = null;
+        // It used to throw errors from EE when inserting without giving explicit values for default null columns.
+        result = client.callProcedure("@AdHoc",
+                " INSERT INTO DEFAULT_NULL(id) VALUES (1);").getResults()[0];
+
+        result = client.callProcedure("@AdHoc",
+                " select id, num1, num2, ratio from DEFAULT_NULL;").getResults()[0];
+
+        assertTrue(result.advanceRow());
+        assertEquals(1, result.getLong(0));
+
+        if (!isHSQL()) {
+            result.getLong(1);
+            assertTrue(result.wasNull());
+
+            result.getLong(2);
+            assertTrue(result.wasNull());
+
+            result.getDouble(3);
+            assertTrue(result.wasNull());
+        }
+    }
+
+
     //
     // JUnit / RegressionSuite boilerplate
     //

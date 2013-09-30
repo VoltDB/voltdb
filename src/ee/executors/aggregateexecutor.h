@@ -64,7 +64,8 @@ class AggregateExecutorBase : public AbstractExecutor
 {
 public:
     AggregateExecutorBase(VoltDBEngine* engine, AbstractPlanNode* abstract_node) :
-        AbstractExecutor(engine, abstract_node), m_groupByKeySchema(NULL), m_predicate(NULL)
+        AbstractExecutor(engine, abstract_node), m_groupByKeySchema(NULL),
+        m_prePredicate(NULL), m_postPredicate(NULL)
     { }
     ~AggregateExecutorBase()
     {
@@ -108,7 +109,8 @@ protected:
     std::vector<AbstractExpression*> m_inputExpressions;
     std::vector<AbstractExpression*> m_outputColumnExpressions;
     std::vector<int> m_aggregateOutputColumns;
-    AbstractExpression* m_predicate;    // ENG-1565: for enabling max() using index purpose only
+    AbstractExpression* m_prePredicate;    // ENG-1565: for enabling max() using index purpose only
+    AbstractExpression* m_postPredicate;
 };
 
 

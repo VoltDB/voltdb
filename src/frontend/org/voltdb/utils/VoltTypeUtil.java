@@ -280,7 +280,7 @@ public abstract class VoltTypeUtil {
             // INVALID
             // --------------------------------
             default:
-                LOG.severe("ERROR: Unable to generate random value for invalid ValueType '" + type + "'");
+                LOG.severe("ERROR: Unable to get object from string for invalid ValueType '" + type + "'");
         }
         return (ret);
     }

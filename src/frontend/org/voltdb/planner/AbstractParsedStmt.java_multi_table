@@ -654,6 +654,7 @@ public abstract class AbstractParsedStmt {
      */
     HashMap<AbstractExpression, Set<AbstractExpression>> analyzeValueEquivalence() {
         // collect individual where/join expressions
+        analyzeJoinExpressions(joinTree);
         return joinTree.getAllEquivalenceFilters();
     }
 

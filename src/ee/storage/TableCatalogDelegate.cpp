@@ -442,12 +442,6 @@ void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & vie
             if (newTargetTable) {
                 targetTable = newTargetTable;
             }
-            else {
-                DEBUG_STREAM_HERE("ERROR? Found non-PersistentTable delegate for view target table");
-            }
-        }
-        else {
-            DEBUG_STREAM_HERE("ERROR? Found no delegate for view target table");
         }
         // This is not a leak -- the materialized view metadata is self-installing into the new table.
         // Also, it guards its targetTable from accidental deletion with a refcount bump.
