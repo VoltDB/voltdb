@@ -44,7 +44,6 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorProperty;
 import org.voltdb.catalog.Database;
-import org.voltdb.export.processors.RawProcessor;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltFile;
 
@@ -177,7 +176,7 @@ public class ExportManager
                     newProcessor.setProcessorConfig(m_processorConfig);
                     newProcessor.readyForData();
 
-                    if (!m_loaderClass.equals(RawProcessor.class.getName())) {
+                    if (!m_loaderClass.equals("org.voltdb.export.processors.RawProcessor")) {
                         if (nextGeneration.isDiskBased()) {
                                         /*
                                          * Changes in partition count can make the load balancing strategy not capture
@@ -256,7 +255,7 @@ public class ExportManager
      * @param partitionId
      */
     synchronized public void acceptMastership(int partitionId) {
-        if (m_loaderClass == null || m_loaderClass.equals(RawProcessor.class.getName())) return;
+        if (m_loaderClass == null || m_loaderClass.equals("org.voltdb.export.processors.RawProcessor")) return;
         Preconditions.checkArgument(
                 m_masterOfPartitions.add(partitionId),
                 "can't acquire mastership twice for partition id: " + partitionId
@@ -398,7 +397,7 @@ public class ExportManager
                  * to choose which server is going to export each partition
                  */
                 if (nextGeneration.isDiskBased() &&
-                        !m_loaderClass.equals(RawProcessor.class.getName())) {
+                        !m_loaderClass.equals("org.voltdb.export.processors.RawProcessor")) {
                     nextGeneration.kickOffLeaderElection();
                 }
             } else {
@@ -406,7 +405,7 @@ public class ExportManager
                  * When it isn't startup, it is necessary to kick things off with the mastership
                  * settings that already exist
                  */
-                if (!m_loaderClass.equals(RawProcessor.class.getName())) {
+                if (!m_loaderClass.equals("org.voltdb.export.processors.RawProcessor")) {
                     if (nextGeneration.isDiskBased()) {
                         /*
                          * Changes in partition count can make the load balancing strategy not capture

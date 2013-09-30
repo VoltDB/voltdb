@@ -102,7 +102,7 @@ if [ -z "${LOG4J_CONFIG_PATH}" ]; then
   fi
 fi
 
-VOLTDBJAR=`ls $VOLTDB_VOLTDB/voltdb-3.*.jar | grep -v "doc.jar" | head -1`
+VOLTDBJAR=`ls $VOLTDB_VOLTDB/voltdb-[0-9].*.jar | grep -v "doc.jar" | head -1`
 if [ -n "${VOLTDBJAR}" ]; then
   CLASSPATH=$VOLTDBJAR
 else

@@ -159,18 +159,18 @@ public abstract class JoinProducerBase extends SiteTasker {
                 buffer.duplicate(), true);
 
         // Currently, only export cares about this TXN ID.  Since we don't have one handy, and IV2
-        // doesn't yet care about export, just use Long.MIN_VALUE. Long.MAX_VALUE is a no-op
-        // don't track undo token
+        // doesn't yet care about export, just use Long.MIN_VALUE.
 
-        siteConnection.loadTable(Long.MIN_VALUE, tableId, table, false, Long.MAX_VALUE);
+        siteConnection.loadTable(Long.MIN_VALUE, tableId, table, false, false);
     }
 
     // Completed all criteria: Kill the watchdog and inform the site.
     protected void setJoinComplete(SiteProcedureConnection siteConnection,
-                                     Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers)
+                                     Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+                                     boolean requireExistingSequenceNumbers)
     {
         kickWatchdog(false);
-        siteConnection.setRejoinComplete(m_completionAction, exportSequenceNumbers);
+        siteConnection.setRejoinComplete(m_completionAction, exportSequenceNumbers, requireExistingSequenceNumbers);
     }
 
     // cancel and maybe rearm the snapshot data-segment watchdog.

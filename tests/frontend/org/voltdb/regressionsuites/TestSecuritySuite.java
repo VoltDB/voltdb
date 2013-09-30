@@ -36,8 +36,6 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
-import org.voltdb.export.ExportTestClient;
-import org.voltdb.exportclient.ExportClientException;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing1;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing2;
@@ -223,37 +221,6 @@ public class TestSecuritySuite extends RegressionSuite {
             exceptionThrown = true;
         }
         assertTrue(exceptionThrown);
-    }
-
-    public void testAllowedExportConnectorPermissions() throws ExportClientException {
-        if (!MiscUtils.isPro()) { return; } // feature disabled in community
-
-        // user1 can connect (in groups list)
-        ExportTestClient eclient = new ExportTestClient(1, port(0));
-        eclient.addCredentials("user1", "password");
-        eclient.connect();
-        eclient.disconnect();
-
-        // Expected to throw an exception on failure
-        assertTrue(true);
-    }
-
-    public void testRejectedExportConnectorPermissions() {
-        if (!MiscUtils.isPro()) { return; } // feature disabled in community
-
-        boolean caught = false;
-        ExportTestClient eclient = new ExportTestClient(1, port(0));
-        try {
-            // bad group
-            eclient.addCredentials("user2", "password");
-            eclient.connect();
-        }
-        catch (ExportClientException e) {
-            caught = true;
-        }
-        assertTrue(caught);
-
-        eclient.disconnect();
     }
 
     // Tests permissions applied to auto-generated default CRUD procedures.

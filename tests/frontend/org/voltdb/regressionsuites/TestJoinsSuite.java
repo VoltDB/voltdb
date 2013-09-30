@@ -759,6 +759,37 @@ public class TestJoinsSuite extends RegressionSuite {
         assertEquals(2, result.getRowCount());
     }
 
+    /**
+     * Multi table outer join
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testMultiTableOuterJoin() throws NoConnectionsException, IOException, ProcCallException
+    {
+        Client client = this.getClient();
+        client.callProcedure("InsertR1", 11, 11, 11);
+        client.callProcedure("InsertR1", 12, 12, 12);
+        client.callProcedure("InsertR1", 13, 13, 13);
+        client.callProcedure("InsertR2", 21, 21);
+        client.callProcedure("InsertR2", 22, 22);
+        client.callProcedure("InsertR2", 12, 12);
+        client.callProcedure("InsertR3", 31, 31);
+        client.callProcedure("InsertR3", 32, 32);
+        client.callProcedure("InsertR3", 33, 21);
+        VoltTable result = client.callProcedure(
+                "@AdHoc", "select *  FROM R1 RIGHT JOIN R2 on R1.A = R2.A LEFT JOIN R3 ON R3.C = R2.C")
+                .getResults()[0];
+        System.out.println(result.toString());
+        assertEquals(3, result.getRowCount());
+
+        result = client.callProcedure(
+                "@AdHoc", "select *  FROM R1 RIGHT JOIN R2 on R1.A = R2.A LEFT JOIN R3 ON R3.C = R2.C WHERE R1.C > 0")
+                .getResults()[0];
+        System.out.println(result.toString());
+        assertEquals(1, result.getRowCount());
+    }
+
     static public junit.framework.Test suite()
     {
         VoltServerConfig config = null;

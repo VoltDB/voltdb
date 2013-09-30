@@ -17,7 +17,10 @@
 
 package org.voltdb.iv2;
 
-import com.google.common.util.concurrent.SettableFuture;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.concurrent.ExecutionException;
+
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
@@ -31,9 +34,7 @@ import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.TaskLog;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.concurrent.ExecutionException;
+import com.google.common.util.concurrent.SettableFuture;
 
 public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     // true if the site has received the first fragment task message
@@ -161,7 +162,11 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         RejoinMessage rm = new RejoinMessage(m_mailbox.getHSId(),
                                              RejoinMessage.Type.SNAPSHOT_FINISHED);
         m_mailbox.send(m_coordinatorHsId, rm);
-        setJoinComplete(siteConnection, event.exportSequenceNumbers);
+        setJoinComplete(
+                siteConnection,
+                event.exportSequenceNumbers,
+                false /* requireExistingSequenceNumbers */
+                );
     }
 
     @Override

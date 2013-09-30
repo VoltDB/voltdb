@@ -39,6 +39,7 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.DeploymentBuilder;
+import org.voltdb.utils.MiscUtils;
 
 public class TestClientFeatures extends TestCase {
 
@@ -120,54 +121,55 @@ public class TestClientFeatures extends TestCase {
 
         //
         // From here down test special exception for slow snapshots or catalogs updates
+        // - Both features are pro only
         //
 
-        // build a catalog with a ton of indexes so catalog update will be slow
-        CatalogBuilder builder = new CatalogBuilder();
-        builder.addSchema(getClass().getResource("clientfeatures-wellindexed.sql"));
-        builder.addProcedures(ArbitraryDurationProc.class);
-        byte[] catalogToUpdate = builder.compileToBytes();
-        assert(catalogToUpdate != null);
+        if (MiscUtils.isPro()) {
+            // build a catalog with a ton of indexes so catalog update will be slow
+            CatalogBuilder builder = new CatalogBuilder();
+            builder.addSchema(getClass().getResource("clientfeatures-wellindexed.sql"));
+            builder.addProcedures(ArbitraryDurationProc.class);
+            byte[] catalogToUpdate = builder.compileToBytes();
+            assert(catalogToUpdate != null);
 
-        // make a copy of the table from ddl for loading
-        // (shouldn't have to do this, but for now, the table loader requires
-        //  a VoltTable, and can't read schema. Could fix by using this VoltTable
-        //  to generate schema or by teaching to loader how to discover tables)
-        VoltTable t = TableHelper.quickTable("indexme (pkey:bigint, " +
-                                                      "c01:varchar63, " +
-                                                      "c02:varchar63, " +
-                                                      "c03:varchar63, " +
-                                                      "c04:varchar63, " +
-                                                      "c05:varchar63, " +
-                                                      "c06:varchar63, " +
-                                                      "c07:varchar63, " +
-                                                      "c08:varchar63, " +
-                                                      "c09:varchar63, " +
-                                                      "c10:varchar63) " +
-                                                      "PKEY(pkey)");
-        // get a client with a normal timout
-        Client client2 = ClientFactory.createClient();
-        client2.createConnection("localhost");
-        TableHelper.fillTableWithBigintPkey(t, 400, 0, client2, new Random(), 0, 1);
+            // make a copy of the table from ddl for loading
+            // (shouldn't have to do this, but for now, the table loader requires
+            //  a VoltTable, and can't read schema. Could fix by using this VoltTable
+            //  to generate schema or by teaching to loader how to discover tables)
+            VoltTable t = TableHelper.quickTable("indexme (pkey:bigint, " +
+                                                          "c01:varchar63, " +
+                                                          "c02:varchar63, " +
+                                                          "c03:varchar63, " +
+                                                          "c04:varchar63, " +
+                                                          "c05:varchar63, " +
+                                                          "c06:varchar63, " +
+                                                          "c07:varchar63, " +
+                                                          "c08:varchar63, " +
+                                                          "c09:varchar63, " +
+                                                          "c10:varchar63) " +
+                                                          "PKEY(pkey)");
+            // get a client with a normal timout
+            Client client2 = ClientFactory.createClient();
+            client2.createConnection("localhost");
+            TableHelper.fillTableWithBigintPkey(t, 400, 0, client2, new Random(), 0, 1);
 
-        long start;
-        double duration;
+            long start;
+            double duration;
 
-        if (VoltDB.instance().getConfig().m_isEnterprise) {
             // run a catalog update that *might* normally timeout
             start = System.nanoTime();
             response = client.callProcedure("@UpdateApplicationCatalog", catalogToUpdate, depBuilder.getXML());
             duration = (System.nanoTime() - start) / 1000000000.0;
             System.out.printf("Catalog update duration in seconds: %.2f\n", duration);
             assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        }
 
-        // run a blocking snapshot that *might* normally timeout
-        start = System.nanoTime();
-        response = client.callProcedure("@SnapshotSave", Configuration.getPathToCatalogForTest(""), "slow", 1);
-        duration = (System.nanoTime() - start) / 1000000000.0;
-        System.out.printf("Snapshot save duration in seconds: %.2f\n", duration);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+            // run a blocking snapshot that *might* normally timeout
+            start = System.nanoTime();
+            response = client.callProcedure("@SnapshotSave", Configuration.getPathToCatalogForTest(""), "slow", 1);
+            duration = (System.nanoTime() - start) / 1000000000.0;
+            System.out.printf("Snapshot save duration in seconds: %.2f\n", duration);
+            assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        }
     }
 
     public void testMaxTimeout() throws NoConnectionsException, IOException, ProcCallException {

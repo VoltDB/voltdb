@@ -15,32 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.exportclient;
+package org.voltdb.export;
 
-public class ExportClientException extends Exception {
-
-    private static final long serialVersionUID = 8519169468665494915L;
-
-    enum Type {
-        AUTH_FAILURE,
-        DISCONNECT_UNEXPECTED,
-        DISCONNECT_UPDATE,
-        USER_ERROR
-    }
-
-    public final Type type;
-
-    public ExportClientException(Throwable t) {
-        super(t);
-        type = Type.USER_ERROR;
-    }
-    public ExportClientException(Type type, String message) {
-        super(message);
-        this.type = type;
-    }
-
-    public ExportClientException(Type type, String message, Exception cause) {
-        super(message, cause);
-        this.type = type;
-    }
+public interface ExportStateBlock {
+    public void event(ExportProtoMessage message);
 }
