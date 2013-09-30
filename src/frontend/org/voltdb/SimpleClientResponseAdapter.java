@@ -28,7 +28,10 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Exchanger;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * A very simple adapter that deserializes bytes into client responses. It calls
@@ -42,9 +45,13 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
     public static final class SyncCallback implements Callback {
         private final Exchanger<ClientResponse> m_responseExchanger = new Exchanger<ClientResponse>();
 
-        public ClientResponse getResponse() throws InterruptedException
+        public ClientResponse getResponse(long timeoutMs) throws InterruptedException
         {
-            return m_responseExchanger.exchange(null);
+            try {
+                return m_responseExchanger.exchange(null, timeoutMs, TimeUnit.MILLISECONDS);
+            } catch (TimeoutException e) {
+                return null;
+            }
         }
 
         @Override
@@ -59,7 +66,7 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
     }
 
     private final long m_connectionId;
-    private final Callback m_callback;
+    private volatile Callback m_callback = null;
     private final String m_name;
     public static volatile AtomicLong m_testConnectionIdGenerator;
 
@@ -67,17 +74,19 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
     /**
      * @param connectionId    The connection ID for this adapter, needs to be unique for this
      *                        node.
-     * @param callback        A callback to take the client response, null is accepted.
      * @param name            Human readable name identifying the adapter, will stand in for hostname
      */
-    public SimpleClientResponseAdapter(long connectionId, Callback callback, String name) {
+    public SimpleClientResponseAdapter(long connectionId, String name) {
         if (m_testConnectionIdGenerator != null) {
             m_connectionId = m_testConnectionIdGenerator.incrementAndGet();
         } else {
             m_connectionId = connectionId;
         }
-        m_callback = callback;
         m_name = name;
+    }
+
+    public void setCallback(Callback callback) {
+        m_callback = callback;
     }
 
     @Override
@@ -116,8 +125,9 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
             b.position(4);
             resp.initFromBuffer(b);
 
-            if (m_callback != null) {
-                m_callback.handleResponse(resp);
+            Callback callback = m_callback;
+            if (callback != null) {
+                callback.handleResponse(resp);
             }
         }
         catch (IOException e)
