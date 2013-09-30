@@ -4,4 +4,12 @@
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
+    <export enabled="false">
+        <onserver exportto="file">
+            <configuration>
+                <property name="type">csv</property>
+                <property name="nonce">VoterExport</property>
+            </configuration>
+        </onserver>
+    </export>
 </deployment>

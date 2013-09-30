@@ -62,6 +62,10 @@ public class Vote extends VoltProcedure {
     public final SQLStmt insertVoteStmt = new SQLStmt(
             "INSERT INTO votes (phone_number, state, contestant_number) VALUES (?, ?, ?);");
 
+    // Record a vote to the export table
+    public final SQLStmt insertVoteExportStmt = new SQLStmt(
+            "INSERT INTO votes_export (phone_number, state, contestant_number) VALUES (?, ?, ?);");
+
     public long run(long phoneNumber, int contestantNumber, long maxVotesPerPhoneNumber) {
 
         // Queue up validation statements
@@ -88,6 +92,7 @@ public class Vote extends VoltProcedure {
 
         // Post the vote
         voltQueueSQL(insertVoteStmt, EXPECT_SCALAR_MATCH(1), phoneNumber, state, contestantNumber);
+        voltQueueSQL(insertVoteExportStmt, EXPECT_SCALAR_MATCH(1), phoneNumber, state, contestantNumber);
         voltExecuteSQL(true);
 
         // Set the return value to 0: successful vote
