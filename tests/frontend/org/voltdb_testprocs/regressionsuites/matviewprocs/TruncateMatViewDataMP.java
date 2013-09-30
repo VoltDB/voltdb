@@ -38,12 +38,14 @@ public class TruncateMatViewDataMP extends VoltProcedure {
     public final SQLStmt truncatebase3 = new SQLStmt("DELETE FROM OVERFLOWTEST;");
     public final SQLStmt truncatebase4 = new SQLStmt("DELETE FROM ENG798;");
     public final SQLStmt truncatebase5 = new SQLStmt("DELETE FROM CONTEST;");
+    public final SQLStmt truncatebase6 = new SQLStmt("DELETE FROM DEPT_PEOPLE;");
 
     public final SQLStmt validatebase1 = new SQLStmt("SELECT COUNT(*) FROM PEOPLE;");
     public final SQLStmt validatebase2 = new SQLStmt("SELECT COUNT(*) FROM THINGS;");
     public final SQLStmt validatebase3 = new SQLStmt("SELECT COUNT(*) FROM OVERFLOWTEST;");
     public final SQLStmt validatebase4 = new SQLStmt("SELECT COUNT(*) FROM ENG798;");
     public final SQLStmt validatebase5 = new SQLStmt("SELECT COUNT(*) FROM CONTEST;");
+    public final SQLStmt validatebase6 = new SQLStmt("SELECT COUNT(*) FROM DEPT_PEOPLE;");
 
     public final SQLStmt validateview1 = new SQLStmt("SELECT COUNT(*) FROM MATPEOPLE;");
     public final SQLStmt validateview2 = new SQLStmt("SELECT COUNT(*) FROM MATTHINGS;");
@@ -52,6 +54,11 @@ public class TruncateMatViewDataMP extends VoltProcedure {
     public final SQLStmt validateview5 = new SQLStmt("SELECT COUNT(*) FROM V_RUNNING_TEAM;");
     public final SQLStmt validateview6 = new SQLStmt("SELECT COUNT(*) FROM V_TEAM_MEMBERSHIP;");
     public final SQLStmt validateview7 = new SQLStmt("SELECT COUNT(*) FROM V_TEAM_TIMES;");
+    public final SQLStmt validateview8 = new SQLStmt("SELECT COUNT(*) FROM MATPEOPLE2;");
+    public final SQLStmt validateview9 = new SQLStmt("SELECT COUNT(*) FROM MATPEOPLE3;");
+    public final SQLStmt validateview10 = new SQLStmt("SELECT COUNT(*) FROM DEPT_AGE_MATVIEW;");
+    public final SQLStmt validateview11 = new SQLStmt("SELECT COUNT(*) FROM DEPT_AGE_FILTER_MATVIEW;");
+
 
     public VoltTable[] run() {
         VoltTable[] result;
@@ -60,6 +67,7 @@ public class TruncateMatViewDataMP extends VoltProcedure {
         voltQueueSQL(truncatebase3); // ("DELETE FROM OVERFLOWTEST;");
         voltQueueSQL(truncatebase4); // ("DELETE FROM ENG798;");
         voltQueueSQL(truncatebase5); // ("DELETE FROM CONTEST;");
+        voltQueueSQL(truncatebase6); // ("DELETE FROM DEPT_PEOPLE;");
         result = voltExecuteSQL();
         /*
         for (VoltTable deleted : result) {
@@ -70,7 +78,8 @@ public class TruncateMatViewDataMP extends VoltProcedure {
         voltQueueSQL(validatebase2); // ("SELECT COUNT(*) FROM THINGS;");
         voltQueueSQL(validatebase3); // ("SELECT COUNT(*) FROM OVERFLOWTEST;");
         voltQueueSQL(validatebase4); // ("SELECT COUNT(*) FROM ENG798;");
-        voltQueueSQL(validatebase4); // ("SELECT COUNT(*) FROM contest;");
+        voltQueueSQL(validatebase5); // ("SELECT COUNT(*) FROM contest;");
+        voltQueueSQL(validatebase6); // ("SELECT COUNT(*) FROM DEPT_PEOPLE;");
         voltQueueSQL(validateview1); // ("SELECT COUNT(*) FROM MATPEOPLE;");
         voltQueueSQL(validateview2); // ("SELECT COUNT(*) FROM MATTHINGS;");
         voltQueueSQL(validateview3); // ("SELECT COUNT(*) FROM V_OVERFLOWTEST;");
@@ -78,6 +87,10 @@ public class TruncateMatViewDataMP extends VoltProcedure {
         voltQueueSQL(validateview5); // ("SELECT COUNT(*) FROM V_RUNNING_TEAM;");
         voltQueueSQL(validateview6); // ("SELECT COUNT(*) FROM V_TEAM_MEMBERSHIP;");
         voltQueueSQL(validateview7); // ("SELECT COUNT(*) FROM V_TEAM_TIMES;");
+        voltQueueSQL(validateview8); // ("SELECT COUNT(*) FROM MATPEOPLE2;");
+        voltQueueSQL(validateview9); // ("SELECT COUNT(*) FROM MATPEOPLE3;");
+        voltQueueSQL(validateview10); // ("SELECT COUNT(*) FROM DEPT_AGE_MATVIEW;");
+        voltQueueSQL(validateview11); // ("SELECT COUNT(*) FROM DEPT_AGE_FILTER_MATVIEW;");
         result = voltExecuteSQL(true);
         /*
         for (VoltTable deleted : result) {

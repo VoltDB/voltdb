@@ -59,19 +59,27 @@ public class ElasticHashinator extends TheHashinator {
      * the value's hash
      */
     private final ImmutableSortedMap<Long, Integer> m_tokens;
-    private final byte m_configBytes[];
-    private final long m_signature;
-
-    /**
-     * Cached data in format optimized for wire transmission.
-     */
-    private final Supplier<byte[]> m_cookedBytesSupplier = new Supplier<byte[]>() {
+    private final Supplier<byte[]> m_configBytes;
+    private final Supplier<byte[]> m_configBytesSupplier = Suppliers.memoize(new Supplier<byte[]>() {
+        @Override
+        public byte[] get() {
+            return toBytes();
+        }
+    });
+    private final Supplier<byte[]> m_cookedBytes;
+    private final Supplier<byte[]> m_cookedBytesSupplier = Suppliers.memoize(new Supplier<byte[]>() {
         @Override
         public byte[] get() {
             return toCookedBytes();
         }
-    };
-    private final Supplier<byte[]> m_cookedBytesCache = Suppliers.memoize(m_cookedBytesSupplier);
+    });
+    private final Supplier<Long> m_signature = Suppliers.memoize(new Supplier<Long>() {
+        @Override
+        public Long get() {
+            return TheHashinator.computeConfigurationSignature(m_configBytes.get());
+        }
+    });
+
 
     /**
      * Encapsulates all knowledge of how to compress/uncompress hash tokens.
@@ -114,18 +122,10 @@ public class ElasticHashinator extends TheHashinator {
      * @param cooked  compressible wire serialization format if true
      */
     public ElasticHashinator(byte configBytes[], boolean cooked) {
-        Map<Long, Integer> configMap = (cooked ? updateCooked(configBytes)
+        m_tokens = (cooked ? updateCooked(configBytes)
                 : updateRaw(configBytes));
-
-        ImmutableSortedMap.Builder<Long, Integer> builder = ImmutableSortedMap.naturalOrder();
-        for (Map.Entry<Long, Integer> e : configMap.entrySet()) {
-            builder.put(e.getKey(), e.getValue());
-        }
-
-        m_tokens = builder.build();
-
-        m_configBytes = toBytes();
-        m_signature = TheHashinator.computeConfigurationSignature(m_configBytes);
+        m_configBytes = !cooked ? Suppliers.ofInstance(configBytes) : m_configBytesSupplier;
+        m_cookedBytes = cooked ? Suppliers.ofInstance(configBytes) : m_cookedBytesSupplier;
     }
 
     /**
@@ -135,9 +135,8 @@ public class ElasticHashinator extends TheHashinator {
      */
     private ElasticHashinator(Map<Long, Integer> tokens) {
         this.m_tokens = ImmutableSortedMap.copyOf(tokens);
-        m_configBytes = toBytes();
-
-        m_signature = TheHashinator.computeConfigurationSignature(m_configBytes);
+        m_configBytes = m_configBytesSupplier;
+        m_cookedBytes = m_cookedBytesSupplier;
     }
 
     /**
@@ -208,7 +207,7 @@ public class ElasticHashinator extends TheHashinator {
      * Serializes the configuration into bytes, also updates the currently cached m_configBytes.
      * @return The byte[] of the current configuration.
      */
-    public byte[] toBytes() {
+    private byte[] toBytes() {
         ByteBuffer buf = ByteBuffer.allocate(4 + (m_tokens.size() * (8 + TokenCompressor.COMPRESSED_SIZE)));
         buf.putInt(m_tokens.size());
 
@@ -281,7 +280,7 @@ public class ElasticHashinator extends TheHashinator {
 
     @Override
     protected Pair<HashinatorType, byte[]> pGetCurrentConfig() {
-        return Pair.of(HashinatorType.ELASTIC, m_configBytes);
+        return Pair.of(HashinatorType.ELASTIC, m_configBytes.get());
     }
 
     /**
@@ -404,7 +403,7 @@ public class ElasticHashinator extends TheHashinator {
      */
     @Override
     public long pGetConfigurationSignature() {
-        return m_signature;
+        return m_signature.get();
     }
 
     @Override
@@ -425,7 +424,7 @@ public class ElasticHashinator extends TheHashinator {
     @Override
     public byte[] getConfigBytes()
     {
-        return m_configBytes;
+        return m_configBytes.get();
     }
 
     /**
@@ -433,7 +432,7 @@ public class ElasticHashinator extends TheHashinator {
      * @return config bytes
      * @throws IOException
      */
-    public byte[] toCookedBytes()
+    private byte[] toCookedBytes()
     {
         // Allocate for a int pair per token/partition ID entry, plus a size.
         ByteBuffer buf = ByteBuffer.allocate(4 + (m_tokens.size() * (4 + TokenCompressor.COMPRESSED_SIZE)));
@@ -474,21 +473,16 @@ public class ElasticHashinator extends TheHashinator {
      * @param configBytes  raw config data
      * @return  token/partition map
      */
-    private Map<Long, Integer> updateRaw(byte configBytes[]) {
+    private ImmutableSortedMap<Long, Integer> updateRaw(byte configBytes[]) {
         ByteBuffer buf = ByteBuffer.wrap(configBytes);
         int numEntries = buf.getInt();
-        TreeMap<Long, Integer> buildMap = new TreeMap<Long, Integer>();
+        ImmutableSortedMap.Builder<Long, Integer> builder = ImmutableSortedMap.naturalOrder();
         for (int ii = 0; ii < numEntries; ii++) {
             final long token = buf.getLong();
             final int partitionId = buf.getInt();
-            if (buildMap.containsKey(token)) {
-                throw new RuntimeException(
-                        String.format("Duplicate token %d: partitions %d and %d",
-                                      token, partitionId, buildMap.get(token)));
-            }
-            buildMap.put( token, partitionId);
+            builder.put(token, partitionId);
         }
-        return buildMap;
+        return builder.build();
     }
 
     /**
@@ -499,7 +493,7 @@ public class ElasticHashinator extends TheHashinator {
      * @param compressedData  optimized and compressed config data
      * @return  token/partition map
      */
-    private Map<Long, Integer> updateCooked(byte[] compressedData)
+    private ImmutableSortedMap<Long, Integer> updateCooked(byte[] compressedData)
     {
         // Uncompress (inflate) the bytes.
         ByteArrayOutputStream bos = new ByteArrayOutputStream((int)(compressedData.length * 1.5));
@@ -523,18 +517,13 @@ public class ElasticHashinator extends TheHashinator {
         }
         ByteBuffer tokenBuf = ByteBuffer.wrap(cookedBytes, 4, tokensSize);
         ByteBuffer partitionBuf = ByteBuffer.wrap(cookedBytes, 4 + tokensSize, partitionsSize);
-        TreeMap<Long, Integer> buildMap = new TreeMap<Long, Integer>();
+        ImmutableSortedMap.Builder<Long, Integer> builder = ImmutableSortedMap.naturalOrder();
         for (int ii = 0; ii < numEntries; ii++) {
             final long token = TokenCompressor.uncompress(tokenBuf.getInt());
             final int partitionId = partitionBuf.getInt();
-            if (buildMap.containsKey(token)) {
-                throw new RuntimeException(
-                        String.format("Duplicate token %d: partition %d and %d",
-                                      token, partitionId, buildMap.get(token)));
-            }
-            buildMap.put( token, partitionId);
+            builder.put( token, partitionId );
         }
-        return buildMap;
+        return builder.build();
     }
 
     /**
@@ -544,6 +533,6 @@ public class ElasticHashinator extends TheHashinator {
     @Override
     public byte[] getCookedBytes()
     {
-        return m_cookedBytesCache.get();
+        return m_cookedBytes.get();
     }
 }

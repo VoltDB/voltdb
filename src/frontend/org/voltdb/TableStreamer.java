@@ -58,8 +58,9 @@ public class TableStreamer {
      * @param context       Context
      * @param predicates    Predicates associated with the stream
      */
-    public long activate(SystemProcedureExecutionContext context, byte[] predicates)    {
-        return activate(context, Long.MAX_VALUE, predicates);
+    public void activate(SystemProcedureExecutionContext context, byte[] predicates)
+    {
+        activate(context, false, predicates);
     }
 
     /**
@@ -68,14 +69,13 @@ public class TableStreamer {
      * @param undoToken     The undo token
      * @param predicates    Predicates associated with the stream
      */
-    public long activate(SystemProcedureExecutionContext context, long undoToken, byte[] predicates) {
-        long ret_val = context.activateTableStream(m_tableId, m_type, undoToken, predicates);
-        if (ret_val == -1) {
+    public void activate(SystemProcedureExecutionContext context, boolean undo, byte[] predicates)
+    {
+        if (!context.activateTableStream(m_tableId, m_type, undo, predicates)) {
             String tableName = CatalogUtil.getTableNameFromId(context.getDatabase(), m_tableId);
             VoltDB.crashLocalVoltDB("Attempted to activate a table stream of type " + m_type +
                                     "for table " + tableName + " and failed", false, null);
         }
-        return ret_val;
     }
 
     /**
@@ -105,6 +105,7 @@ public class TableStreamer {
                 container.discard();
             }
         }
+
         return Pair.of(writeFuture, serializeResult.getFirst() > 0);
     }
 

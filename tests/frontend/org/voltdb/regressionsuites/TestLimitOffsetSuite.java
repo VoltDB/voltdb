@@ -125,7 +125,6 @@ public class TestLimitOffsetSuite extends RegressionSuite {
                 .getResults()[0];
         assertEquals(1, result.getRowCount());
         result.advanceRow();
-        assertEquals(0, result.getLong(0));
         result = client.callProcedure("@AdHoc", "SELECT A.PKEY FROM A, B WHERE A.PKEY = B.PKEY LIMIT 2 OFFSET 2;")
                 .getResults()[0];
         assertEquals(2, result.getRowCount());

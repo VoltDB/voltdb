@@ -57,47 +57,19 @@ import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
  * identically as the C++ Hashinator.
  *
  */
-@RunWith(Parameterized.class)
 public class TestTheHashinator {
     Random r = new Random();
 
     @Before
     public void setUp() {
+        ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION = 6;
         EELibraryLoader.loadExecutionEngineLibrary(true);
         VoltDB.instance().readBuildInfo("Test");
     }
 
-    @Parameters
-    public static Collection<Object[]> startActions() {
-        return Arrays.asList(new Object[][] {{HashinatorType.LEGACY},
-                                             {HashinatorType.ELASTIC}});
-    }
-
-    private final HashinatorType hashinatorType;
+    private final HashinatorType hashinatorType = TheHashinator.getConfiguredHashinatorType();
     private final int tokensPerPartition = 6;
-    public TestTheHashinator(HashinatorType  type) {
-        hashinatorType = type;
-    }
 
-    public byte[] getConfigBytes(int partitionCount) {
-        switch (hashinatorType) {
-        case LEGACY:
-            return LegacyHashinator.getConfigureBytes(partitionCount);
-        case ELASTIC:
-            return ElasticHashinator.getConfigureBytes(partitionCount, tokensPerPartition);
-        }
-        return null;
-    }
-
-    public Class<? extends TheHashinator> getHashinatorClass() {
-        switch(hashinatorType) {
-        case LEGACY:
-            return LegacyHashinator.class;
-        case ELASTIC:
-            return ElasticHashinator.class;
-        }
-        throw new RuntimeException();
-    }
 
     private static Map<Long, Integer> deserializeElasticConfig(byte[] config) {
         Map<Long, Integer> tokens = new HashMap<Long, Integer>();
@@ -206,7 +178,7 @@ public class TestTheHashinator {
      */
     @Test
     public void testExpectNonZeroHash() throws Exception {
-        final byte configBytes[] = getConfigBytes(3);
+        final byte configBytes[] = TheHashinator.getConfigureBytes(3);
         ExecutionEngine ee =
                 new ExecutionEngineJNI(
                         1,
@@ -220,7 +192,7 @@ public class TestTheHashinator {
 
         int partitionCount = 3;
         long valueToHash = hashinatorType == HashinatorType.ELASTIC ? 39: 2;
-        TheHashinator.initialize(getHashinatorClass(), configBytes);
+        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), configBytes);
 
         int eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
         int javahash = TheHashinator.getPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(),
@@ -238,7 +210,7 @@ public class TestTheHashinator {
 
     @Test
     public void testSameLongHash1() throws Exception {
-        final byte configBytes[] = getConfigBytes(2);
+        final byte configBytes[] = TheHashinator.getConfigureBytes(2);
         ExecutionEngine ee =
                 new ExecutionEngineJNI(
                         1,
@@ -251,7 +223,7 @@ public class TestTheHashinator {
                         configBytes);
 
         int partitionCount = 2;
-        TheHashinator.initialize(getHashinatorClass(), getConfigBytes(partitionCount));
+        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(partitionCount));
 
         long valueToHash = 0;
         int eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
@@ -302,7 +274,7 @@ public class TestTheHashinator {
 
     @Test
     public void testEdgeCases() throws Exception {
-        byte configBytes[] = getConfigBytes(1);
+        byte configBytes[] = TheHashinator.getConfigureBytes(1);
         ExecutionEngine ee =
                 new ExecutionEngineJNI(
                         1,
@@ -323,8 +295,8 @@ public class TestTheHashinator {
             long[] values = new long[] {
                     Long.MIN_VALUE, Long.MAX_VALUE, Long.MAX_VALUE - 1, Long.MIN_VALUE + 1
             };
-            configBytes = getConfigBytes(partitionCount);
-            TheHashinator.initialize(getHashinatorClass(), configBytes);
+            configBytes = TheHashinator.getConfigureBytes(partitionCount);
+            TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), configBytes);
             for (long valueToHash : values) {
                 int eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
                 int javahash = TheHashinator.getPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(),
@@ -343,17 +315,17 @@ public class TestTheHashinator {
 
     @Test
     public void testSameLongHash() throws Exception {
-        byte configBytes[] = getConfigBytes(1);
+        byte configBytes[] = TheHashinator.getConfigureBytes(1);
         ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, 0, "", 100, hashinatorType, configBytes);
 
         /**
          *  Run with 10k of random values and make sure C++ and Java hash to
          *  the same value.
          */
-        for (int i = 0; i < 2500; i++) {
+        for (int i = 0; i < 1500; i++) {
             final int partitionCount = r.nextInt(1000) + 1;
-            configBytes = getConfigBytes(partitionCount);
-            TheHashinator.initialize(getHashinatorClass(), configBytes);
+            configBytes = TheHashinator.getConfigureBytes(partitionCount);
+            TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), configBytes);
             // this will produce negative values, which is desired here.
             final long valueToHash = r.nextLong();
             final int javahash = TheHashinator.getPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(),
@@ -372,7 +344,7 @@ public class TestTheHashinator {
 
     @Test
     public void testSameStringHash() throws Exception {
-        byte configBytes[] = getConfigBytes(1);
+        byte configBytes[] = TheHashinator.getConfigureBytes(1);
         ExecutionEngine ee =
                 new ExecutionEngineJNI(
                         1,
@@ -384,11 +356,11 @@ public class TestTheHashinator {
                         hashinatorType,
                         configBytes);
 
-        for (int i = 0; i < 2500; i++) {
+        for (int i = 0; i < 1500; i++) {
             int partitionCount = r.nextInt(1000) + 1;
-            configBytes = getConfigBytes(partitionCount);
+            configBytes = TheHashinator.getConfigureBytes(partitionCount);
             String valueToHash = Long.toString(r.nextLong());
-            TheHashinator.initialize(getHashinatorClass(), configBytes);
+            TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), configBytes);
 
             int eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
             int javahash = TheHashinator.getPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(),
@@ -411,9 +383,9 @@ public class TestTheHashinator {
     public void testNumberCoercionHash() throws Exception {
         System.out.println("=======================");
         System.out.println("NUMBER COERCION");
-        for (int i = 0; i < 25000; i++) {
+        for (int i = 0; i < 1500; i++) {
             int partitionCount = r.nextInt(1000) + 1;
-            byte[] configBytes = getConfigBytes(partitionCount);
+            byte[] configBytes = TheHashinator.getConfigureBytes(partitionCount);
             long longToHash = r.nextLong();
             String stringToHash = Long.toString(longToHash);
             byte[] bufToHash;
@@ -421,7 +393,7 @@ public class TestTheHashinator {
             buf.order(ByteOrder.LITTLE_ENDIAN);
             buf.putLong(longToHash);
             bufToHash = buf.array();
-            TheHashinator.initialize(getHashinatorClass(), configBytes);
+            TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), configBytes);
             int longHash =
                 TheHashinator.getPartitionForParameter(VoltType.BIGINT.getValue(),
                     longToHash);
@@ -449,9 +421,9 @@ public class TestTheHashinator {
                         "",
                         100,
                         hashinatorType,
-                        getConfigBytes(2));
-        final byte configBytes[] = getConfigBytes(2);
-        TheHashinator.initialize(getHashinatorClass(), configBytes);
+                        TheHashinator.getConfigureBytes(2));
+        final byte configBytes[] = TheHashinator.getConfigureBytes(2);
+        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), configBytes);
         int jHash =
             TheHashinator.getPartitionForParameter(VoltType.TINYINT.getValue(), new Byte(VoltType.NULL_TINYINT));
         int cHash = ee.hashinate(VoltType.NULL_TINYINT, hashinatorType, configBytes);
@@ -518,13 +490,13 @@ public class TestTheHashinator {
                         "",
                         100,
                         hashinatorType,
-                        getConfigBytes(6));
+                        TheHashinator.getConfigureBytes(6));
         for (int i = 0; i < 2500; i++) {
             int partitionCount = r.nextInt(1000) + 1;
             byte[] valueToHash = new byte[r.nextInt(1000)];
             r.nextBytes(valueToHash);
-            final byte configBytes[] = getConfigBytes(partitionCount);
-            TheHashinator.initialize(getHashinatorClass(), configBytes);
+            final byte configBytes[] = TheHashinator.getConfigureBytes(partitionCount);
+            TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), configBytes);
             int eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
             int javahash = TheHashinator.getPartitionForParameter(VoltType.typeFromClass(byte[].class).getValue(),
                     valueToHash);
@@ -745,8 +717,8 @@ public class TestTheHashinator {
     @Test
     public void testGetConfigurationSignature()
     {
-        final byte configBytes[] = getConfigBytes(2);
-        TheHashinator.initialize(getHashinatorClass(), configBytes);
+        final byte configBytes[] = TheHashinator.getConfigureBytes(2);
+        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), configBytes);
 
 
         long expected = TheHashinator.computeConfigurationSignature(configBytes);

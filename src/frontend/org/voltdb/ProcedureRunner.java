@@ -655,7 +655,7 @@ public class ProcedureRunner {
         try {
             return m_site.loadTable(m_txnState.txnId,
                              clusterName, databaseName,
-                             tableName, data, returnUniqueViolations, Long.MAX_VALUE);
+                             tableName, data, returnUniqueViolations, false);
         }
         catch (EEException e) {
             throw new VoltAbortException("Failed to load table: " + tableName);
