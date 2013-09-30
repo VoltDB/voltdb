@@ -51,7 +51,7 @@ public class LimitPlanNode extends AbstractPlanNode {
     public LimitPlanNode(LimitPlanNode limit) {
         super();
         m_offset = limit.getOffset();
-        m_limit =limit.getLimit();
+        m_limit = limit.getLimit();
         m_limitParameterId = limit.m_limitParameterId;
         m_offsetParameterId = limit.m_offsetParameterId;
         if (limit.getLimitExpression() != null) {

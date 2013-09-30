@@ -467,10 +467,17 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         }
 
         LimitPlanNode limit = (LimitPlanNode)m_inlineNodes.get(PlanNodeType.LIMIT);
-        if (limit != null && limit.getLimit() > 0) {
-            m_estimatedOutputTupleCount = Math.min(m_estimatedOutputTupleCount, limit.getLimit());
+        if (limit != null) {
+            int limitInt = limit.getLimit();
+            // TODO(xin): do not use -1 here as a hack in future.
+            if (limitInt == -1) {
+                // If Limit ?, it's likely to be a small number. So pick up 50 here.
+                limitInt = 50;
+            }
+
+            m_estimatedOutputTupleCount = Math.min(m_estimatedOutputTupleCount, limitInt);
             if (m_predicate == null) {
-                m_estimatedProcessedTupleCount = limit.getLimit() + limit.getOffset();
+                m_estimatedProcessedTupleCount = limitInt + limit.getOffset();
             }
         }
     }
