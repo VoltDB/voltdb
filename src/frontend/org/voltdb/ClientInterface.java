@@ -133,8 +133,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     // connection IDs used by internal adapters
     public static final long RESTORE_AGENT_CID          = Long.MIN_VALUE + 1;
     public static final long SNAPSHOT_UTIL_CID          = Long.MIN_VALUE + 2;
-    public static final long CL_REPLAY_BASE_CID         = Long.MIN_VALUE + 3;
-    public static final long ELASTIC_JOIN_CID           = Long.MIN_VALUE + 4;
+    public static final long ELASTIC_JOIN_CID           = Long.MIN_VALUE + 3;
+    // Leave CL_REPLAY_BASE_CID at the end, it uses this as a base and generates more cids
+    public static final long CL_REPLAY_BASE_CID         = Long.MIN_VALUE + 100;
 
     private static final VoltLogger log = new VoltLogger(ClientInterface.class.getName());
     private static final VoltLogger authLog = new VoltLogger("AUTH");
