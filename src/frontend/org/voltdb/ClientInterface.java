@@ -134,8 +134,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long RESTORE_AGENT_CID          = Long.MIN_VALUE + 1;
     public static final long SNAPSHOT_UTIL_CID          = Long.MIN_VALUE + 2;
     public static final long CL_REPLAY_BASE_CID         = Long.MIN_VALUE + 3;
-    public static final long ELASTIC_NODE_PING_CID      = Long.MIN_VALUE + 4;
-    public static final long ELASTIC_DATA_MIGRATION_CID = Long.MIN_VALUE + 5;
+    public static final long ELASTIC_JOIN_CID           = Long.MIN_VALUE + 4;
 
     private static final VoltLogger log = new VoltLogger(ClientInterface.class.getName());
     private static final VoltLogger authLog = new VoltLogger("AUTH");
