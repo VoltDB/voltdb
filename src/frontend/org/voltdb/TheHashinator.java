@@ -411,7 +411,7 @@ public abstract class TheHashinator {
         }
         String hashinatorType = System.getenv("HASHINATOR");
         if (hashinatorType == null) {
-            hashinatorType = System.getProperty("HASHINATOR", HashinatorType.LEGACY.name());
+            hashinatorType = System.getProperty("HASHINATOR", HashinatorType.ELASTIC.name());
         }
         if (hostLogger.isDebugEnabled()) {
             hostLogger.debug("Overriding hashinator to use " + hashinatorType);
@@ -421,7 +421,12 @@ public abstract class TheHashinator {
     }
 
     public static void setConfiguredHashinatorType(HashinatorType type) {
-        configuredHashinatorType = type;
+        if (System.getenv("HASHINATOR") == null && System.getProperty("HASHINATOR") == null) {
+            configuredHashinatorType = type;
+        } else {
+            hostLogger.info("Ignoring manually specified hashinator type " + type +
+                            " in favor of environment/property type " + getConfiguredHashinatorType());
+        }
     }
 
     /**

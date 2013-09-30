@@ -176,7 +176,7 @@ public class TestClientInterface {
         CatalogUtil.compileDeploymentAndGetCRC(catalog, deploymentPath, true);
 
         m_context = new CatalogContext(0, 0, catalog, bytes, 0, 0, 0);
-        TheHashinator.initialize(LegacyHashinator.class, LegacyHashinator.getConfigureBytes(3));
+        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(3));
     }
 
     @After
