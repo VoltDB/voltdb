@@ -219,7 +219,8 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
      * dropped plan fragments
      */
     //Anish Use a callback to track responses on coordinator side.
-    public VoltTable[] executeSysProcPlanFragments(SynthesizedPlanFragment pfs[], Mailbox m) {
+    public VoltTable[] executeSysProcPlanFragments(SynthesizedPlanFragment pfs[],
+            Mailbox m, ProgressMonitor monitor) {
         Set<Integer> dependencyIds = new HashSet<Integer>();
         VoltTable results[] = new VoltTable[1];
 
@@ -309,11 +310,8 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                 if (dependencyIds.contains(dependencyId)) {
                     VoltTable table = frm.getTableAtIndex(0);
                     if (table != null) {
-                        table.advanceRow();
-                        Long count = table.getLong("COUNT");
-                        total += count;
-                        if (count != 0) {
-                            System.out.println("Processed: " + total);
+                        if (monitor != null) {
+                            monitor.reportProgress(table);
                         }
                     }
                     receivedDependencyIds.put(
