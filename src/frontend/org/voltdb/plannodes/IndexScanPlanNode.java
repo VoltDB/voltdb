@@ -469,7 +469,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         LimitPlanNode limit = (LimitPlanNode)m_inlineNodes.get(PlanNodeType.LIMIT);
         if (limit != null) {
             int limitInt = limit.getLimit();
-            // TODO(xin): do not use -1 here as a hack in future.
             if (limitInt == -1) {
                 // If Limit ?, it's likely to be a small number. So pick up 50 here.
                 limitInt = 50;

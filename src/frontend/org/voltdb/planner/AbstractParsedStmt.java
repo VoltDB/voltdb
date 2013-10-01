@@ -91,11 +91,6 @@ public abstract class AbstractParsedStmt {
         this.m_db = db;
     }
 
-    public static AbstractParsedStmt parse(String sql, VoltXMLElement stmtTypeElement, String[] paramValues,
-            Database db, String joinOrder) {
-        return parse(sql, stmtTypeElement, paramValues, db, joinOrder, false);
-    }
-
     /**
      *
      * @param sql
