@@ -17,9 +17,9 @@
 package org.voltdb;
 
 /**
- * System Procedure progress callback interface. Start indicates the total result size expected. Progress updates the
- * work done so far. End indicates that processing is done. Implementer needs to handle these and track the counters and
- * report progress to user or some other system.
+ * System Procedure progress callback interface. Start indicates the total result size expected.
+ * Progress updates the work done so far. End indicates that processing is done. Implementer
+ * needs to handle these and track the counters and report progress to user or some other system.
  */
 public interface ProgressMonitor {
 
