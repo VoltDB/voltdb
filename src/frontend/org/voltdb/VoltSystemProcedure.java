@@ -326,7 +326,6 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                         break;
                     }
                 } else {
-                    System.out.println("Not mine");
                     /*
                      * Stash the dependency intended for a different fragment
                      */

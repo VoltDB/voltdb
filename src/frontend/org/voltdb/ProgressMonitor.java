@@ -25,7 +25,4 @@ public interface ProgressMonitor {
 
     void reportProgress(VoltTable table);
 
-    void reportStart(VoltTable table);
-
-    void reportEnd(VoltTable table);
 }
