@@ -90,13 +90,20 @@ public abstract class AbstractParsedStmt {
         this.m_paramValues = paramValues;
         this.m_db = db;
     }
+
+    public static AbstractParsedStmt parse(String sql, VoltXMLElement stmtTypeElement, String[] paramValues,
+            Database db, String joinOrder) {
+        return parse(sql, stmtTypeElement, paramValues, db, joinOrder, false);
+    }
+
     /**
      *
      * @param sql
      * @param xmlSQL
      * @param db
      */
-    public static AbstractParsedStmt parse(String sql, VoltXMLElement stmtTypeElement, String[] paramValues, Database db, String joinOrder) {
+    public static AbstractParsedStmt parse(String sql, VoltXMLElement stmtTypeElement, String[] paramValues,
+            Database db, String joinOrder, boolean isAdHoc) {
 
         AbstractParsedStmt retval = null;
 
@@ -116,7 +123,7 @@ public abstract class AbstractParsedStmt {
             retval = new ParsedDeleteStmt(paramValues, db);
         }
         else if (stmtTypeElement.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
-            retval = new ParsedSelectStmt(paramValues, db);
+            retval = new ParsedSelectStmt(paramValues, db, isAdHoc);
         }
         else if (stmtTypeElement.name.equalsIgnoreCase(UNION_NODE_NAME)) {
             retval = new ParsedUnionStmt(paramValues, db);

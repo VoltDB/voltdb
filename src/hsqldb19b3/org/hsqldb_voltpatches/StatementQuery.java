@@ -255,8 +255,9 @@ public class StatementQuery extends StatementDMQL {
                 if (limitCondition.nodes[0].isParam == false) {
                     Integer offsetValue = (Integer)limitCondition.nodes[0].getValue(session);
                     if (offsetValue > 0) {
-                        Expression expr = new ExpressionValue(offsetValue, Type.SQL_INTEGER);
+                        Expression expr = new ExpressionValue(offsetValue, Type.SQL_BIGINT);
                         offset.children.add(expr.voltGetXML(session));
+                        offset.attributes.put("offset", offsetValue.toString());
                     }
                 } else {
                     offset.attributes.put("offset_paramid", limitCondition.nodes[0].getUniqueId(session));
@@ -267,8 +268,9 @@ public class StatementQuery extends StatementDMQL {
                 VoltXMLElement limit = new VoltXMLElement("limit");
                 if (limitCondition.nodes[1].isParam == false) {
                     Integer limitValue = (Integer)limitCondition.nodes[1].getValue(session);
-                    Expression expr = new ExpressionValue(limitValue, Type.SQL_INTEGER);
+                    Expression expr = new ExpressionValue(limitValue, Type.SQL_BIGINT);
                     limit.children.add(expr.voltGetXML(session));
+                    limit.attributes.put("limit", limitValue.toString());
                 } else {
                     limit.attributes.put("limit_paramid", limitCondition.nodes[1].getUniqueId(session));
                 }
