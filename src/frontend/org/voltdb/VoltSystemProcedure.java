@@ -307,10 +307,8 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                 final int dependencyId = frm.getTableDependencyIdAtIndex(0);
                 if (dependencyIds.contains(dependencyId)) {
                     VoltTable table = frm.getTableAtIndex(0);
-                    if (table != null) {
-                        if (monitor != null) {
-                            monitor.reportProgress(table);
-                        }
+                    if (monitor != null) {
+                        monitor.reportProgress(table);
                     }
                     receivedDependencyIds.put(
                             dependencyId,
@@ -328,6 +326,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                         break;
                     }
                 } else {
+                    System.out.println("Not mine");
                     /*
                      * Stash the dependency intended for a different fragment
                      */
