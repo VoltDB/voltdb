@@ -192,6 +192,7 @@ public class RepairLog
     // trim unnecessary log messages.
     private void truncate(long handle, boolean isSP)
     {
+        // MIN value means no work to do, is a startup condition
         if (handle == Long.MIN_VALUE) {
             return;
         }
