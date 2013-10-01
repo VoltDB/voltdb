@@ -34,8 +34,6 @@ public interface SystemProcedureExecutionContext {
 
     public long getCurrentTxnId();
 
-    public long getNextUndo();
-
     public long getSiteId();
 
     // does this site have "lowest site id" responsibilities.
@@ -72,7 +70,7 @@ public interface SystemProcedureExecutionContext {
      */
     public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config);
 
-    boolean activateTableStream(int tableId, TableStreamType type, long undoToken, byte[] predicates);
+    boolean activateTableStream(int tableId, TableStreamType type, boolean undo, byte[] predicates);
 
     Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
                                                List<DBBPool.BBContainer> outputBuffers);

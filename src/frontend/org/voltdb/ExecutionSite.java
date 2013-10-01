@@ -167,7 +167,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         return latestUndoToken;
     }
 
-    @Override
     public long getNextUndoToken() {
         return ++latestUndoToken;
     }
@@ -574,8 +573,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         @Override
         public long getCurrentTxnId()                           { return m_currentTransactionState.txnId; }
         @Override
-        public long getNextUndo()                               { return getNextUndoToken(); }
-        @Override
         public long getSiteId()                                 { return m_siteId; }
         @Override
         public boolean isLowestSiteId()                         { return m_siteId == m_tracker.getLowestSiteForHost(getHostId()); }
@@ -626,7 +623,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         }
 
         @Override
-        public boolean activateTableStream(int tableId, TableStreamType type, long undoToken, byte[] predicates)
+        public boolean activateTableStream(int tableId, TableStreamType type, boolean undo, byte[] predicates)
         {
             return false;
         }
@@ -914,7 +911,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             // m_recoveryLog.info("table " + tableId + ": " + table.toString());
 
             // Long.MAX_VALUE is a no-op don't track undo token
-            loadTable(m_rejoinSnapshotTxnId, tableId, table, false, Long.MAX_VALUE);
+            loadTable(m_rejoinSnapshotTxnId, tableId, table, false, false);
             doneWork = true;
         } else if (m_rejoinSnapshotProcessor.isEOF()) {
             m_rejoinLog.debug("Rejoin snapshot transfer is finished");
@@ -1394,7 +1391,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             String tableName,
             VoltTable data,
             boolean returnUniqueViolations,
-            long undoToken)
+            boolean undo)
     throws VoltAbortException
     {
         Cluster cluster = m_context.cluster;
@@ -1410,7 +1407,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
         }
 
-        return loadTable(txnId, table.getRelativeIndex(), data, returnUniqueViolations, undoToken);
+        return loadTable(txnId, table.getRelativeIndex(), data, returnUniqueViolations, undo);
     }
 
     /**
@@ -1421,12 +1418,12 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     @Override
     public byte[] loadTable(long txnId, int tableId,
             VoltTable data, boolean returnUniqueViolations,
-            long undoToken) {
+            boolean undo) {
         return ee.loadTable(tableId, data,
                      txnId,
                      lastCommittedTxnId,
                      returnUniqueViolations,
-                     undoToken);
+                     undo ? getNextUndoToken() : Long.MAX_VALUE);
     }
 
     @Override
@@ -1687,7 +1684,8 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     @Override
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction ignored,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            boolean requireExistingSequenceNumbers) {
         throw new RuntimeException("setRejoinComplete is an IV2-only interface.");
     }
 

@@ -35,7 +35,6 @@ import org.voltdb.iv2.JoinProducerBase;
 public interface SiteProcedureConnection {
 
     public long getLatestUndoToken();
-    public long getNextUndoToken();
 
     /**
      * Get the HSQL backend, if any.  Returns null if we're not configured
@@ -73,7 +72,7 @@ public interface SiteProcedureConnection {
             String tableName,
             VoltTable data,
             boolean returnUniqueViolations,
-            long undoToken)
+            boolean undo)
     throws VoltAbortException;
 
     /**
@@ -84,7 +83,7 @@ public interface SiteProcedureConnection {
             int tableId,
             VoltTable data,
             boolean returnUniqueViolations,
-            long undoToken);
+            boolean undo);
 
     /**
      * Execute a set of plan fragments.
@@ -135,7 +134,8 @@ public interface SiteProcedureConnection {
      */
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction action,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers);
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            boolean requireExistingSequenceNumbers);
 
     public long[] getUSOForExportTable(String signature);
 

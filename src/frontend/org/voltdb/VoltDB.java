@@ -97,11 +97,6 @@ public class VoltDB {
     // The name of the SQLStmt implied by a statement procedure's sql statement.
     public static final String ANON_STMT_NAME = "sql";
 
-    public static boolean createForRejoin(StartAction startAction)
-    {
-        return startAction.doesRejoin();
-    }
-
     //The GMT time zone you know and love
     public static final TimeZone GMT_TIMEZONE = TimeZone.getTimeZone("GMT+0");
 
@@ -540,7 +535,8 @@ public class VoltDB {
                 message = "Usage: voltdb create catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
                         + "       voltdb replica catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml> \n"
                         + "       voltdb recover [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
-                        + "       voltdb [live] rejoin host <hostname>\n";
+                        + "       voltdb [live] rejoin host <hostname>\n"
+                        + "       voltdb add host <hostname>\n";
             } else {
                 message = "Usage: voltdb create  catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>]\n"
                         + "       voltdb recover [host <hostname>] [deployment <deployment.xml>]\n"

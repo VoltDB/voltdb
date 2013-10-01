@@ -85,12 +85,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     int m_partitionId;
 
     @Override
-    public long getNextUndoToken()
-    {
-        throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
-    }
-
-    @Override
     public long getLatestUndoToken()
     {
         throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
@@ -131,11 +125,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         @Override
         public long getCurrentTxnId() {
             return m_currentTxnId;
-        }
-
-        @Override
-        public long getNextUndo() {
-            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
 
         @Override
@@ -216,7 +205,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public boolean activateTableStream(int tableId, TableStreamType type, long undoToken, byte[] predicates)
+        public boolean activateTableStream(int tableId, TableStreamType type, boolean undo, byte[] predicates)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -339,14 +328,14 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     @Override
     public byte[] loadTable(long txnId, String clusterName, String databaseName,
             String tableName, VoltTable data, boolean returnUniqueViolations,
-            long undoToken) throws VoltAbortException
+            boolean undo) throws VoltAbortException
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
     public byte[] loadTable(long spHandle, int tableId, VoltTable data, boolean returnUniqueViolations,
-            long undoToken)
+            boolean undo)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
@@ -441,7 +430,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     @Override
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction replayComplete,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers)
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            boolean requireExistingSequenceNumbers)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }

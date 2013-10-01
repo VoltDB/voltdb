@@ -842,9 +842,6 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                         targetTable = newTargetTable;
                     }
                 }
-                DEBUG_STREAM_HERE("Adding new mat view " << targetTable->name() << "@" << targetTable <<
-                                  " was @" << oldTargetTable <<
-                                  " on " << persistenttable->name() << "@" << persistenttable);
                 // This is not a leak -- the view metadata is self-installing into the new table.
                 // Also, it guards its targetTable from accidental deletion with a refcount bump.
                 new MaterializedViewMetadata(persistenttable, targetTable, currInfo);
@@ -1153,13 +1150,11 @@ void VoltDBEngine::initMaterializedViews(bool addAll) {
             PersistentTable *destTable = dynamic_cast<PersistentTable*>(m_tables[destCatalogTable->relativeIndex()]);
             // connect source and destination tables
             if (addAll || catalogView->wasAdded()) {
-                DEBUG_STREAM_HERE("Adding new mat view " << destTable->name() <<
-                                  " on " << srcTable->name());
                 // This is not a leak -- the materialized view is self-installing into srcTable.
                 new MaterializedViewMetadata(srcTable, destTable, catalogView);
             } else {
                 // Ensure that the materialized view is using the latest version of the target table.
-                srcTable->updateMaterializedViewTargetTable(destTable);
+                srcTable->updateMaterializedViewTargetTable(destTable, catalogView);
             }
         }
     }

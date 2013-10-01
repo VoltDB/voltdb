@@ -1265,6 +1265,38 @@ public class SnapshotUtil {
         public void handleResponse(ClientResponse resp);
     }
 
+    /*
+     * fatalSnapshotResponseHandler is called when a SnapshotUtil.requestSnapshot response occurs.
+     * This callback runs on the snapshot daemon thread.
+     */
+    public static final SnapshotUtil.SnapshotResponseHandler fatalSnapshotResponseHandler =
+        new SnapshotUtil.SnapshotResponseHandler() {
+            @Override
+            public void handleResponse(ClientResponse resp)
+            {
+                if (resp == null) {
+                    VoltDB.crashLocalVoltDB("Failed to initiate snapshot", false, null);
+                } else if (resp.getStatus() != ClientResponseImpl.SUCCESS) {
+                    VoltDB.crashLocalVoltDB("Failed to initiate snapshot: "
+                                            + resp.getStatusString(), true, resp.getException());
+                }
+
+                assert resp != null;
+                VoltTable[] results = resp.getResults();
+                if (SnapshotUtil.didSnapshotRequestSucceed(results)) {
+                    String appStatus = resp.getAppStatusString();
+                    if (appStatus == null) {
+                        VoltDB.crashLocalVoltDB("Snapshot request failed: "
+                                                + resp.getStatusString(), false, null);
+                    }
+                    // else success
+                } else {
+                    VoltDB.crashLocalVoltDB("Snapshot request failed: " + results[0].toJSONString(),
+                                            false, null);
+                }
+            }
+        };
+
     /**
      * Request a new snapshot. It will retry for a couple of times. If it
      * doesn't succeed in the specified time, an error response will be sent to
@@ -1294,8 +1326,8 @@ public class SnapshotUtil {
         final SnapshotInitiationInfo snapInfo = new SnapshotInitiationInfo(path, nonce, blocking, format, data);
         final Exchanger<ClientResponse> responseExchanger = new Exchanger<ClientResponse>();
         final SimpleClientResponseAdapter adapter =
-            new SimpleClientResponseAdapter(ClientInterface.SNAPSHOT_UTIL_CID,
-                                            new SimpleClientResponseAdapter.Callback() {
+            new SimpleClientResponseAdapter(ClientInterface.SNAPSHOT_UTIL_CID, "SnapshotUtilAdapter");
+        adapter.setCallback(new SimpleClientResponseAdapter.Callback() {
             @Override
             public void handleResponse(ClientResponse response)
             {
@@ -1305,9 +1337,7 @@ public class SnapshotUtil {
                     throw new RuntimeException(e);
                 }
             }
-        },
-           "SnapshotUtilAdapter"
-            );
+        });
 
         final SnapshotDaemon sd = VoltDB.instance().getClientInterfaces().get(0).getSnapshotDaemon();
         Runnable work = new Runnable() {

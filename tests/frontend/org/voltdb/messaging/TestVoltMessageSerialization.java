@@ -153,6 +153,29 @@ public class TestVoltMessageSerialization extends TestCase {
         assertTrue(iresponse2.isReadOnly());
     }
 
+    public void testMispartitionedResponse() throws IOException {
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        spi.setClientHandle(25);
+        spi.setProcName("elmerfudd");
+        spi.setParams(57, "wrascallywabbit");
+
+        Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 10L, 100045, 99, true, false, spi, 2101, 3101, true);
+
+        InitiateResponseMessage iresponse = new InitiateResponseMessage(itask);
+        iresponse.setMispartitioned(true, spi, Pair.of(3l, new byte[] {1, 2, 3}));
+        iresponse.setClientHandle(99);
+
+        InitiateResponseMessage iresponse2 = (InitiateResponseMessage) checkVoltMessage(iresponse);
+
+        assertEquals(iresponse.getTxnId(), iresponse2.getTxnId());
+        assertTrue(iresponse2.isReadOnly());
+        assertTrue(iresponse2.isMispartitioned());
+        assertFalse(iresponse2.shouldCommit());
+        assertNotNull(iresponse2.getInvocation());
+        assertNotNull(iresponse2.getCurrentHashinatorConfig());
+        assertEquals(ClientResponse.TXN_RESTART, iresponse2.getClientResponseData().getStatus());
+    }
+
     public void testFragmentTask() throws IOException {
         FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, 99, true, true, false);
         ft.addFragment(new byte[20], 12, ByteBuffer.allocate(0));
