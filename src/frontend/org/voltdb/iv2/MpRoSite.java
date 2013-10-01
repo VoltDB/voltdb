@@ -49,6 +49,12 @@ import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
 
+/**
+ * An implementation of Site which provides only the functionality
+ * necessary to run read-only multipartition transactions.  A pool
+ * of these will be used to run multiple read-only transactions
+ * concurrently.
+ */
 public class MpRoSite implements Runnable, SiteProcedureConnection
 {
     @SuppressWarnings("unused")
@@ -291,6 +297,12 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         shutdown();
     }
 
+    /**
+     * Commence the shutdown of the Site.  This will allow the run loop to escape, but
+     * it will be blocked on taking from the SiteTaskerQueue.  To make shutdown actually
+     * happen, the site needs to be unblocked by offering a null SiteTasker to the queue, see
+     * Scheduler.m_nullTask for an example (or just use it).
+     */
     public void startShutdown()
     {
         m_shouldContinue = false;

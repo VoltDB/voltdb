@@ -22,6 +22,12 @@ import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
+/**
+ * Every transaction needs a TransactionState.  This provides a minimal one with the proper
+ * default settings for every partition transactions (currently only used by system procedures).
+ * This used to just use SpTransactionState until it became necessary to not have these
+ * claim to be isSinglePartition().
+ */
 public class EveryPartTransactionState extends TransactionState
 {
     final Iv2InitiateTaskMessage m_initiationMsg;

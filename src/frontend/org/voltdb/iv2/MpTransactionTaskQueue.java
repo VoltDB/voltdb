@@ -33,6 +33,11 @@ import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 
+/**
+ * Provide an implementation of the TransactionTaskQueue specifically for the MPI.
+ * This class will manage separating the stream of reads and writes to different
+ * Sites and block appropriately so that reads and writes never execute concurrently.
+ */
 public class MpTransactionTaskQueue extends TransactionTaskQueue
 {
     protected static final VoltLogger tmLog = new VoltLogger("TM");
@@ -66,11 +71,11 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     }
 
     /**
-     * If necessary, stick this task in the backlog.
+     * Stick this task in the backlog.
      * Many network threads may be racing to reach here, synchronize to
-     * serialize queue order
-     * @param task
-     * @return true if this task was stored, false if not
+     * serialize queue order.
+     * Always returns true in this case, side effect of extending
+     * TransactionTaskQueue.
      */
     synchronized boolean offer(TransactionTask task)
     {
@@ -199,8 +204,10 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     }
 
     /**
-     * Try to offer as many runnable Tasks to the SiteTaskerQueue as possible.
-     * @return the number of TransactionTasks queued to the SiteTaskerQueue
+     * Indicate that the transaction associated with txnId is complete.  Perform
+     * management of reads/writes in progress then call taskQueueOffer() to
+     * submit additional tasks to be done, determined by whatever the current state is.
+     * See giant comment at top of taskQueueOffer() for what happens.
      */
     synchronized int flush(long txnId)
     {
@@ -238,6 +245,8 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         else {
             assert(!m_currentWrites.isEmpty());
             TransactionTask task;
+            // There currently should only ever be one current write.  This
+            // is the awkward way to get a single value out of a Map
             task = m_currentWrites.entrySet().iterator().next().getValue();
             taskQueueOffer(task);
         }

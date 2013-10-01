@@ -170,7 +170,9 @@ class MpRoSitePool {
     }
 
     /**
-     * Repair
+     * Repair: Submit the provided task to the MpRoSite running the transaction associated
+     * with txnId.  This occurs when the MPI has survived a node failure and needs to interrupt and
+     * re-run the current MP transaction; this task is used to run the repair algorithm in the site thread.
      */
     void repair(long txnId, SiteTasker task)
     {
@@ -247,12 +249,17 @@ class MpRoSitePool {
 
     void shutdown()
     {
+        // Shutdown all, then join all, hopefully save some shutdown time for tests.
         for (MpRoSiteContext site : m_idleSites) {
             site.shutdown();
-            site.joinThread();
         }
         for (MpRoSiteContext site : m_busySites.values()) {
             site.shutdown();
+        }
+        for (MpRoSiteContext site : m_idleSites) {
+            site.joinThread();
+        }
+        for (MpRoSiteContext site : m_busySites.values()) {
             site.joinThread();
         }
     }
