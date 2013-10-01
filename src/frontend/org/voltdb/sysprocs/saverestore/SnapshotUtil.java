@@ -585,6 +585,11 @@ public class SnapshotUtil {
             return m_txnId;
         }
 
+        public String getNonce()
+        {
+            return m_nonce;
+        }
+
         public final List<File> m_digests = new ArrayList<File>();
         public File m_hashConfig = null;
         public final List<Set<String>> m_digestTables = new ArrayList<Set<String>>();
