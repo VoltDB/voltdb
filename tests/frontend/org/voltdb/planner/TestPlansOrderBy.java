@@ -170,12 +170,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
         validatePlan("SELECT SUM(T_D0) from T", false, true, false, false, true);
         validatePlan("SELECT SUM(T_D0), COUNT(*), AVG(T_D1) from T", false, true, false, false, true);
 
-        // Fix it with (false, true, false, false, true)
-        // when ENG-4937 is solved.
         validatePlan("SELECT SUM(T_D0) from T ORDER BY T_D0, T_D1",
-                true, false, false, false, true);
+                false, true, false, false, true);
         validatePlan("SELECT SUM(T_D0), COUNT(*), AVG(T_D1) from T ORDER BY T_D0, T_D1",
-                true, false, false, false, true);
+                false, true, false, false, true);
     }
 
     //TODO: This test actually validates that we generate a sub-optimal plan for this query

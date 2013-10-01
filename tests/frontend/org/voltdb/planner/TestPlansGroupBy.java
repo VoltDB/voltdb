@@ -192,10 +192,16 @@ public class TestPlansGroupBy extends PlannerTestCase {
         p = pns.get(1).getChild(0);
         assertTrue(p instanceof AbstractScanPlanNode);
 
-        // Make it to false when we fix ENG-4397
-        // ENG-4937 - As a developer, I want to ignore the "order by" clause on non-grouped aggregate queries.
+        // Useless order by clause.
         pns = compileToFragments("SELECT count(*)  FROM P1 order by PKEY");
-        checkHasComplexAgg(pns);
+        for ( AbstractPlanNode nd : pns) {
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+        }
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AbstractScanPlanNode);
 
         // Make sure it compile correctly
         pns = compileToFragments("SELECT A1, count(*) as tag FROM P1 group by A1 order by tag, A1 limit 1");
