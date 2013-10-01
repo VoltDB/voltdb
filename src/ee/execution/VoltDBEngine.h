@@ -335,7 +335,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * Activate a table stream of the specified type for the specified table.
          * Returns true on success and false on failure
          */
-        int64_t activateTableStream(
+        bool activateTableStream(
                 const CatalogId tableId,
                 const TableStreamType streamType,
                 int64_t undoToken,

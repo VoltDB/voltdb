@@ -376,7 +376,7 @@ public class SnapshotSiteProcessor {
         };
     }
 
-    public long initiateSnapshots(
+    public void initiateSnapshots(
             SystemProcedureExecutionContext context,
             SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
@@ -405,16 +405,13 @@ public class SnapshotSiteProcessor {
         }
 
         // Table doesn't implement hashCode(), so use the table ID as key
-        long total = 0;
         for (Map.Entry<Integer, byte[]> tablePredicates : makeTablesAndPredicatesToSnapshot(tasks).entrySet()) {
             int tableId = tablePredicates.getKey();
             TableStreamer streamer =
-                    new TableStreamer(tableId, format.getStreamType(), m_snapshotTableTasks.get(tableId));
-            long cnt = streamer.activate(context, tablePredicates.getValue());
-            if (cnt == -1) {
+                new TableStreamer(tableId, format.getStreamType(), m_snapshotTableTasks.get(tableId));
+            if (!streamer.activate(context, tablePredicates.getValue())) {
                 VoltDB.crashLocalVoltDB("Failed to activate snapshot stream", false, null);
             }
-            total += cnt;
             m_streamers.put(tableId, streamer);
         }
 
@@ -455,7 +452,6 @@ public class SnapshotSiteProcessor {
              */
             queueInitialSnapshotTasks(m_availableSnapshotBuffers.size(), now);
         }
-        return total;
     }
 
     private void queueInitialSnapshotTasks(int count, long now)

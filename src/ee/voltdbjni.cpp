@@ -965,7 +965,7 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeS
  * Method:    nativeActivateTableStream
  * Signature: (JIIIJ[B)Z
  */
-SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeActivateTableStream(
+SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeActivateTableStream(
         JNIEnv *env, jobject obj, jlong engine_ptr, jint tableId, jint streamType, jlong undoToken,
         jbyteArray serialized_predicates)
 {
@@ -981,10 +981,10 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeActi
     try {
         try {
             voltdb::TableStreamType tableStreamType = static_cast<voltdb::TableStreamType>(streamType);
-            jlong count = engine->activateTableStream(tableId, tableStreamType, undoToken, serialize_in);
+            bool success = engine->activateTableStream(tableId, tableStreamType, undoToken, serialize_in);
             env->ReleaseByteArrayElements(serialized_predicates, bytes, JNI_ABORT);
-            VOLT_DEBUG("deserialized predicates (success=%d)", count);
-            return count;
+            VOLT_DEBUG("deserialized predicates (success=%d)", (int)success);
+            return success;
         } catch (SerializableEEException &e) {
             engine->resetReusedResultOutputBuffer();
             e.serialize(engine->getExceptionOutputSerializer());
@@ -993,7 +993,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeActi
         topend->crashVoltDB(e);
     }
 
-    return -1;
+    return false;
 }
 
 // Templated utility function to convert a Java array to a C array with error

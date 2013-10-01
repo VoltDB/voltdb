@@ -62,7 +62,8 @@ public class TableStreamer {
      * @param predicates    Predicates associated with the stream
      * @return true if activation succeeded.
      */
-    public long activate(SystemProcedureExecutionContext context, byte[] predicates)    {
+    public boolean activate(SystemProcedureExecutionContext context, byte[] predicates)
+    {
         return activate(context, false, predicates);
     }
 
@@ -73,14 +74,15 @@ public class TableStreamer {
      * @param predicates    Predicates associated with the stream
      * @return true if activation succeeded.
      */
-    public long activate(SystemProcedureExecutionContext context, boolean undo, byte[] predicates) {
-        long cnt = context.activateTableStream(m_tableId, m_type, undo, predicates);
-        if (cnt == -1) {
+    public boolean activate(SystemProcedureExecutionContext context, boolean undo, byte[] predicates)
+    {
+        if (!context.activateTableStream(m_tableId, m_type, undo, predicates)) {
             String tableName = CatalogUtil.getTableNameFromId(context.getDatabase(), m_tableId);
             log.error("Attempted to activate a table stream of type " + m_type +
                       "for table " + tableName + " and failed");
+            return false;
         }
-        return cnt;
+        return true;
     }
 
     /**

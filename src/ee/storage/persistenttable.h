@@ -295,7 +295,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
      * Prepare table for streaming from serialized data.
      * Return true on success or false if it was already active.
      */
-    int64_t activateStream(TupleSerializer &tupleSerializer,
+    bool activateStream(TupleSerializer &tupleSerializer,
                         TableStreamType streamType,
                         int32_t partitionId,
                         CatalogId tableId,

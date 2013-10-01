@@ -627,8 +627,9 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         }
 
         @Override
-        public long activateTableStream(int tableId, TableStreamType type, boolean undo, byte[] predicates) {
-            return -1;
+        public boolean activateTableStream(int tableId, TableStreamType type, boolean undo, byte[] predicates)
+        {
+            return false;
         }
 
         @Override
@@ -1346,15 +1347,15 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     }
 
     @Override
-    public long initiateSnapshots(
+    public void initiateSnapshots(
             SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
             List<SnapshotDataTarget> targets,
             long txnId,
             int numLiveHosts,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
-        return m_snapshotter.initiateSnapshots(m_systemProcedureContext, format, tasks, targets, txnId,
-                numLiveHosts, exportSequenceNumbers);
+        m_snapshotter.initiateSnapshots(m_systemProcedureContext, format, tasks, targets, txnId, numLiveHosts,
+                                        exportSequenceNumbers);
     }
 
     /*
