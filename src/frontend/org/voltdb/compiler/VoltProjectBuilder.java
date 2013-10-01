@@ -59,7 +59,6 @@ import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
-import org.voltdb.compiler.deploymentfile.ExportOnServerType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
@@ -272,7 +271,6 @@ public class VoltProjectBuilder {
     private List<String> m_diagnostics;
 
     private Properties m_elConfig;
-    private boolean m_elOnServer;
     private String m_elExportTo;
 
     private Integer m_deadHostTimeout = null;
@@ -480,18 +478,10 @@ public class VoltProjectBuilder {
         m_ppdPrefix = ppdPrefix;
     }
 
-    public void addExport(final String loader, boolean enabled, List<String> groups) {
-        m_elloader = loader;
-        m_elenabled = enabled;
-        m_elAuthGroups = groups;
-        m_elOnServer = false;
-    }
-
-    public void addOnServerExport(boolean enabled, List<String> groups, String exportTo, Properties config) {
+    public void addExport(boolean enabled, List<String> groups, String exportTarget, Properties config) {
         m_elloader = "org.voltdb.export.processors.GuestProcessor";
         m_elenabled = enabled;
         m_elAuthGroups = groups;
-        m_elOnServer = true;
 
         if (config == null) {
             config = new Properties();
@@ -501,14 +491,14 @@ public class VoltProjectBuilder {
         }
         m_elConfig = config;
 
-        if (exportTo == null || exportTo.trim().isEmpty()) {
-            exportTo = "file";
+        if (exportTarget == null || exportTarget.trim().isEmpty()) {
+            exportTarget = "file";
         }
-        m_elExportTo = exportTo;
+        m_elExportTo = exportTarget;
     }
 
-    public void addOnServerExport( boolean enabled, List<String> groups) {
-        addOnServerExport(enabled, groups, null, null);
+    public void addExport( boolean enabled, List<String> groups) {
+        addExport(enabled, groups, null, null);
     }
 
     public void setTableAsExportOnly(String name) {
@@ -1095,26 +1085,22 @@ public class VoltProjectBuilder {
         // this is for old generation export test suite backward compatibility
         export.setEnabled(m_elenabled && m_elloader != null && !m_elloader.trim().isEmpty());
 
-        if (m_elOnServer) {
-            ExportOnServerType onServer = factory.createExportOnServerType();
-            ServerExportEnum exportTo = ServerExportEnum.fromValue(m_elExportTo.toLowerCase());
-            onServer.setExportto(exportTo);
-            export.setOnserver(onServer);
-            if( m_elConfig != null && m_elConfig.size() > 0) {
-                ExportConfigurationType exportConfig = factory.createExportConfigurationType();
-                List<PropertyType> configProperties = exportConfig.getProperty();
+        ServerExportEnum exportTarget = ServerExportEnum.fromValue(m_elExportTo.toLowerCase());
+        export.setTarget(exportTarget);
+        if((m_elConfig != null) && (m_elConfig.size() > 0)) {
+            ExportConfigurationType exportConfig = factory.createExportConfigurationType();
+            List<PropertyType> configProperties = exportConfig.getProperty();
 
-                for( Object nameObj: m_elConfig.keySet()) {
-                    String name = String.class.cast(nameObj);
+            for( Object nameObj: m_elConfig.keySet()) {
+                String name = String.class.cast(nameObj);
 
-                    PropertyType prop = factory.createPropertyType();
-                    prop.setName(name);
-                    prop.setValue(m_elConfig.getProperty(name));
+                PropertyType prop = factory.createPropertyType();
+                prop.setName(name);
+                prop.setValue(m_elConfig.getProperty(name));
 
-                    configProperties.add(prop);
-                }
-                onServer.setConfiguration(exportConfig);
+                configProperties.add(prop);
             }
+            export.setConfiguration(exportConfig);
         }
 
         // Have some yummy boilerplate!

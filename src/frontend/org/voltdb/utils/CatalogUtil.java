@@ -86,7 +86,6 @@ import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.CommandLogType.Frequency;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
-import org.voltdb.compiler.deploymentfile.ExportOnServerType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
@@ -749,17 +748,15 @@ public abstract class CatalogUtil {
             // mimic what is done when the catalog is built, which
             // ignores anything else within the export XML stanza
             // when enabled is false
-            ExportOnServerType onServer = export.getOnserver();
-            if (onServer != null && export.isEnabled()) {
-                sb.append(" ONSERVER ");
-                ServerExportEnum exportTo = onServer.getExportto();
-                if (exportTo != null) {
-                    sb.append( "EXPORTTO ").append(exportTo.name());
-                    if (exportTo.name().equalsIgnoreCase("CUSTOM")) {
-                        sb.append(" EXPORTCONNECTORCLASS ").append(onServer.getExportconnectorclass());
+            if (export.isEnabled()) {
+                ServerExportEnum exportTarget = export.getTarget();
+                if (exportTarget != null) {
+                    sb.append( "TARGET ").append(exportTarget.name());
+                    if (exportTarget.name().equalsIgnoreCase("CUSTOM")) {
+                        sb.append(" EXPORTCONNECTORCLASS ").append(export.getExportconnectorclass());
                     }
                 }
-                ExportConfigurationType config = onServer.getConfiguration();
+                ExportConfigurationType config = export.getConfiguration();
                 if (config != null) {
                     List<PropertyType> props = config.getProperty();
                     if( props != null && !props.isEmpty()) {
@@ -1059,10 +1056,8 @@ public abstract class CatalogUtil {
         }
 
         boolean adminstate = exportType.isEnabled();
-        String connector = "org.voltdb.export.processors.RawProcessor";
-        if (exportType.getOnserver() != null) {
-            connector = "org.voltdb.export.processors.GuestProcessor";
-        }
+        // on-server export always uses the gues processor
+        String connector = "org.voltdb.export.processors.GuestProcessor";
 
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
         org.voltdb.catalog.Connector catconn = db.getConnectors().get("0");
@@ -1077,49 +1072,46 @@ public abstract class CatalogUtil {
         catconn.setLoaderclass(connector);
         catconn.setEnabled(adminstate);
 
-        ExportOnServerType exportOnServer = exportType.getOnserver();
-        if (exportOnServer != null) {
+        String exportClientClassName = null;
 
-            String exportClientClassName = null;
-
-            switch( exportOnServer.getExportto()) {
+        switch(exportType.getTarget()) {
             case FILE: exportClientClassName = "org.voltdb.exportclient.ExportToFileClient"; break;
             case JDBC: exportClientClassName = "org.voltdb.exportclient.JDBCExportClient"; break;
             //Validate that we can load the class.
             case CUSTOM:
                 try {
-                    CatalogUtil.class.getClassLoader().loadClass(exportOnServer.getExportconnectorclass());
-                    exportClientClassName = exportOnServer.getExportconnectorclass();
-                } catch (ClassNotFoundException ex) {
+                    CatalogUtil.class.getClassLoader().loadClass(exportType.getExportconnectorclass());
+                    exportClientClassName = exportType.getExportconnectorclass();
+                }
+                catch (ClassNotFoundException ex) {
                     hostLog.error(
                             "Custom Export failed to configure, failed to load " +
-                            " export plugin class: " + exportOnServer.getExportconnectorclass() +
+                            " export plugin class: " + exportType.getExportconnectorclass() +
                             " Disabling export.");
-                    exportType.setEnabled(false);
-                    return;
-                }
-                break;
+                exportType.setEnabled(false);
+                return;
             }
+            break;
+        }
 
-            // this is OK as the deployment file XML schema does not allow for
-            // export configuration property names that begin with underscores
-            if (exportClientClassName != null && exportClientClassName.trim().length() > 0) {
-                ConnectorProperty prop = catconn.getConfig().add(ExportDataProcessor.EXPORT_TO_TYPE);
-                prop.setName(ExportDataProcessor.EXPORT_TO_TYPE);
-                prop.setValue(exportClientClassName);
-            }
+        // this is OK as the deployment file XML schema does not allow for
+        // export configuration property names that begin with underscores
+        if (exportClientClassName != null && exportClientClassName.trim().length() > 0) {
+            ConnectorProperty prop = catconn.getConfig().add(ExportDataProcessor.EXPORT_TO_TYPE);
+            prop.setName(ExportDataProcessor.EXPORT_TO_TYPE);
+            prop.setValue(exportClientClassName);
+        }
 
-            ExportConfigurationType exportConfiguration = exportOnServer.getConfiguration();
-            if (exportConfiguration != null) {
+        ExportConfigurationType exportConfiguration = exportType.getConfiguration();
+        if (exportConfiguration != null) {
 
-                List<PropertyType> configProperties = exportConfiguration.getProperty();
-                if (configProperties != null && ! configProperties.isEmpty()) {
+            List<PropertyType> configProperties = exportConfiguration.getProperty();
+            if (configProperties != null && ! configProperties.isEmpty()) {
 
-                    for( PropertyType configProp: configProperties) {
-                        ConnectorProperty prop = catconn.getConfig().add(configProp.getName());
-                        prop.setName(configProp.getName());
-                        prop.setValue(configProp.getValue());
-                    }
+                for( PropertyType configProp: configProperties) {
+                    ConnectorProperty prop = catconn.getConfig().add(configProp.getName());
+                    prop.setName(configProp.getName());
+                    prop.setValue(configProp.getValue());
                 }
             }
         }

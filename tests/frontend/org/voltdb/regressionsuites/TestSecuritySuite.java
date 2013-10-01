@@ -303,7 +303,7 @@ public class TestSecuritySuite extends RegressionSuite {
 
         // export disabled in community
         if (MiscUtils.isPro()) {
-            project.addExport("org.voltdb.export.processors.RawProcessor", true /*enabled*/, elgroups);
+            project.addExport(true /*enabled*/, elgroups);
         }
 
         /////////////////////////////////////////////////////////////

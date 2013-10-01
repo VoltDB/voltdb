@@ -404,7 +404,7 @@ public class TestVoltCompiler extends TestCase {
     public void testExportSetting() throws IOException {
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(getClass().getResource("ExportTester-ddl.sql"));
-        project.addExport("org.voltdb.export.processors.RawProcessor", false, null);
+        project.addExport(false, null);
         project.setTableAsExportOnly("A");
         project.setTableAsExportOnly("B");
         try {
@@ -436,7 +436,7 @@ public class TestVoltCompiler extends TestCase {
         project.addPartitionInfo("B", "B_ID");
         project.addPartitionInfo("e", "e_id");
         project.addPartitionInfo("f", "f_id");
-        project.addExport("org.voltdb.export.processors.RawProcessor", true, null);
+        project.addExport(true, null);
         project.setTableAsExportOnly("A"); // uppercase DDL, uppercase export
         project.setTableAsExportOnly("b"); // uppercase DDL, lowercase export
         project.setTableAsExportOnly("E"); // lowercase DDL, uppercase export
@@ -467,7 +467,7 @@ public class TestVoltCompiler extends TestCase {
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
         project.addStmtProcedure("Dummy", "select * from v_table1r_el_only");
-        project.addExport("org.voltdb.export.processors.RawProcessor", true, null);
+        project.addExport(true, null);
         project.setTableAsExportOnly("table1r_el_only");
         try {
             assertFalse(project.compile("/tmp/exporttestview.jar"));
@@ -483,7 +483,7 @@ public class TestVoltCompiler extends TestCase {
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
         project.addStmtProcedure("Dummy", "select * from table1r_el_only");
-        project.addExport("org.voltdb.export.processors.RawProcessor", true, null);
+        project.addExport(true, null);
         project.setTableAsExportOnly("v_table1r_el_only");
         try {
             assertFalse(project.compile("/tmp/exporttestview.jar"));

@@ -26,7 +26,6 @@ package org.voltdb.utils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import junit.framework.TestCase;
@@ -802,8 +801,8 @@ public class TestCatalogUtil extends TestCase {
         assertNotNull(catconn);
 
         assertTrue(good_deployment.getExport().isEnabled());
-        assertEquals(good_deployment.getExport().getOnserver().getExportto(), ServerExportEnum.CUSTOM);
-        assertEquals(good_deployment.getExport().getOnserver().getExportconnectorclass(),
+        assertEquals(good_deployment.getExport().getTarget(), ServerExportEnum.CUSTOM);
+        assertEquals(good_deployment.getExport().getExportconnectorclass(),
                 "org.voltdb.exportclient.NoOpTestExportClient");
         ConnectorProperty prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
         assertEquals(prop.getValue(), "org.voltdb.exportclient.NoOpTestExportClient");
@@ -821,7 +820,7 @@ public class TestCatalogUtil extends TestCase {
         assertNotNull(catconn);
 
         assertTrue(builtin_deployment.getExport().isEnabled());
-        assertEquals(builtin_deployment.getExport().getOnserver().getExportto(), ServerExportEnum.FILE);
+        assertEquals(builtin_deployment.getExport().getTarget(), ServerExportEnum.FILE);
         prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
         assertEquals(prop.getValue(), "org.voltdb.exportclient.ExportToFileClient");
 
