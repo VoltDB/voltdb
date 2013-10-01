@@ -184,7 +184,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
 
         // Test AdHoc.
         result = client.callProcedure("@Explain",
-                "SELECT user_id, user_name, score_value FROM score " +
+                "SELECT user_id, score_value FROM score " +
                 "WHERE score_date > 1378827221793 AND score_date <= 1378827421793 " +
                 "ORDER BY score_value DESC, user_id DESC LIMIT 1; ").getResults()[0];
         assertTrue(result.toString().contains("IDX_SCORE_VALUE_USER"));

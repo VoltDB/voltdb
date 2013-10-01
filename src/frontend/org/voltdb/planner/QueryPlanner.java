@@ -288,7 +288,7 @@ public class QueryPlanner {
     private CompiledPlan compileFromXML(VoltXMLElement xmlSQL, String[] paramValues) {
         // Get a parsed statement from the xml
         // The callers of compilePlan are ready to catch any exceptions thrown here.
-        AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(m_sql, xmlSQL, paramValues, m_db, m_joinOrder);
+        AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(m_sql, xmlSQL, paramValues, m_db, m_joinOrder, isAdHoc());
         if (parsedStmt == null)
         {
             m_recentErrorMsg = "Failed to parse SQL statement: " + m_sql;

@@ -28,7 +28,7 @@ CREATE INDEX IDX_score_date ON score (score_date, user_id);
 CREATE INDEX IDX_score_value_user ON score (score_value, user_id);
 
 CREATE PROCEDURE GetTopScores AS 
- SELECT user_id, user_name, score_value 
+ SELECT user_id, score_value 
  FROM score WHERE score_date > ? AND score_date <= ? 
  ORDER BY score_value DESC, user_id DESC LIMIT ?;
  
