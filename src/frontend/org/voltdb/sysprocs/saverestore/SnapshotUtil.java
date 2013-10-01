@@ -136,8 +136,9 @@ public class SnapshotUtil {
         long catalogCRC,
         String path,
         String nonce,
-        List<Table> tables,
-        int hostId,
+            List<Table> tables,
+            List<Long> tuples,
+            int hostId,
         Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
         Map<Integer, Long> partitionTransactionIds,
         InstanceId instanceId,
@@ -196,6 +197,11 @@ public class SnapshotUtil {
                 }
                 stringer.key("catalogCRC").value(catalogCRC);
                 stringer.key("instanceId").value(instanceId.serializeToJSONObject());
+                stringer.key("tuples").array();
+                for (int ii = 0; ii < tuples.size(); ii++) {
+                    stringer.value(tuples.get(ii));
+                }
+                stringer.endArray();
                 stringer.endObject();
             } catch (JSONException e) {
                 throw new IOException(e);
@@ -1186,6 +1192,21 @@ public class SnapshotUtil {
             my_tables.add(table);
         }
         return my_tables;
+    }
+
+    public static final List<Long> getTablesToSaveEstimatedTuples(Database database) {
+        CatalogMap<Table> all_tables = database.getTables();
+        ArrayList<Long> my_tuples = new ArrayList<Long>();
+        for (Table table : all_tables) {
+            // Make a list of all non-materialized, non-export only tables
+            if ((table.getMaterializer() != null)
+                    || (CatalogUtil.isTableExportOnly(database, table))) {
+                continue;
+            }
+            //Get the tuple count to write to JSON
+            my_tuples.add((long) table.getEstimatedtuplecount());
+        }
+        return my_tuples;
     }
 
     public static File[] retrieveRelevantFiles(String filePath,

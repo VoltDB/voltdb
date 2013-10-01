@@ -213,6 +213,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             long timestamp, int newPartitionCount) throws IOException
     {
         final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
+        final List<Long> tuples = SnapshotUtil.getTablesToSaveEstimatedTuples(context.getDatabase());
         InstanceId instId = VoltDB.instance().getHostMessenger().getInstanceId();
         Runnable completionTask = SnapshotUtil.writeSnapshotDigest(
                 txnId,
@@ -220,6 +221,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 file_path,
                 file_nonce,
                 tables,
+                tuples,
                 context.getHostId(),
                 exportSequenceNumbers,
                 partitionTransactionIds,
