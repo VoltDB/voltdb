@@ -139,9 +139,13 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                                                    HashinatorSnapshotData hashinatorData,
                                                    Map<Integer, byte[]> schemas)
     {
-        ByteBuffer hashinatorConfigBuf = ByteBuffer.allocate(8 + hashinatorData.m_serData.length);
-        hashinatorConfigBuf.putLong(hashinatorData.m_version);
-        hashinatorConfigBuf.put(hashinatorData.m_serData);
+        byte[] hashinatorConfig = null;
+        if (hashinatorData != null) {
+            ByteBuffer hashinatorConfigBuf = ByteBuffer.allocate(8 + hashinatorData.m_serData.length);
+            hashinatorConfigBuf.putLong(hashinatorData.m_version);
+            hashinatorConfigBuf.put(hashinatorData.m_serData);
+            hashinatorConfig =  hashinatorConfigBuf.array();
+        }
 
         List<DataTargetInfo> sdts = Lists.newArrayList();
 
@@ -165,7 +169,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                     sdts.add(new DataTargetInfo(stream,
                                                 srcHSId,
                                                 destHSId,
-                                                new StreamSnapshotDataTarget(destHSId, hashinatorConfigBuf.array(),
+                                                new StreamSnapshotDataTarget(destHSId, hashinatorConfig,
                                                                              schemas, sender, ackReceiver)));
                 }
             }
