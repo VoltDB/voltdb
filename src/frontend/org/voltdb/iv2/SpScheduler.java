@@ -123,6 +123,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     List<Long> m_replicaHSIds = new ArrayList<Long>();
     long m_sendToHSIds[] = new long[0];
 
+    private final TransactionTaskQueue m_pendingTasks;
     private final Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
     private final Map<DuplicateCounterKey, DuplicateCounter> m_duplicateCounters =
@@ -147,6 +148,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor)
     {
         super(partitionId, taskQueue);
+        m_pendingTasks = new TransactionTaskQueue(m_tasks);
         m_snapMonitor = snapMonitor;
         m_durabilityListener = new DurabilityListener() {
             @Override

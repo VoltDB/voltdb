@@ -19,9 +19,12 @@ package org.voltdb.iv2;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import com.google.common.collect.Maps;
 import org.voltcore.logging.VoltLogger;
@@ -29,6 +32,8 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltdb.CatalogContext;
+import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SystemProcedureCatalog;
@@ -55,9 +60,11 @@ public class MpScheduler extends Scheduler
 
     private final List<Long> m_iv2Masters;
     private final Map<Integer, Long> m_partitionMasters;
-    private final long m_buddyHSId;
+    private final List<Long> m_buddyHSIds;
+    private int m_nextBuddy = 0;
     //Generator of pre-IV2ish timestamp based unique IDs
     private final UniqueIdGenerator m_uniqueIdGenerator;
+    final private MpTransactionTaskQueue m_pendingTasks;
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
@@ -66,13 +73,24 @@ public class MpScheduler extends Scheduler
     // Let the one we can't be sure about linger here.  See ENG-4211 for more.
     long m_repairLogAwaitingCommit = Long.MIN_VALUE;
 
-    MpScheduler(int partitionId, long buddyHSId, SiteTaskerQueue taskQueue)
+    MpScheduler(int partitionId, List<Long> buddyHSIds, SiteTaskerQueue taskQueue)
     {
         super(partitionId, taskQueue);
-        m_buddyHSId = buddyHSId;
+        m_pendingTasks = new MpTransactionTaskQueue(m_tasks);
+        m_buddyHSIds = buddyHSIds;
         m_iv2Masters = new ArrayList<Long>();
         m_partitionMasters = Maps.newHashMap();
         m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
+    }
+
+    void setMpRoSitePool(MpRoSitePool sitePool)
+    {
+        m_pendingTasks.setMpRoSitePool(sitePool);
+    }
+
+    void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
+    {
+        m_pendingTasks.updateCatalog(diffCmds, context, csp);
     }
 
     @Override
@@ -82,6 +100,7 @@ public class MpScheduler extends Scheduler
         // response to roll back. This function must be called with
         // the deliver lock held to be correct. The null task should
         // never run; the site thread is expected to be told to stop.
+        m_pendingTasks.shutdown();
         m_pendingTasks.repair(m_nullTask, m_iv2Masters, m_partitionMasters);
     }
 
@@ -97,6 +116,39 @@ public class MpScheduler extends Scheduler
         if (!m_isLeader) {
             return;
         }
+
+        // Stolen from SpScheduler.  Need to update the duplicate counters associated with any EveryPartitionTasks
+        // Cleanup duplicate counters and collect DONE counters
+        // in this list for further processing.
+        List<Long> doneCounters = new LinkedList<Long>();
+        for (Entry<Long, DuplicateCounter> entry : m_duplicateCounters.entrySet()) {
+            DuplicateCounter counter = entry.getValue();
+            int result = counter.updateReplicas(m_iv2Masters);
+            if (result == DuplicateCounter.DONE) {
+                doneCounters.add(entry.getKey());
+            }
+        }
+
+        // Maintain the CI invariant that responses arrive in txnid order.
+        Collections.sort(doneCounters);
+        for (Long key : doneCounters) {
+            DuplicateCounter counter = m_duplicateCounters.remove(key);
+            VoltMessage resp = counter.getLastResponse();
+            if (resp != null && resp instanceof InitiateResponseMessage) {
+                InitiateResponseMessage msg = (InitiateResponseMessage)resp;
+                if (msg.shouldCommit()) {
+                    m_repairLogTruncationHandle = m_repairLogAwaitingCommit;
+                    m_repairLogAwaitingCommit = msg.getTxnId();
+                }
+                m_outstandingTxns.remove(msg.getTxnId());
+                m_mailbox.send(counter.m_destinationId, resp);
+            }
+            else {
+                hostLog.warn("TXN " + counter.getTxnId() + " lost all replicas and " +
+                        "had no responses.  This should be impossible?");
+            }
+        }
+
 
         final List<Long> replicaCopy = new ArrayList<Long>(replicas);
 
@@ -276,7 +328,9 @@ public class MpScheduler extends Scheduler
         // Multi-partition initiation (at the MPI)
         final MpProcedureTask task =
             new MpProcedureTask(m_mailbox, procedureName,
-                    m_pendingTasks, mp, m_iv2Masters, m_partitionMasters, m_buddyHSId, false);
+                    m_pendingTasks, mp, m_iv2Masters, m_partitionMasters,
+                    m_buddyHSIds.get(m_nextBuddy), false);
+        m_nextBuddy = (m_nextBuddy++) % m_buddyHSIds.size();
         m_outstandingTxns.put(task.m_txnState.txnId, task.m_txnState);
         m_pendingTasks.offer(task);
     }
@@ -316,7 +370,9 @@ public class MpScheduler extends Scheduler
         // Multi-partition initiation (at the MPI)
         final MpProcedureTask task =
             new MpProcedureTask(m_mailbox, procedureName,
-                    m_pendingTasks, mp, m_iv2Masters, m_partitionMasters, m_buddyHSId, true);
+                    m_pendingTasks, mp, m_iv2Masters, m_partitionMasters,
+                    m_buddyHSIds.get(m_nextBuddy), true);
+        m_nextBuddy = (m_nextBuddy++) % m_buddyHSIds.size();
         m_outstandingTxns.put(task.m_txnState.txnId, task.m_txnState);
         m_pendingTasks.offer(task);
     }
