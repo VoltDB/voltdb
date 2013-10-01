@@ -1060,11 +1060,11 @@ SnapshotCompletionInterest
             // Check if we have all the partitions
             for (Set<Integer> partitions : tablePartitions.values()) {
                 if (partitions.size() != totalPartitions) {
-                    m_snapshotLogStr.append("\nRejected snapshot")
+                    m_snapshotLogStr.append("\nRejected snapshot ")
                                     .append(nonce)
                                     .append(" due to missing partitions. Got ")
                                     .append(partitions.size())
-                                    .append(", expecting")
+                                    .append(", expecting ")
                                     .append(totalPartitions);
                     inconsistent = true;
                     break;
