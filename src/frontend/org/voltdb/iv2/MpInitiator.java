@@ -48,14 +48,14 @@ public class MpInitiator extends BaseInitiator implements Promotable
 {
     public static final int MP_INIT_PID = TxnEgo.PARTITIONID_MAX_VALUE;
 
-    public MpInitiator(HostMessenger messenger, long buddyHSId, StatsAgent agent)
+    public MpInitiator(HostMessenger messenger, List<Long> buddyHSIds, StatsAgent agent)
     {
         super(VoltZK.iv2mpi,
                 messenger,
                 MP_INIT_PID,
                 new MpScheduler(
                     MP_INIT_PID,
-                    buddyHSId,
+                    buddyHSIds,
                     new SiteTaskerQueue()),
                 "MP",
                 agent,
@@ -82,6 +82,16 @@ public class MpInitiator extends BaseInitiator implements Promotable
 
         super.configureCommon(backend, serializedCatalog, catalogContext,
                 csp, numberOfPartitions, startAction, null, null, cl, coreBindIds, null);
+        // Hacky
+        MpScheduler sched = (MpScheduler)m_scheduler;
+        MpRoSitePool sitePool = new MpRoSitePool(m_initiatorMailbox.getHSId(),
+                backend,
+                catalogContext,
+                m_partitionId,
+                m_initiatorMailbox,
+                csp);
+        sched.setMpRoSitePool(sitePool);
+
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),
@@ -190,6 +200,8 @@ public class MpInitiator extends BaseInitiator implements Promotable
     {
         // note this will never require snapshot isolation because the MPI has no snapshot funtionality
         m_executionSite.updateCatalog(diffCmds, context, csp, false, true);
+        MpScheduler sched = (MpScheduler)m_scheduler;
+        sched.updateCatalog(diffCmds, context, csp);
     }
 
     @Override
