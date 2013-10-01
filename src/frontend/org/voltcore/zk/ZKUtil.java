@@ -500,7 +500,7 @@ public class ZKUtil {
     {
         List<String> children = zk.getChildren(dir, false);
         for (String child : children) {
-            deleteRecursively(zk, child);
+            deleteRecursively(zk, joinZKPath(dir, child));
         }
         zk.delete(dir, -1);
     }
