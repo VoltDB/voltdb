@@ -1002,13 +1002,11 @@ public class TestMaterializedViewSuite extends RegressionSuite {
               Senior,Concord,3
               Senior,Lexington,2
          */
-        // ENG-5241: Add order by V_CNT will crash the system for table V_P2 on multi-server config.
-        // When it is fixed, enable the next query to test.
-//        results = client.callProcedure("@AdHoc",
-//                "SELECT count(*) FROM V_TEAM_MEMBERSHIP where team > 'Cambridge' order by total").getResults();
-//        assertEquals(1, results.length);
-//        System.out.println(results[0]);
-//        assertEquals(2L, results[0].asScalarLong());
+        results = client.callProcedure("@AdHoc",
+                "SELECT count(*) FROM V_TEAM_MEMBERSHIP where team > 'Cambridge' order by total").getResults();
+        assertEquals(1, results.length);
+        System.out.println(results[0]);
+        assertEquals(2L, results[0].asScalarLong());
 
         results = client.callProcedure("@AdHoc",
                 "SELECT count(*) FROM V_TEAM_MEMBERSHIP where total > 3 ").getResults();
