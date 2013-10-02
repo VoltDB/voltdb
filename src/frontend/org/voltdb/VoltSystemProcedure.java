@@ -219,7 +219,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
      * dropped plan fragments
      */
     public VoltTable[] executeSysProcPlanFragments(SynthesizedPlanFragment pfs[],
-            Mailbox m, ProgressMonitor monitor) {
+            Mailbox m, SnapshotProgressMonitor monitor) {
         Set<Integer> dependencyIds = new HashSet<Integer>();
         VoltTable results[] = new VoltTable[1];
 
