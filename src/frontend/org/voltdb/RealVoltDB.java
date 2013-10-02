@@ -1200,6 +1200,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                                         "cluster element must be " +
                                         "'enabled' or 'disabled' but was '" + elasticSetting + "'", false, null);
             }
+            else {
+                TheHashinator.setConfiguredHashinatorType(HashinatorType.LEGACY);
+            }
 
 
             // create a dummy catalog to load deployment info into
