@@ -45,7 +45,7 @@ public class EveryPartitionTask extends TransactionTask
     EveryPartitionTask(Mailbox mailbox, TransactionTaskQueue queue,
                   TransactionInfoBaseMessage msg, List<Long> pInitiators)
     {
-        super(new SpTransactionState(msg), queue);
+        super(new EveryPartTransactionState(msg), queue);
         m_initiationMsg = msg;
         m_initiatorHSIds = com.google.common.primitives.Longs.toArray(pInitiators);
         m_mailbox = mailbox;
@@ -57,7 +57,8 @@ public class EveryPartitionTask extends TransactionTask
     {
         hostLog.debug("STARTING: " + this);
         m_mailbox.send(m_initiatorHSIds, m_initiationMsg);
-        m_queue.flush();
+        m_txnState.setDone();
+        m_queue.flush(getTxnId());
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
         hostLog.debug("COMPLETE: " + this);
     }

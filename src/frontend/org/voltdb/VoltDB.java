@@ -438,10 +438,10 @@ public class VoltDB {
             // If no action is specified, issue an error.
             if (null == m_startAction) {
                 if (org.voltdb.utils.MiscUtils.isPro()) {
-                    hostLog.fatal("You must specify a startup action, either create, recover, replica, rejoin, or compile.");
+                    hostLog.fatal("You must specify a startup action, either create, recover, replica, rejoin, collect, or compile.");
                 } else
                 {
-                    hostLog.fatal("You must specify a startup action, either create, recover, rejoin, or compile.");
+                    hostLog.fatal("You must specify a startup action, either create, recover, rejoin, collect, or compile.");
                 }
                 usage();
                 System.exit(-1);
@@ -542,6 +542,7 @@ public class VoltDB {
                         + "       voltdb recover [host <hostname>] [deployment <deployment.xml>]\n"
                         + "       voltdb rejoin host <hostname>\n";
             }
+            message += "       voltdb collect [<option> ...] <path-to-voltdbroot> (run voltdb collect -h for more details)\n";
             message += "       voltdb compile [<option> ...] [<ddl-file> ...]  (run voltdb compile -h for more details)\n";
             os.print(message);
             // Log it to log4j as well, which will capture the output to a file for (hopefully never) cases where VEM has issues (it generates command lines).

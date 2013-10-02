@@ -98,8 +98,11 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
             for (int i = 0; i < streamArray.length(); i++) {
                 JSONObject streamObj = streamArray.getJSONObject(i);
 
-                Stream config = new Stream(parseStreamPairs(streamObj),
-                                           streamObj.optInt("newPartition"));
+                Integer newPartition = null;
+                if (!streamObj.isNull("newPartition")) {
+                    newPartition = Integer.parseInt(streamObj.getString("newPartition"));
+                }
+                Stream config = new Stream(parseStreamPairs(streamObj), newPartition);
 
                 builder.add(config);
             }
@@ -147,7 +150,8 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
         for (Stream stream : streams) {
             stringer.object();
 
-            stringer.key("newPartition").value(stream.newPartition);
+            stringer.key("newPartition").value(stream.newPartition == null ?
+                                               null : Integer.toString(stream.newPartition));
 
             stringer.key("streamPairs").object();
             for (Map.Entry<Long, Collection<Long>> entry : stream.streamPairs.asMap().entrySet()) {

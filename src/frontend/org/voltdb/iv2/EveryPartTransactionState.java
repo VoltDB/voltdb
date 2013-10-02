@@ -20,14 +20,25 @@ package org.voltdb.iv2;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 /**
- *
+ * Every transaction needs a TransactionState.  This provides a minimal one with the proper
+ * default settings for every partition transactions (currently only used by system procedures).
+ * This used to just use SpTransactionState until it became necessary to not have these
+ * claim to be isSinglePartition().
  */
-public class MPIEndOfLogTransactionState extends TransactionState {
-    public MPIEndOfLogTransactionState(TransactionInfoBaseMessage notice)
+public class EveryPartTransactionState extends TransactionState
+{
+    final Iv2InitiateTaskMessage m_initiationMsg;
+    protected EveryPartTransactionState(TransactionInfoBaseMessage notice)
     {
         super(null, notice);
+        if (notice instanceof Iv2InitiateTaskMessage) {
+            m_initiationMsg = (Iv2InitiateTaskMessage)notice;
+        } else {
+            m_initiationMsg = null;
+        }
     }
 
     @Override
@@ -39,6 +50,6 @@ public class MPIEndOfLogTransactionState extends TransactionState {
     @Override
     public StoredProcedureInvocation getInvocation()
     {
-        return null;
+        return m_initiationMsg.getStoredProcedureInvocation();
     }
 }
