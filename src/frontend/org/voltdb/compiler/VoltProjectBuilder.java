@@ -271,7 +271,7 @@ public class VoltProjectBuilder {
     private List<String> m_diagnostics;
 
     private Properties m_elConfig;
-    private String m_elExportTo;
+    private String m_elExportTarget = "file";
 
     private Integer m_deadHostTimeout = null;
 
@@ -491,13 +491,12 @@ public class VoltProjectBuilder {
         }
         m_elConfig = config;
 
-        if (exportTarget == null || exportTarget.trim().isEmpty()) {
-            exportTarget = "file";
+        if ((exportTarget != null) && !exportTarget.trim().isEmpty()) {
+            m_elExportTarget = exportTarget;
         }
-        m_elExportTo = exportTarget;
     }
 
-    public void addExport( boolean enabled, List<String> groups) {
+    public void addExport(boolean enabled, List<String> groups) {
         addExport(enabled, groups, null, null);
     }
 
@@ -1085,7 +1084,7 @@ public class VoltProjectBuilder {
         // this is for old generation export test suite backward compatibility
         export.setEnabled(m_elenabled && m_elloader != null && !m_elloader.trim().isEmpty());
 
-        ServerExportEnum exportTarget = ServerExportEnum.fromValue(m_elExportTo.toLowerCase());
+        ServerExportEnum exportTarget = ServerExportEnum.fromValue(m_elExportTarget.toLowerCase());
         export.setTarget(exportTarget);
         if((m_elConfig != null) && (m_elConfig.size() > 0)) {
             ExportConfigurationType exportConfig = factory.createExportConfigurationType();
