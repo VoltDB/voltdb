@@ -150,7 +150,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private boolean hasAverage = false;
 
     public MVFixInfo mvFixInfo = new MVFixInfo();
-    private boolean isAdHoc = false;
 
     /**
     * Class constructor
@@ -159,11 +158,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     */
     public ParsedSelectStmt(String[] paramValues, Database db) {
         super(paramValues, db);
-    }
-
-    public ParsedSelectStmt(String[] paramValues, Database db, boolean adHoc) {
-        super(paramValues, db);
-        isAdHoc = adHoc;
     }
 
     @Override
@@ -724,8 +718,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 limitParameterId = Long.parseLong(node);
             else {
                 assert(limitNode.children.size() == 1);
-                if (isAdHoc) {
-                    limitParameterId = Long.parseLong(limitNode.children.get(0).attributes.get("id"));
+                VoltXMLElement valueNode = limitNode.children.get(0);
+                boolean isAdHocParameter = valueNode.attributes.get("isparam").equals("true") ? true: false;
+                if (isAdHocParameter) {
+                    limitParameterId = Long.parseLong(valueNode.attributes.get("id"));
                 } else {
                     node = limitNode.attributes.get("limit");
                     assert(node != null);
@@ -739,8 +735,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 offsetParameterId = Long.parseLong(node);
             else {
                 if (offsetNode.children.size() == 1) {
-                    if (isAdHoc) {
-                        offsetParameterId = Long.parseLong(offsetNode.children.get(0).attributes.get("id"));
+                    VoltXMLElement valueNode = offsetNode.children.get(0);
+                    boolean isAdHocParameter = valueNode.attributes.get("isparam").equals("true") ? true: false;
+                    if (isAdHocParameter) {
+                        offsetParameterId = Long.parseLong(valueNode.attributes.get("id"));
                     } else {
                         node = offsetNode.attributes.get("offset");
                         assert(node != null);
