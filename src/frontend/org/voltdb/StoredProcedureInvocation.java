@@ -152,7 +152,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         return null;
     }
 
-    public void setClientHandle(int aHandle) {
+    public void setClientHandle(long aHandle) {
         clientHandle = aHandle;
     }
 
