@@ -309,6 +309,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                     VoltTable table = frm.getTableAtIndex(0);
                     if (monitor != null) {
                         monitor.reportProgress(table);
+                        resetResultTable(table);
                     }
                     receivedDependencyIds.put(
                             dependencyId,
@@ -436,5 +437,22 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         } else {
             throw new RuntimeException("SP sysproc doesn't support getting the master HSID");
         }
+    }
+
+    private void resetResultTable(VoltTable table) {
+        table.advanceRow();
+        Object hid = table.get(VoltSystemProcedure.CNAME_HOST_ID, VoltSystemProcedure.CTYPE_ID);
+        String hostName = table.getString("HOSTNAME");
+        Object sid = table.get(VoltSystemProcedure.CNAME_SITE_ID, VoltSystemProcedure.CTYPE_ID);
+        String tableName = table.getString("TABLE");
+        Object pid = table.get(VoltSystemProcedure.CNAME_PARTITION_ID, VoltSystemProcedure.CTYPE_ID);
+        String result = table.getString("RESULT");
+        String errMsg = table.getString("ERR_MSG");
+
+        //Reset count after we counted.
+        table.resetRowPosition();
+        table.clearRowData();
+        table.addRow(hid, hostName, sid, tableName, pid,
+                result, errMsg, 0);
     }
 }
