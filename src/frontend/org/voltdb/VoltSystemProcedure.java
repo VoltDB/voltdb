@@ -453,6 +453,6 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         table.resetRowPosition();
         table.clearRowData();
         table.addRow(hid, hostName, sid, tableName, pid,
-                result, errMsg, 0);
+                result, errMsg, 0, 0);
     }
 }
