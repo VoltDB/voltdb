@@ -876,11 +876,10 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                     + tb + " where V_G1 > 10 ;").getResults()[0];
             assertEquals(3, vt.asScalarLong());
 
-            // ENG-5241: Add order by V_CNT will crash the system for table V_P2 on multi-server config.
-            // When it is fixed, enable the next query to test.
-//            vt = client.callProcedure("@AdHoc", "Select count(*) from "
-//                    + tb + " where V_G1 > 10 ORDER BY V_CNT;").getResults()[0];
-//            assertEquals(3, vt.asScalarLong());
+            // Test it with extra meaningless order by.
+            vt = client.callProcedure("@AdHoc", "Select count(*) from "
+                    + tb + " where V_G1 > 10 ORDER BY V_CNT;").getResults()[0];
+            assertEquals(3, vt.asScalarLong());
 
             // Test AND
             vt = client.callProcedure("@AdHoc", "Select V_CNT from "
