@@ -475,9 +475,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             }
 
             m_estimatedOutputTupleCount = Math.min(m_estimatedOutputTupleCount, limitInt);
-            if (m_predicate == null) {
-                m_estimatedProcessedTupleCount = limitInt + limit.getOffset();
-            }
         }
     }
 
