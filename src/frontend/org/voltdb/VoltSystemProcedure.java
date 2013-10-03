@@ -439,7 +439,9 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         }
     }
 
+    // This method resets count as this table is reused and dont need count overcounted.
     private void resetResultTable(VoltTable table) {
+        table.resetRowPosition();
         table.advanceRow();
         Object hid = table.get(VoltSystemProcedure.CNAME_HOST_ID, VoltSystemProcedure.CTYPE_ID);
         String hostName = table.getString("HOSTNAME");
