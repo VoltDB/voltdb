@@ -1242,7 +1242,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
         System.out.println("STARTING insert no json string...");
         Client client = getClient();
         VoltTable result = null;
-        // It used to throw errors from EE when inserting without giving explicit values for default null columns.
+        // it used to throw EE exception
+        // when inserting a non-json encoded var char into a column that has a field() index;
         client.callProcedure("NO_JSON.insert",  1, "jpiekos1", "foo", "no json");
 
         result = client.callProcedure("@AdHoc","select id, var1, var2, var3 from no_json;").getResults()[0];
