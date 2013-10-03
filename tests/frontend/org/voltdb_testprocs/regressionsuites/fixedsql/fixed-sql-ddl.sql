@@ -91,9 +91,20 @@ create index eng1850_tree_pid_aid on ENG1850 (
 );
 
 CREATE TABLE DEFAULT_NULL (
-  ID INTEGER DEFAULT '0' NOT NULL,
+  ID INTEGER NOT NULL,
   num1 INTEGER DEFAULT NULL,
   num2 INTEGER ,
   ratio FLOAT DEFAULT NULL,
   PRIMARY KEY (ID)
 );
+
+
+CREATE TABLE NO_JSON (
+  ID INTEGER NOT NULL,
+  var1 VARCHAR(300),
+  var2 VARCHAR(300),
+  var3 VARCHAR(300),
+  PRIMARY KEY (ID)
+);
+CREATE INDEX test_field ON R1 (var2, field(var3,'color'));
+

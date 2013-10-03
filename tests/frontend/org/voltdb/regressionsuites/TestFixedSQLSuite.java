@@ -1238,6 +1238,22 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
     }
 
+    public void testENG4146() throws IOException, ProcCallException {
+        System.out.println("STARTING insert no json string...");
+        Client client = getClient();
+        VoltTable result = null;
+        // It used to throw errors from EE when inserting without giving explicit values for default null columns.
+        client.callProcedure("NO_JSON.insert",  1, "jpiekos1", "foo", "no json");
+
+        result = client.callProcedure("@AdHoc","select id, var1, var2, var3 from no_json;").getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals(1, result.getLong(0));
+
+        assertEquals("jpiekos1", result.getString(1));
+        assertEquals("foo", result.getString(2));
+        assertEquals("no json", result.getString(3));
+    }
+
 
     //
     // JUnit / RegressionSuite boilerplate
