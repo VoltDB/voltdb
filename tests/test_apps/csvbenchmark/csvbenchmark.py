@@ -171,6 +171,7 @@ def run_csvloader(schema, data_file):
             for l in stdout_lines:
                 print '[csvloader stdout] ' + l
         rc = p.returncode
+        actual_row_count = get_table_row_count(schema)
         if rc != 0:
             print "CSVLoader failed with rc %d" % rc
             for l in stderr.split('\n'):
@@ -181,6 +182,8 @@ def run_csvloader(schema, data_file):
                         stdout, flags=re.M)
         if m is None or int(m.group(1)) != rowcount or m.group(1) != m.group(2):
             raise RuntimeError ("CSV Loader failed to load all rows")
+        if rowcount != int(actual_row_count):
+            raise RuntimeError ("Actual table row count was not as expected exp:%d act:%d" % (rowcount,actual_row_count))
         stats = csvloader_getstatistics(stdout)
         print "try %d %s elapsed: %f parsing: %f inserting: %f" % ((I+1, schema)+stats)
         elapsed_results.append(stats[0])
@@ -235,27 +238,17 @@ def csvloader_getstatistics(lines):
     return (elapsed, parsing, inserting)
 
 def get_table_row_count(table_name):
-        result = None
-        # random.shuffle has a bug
-        hosts = []
-        hostsup = options.servers
-        while hostsup:
-            h = random.choice(hostsup)
-            hosts.append(h)
-            hostsup.remove(h)
-        logging.debug("get_count hosts: %s" % hosts)
-        to = int(math.ceil(360.0/len(hosts)))
-        for h in hosts:
-            try:
-                T = self.count_query(host=h, timeout=to)
-                result = T[0]
-            except:
-                pass
-            if result and result > 0:
-                break
-            logging.error("Count query failed for host %s" % h)
-            self.success = False
-        return result
+    host = random.choice(options.servers)
+    pyclient = FastSerializer(host=host, port=21212)
+    count = VoltProcedure(pyclient, '@AdHoc', [FastSerializer.VOLTTYPE_STRING])
+    resp = count.call(['select count(*) from %s' % table_name], timeout=360)
+    if resp.status != 1 or len(resp.tables[0].tuples) != 1:
+        print "Unexpected response to count query from host %s: %s" % (host, resp)
+        raise RuntimeError()
+    __tuples = resp.tables[0].tuples[0]
+    result = __tuples[0]
+    print "count query returned: %s" % result
+    return result
 
 def get_datafile_path(case):
     return os.path.join(DATA_DIR, "csvbench_%s_%d.dat" % (case, options.ROW_COUNT))
