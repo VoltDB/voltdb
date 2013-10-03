@@ -106,5 +106,5 @@ CREATE TABLE NO_JSON (
   var3 VARCHAR(300),
   PRIMARY KEY (ID)
 );
-CREATE INDEX test_field ON R1 (var2, field(var3,'color'));
+CREATE INDEX test_field ON NO_JSON (var2, field(var3,'color'));
 
