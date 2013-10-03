@@ -17,12 +17,13 @@
 package org.voltdb;
 
 /**
- * System Procedure progress callback interface. Start indicates the total result size expected.
- * Progress updates the work done so far. End indicates that processing is done. Implementer
- * needs to handle these and track the counters and report progress to user or some other system.
+ * Snapshot Procedure progress callback interface.
+ * reportProgress updates the work done so far. Implementer needs to handle these and
+ * track the counters and report progress to user.
  */
 public interface SnapshotProgressMonitor {
 
+    //Update your internal counters.
     void reportProgress(VoltTable table);
 
 }
