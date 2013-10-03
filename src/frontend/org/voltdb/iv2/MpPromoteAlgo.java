@@ -89,7 +89,13 @@ public class MpPromoteAlgo implements RepairAlgo
         @Override
         public int compare(Iv2RepairLogResponseMessage o1, Iv2RepairLogResponseMessage o2)
         {
-            return (int)(o1.getTxnId() - o2.getTxnId());
+            if (o1.getTxnId() < o2.getTxnId()) {
+                return -1;
+            }
+            else if (o1.getTxnId() > o2.getTxnId()) {
+                return 1;
+            }
+            return 0;
         }
     };
 

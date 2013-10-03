@@ -224,7 +224,13 @@ public class RepairLog
         @Override
         public int compare(Item i1, Item i2)
         {
-            return (int)(i1.getHandle() - i2.getHandle());
+            if (i1.getHandle() < i2.getHandle()) {
+                return -1;
+            }
+            else if (i1.getHandle() > i2.getHandle()) {
+                return 1;
+            }
+            return 0;
         }
     };
 
