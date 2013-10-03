@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 import java.io.IOException;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.voltcore.logging.Level;
@@ -38,7 +39,7 @@ import org.voltdb.utils.LogKeys;
  */
 public class EveryPartitionTask extends TransactionTask
 {
-    final long[] m_initiatorHSIds;
+    final List<Long> m_initiatorHSIds = new ArrayList<Long>();
     final TransactionInfoBaseMessage m_initiationMsg;
     final Mailbox m_mailbox;
 
@@ -47,7 +48,7 @@ public class EveryPartitionTask extends TransactionTask
     {
         super(new EveryPartTransactionState(msg), queue);
         m_initiationMsg = msg;
-        m_initiatorHSIds = com.google.common.primitives.Longs.toArray(pInitiators);
+        m_initiatorHSIds.addAll(pInitiators);
         m_mailbox = mailbox;
     }
 
@@ -56,7 +57,7 @@ public class EveryPartitionTask extends TransactionTask
     public void run(SiteProcedureConnection siteConnection)
     {
         hostLog.debug("STARTING: " + this);
-        m_mailbox.send(m_initiatorHSIds, m_initiationMsg);
+        m_mailbox.send(com.google.common.primitives.Longs.toArray(m_initiatorHSIds), m_initiationMsg);
         m_txnState.setDone();
         m_queue.flush(getTxnId());
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
@@ -74,6 +75,17 @@ public class EveryPartitionTask extends TransactionTask
     public void runFromTaskLog(SiteProcedureConnection siteConnection)
     {
         throw new RuntimeException("MPI asked to execute everysite proc from task log while rejoining.");
+    }
+
+    /**
+     * Update the list of partition masters in the event of a failure/promotion.
+     * Currently only thread-"safe" by virtue of only calling this on
+     * ProcedureTasks which are not at the head of the MPI's TransactionTaskQueue.
+     */
+    public void updateMasters(List<Long> masters)
+    {
+        m_initiatorHSIds.clear();
+        m_initiatorHSIds.addAll(masters);
     }
 
     @Override

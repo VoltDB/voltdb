@@ -134,7 +134,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             }
         }
         // Now, iterate through the backlog and update the partition masters
-        // for all MpProcedureTasks
+        // for all ProcedureTasks
         Iterator<TransactionTask> iter = m_backlog.iterator();
         while (iter.hasNext()) {
             TransactionTask tt = iter.next();
@@ -143,9 +143,11 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                 tmLog.debug("Repair updating task: " + next + " with masters: " + masters);
                 next.updateMasters(masters, partitionMasters);
             }
-            // EveryPartitionTasks don't need repair handling.
-            // MpScheduler should take care of the duplicate counter, there's no
-            // other maintenance to do here since they don't linger in the queue
+            else if (tt instanceof EveryPartitionTask) {
+                EveryPartitionTask next = (EveryPartitionTask)tt;
+                tmLog.debug("Repair updating EPT task: " + next + " with masters: " + masters);
+                next.updateMasters(masters);
+            }
         }
     }
 
