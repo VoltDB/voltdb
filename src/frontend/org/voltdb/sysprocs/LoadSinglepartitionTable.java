@@ -17,26 +17,20 @@
 
 package org.voltdb.sysprocs;
 
-import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
-import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
-import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
-import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
-import org.voltdb.messaging.FastDeserializer;
 
 /**
  * Given as input a VoltTable with a schema corresponding to a persistent table,

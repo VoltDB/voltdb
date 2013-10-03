@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 
@@ -56,7 +57,7 @@ public class InitiatorMailbox implements Mailbox
 
     private final int m_partitionId;
     protected final Scheduler m_scheduler;
-    private final HostMessenger m_messenger;
+    protected final HostMessenger m_messenger;
     protected final RepairLog m_repairLog;
     private final JoinProducerBase m_joinProducer;
     private final LeaderCacheReader m_masterLeaderCache;
@@ -203,12 +204,12 @@ public class InitiatorMailbox implements Mailbox
     }
 
     // Change the replica set configuration (during or after promotion)
-    public synchronized void updateReplicas(List<Long> replicas)
+    public synchronized void updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters)
     {
-        updateReplicasInternal(replicas);
+        updateReplicasInternal(replicas, partitionMasters);
     }
 
-    protected void updateReplicasInternal(List<Long> replicas) {
+    protected void updateReplicasInternal(List<Long> replicas, Map<Integer, Long> partitionMasters) {
         assert(lockingVows());
         Iv2Trace.logTopology(getHSId(), replicas, m_partitionId);
         // If a replica set has been configured and it changed during
@@ -216,7 +217,7 @@ public class InitiatorMailbox implements Mailbox
         if (m_algo != null) {
             m_algo.cancel();
         }
-        m_scheduler.updateReplicas(replicas);
+        m_scheduler.updateReplicas(replicas, partitionMasters);
     }
 
     public long getMasterHsId(int partitionId)

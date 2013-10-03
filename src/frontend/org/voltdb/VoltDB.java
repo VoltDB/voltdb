@@ -97,11 +97,6 @@ public class VoltDB {
     // The name of the SQLStmt implied by a statement procedure's sql statement.
     public static final String ANON_STMT_NAME = "sql";
 
-    public static boolean createForRejoin(StartAction startAction)
-    {
-        return startAction.doesRejoin();
-    }
-
     //The GMT time zone you know and love
     public static final TimeZone GMT_TIMEZONE = TimeZone.getTimeZone("GMT+0");
 
@@ -443,10 +438,10 @@ public class VoltDB {
             // If no action is specified, issue an error.
             if (null == m_startAction) {
                 if (org.voltdb.utils.MiscUtils.isPro()) {
-                    hostLog.fatal("You must specify a startup action, either create, recover, replica, rejoin, or compile.");
+                    hostLog.fatal("You must specify a startup action, either create, recover, replica, rejoin, collect, or compile.");
                 } else
                 {
-                    hostLog.fatal("You must specify a startup action, either create, recover, rejoin, or compile.");
+                    hostLog.fatal("You must specify a startup action, either create, recover, rejoin, collect, or compile.");
                 }
                 usage();
                 System.exit(-1);
@@ -540,12 +535,14 @@ public class VoltDB {
                 message = "Usage: voltdb create catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
                         + "       voltdb replica catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml> \n"
                         + "       voltdb recover [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
-                        + "       voltdb [live] rejoin host <hostname>\n";
+                        + "       voltdb [live] rejoin host <hostname>\n"
+                        + "       voltdb add host <hostname>\n";
             } else {
                 message = "Usage: voltdb create  catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>]\n"
                         + "       voltdb recover [host <hostname>] [deployment <deployment.xml>]\n"
                         + "       voltdb rejoin host <hostname>\n";
             }
+            message += "       voltdb collect [<option> ...] <path-to-voltdbroot> (run voltdb collect -h for more details)\n";
             message += "       voltdb compile [<option> ...] [<ddl-file> ...]  (run voltdb compile -h for more details)\n";
             os.print(message);
             // Log it to log4j as well, which will capture the output to a file for (hopefully never) cases where VEM has issues (it generates command lines).

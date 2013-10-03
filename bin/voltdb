@@ -48,10 +48,18 @@
 # list of commands handled by tools/volt
 declare -a VOLT_KEYWORDS=(compile mask collect)
 
+JAVA=`which java`
+
+# some Java parameters
+if [ "$JAVA_HOME" != "" ]; then
+  #echo "run java in $JAVA_HOME"
+  JAVA=$JAVA_HOME/bin/java
+fi
+
 # JVM detection taken from Apache Cassandra
 # Determine the sort of JVM we'll be running on.
 
-java_ver_output=`"${JAVA:-java}" -version 2>&1`
+java_ver_output=`"$JAVA" -version 2>&1`
 
 jvmver=`echo "$java_ver_output" | awk -F'"' 'NR==1 {print $2}'`
 JVM_VERSION=${jvmver%_*}
@@ -123,14 +131,7 @@ else
     VOLTDB_LIB=$VOLTDB_HOME/lib
 fi
 
-JAVA=`which java`
 JAVA_HEAP_MAX=-Xmx1024m
-
-# some Java parameters
-if [ "$JAVA_HOME" != "" ]; then
-  #echo "run java in $JAVA_HOME"
-  JAVA=$JAVA_HOME/bin/java
-fi
 
 # check envvars which might override default args
 if [ -n "${VOLTDB_HEAPSIZE:+x}" ]; then
@@ -153,7 +154,7 @@ if [ -z "${LOG4J_CONFIG_PATH}" ]; then
   fi
 fi
 
-VOLTDBJAR=`ls $VOLTDB_VOLTDB/voltdb-3.*.jar | grep -v "doc.jar" | head -1`
+VOLTDBJAR=`ls $VOLTDB_VOLTDB/voltdb-[0-9].*.jar | grep -v "doc.jar" | head -1`
 if [ -n "${VOLTDBJAR}" ]; then
   CLASSPATH=$CLASSPATH:$VOLTDBJAR
 else

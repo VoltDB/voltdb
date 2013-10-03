@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -47,20 +48,13 @@ public class SnapshotVerifier {
             printHelpAndQuit(0);
         }
 
-        FileFilter filter = new SnapshotFilter();
-        boolean specifiedSingle = false;
         HashSet<String> snapshotNames = new HashSet<String>();
         for (int ii = 0; ii < args.length; ii++) {
             if (args[ii].equals("--dir")) {
                 ii++;
                 continue;
             }
-            specifiedSingle = true;
             snapshotNames.add(args[ii]);
-        }
-
-        if (specifiedSingle) {
-            filter = new SpecificSnapshotFilter(snapshotNames);
         }
 
         List<String> directories = new ArrayList<String>();
@@ -75,21 +69,39 @@ public class SnapshotVerifier {
                 ii++;
             }
         }
+
         if (directories.isEmpty()) {
             directories.add(".");
         }
 
+        verifySnapshots(directories, snapshotNames, false);
+    }
+
+    /**
+     * Perform snapshot verification.
+     * @param directories list of directories to search for snapshots
+     * @param snapshotNames set of snapshot names/nonces to verify
+     */
+    public static void verifySnapshots(
+            final List<String> directories, final Set<String> snapshotNames, boolean expectHashinator) {
+
+        FileFilter filter = new SnapshotFilter();
+        if (!snapshotNames.isEmpty()) {
+            filter = new SpecificSnapshotFilter(snapshotNames);
+        }
+
         Map<String, Snapshot> snapshots = new HashMap<String, Snapshot>();
         for (String directory : directories) {
-            SnapshotUtil.retrieveSnapshotFiles( new File(directory), snapshots, filter, 0, true, CONSOLE_LOG);
+            SnapshotUtil.retrieveSnapshotFiles( new File(directory), snapshots, filter, true, CONSOLE_LOG);
         }
 
         if (snapshots.isEmpty()) {
             System.out.println("Snapshot corrupted");
             System.out.println("No files found");
         }
+
         for (Snapshot s : snapshots.values()) {
-            System.out.println(SnapshotUtil.generateSnapshotReport(s.getTxnId(), s).getSecond());
+            System.out.println(SnapshotUtil.generateSnapshotReport(s.getTxnId(), s, expectHashinator).getSecond());
         }
     }
 

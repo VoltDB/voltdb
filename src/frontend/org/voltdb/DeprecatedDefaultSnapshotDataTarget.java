@@ -354,7 +354,7 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
     }
 
     @Override
-    public ListenableFuture<?> write(final Callable<BBContainer> tupleData, SnapshotTableTask context) {
+    public ListenableFuture<?> write(final Callable<BBContainer> tupleData, int tableId) {
         return write(tupleData, true);
     }
 

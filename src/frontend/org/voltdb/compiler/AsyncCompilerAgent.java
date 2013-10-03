@@ -24,6 +24,8 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
@@ -32,6 +34,7 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
 import org.voltdb.messaging.LocalMailbox;
 
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -81,18 +84,22 @@ public class AsyncCompilerAgent {
                 } catch (RejectedExecutionException rejected) {
                     final LocalObjectMessage wrapper = (LocalObjectMessage)message;
                     AsyncCompilerWork work = (AsyncCompilerWork)(wrapper.payload);
-                    AsyncCompilerResult retval = new AsyncCompilerResult();
-                    retval.clientHandle = work.clientHandle;
-                    retval.errorMsg = "Ad Hoc Planner is not available. Try again.";
-                    retval.connectionId = work.connectionId;
-                    retval.hostname = work.hostname;
-                    retval.adminConnection = work.adminConnection;
-                    retval.clientData = work.clientData;
-                    work.completionHandler.onCompletion(retval);
+                    generateErrorResult("Ad Hoc Planner task queue is full. Try again.", work);
                 }
             }
         };
         hostMessenger.createMailbox(hsId, m_mailbox);
+    }
+
+    void generateErrorResult(String errorMsg, AsyncCompilerWork work) {
+        AsyncCompilerResult retval = new AsyncCompilerResult();
+        retval.clientHandle = work.clientHandle;
+        retval.errorMsg = errorMsg;
+        retval.connectionId = work.connectionId;
+        retval.hostname = work.hostname;
+        retval.adminConnection = work.adminConnection;
+        retval.clientData = work.clientData;
+        work.completionHandler.onCompletion(retval);
     }
 
     void handleMailboxMessage(final VoltMessage message) {

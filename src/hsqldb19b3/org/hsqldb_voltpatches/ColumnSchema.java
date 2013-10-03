@@ -358,7 +358,8 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
         Expression exp = getDefaultExpression();
 
         // if there is a default value for the column
-        if (exp != null) {
+        // and the column value is not NULL. (Ignore "DEFAULT NULL" in DDL)
+        if (exp != null && exp.valueData != null) {
             exp.dataType = dataType;
 
             // add default value to body of column element

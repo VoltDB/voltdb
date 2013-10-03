@@ -34,6 +34,7 @@ public class CachedByteBufferAllocator {
             m_buffer = ByteBuffer.allocate(size);
         }
         m_buffer.clear();
+        m_buffer.limit(size);
         return m_buffer;
     }
 }

@@ -22,8 +22,11 @@ import java.nio.ByteBuffer;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.VoltTable;
+import org.voltdb.client.ClientResponse;
 
 /**
  * Message from an execution site to initiator with the final response for
@@ -45,6 +48,7 @@ public class InitiateResponseMessage extends VoltMessage {
     // Mis-partitioned invocation needs to send the invocation back to ClientInterface for restart
     private boolean m_mispartitioned;
     private StoredProcedureInvocation m_invocation;
+    private Pair<Long, byte[]> m_currentHashinatorConfig;
 
     /** Empty constructor for de-serialization */
     public InitiateResponseMessage()
@@ -147,11 +151,17 @@ public class InitiateResponseMessage extends VoltMessage {
         return m_invocation;
     }
 
-    public void setMispartitioned(boolean mispartitioned, StoredProcedureInvocation invocation) {
+    public Pair<Long, byte[]> getCurrentHashinatorConfig() {
+        return m_currentHashinatorConfig;
+    }
+
+    public void setMispartitioned(boolean mispartitioned, StoredProcedureInvocation invocation,
+                                  Pair<Long, byte[]> currentHashinatorConfig) {
         m_mispartitioned = mispartitioned;
         m_invocation = invocation;
+        m_currentHashinatorConfig = currentHashinatorConfig;
         m_commit = false;
-        m_response = null;
+        m_response = new ClientResponseImpl(ClientResponse.TXN_RESTART, new VoltTable[]{}, "Mispartitioned");
     }
 
     public ClientResponseImpl getClientResponseData() {
@@ -179,12 +189,14 @@ public class InitiateResponseMessage extends VoltMessage {
             + 8 // client connection id
             + 1 // read only
             + 1 // node recovering indication
-            + 1; // mispartitioned invocation
+            + 1 // mispartitioned invocation
+            + m_response.getSerializedSize();
 
         if (m_mispartitioned) {
-            msgsize += m_invocation.getSerializedSize();
-        } else {
-            msgsize += m_response.getSerializedSize();
+            msgsize += m_invocation.getSerializedSize()
+                       + 8 // current hashinator version
+                       + 4 // hashinator config length
+                       + m_currentHashinatorConfig.getSecond().length; // hashinator config
         }
 
         return msgsize;
@@ -203,10 +215,12 @@ public class InitiateResponseMessage extends VoltMessage {
         buf.put((byte) (m_readOnly == true ? 1 : 0));
         buf.put((byte) (m_recovering == true ? 1 : 0));
         buf.put((byte) (m_mispartitioned == true ? 1 : 0));
+        m_response.flattenToBuffer(buf);
         if (m_mispartitioned) {
+            buf.putLong(m_currentHashinatorConfig.getFirst());
+            buf.putInt(m_currentHashinatorConfig.getSecond().length);
+            buf.put(m_currentHashinatorConfig.getSecond());
             m_invocation.flattenToBuffer(buf);
-        } else {
-            m_response.flattenToBuffer(buf);
         }
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
@@ -224,16 +238,19 @@ public class InitiateResponseMessage extends VoltMessage {
         m_readOnly = buf.get() == 1;
         m_recovering = buf.get() == 1;
         m_mispartitioned = buf.get() == 1;
+        m_response = new ClientResponseImpl();
+        m_response.initFromBuffer(buf);
+        m_commit = (m_response.getStatus() == ClientResponseImpl.SUCCESS);
         if (m_mispartitioned) {
+            long hashinatorVersion = buf.getLong();
+            byte[] hashinatorBytes = new byte[buf.getInt()];
+            buf.get(hashinatorBytes);
+            m_currentHashinatorConfig = Pair.of(hashinatorVersion, hashinatorBytes);
+            // SPI must be the last to deserialize, it will take the remaining as parameter bytes
             m_invocation = new StoredProcedureInvocation();
             m_invocation.initFromBuffer(buf);
             m_commit = false;
-        } else {
-            m_response = new ClientResponseImpl();
-            m_response.initFromBuffer(buf);
-            m_commit = (m_response.getStatus() == ClientResponseImpl.SUCCESS);
         }
-        assert(buf.capacity() == buf.position());
     }
 
     @Override

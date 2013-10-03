@@ -30,7 +30,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
@@ -38,6 +37,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google.common.collect.Maps;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -51,15 +51,12 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.iv2.SiteTaskerQueue;
 import org.voltdb.iv2.SnapshotTask;
-import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.MiscUtils;
 
 import com.google.common.collect.ListMultimap;
-import com.google.common.util.concurrent.Callables;
-import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
 
@@ -173,6 +170,7 @@ public class SnapshotSiteProcessor {
      * Making it a TreeMap so that it works through one table at time, easier to debug.
      */
     private ListMultimap<Integer, SnapshotTableTask> m_snapshotTableTasks = null;
+    private Map<Integer, TableStreamer> m_streamers = null;
 
     private long m_lastSnapshotTxnId;
     private int m_lastSnapshotNumHosts;
@@ -379,7 +377,8 @@ public class SnapshotSiteProcessor {
     }
 
     public void initiateSnapshots(
-            ExecutionEngine ee,
+            SystemProcedureExecutionContext context,
+            SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
             List<SnapshotDataTarget> targets,
             long txnId,
@@ -393,6 +392,7 @@ public class SnapshotSiteProcessor {
         m_lastSnapshotTxnId = txnId;
         m_lastSnapshotNumHosts = numHosts;
         m_snapshotTableTasks = MiscUtils.sortedArrayListMultimap();
+        m_streamers = Maps.newHashMap();
         m_snapshotTargets = new ArrayList<SnapshotDataTarget>();
         m_snapshotTargetTerminators = new ArrayList<Thread>();
         m_exportSequenceNumbersToLogOnCompletion = exportSequenceNumbers;
@@ -405,10 +405,15 @@ public class SnapshotSiteProcessor {
         }
 
         // Table doesn't implement hashCode(), so use the table ID as key
-        Map<Integer, Pair<Table, SnapshotPredicates>> tablesAndPredicates =
-            makeTablesAndPredicatesToSnapshot(tasks);
-
-        activateTableStreams(ee, tablesAndPredicates);
+        for (Map.Entry<Integer, byte[]> tablePredicates : makeTablesAndPredicatesToSnapshot(tasks).entrySet()) {
+            int tableId = tablePredicates.getKey();
+            TableStreamer streamer =
+                new TableStreamer(tableId, format.getStreamType(), m_snapshotTableTasks.get(tableId));
+            if (!streamer.activate(context, tablePredicates.getValue())) {
+                VoltDB.crashLocalVoltDB("Failed to activate snapshot stream", false, null);
+            }
+            m_streamers.put(tableId, streamer);
+        }
 
         /*
          * Resize the buffer pool to contain enough buffers for the number of tasks. The buffer
@@ -467,10 +472,10 @@ public class SnapshotSiteProcessor {
         }
     }
 
-    private Map<Integer, Pair<Table, SnapshotPredicates>>
+    private Map<Integer, byte[]>
     makeTablesAndPredicatesToSnapshot(Collection<SnapshotTableTask> tasks) {
-        Map<Integer, Pair<Table, SnapshotPredicates>> tablesAndPredicates =
-            new HashMap<Integer, Pair<Table, SnapshotPredicates>>();
+        Map<Integer, SnapshotPredicates> tablesAndPredicates = Maps.newHashMap();
+        Map<Integer, byte[]> predicateBytes = Maps.newHashMap();
 
         for (SnapshotTableTask task : tasks) {
             SNAP_LOG.debug("Examining SnapshotTableTask: " + task);
@@ -480,34 +485,20 @@ public class SnapshotSiteProcessor {
 
             // Make sure there is a predicate object for each table, the predicate could contain
             // empty expressions. So activateTableStream() doesn't have to do a null check.
-            Pair<Table, SnapshotPredicates> tableAndPredicate =
-                tablesAndPredicates.get(task.m_table.getRelativeIndex());
-            if (tableAndPredicate == null) {
-                tableAndPredicate =
-                    Pair.of(task.m_table, new SnapshotPredicates());
-                tablesAndPredicates.put(task.m_table.getRelativeIndex(), tableAndPredicate);
+            SnapshotPredicates predicates = tablesAndPredicates.get(task.m_table.getRelativeIndex());
+            if (predicates == null) {
+                predicates = new SnapshotPredicates(task.m_table.getRelativeIndex());
+                tablesAndPredicates.put(task.m_table.getRelativeIndex(), predicates);
             }
 
-            tableAndPredicate.getSecond().addPredicate(task.m_predicate, task.m_deleteTuples);
+            predicates.addPredicate(task.m_predicate, task.m_deleteTuples);
         }
 
-        return tablesAndPredicates;
-    }
-
-    private static void activateTableStreams(ExecutionEngine ee,
-                                             Map<Integer, Pair<Table, SnapshotPredicates>> tablesAndPredicates)
-    {
-        for (Pair<Table, SnapshotPredicates> tableAndPredicate : tablesAndPredicates.values()) {
-            Table table = tableAndPredicate.getFirst();
-            SnapshotPredicates predicates = tableAndPredicate.getSecond();
-
-            if (!ee.activateTableStream(table.getRelativeIndex(),
-                                        TableStreamType.SNAPSHOT,
-                                        predicates)) {
-                VoltDB.crashLocalVoltDB("Attempted to activate copy on write mode for table "
-                                        + table.getTypeName() + " and failed", false, null);
-            }
+        for (Map.Entry<Integer, SnapshotPredicates> e : tablesAndPredicates.entrySet()) {
+            predicateBytes.put(e.getKey(), e.getValue().toBytes());
         }
+
+        return predicateBytes;
     }
 
     /**
@@ -524,15 +515,7 @@ public class SnapshotSiteProcessor {
         List<BBContainer> outputBuffers = new ArrayList<BBContainer>(tableTasks.size());
 
         for (SnapshotTableTask tableTask : tableTasks) {
-            assert(tableTask != null);
-            int headerSize = tableTask.m_target.getHeaderSize();
-            BBContainer snapshotBuffer = m_availableSnapshotBuffers.poll();
-            // XXX: with multiple output targets, is this still true?
-            assert(snapshotBuffer != null);
-            snapshotBuffer.b.clear();
-            snapshotBuffer.b.position(headerSize);
-
-            outputBuffers.add(snapshotBuffer);
+            outputBuffers.add(m_availableSnapshotBuffers.poll());
         }
 
         return outputBuffers;
@@ -547,7 +530,7 @@ public class SnapshotSiteProcessor {
              * thread so the EE can continue working.
              */
             if (tableTask.m_table.getIsreplicated() &&
-                tableTask.m_target.getFormat().isTableBased()) {
+                tableTask.m_target.getFormat().canCloseEarly()) {
                 final Thread terminatorThread =
                     new Thread("Replicated SnapshotDataTarget terminator ") {
                         @Override
@@ -568,72 +551,7 @@ public class SnapshotSiteProcessor {
         }
     }
 
-    /**
-     * Finalize the output buffers and write them to the corresponding data targets
-     *
-     * @return A future that can used to wait for all targets to finish writing the buffers
-     */
-    private ListenableFuture<?> writeSnapshotBlocksToTargets(int tableId,
-                                                             Collection<BBContainer> outputBuffers,
-                                                             int[] serialized)
-    {
-        final List<ListenableFuture<?>> writeFutures =
-            new ArrayList<ListenableFuture<?>>(outputBuffers.size());
-
-        // The containers, the data targets, and the serialized byte counts should all line up
-        Iterator<BBContainer> containerIter = outputBuffers.iterator();
-        Iterator<SnapshotTableTask> taskIter = m_snapshotTableTasks.get(tableId).iterator();
-        int serializedIndex = 0;
-
-        while (containerIter.hasNext() &&
-               taskIter.hasNext() &&
-               serializedIndex < serialized.length) {
-            final BBContainer snapshotBuffer = containerIter.next();
-            final SnapshotTableTask task = taskIter.next();
-            final int serializedBytes = serialized[serializedIndex++];
-            final int headerSize = snapshotBuffer.b.position();
-
-            /*
-             * Finalize the buffer by setting position to 0 and limit to the last used byte
-             */
-            snapshotBuffer.b.limit(serializedBytes + headerSize);
-            snapshotBuffer.b.position(0);
-
-            Callable<BBContainer> valueForTarget = Callables.returning(snapshotBuffer);
-            for (SnapshotDataFilter filter : task.m_filters) {
-                valueForTarget = filter.filter(valueForTarget);
-            }
-
-            ListenableFuture<?> writeFuture = task.m_target.write(valueForTarget, task);
-            if (writeFuture != null) {
-                writeFutures.add(writeFuture);
-                final ListenableFuture<?> retvalFinal = writeFuture;
-                retvalFinal.addListener(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            retvalFinal.get();
-                        } catch (Throwable t) {
-                            if (m_lastSnapshotSucceded) {
-                                SNAP_LOG.error("Error while attempting to write snapshot data to file " +
-                                               task.m_target, t);
-                                m_lastSnapshotSucceded = false;
-                            }
-                        }
-                    }
-                }, MoreExecutors.sameThreadExecutor());
-            }
-        }
-
-        // Should have iterated through all containers and tasks
-        assert !containerIter.hasNext() && !taskIter.hasNext() && serializedIndex == serialized.length;
-
-        // Wraps all write futures in one future
-        return Futures.allAsList(writeFutures);
-    }
-
-    public Future<?> doSnapshotWork(SystemProcedureExecutionContext context,
-                                    ExecutionEngine ee) {
+    public Future<?> doSnapshotWork(SystemProcedureExecutionContext context) {
         ListenableFuture<?> retval = null;
 
         /*
@@ -664,33 +582,38 @@ public class SnapshotSiteProcessor {
                 break;
             }
 
-            final int[] serialized = ee.tableStreamSerializeMore(tableId,
-                                                                 TableStreamType.SNAPSHOT,
-                                                                 outputBuffers);
-            for (int serializedBytes : serialized) {
-                if (serializedBytes < 0) {
-                    VoltDB.crashLocalVoltDB("Failure while serialize data from a table for COW snapshot", false, null);
-                }
+            // Stream more and add a listener to handle any failures
+            Pair<ListenableFuture, Boolean> streamResult = m_streamers.get(tableId).streamMore(context, outputBuffers);
+            if (streamResult.getFirst() != null) {
+                final ListenableFuture writeFutures = streamResult.getFirst();
+                writeFutures.addListener(new Runnable() {
+                    @Override
+                    public void run()
+                    {
+                        try {
+                            writeFutures.get();
+                        } catch (Throwable t) {
+                            if (m_lastSnapshotSucceded) {
+                                SNAP_LOG.error("Error while attempting to write snapshot data", t);
+                                m_lastSnapshotSucceded = false;
+                            }
+                        }
+                    }
+                }, MoreExecutors.sameThreadExecutor());
             }
 
             /**
-             * The EE will return 0 when there is no more data left to pull from that table.
-             * The enclosing loop ensures that the next table is then addressed.
+             * The table streamer will return false when there is no more data left to pull from that table. The
+             * enclosing loop ensures that the next table is then addressed.
              */
-            if (serialized[0] == 0) {
+            if (!streamResult.getSecond()) {
                 asyncTerminateReplicatedTableTasks(tableTasks);
                 // XXX: Guava's multimap will clear the tableTasks collection when the entry is
                 // removed from the containing map, so don't use the collection after removal!
                 taskIter.remove();
                 SNAP_LOG.debug("Finished snapshot tasks for table " + tableId +
                                ": " + tableTasks);
-
-                // Return all allocated snapshot output buffers
-                for (BBContainer container : outputBuffers) {
-                    m_availableSnapshotBuffers.offer(container);
-                }
             } else {
-                retval = writeSnapshotBlocksToTargets(tableId, outputBuffers, serialized);
                 break;
             }
         }
@@ -967,12 +890,11 @@ public class SnapshotSiteProcessor {
      * Do snapshot work exclusively until there is no more. Also blocks
      * until the fsync() and close() of snapshot data targets has completed.
      */
-    public HashSet<Exception> completeSnapshotWork(SystemProcedureExecutionContext context,
-                                                   ExecutionEngine ee)
+    public HashSet<Exception> completeSnapshotWork(SystemProcedureExecutionContext context)
         throws InterruptedException {
         HashSet<Exception> retval = new HashSet<Exception>();
         while (m_snapshotTableTasks != null) {
-            Future<?> result = doSnapshotWork(context, ee);
+            Future<?> result = doSnapshotWork(context);
             if (result != null) {
                 try {
                     result.get();

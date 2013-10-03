@@ -129,6 +129,7 @@ public class VoltCompiler {
 
     // generated html text for catalog report
     String m_report = null;
+    String m_reportPath = null;
 
     InMemoryJarfile m_jarOutput = null;
     Catalog m_catalog = null;
@@ -567,11 +568,12 @@ public class VoltCompiler {
 
         // generate the catalog report and write it to disk
         try {
-            m_report = ReportMaker.report(m_catalog);
+            m_report = ReportMaker.report(m_catalog, m_warnings);
             File file = new File("catalog-report.html");
             FileWriter fw = new FileWriter(file);
             fw.write(m_report);
             fw.close();
+            m_reportPath = file.getAbsolutePath();
         } catch (IOException e) {
             e.printStackTrace();
             return null;
@@ -1845,6 +1847,9 @@ public class VoltCompiler {
                         "\tfor best performance. For information on VoltDB partitioning, see:\n"+
                         "\thttp://voltdb.com/docs/UsingVoltDB/ChapAppDesign.php\n\n");
             }
+            outputStream.println("------------------------------------------\n");
+            outputStream.println("Full catalog report can be found at file://" + m_reportPath + "\n" +
+                        "\t or can be viewed at \"http://localhost:8080\" when the server is running.\n");
             outputStream.println("------------------------------------------\n");
         }
         if (feedbackStream != null) {

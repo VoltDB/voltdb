@@ -23,17 +23,13 @@
 
 package org.voltdb;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
+
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
 
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -42,8 +38,12 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.utils.VoltTableUtil;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+import org.mockito.Mockito;
 
-public class TestVoltTableUtil {
+public class TestVoltTableUtil extends Mockito {
     @Test
     public void testCSVNullConversion() throws IOException {
         CSVWriter writer = mock(CSVWriter.class);
@@ -131,7 +131,8 @@ public class TestVoltTableUtil {
         }
 
         assertEquals(2, numbers.size());
-        assertTrue(numbers.contains(1l));
-        assertTrue(numbers.contains(2l));
+        assertEquals(numbers.contains(1l), true);
+        assertEquals(numbers.contains(2l), true);
     }
+
 }

@@ -1147,13 +1147,8 @@ public class DDLCompiler {
                 }
             }
         }
-        if (defaultvalue != null && defaultvalue.equals("NULL"))
-            defaultvalue = null;
         if (defaulttype != null) {
             // fyi: Historically, VoltType class initialization errors get reported on this line (?).
-            if (defaultvalue == null) {
-                defaulttype = "NULL";
-            }
             defaulttype = Integer.toString(VoltType.typeFromString(defaulttype).getValue());
         }
 
@@ -1611,6 +1606,8 @@ public class DDLCompiler {
             // prepare info for aggregation columns.
             List<AbstractExpression> aggregationExprs = new ArrayList<AbstractExpression>();
             boolean hasAggregationExprs = false;
+            boolean hasMinOrMaxAgg = false;
+            ArrayList<AbstractExpression> minMaxAggs = new ArrayList<AbstractExpression>();
             for (int i = stmt.groupByColumns.size() + 1; i < stmt.displayColumns.size(); i++) {
                 ParsedSelectStmt.ParsedColInfo col = stmt.displayColumns.get(i);
                 AbstractExpression aggExpr = col.expression.getLeft();
@@ -1618,6 +1615,11 @@ public class DDLCompiler {
                     hasAggregationExprs = true;
                 }
                 aggregationExprs.add(aggExpr);
+                if (col.expression.getExpressionType() ==  ExpressionType.AGGREGATE_MIN ||
+                        col.expression.getExpressionType() == ExpressionType.AGGREGATE_MAX) {
+                    hasMinOrMaxAgg = true;
+                    minMaxAggs.add(aggExpr);
+                }
             }
 
             // set Aggregation Expressions.
@@ -1630,6 +1632,23 @@ public class DDLCompiler {
                             "expressions for aggregation expressions: " + e.toString());
                 }
                 matviewinfo.setAggregationexpressionsjson(aggregationExprsJson);
+            }
+
+            if (hasMinOrMaxAgg) {
+                // TODO: deal with minMaxAggs, i.e. if only one min/max agg, try to find the index
+                // with group by cols followed by this agg col; if multiple min/max aggs, decide
+                // what to do (probably the index on group by cols is the best choice)
+                Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs);
+                if (found != null) {
+                    matviewinfo.setIndexforminmax(found.getTypeName());
+                } else {
+                    matviewinfo.setIndexforminmax("");
+                    m_compiler.addWarn("No index found to support min() / max() UPDATE and DELETE on Materialized View " +
+                            matviewinfo.getTypeName() +
+                            ", and a sequential scan might be issued when current min / max value is updated / deleted.");
+                }
+            } else {
+                matviewinfo.setIndexforminmax("");
             }
 
             // parse out the aggregation columns into the dest table
@@ -1650,6 +1669,95 @@ public class DDLCompiler {
                 destColumn.setType(col.expression.getValueType().getValue());
             }
         }
+    }
+
+    // if the materialized view has MIN / MAX, try to find an index defined on the source table
+    // covering all group by cols / exprs to avoid expensive tablescan, must be full key coverage
+    private static Index findBestMatchIndexForMatviewMinOrMax(MaterializedViewInfo matviewinfo, Table srcTable, List<AbstractExpression> groupbyExprs) {
+        CatalogMap<Index> allIndexes = srcTable.getIndexes();
+
+        ArrayList<Index> candidates = new ArrayList<Index>();
+
+        for (Index index : allIndexes) {
+            String expressionjson = index.getExpressionsjson();
+            if (groupbyExprs == null && !expressionjson.isEmpty() ||
+                    groupbyExprs != null && expressionjson.isEmpty()) {
+                continue;
+            }
+            List<AbstractExpression> indexedExprs = null;
+            List<ColumnRef> indexedColRefs = null;
+
+            // complex group by exprs
+            if (groupbyExprs != null) {
+                try {
+                    indexedExprs = AbstractExpression.fromJSONArrayString(expressionjson, null);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                    assert(false);
+                    return null;
+                }
+
+                if (!prefixCompatibleExprs(indexedExprs, groupbyExprs)) {
+                    continue;
+                } else {
+                    candidates.add(index);
+                }
+            }
+            // simple group by cols
+            else {
+                indexedColRefs = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
+                List<ColumnRef> groupbyColRefs = CatalogUtil.getSortedCatalogItems(matviewinfo.getGroupbycols(), "index");
+
+                if (indexedColRefs.size() > groupbyColRefs.size()) {
+                    continue;
+                }
+
+                List<Integer> indexedColIds = new ArrayList<Integer>();
+                List<Integer> groupbyColIds = new ArrayList<Integer>();
+
+                for (ColumnRef cr : indexedColRefs) {
+                    indexedColIds.add(cr.getColumn().getIndex());
+                }
+                for (ColumnRef cr : groupbyColRefs) {
+                    groupbyColIds.add(cr.getColumn().getIndex());
+                }
+
+                boolean found = true;
+                for (int i = 0; i < indexedColIds.size(); i++) {
+                    if (!indexedColIds.contains(groupbyColIds.get(i))) {
+                        found = false;
+                        break;
+                    }
+                }
+                if (found) {
+                    candidates.add(index);
+                }
+            }
+        }
+
+        // return the widest index (match best)
+        Index ret = null;
+        for (Index index : candidates) {
+            if (ret == null) {
+                ret = index;
+            } else if (CatalogUtil.getCatalogIndexSize(index) > CatalogUtil.getCatalogIndexSize(ret)) {
+                ret = index;
+            }
+        }
+        return ret;
+    }
+
+    // srcExprs is the prefix of destExprs
+    private static boolean prefixCompatibleExprs(List<AbstractExpression> srcExprs, List<AbstractExpression> destExprs) {
+        if (srcExprs.size() > destExprs.size()) {
+            return false;
+        }
+        for (int i = 0; i < srcExprs.size(); i ++) {
+            if (!srcExprs.contains(destExprs.get(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -1677,13 +1785,6 @@ public class DDLCompiler {
             throw m_compiler.new VoltCompilerException(msg);
         }
 
-        if (stmt.hasComplexAgg()) {
-            msg += "contains an expression involving an aggregate function. " +
-                    "Expressions with aggregate functions are not currently supported in views.";
-            throw m_compiler.new VoltCompilerException(msg);
-        }
-
-
         int i;
         for (i = 0; i < groupColCount; i++) {
             ParsedSelectStmt.ParsedColInfo gbcol = stmt.groupByColumns.get(i);
@@ -1704,8 +1805,10 @@ public class DDLCompiler {
         for (i++; i < displayColCount; i++) {
             ParsedSelectStmt.ParsedColInfo outcol = stmt.displayColumns.get(i);
             if ((outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_COUNT) &&
-                    (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_SUM)) {
-                msg += "must have non-group by columns aggregated by sum or count.";
+                    (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_SUM) &&
+                    (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MIN) &&
+                    (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MAX)) {
+                msg += "must have non-group by columns aggregated by sum, count, min or max.";
                 throw m_compiler.new VoltCompilerException(msg);
             }
         }

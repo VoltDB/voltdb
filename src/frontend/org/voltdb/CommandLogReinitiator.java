@@ -58,20 +58,6 @@ public interface CommandLogReinitiator {
     public void replay();
 
     /**
-     * Whether or not we have started replaying local command log.
-     *
-     * @return true if it's replaying or it has finished, false if we are still
-     *         waiting for replay plan
-     */
-    public boolean started();
-
-    /**
-     * Joins the two threads
-     * @throws InterruptedException
-     */
-    public void join() throws InterruptedException;
-
-    /**
      * Whether or not there were log segments replayed in the cluster. This will
      * return true even if there were segments replayed by other nodes. It
      * doesn't necessarily mean that there were SPIs replayed. The segments
@@ -113,4 +99,17 @@ public interface CommandLogReinitiator {
      * discards the command log.
      */
     public void returnAllSegments();
+
+    /**
+     * Request an elastic index snapshot if the command log will replay @BalancePartitions transactions.
+     * @return true if successfully requested.
+     */
+    public boolean requestIndexSnapshot();
+
+    /**
+     * Call @BalancePartitions until the partitions are balanced if necessary. Does nothing if the partitions are
+     * already balanced or if the legacy hashinator is used.
+     * @return true if the partitions are balanced successfully.
+     */
+    public boolean checkAndBalancePartitions();
 }

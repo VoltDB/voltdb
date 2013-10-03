@@ -322,6 +322,12 @@ public class LocalCluster implements VoltServerConfig {
         startUp(clearLocalDataDirectories, ReplicationRole.NONE);
     }
 
+    public void setSiteCount(int siteCount) {
+        m_siteCount = siteCount;
+        // Force recompilation
+        m_compiled = false;
+    }
+
     void startLocalServer(boolean clearLocalDataDirectories) {
         // Generate a new root for the in-process server if clearing directories.
         File subroot = null;
@@ -578,10 +584,8 @@ public class LocalCluster implements VoltServerConfig {
 
             // add the ipc ports
             if (m_target == BackendTarget.NATIVE_EE_IPC) {
-                // set 1 port per site
-                for (int i = 0; i < m_siteCount; i++) {
-                    cmdln.ipcPort(portGenerator.next());
-                }
+                // set 1 port for the EE process
+                cmdln.ipcPort(portGenerator.next());
             }
             if (m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
                 EEProcess proc = m_eeProcs.get(hostId);

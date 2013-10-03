@@ -27,7 +27,6 @@ APPCLASSPATH=$CLASSPATH:$({ \
 VOLTDB="$VOLTDB_BIN/voltdb"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 CSVLOADER="$VOLTDB_BIN/csvloader"
-EXPORTTOFILE="$VOLTDB_BIN/exporttofile"
 
 DATAFILES="src/com/auctionexample/datafiles/"
 
@@ -84,14 +83,8 @@ function client() {
     java -classpath obj:$APPCLASSPATH com.auctionexample.Client
 }
 
-function export() {
-    $EXPORTTOFILE \
-        --connect client --servers localhost --type csv \
-        --nonce EXPORTDEMO --user voltdb --password demo
-}
-
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|client|server|export}"
+    echo "Usage: ./run.sh {clean|catalog|client|server}"
 }
 
 # Run the target passed as the first arg on the command line

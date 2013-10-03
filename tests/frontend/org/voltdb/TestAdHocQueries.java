@@ -158,28 +158,32 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
             results = m_client.callProcedure("executeSQLSP", 24, "select * from parted1 order by partval").getResults();
 
-            assertEquals( 1, results[0].getRowCount());
-            assertTrue(results[0].advanceRow());
-            assertEquals(24, results[0].getLong(0));
-            assertEquals( 4, results[0].getLong(1));
-
-            //Output from the first preplanned statement
-            assertEquals( 1, results[1].getRowCount());
-            assertTrue(results[1].advanceRow());
-            assertEquals( 24, results[1].getLong(0));
-            assertEquals( 4, results[1].getLong(1));
-
-            //Output from the second adhoc statement
-            assertEquals( 1, results[2].getRowCount());
-            assertTrue(results[2].advanceRow());
-            assertEquals( 24, results[2].getLong(0));
-            assertEquals( 4, results[2].getLong(1));
-
-            //Output from the second preplanned statement
-            assertEquals( 1, results[3].getRowCount());
-            assertTrue(results[3].advanceRow());
-            assertEquals( 24, results[3].getLong(0));
-            assertEquals( 4, results[3].getLong(1));
+            if (TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY) {
+                for (int ii = 0; ii < 4; ii++) {
+                    assertEquals( 1, results[ii].getRowCount());
+                    assertTrue(results[ii].advanceRow());
+                    assertEquals(24, results[ii].getLong(0));
+                    assertEquals( 4, results[ii].getLong(1));
+                }
+            } else {
+                for (int ii = 0; ii < 4; ii++) {
+                    //The third statement does an exact equality match
+                    if (ii == 2) {
+                        assertEquals( 1, results[ii].getRowCount());
+                        assertTrue(results[ii].advanceRow());
+                        assertEquals(24, results[ii].getLong(0));
+                        assertEquals( 4, results[ii].getLong(1));
+                        continue;
+                    }
+                    assertEquals( 2, results[ii].getRowCount());
+                    assertTrue(results[ii].advanceRow());
+                    assertEquals(23, results[ii].getLong(0));
+                    assertEquals( 3, results[ii].getLong(1));
+                    assertTrue(results[ii].advanceRow());
+                    assertEquals(24, results[ii].getLong(0));
+                    assertEquals( 4, results[ii].getLong(1));
+                }
+            }
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -407,6 +411,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
             // mixed reads and writes (start from a clean slate)
             batcher.addUnchecked("DELETE FROM BLAH");
             batcher.run();
+            System.out.println("Running problem batch");
             batcher.add("INSERT INTO BLAH VALUES (100, '2012-05-21 12:00:00.000000', 1000)", 1);
             batcher.add("INSERT INTO BLAH VALUES (101, '2012-05-21 12:00:00.000000', 1001)", 1);
             batcher.add("INSERT INTO BLAH VALUES (102, '2012-05-21 12:00:00.000000', 1002)", 1);
@@ -716,6 +721,12 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
         TestEnv(String pathToCatalog, String pathToDeployment,
                      int siteCount, int hostCount, int kFactor) {
+
+            // hack for no k-safety in community version
+            if (!MiscUtils.isPro()) {
+                kFactor = 0;
+            }
+
             m_builder = new VoltProjectBuilder();
             try {
                 m_builder.addLiteralSchema("create table BLAH (" +

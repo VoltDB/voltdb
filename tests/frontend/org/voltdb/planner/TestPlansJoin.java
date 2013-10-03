@@ -40,6 +40,9 @@ import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
 
 public class TestPlansJoin extends PlannerTestCase {
+  public void testJoin() {
+      AbstractPlanNode pn = compile("select R1.a, r1.c, R2.a, r2.c, R3.a, r3.c FROM R1 RIGHT JOIN R2 ON R1.A = R2.A LEFT JOIN R3 ON R1.C = R3.c");
+  }
 
     public void testBasicInnerJoin() {
         // select * with ON clause should return all columns from all tables
@@ -931,11 +934,6 @@ public class TestPlansJoin extends PlannerTestCase {
        // Self JOIN . Temporary restriction
        failToCompile("select R1.C FROM R1 LEFT OUTER JOIN R2 ON R1.C = R2.C RIGHT JOIN R2 ON R2.C = R1.C",
                      "VoltDB does not support self joins, consider using views instead");
-       // OUTER JOIN with more then two tables. Temporary restriction
-       failToCompile("select R1.C FROM R1 LEFT OUTER JOIN R2 ON R1.C = R2.C RIGHT JOIN R3 ON R3.C = R1.C",
-                     "VoltDB does not support outer joins with more than two tables involved");
-       failToCompile("select R1.C FROM R1 LEFT JOIN R2 ON R1.C = R2.C, R3 WHERE R3.C = R1.C",
-                     "VoltDB does not support outer joins with more than two tables involved");
    }
 
 

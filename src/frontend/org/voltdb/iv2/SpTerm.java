@@ -58,7 +58,7 @@ public class SpTerm implements Term
             tmLog.debug(m_whoami
                       + "replica change handler updating replica list to: "
                       + CoreUtils.hsIdCollectionToString(replicas));
-            m_mailbox.updateReplicas(replicas);
+            m_mailbox.updateReplicas(replicas, null);
         }
     };
 

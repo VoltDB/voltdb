@@ -44,6 +44,7 @@ import org.voltdb_testprocs.regressionsuites.failureprocs.CrashJVM;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CrashVoltDBProc;
 
 public class TestCollector {
+    private static final int STARTUP_DELAY = 3000;
     VoltProjectBuilder builder;
     LocalCluster cluster;
     String listener;
@@ -139,40 +140,19 @@ public class TestCollector {
      */
 
     @Test
-    public void testCatalog() throws Exception {
+    public void testBasicFilesAndCrash() throws Exception {
+        //Terrible hack, wait for config logging thread to finish
+        Thread.sleep(STARTUP_DELAY);
+
+        try {
+            client.callProcedure("CrashVoltDBProc");
+        }
+        catch (Exception e) {
+
+        }
         client.close();
         cluster.shutDown();
 
-        File collectionDecompressed = collect(voltDbRootPath, true);
-
-        File catalogJar = new File(collectionDecompressed, "catalog.jar");
-        assertTrue(catalogJar.exists());
-    }
-
-    @Test
-    public void testDeployment() throws Exception {
-        client.close();
-        cluster.shutDown();
-
-        File collectionDecompressed = collect(voltDbRootPath, true);
-
-        File deploymentXml = new File(collectionDecompressed, "deployment.xml");
-        assertTrue(deploymentXml.exists());
-    }
-
-    @Test
-    public void testDmesg() throws Exception {
-        client.close();
-        cluster.shutDown();
-
-        File collectionDecompressed = collect(voltDbRootPath, true);
-
-        File dmesgdata = new File(collectionDecompressed, "dmesgdata");
-        assertTrue(dmesgdata.exists());
-    }
-
-    @Test
-    public void testHeapdump() throws Exception {
         // generate heap dump
         int pid = getpid(voltDbRootPath);
 
@@ -183,21 +163,22 @@ public class TestCollector {
         writer.println("fake heapdump file");
         writer.close();
 
-        client.close();
-        cluster.shutDown();
 
         File collectionDecompressed = collect(voltDbRootPath, false);
+
 
         File heapdumpFile = new File(collectionDecompressed, "java_pid" + pid + ".hprof");
         assertTrue(heapdumpFile.exists());
-    }
 
-    @Test
-    public void testLogFiles() throws Exception {
-        client.close();
-        cluster.shutDown();
+        File catalogJar = new File(collectionDecompressed, "catalog.jar");
+        assertTrue(catalogJar.exists());
 
-        File collectionDecompressed = collect(voltDbRootPath, false);
+        File deploymentXml = new File(collectionDecompressed, "deployment.xml");
+        assertTrue(deploymentXml.exists());
+
+
+        File dmesgdata = new File(collectionDecompressed, "dmesgdata");
+        assertTrue(dmesgdata.exists());
 
         File logDir = new File(collectionDecompressed, "log");
         assertTrue(logDir.exists());
@@ -214,21 +195,6 @@ public class TestCollector {
             }
             assertTrue(match);
         }
-    }
-
-    @Test
-    public void testVoltdbCrash() throws Exception {
-        try {
-            client.callProcedure("CrashVoltDBProc");
-        }
-        catch (Exception e) {
-
-        }
-
-        client.close();
-        cluster.shutDown();
-
-        File collectionDecompressed = collect(voltDbRootPath, true);
 
         File voltdbCrashDir = new File(collectionDecompressed, "voltdb_crash");
         assertTrue(voltdbCrashDir.exists());
@@ -241,6 +207,7 @@ public class TestCollector {
 
     @Test
     public void testJvmCrash() throws Exception {
+        Thread.sleep(STARTUP_DELAY);
         try {
             client.callProcedure("CrashJVM");
         }

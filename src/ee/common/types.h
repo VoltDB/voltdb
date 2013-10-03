@@ -338,13 +338,70 @@ enum IndexLookupType {
 
 // ------------------------------------------------------------------
 // Table Stream Types
+//
+// IMPORTANT: Keep this enum in sync with the Java equivalent
+//            in TableStreamType.java!
+//
+// Use the functions in preference to switch/case constructs on enum
+// values. This minimizes the spread of stream type assumptions and
+// makes it less painful to change the enum.
 // ------------------------------------------------------------------
 enum TableStreamType {
-   TABLE_STREAM_SNAPSHOT,
-   TABLE_STREAM_RECOVERY,
-   TABLE_STREAM_ELASTIC,
-   TABLE_STREAM_NONE = -1
+    // Table stream types that use predicates.
+    TABLE_STREAM_SNAPSHOT,
+    TABLE_STREAM_ELASTIC_INDEX,
+
+    // Materialize previously-captured index.
+    TABLE_STREAM_ELASTIC_INDEX_READ,
+
+    // Clear previously-captured index using the same range predicate that
+    // was used for TABLE_STREAM_ELASTIC_INDEX_READ.
+    TABLE_STREAM_ELASTIC_INDEX_CLEAR,
+
+    // Table stream types that don't use predicates.
+    // Add new non-predicate types below TABLE_STREAM_RECOVERY so
+    // that tableStreamTypeHasPredicates() doesn't have to change.
+    TABLE_STREAM_RECOVERY,
+
+    // Table stream type provided when no stream is active.
+    TABLE_STREAM_NONE = -1
 };
+
+// Serialization special values returned by serializeMore(), etc. instead
+// of the normal count. There's only one possible value for now.
+enum TableStreamSerializationError {
+    TABLE_STREAM_SERIALIZATION_ERROR = -1
+};
+
+/**
+ * Return true if the table stream type uses predicates.
+ */
+inline bool tableStreamTypeHasPredicates(TableStreamType streamType) {
+    return streamType == TABLE_STREAM_SNAPSHOT
+        || streamType == TABLE_STREAM_ELASTIC_INDEX
+        || streamType == TABLE_STREAM_ELASTIC_INDEX_READ;
+}
+
+/**
+ * Return true if the table stream type is performing a snapshot.
+ */
+inline bool tableStreamTypeIsSnapshot(TableStreamType streamType) {
+    return streamType == TABLE_STREAM_SNAPSHOT;
+}
+
+/**
+ * Return true if the table stream type is for recovery.
+ */
+inline bool tableStreamTypeIsRecovery(TableStreamType streamType) {
+    return streamType == TABLE_STREAM_RECOVERY;
+}
+
+/**
+ * Return true if the table stream type valid.
+ */
+inline bool tableStreamTypeIsValid(TableStreamType streamType) {
+    return streamType != TABLE_STREAM_NONE;
+}
 
 // ------------------------------------------------------------------
 // Statistics Selector Types

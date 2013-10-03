@@ -33,6 +33,8 @@ import org.voltcore.network.InputHandler;
  */
 public interface ExportDataProcessor  {
 
+    public static final String EXPORT_TO_TYPE = "__EXPORT_TO_TYPE__";
+
     /**
      * Allow the processor access to the Export logger. Processor may
      * log to this logger to produce Export category output.
