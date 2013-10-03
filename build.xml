@@ -188,8 +188,10 @@
     <include name='org/voltdb/messaging/Test*.class'/>
     <!-- Can not find following 3 dir, but was in old set, so keep them -->
     <include name='org/voltdb/messaging/**/*Test.class'/>
-    <include name='org/voltdb/network/**/Test*.class'/>
     <include name='org/voltdb/network/**/*Test.class'/>
+	<include name='org/voltdb/utils/**/*Test.class'/>
+
+	<include name='org/voltdb/network/**/Test*.class'/>
     <include name='org/voltdb/planner/Test*.class'/>
     <include name='org/voltdb/plannodes/Test*.class'/>
     <include name='org/voltdb/rejoin/Test*.class'/>
