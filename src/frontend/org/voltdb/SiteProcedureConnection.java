@@ -100,11 +100,6 @@ public interface SiteProcedureConnection {
             boolean readOnly) throws EEException;
 
     /**
-     * For test cases that need to mimic a plan fragment being invoked
-     */
-    public void simulateExecutePlanFragments(long txnId, boolean readOnly);
-
-    /**
      * Legacy recursable execution interface for MP transaction states.
      */
     public Map<Integer, List<VoltTable>> recursableRun(TransactionState currentTxnState);
