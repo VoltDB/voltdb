@@ -234,7 +234,6 @@ public class VoltProjectBuilder {
 
     String m_elloader = null;         // loader package.Classname
     private boolean m_elenabled;      // true if enabled; false if disabled
-    List<String> m_elAuthGroups;      // authorized groups
 
     // zero defaults to first open port >= 8080.
     // negative one means disabled in the deployment file.
@@ -478,10 +477,9 @@ public class VoltProjectBuilder {
         m_ppdPrefix = ppdPrefix;
     }
 
-    public void addExport(boolean enabled, List<String> groups, String exportTarget, Properties config) {
+    public void addExport(boolean enabled, String exportTarget, Properties config) {
         m_elloader = "org.voltdb.export.processors.GuestProcessor";
         m_elenabled = enabled;
-        m_elAuthGroups = groups;
 
         if (config == null) {
             config = new Properties();
@@ -496,8 +494,8 @@ public class VoltProjectBuilder {
         }
     }
 
-    public void addExport(boolean enabled, List<String> groups) {
-        addExport(enabled, groups, null, null);
+    public void addExport(boolean enabled) {
+        addExport(enabled, null, null);
     }
 
     public void setTableAsExportOnly(String name) {
@@ -861,20 +859,6 @@ public class VoltProjectBuilder {
         if (m_elloader != null) {
             final Element export = doc.createElement("export");
             database.appendChild(export);
-
-            // turn list into stupid comma separated attribute list
-            String groupsattr = "";
-            if (m_elAuthGroups != null) {
-                for (String s : m_elAuthGroups) {
-                    if (groupsattr.isEmpty()) {
-                        groupsattr += s;
-                    }
-                    else {
-                        groupsattr += "," + s;
-                    }
-                }
-                export.setAttribute("groups", groupsattr);
-            }
 
             if (m_exportTables.size() > 0) {
                 final Element tables = doc.createElement("tables");

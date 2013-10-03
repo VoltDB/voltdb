@@ -404,7 +404,7 @@ public class TestVoltCompiler extends TestCase {
     public void testExportSetting() throws IOException {
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(getClass().getResource("ExportTester-ddl.sql"));
-        project.addExport(false, null);
+        project.addExport(false /* disabled */);
         project.setTableAsExportOnly("A");
         project.setTableAsExportOnly("B");
         try {
@@ -436,7 +436,7 @@ public class TestVoltCompiler extends TestCase {
         project.addPartitionInfo("B", "B_ID");
         project.addPartitionInfo("e", "e_id");
         project.addPartitionInfo("f", "f_id");
-        project.addExport(true, null);
+        project.addExport(true /* enabled */);
         project.setTableAsExportOnly("A"); // uppercase DDL, uppercase export
         project.setTableAsExportOnly("b"); // uppercase DDL, lowercase export
         project.setTableAsExportOnly("E"); // lowercase DDL, uppercase export
@@ -467,7 +467,7 @@ public class TestVoltCompiler extends TestCase {
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
         project.addStmtProcedure("Dummy", "select * from v_table1r_el_only");
-        project.addExport(true, null);
+        project.addExport(true /* enabled */);
         project.setTableAsExportOnly("table1r_el_only");
         try {
             assertFalse(project.compile("/tmp/exporttestview.jar"));
@@ -483,7 +483,7 @@ public class TestVoltCompiler extends TestCase {
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
         project.addStmtProcedure("Dummy", "select * from table1r_el_only");
-        project.addExport(true, null);
+        project.addExport(true /* enabled */);
         project.setTableAsExportOnly("v_table1r_el_only");
         try {
             assertFalse(project.compile("/tmp/exporttestview.jar"));
@@ -2326,10 +2326,8 @@ public class TestVoltCompiler extends TestCase {
             if (connectors.get("0") == null ) {
                 connectors.add("0");
             }
-            CatalogMap<GroupRef> authGroups = connectors.get("0").getAuthgroups();
 
             assertNotNull(groups);
-            assertNotNull(authGroups);
             assertEquals(roles.length, groups.size());
 
             for (TestRole role : roles) {
@@ -2338,9 +2336,6 @@ public class TestVoltCompiler extends TestCase {
                 assertEquals(String.format("Role \"%s\" adhoc flag mismatch:", role.name), role.adhoc, group.getAdhoc());
                 assertEquals(String.format("Role \"%s\" sysproc flag mismatch:", role.name), role.sysproc, group.getSysproc());
                 assertEquals(String.format("Role \"%s\" defaultproc flag mismatch:", role.name), role.defaultproc, group.getDefaultproc());
-
-                boolean allowedToExport = authGroups.get(role.name) != null;
-                assertEquals(String.format("Role \"%s\" export flag mismatch:", role.name), role.export, allowedToExport);
             }
         }
         else {
