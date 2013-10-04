@@ -185,21 +185,15 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         return true;
     }
 
-    private void onSnapshotStreamFinished(long HSId) {
+    private void initiateNextSite() {
         // make all the decisions under lock.
         Long nextSite = null;
         synchronized (m_lock) {
             if (!m_pendingSites.isEmpty()) {
                 nextSite = m_pendingSites.poll();
                 m_snapshotSites.add(nextSite);
-                REJOINLOG.info("Finished streaming snapshot to site: " +
-                        CoreUtils.hsIdToString(HSId) +
-                        " and initiating snapshot stream to next site: " +
+                REJOINLOG.info("Initiating snapshot stream to next site: " +
                         CoreUtils.hsIdToString(nextSite));
-            }
-            else {
-                REJOINLOG.info("Finished streaming snapshot to site: " +
-                        CoreUtils.hsIdToString(HSId));
             }
         }
         if (nextSite != null) {
@@ -278,8 +272,10 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         RejoinMessage rm = (RejoinMessage) message;
         Type type = rm.getType();
         if (type == RejoinMessage.Type.SNAPSHOT_FINISHED) {
-            onSnapshotStreamFinished(rm.m_sourceHSId);
+            REJOINLOG.info("Finished streaming snapshot to site: " +
+                           CoreUtils.hsIdToString(rm.m_sourceHSId));
         } else if (type == RejoinMessage.Type.REPLAY_FINISHED) {
+            initiateNextSite();
             onReplayFinished(rm.m_sourceHSId);
         } else if (type == RejoinMessage.Type.INITIATION_RESPONSE) {
             onSiteInitialized(rm.m_sourceHSId, rm.getMasterHSId(), rm.getSnapshotSinkHSId());

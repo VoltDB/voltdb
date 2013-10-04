@@ -27,6 +27,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.CachedByteBufferAllocator;
 import org.voltdb.utils.FixedDBBPool;
@@ -197,6 +198,17 @@ public class StreamSnapshotSink {
                 block.get(schemaBytes);
                 m_schemas.put(block.getInt(StreamSnapshotDataTarget.tableIdOffset),
                               schemaBytes);
+            }
+            else if (type == StreamSnapshotMessageType.HASHINATOR) {
+                block.position(StreamSnapshotDataTarget.contentOffset);
+                long version = block.getLong();
+                byte[] hashinatorConfig = new byte[block.remaining()];
+                block.get(hashinatorConfig);
+
+                rejoinLog.debug("Updating the hashinator to version " + version);
+
+                // Update the local hashinator
+                TheHashinator.updateConfiguredHashinator(version, hashinatorConfig);
             }
             else {
                 // It's normal snapshot data afterwards
