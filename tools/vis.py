@@ -135,6 +135,7 @@ class Plot:
         plt.legend(prop={'size': 10}, loc=2)
         plt.savefig(self.filename, format="png", transparent=False,
                     bbox_inches="tight", pad_inches=0.2)
+        plt.close('all')
 
 
 def plot(title, xlabel, ylabel, filename, width, height, app, data, data_type, ndays):
@@ -210,7 +211,30 @@ def generate_index_file(filenames):
 </html>
 """
 
+    hrow = """
+    <tr>
+        <td><a href=#%s>%s</a></td>
+        <td><a href=#%s>%s</a></td>
+        <td><a href=#%s>%s</a></td>
+        <td><a href=#%s>%s</a></td>
+    </tr>
+"""
+    toc = sorted(list(set([x[0] for x in filenames])))
+    h = map(lambda x:(x.replace(' ','%20'), x), toc)
+    n = 4
+    z = n-len(h)%n
+    while z > 0 and z < n:
+        h.append(('',''))
+        z -= 1
+
     rows = []
+    t = ()
+    for i in range(1, len(h)+1):
+        t += tuple(h[i-1])
+        if i%n == 0:
+            rows.append(hrow % t)
+            t = ()
+
     last_app = None
     for i in filenames:
         if i[0] != last_app:

@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from voltdbclient import *
 from operator import itemgetter, attrgetter
+import numpy
 
 STATS_SERVER = 'volt2'
 
@@ -27,8 +28,14 @@ def COLORS(k):
             ((k * 100) % 255) / 255.0,
             ((k * k) % 255) / 255.0)
 
+#COLORS = plt.cm.Spectral(numpy.linspace(0, 1, 10)).tolist()
+COLORS = ['b','g','r','c','m','y','k']
+#print COLORS
+
 MARKERS = ['+', '*', '<', '>', '^', '_',
            'D', 'H', 'd', 'h', 'o', 'p']
+
+mc = {}
 
 def get_stats(hostname, port, days):
     """Get most recent run statistics of all apps within the last 'days'
@@ -39,9 +46,6 @@ def get_stats(hostname, port, days):
                          [FastSerializer.VOLTTYPE_SMALLINT])
     resp = proc.call([days])
     conn.close()
-
-    raw = [tuple(x) for x in resp.tables[0].tuples]
-    sorted(raw, key=itemgetter(0,1,2,3))
 
     # keyed on app name, value is a list of runs sorted chronologically
     stats = dict()
@@ -73,12 +77,13 @@ class Plot:
         self.ax.set_title(title)
         plt.xticks(fontsize=10)
         plt.yticks(fontsize=10)
+        plt.tick_params(axis='y', labelleft=True, labelright=True)
         plt.ylabel(ylabel, fontsize=8)
         plt.xlabel(xlabel, fontsize=8)
         self.fig.autofmt_xdate()
 
     def plot(self, x, y, color, marker_shape, legend):
-        self.ax.plot(x, y, linestyle="-", label=str(legend),
+        self.ax.plot(x, y, linestyle="-", label=str(legend), color=color,
                      marker=marker_shape, markerfacecolor=color, markersize=4)
 
     def close(self):
@@ -94,6 +99,7 @@ class Plot:
         plt.close('all')
 
 def plot(title, xlabel, ylabel, filename, width, height, app, data, data_type):
+    global mc
     plot_data = dict()
     for run in data:
         if run['branch'] not in plot_data:
@@ -109,13 +115,15 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, data_type):
     if len(plot_data) == 0:
         return
 
-    i = 0
     pl = Plot(title, xlabel, ylabel, filename, width, height, 1)
     for b,bd in plot_data.items():
         for k,v in bd.items():
             v = sorted(v, key=lambda x: x[0])
             u = zip(*v)
-            pl.plot(u[0], u[1], COLORS(i), MARKERS[i%len(MARKERS)], b)
+            if b not in mc:
+                mc[b] = (COLORS[len(mc.keys())%len(COLORS)], MARKERS[len(mc.keys())%len(MARKERS)])
+            pl.plot(u[0], u[1], mc[b][0], mc[b][1], b)
+            """
             #pl.ax.annotate(b, xy=(u[0][-1],u[1][-1]), xycoords='data',
             #        xytext=(0, 0), textcoords='offset points') #, arrowprops=dict(arrowstyle="->"))
             x = u[0][-1]
@@ -131,7 +139,7 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, data_type):
                 if xmin != x:
                     pl.ax.annotate(str(ymin), xy=(xmin,ymin),
                         textcoords='offset points', ha='center', va='top', xytext=(0,-5))
-            i += 3
+            """
     pl.close()
 
 def generate_index_file(filenames):
@@ -147,7 +155,7 @@ def generate_index_file(filenames):
      </table>
      <table frame="box">
      <tr>
-         <th colspan="1">%s</th>
+         <th colspan="3"><a name="%s">%s</a></th>
      </tr>
 """
 
@@ -164,11 +172,34 @@ def generate_index_file(filenames):
 </html>
 """
 
+    hrow = """
+    <tr>
+        <td><a href=#%s>%s</a></td>
+        <td><a href=#%s>%s</a></td>
+        <td><a href=#%s>%s</a></td>
+        <td><a href=#%s>%s</a></td>
+    </tr>
+"""
+
+    h = map(lambda x:(x[0].replace(' ','%20'), x[0]), filenames)
+    n = 4
+    z = n-len(h)%n
+    while z > 0 and z < n:
+        h.append(('','')) 
+        z -= 1
+
     rows = []
+    t = ()
+    for i in range(1, len(h)+1):
+        t += tuple(h[i-1])
+        if i%n == 0:
+            rows.append(hrow % t)
+            t = ()
+ 
     last_app = None
     for i in filenames:
         if i[0] != last_app:
-            rows.append(sep % i[0])
+            rows.append(sep % (i[0], i[0]))
             last_app = i[0]
         rows.append(row % (i[1], i[1], i[2], i[2], i[3], i[3]))
 
@@ -211,7 +242,7 @@ def main():
     iorder = 0
     for group, data in stats.iteritems():
         (app,nodes) = group
-        app = app +"-%d %s" % (nodes, ["node","nodes"][nodes>1])
+        app = app +" %d %s" % (nodes, ["node","nodes"][nodes>1])
         app_filename = app.replace(' ', '_')
         latency95_filename = '%s-latency95-%s.png' % (prefix, app_filename)
         latency99_filename = '%s-latency99-%s.png' % (prefix, app_filename)
