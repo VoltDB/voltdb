@@ -136,6 +136,7 @@ public abstract class TheHashinator {
     abstract public Pair<Long, Integer> pPredecessor(int partition, long token);
     abstract public Map<Long, Long> pGetRanges(int partition);
     public abstract HashinatorType getConfigurationType();
+    abstract public int pHashToPartition(Object obj);
 
     /**
      * Returns the configuration signature
@@ -189,34 +190,7 @@ public abstract class TheHashinator {
      * Given an object, map it to a partition. DON'T EVER MAKE ME PUBLIC
      */
     private static int hashToPartition(TheHashinator hashinator, Object obj) {
-        HashinatorType type;
-        //If I am statically created use my static type or use from per connection instance
-        //This is bit hackish because the TheHashinator is not really good place to hide static.
-        if ((instance != null) && (instance.get() != null)
-                && hashinator == instance.get().getSecond()) {
-            type = getConfiguredHashinatorType();
-        } else {
-            type = hashinator.getConfigurationType();
-        }
-        if (type == HashinatorType.LEGACY) {
-            // Annoying, legacy hashes numbers and bytes differently, need to preserve that.
-            if (obj == null || VoltType.isNullVoltType(obj)) {
-                return 0;
-            } else if (obj instanceof Long) {
-                long value = ((Long) obj).longValue();
-                return hashinator.pHashinateLong(value);
-            } else if (obj instanceof Integer) {
-                long value = ((Integer) obj).intValue();
-                return hashinator.pHashinateLong(value);
-            } else if (obj instanceof Short) {
-                long value = ((Short) obj).shortValue();
-                return hashinator.pHashinateLong(value);
-            } else if (obj instanceof Byte) {
-                long value = ((Byte) obj).byteValue();
-                return hashinator.pHashinateLong(value);
-            }
-        }
-        return hashinator.hashinateBytes(valueToBytes(obj));
+        return hashinator.pHashToPartition(obj);
 
     }
 
@@ -298,8 +272,8 @@ public abstract class TheHashinator {
      * @return The partition best set up to execute the procedure.
      * @throws VoltTypeException
      */
-    public static int getPartitionForParameter(int partitionType, Object invocationParameter)
-        throws VoltTypeException
+    protected static int getPartitionForParameter(int partitionType, Object invocationParameter)
+            throws VoltTypeException
     {
         return instance.get().getSecond().getHashedPartitionForParameter(partitionType, invocationParameter);
     }
@@ -338,7 +312,7 @@ public abstract class TheHashinator {
                     }
                 }
             }
-            else if (getConfiguredHashinatorType() == HashinatorType.LEGACY
+            else if (getConfigurationType() == HashinatorType.LEGACY
                     && partitionValue.getClass() == byte[].class) {
                 partitionValue = bytesToValue(partitionParamType, (byte[]) partitionValue);
             }

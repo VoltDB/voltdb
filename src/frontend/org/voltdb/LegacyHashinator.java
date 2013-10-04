@@ -22,6 +22,7 @@ import java.util.Map;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
+import static org.voltdb.TheHashinator.valueToBytes;
 
 public class LegacyHashinator extends TheHashinator {
     private final int catalogPartitionCount;
@@ -109,5 +110,26 @@ public class LegacyHashinator extends TheHashinator {
     @Override
     public HashinatorType getConfigurationType() {
         return TheHashinator.HashinatorType.LEGACY;
+    }
+
+    @Override
+    public int pHashToPartition(Object obj) {
+        // Annoying, legacy hashes numbers and bytes differently, need to preserve that.
+        if (obj == null || VoltType.isNullVoltType(obj)) {
+            return 0;
+        } else if (obj instanceof Long) {
+            long value = ((Long) obj).longValue();
+            return pHashinateLong(value);
+        } else if (obj instanceof Integer) {
+            long value = ((Integer) obj).intValue();
+            return pHashinateLong(value);
+        } else if (obj instanceof Short) {
+            long value = ((Short) obj).shortValue();
+            return pHashinateLong(value);
+        } else if (obj instanceof Byte) {
+            long value = ((Byte) obj).byteValue();
+            return pHashinateLong(value);
+        }
+        return pHashinateBytes(valueToBytes(obj));
     }
 }
