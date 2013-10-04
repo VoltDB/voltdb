@@ -16,7 +16,6 @@
  */
 package org.voltdb;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Map;
@@ -105,5 +104,10 @@ public class LegacyHashinator extends TheHashinator {
     public byte[] getConfigBytes()
     {
         return m_configBytes;
+    }
+
+    @Override
+    public HashinatorType getConfigurationType() {
+        return TheHashinator.HashinatorType.LEGACY;
     }
 }

@@ -17,21 +17,20 @@
 
 package org.voltdb;
 
-import java.io.IOException;
+import com.google.common.base.Charsets;
 import java.lang.reflect.Constructor;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
-import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
-
-import com.google.common.base.Charsets;
 import com.google.common.base.Throwables;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import org.voltdb.dtxn.UndoAction;
+import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
 
 /**
  * Class that maps object values to partitions. It's rather simple
@@ -136,6 +135,7 @@ public abstract class TheHashinator {
     abstract public Map<Long, Integer> pPredecessors(int partition);
     abstract public Pair<Long, Integer> pPredecessor(int partition, long token);
     abstract public Map<Long, Long> pGetRanges(int partition);
+    public abstract HashinatorType getConfigurationType();
 
     /**
      * Returns the configuration signature
@@ -189,7 +189,15 @@ public abstract class TheHashinator {
      * Given an object, map it to a partition. DON'T EVER MAKE ME PUBLIC
      */
     private static int hashToPartition(TheHashinator hashinator, Object obj) {
-        HashinatorType type = getConfiguredHashinatorType();
+        HashinatorType type;
+        //If I am statically created use my static type or use from per connection instance
+        //This is bit hackish because the TheHashinator is not really good place to hide static.
+        if ((instance != null) && (instance.get() != null)
+                && hashinator == instance.get().getSecond()) {
+            type = getConfiguredHashinatorType();
+        } else {
+            type = hashinator.getConfigurationType();
+        }
         if (type == HashinatorType.LEGACY) {
             // Annoying, legacy hashes numbers and bytes differently, need to preserve that.
             if (obj == null || VoltType.isNullVoltType(obj)) {

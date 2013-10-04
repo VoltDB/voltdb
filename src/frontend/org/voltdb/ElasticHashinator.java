@@ -535,4 +535,9 @@ public class ElasticHashinator extends TheHashinator {
     {
         return m_cookedBytes.get();
     }
+
+    @Override
+    public HashinatorType getConfigurationType() {
+        return TheHashinator.HashinatorType.LEGACY;
+    }
 }
