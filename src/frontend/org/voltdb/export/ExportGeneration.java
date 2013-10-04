@@ -773,6 +773,12 @@ public class ExportGeneration {
     public void acceptMastershipTask( int partitionId) {
         HashMap<String, ExportDataSource> partitionDataSourceMap =
                 m_dataSourcesByPartition.get(partitionId);
+
+        // this case happens when there are no export tables
+        if (partitionDataSourceMap == null) {
+            return;
+        }
+
         exportLog.info("Export generation " + m_timestamp + " accepting mastership for partition " + partitionId);
         for( ExportDataSource eds: partitionDataSourceMap.values()) {
             try {

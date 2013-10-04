@@ -170,8 +170,6 @@
         </xsd:complexType>
       </xsd:element>
     </xsd:all>
-    <xsd:attribute name="groups" type="xsd:string"/>
-    <xsd:attribute name="roles" type="xsd:string"/>
   </xsd:complexType>
 
 </xsd:schema>
