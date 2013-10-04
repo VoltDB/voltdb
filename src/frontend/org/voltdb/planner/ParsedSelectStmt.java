@@ -719,8 +719,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             else {
                 assert(limitNode.children.size() == 1);
                 VoltXMLElement valueNode = limitNode.children.get(0);
-                boolean isAdHocParameter = valueNode.attributes.get("isparam").equals("true") ? true: false;
-                if (isAdHocParameter) {
+                String isParam = valueNode.attributes.get("isparam");
+                if ((isParam != null) && (isParam.equalsIgnoreCase("true"))) {
                     limitParameterId = Long.parseLong(valueNode.attributes.get("id"));
                 } else {
                     node = limitNode.attributes.get("limit");
@@ -736,8 +736,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             else {
                 if (offsetNode.children.size() == 1) {
                     VoltXMLElement valueNode = offsetNode.children.get(0);
-                    boolean isAdHocParameter = valueNode.attributes.get("isparam").equals("true") ? true: false;
-                    if (isAdHocParameter) {
+                    String isParam = valueNode.attributes.get("isparam");
+                    if ((isParam != null) && (isParam.equalsIgnoreCase("true"))) {
                         offsetParameterId = Long.parseLong(valueNode.attributes.get("id"));
                     } else {
                         node = offsetNode.attributes.get("offset");
