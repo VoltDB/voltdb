@@ -538,6 +538,6 @@ public class ElasticHashinator extends TheHashinator {
 
     @Override
     public HashinatorType getConfigurationType() {
-        return TheHashinator.HashinatorType.LEGACY;
+        return TheHashinator.HashinatorType.ELASTIC;
     }
 }
