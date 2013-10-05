@@ -19,6 +19,11 @@ package org.voltdb.rejoin;
 
 public enum StreamSnapshotMessageType {
     /*
+     * Hashinator config bytes
+     */
+    HASHINATOR,
+
+    /*
      * Only contain the schema of a table, sent before the table data
      */
     SCHEMA,
@@ -36,5 +41,5 @@ public enum StreamSnapshotMessageType {
     /*
      * Signifies a failure to the rejoining node
      */
-    FAILURE;
+    FAILURE
 }
