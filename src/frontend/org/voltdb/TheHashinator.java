@@ -136,7 +136,7 @@ public abstract class TheHashinator {
     abstract public Pair<Long, Integer> pPredecessor(int partition, long token);
     abstract public Map<Long, Long> pGetRanges(int partition);
     public abstract HashinatorType getConfigurationType();
-    abstract public int pHashToPartition(Object obj);
+    abstract public int pHashToPartition(VoltType type, Object obj);
 
     /**
      * Returns the configuration signature
@@ -189,8 +189,8 @@ public abstract class TheHashinator {
     /**
      * Given an object, map it to a partition. DON'T EVER MAKE ME PUBLIC
      */
-    private static int hashToPartition(TheHashinator hashinator, Object obj) {
-        return hashinator.pHashToPartition(obj);
+    private static int hashToPartition(TheHashinator hashinator, VoltType type, Object obj) {
+        return hashinator.pHashToPartition(type, obj);
 
     }
 
@@ -236,7 +236,7 @@ public abstract class TheHashinator {
      * @param value Byte array representation of partition parameter.
      * @return Java object of the correct type.
      */
-    private static Object bytesToValue(VoltType type, byte[] value) {
+    protected static Object bytesToValue(VoltType type, byte[] value) {
         if ((type == VoltType.NULL) || (value == null)) {
             return null;
         }
@@ -312,13 +312,12 @@ public abstract class TheHashinator {
                     }
                 }
             }
-            else if (getConfigurationType() == HashinatorType.LEGACY
-                    && partitionValue.getClass() == byte[].class) {
+            else if (partitionValue.getClass() == byte[].class) {
                 partitionValue = bytesToValue(partitionParamType, (byte[]) partitionValue);
             }
         }
 
-        return hashToPartition(this, partitionValue);
+        return hashToPartition(this, partitionParamType, partitionValue);
     }
 
     /**
@@ -381,6 +380,9 @@ public abstract class TheHashinator {
         throw new RuntimeException("Should not reach here");
     }
 
+    public static HashinatorType getConfiguredHashinatorType(TheHashinator hashinator) {
+        return hashinator.getConfigurationType();
+    }
     private static volatile HashinatorType configuredHashinatorType = null;
 
     /**

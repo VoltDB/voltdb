@@ -113,7 +113,7 @@ public class LegacyHashinator extends TheHashinator {
     }
 
     @Override
-    public int pHashToPartition(Object obj) {
+    public int pHashToPartition(VoltType type, Object obj) {
         // Annoying, legacy hashes numbers and bytes differently, need to preserve that.
         if (obj == null || VoltType.isNullVoltType(obj)) {
             return 0;
@@ -129,7 +129,11 @@ public class LegacyHashinator extends TheHashinator {
         } else if (obj instanceof Byte) {
             long value = ((Byte) obj).byteValue();
             return pHashinateLong(value);
+        } else if (obj.getClass() == byte[].class) {
+            obj = bytesToValue(type, (byte[]) obj);
+            return pHashinateBytes(valueToBytes(obj));
         }
+
         return pHashinateBytes(valueToBytes(obj));
     }
 }
