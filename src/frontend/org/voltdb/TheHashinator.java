@@ -272,7 +272,7 @@ public abstract class TheHashinator {
      * @return The partition best set up to execute the procedure.
      * @throws VoltTypeException
      */
-    protected static int getPartitionForParameter(int partitionType, Object invocationParameter)
+    public static int getPartitionForParameter(int partitionType, Object invocationParameter)
             throws VoltTypeException
     {
         return instance.get().getSecond().getHashedPartitionForParameter(partitionType, invocationParameter);
