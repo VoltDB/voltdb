@@ -158,6 +158,7 @@ def run_csvloader(schema, data_file):
     loading_results = []
     for I in range(0, options.TRIES):
         home = os.getenv("VOLTDB_HOME")
+        before_row_count = get_table_row_count(schema)
         cmd = "%s --servers=%s" % (os.path.join(home, CSVLOADER), ','.join(options.servers))
         if options.csvoptions:
             cmd += " -o " + ",".join(options.csvoptions)
@@ -182,7 +183,7 @@ def run_csvloader(schema, data_file):
                         stdout, flags=re.M)
         if m is None or int(m.group(1)) != rowcount or m.group(1) != m.group(2):
             raise RuntimeError ("CSV Loader failed to load all rows")
-        if rowcount != int(actual_row_count):
+        if int(before_row_count) + rowcount != int(actual_row_count):
             raise RuntimeError ("Actual table row count was not as expected exp:%d act:%d" % (rowcount,actual_row_count))
         stats = csvloader_getstatistics(stdout)
         print "try %d %s elapsed: %f parsing: %f inserting: %f" % ((I+1, schema)+stats)
