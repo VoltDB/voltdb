@@ -1005,4 +1005,11 @@ class Distributer {
         }
         return m_hashinator.getHashedPartitionForParameter(typeValue, value);
     }
+
+    public HashinatorType getHashinatorType() {
+        if (m_hashinator == null) {
+            return HashinatorType.LEGACY;
+        }
+        return m_hashinator.getConfigurationType();
+    }
 }

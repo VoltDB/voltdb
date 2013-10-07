@@ -41,7 +41,10 @@ import urllib
 )
 def restore(runner):
     nonce = runner.opts.nonce.replace('"', '\\"')
-    hashinator = 'true' if runner.opts.hashinator else 'false'
+    if runner.opts.hashinator:
+        hashinator = 'true'
+    else:
+        hashinator = 'false'
     json_opts = ['{path:"%s",nonce:"%s",hashinator:"%s"}' % (runner.opts.directory, nonce, hashinator)]
     runner.verbose_info('@SnapshotRestore "%s"' % json_opts)
     columns = [VOLT.FastSerializer.VOLTTYPE_STRING]
