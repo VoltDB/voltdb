@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
+import org.voltdb.exceptions.SerializableException;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -79,6 +80,13 @@ public class StreamSnapshotAckReceiver implements Runnable {
                 // TestMidRejoinDeath ignores acks to trigger the watchdog
                 if (StreamSnapshotDataTarget.m_rejoinDeathTestMode && (m_msgFactory.getAckTargetId(msg) == 1)) {
                     continue;
+                }
+
+                SerializableException se = m_msgFactory.getException(msg);
+                if (se != null) {
+                    m_lastException = se;
+                    rejoinLog.error("Received exception in ack receiver", se);
+                    return;
                 }
 
                 AckCallback ackCallback = m_callbacks.get(m_msgFactory.getAckTargetId(msg));

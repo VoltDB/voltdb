@@ -358,7 +358,7 @@ public abstract class TheHashinator {
         while (true) {
             final Pair<Long, ? extends TheHashinator> snapshot = instance.get();
             if (version > snapshot.getFirst()) {
-                Pair<Long, ? extends TheHashinator> update =
+                final Pair<Long, ? extends TheHashinator> update =
                         Pair.of(version, constructHashinator(hashinatorImplementation, configBytes, cooked));
                 if (instance.compareAndSet(snapshot, update)) {
                     return new UndoAction() {
@@ -367,7 +367,11 @@ public abstract class TheHashinator {
 
                         @Override
                         public void undo() {
-                            instance.set(snapshot);
+                            boolean rolledBack = instance.compareAndSet(update, snapshot);
+                            if (!rolledBack) {
+                                hostLogger.info(
+                                        "Didn't roll back hashinator because it wasn't set to expected hashinator");
+                            }
                         }
                     };
                 }
