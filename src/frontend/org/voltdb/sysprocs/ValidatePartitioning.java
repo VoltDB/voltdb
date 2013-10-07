@@ -82,10 +82,8 @@ public class ValidatePartitioning extends VoltSystemProcedure {
             List<Integer> tableIds = new ArrayList<Integer>();
             List<String> tableNames = new ArrayList<String>();
             for (Table t : CatalogUtil.getNormalTables(context.getDatabase(), false)) {
-                if (!t.getIsreplicated() && t.getMaterializer() == null) {
-                    tableIds.add(t.getRelativeIndex());
-                    tableNames.add(t.getTypeName());
-                }
+                tableIds.add(t.getRelativeIndex());
+                tableNames.add(t.getTypeName());
             }
             long mispartitionedCounts[] = context.getSiteProcedureConnection().validatePartitioning(
                     Longs.toArray(tableIds), (Integer)params.toArray()[0], (byte[])params.toArray()[1]);
