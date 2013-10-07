@@ -37,14 +37,11 @@ public class SnapshotRequestConfig {
     public final Table[] tables;
 
     /**
-     * @param tables    If tables is null, all tables will be snapshotted.
-     *                  It doesn't make sense to take a snapshot with no
-     *                  tables.
+     * @param tables    Tables to snapshot, cannot be null.
      */
     public SnapshotRequestConfig(List<Table> tables)
     {
         Preconditions.checkNotNull(tables);
-        Preconditions.checkArgument(!tables.isEmpty());
         this.tables = tables.toArray(new Table[0]);
     }
 

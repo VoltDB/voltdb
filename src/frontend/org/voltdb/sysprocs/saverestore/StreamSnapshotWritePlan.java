@@ -149,7 +149,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
 
         List<DataTargetInfo> sdts = Lists.newArrayList();
 
-        if (!localStreams.isEmpty()) {
+        if (!localStreams.isEmpty() && !schemas.isEmpty()) {
             Mailbox mb = VoltDB.instance().getHostMessenger().createMailbox();
             StreamSnapshotDataTarget.SnapshotSender sender = new StreamSnapshotDataTarget.SnapshotSender(mb);
             StreamSnapshotAckReceiver ackReceiver = new StreamSnapshotAckReceiver(mb);
