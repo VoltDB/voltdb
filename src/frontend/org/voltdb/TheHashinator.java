@@ -312,7 +312,8 @@ public abstract class TheHashinator {
                     }
                 }
             }
-            else if (partitionValue.getClass() == byte[].class) {
+            else if (this.getConfigurationType() == HashinatorType.LEGACY
+                    && partitionValue.getClass() == byte[].class) {
                 partitionValue = bytesToValue(partitionParamType, (byte[]) partitionValue);
             }
         }
@@ -380,15 +381,6 @@ public abstract class TheHashinator {
         throw new RuntimeException("Should not reach here");
     }
 
-    /**
-     * Return the type of the hashinator passed in.
-     *
-     * @param hashinator
-     * @return
-     */
-    public static HashinatorType getConfiguredHashinatorType(TheHashinator hashinator) {
-        return hashinator.getConfigurationType();
-    }
     private static volatile HashinatorType configuredHashinatorType = null;
 
     /**
