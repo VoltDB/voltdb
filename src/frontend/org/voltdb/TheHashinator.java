@@ -380,6 +380,12 @@ public abstract class TheHashinator {
         throw new RuntimeException("Should not reach here");
     }
 
+    /**
+     * Return the type of the hashinator passed in.
+     *
+     * @param hashinator
+     * @return
+     */
     public static HashinatorType getConfiguredHashinatorType(TheHashinator hashinator) {
         return hashinator.getConfigurationType();
     }
@@ -404,6 +410,11 @@ public abstract class TheHashinator {
         return configuredHashinatorType;
     }
 
+    /**
+     * This is only called by server client should never call this.
+     *
+     * @param type
+     */
     public static void setConfiguredHashinatorType(HashinatorType type) {
         if (System.getenv("HASHINATOR") == null && System.getProperty("HASHINATOR") == null) {
             configuredHashinatorType = type;
