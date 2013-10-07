@@ -35,6 +35,7 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltTableUtil;
 
 import com.google.common.primitives.Longs;
@@ -80,7 +81,7 @@ public class ValidatePartitioning extends VoltSystemProcedure {
             final VoltTable results = constructPartitioningResultsTable();
             List<Integer> tableIds = new ArrayList<Integer>();
             List<String> tableNames = new ArrayList<String>();
-            for (Table t : context.getDatabase().getTables()) {
+            for (Table t : CatalogUtil.getNormalTables(context.getDatabase(), false)) {
                 if (!t.getIsreplicated() && t.getMaterializer() == null) {
                     tableIds.add(t.getRelativeIndex());
                     tableNames.add(t.getTypeName());
