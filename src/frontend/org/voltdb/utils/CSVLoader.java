@@ -291,10 +291,10 @@ public class CSVLoader {
             List<Thread> spawned = new ArrayList<Thread>(CSVPartitionProcessor.m_numProcessors);
             CSVLineWithMetaData endOfData = new CSVLineWithMetaData(null, null, -1);
 
-            Map<Long, BlockingQueue<CSVLineWithMetaData>> lineq =
-                    new HashMap<Long, BlockingQueue<CSVLineWithMetaData>>(CSVPartitionProcessor.m_numProcessors);
+            Map<Integer, BlockingQueue<CSVLineWithMetaData>> lineq =
+                    new HashMap<Integer, BlockingQueue<CSVLineWithMetaData>>(CSVPartitionProcessor.m_numProcessors);
             List<CSVPartitionProcessor> processors = new ArrayList<CSVPartitionProcessor>(CSVPartitionProcessor.m_numProcessors);
-            for (long i = 0; i < CSVPartitionProcessor.m_numProcessors; i++) {
+            for (int i = 0; i < CSVPartitionProcessor.m_numProcessors; i++) {
                 LinkedBlockingQueue<CSVLineWithMetaData> partitionQueue =
                         new LinkedBlockingQueue<CSVLineWithMetaData>(Integer.MAX_VALUE);
                 lineq.put(i, partitionQueue);
