@@ -18,6 +18,7 @@
 package org.voltdb.sysprocs.saverestore;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
@@ -120,7 +121,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             schemas.put(table.getRelativeIndex(), schemaTable.getSchemaBytes());
         }
 
-        List<DataTargetInfo> sdts = createDataTargets(localStreams, schemas);
+        List<DataTargetInfo> sdts = createDataTargets(localStreams, hashinatorData, schemas);
 
         // If there's no work to do on this host, just claim success, return an empty plan,
         // and things will sort themselves out properly
@@ -135,8 +136,17 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     }
 
     private List<DataTargetInfo> createDataTargets(List<StreamSnapshotRequestConfig.Stream> localStreams,
+                                                   HashinatorSnapshotData hashinatorData,
                                                    Map<Integer, byte[]> schemas)
     {
+        byte[] hashinatorConfig = null;
+        if (hashinatorData != null) {
+            ByteBuffer hashinatorConfigBuf = ByteBuffer.allocate(8 + hashinatorData.m_serData.length);
+            hashinatorConfigBuf.putLong(hashinatorData.m_version);
+            hashinatorConfigBuf.put(hashinatorData.m_serData);
+            hashinatorConfig =  hashinatorConfigBuf.array();
+        }
+
         List<DataTargetInfo> sdts = Lists.newArrayList();
 
         if (!localStreams.isEmpty()) {
@@ -159,8 +169,8 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                     sdts.add(new DataTargetInfo(stream,
                                                 srcHSId,
                                                 destHSId,
-                                                new StreamSnapshotDataTarget(destHSId, schemas,
-                                                                             sender, ackReceiver)));
+                                                new StreamSnapshotDataTarget(destHSId, hashinatorConfig,
+                                                                             schemas, sender, ackReceiver)));
                 }
             }
         }

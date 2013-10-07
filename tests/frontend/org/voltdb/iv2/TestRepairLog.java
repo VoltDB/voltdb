@@ -31,7 +31,10 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -314,5 +317,18 @@ public class TestRepairLog
                     (deltaPercent * 100) + "%.",
                     deltaPercent < .20);
         }
+    }
+
+    @Test
+    public void testComparator()
+    {
+        RepairLog dut = new RepairLog();
+        Random rand = new Random();
+        List<RepairLog.Item> items = new ArrayList<RepairLog.Item>();
+        for (int i = 0; i < 1000000; i++) {
+            RepairLog.Item item = new RepairLog.Item(true, null, rand.nextInt(), i);
+            items.add(item);
+        }
+        Collections.sort(items, dut.m_handleComparator);
     }
 }

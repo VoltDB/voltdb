@@ -298,12 +298,9 @@ public class TestSecuritySuite extends RegressionSuite {
         project.addGroups(groups);
         project.setSecurityEnabled(true);
 
-        ArrayList<String> elgroups = new ArrayList<String>();
-        elgroups.add("group1");
-
         // export disabled in community
         if (MiscUtils.isPro()) {
-            project.addExport("org.voltdb.export.processors.RawProcessor", true /*enabled*/, elgroups);
+            project.addExport(true /*enabled*/);
         }
 
         /////////////////////////////////////////////////////////////

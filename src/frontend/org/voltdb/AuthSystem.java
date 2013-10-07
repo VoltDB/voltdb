@@ -379,33 +379,6 @@ public class AuthSystem {
             }
         }
 
-        /*
-         * Iterate through the export connectors and add each connector to
-         * the authorized user objects.
-         */
-        for (org.voltdb.catalog.Connector connector : db.getConnectors()) {
-            for (org.voltdb.catalog.UserRef userRef : connector.getAuthusers()) {
-                final org.voltdb.catalog.User catalogUser = userRef.getUser();
-                final AuthUser user = m_users.get(catalogUser.getTypeName());
-                if (user == null) {
-                    //Error case. Procedure has a user listed as authorized but no such user exists
-                } else {
-                    user.m_authorizedConnectors.add(connector);
-                }
-            }
-
-            for (org.voltdb.catalog.GroupRef catalogGroupRef : connector.getAuthgroups()) {
-                final org.voltdb.catalog.Group catalogGroup = catalogGroupRef.getGroup();
-                final AuthGroup group = m_groups.get(catalogGroup.getTypeName());
-                if (group == null) {
-                    //Error case. Procedure has a group listed as authorized but no such user exists
-                } else {
-                    for (AuthUser user : group.m_users) {
-                        user.m_authorizedConnectors.add(connector);
-                    }
-                }
-            }
-        }
         m_users = ImmutableMap.copyOf(m_users);
         m_groups = ImmutableMap.copyOf(m_groups);
         for (AuthUser user : m_users.values()) {

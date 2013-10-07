@@ -91,7 +91,13 @@ public class SpPromoteAlgo implements RepairAlgo
         @Override
         public int compare(Iv2RepairLogResponseMessage o1, Iv2RepairLogResponseMessage o2)
         {
-            return (int)(o1.getHandle() - o2.getHandle());
+            if (o1.getHandle() < o2.getHandle()) {
+                return -1;
+            }
+            else if (o1.getHandle() > o2.getHandle()) {
+                return 1;
+            }
+            return 0;
         }
     };
 

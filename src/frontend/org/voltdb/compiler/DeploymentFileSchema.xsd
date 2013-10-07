@@ -224,16 +224,10 @@
   <!-- <export> -->
   <xs:complexType name="exportType">
     <xs:sequence>
-      <xs:element name="onserver" type="ExportOnServerType" minOccurs="0" maxOccurs="1"/>
-    </xs:sequence>
-    <xs:attribute name="enabled" type="xs:boolean" default="true"/>
-  </xs:complexType>
-
-  <xs:complexType name="ExportOnServerType">
-    <xs:sequence>
       <xs:element name="configuration" type="ExportConfigurationType" minOccurs="0" maxOccurs="1"/>
     </xs:sequence>
-    <xs:attribute name="exportto" type="ServerExportEnum" default="file"/>
+    <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+    <xs:attribute name="target" type="ServerExportEnum" default="file"/>
     <xs:attribute name="exportconnectorclass" type="xs:string" default=""/>
   </xs:complexType>
 
