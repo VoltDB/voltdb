@@ -104,6 +104,7 @@ import org.voltdb.iv2.LeaderAppointer;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SpInitiator;
 import org.voltdb.iv2.TxnEgo;
+import org.voltdb.join.ElasticJoinService;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.planner.ActivePlanRepository;
@@ -225,6 +226,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     // Rejoin coordinator
     private JoinCoordinator m_joinCoordinator = null;
+    private ElasticJoinService m_elasticJoinService = null;
 
     // id of the leader, or the host restore planner says has the catalog
     int m_hostIdWithStartupCatalog;
@@ -430,7 +432,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             if (m_joining) {
                 Class<?> elasticJoinCoordClass =
-                        MiscUtils.loadProClass("org.voltdb.join.ElasticJoinCoordinator", "Elastic", false);
+                        MiscUtils.loadProClass("org.voltdb.join.ElasticJoinNodeCoordinator", "Elastic", false);
                 try {
                     Constructor<?> constructor = elasticJoinCoordClass.getConstructor(HostMessenger.class);
                     m_joinCoordinator = (JoinCoordinator) constructor.newInstance(m_messenger);
@@ -473,10 +475,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                                     "No more nodes can join.", false, null);
                         }
                     }
-                    else if (m_joining) {
-                        // Ask the joiner for the new partitions to create on this node.
-                        partitions = m_joinCoordinator.getPartitionsToAdd();
-                    }
                     else {
                         partitions = ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
                     }
@@ -491,9 +489,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     m_iv2InitiatorStartingTxnIds.put(
                             MpInitiator.MP_INIT_PID,
                             TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId());
-                    // each node has an MPInitiator (and exactly 1 node has the master MPI).
-                    long mpiBuddyHSId = m_iv2Initiators.get(0).getInitiatorHSId();
-                    m_MPI = new MpInitiator(m_messenger, mpiBuddyHSId, getStatsAgent());
+                    // Pass the local HSIds to the MPI so it can farm out buddy sites
+                    // to the RO MP site pool
+                    List<Long> localHSIds = new ArrayList<Long>();
+                    for (Initiator ii : m_iv2Initiators) {
+                        localHSIds.add(ii.getInitiatorHSId());
+                    }
+                    m_MPI = new MpInitiator(m_messenger, localHSIds, getStatsAgent());
                     m_iv2Initiators.add(m_MPI);
                 }
 
@@ -763,6 +765,32 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             assert(m_clientInterfaces.size() > 0);
             ClientInterface ci = m_clientInterfaces.get(0);
             ci.initializeSnapshotDaemon(m_messenger.getZK(), m_globalServiceElector);
+
+            // Start elastic join service
+            try {
+                String clSnapshotPath = m_catalogContext.cluster.getLogconfig().get("log")
+                                                        .getInternalsnapshotpath();
+
+                Class<?> elasticServiceClass =
+                    MiscUtils.loadProClass("org.voltdb.join.ElasticJoinCoordinator", "Elastic", false);
+
+                if (elasticServiceClass != null && TheHashinator.getCurrentConfig().getFirst() == HashinatorType.ELASTIC) {
+                    Constructor<?> constructor =
+                        elasticServiceClass.getConstructor(HostMessenger.class,
+                                                           ClientInterface.class,
+                                                           Cartographer.class,
+                                                           String.class,
+                                                           int.class);
+                    m_elasticJoinService =
+                        (ElasticJoinService) constructor.newInstance(m_messenger,
+                                                                     m_clientInterfaces.get(0),
+                                                                     m_cartographer,
+                                                                     clSnapshotPath,
+                                                                     m_deployment.getCluster().getKfactor());
+                }
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Failed to instantiate elastic join service", false, e);
+            }
 
             // set additional restore agent stuff
             if (m_restoreAgent != null) {
@@ -1172,6 +1200,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                                         "cluster element must be " +
                                         "'enabled' or 'disabled' but was '" + elasticSetting + "'", false, null);
             }
+            else {
+                TheHashinator.setConfiguredHashinatorType(HashinatorType.LEGACY);
+            }
 
 
             // create a dummy catalog to load deployment info into
@@ -1579,14 +1610,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         // Start the rejoin coordinator
         if (m_joinCoordinator != null) {
             try {
-                m_joinCoordinator.setClientInterface(m_clientInterfaces.get(0));
-
-                String clSnapshotPath = m_catalogContext.cluster.getLogconfig().get("log")
-                                                        .getInternalsnapshotpath();
-
-                if (!m_joinCoordinator.startJoin(m_catalogContext.database,
-                                                 m_cartographer,
-                                                 clSnapshotPath)) {
+                if (!m_joinCoordinator.startJoin()) {
                     VoltDB.crashLocalVoltDB("Failed to join the cluster", true, null);
                 }
             } catch (Exception e) {
@@ -1642,6 +1666,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_snapshotCompletionMonitor.shutdown();
                 m_periodicWorkThread.shutdown();
                 m_periodicPriorityWorkThread.shutdown();
+
+                if (m_elasticJoinService != null) {
+                    m_elasticJoinService.shutdown();
+                }
 
                 if (m_leaderAppointer != null) {
                     m_leaderAppointer.shutdown();

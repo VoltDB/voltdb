@@ -52,15 +52,16 @@ public class ClientThread extends Thread {
          * Use modulo so the same CID will run the same code
          * across client process lifetimes.
          */
-        static Type typeFromId(int id, boolean allowInProcAdhoc) {
-            if (id % 10 == 0) return PARTITIONED_MP;               // 20%
-            if (id % 10 == 1) return PARTITIONED_MP;
-            if (id % 10 == 2) return REPLICATED;                   // 20%
-            if (id % 10 == 3) return REPLICATED;
-            if (id % 10 == 4) return HYBRID;                       // 20%
-            if (id % 10 == 5) return HYBRID;
-            if (allowInProcAdhoc && (id % 10 == 6) && (id % 20 != 6)) return ADHOC_MP; // 5% or 0%
-            return PARTITIONED_SP;                                 // 35% or 40%
+        static Type typeFromId(float mpRatio, boolean allowInProcAdhoc) {
+            Random rn = new Random();
+            if (rn.nextFloat() < mpRatio) {
+                int r = rn.nextInt(19);
+                if (allowInProcAdhoc && (r < 1)) return ADHOC_MP;  // 0% or ~5% of MP workload
+                if (r < 7) return PARTITIONED_MP;                  // ~33% or 38%
+                if (r < 13) return REPLICATED;                     // ~33%
+                if (r < 19) return HYBRID;                         // ~33%
+            }
+            return PARTITIONED_SP;
         }
     }
 
@@ -75,12 +76,13 @@ public class ClientThread extends Thread {
     final Semaphore m_permits;
 
     ClientThread(byte cid, AtomicLong txnsRun, Client client, TxnId2PayloadProcessor processor, Semaphore permits,
-            boolean allowInProcAdhoc)
+            boolean allowInProcAdhoc, float mpRatio)
         throws Exception
     {
         setName("ClientThread(CID=" + String.valueOf(cid) + ")");
 
-        m_type = Type.typeFromId(cid, allowInProcAdhoc);
+
+        m_type = Type.typeFromId(mpRatio, allowInProcAdhoc);
         m_cid = cid;
         m_client = client;
         m_processor = processor;

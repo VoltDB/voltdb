@@ -208,10 +208,6 @@ public class ClientInterfaceHandleManager
             partitionId = MP_PART_ID;
         }
 
-        if (!isSinglePartition && isShortCircuitRead) {
-            throw new RuntimeException("Can't short circuit read a multi-part transaction");
-        }
-
         PartitionData partitionStuff = m_partitionStuff.get(partitionId);
         if (partitionStuff == null) {
             partitionStuff = new PartitionData(partitionId);

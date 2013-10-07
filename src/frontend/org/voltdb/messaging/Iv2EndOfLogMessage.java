@@ -40,7 +40,7 @@ public class Iv2EndOfLogMessage extends TransactionInfoBaseMessage
 
     public Iv2EndOfLogMessage(boolean isMP)
     {
-        super(0l, 0l, 0l, 0l, true, true);
+        super(0l, 0l, 0l, 0l, false, true);
         m_isMP = isMP;
     }
 

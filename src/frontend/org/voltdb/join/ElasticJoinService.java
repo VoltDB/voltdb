@@ -15,30 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.iv2;
+package org.voltdb.join;
 
-import org.voltcore.messaging.TransactionInfoBaseMessage;
-import org.voltdb.StoredProcedureInvocation;
-import org.voltdb.dtxn.TransactionState;
-
-/**
- *
- */
-public class MPIEndOfLogTransactionState extends TransactionState {
-    public MPIEndOfLogTransactionState(TransactionInfoBaseMessage notice)
-    {
-        super(null, notice);
-    }
-
-    @Override
-    public boolean isSinglePartition()
-    {
-        return false;
-    }
-
-    @Override
-    public StoredProcedureInvocation getInvocation()
-    {
-        return null;
-    }
+public interface ElasticJoinService {
+    void shutdown();
 }

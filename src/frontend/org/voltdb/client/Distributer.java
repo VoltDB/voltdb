@@ -724,9 +724,9 @@ class Distributer {
                         if (partitionReplicas != null && partitionReplicas.length > 0) {
                             cxn = partitionReplicas[ThreadLocalRandom.current().nextInt(partitionReplicas.length)];
                             if (cxn.hadBackPressure()) {
-                                //See if there is one without backpressure
+                                //See if there is one without backpressure, make sure it's still connected
                                 for (NodeConnection nc : partitionReplicas) {
-                                    if (!nc.hadBackPressure()) {
+                                    if (!nc.hadBackPressure() && nc.m_isConnected) {
                                         cxn = nc;
                                         break;
                                     }
@@ -745,6 +745,12 @@ class Distributer {
                             backpressure = false;
                         }
                     }
+                }
+                if (cxn != null && !cxn.m_isConnected) {
+                    // Would be nice to log something here
+                    // Client affinity picked a connection that was actually disconnected.  Reset to null
+                    // and let the round-robin choice pick a connection
+                    cxn = null;
                 }
             }
             if (cxn == null) {

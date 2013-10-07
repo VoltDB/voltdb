@@ -31,7 +31,10 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -273,5 +276,59 @@ public class TestRepairLog
         // Also check the MP version
         stuff = dut.contents(1l, true);
         validateRepairLog(stuff);
+    }
+
+    @Test
+    public void testPerformance()
+    {
+        RepairLog dut = new RepairLog();
+        // First, add and truncate SP transactions with no MPs
+        dut.deliver(truncInitMsg(Long.MIN_VALUE, 0));
+        long start = System.currentTimeMillis();
+        for (int i = 0; i < 100000; i++)
+        {
+            VoltMessage msg = truncInitMsg(i, i + 1);
+            dut.deliver(msg);
+        }
+        long end = System.currentTimeMillis();
+        long duration1 = end - start;
+        System.out.println("Time to deliver 100,000 SPs: " + duration1);
+
+        // Now, add 40000 MP messages and then see how long it takes to do the SPs
+        dut = new RepairLog();
+        dut.deliver(truncInitMsg(Long.MIN_VALUE, 0));
+        for (int i = 0; i < 40000; i++) {
+            dut.deliver(truncCompleteMsg(Long.MIN_VALUE, i));
+        }
+        start = System.currentTimeMillis();
+        for (int i = 0; i < 100000; i++)
+        {
+            VoltMessage msg = truncInitMsg(i, i + 1);
+            dut.deliver(msg);
+        }
+        end = System.currentTimeMillis();
+        long duration2 = end - start;
+        System.out.println("Time to deliver 100,000 SPs: " + duration2);
+        // rough check, verify that the two don't differ by more than 20%
+        if (duration2 > duration1) {
+            long delta = Math.abs(duration2 - duration1);
+            float deltaPercent = delta / (float)duration1;
+            assertTrue("SP deliver performance with stored MP logs exceeds allowed hit of 20%, was: " +
+                    (deltaPercent * 100) + "%.",
+                    deltaPercent < .20);
+        }
+    }
+
+    @Test
+    public void testComparator()
+    {
+        RepairLog dut = new RepairLog();
+        Random rand = new Random();
+        List<RepairLog.Item> items = new ArrayList<RepairLog.Item>();
+        for (int i = 0; i < 1000000; i++) {
+            RepairLog.Item item = new RepairLog.Item(true, null, rand.nextInt(), i);
+            items.add(item);
+        }
+        Collections.sort(items, dut.m_handleComparator);
     }
 }

@@ -573,8 +573,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         @Override
         public long getCurrentTxnId()                           { return m_currentTransactionState.txnId; }
         @Override
-        public ImmutableMap<String, ProcedureRunner> getProcedures() { return m_loadedProcedures.procs; }
-        @Override
         public long getSiteId()                                 { return m_siteId; }
         @Override
         public boolean isLowestSiteId()                         { return m_siteId == m_tracker.getLowestSiteForHost(getHostId()); }
@@ -586,8 +584,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         public long getCatalogCRC()                             { return m_context.getCatalogCRC(); }
         @Override
         public int getCatalogVersion()                          { return m_context.catalogVersion; }
-        @Override
-        public SiteTracker getSiteTracker()                     { return m_tracker; }
         @Override
         public SiteTracker getSiteTrackerForSnapshot()          { return m_tracker; }
         @Override
@@ -1449,14 +1445,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             lastCommittedTxnId,
             txnIdAsUniqueId,
             readOnly ? Long.MAX_VALUE : getNextUndoToken());
-    }
-
-    @Override
-    public void simulateExecutePlanFragments(long txnId, boolean readOnly) {
-        if (!readOnly) {
-            // pretend real work was done
-            getNextUndoToken();
-        }
     }
 
     /**

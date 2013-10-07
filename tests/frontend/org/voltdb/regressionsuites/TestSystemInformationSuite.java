@@ -146,7 +146,7 @@ public class TestSystemInformationSuite extends RegressionSuite {
 
         // Add export
         m_expectedVals.put("export", "true");
-        project.addExport("org.voltdb.export.processors.RawProcessor", true, null);
+        project.addExport(true /* enabled */);
 
         // Add command logging
         // XXX currently broken because we can't restart the server
