@@ -23,6 +23,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.VoltDB;
+import org.voltdb.catalog.Database;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.sysprocs.saverestore.SnapshotRequestConfig;
 import org.voltdb.utils.VoltFile;
@@ -52,7 +53,7 @@ public abstract class JoinCoordinator extends LocalMailbox {
     /**
      * Starts the rejoin process.
      */
-    public abstract boolean startJoin();
+    public abstract boolean startJoin(Database catalog);
 
     /**
      * Discard the mailbox.

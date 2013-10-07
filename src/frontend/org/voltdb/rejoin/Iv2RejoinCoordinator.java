@@ -69,7 +69,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
 
     private static AtomicLong m_sitesRejoinedCount = new AtomicLong(0);
 
-    private final Database m_catalog;
+    private Database m_catalog;
     // contains all sites that haven't started rejoin initialization
     private final Queue<Long> m_pendingSites;
     // contains all sites that are waiting to start a snapshot
@@ -86,14 +86,12 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     private final FixedDBBPool m_snapshotBufPool;
 
     public Iv2RejoinCoordinator(HostMessenger messenger,
-                                Database catalog,
                                 Collection<Long> sites,
                                 String voltroot,
                                 boolean liveRejoin)
     {
         super(messenger);
         synchronized (m_lock) {
-            m_catalog = catalog;
             m_liveRejoin = liveRejoin;
             m_pendingSites = new LinkedList<Long>(sites);
             if (m_pendingSites.isEmpty()) {
@@ -163,7 +161,8 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     }
 
     @Override
-    public boolean startJoin() {
+    public boolean startJoin(Database catalog) {
+        m_catalog = catalog;
         m_startTime = System.currentTimeMillis();
         if (m_liveRejoin) {
             long firstSite;
