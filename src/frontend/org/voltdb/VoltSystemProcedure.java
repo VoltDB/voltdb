@@ -432,5 +432,4 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
             throw new RuntimeException("SP sysproc doesn't support getting the master HSID");
         }
     }
-
 }
