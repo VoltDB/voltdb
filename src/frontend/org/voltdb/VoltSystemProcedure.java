@@ -218,8 +218,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
      * This is not safe to use after restore because it doesn't do failure handling that would deal with
      * dropped plan fragments
      */
-    public VoltTable[] executeSysProcPlanFragments(SynthesizedPlanFragment pfs[],
-            Mailbox m) {
+    public VoltTable[] executeSysProcPlanFragments(SynthesizedPlanFragment pfs[], Mailbox m) {
         Set<Integer> dependencyIds = new HashSet<Integer>();
         VoltTable results[] = new VoltTable[1];
 
@@ -306,7 +305,6 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                 FragmentResponseMessage frm = (FragmentResponseMessage)vm;
                 final int dependencyId = frm.getTableDependencyIdAtIndex(0);
                 if (dependencyIds.contains(dependencyId)) {
-                    VoltTable table = frm.getTableAtIndex(0);
                     receivedDependencyIds.put(
                             dependencyId,
                             Arrays.asList(new VoltTable[] {frm.getTableAtIndex(0)}));
