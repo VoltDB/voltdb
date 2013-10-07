@@ -219,7 +219,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
      * dropped plan fragments
      */
     public VoltTable[] executeSysProcPlanFragments(SynthesizedPlanFragment pfs[],
-            Mailbox m, SnapshotProgressMonitor monitor) {
+            Mailbox m) {
         Set<Integer> dependencyIds = new HashSet<Integer>();
         VoltTable results[] = new VoltTable[1];
 
@@ -307,10 +307,6 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                 final int dependencyId = frm.getTableDependencyIdAtIndex(0);
                 if (dependencyIds.contains(dependencyId)) {
                     VoltTable table = frm.getTableAtIndex(0);
-                    if (monitor != null) {
-                        monitor.reportProgress(table);
-                        resetResultTable(table);
-                    }
                     receivedDependencyIds.put(
                             dependencyId,
                             Arrays.asList(new VoltTable[] {frm.getTableAtIndex(0)}));
@@ -439,22 +435,4 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         }
     }
 
-    // This method resets count as this table is reused and dont need count overcounted.
-    private void resetResultTable(VoltTable table) {
-        table.resetRowPosition();
-        table.advanceRow();
-        Object hid = table.get(VoltSystemProcedure.CNAME_HOST_ID, VoltSystemProcedure.CTYPE_ID);
-        String hostName = table.getString("HOSTNAME");
-        Object sid = table.get(VoltSystemProcedure.CNAME_SITE_ID, VoltSystemProcedure.CTYPE_ID);
-        String tableName = table.getString("TABLE");
-        Object pid = table.get(VoltSystemProcedure.CNAME_PARTITION_ID, VoltSystemProcedure.CTYPE_ID);
-        String result = table.getString("RESULT");
-        String errMsg = table.getString("ERR_MSG");
-
-        //Reset count after we counted.
-        table.resetRowPosition();
-        table.clearRowData();
-        table.addRow(hid, hostName, sid, tableName, pid,
-                result, errMsg, 0, 0);
-    }
 }

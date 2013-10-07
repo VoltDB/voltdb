@@ -24,6 +24,5 @@ package org.voltdb;
 public interface SnapshotProgressMonitor {
 
     //Update your internal counters.
-    void reportProgress(VoltTable table);
-
+    void reportProgress(String tableName, long count, long partitionId);
 }
