@@ -17,6 +17,7 @@
 
 package org.voltdb.sysprocs.saverestore;
 
+import com.google.common.base.Preconditions;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -42,11 +43,9 @@ public class SnapshotRequestConfig {
      */
     public SnapshotRequestConfig(List<Table> tables)
     {
-        if (tables == null) {
-            this.tables = null;
-        } else {
-            this.tables = tables.toArray(new Table[0]);
-        }
+        Preconditions.checkNotNull(tables);
+        Preconditions.checkArgument(!tables.isEmpty());
+        this.tables = tables.toArray(new Table[0]);
     }
 
     public SnapshotRequestConfig(JSONObject jsData, Database catalogDatabase)
@@ -71,13 +70,6 @@ public class SnapshotRequestConfig {
                     }
                 }
             }
-        }
-
-        if (tableIdsToInclude.isEmpty()) {
-            // It doesn't make any sense to take a snapshot that doesn't include any table,
-            // it must be that the request doesn't specify a table filter,
-            // so default to all tables.
-            return tables.toArray(new Table[0]);
         }
 
         ListIterator<Table> iter = tables.listIterator();

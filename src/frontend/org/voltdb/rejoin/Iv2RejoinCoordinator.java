@@ -39,6 +39,7 @@ import org.voltdb.SnapshotSiteProcessor;
 
 import org.voltdb.SnapshotFormat;
 
+import org.voltdb.catalog.Database;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.messaging.RejoinMessage;
@@ -68,6 +69,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
 
     private static AtomicLong m_sitesRejoinedCount = new AtomicLong(0);
 
+    private final Database m_catalog;
     // contains all sites that haven't started rejoin initialization
     private final Queue<Long> m_pendingSites;
     // contains all sites that are waiting to start a snapshot
@@ -84,12 +86,14 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     private final FixedDBBPool m_snapshotBufPool;
 
     public Iv2RejoinCoordinator(HostMessenger messenger,
+                                Database catalog,
                                 Collection<Long> sites,
                                 String voltroot,
                                 boolean liveRejoin)
     {
         super(messenger);
         synchronized (m_lock) {
+            m_catalog = catalog;
             m_liveRejoin = liveRejoin;
             m_pendingSites = new LinkedList<Long>(sites);
             if (m_pendingSites.isEmpty()) {
@@ -154,7 +158,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         StreamSnapshotRequestConfig.Stream stream =
             new StreamSnapshotRequestConfig.Stream(sourceToDests, null);
         StreamSnapshotRequestConfig config =
-            new StreamSnapshotRequestConfig(null, Arrays.asList(stream), false);
+            new StreamSnapshotRequestConfig(SnapshotUtil.getTablesToSave(m_catalog), Arrays.asList(stream), false);
         return makeSnapshotRequest(config);
     }
 
