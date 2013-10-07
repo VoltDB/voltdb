@@ -18,6 +18,7 @@
 package org.voltdb.rejoin;
 
 import org.voltcore.messaging.VoltMessage;
+import org.voltdb.exceptions.SerializableException;
 
 /**
  * Base class for reading and writing snapshot streams over the network.
@@ -34,6 +35,7 @@ public abstract class StreamSnapshotBase {
         public boolean isAckEOS(VoltMessage msg);
         public long getAckTargetId(VoltMessage msg);
         public int getAckBlockIndex(VoltMessage msg);
+        public SerializableException getException(VoltMessage msg);
     }
 
     public static class DefaultMessageFactory implements MessageFactory {
@@ -62,6 +64,12 @@ public abstract class StreamSnapshotBase {
         {
             assert msg instanceof RejoinDataAckMessage;
             return ((RejoinDataAckMessage) msg).getBlockIndex();
+        }
+
+        @Override
+        public  SerializableException getException(VoltMessage msg)
+        {
+            return null;
         }
     }
 

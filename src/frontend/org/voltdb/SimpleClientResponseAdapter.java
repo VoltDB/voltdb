@@ -17,21 +17,23 @@
 
 package org.voltdb;
 
+import com.google.common.base.Supplier;
+import com.google.common.util.concurrent.SettableFuture;
 import org.voltcore.network.Connection;
 import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.DeferredSerialization;
+import org.voltcore.utils.Pair;
 import org.voltdb.client.ClientResponse;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.util.concurrent.Exchanger;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * A very simple adapter that deserializes bytes into client responses. It calls
@@ -42,14 +44,23 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
         public void handleResponse(ClientResponse response);
     }
 
+    public static final Callback NULL_CALLBACK = new Callback() {
+        @Override
+        public void handleResponse(ClientResponse response)
+        {}
+    };
+
     public static final class SyncCallback implements Callback {
-        private final Exchanger<ClientResponse> m_responseExchanger = new Exchanger<ClientResponse>();
+        private final SettableFuture<ClientResponse> m_responseFuture = SettableFuture.create();
 
         public ClientResponse getResponse(long timeoutMs) throws InterruptedException
         {
             try {
-                return m_responseExchanger.exchange(null, timeoutMs, TimeUnit.MILLISECONDS);
+                return m_responseFuture.get(timeoutMs, TimeUnit.MILLISECONDS);
             } catch (TimeoutException e) {
+                return null;
+            } catch (ExecutionException e) {
+                VoltDB.crashLocalVoltDB("Should never happen", true, e);
                 return null;
             }
         }
@@ -57,16 +68,13 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
         @Override
         public void handleResponse(ClientResponse response)
         {
-            try {
-                m_responseExchanger.exchange(response);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+            m_responseFuture.set(response);
         }
     }
 
     private final long m_connectionId;
-    private volatile Callback m_callback = null;
+    private final AtomicLong m_handles = new AtomicLong();
+    private Map<Long, Callback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, Callback>());
     private final String m_name;
     public static volatile AtomicLong m_testConnectionIdGenerator;
 
@@ -85,8 +93,26 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
         m_name = name;
     }
 
-    public void setCallback(Callback callback) {
-        m_callback = callback;
+    public void registerCallback(long handle, Callback c) {
+        m_handles.set(handle + 1);//just in case make them not match
+        m_callbacks.put(handle, c);
+    }
+
+    public long registerCallback(Callback c) {
+        final long handle = m_handles.incrementAndGet();
+        m_callbacks.put( handle, c);
+        return handle;
+    }
+
+    public Supplier<Pair<Long, SyncCallback>> getSyncCallbackSupplier() {
+        return new Supplier<Pair<Long, SyncCallback>>() {
+            @Override
+            public Pair<Long, SyncCallback> get() {
+                final SyncCallback callback = new SyncCallback();
+                final long handle = registerCallback(callback);
+                return Pair.of(handle, callback);
+            }
+        };
     }
 
     @Override
@@ -125,7 +151,7 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
             b.position(4);
             resp.initFromBuffer(b);
 
-            Callback callback = m_callback;
+            Callback callback = m_callbacks.remove(resp.getClientHandle());
             if (callback != null) {
                 callback.handleResponse(resp);
             }
