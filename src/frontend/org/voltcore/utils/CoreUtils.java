@@ -41,6 +41,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
@@ -50,7 +51,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
-import jsr166y.LinkedTransferQueue;
 
 import org.voltcore.logging.VoltLogger;
 
