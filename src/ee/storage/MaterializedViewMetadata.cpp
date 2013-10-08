@@ -414,7 +414,6 @@ void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bo
             if (newValue.isNull()) {
                 newValue = existingValue;
             } else {
-                int reversedForMin = 1; // initially assume that agg is not MIN.
                 switch(m_aggTypes[aggIndex]) {
                 case EXPRESSION_TYPE_AGGREGATE_SUM:
                     newValue = existingValue.op_add(newValue);
@@ -423,10 +422,14 @@ void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bo
                     newValue = existingValue.op_increment();
                     break;
                 case EXPRESSION_TYPE_AGGREGATE_MIN:
-                    reversedForMin = -1;
-                    // fall through...
+                    // ignore any new value that is not strictly an improvement
+                    if (newValue.compare(existingValue) >= 0) {
+                        newValue = existingValue;
+                    }
+                    break;
                 case EXPRESSION_TYPE_AGGREGATE_MAX:
-                    if (newValue.compare(existingValue)*(reversedForMin) <= 0) {
+                    // ignore any new value that is not strictly an improvement
+                    if (newValue.compare(existingValue) <= 0) {
                         newValue = existingValue;
                     }
                     break;
@@ -517,19 +520,19 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
                 // fall through...
             case EXPRESSION_TYPE_AGGREGATE_MAX:
                 if (oldValue.compare(existingValue) == 0) {
-            // re-calculate MIN / MAX
-            newValue = NValue::getNullValue(m_target->schema()->columnType(aggOffset+aggIndex));
+                    // re-calculate MIN / MAX
+                    newValue = NValue::getNullValue(m_target->schema()->columnType(aggOffset+aggIndex));
 
-            // indexscan if an index is available, otherwise tablescan
-            if (m_indexForMinMax) {
-                newValue = findMinMaxFallbackValueIndexed(oldTuple, existingValue, newValue,
-                                                          reversedForMin, aggIndex);
-            } else {
-                VOLT_TRACE("before findMinMaxFallbackValueSequential\n");
-                newValue = findMinMaxFallbackValueSequential(oldTuple, existingValue, newValue,
-                                                             reversedForMin, aggIndex);
-                VOLT_TRACE("after findMinMaxFallbackValueSequential\n");
-            }
+                    // indexscan if an index is available, otherwise tablescan
+                    if (m_indexForMinMax) {
+                        newValue = findMinMaxFallbackValueIndexed(oldTuple, existingValue, newValue,
+                                                                  reversedForMin, aggIndex);
+                    } else {
+                        VOLT_TRACE("before findMinMaxFallbackValueSequential\n");
+                        newValue = findMinMaxFallbackValueSequential(oldTuple, existingValue, newValue,
+                                                                     reversedForMin, aggIndex);
+                        VOLT_TRACE("after findMinMaxFallbackValueSequential\n");
+                    }
                 }
                 break;
             default:
