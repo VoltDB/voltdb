@@ -56,7 +56,7 @@ public class VoltZK {
     /*
      * Processes that want to block catalog updates create children here
      */
-    public static final String catalogUpdateBlockers = "/db/catalog_update_blockers";
+    public static final String elasticJoinActiveBlockers = "/db/elastic_join_active_blockers";
 
     // configuration (ports, interfaces, ...)
     public static final String cluster_metadata = "/db/cluster_metadata";
@@ -98,7 +98,7 @@ public class VoltZK {
     public static final String leaders_globalservice = "/db/leaders/globalservice";
     public static final String lastKnownLiveNodes = "/db/lastKnownLiveNodes";
 
-    public static final String joinCatalogUpdateBlocker = ZKUtil.joinZKPath(catalogUpdateBlockers, "join_blocker");
+    public static final String elasticJoinActiveBlocker = ZKUtil.joinZKPath(elasticJoinActiveBlockers, "join_blocker");
 
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
@@ -113,7 +113,7 @@ public class VoltZK {
             leaders_initiators,
             leaders_globalservice,
             lastKnownLiveNodes,
-            catalogUpdateBlockers
+            elasticJoinActiveBlockers
     };
 
     /**
