@@ -825,7 +825,7 @@ public class VoltCompiler {
                     // if this is a fancy expression-based index...
                     else {
                         try {
-                            List<AbstractExpression> indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, null);
+                            List<AbstractExpression> indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr);
                             for (AbstractExpression expr: indexExpressions) {
                                 if (expr instanceof TupleValueExpression &&
                                         ((TupleValueExpression) expr).getColumnName().equals(c.getName()) ) {

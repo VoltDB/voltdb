@@ -18,10 +18,7 @@
 package org.voltdb.expressions;
 
 import org.apache.commons.lang3.builder.HashCodeBuilder;
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Database;
 import org.voltdb.types.ExpressionType;
 
 public class AggregateExpression extends AbstractExpression {
@@ -61,9 +58,6 @@ public class AggregateExpression extends AbstractExpression {
         return result;
     }
 
-
-    @Override
-    protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {}
 
     @Override
     public void finalizeValueTypes()
