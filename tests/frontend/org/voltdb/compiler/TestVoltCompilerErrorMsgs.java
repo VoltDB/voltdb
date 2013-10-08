@@ -30,9 +30,12 @@ import junit.framework.TestCase;
 
 import org.voltdb.VoltDB.Configuration;
 
-public class VoltCompilerErrorTest extends TestCase {
 
-    public void statementTest(String statement, String feature, boolean expectError) throws Exception {
+public class TestVoltCompilerErrorMsgs extends TestCase {
+
+    private void statementTest(String statement, String feature, boolean expectError, boolean testStmtIsDdl)
+        throws Exception
+    {
         String simpleSchema =
             "create table blah (" +
             "ival bigint default 0 not null, " +
@@ -51,20 +54,17 @@ public class VoltCompilerErrorTest extends TestCase {
         builder.setCompilerDebugPrintStream(capturing);
 
         builder.addLiteralSchema(simpleSchema);
-        builder.addStmtProcedure(feature, statement);
+
+        if (testStmtIsDdl) {
+            builder.addLiteralSchema(statement);
+        } else {
+            builder.addStmtProcedure(feature, statement);
+        }
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("errors.jar"));
         assertEquals(expectError, ! success);
         String captured = capturer.toString("UTF-8");
         String[] lines = captured.split("\n");
         assertEquals(expectError, foundLineMatching(lines, ".*[Ee]rror.*" + feature + ".*"));
-    }
-
-    public void statementErrorTest(String feature, String statement) throws Exception {
-        statementTest(statement, feature, true);
-    }
-
-    public void statementNonErrorTest(String feature, String statement) throws Exception {
-        statementTest(statement, feature, false);
     }
 
     private boolean foundLineMatching(String[] lines, String pattern) {
@@ -74,5 +74,38 @@ public class VoltCompilerErrorTest extends TestCase {
             }
         }
         return false;
+    }
+
+    void statementErrorTest(String feature, String statement) throws Exception {
+        statementTest(statement, feature, true, true);
+    }
+
+    void statementNonErrorTest(String feature, String statement) throws Exception {
+        statementTest(statement, feature, false, false);
+    }
+
+    void ddlErrorTest(String feature, String statement) throws Exception {
+        statementTest(statement, feature, true, true);
+    }
+
+    void ddlNonErrorTest(String feature, String statement) throws Exception {
+        statementTest(statement, feature, false, true);
+    }
+
+    public void testNoErrorOnParens() throws Exception {
+        statementNonErrorTest("PARENS", "(select ival from blah);");
+    }
+
+    public void testErrorOnVarchar0() throws Exception {
+        ddlErrorTest("out of range", "create table hassize0vc (vc varchar(0));");
+    }
+
+    public void testErrorOnVarbinary0() throws Exception {
+        ddlErrorTest("out of range", "create table hassize0vb (vb varbinary(0));");
+    }
+
+    public void testErrorOnSizedInteger() throws Exception {
+        // We do not support sized integers.
+        ddlErrorTest("unexpected token", "create table hassizedint (i integer(5));");
     }
 }
