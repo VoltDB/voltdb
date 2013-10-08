@@ -23,6 +23,9 @@
 
 package org.voltdb.planner;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
@@ -41,6 +44,8 @@ public class TestReverseIndexScan extends PlannerTestCase {
     protected void tearDown() throws Exception {
         super.tearDown();
     }
+
+    List <AbstractPlanNode> pns = new ArrayList<AbstractPlanNode>();
 
     public void test001()
     {
@@ -191,5 +196,30 @@ public class TestReverseIndexScan extends PlannerTestCase {
         assertEquals(SortDirectionType.DESC, ispn.getSortDirection());
     }
 
+    public void testENG5297()
+    {
+        String sql = "SELECT * FROM data_reports " +
+                "WHERE appID = 1486287933647372287 AND reportID = 1526804868369481731 " +
+                "AND metricID = 1486287935375409155 AND field = 'accountID' " +
+                "AND time >= '2013-09-29 00:00:00' AND time <= '2013-10-07 00:00:00' " +
+                "ORDER BY time DESC LIMIT 150";
+
+        AbstractPlanNode pn = compile(sql);
+        pn = pn.getChild(0);
+        System.out.println(pn.toExplainPlanString());
+
+
+        assertTrue(pn instanceof IndexScanPlanNode);
+        IndexScanPlanNode ispn = (IndexScanPlanNode)pn;
+        assertTrue(ispn.getTargetIndexName().contains("SYS_IDX_IDX_REPORTDATA_PK"));
+        assertEquals(IndexLookupType.LTE, ispn.getLookupType());
+        assertEquals(3, ispn.getSearchKeyExpressions().size());
+        assertEquals(3, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
+        assertEquals(3, ExpressionUtil.uncombine(ispn.getPredicate()).size());
+        assertEquals(3, ExpressionUtil.uncombine(ispn.getInitialExpression()).size());
+        assertEquals(SortDirectionType.DESC, ispn.getSortDirection());
+
+
+    }
 
 }
