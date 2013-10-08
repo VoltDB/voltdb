@@ -634,9 +634,6 @@ public class DDLCompiler {
             Class<?> scriptClass = null;
 
             if (language == Language.GROOVY) {
-                if (!JvmProbe.mayLoadGroovy()) {
-                    throw m_compiler.new VoltCompilerException("Groovy Procedures require Java version 7 or newer");
-                }
                 try {
                     scriptClass = GroovyCodeBlockCompiler.instance().parseCodeBlock(codeBlock, className);
                 } catch (CodeBlockCompilerException ex) {

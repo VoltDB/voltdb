@@ -26,7 +26,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.compiler.JvmProbe;
 import org.voltdb.compiler.Language;
 import org.voltdb.groovy.GroovyScriptProcedureDelegate;
 import org.voltdb.utils.LogKeys;
@@ -101,9 +100,6 @@ public class LoadedProcedureSet {
                 final String className = proc.getClassname();
 
                 final Language lang = Language.valueOf(proc.getLanguage());
-                if (!JvmProbe.mayLoad(lang)) {
-                    VoltDB.crashLocalVoltDB("VoltDB " + lang + " procedures require Java version 7 or higher", false, null);
-                }
 
                 Class<?> procClass = null;
                 try {

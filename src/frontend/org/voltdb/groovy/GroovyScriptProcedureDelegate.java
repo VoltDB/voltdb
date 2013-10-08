@@ -30,7 +30,6 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.compiler.JvmProbe;
 
 import com.google.common.collect.ImmutableMap;
 
@@ -44,10 +43,6 @@ public class GroovyScriptProcedureDelegate extends VoltProcedure implements Groo
 
     public GroovyScriptProcedureDelegate(Class<?> scriptClass)  {
         String shortName = scriptClass.getSimpleName();
-
-        if (!JvmProbe.mayLoadGroovy()) {
-            throw new UnsupportedOperationException("Groovy procedures are supported on Java version 7 or higher");
-        }
 
         // all groovy scripts have an implicit run method defined
         Method run;
