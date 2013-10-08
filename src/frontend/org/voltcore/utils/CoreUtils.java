@@ -427,17 +427,31 @@ public class CoreUtils {
             if (!first) sb.append(", ");
             first = false;
             sb.append(CoreUtils.hsIdToString(entry.getKey()));
-            sb.append(entry.getValue());
+            sb.append("->").append(entry.getValue());
         }
         sb.append('}');
         return sb.toString();
     }
 
-    public static String hsIdEntriesToString(Collection<Map.Entry<Long, Long>> entries) {
+    public static String hsIdValueMapToString(Map<?, Long> m) {
         StringBuilder sb = new StringBuilder();
         sb.append('{');
         boolean first = true;
-        for (Map.Entry<Long, Long> entry : entries) {
+        for (Map.Entry<?, Long> entry : m.entrySet()) {
+            if (!first) sb.append(", ");
+            first = false;
+            sb.append(entry.getKey()).append("->");
+            sb.append(CoreUtils.hsIdToString(entry.getValue()));
+        }
+        sb.append('}');
+        return sb.toString();
+    }
+
+    public static String hsIdMapToString(Map<Long, Long> m) {
+        StringBuilder sb = new StringBuilder();
+        sb.append('{');
+        boolean first = true;
+        for (Map.Entry<Long, Long> entry : m.entrySet()) {
             if (!first) sb.append(", ");
             first = false;
             sb.append(CoreUtils.hsIdToString(entry.getKey())).append(" -> ");
