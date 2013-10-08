@@ -53,7 +53,7 @@ class CSVFileReader implements Runnable {
     static boolean m_errored = false;
     long m_parsingTime = 0;
     private static final Map<VoltType, String> m_blankValues = new EnumMap<VoltType, String>(VoltType.class);
-    private static final VoltLogger m_log = new VoltLogger("CONSOLE");
+    private static final VoltLogger m_log = new VoltLogger("CSVLOADER");
 
     static {
         m_blankValues.put(VoltType.NUMERIC, "0");
