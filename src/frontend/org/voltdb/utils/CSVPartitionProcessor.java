@@ -55,7 +55,7 @@ class CSVPartitionProcessor implements Runnable {
     final AtomicLong m_partitionProcessedCount = new AtomicLong(0);
     //Incremented after insert is acknowledged by server.
     static AtomicLong m_partitionAcknowledgedCount = new AtomicLong(0);
-    protected static final VoltLogger m_log = new VoltLogger("CONSOLE");
+    protected static final VoltLogger m_log = new VoltLogger("CSVLOADER");
     static CountDownLatch m_processor_cdl;
     boolean m_errored = false;
     static int m_reportEveryNRows = 10000;

@@ -72,7 +72,7 @@ public class CSVLoader {
      * log file name
      */
     static String pathLogfile = "csvloaderLog.log";
-    private static final VoltLogger m_log = new VoltLogger("CONSOLE");
+    private static final VoltLogger m_log = new VoltLogger("CSVLOADER");
     private static CSVConfig config = null;
     private static long latency = 0;
     private static long start = 0;
