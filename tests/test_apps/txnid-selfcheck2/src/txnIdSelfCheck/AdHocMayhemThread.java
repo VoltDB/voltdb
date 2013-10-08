@@ -56,7 +56,7 @@ public class AdHocMayhemThread extends Thread {
 
     private String nextAdHoc() {
 
-        // 1/5 of all adhocs are MP
+        // mpRatio % of all adhocs are MP
         boolean replicated = (counter % 100) < (this.mpRatio * 100.);
         boolean batched = (counter % 11) == 0;
 
