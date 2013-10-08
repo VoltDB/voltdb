@@ -26,12 +26,14 @@ package org.voltdb.regressionsuites;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
@@ -420,7 +422,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         }
     }
 
-    private void verifyMVTestR3 (Client client, Object[][] expected13,
+    private void verifyMVTestR3(Client client, Object[][] expected13,
             Object[][] expected24, String orderbyStmt) {
         String mvTable = "V_R3";
 
@@ -530,67 +532,95 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
 
     public void testMaterializedViewMinMax() throws IOException, ProcCallException, Exception {
         System.out.println("Test Min and Max...");
-        if (isHSQL()) {
-            return;
-        }
         Client client = getClient();
-        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSSSS");
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+        final long expectedMinMostTM = dateFormat.parse("2010-06-11 02:00:00.123").getTime()*1000;
+        final long expectedMinTM = dateFormat.parse("2011-06-11 02:00:00.123").getTime()*1000;
+        final long expectedMedTM = dateFormat.parse("2012-06-11 02:00:00.123").getTime()*1000;
+        final long expectedMaxTM = dateFormat.parse("2013-06-11 02:00:00.123").getTime()*1000;
+        long[][] expected;
+        //                               id, wage, dept, tm
+        client.callProcedure("R2.insert", 0, 10,  0, "2013-06-11 02:00:00.123000");
+        client.callProcedure("R2.insert", 1, 10,  1, "2013-06-11 02:00:00.123000");
+        client.callProcedure("R2.insert", 2, 20, -1, "2012-06-11 02:00:00.123000");
+        client.callProcedure("R2.insert", 3, 30,  1, "2011-06-11 02:00:00.123000");
+        client.callProcedure("R2.insert", 4, 20, -1, "2012-06-11 02:00:00.123000");
+        client.callProcedure("R2.insert", 5, 10,  1, "2013-06-11 02:00:00.123000");
 
-        client.callProcedure("R2.insert", 1, 10, 1 , "2013-06-11 02:00:00.123456");
-        client.callProcedure("R2.insert", 2, 20, -1 , "2012-06-11 02:00:00.123456");
-        client.callProcedure("R2.insert", 3, 30, 1 , "2011-06-11 02:00:00.123456");
-        client.callProcedure("R2.insert", 4, 20, -1 , "2012-06-11 02:00:00.123456");
-        client.callProcedure("R2.insert", 5, 10, 1 , "2013-06-11 02:00:00.123456");
+        client.callProcedure("R2.insert", 7, 70,  2, "2011-06-11 02:00:00.123000");
 
-        VoltTable table;
-        table = client.callProcedure("@AdHoc", "SELECT * FROM V_R2_MIN_MAX").getResults()[0];
-        assertEquals(1, table.getRowCount());
-        System.out.println(table.toString());
-        table.advanceRow();
-        assertEquals(1, table.getLong(0));
-        assertEquals(5, table.getLong(1));
-        assertEquals(60, table.getLong(2));
-        long expectedTM = dateFormat.parse("2011-06-11 02:00:00.123456").getTime();
-        long realTM = dateFormat.parse(table.getTimestampAsTimestamp(3).toString()).getTime();
-        assertEquals(expectedTM, realTM);
+        // ABS(DEPT), COUNT (*), MAX(WAGE * 2), MIN(TM)
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,5,60,expectedMinTM},
+                                 {2,1,140,expectedMinTM}};
+        verifyMVTestR2MinMax(client, expected);
 
+        // Drop the min tm and max wage value for group 1
         client.callProcedure("R2.delete", 3);
 
-        table = client.callProcedure("@AdHoc", "SELECT * FROM V_R2_MIN_MAX").getResults()[0];
-        assertEquals(1, table.getRowCount());
-        System.out.println(table.toString());
-        table.advanceRow();
-        assertEquals(1, table.getLong(0));
-        assertEquals(4, table.getLong(1));
-        assertEquals(40, table.getLong(2));
-        expectedTM = dateFormat.parse("2012-06-11 02:00:00.123456").getTime();
-        realTM = dateFormat.parse(table.getTimestampAsTimestamp(3).toString()).getTime();
-        assertEquals(expectedTM, realTM);
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,4,40,expectedMedTM},
+                                 {2,1,140,expectedMinTM}};
+        verifyMVTestR2MinMax(client, expected);
 
+        // Drop 1 of 2 min tm and max wage values for group 1 -- expect no change except to the count
         client.callProcedure("R2.delete", 2);
 
-        table = client.callProcedure("@AdHoc", "SELECT * FROM V_R2_MIN_MAX").getResults()[0];
-        assertEquals(1, table.getRowCount());
-        System.out.println(table.toString());
-        table.advanceRow();
-        assertEquals(1, table.getLong(0));
-        assertEquals(3, table.getLong(1));
-        assertEquals(40, table.getLong(2));
-        expectedTM = dateFormat.parse("2012-06-11 02:00:00.123456").getTime();
-        assertEquals(expectedTM, realTM);
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,3,40,expectedMedTM},
+                                 {2,1,140,expectedMinTM}};
 
-        client.callProcedure("R2.insert", 6, 30, 1 , "2011-06-11 02:00:00.123456");
+        // Re-establish a min tm and max wage value for group 1
+        client.callProcedure("R2.insert", 6, 30, 1, "2011-06-11 02:00:00.123000");
 
-        table = client.callProcedure("@AdHoc", "SELECT * FROM V_R2_MIN_MAX").getResults()[0];
-        assertEquals(1, table.getRowCount());
-        System.out.println(table.toString());
-        table.advanceRow();
-        assertEquals(1, table.getLong(0));
-        assertEquals(4, table.getLong(1));
-        assertEquals(60, table.getLong(2));
-        expectedTM = dateFormat.parse("2011-06-11 02:00:00.123456").getTime();
-        realTM = dateFormat.parse(table.getTimestampAsTimestamp(3).toString()).getTime();
-        assertEquals(expectedTM, realTM);
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,4,60,expectedMinTM},
+                                 {2,1,140,expectedMinTM}};
+        verifyMVTestR2MinMax(client, expected);
+
+        // Re-establish a min tm and max wage value for group 2 via update of the sole base
+        client.callProcedure("R2.update", 7, 77, 2, "2013-06-11 02:00:00.123000", 7);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,4,60,expectedMinTM},
+                                 {2,1,154,expectedMaxTM}};
+        verifyMVTestR2MinMax(client, expected);
+
+        // Re-establish a min tm and max wage value for group 1 via update of the current extreme value
+        client.callProcedure("R2.update", 6, 40, 1, "2010-06-11 02:00:00.123000", 6);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,4,80,expectedMinMostTM},
+                                 {2,1,154,expectedMaxTM}};
+        verifyMVTestR2MinMax(client, expected);
+
+        // Re-establish a min tm and max wage value for groups 1 and 2 via switch of a grouped key
+        client.callProcedure("R2.update", 6, 80, 2, "2010-06-11 02:00:00.123000", 6);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,3,40,expectedMedTM},
+                                 {2,2,160,expectedMinMostTM}};
+        verifyMVTestR2MinMax(client, expected);
+
+        // Demonstrate that null values do not alter mins or maxs.
+        if ( ! isHSQL()) { // hsql backend does not know to filter VoltDB nulls? should it?
+           client.callProcedure("R2.insert", 10, null, 0, null);
+           client.callProcedure("R2.insert", 11, null, 1, null);
+           client.callProcedure("R2.insert", 12, null, 2, null);
+           expected = new long[][] {{0,2,20,expectedMaxTM},
+                                    {1,4,40,expectedMedTM},
+                                    {2,3,160,expectedMinMostTM}};
+           verifyMVTestR2MinMax(client, expected);
+        }
+
+}
+
+    private void verifyMVTestR2MinMax(Client client, long[][] expected)
+        throws IOException, NoConnectionsException, ProcCallException, ParseException
+    {
+        VoltTable table = client.callProcedure("@AdHoc", "SELECT * FROM V_R2_MIN_MAX ORDER BY DEPT").getResults()[0];
+        System.out.println(table);
+        validateTableOfLongs(table, expected);
     }
 
     private void mvUpdateR4() throws IOException, ProcCallException {
@@ -629,9 +659,18 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         assertEquals(1, result.getResults()[0].asScalarLong());
         compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, -2, 2, 51}, {1, 2, 3, 104}}, orderbyStmt);
 
+        // Test ENG-5291 -- that inserting nulls effects only count(*)s but not aggregation columns.
+        client.callProcedure("R4.insert", 6, null, 1, null, null);
+        assertEquals(ClientResponse.SUCCESS, result.getStatus());
+        assertEquals(1, result.getResults()[0].asScalarLong());
+        client.callProcedure("R4.insert", 7, null, 1, null, null);
+        assertEquals(ClientResponse.SUCCESS, result.getStatus());
+        assertEquals(1, result.getResults()[0].asScalarLong());
+        compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, -2, 2, 51}, {1, 2, 5, 104}}, orderbyStmt);
+
         result = client.callProcedure("@AdHoc","Delete from R4");
         assertEquals(ClientResponse.SUCCESS, result.getStatus());
-        assertEquals(5, result.getResults()[0].asScalarLong());
+        assertEquals(7, result.getResults()[0].asScalarLong());
         compareMVcontentsOfLongs(client, mvTable, null, orderbyStmt);
     }
 
