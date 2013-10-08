@@ -353,4 +353,160 @@ public class TestDDLCompiler extends TestCase {
         assertTrue(checkImportValidity("org.**.RealVoltDB"));
         assertTrue(checkImportValidity("org.vol*db.RealVoltDB"));
     }
+
+    public void testIndexedMinMaxViews() {
+        File jarOut = new File("indexedMinMaxViews.jar");
+        jarOut.deleteOnExit();
+
+        // no indexes (should produce warnings)
+        String schema1 =
+                "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+                "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
+                "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
+                "FROM T " +
+                "GROUP BY D1, D2, D3;\n" +
+                "CREATE VIEW VT2 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
+                "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
+                "FROM T " +
+                "GROUP BY D1 + D2, ABS(D3);";
+
+        // schema with indexes (should have no warnings)
+        String schema2 =
+               "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+               "CREATE INDEX T_TREE_1 ON T(D1);\n" +
+               "CREATE INDEX T_TREE_2 ON T(D1, D2);\n" +
+               "CREATE INDEX T_TREE_3 ON T(D1 + D2, ABS(D3));\n" +
+               "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
+               "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
+               "FROM T " +
+               "GROUP BY D1, D2, D3;\n" +
+               "CREATE VIEW VT2 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
+               "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
+               "FROM T " +
+               "GROUP BY D1 + D2, ABS(D3);";
+
+        // schema with no indexes and mat view with no min / max
+        String schema3 =
+               "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+               "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT) " +
+               "AS SELECT D1, D2, D3, COUNT(*) " +
+               "FROM T " +
+               "GROUP BY D1, D2, D3;\n" +
+               "CREATE VIEW VT2 (V_D1_D2, V_D3, CNT) " +
+               "AS SELECT D1 + D2, ABS(D3), COUNT(*) " +
+               "FROM T " +
+               "GROUP BY D1 + D2, ABS(D3);";
+
+        // schema with index but can not be used for mat view with min / max
+        String schema4 =
+                "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+                "CREATE INDEX T_TREE_1 ON T(D1, D2 + D3);\n" +
+                "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
+                "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
+                "FROM T " +
+                "GROUP BY D1, D2, D3;" ;
+
+        // boilerplate for making a project
+        final String simpleProject =
+                "<?xml version=\"1.0\"?>\n" +
+                "<project><database><schemas>" +
+                "<schema path='%s' />" +
+                "</schemas></database></project>";
+
+        // RUN EXPECTING WARNINGS
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema1);
+        String schemaPath = schemaFile.getPath();
+
+        File projectFile = VoltProjectBuilder.writeStringToTempFile(
+                String.format(simpleProject, schemaPath));
+        String projectPath = projectFile.getPath();
+
+        // compile successfully (but with two warnings hopefully)
+        VoltCompiler compiler = new VoltCompiler();
+        boolean success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
+        assertTrue(success);
+
+        // verify the warnings exist
+        int foundWarnings = 0;
+        for (VoltCompiler.Feedback f : compiler.m_warnings) {
+            if (f.message.toLowerCase().contains("min")) {
+                System.out.println(f.message);
+                foundWarnings++;
+            }
+        }
+        assertEquals(2, foundWarnings);
+
+        // cleanup after the test
+        jarOut.delete();
+
+        // RUN EXPECTING NO WARNINGS
+        schemaFile = VoltProjectBuilder.writeStringToTempFile(schema2);
+        schemaPath = schemaFile.getPath();
+
+        projectFile = VoltProjectBuilder.writeStringToTempFile(
+                String.format(simpleProject, schemaPath));
+        projectPath = projectFile.getPath();
+
+        // don't reinitialize the compiler to test that it can be re-called
+        //compiler = new VoltCompiler();
+
+        // compile successfully with no warnings
+        success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
+        assertTrue(success);
+
+        // verify no warnings
+        assertEquals(0, compiler.m_warnings.size());
+
+        // cleanup after the test
+        jarOut.delete();
+
+        // RUN EXPECTING NO WARNINGS
+        schemaFile = VoltProjectBuilder.writeStringToTempFile(schema3);
+        schemaPath = schemaFile.getPath();
+
+        projectFile = VoltProjectBuilder.writeStringToTempFile(
+                String.format(simpleProject, schemaPath));
+        projectPath = projectFile.getPath();
+
+        // don't reinitialize the compiler to test that it can be re-called
+        //compiler = new VoltCompiler();
+
+        // compile successfully with no warnings
+        success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
+        assertTrue(success);
+
+        // verify no warnings
+        assertEquals(0, compiler.m_warnings.size());
+
+        // cleanup after the test
+        jarOut.delete();
+
+        // RUN EXPECTING WARNINGS
+        schemaFile = VoltProjectBuilder.writeStringToTempFile(schema4);
+        schemaPath = schemaFile.getPath();
+
+        projectFile = VoltProjectBuilder.writeStringToTempFile(
+                String.format(simpleProject, schemaPath));
+        projectPath = projectFile.getPath();
+
+        // don't reinitialize the compiler to test that it can be re-called
+        //compiler = new VoltCompiler();
+
+        // compile successfully with no warnings
+        success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
+        assertTrue(success);
+
+        // verify the warnings exist
+        foundWarnings = 0;
+        for (VoltCompiler.Feedback f : compiler.m_warnings) {
+            if (f.message.toLowerCase().contains("min")) {
+                System.out.println(f.message);
+                foundWarnings++;
+            }
+        }
+        assertEquals(1, foundWarnings);
+
+        // cleanup after the test
+        jarOut.delete();
+    }
 }

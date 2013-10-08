@@ -288,7 +288,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
                 newPredicate.setLeft(aggExpr);
                 newPredicate.setValueType(aggExpr.getValueType());
                 ispn.clearSearchKeyExpression();
-                aggplan.setPredicate(newPredicate);
+                aggplan.setPrePredicate(newPredicate);
             }
 
             return plan;
