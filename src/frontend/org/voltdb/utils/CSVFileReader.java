@@ -84,10 +84,10 @@ class CSVFileReader implements Runnable {
             }
         }
         if (sleptTimes >= 120 && CSVPartitionProcessor.m_isMP) {
-            m_log.debug("Failed to detect partition information, "
-                    + "client affinity will not be used and CSV loading could be slow.");
+            m_log.info("Unable to retrieve partition information from cluster. "
+                    + "Falling back to single row insertions; CSV loading performance will be degraded.");
         }
-        m_log.info("Client Initialization Done.");
+        m_log.debug("Client Initialization Done.");
 
         while ((m_config.limitrows-- > 0)) {
             if (m_errored) {
@@ -140,6 +140,8 @@ class CSVFileReader implements Runnable {
                 BlockingQueue<CSVLineWithMetaData> q = m_processorQueues.get(partitionId);
                 if (q == null) {
                     //We have not known about this partition do something.
+                    // We could always bail out to the single row insert and trust the cluster
+                    // to get this row to the right place.
                     m_log.warn("Unknown or New partition detected possibly because of change in topology.");
                     String[] info = {lineList.toString(), "Topology changed."};
                     if (synchronizeErrorInfo(m_totalLineCount.get() + 1, info)) {
@@ -149,7 +151,7 @@ class CSVFileReader implements Runnable {
                     continue;
                 }
                 if (!q.offer(lineData)) {
-                    m_log.info("Failed to insert linedata in processor, waiting and doing put.");
+                    m_log.debug("Failed to insert linedata in processor, waiting and doing put.");
                     q.put(lineData);
                 }
             } catch (SuperCsvException e) {
@@ -171,7 +173,7 @@ class CSVFileReader implements Runnable {
 
         //Did we hit the maxerror ceiling?
         if (m_errorInfo.size() >= m_config.maxerrors) {
-            m_log.info("The number of Failure row data exceeds "
+            m_log.warn("The number of failed rows exceeds the configured maximum failed rows: "
                     + m_config.maxerrors);
         }
 
@@ -179,7 +181,7 @@ class CSVFileReader implements Runnable {
         try {
             m_listReader.close();
         } catch (Exception ex) {
-            m_log.error("Error cloging Reader: " + ex);
+            m_log.error("Error closing reader: " + ex);
         } finally {
             for (BlockingQueue<CSVLineWithMetaData> q : m_processorQueues.values()) {
                 try {
@@ -188,15 +190,15 @@ class CSVFileReader implements Runnable {
                     m_log.error("Failed to add endOfData for Partition Processor. " + ex);
                 }
             }
-            m_log.info("Rows Queued by Reader: " + m_totalRowCount.get());
+            m_log.debug("Rows Queued by Reader: " + m_totalRowCount.get());
         }
 
         //Now wait for processors to see endOfData and count down. After that drain to finish all callbacks
         try {
-            m_log.info("Waiting for partition processors to finish.");
+            m_log.debug("Waiting for partition processors to finish.");
             CSVPartitionProcessor.m_processor_cdl.await();
             m_csvClient.drain();
-            m_log.info("Partition Processors Done.");
+            m_log.debug("Partition Processors Done.");
         } catch (InterruptedException ex) {
             m_log.warn("Stopped processing because of connection error. "
                     + "A report will be generated with what we processed so far. Error: " + ex);
