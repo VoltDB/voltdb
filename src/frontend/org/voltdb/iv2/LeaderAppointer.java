@@ -376,7 +376,7 @@ public class LeaderAppointer implements Promotable
             // call our callback, get the current full set of replicas, and
             // appoint a new leader if the seeded one has actually failed
             Map<Integer, Long> masters = m_iv2masters.pointInTimeCache();
-            tmLog.info("LeaderAppointer repairing with master set: " + masters);
+            tmLog.info("LeaderAppointer repairing with master set: " + CoreUtils.hsIdValueMapToString(masters));
             for (Entry<Integer, Long> master : masters.entrySet()) {
                 int partId = master.getKey();
                 String dir = LeaderElector.electionDirForPartition(partId);

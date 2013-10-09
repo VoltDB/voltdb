@@ -773,8 +773,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // Start elastic join service
             try {
-                String clSnapshotPath = m_catalogContext.cluster.getLogconfig().get("log")
-                                                        .getInternalsnapshotpath();
+                String clSnapshotPath = null;
+                if (m_catalogContext.cluster.getLogconfig().get("log").getEnabled()) {
+                    clSnapshotPath = m_catalogContext.cluster.getLogconfig().get("log").getInternalsnapshotpath();
+                }
 
                 Class<?> elasticServiceClass =
                     MiscUtils.loadProClass("org.voltdb.join.ElasticJoinCoordinator", "Elastic", false);
