@@ -111,7 +111,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         while (result.advanceRow()) {
             String procName = result.getString(columnName);
             if (procName.equalsIgnoreCase(rowId)) {
-                Long thisSiteId = result.getLong("SITE_ID");
+                long hostId = result.getLong("HOST_ID");
+                long thisSiteId = result.getLong("SITE_ID");
+                thisSiteId |= hostId << 32;
                 if (enforceUnique) {
                     assertFalse("SITE_ID: " + thisSiteId + " seen twice in table looking for " + rowId +
                             " in column " + columnName, sitesSeen.contains(thisSiteId));
@@ -132,7 +134,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         while (result.advanceRow()) {
             String procName = result.getString(columnName);
             if (procName.equalsIgnoreCase(rowId)) {
-                Long thisPartId = result.getLong("PARTITION_ID");
+                long thisPartId = result.getLong("PARTITION_ID");
                 if (enforceUnique) {
                     assertFalse("PARTITION_ID: " + thisPartId + " seen twice in table looking for " + rowId +
                             " in column " + columnName, partsSeen.contains(thisPartId));

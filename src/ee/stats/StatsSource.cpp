@@ -126,7 +126,7 @@ TableTuple* StatsSource::getStatsTuple(bool interval, int64_t now) {
     m_statsTuple.setNValue(0, ValueFactory::getBigIntValue(now));
     m_statsTuple.setNValue(1, ValueFactory::getIntegerValue(static_cast<int32_t>(m_hostId)));
     m_statsTuple.setNValue(2, m_hostname);
-    m_statsTuple.setNValue(3, ValueFactory::getIntegerValue(static_cast<int32_t>(m_siteId)));
+    m_statsTuple.setNValue(3, ValueFactory::getIntegerValue(static_cast<int32_t>(m_siteId >> 32)));
     m_statsTuple.setNValue(4, ValueFactory::getBigIntValue(m_partitionId));
     updateStatsTuple(&m_statsTuple);
 
