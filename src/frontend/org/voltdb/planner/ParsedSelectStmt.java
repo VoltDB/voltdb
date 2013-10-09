@@ -248,8 +248,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (complexGroupbyJson.length() > 0) {
             List<AbstractExpression> mvComplexGroupbyCols = null;
             try {
-                mvComplexGroupbyCols =
-                        AbstractExpression.fromJSONArrayString(complexGroupbyJson, db);
+                mvComplexGroupbyCols = AbstractExpression.fromJSONArrayString(complexGroupbyJson);
             } catch (JSONException e) {
                 e.printStackTrace();
             }

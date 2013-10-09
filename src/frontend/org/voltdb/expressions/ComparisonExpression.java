@@ -20,10 +20,7 @@ package org.voltdb.expressions;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Database;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -47,9 +44,6 @@ public class ComparisonExpression extends AbstractExpression {
         //
         super();
     }
-
-    @Override
-    protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {}
 
     @Override
     public boolean needsRightExpression() {
