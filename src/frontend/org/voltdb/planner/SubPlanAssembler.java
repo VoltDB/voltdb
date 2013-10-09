@@ -505,7 +505,7 @@ public abstract class SubPlanAssembler {
             }
         }
         else {
-            AbstractExpression endComparator = endingBoundExpr.getFilter();
+            AbstractExpression upperBoundComparator = endingBoundExpr.getFilter();
             retval.use = IndexUseType.INDEX_SCAN;
             retval.bindings.addAll(endingBoundExpr.getBindings());
 
@@ -513,17 +513,16 @@ public abstract class SubPlanAssembler {
             // do not do the reverse scan optimization
             if (retval.sortDirection != SortDirectionType.DESC &&
                 (startingBoundExpr != null || retval.sortDirection == SortDirectionType.ASC)) {
-                retval.endExprs.add(endComparator);
+                retval.endExprs.add(upperBoundComparator);
                 if (retval.lookupType == IndexLookupType.EQ) {
                     retval.lookupType = IndexLookupType.GTE;
                 }
             } else {
-                // only do reverse scan optimization when no startingBoundExpr and lookup type is
-                // either < or <=, so do not optimize BETWEEN.
-                if (endComparator.getExpressionType() == ExpressionType.COMPARE_LESSTHAN) {
+                // only do reverse scan optimization when no startingBoundExpr and lookup type is either < or <=.
+                if (upperBoundComparator.getExpressionType() == ExpressionType.COMPARE_LESSTHAN) {
                     retval.lookupType = IndexLookupType.LT;
                 } else {
-                    assert endComparator.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO;
+                    assert upperBoundComparator.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO;
                     retval.lookupType = IndexLookupType.LTE;
                 }
                 // optimizable
@@ -533,10 +532,9 @@ public abstract class SubPlanAssembler {
                 }
 
                 // add to indexExprs because it will be used as part of searchKey
-                retval.indexExprs.add(endComparator);
+                retval.indexExprs.add(upperBoundComparator);
                 // put it to post-filter as well
-                // TODO(xin): Why ???
-                retval.otherExprs.add(endComparator);
+
                 // Unlike a lower bound, an upper bound does not automatically filter out nulls
                 // as required by the comparison filter, so construct a NOT NULL comparator and
                 // add to post-filter
@@ -545,7 +543,7 @@ public abstract class SubPlanAssembler {
                 if (startingBoundExpr == null) {
                     AbstractExpression newComparator = new OperatorExpression(ExpressionType.OPERATOR_NOT,
                             new OperatorExpression(ExpressionType.OPERATOR_IS_NULL), null);
-                    newComparator.getLeft().setLeft(endComparator.getLeft());
+                    newComparator.getLeft().setLeft(upperBoundComparator.getLeft());
                     newComparator.finalizeValueTypes();
                     retval.otherExprs.add(newComparator);
                 } else {

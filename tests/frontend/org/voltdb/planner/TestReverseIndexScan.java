@@ -60,7 +60,7 @@ public class TestReverseIndexScan extends PlannerTestCase {
         assertEquals(IndexLookupType.LT, ispn.getLookupType());
         assertEquals(2, ispn.getSearchKeyExpressions().size());
         assertEquals(1, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
-        assertEquals(2, ExpressionUtil.uncombine(ispn.getPredicate()).size());
+        assertEquals(1, ExpressionUtil.uncombine(ispn.getPredicate()).size());
         // SortDirection is still INVALID because in EE, we use LookupType to determine
         // index scan direction
         assertEquals(SortDirectionType.INVALID, ispn.getSortDirection());
@@ -79,7 +79,7 @@ public class TestReverseIndexScan extends PlannerTestCase {
         assertEquals(IndexLookupType.LT, ispn.getLookupType());
         assertEquals(3, ispn.getSearchKeyExpressions().size());
         assertEquals(2, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
-        assertEquals(2, ExpressionUtil.uncombine(ispn.getPredicate()).size());
+        assertEquals(1, ExpressionUtil.uncombine(ispn.getPredicate()).size());
         // SortDirection is still INVALID because in EE, we use LookupType to determine
         // index scan direction
         assertEquals(SortDirectionType.INVALID, ispn.getSortDirection());
@@ -116,7 +116,7 @@ public class TestReverseIndexScan extends PlannerTestCase {
         assertEquals(IndexLookupType.LT, ispn.getLookupType());
         assertEquals(3, ispn.getSearchKeyExpressions().size());
         assertEquals(2, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
-        assertEquals(2, ExpressionUtil.uncombine(ispn.getPredicate()).size());
+        assertEquals(1, ExpressionUtil.uncombine(ispn.getPredicate()).size());
         assertEquals(SortDirectionType.DESC, ispn.getSortDirection());
     }
 
@@ -133,7 +133,7 @@ public class TestReverseIndexScan extends PlannerTestCase {
         assertEquals(IndexLookupType.LTE, ispn.getLookupType());
         assertEquals(2, ispn.getSearchKeyExpressions().size());
         assertEquals(1, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
-        assertEquals(2, ExpressionUtil.uncombine(ispn.getPredicate()).size());
+        assertEquals(1, ExpressionUtil.uncombine(ispn.getPredicate()).size());
         assertEquals(2, ExpressionUtil.uncombine(ispn.getInitialExpression()).size());
         // SortDirection is still INVALID because in EE, we use LookupType to determine
         // index scan direction
@@ -153,7 +153,7 @@ public class TestReverseIndexScan extends PlannerTestCase {
         assertEquals(IndexLookupType.LTE, ispn.getLookupType());
         assertEquals(3, ispn.getSearchKeyExpressions().size());
         assertEquals(2, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
-        assertEquals(2, ExpressionUtil.uncombine(ispn.getPredicate()).size());
+        assertEquals(1, ExpressionUtil.uncombine(ispn.getPredicate()).size());
         assertEquals(3, ExpressionUtil.uncombine(ispn.getInitialExpression()).size());
         // SortDirection is still INVALID because in EE, we use LookupType to determine
         // index scan direction
@@ -191,7 +191,7 @@ public class TestReverseIndexScan extends PlannerTestCase {
         assertEquals(IndexLookupType.LTE, ispn.getLookupType());
         assertEquals(3, ispn.getSearchKeyExpressions().size());
         assertEquals(2, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
-        assertEquals(2, ExpressionUtil.uncombine(ispn.getPredicate()).size());
+        assertEquals(1, ExpressionUtil.uncombine(ispn.getPredicate()).size());
         assertEquals(3, ExpressionUtil.uncombine(ispn.getInitialExpression()).size());
         assertEquals(SortDirectionType.DESC, ispn.getSortDirection());
     }
@@ -208,18 +208,15 @@ public class TestReverseIndexScan extends PlannerTestCase {
         pn = pn.getChild(0);
         System.out.println(pn.toExplainPlanString());
 
-
         assertTrue(pn instanceof IndexScanPlanNode);
         IndexScanPlanNode ispn = (IndexScanPlanNode)pn;
         assertTrue(ispn.getTargetIndexName().contains("SYS_IDX_IDX_REPORTDATA_PK"));
         assertEquals(IndexLookupType.LTE, ispn.getLookupType());
         assertEquals(3, ispn.getSearchKeyExpressions().size());
         assertEquals(3, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
-        assertEquals(3, ExpressionUtil.uncombine(ispn.getPredicate()).size());
+        assertEquals(2, ExpressionUtil.uncombine(ispn.getPredicate()).size());
         assertEquals(3, ExpressionUtil.uncombine(ispn.getInitialExpression()).size());
         assertEquals(SortDirectionType.DESC, ispn.getSortDirection());
-
-
     }
 
 }
