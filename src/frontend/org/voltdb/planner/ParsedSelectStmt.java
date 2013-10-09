@@ -163,25 +163,17 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     @Override
     void parse(VoltXMLElement stmtNode) {
         String node;
-
-        if ((node = stmtNode.attributes.get("limit")) != null)
-            limit = Long.parseLong(node);
-        if ((node = stmtNode.attributes.get("offset")) != null)
-            offset = Long.parseLong(node);
-        if ((node = stmtNode.attributes.get("limit_paramid")) != null)
-            limitParameterId = Long.parseLong(node);
-        if ((node = stmtNode.attributes.get("offset_paramid")) != null)
-            offsetParameterId = Long.parseLong(node);
         if ((node = stmtNode.attributes.get("distinct")) != null)
             distinct = Boolean.parseBoolean(node);
 
-        // limit and offset can't have both value and parameter
-        if (limit != -1) assert limitParameterId == -1 : "Parsed value and param. limit.";
-        if (offset != 0) assert offsetParameterId == -1 : "Parsed value and param. offset.";
-
+        VoltXMLElement limitElement = null, offsetElement = null;
         VoltXMLElement displayElement = null, orderbyElement = null, groupbyElement = null;
         for (VoltXMLElement child : stmtNode.children) {
-            if (child.name.equalsIgnoreCase("columns")) {
+            if (child.name.equalsIgnoreCase("limit")) {
+                limitElement = child;
+            } else if (child.name.equalsIgnoreCase("offset")) {
+                offsetElement = child;
+            } else if (child.name.equalsIgnoreCase("columns")) {
                 displayElement = child;
             } else if (child.name.equalsIgnoreCase("ordercolumns")) {
                 orderbyElement = child;
@@ -189,6 +181,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 groupbyElement = child;
             }
         }
+        parseLimitAndOffset(limitElement, offsetElement);
+
         if (aggregationList == null) {
             aggregationList = new ArrayList<AbstractExpression>();
         }
@@ -254,8 +248,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (complexGroupbyJson.length() > 0) {
             List<AbstractExpression> mvComplexGroupbyCols = null;
             try {
-                mvComplexGroupbyCols =
-                        AbstractExpression.fromJSONArrayString(complexGroupbyJson, db);
+                mvComplexGroupbyCols = AbstractExpression.fromJSONArrayString(complexGroupbyJson);
             } catch (JSONException e) {
                 e.printStackTrace();
             }
@@ -714,6 +707,49 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
         }
         aggregationList.addAll(optimalAvgAggs);
+    }
+
+    private void parseLimitAndOffset(VoltXMLElement limitNode, VoltXMLElement offsetNode) {
+        String node;
+        if (limitNode != null) {
+            // Parse limit
+            if ((node = limitNode.attributes.get("limit_paramid")) != null)
+                limitParameterId = Long.parseLong(node);
+            else {
+                assert(limitNode.children.size() == 1);
+                VoltXMLElement valueNode = limitNode.children.get(0);
+                String isParam = valueNode.attributes.get("isparam");
+                if ((isParam != null) && (isParam.equalsIgnoreCase("true"))) {
+                    limitParameterId = Long.parseLong(valueNode.attributes.get("id"));
+                } else {
+                    node = limitNode.attributes.get("limit");
+                    assert(node != null);
+                    limit = Long.parseLong(node);
+                }
+            }
+        }
+        if (offsetNode != null) {
+            // Parse offset
+            if ((node = offsetNode.attributes.get("offset_paramid")) != null)
+                offsetParameterId = Long.parseLong(node);
+            else {
+                if (offsetNode.children.size() == 1) {
+                    VoltXMLElement valueNode = offsetNode.children.get(0);
+                    String isParam = valueNode.attributes.get("isparam");
+                    if ((isParam != null) && (isParam.equalsIgnoreCase("true"))) {
+                        offsetParameterId = Long.parseLong(valueNode.attributes.get("id"));
+                    } else {
+                        node = offsetNode.attributes.get("offset");
+                        assert(node != null);
+                        offset = Long.parseLong(node);
+                    }
+                }
+            }
+        }
+
+        // limit and offset can't have both value and parameter
+        if (limit != -1) assert limitParameterId == -1 : "Parsed value and param. limit.";
+        if (offset != 0) assert offsetParameterId == -1 : "Parsed value and param. offset.";
     }
 
     private void parseDisplayColumns(VoltXMLElement columnsNode, boolean isDistributed) {

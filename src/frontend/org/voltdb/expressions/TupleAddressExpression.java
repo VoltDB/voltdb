@@ -17,10 +17,7 @@
 
 package org.voltdb.expressions;
 
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Database;
 import org.voltdb.types.ExpressionType;
 
 
@@ -41,11 +38,6 @@ public class TupleAddressExpression extends AbstractValueExpression {
         // being checked within the context of identical expressions.
         // If that ever matters, add some kind of table identifier attribute to this class.
         return (obj instanceof TupleAddressExpression);
-    }
-
-    @Override
-    protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {
-        // No attributes -- nothing to load.
     }
 
     @Override
