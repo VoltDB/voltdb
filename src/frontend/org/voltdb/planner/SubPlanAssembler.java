@@ -533,8 +533,6 @@ public abstract class SubPlanAssembler {
 
                 // add to indexExprs because it will be used as part of searchKey
                 retval.indexExprs.add(upperBoundComparator);
-                // put it to post-filter as well
-                //retval.otherExprs.add(upperBoundComparator);
 
                 // Unlike a lower bound, an upper bound does not automatically filter out nulls
                 // as required by the comparison filter, so construct a NOT NULL comparator and
