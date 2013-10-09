@@ -365,24 +365,12 @@ public class AggregatePlanNode extends AbstractPlanNode {
             }
             else {
                 m_aggregateExpressions.add(
-                        AbstractExpression.fromJSONObject(
-                                tempObj.getJSONObject( Members.AGGREGATE_EXPRESSION.name() ),
-                                db) );
+                    AbstractExpression.fromJSONChild(tempObj, Members.AGGREGATE_EXPRESSION.name()));
             }
         }
-        if ( ! jobj.isNull(Members.GROUPBY_EXPRESSIONS.name()) ) {
-            jarray = jobj.getJSONArray( Members.GROUPBY_EXPRESSIONS.name() );
-            size = jarray.length();
-            for( int i = 0; i < size; i++ ) {
-                m_groupByExpressions.add(
-                        AbstractExpression.fromJSONObject( jarray.getJSONObject(i), db));
-            }
-        }
-        if(!jobj.isNull(Members.PRE_PREDICATE.name())) {
-            m_prePredicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.PRE_PREDICATE.name()), db);
-        }
-        if(!jobj.isNull(Members.POST_PREDICATE.name())) {
-            m_postPredicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.POST_PREDICATE.name()), db);
-        }
+        AbstractExpression.loadFromJSONArrayChild(m_groupByExpressions, jobj,
+                                                  Members.GROUPBY_EXPRESSIONS.name());
+        m_prePredicate = AbstractExpression.fromJSONChild(jobj, Members.PRE_PREDICATE.name());
+        m_postPredicate = AbstractExpression.fromJSONChild(jobj, Members.POST_PREDICATE.name());
     }
 }
