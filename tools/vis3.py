@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # This is a visualizer which pulls TPC-C benchmark results from the MySQL
 # databases and visualizes them. Four graphs will be generated, latency graph on
 # sinigle node and multiple nodes, and throughput graph on single node and
@@ -40,7 +42,7 @@ def get_branches(hostname, port, days):
 
     mydate = datetime.datetime.today()-datetime.timedelta(days=days)
 
-    query = "select branch, count(*) from app_stats where date >= '%s' group by branch order by 2 desc" % \
+    query = "select branch, max(date), count(*) from app_stats where date >= '%s' group by branch order by 3 desc" % \
                     mydate.strftime('%Y-%m-%d 00:00:00')
 
     conn = FastSerializer(hostname, port)
@@ -50,8 +52,9 @@ def get_branches(hostname, port, days):
     conn.close()
 
     branches = []
+    keys=['branch','sampledate','count']
     for row in resp.tables[0].tuples:
-        branches.append(str(row[0]))
+        branches.append(dict(zip(keys,row)))
 
     return branches
 
@@ -242,17 +245,18 @@ def main():
 
     for bg in bc:
         merged = {}
-        missing = ['Cases missing from %s:' % bg[1]]
+        missing = ['Cases missing from %s:' % bg[1]['branch']]
         for group,data in stats.iteritems():
-            if bg[0] == group[0]:
-                k = (bg[1],group[1],group[2])
+            if bg[0]['branch'] == group[0]:
+                k = (bg[1]['branch'],group[1],group[2])
                 if k in stats:
                     m = stats[k]
-                    merged[bg+(group[1],group[2])] = {"y": data[0], "x": stats[k][0]}
+                    merged[(bg[0]['branch'],bg[1]['branch'])+(group[1],group[2])] = {"y": data[0], "x": stats[k][0]}
                 else:
                     missing.append("%s %d %s" % (group[1],group[2],["node","nodes"][group[2]>1]))
 
-        app = "%s vs %s" % (bg)
+        app = "%s vs %s" % (bg[0]['branch'],bg[1]['branch'])
+        title = "%s as of %s vs %s as of %s" % (bg[0]['branch'],bg[0]['sampledate'],bg[1]['branch'],bg[1]['sampledate'])
         app_filename = app.replace(' ', '_')
         """
         latency95_filename = '%s-latency95-%s.png' % (prefix, app_filename)
@@ -273,7 +277,7 @@ def main():
              data, 'lat99')
         """
 
-        plot(app+" throughput", "%s Thpt tx/sec" % bg[1], "%s Thpt tx/sec" % bg[0],
+        plot(title+" throughput", "%s Thpt tx/sec" % bg[1]['branch'], "%s Thpt tx/sec" % bg[0]['branch'],
                     path + "-throughput-" + app_filename + ".png", width, height, merged, missing)
 
     # generate index file
