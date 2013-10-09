@@ -98,9 +98,6 @@ SnapshotCompletionInterest
     // Current state of the restore agent
     private volatile State m_state = State.RESTORE;
 
-    // Transaction ID of the restore sysproc
-    private final static long RESTORE_TXNID = 1l;
-
     // Restore adapter needs a completion functor.
     // Runnable here preferable to exposing all of RestoreAgent to RestoreAdapater.
     private final Runnable m_changeStateFunctor = new Runnable() {
@@ -186,8 +183,13 @@ SnapshotCompletionInterest
                         if (m_action == StartAction.SAFE_RECOVER) {
                             jsObj.put(SnapshotUtil.JSON_DUPLICATES_PATH, m_voltdbrootPath);
                         }
+                        if (m_replayAgent.hasReplayedSegments() &&
+                            TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.ELASTIC) {
+                            // Restore the hashinator if there's command log to replay and we're running elastic
+                            jsObj.put(SnapshotUtil.JSON_HASHINATOR, true);
+                        }
                         Object[] params = new Object[] { jsObj.toString() };
-                        initSnapshotWork(RESTORE_TXNID, params);
+                        initSnapshotWork(params);
                     }
 
                     // if no snapshot to restore, transition immediately.
@@ -448,18 +450,14 @@ SnapshotCompletionInterest
                                                StartAction.class,
                                                ZooKeeper.class,
                                                String.class,
-                                               int[].class,
-                                               Set.class,
-                                               long.class);
+                                               Set.class);
 
                 m_replayAgent =
                     (CommandLogReinitiator) constructor.newInstance(m_hostId,
                                                                     m_action,
                                                                     m_zk,
                                                                     m_clPath,
-                                                                    m_allPartitions,
-                                                                    m_liveHosts,
-                                                                    RESTORE_TXNID + 1);
+                                                                    m_liveHosts);
             }
         } catch (Exception e) {
             VoltDB.crashGlobalVoltDB("Unable to instantiate command log reinitiator",
@@ -1186,7 +1184,7 @@ SnapshotCompletionInterest
      * Restore a snapshot. An arbitrarily early transaction is provided if command
      * log replay follows to maintain txnid sequence constraints (with simple dtxn).
      */
-    private void initSnapshotWork(Long txnId, final Object[] procParams) {
+    private void initSnapshotWork(final Object[] procParams) {
         final String procedureName = "@SnapshotRestore";
         Config restore = SystemProcedureCatalog.listing.get(procedureName);
         Procedure restoreProc = restore.asCatalogProcedure();
@@ -1201,34 +1199,13 @@ SnapshotCompletionInterest
         });
         spi.setClientHandle(m_restoreAdapter.registerCallback(m_clientAdapterCallback));
 
-        // txnId is hacked here for the SimpleDTXN case to maintain the constraint
-        // that it always precedes any txnid that might appear in the log. Basically,
-        // an invalid Id is used for the snapshot restore.
-        //
-        // Iv2 asserts/throws on invalid ids. And it doesn't have the same constraint,
-        // so only take the txnId hack path in the non-iv2 case.
-        if (VoltDB.instance().isIV2Enabled()) {
-            txnId = null;
-        }
-
-        if (txnId == null) {
-            m_initiator.createTransaction(m_restoreAdapter.connectionId(), spi,
-                                          restoreProc.getReadonly(),
-                                          restoreProc.getSinglepartition(),
-                                          restoreProc.getEverysite(),
-                                          0,//Can provide anything for multi-part
-                                          0,
-                                          EstTime.currentTimeMillis());
-        } else {
-            m_initiator.createTransaction(m_restoreAdapter.connectionId(),
-                                          txnId, System.currentTimeMillis(), spi,
-                                          restoreProc.getReadonly(),
-                                          restoreProc.getSinglepartition(),
-                                          restoreProc.getEverysite(),
-                                          0,//Can provide anything for multi-part
-                                          0,
-                                          EstTime.currentTimeMillis());
-        }
+        m_initiator.createTransaction(m_restoreAdapter.connectionId(), spi,
+                                      restoreProc.getReadonly(),
+                                      restoreProc.getSinglepartition(),
+                                      restoreProc.getEverysite(),
+                                      0,//Can provide anything for multi-part
+                                      0,
+                                      EstTime.currentTimeMillis());
     }
 
     /**

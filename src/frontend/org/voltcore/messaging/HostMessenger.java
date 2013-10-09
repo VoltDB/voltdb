@@ -386,7 +386,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     @Override
     public void notifyOfJoin(int hostId, SocketChannel socket, InetSocketAddress listeningAddress) {
-        System.out.println(getHostId() + " notified of " + hostId);
+        logger.info(getHostId() + " notified of " + hostId);
         prepSocketChannel(socket);
         ForeignHost fhost = null;
         try {
@@ -576,7 +576,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         m_network.start();//network must be running for register to work
 
         for (int ii = 0; ii < hosts.length; ii++) {
-            System.out.println(yourHostId + " Notified of host " + hosts[ii]);
+            logger.info(yourHostId + " notified of host " + hosts[ii]);
             agreementSites.add(CoreUtils.getHSIdFromHostAndSite(hosts[ii], AGREEMENT_SITE_ID));
             prepSocketChannel(sockets[ii]);
             ForeignHost fhost = null;
