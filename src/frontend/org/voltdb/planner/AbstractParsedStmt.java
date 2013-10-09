@@ -90,13 +90,15 @@ public abstract class AbstractParsedStmt {
         this.m_paramValues = paramValues;
         this.m_db = db;
     }
+
     /**
      *
      * @param sql
      * @param xmlSQL
      * @param db
      */
-    public static AbstractParsedStmt parse(String sql, VoltXMLElement stmtTypeElement, String[] paramValues, Database db, String joinOrder) {
+    public static AbstractParsedStmt parse(String sql, VoltXMLElement stmtTypeElement, String[] paramValues,
+            Database db, String joinOrder) {
 
         AbstractParsedStmt retval = null;
 

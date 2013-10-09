@@ -325,7 +325,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
             // either pure expression index or mix of expressions and simple columns
             List<AbstractExpression> indexedExprs = null;
             try {
-                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, null);
+                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson);
             } catch (JSONException e) {
                 e.printStackTrace();
                 assert(false);
