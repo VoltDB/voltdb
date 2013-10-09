@@ -110,7 +110,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         Pair<Integer, ByteBuffer> tableBlock = m_dataSink.poll(m_snapshotBufferAllocator);
         // poll() could return null if the source indicated end of stream,
         // need to check on that before retry
-        if (tableBlock == null && !m_dataSink.isEOF()) {
+        if (tableBlock == null && !m_dataSink.isEOF() && !m_snapshotCompletionMonitor.isDone()) {
             // The sources are not set up yet, don't block the site,
             // return here and retry later.
             m_taskQueue.offer(this);
@@ -138,7 +138,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         }
 
         // No more data from this data sink, close and remove it from the list
-        assert m_dataSink.isEOF();
+        assert m_dataSink.isEOF() || m_snapshotCompletionMonitor.isDone();
         m_dataSink.close();
 
         if (m_streamSnapshotMb != null) {

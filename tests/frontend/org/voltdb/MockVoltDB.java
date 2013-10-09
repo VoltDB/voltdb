@@ -77,6 +77,7 @@ public class MockVoltDB implements VoltDBInterface
     private SiteTracker m_siteTracker;
     private final Map<MailboxType, List<MailboxNodeContent>> m_mailboxMap =
             new HashMap<MailboxType, List<MailboxNodeContent>>();
+    private boolean m_replicationActive = false;
 
     public MockVoltDB() {
         this(VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT, -1, VoltDB.DEFAULT_DR_PORT);
@@ -473,12 +474,13 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public void setReplicationActive(boolean active)
     {
+        m_replicationActive = active;
     }
 
     @Override
     public boolean getReplicationActive()
     {
-        return false;
+        return m_replicationActive;
     }
 
     @Override

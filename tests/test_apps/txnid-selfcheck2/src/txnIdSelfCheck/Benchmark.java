@@ -464,10 +464,10 @@ public class Benchmark {
         log.info("Running benchmark...");
 
         BigTableLoader partitionedLoader = new BigTableLoader(client, "bigp",
-                (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize);
+                         (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50);
         partitionedLoader.start();
         BigTableLoader replicatedLoader = new BigTableLoader(client, "bigr",
-                (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize);
+                         (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3);
         replicatedLoader.start();
 
         ReadThread readThread = new ReadThread(client, config.threads, config.threadoffset,

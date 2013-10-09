@@ -513,7 +513,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     SnapshotSaveAPI.recoveringSiteCount.set(partsToHSIdsToRejoin.size());
                     hostLog.info("Set recovering site count to " + partsToHSIdsToRejoin.size());
 
-                    m_joinCoordinator = new Iv2RejoinCoordinator(m_messenger, partsToHSIdsToRejoin.values(),
+                    m_joinCoordinator = new Iv2RejoinCoordinator(m_messenger,
+                            partsToHSIdsToRejoin.values(),
                             m_catalogContext.cluster.getVoltroot(),
                             m_config.m_startAction == StartAction.LIVE_REJOIN);
                     m_messenger.registerMailbox(m_joinCoordinator);
@@ -533,6 +534,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // do the many init tasks in the Inits class
             Inits inits = new Inits(this, 1);
             inits.doInitializationWork();
+
+            if (m_joining && m_config.m_replicationRole == ReplicationRole.REPLICA) {
+                VoltDB.crashLocalVoltDB("Elastic join is prohibited on a replica cluster.", false, null);
+            }
 
             collectLocalNetworkMetadata();
 
@@ -1610,7 +1615,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         // Start the rejoin coordinator
         if (m_joinCoordinator != null) {
             try {
-                if (!m_joinCoordinator.startJoin()) {
+                if (!m_joinCoordinator.startJoin(m_catalogContext.database)) {
                     VoltDB.crashLocalVoltDB("Failed to join the cluster", true, null);
                 }
             } catch (Exception e) {

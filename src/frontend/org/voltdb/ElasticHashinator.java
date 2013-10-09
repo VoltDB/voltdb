@@ -42,6 +42,7 @@ import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.UnmodifiableIterator;
+import static org.voltdb.TheHashinator.valueToBytes;
 
 /**
  * A hashinator that uses Murmur3_x64_128 to hash values and a consistent hash ring
@@ -80,6 +81,10 @@ public class ElasticHashinator extends TheHashinator {
         }
     });
 
+    @Override
+    public int pHashToPartition(VoltType type, Object obj) {
+        return hashinateBytes(valueToBytes(obj));
+    }
 
     /**
      * Encapsulates all knowledge of how to compress/uncompress hash tokens.
@@ -534,5 +539,10 @@ public class ElasticHashinator extends TheHashinator {
     public byte[] getCookedBytes()
     {
         return m_cookedBytes.get();
+    }
+
+    @Override
+    public HashinatorType getConfigurationType() {
+        return TheHashinator.HashinatorType.ELASTIC;
     }
 }
