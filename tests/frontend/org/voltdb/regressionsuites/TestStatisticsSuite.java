@@ -302,9 +302,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
 
         ColumnInfo[] expectedSchema = new ColumnInfo[11];
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
-        expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.BIGINT);
+        expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
-        expectedSchema[3] = new ColumnInfo("SITE_ID", VoltType.BIGINT);
+        expectedSchema[3] = new ColumnInfo("SITE_ID", VoltType.INTEGER);
         expectedSchema[4] = new ColumnInfo("PARTITION_ID", VoltType.BIGINT);
         expectedSchema[5] = new ColumnInfo("TABLE_NAME", VoltType.STRING);
         expectedSchema[6] = new ColumnInfo("TABLE_TYPE", VoltType.STRING);
@@ -336,9 +336,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
 
         ColumnInfo[] expectedSchema = new ColumnInfo[12];
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
-        expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.BIGINT);
+        expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
-        expectedSchema[3] = new ColumnInfo("SITE_ID", VoltType.BIGINT);
+        expectedSchema[3] = new ColumnInfo("SITE_ID", VoltType.INTEGER);
         expectedSchema[4] = new ColumnInfo("PARTITION_ID", VoltType.BIGINT);
         expectedSchema[5] = new ColumnInfo("INDEX_NAME", VoltType.STRING);
         expectedSchema[6] = new ColumnInfo("TABLE_NAME", VoltType.STRING);
