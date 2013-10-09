@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # This file is part of VoltDB.
 
 # Copyright (C) 2008-2013 VoltDB Inc.
@@ -26,28 +28,29 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import sys
+import os
+import toolrunner
 
-def show_config(runner):
-    if not runner.opts.arg:
-        # All labels.
-        for (key, value) in runner.config.query_pairs():
-            sys.stdout.write('%s=%s\n' % (key, value))
-    else:
-        # Specific keys requested.
-        for filter in runner.opts.arg:
-            n = 0
-            for (key, value) in runner.config.query_pairs(filter = filter):
-                sys.stdout.write('%s=%s\n' % (key, value))
-                n += 1
-            if n == 0:
-                sys.stdout.write('%s *not found*\n' % filter)
+description = 'External database bridge commands.'
+standalone = False
+# Required packages (auto-installed into virtual environment using pip).
+packages = ('mysql-python', 'ez_setup', 'schemaobject')
+verbose = (sys.argv[1:] == ['-v'])
+myDir, myName = os.path.split(os.path.realpath(sys.argv[0]))
+libpath = os.path.join(myDir, 'lib', 'python')
 
-@VOLT.Multi_Command(
-    description  = 'Display various types of information.',
-    modifiers = [
-        VOLT.Modifier('config', show_config,
-                      'Display all or specific configuration key/value pairs.',
-                      arg_name = 'KEY')]
-)
-def show(runner):
-    runner.go()
+# Work around a problem with the OSX MySQL installation that makes the MySQL
+# client library not load. Rely on the fact that vmain() exec's Python again.
+# This allows DYLD_LIBRARY_PATH to have the desired effect. Yes, it can cause a
+# problem if a user has two versions of MySQL installed, one in the standard
+# location and another somewhere else.
+if sys.platform == 'darwin':
+    os.environ['DYLD_LIBRARY_PATH'] = '/usr/local/mysql/lib'
+
+# Run in an automatically-built virtual environment.
+toolrunner.vmain(description=description,
+                 standalone=standalone,
+                 packages=packages,
+                 directory=os.getcwd(),
+                 verbose=verbose,
+                 libpath=libpath)

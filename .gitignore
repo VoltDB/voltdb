@@ -40,3 +40,4 @@ doc/tutorials/auction/csvloader_*.csv
 /README.voltadmin
 /.idea
 *.iml
+/tools/vbridge.venv
