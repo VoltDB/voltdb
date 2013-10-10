@@ -23,10 +23,9 @@
 
 package org.voltdb;
 
-import org.junit.Test;
-
-import org.voltdb.VoltDB;
 import junit.framework.TestCase;
+
+import org.junit.Test;
 
 public class Iv2TestCommandLine extends TestCase {
 
@@ -41,6 +40,5 @@ public class Iv2TestCommandLine extends TestCase {
 
         MockVoltDB vdb = new MockVoltDB(null, null);
         vdb.initialize(cfg);
-        assertTrue(vdb.isIV2Enabled());
     }
 }

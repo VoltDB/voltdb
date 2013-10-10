@@ -187,13 +187,13 @@ public class SnapshotUtil {
                     stringer.endObject();
                 }
                 stringer.endArray();
-                if (VoltDB.instance().isIV2Enabled()) {
-                    stringer.key("partitionTransactionIds").object();
-                    for (Map.Entry<Integer, Long> entry : partitionTransactionIds.entrySet()) {
-                        stringer.key(entry.getKey().toString()).value(entry.getValue());
-                    }
-                    stringer.endObject();
+
+                stringer.key("partitionTransactionIds").object();
+                for (Map.Entry<Integer, Long> entry : partitionTransactionIds.entrySet()) {
+                    stringer.key(entry.getKey().toString()).value(entry.getValue());
                 }
+                stringer.endObject();
+
                 stringer.key("catalogCRC").value(catalogCRC);
                 stringer.key("instanceId").value(instanceId.serializeToJSONObject());
                 stringer.endObject();

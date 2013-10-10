@@ -1778,8 +1778,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                  * but doesn't initiate the invocation. It will fall through to
                  * the shared dispatch of sysprocs.
                  */
-                if (VoltDB.instance().isIV2Enabled() &&
-                        task.getType() == ProcedureInvocationType.REPLICATED) {
+                if (task.getType() == ProcedureInvocationType.REPLICATED) {
                     sendSentinelsToAllPartitions(task.getOriginalTxnId());
                 }
             } else if (task.procName.equals("@LoadSinglepartitionTable")) {
