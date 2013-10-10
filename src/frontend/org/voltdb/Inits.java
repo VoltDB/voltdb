@@ -282,12 +282,7 @@ public class Inits {
                     hostLog.debug(String.format("Sending %d catalog bytes", catalogBytes.length));
 
                     long catalogTxnId;
-                    if (m_rvdb.isIV2Enabled()) {
-                        catalogTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
-                    } else {
-                        catalogTxnId =
-                                org.voltdb.TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0);
-                    }
+                    catalogTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
 
                     // get a hash of the catalog - should never actually throw
                     MessageDigest md = null;

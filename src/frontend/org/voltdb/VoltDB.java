@@ -57,27 +57,6 @@ public class VoltDB {
     public static final int SITES_TO_HOST_DIVISOR = 100;
     public static final int MAX_SITES_PER_HOST = 128;
 
-    // Utility to calculate whether Iv2 is enabled or not for test cases.
-    // There are several ways to enable Iv2, of course. Ideally, use a cluster
-    // command line flag (enableiv2). Second best, use the VOLT_ENABLEIV2
-    // environment variable.
-    //
-    // IMPORTANT: To determine if Iv2 is enabled at runtime,
-    // call RealVoltDB.isIV2Enabled();
-    public static boolean checkTestEnvForIv2()
-    {
-        String iv2 = System.getenv().get("VOLT_ENABLEIV2");
-        if (iv2 == null) {
-            iv2 = System.getProperty("VOLT_ENABLEIV2");
-        }
-        if (iv2 != null && iv2.equalsIgnoreCase("false")) {
-            return false;
-        }
-        else {
-            return true;
-        }
-    }
-
     // Utility to try to figure out if this is a test case.  Various junit targets in
     // build.xml set this environment variable to give us a hint
     public static boolean isThisATest()
@@ -212,16 +191,12 @@ public class VoltDB {
         /** true if we're running the rejoin tests. Not used in production. */
         public boolean m_isRejoinTest = false;
 
-        /** set to true to run with iv2 initiation. Good Luck! */
-        public boolean m_enableIV2 = true;
-
         public final Queue<String> m_networkCoreBindings = new ArrayDeque<String>();
         public final Queue<String> m_computationCoreBindings = new ArrayDeque<String>();
         public final Queue<String> m_executionCoreBindings = new ArrayDeque<String>();
         public String m_commandLogBinding = null;
 
         public Configuration() {
-            m_enableIV2 = VoltDB.checkTestEnvForIv2();
             // Set start action create.  The cmd line validates that an action is specified, however,
             // defaulting it to create for local cluster test scripts
             m_startAction = StartAction.CREATE;
@@ -237,7 +212,6 @@ public class VoltDB {
         public Configuration(PortGenerator ports) {
             // Default iv2 configuration to the environment settings.
             // Let explicit command line override the environment.
-            m_enableIV2 = VoltDB.checkTestEnvForIv2();
             m_port = ports.nextClient();
             m_adminPort = ports.nextAdmin();
             m_internalPort = ports.next();
@@ -249,9 +223,6 @@ public class VoltDB {
 
         public Configuration(String args[]) {
             String arg;
-
-            // let the command line override the environment setting for enable iv2.
-            m_enableIV2 = VoltDB.checkTestEnvForIv2();
 
             for (int i=0; i < args.length; ++i) {
                 arg = args[i];
@@ -427,7 +398,7 @@ public class VoltDB {
                     String portStr = args[++i];
                     m_ipcPort = Integer.valueOf(portStr);
                 } else if (arg.equals("enableiv2")) {
-                    m_enableIV2 = true;
+                    // noop because IV2 is always on now
                 } else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     usage();

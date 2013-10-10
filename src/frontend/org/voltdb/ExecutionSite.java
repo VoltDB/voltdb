@@ -87,8 +87,6 @@ import org.voltdb.utils.CachedByteBufferAllocator;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 
-import com.google.common.collect.ImmutableMap;
-
 /**
  * The main executor of transactional work in the system. Controls running
  * stored procedures and manages the execution engine's running of plan
@@ -652,7 +650,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         m_mailbox = null;
 
         // initialize the DR gateway
-        m_partitionDRGateway = new PartitionDRGateway(false);
+        m_partitionDRGateway = new PartitionDRGateway();
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
@@ -696,7 +694,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
         // initialize the DR gateway
         m_partitionDRGateway =
-            PartitionDRGateway.getInstance(partitionId, nodeDRGateway, false, m_rejoining);
+            PartitionDRGateway.getInstance(partitionId, nodeDRGateway, m_rejoining);
 
         if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
             ee = new MockExecutionEngine();
