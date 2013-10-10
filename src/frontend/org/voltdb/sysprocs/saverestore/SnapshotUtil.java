@@ -43,7 +43,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Exchanger;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadFactory;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
@@ -1329,18 +1329,14 @@ public class SnapshotUtil {
                                        final boolean notifyChanges)
     {
         final SnapshotInitiationInfo snapInfo = new SnapshotInitiationInfo(path, nonce, blocking, format, data);
-        final Exchanger<ClientResponse> responseExchanger = new Exchanger<ClientResponse>();
+        final SettableFuture<ClientResponse> responseFuture = SettableFuture.create();
         final SimpleClientResponseAdapter adapter =
             new SimpleClientResponseAdapter(ClientInterface.SNAPSHOT_UTIL_CID, "SnapshotUtilAdapter");
-        adapter.setCallback(new SimpleClientResponseAdapter.Callback() {
+        adapter.registerCallback(clientHandle, new SimpleClientResponseAdapter.Callback() {
             @Override
             public void handleResponse(ClientResponse response)
             {
-                try {
-                    responseExchanger.exchange(response);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
+                responseFuture.set(response);
             }
         });
 
@@ -1359,7 +1355,12 @@ public class SnapshotUtil {
                             hasRequested = true;
                         }
 
-                        response = responseExchanger.exchange(null);
+                        try {
+                            response = responseFuture.get();
+                        } catch (ExecutionException e) {
+                            VoltDB.crashLocalVoltDB("Should never happen", true, e);
+                        }
+
                         VoltTable[] results = response.getResults();
                         if (response.getStatus() != ClientResponse.SUCCESS) {
                             break;

@@ -22,7 +22,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
@@ -467,10 +466,18 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         }
 
         LimitPlanNode limit = (LimitPlanNode)m_inlineNodes.get(PlanNodeType.LIMIT);
-        if (limit != null && limit.getLimit() > 0) {
-            m_estimatedOutputTupleCount = Math.min(m_estimatedOutputTupleCount, limit.getLimit());
-            if (m_predicate == null) {
-                m_estimatedProcessedTupleCount = limit.getLimit() + limit.getOffset();
+        if (limit != null) {
+            int limitInt = limit.getLimit();
+            if (limitInt == -1) {
+                // If Limit ?, it's likely to be a small number. So pick up 50 here.
+                limitInt = 50;
+            }
+
+            m_estimatedOutputTupleCount = Math.min(m_estimatedOutputTupleCount, limitInt);
+            int offsetInt = limit.getOffset();
+
+            if (m_predicate == null && offsetInt == 0) {
+                m_estimatedProcessedTupleCount = limitInt;
             }
         }
     }
@@ -510,26 +517,13 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         m_forDeterminismOnly = jobj.optBoolean(Members.DETERMINISM_ONLY.name());
         m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
         m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
-        JSONObject tempjobj = null;
         //load end_expression
-        if( !jobj.isNull( Members.END_EXPRESSION.name() ) ) {
-            tempjobj = jobj.getJSONObject( Members.END_EXPRESSION.name() );
-            m_endExpression = AbstractExpression.fromJSONObject( tempjobj, db);
-        }
+        m_endExpression = AbstractExpression.fromJSONChild(jobj, Members.END_EXPRESSION.name());
         // load initial_expression
-        if ( !jobj.isNull(Members.INITIAL_EXPRESSION.name() ) ) {
-            tempjobj = jobj.getJSONObject( Members.INITIAL_EXPRESSION.name() );
-            m_initialExpression = AbstractExpression.fromJSONObject(tempjobj,  db);
-        }
+        m_initialExpression = AbstractExpression.fromJSONChild(jobj, Members.INITIAL_EXPRESSION.name());
         //load searchkey_expressions
-        if( !jobj.isNull( Members.SEARCHKEY_EXPRESSIONS.name() ) ) {
-            JSONArray jarray = jobj.getJSONArray( Members.SEARCHKEY_EXPRESSIONS.name() );
-            int size = jarray.length();
-            for( int i = 0 ; i < size; i++ ) {
-                tempjobj = jarray.getJSONObject( i );
-                m_searchkeyExpressions.add( AbstractExpression.fromJSONObject(tempjobj, db));
-            }
-        }
+        AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
+                Members.SEARCHKEY_EXPRESSIONS.name());
     }
 
     @Override
@@ -579,7 +573,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             else {
                 try {
                     List<AbstractExpression> indexExpressions =
-                        AbstractExpression.fromJSONArrayString(jsonExpr, null);
+                        AbstractExpression.fromJSONArrayString(jsonExpr);
                     int ii = 0;
                     for (AbstractExpression ae : indexExpressions) {
                         asIndexed[ii++] = ae.explain(m_targetTableName);
@@ -733,7 +727,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         } else {
             List<AbstractExpression> indexedExprs = null;
             try {
-                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, null);
+                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson);
             } catch (JSONException e) {
                 e.printStackTrace();
                 assert(false);

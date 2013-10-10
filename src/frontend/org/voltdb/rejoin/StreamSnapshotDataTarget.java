@@ -86,14 +86,14 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
     private final AtomicBoolean m_closed = new AtomicBoolean(false);
 
-    public StreamSnapshotDataTarget(long HSId, Map<Integer, byte[]> schemas,
+    public StreamSnapshotDataTarget(long HSId, byte[] hashinatorConfig, Map<Integer, byte[]> schemas,
                                     SnapshotSender sender, StreamSnapshotAckReceiver ackReceiver)
     {
-        this(HSId, schemas, DEFAULT_WRITE_TIMEOUT_MS, sender, ackReceiver);
+        this(HSId, hashinatorConfig, schemas, DEFAULT_WRITE_TIMEOUT_MS, sender, ackReceiver);
     }
 
-    public StreamSnapshotDataTarget(long HSId, Map<Integer, byte[]> schemas, long writeTimeout,
-                                    SnapshotSender sender, StreamSnapshotAckReceiver ackReceiver)
+    public StreamSnapshotDataTarget(long HSId, byte[] hashinatorConfig, Map<Integer, byte[]> schemas,
+                                    long writeTimeout, SnapshotSender sender, StreamSnapshotAckReceiver ackReceiver)
     {
         super();
         m_targetId = m_totalSnapshotTargetCount.getAndIncrement();
@@ -110,6 +110,11 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
         // start a periodic task to look for timed out connections
         VoltDB.instance().scheduleWork(new Watchdog(0, writeTimeout), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
+
+        if (hashinatorConfig != null) {
+            // Send the hashinator config as  the first block
+            send(StreamSnapshotMessageType.HASHINATOR, -1, hashinatorConfig);
+        }
     }
 
     /**
@@ -406,16 +411,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 byte[] schema = m_schemas.remove(tableId);
                 rejoinLog.debug("Sending schema for table " + tableId);
 
-                // 1 byte for the type, 4 bytes for the block index, 4 bytes for table Id
-                ByteBuffer buf = ByteBuffer.allocate(schema.length + 1 + 4 + 4);
-                buf.put((byte) StreamSnapshotMessageType.SCHEMA.ordinal());
-                buf.putInt(m_blockIndex);
-                buf.putInt(tableId);
-                buf.put(schema);
-                buf.flip();
-
                 rejoinLog.trace("Writing schema as part of this write");
-                send(m_blockIndex++, DBBPool.wrapBB(buf));
+                send(StreamSnapshotMessageType.SCHEMA, tableId, schema);
             }
 
             chunk.b.put((byte) StreamSnapshotMessageType.DATA.ordinal());
@@ -428,6 +425,19 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         } finally {
             rejoinLog.trace("Finished call to write");
         }
+    }
+
+    private ListenableFuture<Boolean> send(StreamSnapshotMessageType type, int tableId, byte[] content)
+    {
+        // 1 byte for the type, 4 bytes for the block index, 4 bytes for table Id
+        ByteBuffer buf = ByteBuffer.allocate(1 + 4 + 4 + content.length);
+        buf.put((byte) type.ordinal());
+        buf.putInt(m_blockIndex);
+        buf.putInt(tableId);
+        buf.put(content);
+        buf.flip();
+
+        return send(m_blockIndex++, DBBPool.wrapBB(buf));
     }
 
     /**

@@ -20,6 +20,7 @@ import matplotlib.ticker as ticker
 from voltdbclient import *
 from operator import itemgetter, attrgetter
 import numpy
+from mpl_toolkits.axes_grid.anchored_artists import AnchoredText
 
 STATS_SERVER = 'volt2'
 
@@ -32,26 +33,46 @@ def COLORS(k):
 COLORS = ['b','g','r','c','m','y','k']
 #print COLORS
 
-MARKERS = ['+', '*', '<', '>', '^', '_',
-           'D', 'H', 'd', 'h', 'o', 'p']
+MARKERS = ['o', '*', '<', '>', '^', '_',
+           'D', 'H', 'd', 'h', '+', 'p']
 
 mc = {}
+
+def get_branches(hostname, port, days):
+
+    mydate = datetime.datetime.today()-datetime.timedelta(days=days)
+
+    query = "select branch, max(date), count(*) from app_stats where date >= '%s' group by branch order by 3 desc" % \
+                    mydate.strftime('%Y-%m-%d 00:00:00')
+
+    conn = FastSerializer(hostname, port)
+    proc = VoltProcedure(conn, '@AdHoc',
+                         [FastSerializer.VOLTTYPE_STRING])
+    resp = proc.call([query])
+    conn.close()
+
+    branches = []
+    keys=['branch','sampledate','count']
+    for row in resp.tables[0].tuples:
+        branches.append(dict(zip(keys,row)))
+
+    return branches
 
 def get_stats(hostname, port, days):
     """Get most recent run statistics of all apps within the last 'days'
     """
 
     conn = FastSerializer(hostname, port)
-    proc = VoltProcedure(conn, 'BestOfPeriod_ab',
+    proc = VoltProcedure(conn, 'BestOfPeriod_mr',
                          [FastSerializer.VOLTTYPE_SMALLINT])
     resp = proc.call([days])
     conn.close()
 
     # keyed on app name, value is a list of runs sorted chronologically
     stats = dict()
-    run_stat_keys = ['app', 'nodes', 'branch', 'date', 'tps', 'lat95', 'lat99']
+    run_stat_keys = ['app', 'branch', 'nodes', 'date', 'tps', 'lat95', 'lat99']
     for row in resp.tables[0].tuples:
-        group = (row[0],row[1])
+        group = (row[1],row[0],row[2])
         app_stats = []
         if group not in stats:
             stats[group] = app_stats
@@ -70,7 +91,7 @@ class Plot:
         self.ndays = ndays
         self.legends = {}
         w = w == None and 1200 or w
-        h = h == None and 400 or h
+        h = h == None and 1200 or h
         self.fig = plt.figure(figsize=(w / self.DPI, h / self.DPI),
                          dpi=self.DPI)
         self.ax = self.fig.add_subplot(111)
@@ -80,75 +101,52 @@ class Plot:
         plt.tick_params(axis='y', labelleft=True, labelright=True)
         plt.ylabel(ylabel, fontsize=8)
         plt.xlabel(xlabel, fontsize=8)
-        self.fig.autofmt_xdate()
+        self.ax.set_aspect(1)
+        self.ax.set_yscale('log')
+        self.ax.set_xscale('log')
+        self.cm = plt.get_cmap("PiYG")
 
     def plot(self, x, y, color, marker_shape, legend):
-        self.ax.plot(x, y, linestyle="-", label=str(legend), color=color,
-                     marker=marker_shape, markerfacecolor=color, markersize=4)
+        self.ax.scatter(x, y, label=str(legend), c=color,
+                     marker=marker_shape) #, markerfacecolor=color)
+                     #float(x)/float(y), cmap=self.cm, # color=color,
 
     def close(self):
-        formatter = matplotlib.dates.DateFormatter("%b %d %y")
-        self.ax.xaxis.set_major_formatter(formatter)
         ymin, ymax = plt.ylim()
-        plt.ylim((ymin-(ymax-ymin)*0.1, ymax+(ymax-ymin)*0.1))
-        #xmax = datetime.datetime.today().toordinal()
-        #plt.xlim((xmax-self.ndays, xmax))
+        plt.ylim((ymin-(ymax-ymin)*0.2, ymax+(ymax-ymin)*0.2))
+        xmin, xmax = plt.xlim()
+        plt.xlim((xmin-(xmax-xmin)*0.2, xmax+(xmax-xmin)*0.2))
         plt.legend(prop={'size': 10}, loc=0)
-        plt.savefig(self.filename, format="png", transparent=False,
-                    bbox_inches="tight", pad_inches=0.2)
+        plt.savefig(self.filename, format="png", transparent=False)
         plt.close('all')
 
-def plot(title, xlabel, ylabel, filename, width, height, app, data, data_type):
+def plot(title, xlabel, ylabel, filename, width, height, data, info):
     global mc
-    plot_data = dict()
-    for run in data:
-        if run['branch'] not in plot_data:
-            plot_data[run['branch']] = {data_type: []}
-
-        if data_type == 'tps':
-            value = run['tps']/run['nodes']
-        else:
-            value = run[data_type]
-        datenum = matplotlib.dates.date2num(run['date'])
-        plot_data[run['branch']][data_type].append((datenum,value))
-
-    if len(plot_data) == 0:
-        return
 
     pl = Plot(title, xlabel, ylabel, filename, width, height, 1)
-    for b,bd in plot_data.items():
-        for k,v in bd.items():
-            v = sorted(v, key=lambda x: x[0])
-            u = zip(*v)
-            if b not in mc:
-                mc[b] = (COLORS[len(mc.keys())%len(COLORS)], MARKERS[len(mc.keys())%len(MARKERS)])
-            pl.plot(u[0], u[1], mc[b][0], mc[b][1], b)
-            """
-            #pl.ax.annotate(b, xy=(u[0][-1],u[1][-1]), xycoords='data',
-            #        xytext=(0, 0), textcoords='offset points') #, arrowprops=dict(arrowstyle="->"))
-            x = u[0][-1]
-            y = u[1][-1]
-            pl.ax.annotate(str(y), xy=(x,y), xycoords='data', xytext=(5,0),
-                textcoords='offset points', ha='left')
-            xmin, ymin = [(u[0][i],y) for i,y in enumerate(u[1]) if y == min(u[1])][-1]
-            xmax, ymax= [(u[0][i],y) for i,y in enumerate(u[1]) if y == max(u[1])][-1]
-            if ymax != ymin:
-                if xmax != x:
-                    pl.ax.annotate(str(ymax), xy=(xmax,ymax),
-                        textcoords='offset points', ha='center', va='bottom', xytext=(0,5))
-                if xmin != x:
-                    pl.ax.annotate(str(ymin), xy=(xmin,ymin),
-                        textcoords='offset points', ha='center', va='top', xytext=(0,-5))
-            """
+
+    if len(data) > 0:
+        for k,v in data.iteritems():
+            diff = (float(v["y"]['tps'])-float(v["x"]['tps']))/float(v["y"]['tps']) * 100.
+            acolor = ['g','r'][diff<0]
+            pl.plot(v["x"]['tps'], v["y"]['tps'], acolor, MARKERS[0], "")
+            if abs(diff) > 5.:
+                atxt = "%s %d %s (%.2f%%)" % (k[2],k[3],["node","nodes"][k[3]>1],diff)
+                pl.ax.annotate(atxt, xy=(v["x"]['tps'], v["y"]['tps']), xycoords='data',
+                        xytext=(10*[1,-1][diff>0], -5), textcoords='offset points', ha=["left","right"][diff>0],
+                        size=10, color=acolor) #, arrowprops=dict(arrowstyle="->"))
+
+    if len(info) > 1:
+        _at = AnchoredText("\n".join(info), loc=2, prop=dict(size=10))
+        pl.ax.add_artist(_at)
+
     pl.close()
 
 def generate_index_file(filenames):
     row = """
       <tr>
-        <td><a href="%s"><img src="%s" width="400" height="200"/></a></td>
-        <td><a href="%s"><img src="%s" width="400" height="200"/></a></td>
-        <td><a href="%s"><img src="%s" width="400" height="200"/></a></td>
-      </tr>
+        <td><a href="%s"><img src="%s" width="400" height="400"/></a></td>
+      </tr4
 """
 
     sep = """
@@ -185,7 +183,7 @@ def generate_index_file(filenames):
     n = 4
     z = n-len(h)%n
     while z > 0 and z < n:
-        h.append(('','')) 
+        h.append(('',''))
         z -= 1
 
     rows = []
@@ -195,15 +193,15 @@ def generate_index_file(filenames):
         if i%n == 0:
             rows.append(hrow % t)
             t = ()
- 
+
     last_app = None
     for i in filenames:
         if i[0] != last_app:
             rows.append(sep % (i[0], i[0]))
             last_app = i[0]
-        rows.append(row % (i[1], i[1], i[2], i[2], i[3], i[3]))
+        rows.append(row % (i[1], i[1]))
 
-    return full_content % ''.join(rows)
+    return  full_content % ''.join(rows)
 
 def usage():
     print "Usage:"
@@ -234,21 +232,42 @@ def main():
     if len(sys.argv) >= 6:
         height = int(sys.argv[5])
 
+    branches = get_branches(STATS_SERVER, 21212, ndays)
+
     # show all the history
     stats = get_stats(STATS_SERVER, 21212, ndays)
 
     root_path = path
     filenames = []              # (appname, latency, throughput)
     iorder = 0
-    for group, data in stats.iteritems():
-        (app,nodes) = group
-        app = app +" %d %s" % (nodes, ["node","nodes"][nodes>1])
+
+    bc = [(branches[i],branches[j]) for i in range(len(branches)) for j in range(len(branches)) if i != j]
+
+    for bg in bc:
+        merged = {}
+        missing = ['Cases missing from %s:' % bg[1]['branch']]
+        for group,data in stats.iteritems():
+            if bg[0]['branch'] == group[0]:
+                k = (bg[1]['branch'],group[1],group[2])
+                if k in stats:
+                    m = stats[k]
+                    merged[(bg[0]['branch'],bg[1]['branch'])+(group[1],group[2])] = {"y": data[0], "x": stats[k][0]}
+                else:
+                    missing.append("%s %d %s" % (group[1],group[2],["node","nodes"][group[2]>1]))
+
+        app = "%s vs %s" % (bg[0]['branch'],bg[1]['branch'])
+        title = "%s as of %s vs %s as of %s" % (bg[0]['branch'],bg[0]['sampledate'],bg[1]['branch'],bg[1]['sampledate'])
         app_filename = app.replace(' ', '_')
+        """
         latency95_filename = '%s-latency95-%s.png' % (prefix, app_filename)
         latency99_filename = '%s-latency99-%s.png' % (prefix, app_filename)
         throughput_filename = '%s-throughput-%s.png' % (prefix, app_filename)
         filenames.append((app, latency95_filename, latency99_filename, throughput_filename, iorder))
+        """
+        throughput_filename = '%s-throughput-%s.png' % (prefix, app_filename)
+        filenames.append((app, throughput_filename, iorder))
 
+        """
         plot(app + " latency95", "Time", "Latency (ms)",
              path + "-latency95-" + app_filename + ".png", width, height, app,
              data, 'lat95')
@@ -256,14 +275,15 @@ def main():
         plot(app + " latency99", "Time", "Latency (ms)",
              path + "-latency99-" + app_filename + ".png", width, height, app,
              data, 'lat99')
+        """
 
-        plot(app+" throughput(best) per node", "Time", "Thpt tx/sec",
-                    path + "-throughput-" + app_filename + ".png", width, height, app, data, 'tps')
+        plot(title+" throughput", "%s Thpt tx/sec" % bg[1]['branch'], "%s Thpt tx/sec" % bg[0]['branch'],
+                    path + "-throughput-" + app_filename + ".png", width, height, merged, missing)
 
     # generate index file
     index_file = open(root_path + '-index.html', 'w')
-    sorted_filenames = sorted(filenames, key=lambda f: f[0].lower()+str(f[1]))
-    index_file.write(generate_index_file(sorted_filenames))
+    #sorted_filenames = sorted(filenames, key=lambda f: f[0].lower()+str(f[1]))
+    index_file.write(generate_index_file(filenames))
     index_file.close()
 
 if __name__ == "__main__":

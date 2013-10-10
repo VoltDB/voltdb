@@ -18,6 +18,8 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +30,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.*;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
+import org.voltdb.exceptions.SerializableException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.rejoin.TaskLog;
@@ -176,7 +179,9 @@ public class SysprocFragmentTask extends TransactionTask
                 break;
             } catch (final VoltAbortException e) {
                 hostLog.warn("Error running system procedure plan fragment", e);
-                currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, null);
+                currentFragResponse.setStatus(
+                        FragmentResponseMessage.UNEXPECTED_ERROR,
+                        new SerializableException(CoreUtils.throwableToString(e)));
                 break;
             }
         }
