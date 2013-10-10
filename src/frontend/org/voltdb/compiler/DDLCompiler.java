@@ -1692,7 +1692,7 @@ public class DDLCompiler {
             // complex group by exprs
             if (groupbyExprs != null) {
                 try {
-                    indexedExprs = AbstractExpression.fromJSONArrayString(expressionjson, null);
+                    indexedExprs = AbstractExpression.fromJSONArrayString(expressionjson);
                 } catch (JSONException e) {
                     e.printStackTrace();
                     assert(false);

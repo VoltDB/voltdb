@@ -147,8 +147,7 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
         helpLoadFromJSONObject(obj, db);
 
         assert(!obj.isNull(Members.TABLE_DATA.name()));
-        JSONObject tableDataObj = obj.getJSONObject(Members.TABLE_DATA.name());
-        m_tableData = AbstractExpression.fromJSONObject(tableDataObj, db);
+        m_tableData = AbstractExpression.fromJSONChild(obj, Members.TABLE_DATA.name());
 
         if (!obj.isNull(Members.SORT_DIRECTION.name())) {
             m_sortDirection = SortDirectionType.get(obj.getString( Members.SORT_DIRECTION.name()));

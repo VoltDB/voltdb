@@ -17,9 +17,6 @@
 
 package org.voltdb.expressions;
 
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
-import org.voltdb.catalog.Database;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -51,11 +48,6 @@ public class VectorValueExpression extends AbstractExpression {
         }
 
         return true;
-    }
-
-    @Override
-    protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {
-        // nothing used besides the m_args list in AbstractExpression
     }
 
     @Override
