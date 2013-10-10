@@ -508,8 +508,11 @@ class CSVPartitionProcessor implements Runnable {
                 processLoadTable(table, procName);
             }
             m_partitionQueue.clear();
+            //Make sure all callbacks have been called and any failures are posted on failure queue before we
+            //we put end of queue marker on failure processor.
+            m_csvClient.drain();
 
-            //Let partition processor drain and put any failures on failure processing.
+            //Let partition processor drain on failure processing.
             if (failureProcessor != null) {
                 if (m_failedQueue != null) {
                     m_failedQueue.put(m_endOfData);
