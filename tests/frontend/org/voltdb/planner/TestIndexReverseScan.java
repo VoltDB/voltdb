@@ -33,11 +33,11 @@ import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.SortDirectionType;
 
-public class TestReverseIndexScan extends PlannerTestCase {
+public class TestIndexReverseScan extends PlannerTestCase {
     @Override
     protected void setUp() throws Exception {
         final boolean planForSinglePartition = true;
-        setupSchema(TestReverseIndexScan.class.getResource("testplans-indexvshash-ddl.sql"),
+        setupSchema(TestIndexReverseScan.class.getResource("testplans-indexvshash-ddl.sql"),
                     "testindexvshashplans", planForSinglePartition);
     }
 
