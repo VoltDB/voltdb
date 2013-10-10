@@ -613,12 +613,123 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
            verifyMVTestR2MinMax(client, expected);
         }
 
-}
+    }
 
     private void verifyMVTestR2MinMax(Client client, long[][] expected)
         throws IOException, NoConnectionsException, ProcCallException, ParseException
     {
         VoltTable table = client.callProcedure("@AdHoc", "SELECT * FROM V_R2_MIN_MAX ORDER BY DEPT").getResults()[0];
+        System.out.println(table);
+        validateTableOfLongs(table, expected);
+    }
+
+    public void testMaterializedViewFieldMinMax() throws IOException, ProcCallException, Exception {
+        if (isHSQL()) { // hsql backend does not support the FIELD function
+            return;
+        }
+        System.out.println("Test Field Function Min and Max...");
+        Client client = getClient();
+        final long expectedMinMostTM = 2010;
+        final long expectedMinTM = 2011;
+        final long expectedMedTM = 2012;
+        final long expectedMaxTM = 2013;
+        long[][] expected;
+        // JSON FIELDS:
+        //   wage INTEGER
+        //   dept INTEGER
+        //   tm_year INTEGER
+        //   tm_month INTEGER
+        //   tm_day INTEGER
+        //     id, json_data
+        client.callProcedure("R5.insert",
+                0, "{\"wage\":10 , \"dept\":0 , \"tm_year\":2013 , \"tm_month\":6 , \"tm_day\":11 }");
+        client.callProcedure("R5.insert",
+                1, "{\"wage\":10 , \"dept\":1 , \"tm_year\":2013 , \"tm_month\":6 , \"tm_day\":11 }");
+        client.callProcedure("R5.insert",
+                2, "{\"wage\":20 , \"dept\":-1, \"tm_year\":2012 , \"tm_month\":6 , \"tm_day\":11 }");
+        client.callProcedure("R5.insert",
+                3, "{\"wage\":30 , \"dept\":1 , \"tm_year\":2011 , \"tm_month\":6 , \"tm_day\":11 }");
+        client.callProcedure("R5.insert",
+                4, "{\"wage\":20 , \"dept\":-1, \"tm_year\":2012 , \"tm_month\":6 , \"tm_day\":11 }");
+        client.callProcedure("R5.insert",
+                5, "{\"wage\":10 , \"dept\":1 , \"tm_year\":2013 , \"tm_month\":6 , \"tm_day\":11 }");
+
+        client.callProcedure("R5.insert",
+                7, "{\"wage\":70 , \"dept\":2 , \"tm_year\":2011 , \"tm_month\":6 , \"tm_day\":11 }");
+
+        // ABS(DEPT), COUNT (*), MAX(WAGE * 2), MIN(TM)
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,5,60,expectedMinTM},
+                                 {2,1,140,expectedMinTM}};
+        verifyMVTestR5MinMax(client, expected);
+
+        // Drop the min tm and max wage value for group 1
+        client.callProcedure("R5.delete", 3);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,4,40,expectedMedTM},
+                                 {2,1,140,expectedMinTM}};
+        verifyMVTestR5MinMax(client, expected);
+
+        // Drop 1 of 2 min tm and max wage values for group 1 -- expect no change except to the count
+        client.callProcedure("R5.delete", 2);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,3,40,expectedMedTM},
+                                 {2,1,140,expectedMinTM}};
+
+        // Re-establish a min tm and max wage value for group 1
+        client.callProcedure("R5.insert",
+                6, "{\"wage\":30 , \"dept\":1 , \"tm_year\":2011 , \"tm_month\":6 , \"tm_day\":11 }");
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,4,60,expectedMinTM},
+                                 {2,1,140,expectedMinTM}};
+        verifyMVTestR5MinMax(client, expected);
+
+        // Re-establish a min tm and max wage value for group 2 via update of the sole base
+        client.callProcedure("R5.update", 7, 
+                "{\"wage\":77 , \"dept\":2 , \"tm_year\":2013 , \"tm_month\":6 , \"tm_day\":11 }", 7);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,4,60,expectedMinTM},
+                                 {2,1,154,expectedMaxTM}};
+        verifyMVTestR5MinMax(client, expected);
+
+        // Re-establish a min tm and max wage value for group 1 via update of the current extreme value
+        client.callProcedure("R5.update", 6, 
+                "{\"wage\":40 , \"dept\":1 , \"tm_year\":2010 , \"tm_month\":6 , \"tm_day\":11 }", 6);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,4,80,expectedMinMostTM},
+                                 {2,1,154,expectedMaxTM}};
+        verifyMVTestR5MinMax(client, expected);
+
+        // Re-establish a min tm and max wage value for groups 1 and 2 via switch of a grouped key
+        client.callProcedure("R5.update", 6,
+                "{\"wage\":80 , \"dept\":2 , \"tm_year\":2010 , \"tm_month\":6 , \"tm_day\":11 }", 6);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,3,40,expectedMedTM},
+                                 {2,2,160,expectedMinMostTM}};
+        verifyMVTestR5MinMax(client, expected);
+
+        // Demonstrate that null values do not alter mins or maxs.
+        client.callProcedure("R5.insert", 10, "{\"dept\":0}");
+        client.callProcedure("R5.insert", 11, "{\"dept\":1}");
+        client.callProcedure("R5.insert", 12, "{\"dept\":2}");
+        expected = new long[][] {{0,2,20,expectedMaxTM},
+                                 {1,4,40,expectedMedTM},
+                                 {2,3,160,expectedMinMostTM}};
+        verifyMVTestR5MinMax(client, expected);
+    }
+
+    private void verifyMVTestR5MinMax(Client client, long[][] expected)
+        throws IOException, NoConnectionsException, ProcCallException, ParseException
+    {
+        VoltTable table = client.callProcedure("@AdHoc",
+            "SELECT DEPT, CNT, CAST(MAX_WAGE AS INTEGER)*2, CAST(MIN_TM AS INTEGER) " +
+            "FROM V_R5_MIN_MAX ORDER BY DEPT").getResults()[0];
         System.out.println(table);
         validateTableOfLongs(table, expected);
     }
@@ -1062,6 +1173,25 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "AS SELECT ABS(DEPT), COUNT (*), MAX(WAGE * 2), MIN(TM) " +
                 "FROM R2 GROUP BY ABS(DEPT);" +
 
+                // R5 mv tests are mainly for string handling concerns
+                // -- it's a JSONic variant of R2 and its views -- a test for ENG-5292
+                "CREATE TABLE R5 ( " +
+                "id INTEGER DEFAULT '0' NOT NULL, " +
+                "JSON_DATA VARCHAR(100)," +
+                // JSON FIELDS:
+                //   wage INTEGER
+                //   dept INTEGER
+                //   tm_year INTEGER
+                //   tm_month INTEGER
+                //   tm_day INTEGER
+                "PRIMARY KEY (ID) );" +
+
+                "CREATE VIEW V_R5_MIN_MAX (DEPT, CNT, MAX_WAGE, MIN_TM) " +
+                "AS SELECT ABS(CAST(FIELD(JSON_DATA, 'dept') AS INTEGER)), COUNT(*), " +
+                "MAX(FIELD(JSON_DATA, 'wage')), MIN(FIELD(JSON_DATA, 'tm_year')) " +
+                "FROM R5 " +
+                "GROUP BY  ABS(CAST(FIELD(JSON_DATA, 'dept') AS INTEGER));" +
+
                 // R3 mv tests are mainly for memory concerns
                 "CREATE TABLE R3 ( " +
                 "id INTEGER DEFAULT '0' NOT NULL, " +
@@ -1087,7 +1217,6 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "AS SELECT vlong || '" + longStr + "', " +
                 "count(*), SUM(wage) " +
                 "FROM R3 GROUP BY vlong || '" + longStr + "';" +
-
 
                 "CREATE TABLE P1 ( " +
                 "id INTEGER DEFAULT '0' NOT NULL, " +

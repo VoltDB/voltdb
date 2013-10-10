@@ -73,7 +73,6 @@ import org.voltdb.utils.VoltTypeUtil;
 public class DDLCompiler {
 
     static final int MAX_COLUMNS = 1024;
-    static final int MAX_ROW_SIZE = 1024 * 1024 * 2;
 
     /**
      * Regex Description:
@@ -1113,10 +1112,6 @@ public class DDLCompiler {
             } else {
                 maxRowSize += t.getLengthInBytesForFixedTypes();
             }
-        }
-        if (maxRowSize > MAX_ROW_SIZE) {
-            throw m_compiler.new VoltCompilerException("Table name " + name + " has a maximum row size of " + maxRowSize +
-                    " but the maximum supported row size is " + MAX_ROW_SIZE);
         }
     }
 
