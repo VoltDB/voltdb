@@ -74,7 +74,6 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.SiteMailbox;
-import org.voltcore.utils.COWMap;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
@@ -161,11 +160,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
-    private Map<Long, ExecutionSite> m_localSites;
     HTTPAdminListener m_adminListener;
-    private Map<Long, Thread> m_siteThreads;
-    private ArrayList<ExecutionSiteRunner> m_runners;
-    private ExecutionSite m_currentThreadSite;
     private OpsRegistrar m_opsRegistrar = new OpsRegistrar();
 
     private AsyncCompilerAgent m_asyncCompilerAgent = new AsyncCompilerAgent();
@@ -346,9 +341,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             ActivePlanRepository.clear();
 
             // set up site structure
-            m_localSites = new COWMap<Long, ExecutionSite>();
-            m_siteThreads = new HashMap<Long, Thread>();
-            m_runners = new ArrayList<ExecutionSiteRunner>();
             final int computationThreads = Math.max(2, CoreUtils.availableProcessors() / 4);
             m_computationService =
                     CoreUtils.getListeningExecutorService(
@@ -1588,12 +1580,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
      */
     @Override
     public void run() {
-
-        // start the separate EE threads
-        for (ExecutionSiteRunner r : m_runners) {
-            r.m_shouldStartRunning.countDown();
-        }
-
         if (m_restoreAgent != null) {
             // start restore process
             m_restoreAgent.restore();
@@ -1618,7 +1604,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         m_isRunning = true;
         try
         {
-            m_currentThreadSite.run();
+            while (m_isRunning) {
+                Thread.sleep(1);
+            }
         }
         catch (Throwable thrown)
         {
@@ -1678,12 +1666,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     ci.shutdown();
                 }
 
-                // tell all m_sites to stop their runloops
-                if (m_localSites != null) {
-                    for (ExecutionSite site : m_localSites.values())
-                        site.startShutdown();
-                }
-
                 // tell the iv2 sites to stop their runloop
                 if (m_iv2Initiators != null) {
                     for (Initiator init : m_iv2Initiators)
@@ -1692,27 +1674,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
                 if (m_cartographer != null) {
                     m_cartographer.shutdown();
-                }
-
-                // try to join all threads but the main one
-                // probably want to check if one of these is the current thread
-                if (m_siteThreads != null) {
-                    for (Thread siteThread : m_siteThreads.values()) {
-                        if (Thread.currentThread().equals(siteThread) == false) {
-                            // don't interrupt here. the site will start shutdown when
-                            // it sees the shutdown flag set.
-                            siteThread.join();
-                        }
-                    }
-                }
-
-                // try to join the main thread (possibly this one)
-                if (mainSiteThread != null) {
-                    if (Thread.currentThread().equals(mainSiteThread) == false) {
-                        // don't interrupt here. the site will start shutdown when
-                        // it sees the shutdown flag set.
-                        mainSiteThread.join();
-                    }
                 }
 
                 if (m_configLogger != null) {
@@ -1731,12 +1692,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         hostLog.warn("Interrupted shutting down invocation buffer server", e);
                     }
                 }
-
-                // help the gc along
-                m_localSites = null;
-                m_currentThreadSite = null;
-                m_siteThreads = null;
-                m_runners = null;
 
                 // shut down the network/messaging stuff
                 // Close the host messenger first, which should close down all of
@@ -1966,11 +1921,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     @Override
-    public Map<Long, ExecutionSite> getLocalSites() {
-        return m_localSites;
-    }
-
-    @Override
     public OpsAgent getOpsAgent(OpsSelector selector) {
         return m_opsRegistrar.getAgent(selector);
     }
@@ -2023,13 +1973,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         for (ClientInterface ci : getClientInterfaces()) {
             out.print(ci.toString() + "\n");
         }
-
-        out.print("\n\n--reportsection\nContent-Type: text/plain\n\nLocalSite Report\n");
-        for(ExecutionSite es : getLocalSites().values()) {
-            out.print(es.toString() + "\n");
-        }
-
-        out.print("\n\n--reportsection--");
     }
 
     @Override

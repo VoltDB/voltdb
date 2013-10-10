@@ -603,17 +603,6 @@ SnapshotCompletionInterest
         final Long maxLastSeenTxn = m_replayAgent.getMaxLastSeenTxn();
         Set<SnapshotInfo> snapshotInfos = new HashSet<SnapshotInfo>();
         for (Snapshot e : snapshots.values()) {
-            /*
-             * If the txn of the snapshot is before the latest txn
-             * among the last seen txns across all initiators when the
-             * log starts, there is a gap in between the snapshot was
-             * taken and the beginning of the log. So the snapshot is
-             * not viable for replay.
-             */
-            if (maxLastSeenTxn != null && e.getTxnId() < maxLastSeenTxn) {
-                continue;
-            }
-
             SnapshotInfo info = checkSnapshotIsComplete(e.getTxnId(), e);
             // if the cluster instance IDs in the snapshot and command log don't match, just move along
             if (m_replayAgent.getInstanceId() != null && info != null &&
