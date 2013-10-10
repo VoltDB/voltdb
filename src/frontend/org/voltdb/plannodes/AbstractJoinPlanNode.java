@@ -256,16 +256,10 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException
     {
         helpLoadFromJSONObject(jobj, db);
-        this.m_joinType = JoinType.get( jobj.getString( Members.JOIN_TYPE.name() ) );
-        if( !jobj.isNull( Members.PRE_JOIN_PREDICATE.name() )) {
-            m_preJoinPredicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.PRE_JOIN_PREDICATE.name()), db);
-        }
-        if( !jobj.isNull( Members.JOIN_PREDICATE.name() )) {
-            m_joinPredicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.JOIN_PREDICATE.name()), db);
-        }
-        if( !jobj.isNull( Members.WHERE_PREDICATE.name() )) {
-            m_wherePredicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.WHERE_PREDICATE.name()), db);
-        }
+        m_joinType = JoinType.get( jobj.getString( Members.JOIN_TYPE.name() ) );
+        m_preJoinPredicate = AbstractExpression.fromJSONChild(jobj, Members.PRE_JOIN_PREDICATE.name());
+        m_joinPredicate = AbstractExpression.fromJSONChild(jobj, Members.JOIN_PREDICATE.name());
+        m_wherePredicate = AbstractExpression.fromJSONChild(jobj, Members.WHERE_PREDICATE.name());
     }
 
     /**

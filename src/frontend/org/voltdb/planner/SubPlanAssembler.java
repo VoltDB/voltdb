@@ -248,7 +248,7 @@ public abstract class SubPlanAssembler {
             try {
                 // This MAY want to happen once when the plan is loaded from the catalog
                 // and cached in a sticky cached index-to-expressions map?
-                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, null);
+                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson);
                 keyComponentCount = indexedExprs.size();
             } catch (JSONException e) {
                 e.printStackTrace();

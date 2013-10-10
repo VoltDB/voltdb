@@ -1049,7 +1049,7 @@ public class PlanAssembler {
                 // if this is a fancy expression-based index...
                 else {
                     try {
-                        indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, null);
+                        indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr);
                     } catch (JSONException e) {
                         e.printStackTrace(); // danger will robinson
                         assert(false);
@@ -1495,7 +1495,7 @@ public class PlanAssembler {
                     // either pure expression index or mix of expressions and simple columns
                     List<AbstractExpression> indexedExprs = null;
                     try {
-                        indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, null);
+                        indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson);
                     } catch (JSONException e) {
                         e.printStackTrace();
                         assert(false);
