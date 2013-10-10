@@ -175,7 +175,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                         assertEquals( 4, results[ii].getLong(1));
                         continue;
                     }
-                    assertEquals( 2, results[ii].getRowCount());
+                    assertEquals( 3, results[ii].getRowCount());
                     assertTrue(results[ii].advanceRow());
                     assertEquals(23, results[ii].getLong(0));
                     assertEquals( 3, results[ii].getLong(1));
@@ -326,15 +326,15 @@ public class TestAdHocQueries extends AdHocQueryTester {
             System.out.println(result.toString());
 
             // test single-partition stuff
-            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH;", 0).getResults()[0];
+            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH;", TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY ? 0 : 2).getResults()[0];
+            System.out.println(result.toString());
             assertEquals(0, result.getRowCount());
+            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH;", TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY ? 1 : 0).getResults()[0];
             System.out.println(result.toString());
-            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH;", 1).getResults()[0];
             assertEquals(1, result.getRowCount());
-            System.out.println(result.toString());
 
             try {
-                env.m_client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (0, 0, 0);", 1);
+                env.m_client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (0, 0, 0);", 2);
                 fail("Badly partitioned insert failed to throw expected exception");
             }
             catch (Exception e) {}

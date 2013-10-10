@@ -122,11 +122,13 @@ public abstract class AdHocQueryTester extends TestCase {
      */
     protected void runAllAdHocSPtests() throws NoConnectionsException, IOException, ProcCallException {
         int spPartialCount = 0;
+        int hashableA = TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY ? 0 : 0;
+        int hashableB = TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY ? 1 : 2;
         spPartialCount = runQueryTest("SELECT * FROM PARTED1;", 0, 0, 2, NOT_VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED1 WHERE PARTVAL != 0;", 1, spPartialCount-1, 1, VALIDATING_TOTAL_SP_RESULT);
+        runQueryTest("SELECT * FROM PARTED1 WHERE PARTVAL != 0;", hashableB, spPartialCount-1, 1, VALIDATING_TOTAL_SP_RESULT);
 
         spPartialCount = runQueryTest("SELECT * FROM PARTED3;", 0, 0, 2, NOT_VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED3 WHERE PARTVAL != 0;", 1, spPartialCount-1, 1, VALIDATING_TOTAL_SP_RESULT);
+        runQueryTest("SELECT * FROM PARTED3 WHERE PARTVAL != 0;", hashableB, spPartialCount-1, 1, VALIDATING_TOTAL_SP_RESULT);
 
         runQueryTest("SELECT * FROM REPPED1;", 0, 0, 2, VALIDATING_SP_RESULT);
 
@@ -135,10 +137,10 @@ public abstract class AdHocQueryTester extends TestCase {
         runQueryTest("SELECT * FROM REPPED1 WHERE REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
 
         spPartialCount = runQueryTest("SELECT * FROM V_PARTED1;", 0, 0, 2, NOT_VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM V_PARTED1 WHERE PARTVAL != 0;", 1, spPartialCount-1, 1, VALIDATING_TOTAL_SP_RESULT);
+        runQueryTest("SELECT * FROM V_PARTED1 WHERE PARTVAL != 0;", hashableB, spPartialCount-1, 1, VALIDATING_TOTAL_SP_RESULT);
 
         spPartialCount = runQueryTest("SELECT * FROM V_SCATTERED1;", 0, 0, 2, NOT_VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM V_SCATTERED1 WHERE NONPART != 0;", 1, spPartialCount-1, 1, VALIDATING_TOTAL_SP_RESULT);
+        runQueryTest("SELECT * FROM V_SCATTERED1 WHERE NONPART != 0;", hashableB, spPartialCount-1, 1, VALIDATING_TOTAL_SP_RESULT);
 
         runQueryTest("SELECT * FROM V_REPPED1;", 0, 0, 2, VALIDATING_SP_RESULT);
 
@@ -220,21 +222,21 @@ public abstract class AdHocQueryTester extends TestCase {
         runQueryTest("SELECT * FROM PARTED2 A, V_REPPED1 B WHERE A.PARTVAL = 0 and B.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM V_REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = 0 and B.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
         spPartialCount = runQueryTest("SELECT * FROM V_SCATTERED1 A, REPPED2 B WHERE A.NONPART = 0 and B.REPPEDVAL = 0;", 0, 0, 1, NOT_VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM V_SCATTERED1 A, REPPED2 B WHERE A.NONPART = 0 and B.REPPEDVAL = 0;", 1, spPartialCount, 1, VALIDATING_TOTAL_SP_RESULT);
+        runQueryTest("SELECT * FROM V_SCATTERED1 A, REPPED2 B WHERE A.NONPART = 0 and B.REPPEDVAL = 0;", hashableB, spPartialCount, 1, VALIDATING_TOTAL_SP_RESULT);
 
         runQueryTest("SELECT * FROM V_PARTED1 A, PARTED2 B WHERE A.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM V_REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and A.REPPEDVAL = B.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM PARTED2 A, V_REPPED1 B WHERE A.PARTVAL = 0 and A.PARTVAL = B.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM V_REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = 0 and A.REPPEDVAL = B.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
         spPartialCount = runQueryTest("SELECT * FROM V_SCATTERED1 A, REPPED2 B WHERE A.NONPART = 0 and A.NONPART = B.REPPEDVAL;", 0, 0, 1, NOT_VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM V_SCATTERED1 A, REPPED2 B WHERE A.NONPART = 0 and A.NONPART = B.REPPEDVAL;", 1, spPartialCount, 1, VALIDATING_TOTAL_SP_RESULT);
+        runQueryTest("SELECT * FROM V_SCATTERED1 A, REPPED2 B WHERE A.NONPART = 0 and A.NONPART = B.REPPEDVAL;", hashableB, spPartialCount, 1, VALIDATING_TOTAL_SP_RESULT);
 
         runQueryTest("SELECT * FROM V_PARTED1 A, PARTED2 B WHERE B.PARTVAL = A.PARTVAL and B.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM V_REPPED1 A, PARTED2 B WHERE B.PARTVAL = A.REPPEDVAL and B.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM PARTED2 A, V_REPPED1 B WHERE B.REPPEDVAL = A.PARTVAL and B.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM V_REPPED1 A, REPPED2 B WHERE B.REPPEDVAL = A.REPPEDVAL and B.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
         spPartialCount = runQueryTest("SELECT * FROM V_SCATTERED1 A, REPPED2 B WHERE B.REPPEDVAL = A.NONPART and B.REPPEDVAL = 0;", 0, 0, 1, NOT_VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM V_SCATTERED1 A, REPPED2 B WHERE B.REPPEDVAL = A.NONPART and B.REPPEDVAL = 0;", 1, spPartialCount, 1, VALIDATING_TOTAL_SP_RESULT);
+        runQueryTest("SELECT * FROM V_SCATTERED1 A, REPPED2 B WHERE B.REPPEDVAL = A.NONPART and B.REPPEDVAL = 0;", hashableB, spPartialCount, 1, VALIDATING_TOTAL_SP_RESULT);
 
 /* These queries are not yet supported SP because of B's varying partition key.
         runQueryTest("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL != A.PARTVAL;", 0, 1);
@@ -242,7 +244,7 @@ public abstract class AdHocQueryTester extends TestCase {
         runQueryTest("SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = 0 and B.PARTVAL != A.PARTVAL;", 0, 1);
 */
         spPartialCount = runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL != A.REPPEDVAL;", 0, 0, 1, NOT_VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL != A.REPPEDVAL;", 1, spPartialCount, 1, VALIDATING_TOTAL_SP_RESULT);
+        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL != A.REPPEDVAL;", hashableB, spPartialCount, 1, VALIDATING_TOTAL_SP_RESULT);
 
         runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = 0 and B.REPPEDVAL != A.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = 0 and B.REPPEDVAL != A.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
@@ -259,6 +261,7 @@ public abstract class AdHocQueryTester extends TestCase {
         // runQueryTest("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL;", 1, spPartialCount, 2, VALIDATING_TOTAL_SP_RESULT);
 
         // TODO: Three-way join test cases are probably required to cover all code paths through AccessPaths.
+        throw new RuntimeException("THis test is badly broke because it expects the old partitioning scheme");
     }
 
 }
