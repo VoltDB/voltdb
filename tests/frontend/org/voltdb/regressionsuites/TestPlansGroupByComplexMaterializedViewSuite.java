@@ -688,7 +688,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         verifyMVTestR5MinMax(client, expected);
 
         // Re-establish a min tm and max wage value for group 2 via update of the sole base
-        client.callProcedure("R5.update", 7, 
+        client.callProcedure("R5.update", 7,
                 "{\"wage\":77 , \"dept\":2 , \"tm_year\":2013 , \"tm_month\":6 , \"tm_day\":11 }", 7);
 
         expected = new long[][] {{0,1,20,expectedMaxTM},
@@ -697,7 +697,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         verifyMVTestR5MinMax(client, expected);
 
         // Re-establish a min tm and max wage value for group 1 via update of the current extreme value
-        client.callProcedure("R5.update", 6, 
+        client.callProcedure("R5.update", 6,
                 "{\"wage\":40 , \"dept\":1 , \"tm_year\":2010 , \"tm_month\":6 , \"tm_day\":11 }", 6);
 
         expected = new long[][] {{0,1,20,expectedMaxTM},
