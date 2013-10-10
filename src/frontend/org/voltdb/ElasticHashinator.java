@@ -49,11 +49,8 @@ import static org.voltdb.TheHashinator.valueToBytes;
  * to pick what partition to route a particular value.
  */
 public class ElasticHashinator extends TheHashinator {
-    public static int DEFAULT_TOKENS_PER_PARTITION =
-        Integer.parseInt(System.getProperty("ELASTIC_TOKENS_PER_PARTITION", "256"));
-
-    static final String SECURE_RANDOM_ALGORITHM = "SHA1PRNG";
-    static final byte [] SECURE_RANDON_SEED = "Festina Lente".getBytes(Charsets.UTF_8);
+    public static int DEFAULT_TOTAL_TOKENS =
+        Integer.parseInt(System.getProperty("ELASTIC_TOTAL_TOKENS", "16384"));
 
     /**
      * Tokens on the ring. A value hashes to a token if the token is the first value <=
@@ -89,7 +86,7 @@ public class ElasticHashinator extends TheHashinator {
     /**
      * Encapsulates all knowledge of how to compress/uncompress hash tokens.
      */
-    private static class TokenCompressor {
+    public static class TokenCompressor {
         final static long TOKEN_MASK = 0xFFFFFFFF00000000L;
         final static int COMPRESSED_SIZE = 4;
 
@@ -144,50 +141,14 @@ public class ElasticHashinator extends TheHashinator {
         m_cookedBytes = m_cookedBytesSupplier;
     }
 
-    /**
-     * Given an existing elastic hashinator, add a set of new partitions to the existing hash ring.
-     * @param oldHashinator An elastic hashinator
-     * @param newPartitions A set of new partitions to add
-     * @param tokensPerPartition The number of times a partition appears on the ring
-     * @return The config bytes of the new hash ring
-     */
     public static byte[] addPartitions(TheHashinator oldHashinator,
-                                       Collection<Integer> newPartitions,
-                                       int tokensPerPartition) {
+                                       int partitionsToAdd) {
         Preconditions.checkArgument(oldHashinator instanceof ElasticHashinator);
         ElasticHashinator oldElasticHashinator = (ElasticHashinator) oldHashinator;
 
-        SecureRandom sr;
-        try {
-            sr = SecureRandom.getInstance(SECURE_RANDOM_ALGORITHM);
-            sr.setSeed(SECURE_RANDON_SEED);
-        } catch (NoSuchAlgorithmException ex) {
-            throw new RuntimeException("Unable to initialize secure random generator", ex);
-        }
-
-        Map<Long, Integer> newConfig = new HashMap<Long, Integer>(oldElasticHashinator.m_tokens);
-        Set<Integer> existingPartitions = new HashSet<Integer>(oldElasticHashinator.m_tokens.values());
-        Set<Long> checkSet = new HashSet<Long>(oldElasticHashinator.m_tokens.keySet());
-
-        for (int pid : newPartitions) {
-            if (existingPartitions.contains(pid)) {
-                throw new RuntimeException("Partition " + pid + " already exists in the " +
-                        "hashinator");
-            }
-
-            for (int i = 0; i < tokensPerPartition; i++) {
-                while (true) {
-                    long candidateToken = TokenCompressor.prepare(sr.nextLong());
-                    if (!checkSet.add(candidateToken)) {
-                        continue;
-                    }
-                    newConfig.put(candidateToken, pid);
-                    break;
-                }
-            }
-        }
-
-        return new ElasticHashinator(newConfig).toBytes();
+        Buckets buckets = new Buckets(oldElasticHashinator.m_tokens);
+        buckets.addPartitions(partitionsToAdd);
+        return new ElasticHashinator(buckets.getTokens()).getConfigBytes();
     }
 
     /**
@@ -195,17 +156,12 @@ public class ElasticHashinator extends TheHashinator {
      * on a given partition count and tokens per partition. Each partition will have N tokens
      * placed randomly on the ring.
      */
-    public static byte[] getConfigureBytes(int partitionCount, int tokensPerPartition) {
+    public static byte[] getConfigureBytes(int partitionCount, int tokenCount) {
         Preconditions.checkArgument(partitionCount > 0);
-        Preconditions.checkArgument(tokensPerPartition > 0);
-        ElasticHashinator emptyHashinator = new ElasticHashinator(new HashMap<Long, Integer>());
-        Set<Integer> partitions = new TreeSet<Integer>();
-
-        for (int ii = 0; ii < partitionCount; ii++) {
-            partitions.add(ii);
-        }
-
-        return addPartitions(emptyHashinator, partitions, tokensPerPartition);
+        Preconditions.checkArgument(tokenCount > partitionCount);
+        Buckets buckets = new Buckets(partitionCount, tokenCount);
+        ElasticHashinator hashinator = new ElasticHashinator(buckets.getTokens());
+        return hashinator.getConfigBytes();
     }
 
     /**
@@ -213,7 +169,7 @@ public class ElasticHashinator extends TheHashinator {
      * @return The byte[] of the current configuration.
      */
     private byte[] toBytes() {
-        ByteBuffer buf = ByteBuffer.allocate(4 + (m_tokens.size() * (8 + TokenCompressor.COMPRESSED_SIZE)));
+        ByteBuffer buf = ByteBuffer.allocate(4 + (m_tokens.size() * (4 + 8)));
         buf.putInt(m_tokens.size());
 
         for (Map.Entry<Long, Integer> e : m_tokens.entrySet()) {

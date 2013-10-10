@@ -430,7 +430,7 @@ public abstract class TheHashinator {
         case LEGACY:
             return LegacyHashinator.getConfigureBytes(partitionCount);
         case ELASTIC:
-            return ElasticHashinator.getConfigureBytes(partitionCount, ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+            return ElasticHashinator.getConfigureBytes(partitionCount, ElasticHashinator.DEFAULT_TOTAL_TOKENS);
         }
         throw new RuntimeException("Should not reach here");
     }
