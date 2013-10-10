@@ -478,13 +478,13 @@ public abstract class SubPlanAssembler {
         }
 
         if (startingBoundExpr != null) {
-            AbstractExpression comparator = startingBoundExpr.getFilter();
-            retval.indexExprs.add(comparator);
+            AbstractExpression lowerBoundExpr = startingBoundExpr.getFilter();
+            retval.indexExprs.add(lowerBoundExpr);
             retval.bindings.addAll(startingBoundExpr.getBindings());
-            if (comparator.getExpressionType() == ExpressionType.COMPARE_GREATERTHAN) {
+            if (lowerBoundExpr.getExpressionType() == ExpressionType.COMPARE_GREATERTHAN) {
                 retval.lookupType = IndexLookupType.GT;
             } else {
-                assert(comparator.getExpressionType() == ExpressionType.COMPARE_GREATERTHANOREQUALTO);
+                assert(lowerBoundExpr.getExpressionType() == ExpressionType.COMPARE_GREATERTHANOREQUALTO);
                 retval.lookupType = IndexLookupType.GTE;
             }
             retval.use = IndexUseType.INDEX_SCAN;
@@ -518,22 +518,14 @@ public abstract class SubPlanAssembler {
                     retval.lookupType = IndexLookupType.GTE;
                 }
             } else {
-                // only do reverse scan optimization when no startingBoundExpr and lookup type is either < or <=.
+                // optimizable.
+                // only do reverse scan optimization when no lowerBoundExpr and lookup type is either < or <=.
                 if (upperBoundComparator.getExpressionType() == ExpressionType.COMPARE_LESSTHAN) {
                     retval.lookupType = IndexLookupType.LT;
                 } else {
                     assert upperBoundComparator.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO;
                     retval.lookupType = IndexLookupType.LTE;
                 }
-                // optimizable
-                if (startingBoundExpr != null) {
-                    int lastIdx = retval.indexExprs.size() -1;
-                    retval.indexExprs.remove(lastIdx);
-                }
-
-                // add to indexExprs because it will be used as part of searchKey
-                retval.indexExprs.add(upperBoundComparator);
-
                 // Unlike a lower bound, an upper bound does not automatically filter out nulls
                 // as required by the comparison filter, so construct a NOT NULL comparator and
                 // add to post-filter
@@ -546,10 +538,15 @@ public abstract class SubPlanAssembler {
                     newComparator.finalizeValueTypes();
                     retval.otherExprs.add(newComparator);
                 } else {
-                    AbstractExpression startComparator = startingBoundExpr.getFilter();
-                    retval.endExprs.add(startComparator);
+                    int lastIdx = retval.indexExprs.size() -1;
+                    retval.indexExprs.remove(lastIdx);
+
+                    AbstractExpression lowerBoundComparator = startingBoundExpr.getFilter();
+                    retval.endExprs.add(lowerBoundComparator);
                 }
 
+                // add to indexExprs because it will be used as part of searchKey
+                retval.indexExprs.add(upperBoundComparator);
                 // initialExpr is set for both cases
                 // but will be used for LTE and only when overflow case of LT
                 retval.initialExpr.addAll(retval.indexExprs);

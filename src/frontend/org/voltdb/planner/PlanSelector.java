@@ -148,80 +148,80 @@ public class PlanSelector implements Cloneable {
     /** Picks the best cost plan for a given raw plan
      * @param rawplan
      */
-   public void considerCandidatePlan(CompiledPlan rawplan) {
-       //System.out.println(String.format("[Raw plan]:%n%s", rawplan.rootPlanGraph.toExplainPlanString()));
+    public void considerCandidatePlan(CompiledPlan rawplan) {
+        //System.out.println(String.format("[Raw plan]:%n%s", rawplan.rootPlanGraph.toExplainPlanString()));
 
-       // run the set of microptimizations, which may return many plans (or not)
-       List<CompiledPlan> optimizedPlans = MicroOptimizationRunner.applyAll(rawplan, m_db, m_detMode);
+        // run the set of microptimizations, which may return many plans (or not)
+        List<CompiledPlan> optimizedPlans = MicroOptimizationRunner.applyAll(rawplan, m_db, m_detMode);
 
-       // iterate through the subset of plans
-       for (CompiledPlan plan : optimizedPlans) {
+        // iterate through the subset of plans
+        for (CompiledPlan plan : optimizedPlans) {
 
-           // add in the sql to the plan
-           plan.sql = m_sql;
+            // add in the sql to the plan
+            plan.sql = m_sql;
 
-           // compute resource usage using the single stats collector
-           m_stats = new PlanStatistics();
-           AbstractPlanNode planGraph = plan.rootPlanGraph;
+            // compute resource usage using the single stats collector
+            m_stats = new PlanStatistics();
+            AbstractPlanNode planGraph = plan.rootPlanGraph;
 
-           // compute statistics about a plan
-           planGraph.computeEstimatesRecursively(m_stats, m_cluster, m_db, m_estimates, m_paramHints);
+            // compute statistics about a plan
+            planGraph.computeEstimatesRecursively(m_stats, m_cluster, m_db, m_estimates, m_paramHints);
 
-           // compute the cost based on the resources using the current cost model
-           plan.cost = m_costModel.getPlanCost(m_stats);
+            // compute the cost based on the resources using the current cost model
+            plan.cost = m_costModel.getPlanCost(m_stats);
 
-           // filename for debug output
-           String filename = String.valueOf(m_planId++);
+            // filename for debug output
+            String filename = String.valueOf(m_planId++);
 
-           //System.out.println(String.format("[new plan]: Cost:%f%n%s", plan.cost, plan.rootPlanGraph.toExplainPlanString()));
+            //System.out.println(String.format("[new plan]: Cost:%f%n%s", plan.cost, plan.rootPlanGraph.toExplainPlanString()));
 
-           // find the minimum cost plan
-           if (m_bestPlan == null || plan.cost < m_bestPlan.cost) {
-               // free the PlanColumns held by the previous best plan
-               m_bestPlan = plan;
-               m_bestFilename = filename;
-               //System.out.println("[Best plan] gets updated ***\n");
-           }
+            // find the minimum cost plan
+            if (m_bestPlan == null || plan.cost < m_bestPlan.cost) {
+                // free the PlanColumns held by the previous best plan
+                m_bestPlan = plan;
+                m_bestFilename = filename;
+                //System.out.println("[Best plan] gets updated ***\n");
+            }
 
-           outputPlan(plan, planGraph, filename);
-       }
-   }
+            outputPlan(plan, planGraph, filename);
+        }
+    }
 
-   public void finalizeOutput() {
-       if (m_quietPlanner) {
-           return;
-       }
-       outputPlan(m_bestPlan, m_bestPlan.rootPlanGraph, m_bestFilename);
+    public void finalizeOutput() {
+        if (m_quietPlanner) {
+            return;
+        }
+        outputPlan(m_bestPlan, m_bestPlan.rootPlanGraph, m_bestFilename);
 
-       // find out where debugging is going
-       String prefix = BuildDirectoryUtils.getBuildDirectoryPath() +
-               "/" + BuildDirectoryUtils.debugRootPrefix + "statement-all-plans/" +
-               m_procName + "_" + m_stmtName + "/";
-       String winnerFilename, winnerFilenameRenamed;
+        // find out where debugging is going
+        String prefix = BuildDirectoryUtils.getBuildDirectoryPath() +
+                "/" + BuildDirectoryUtils.debugRootPrefix + "statement-all-plans/" +
+                m_procName + "_" + m_stmtName + "/";
+        String winnerFilename, winnerFilenameRenamed;
 
-       // if outputting full stuff
-       if (m_fullDebug) {
-           // rename the winner json plan
-           winnerFilename = prefix + m_bestFilename + "-json.txt";
-           winnerFilenameRenamed = prefix + "WINNER-" + m_bestFilename + "-json.txt";
-           renameFile(winnerFilename, winnerFilenameRenamed);
+        // if outputting full stuff
+        if (m_fullDebug) {
+            // rename the winner json plan
+            winnerFilename = prefix + m_bestFilename + "-json.txt";
+            winnerFilenameRenamed = prefix + "WINNER-" + m_bestFilename + "-json.txt";
+            renameFile(winnerFilename, winnerFilenameRenamed);
 
-           // rename the winner dot plan
-           winnerFilename = prefix + m_bestFilename + ".dot";
-           winnerFilenameRenamed = prefix + "WINNER-" + m_bestFilename + ".dot";
-           renameFile(winnerFilename, winnerFilenameRenamed);
-       }
+            // rename the winner dot plan
+            winnerFilename = prefix + m_bestFilename + ".dot";
+            winnerFilenameRenamed = prefix + "WINNER-" + m_bestFilename + ".dot";
+            renameFile(winnerFilename, winnerFilenameRenamed);
+        }
 
-       // rename the winner explain plan
-       winnerFilename = prefix + m_bestFilename + ".txt";
-       winnerFilenameRenamed = prefix + "WINNER-" + m_bestFilename + ".txt";
-       renameFile(winnerFilename, winnerFilenameRenamed);
+        // rename the winner explain plan
+        winnerFilename = prefix + m_bestFilename + ".txt";
+        winnerFilenameRenamed = prefix + "WINNER-" + m_bestFilename + ".txt";
+        renameFile(winnerFilename, winnerFilenameRenamed);
 
-       if (m_fullDebug) {
-           // output the plan statistics to disk for debugging
-           BuildDirectoryUtils.writeFile("statement-stats", m_procName + "_" + m_stmtName + ".txt",
-                   m_stats.toString(), true);
-       }
+        if (m_fullDebug) {
+            // output the plan statistics to disk for debugging
+            BuildDirectoryUtils.writeFile("statement-stats", m_procName + "_" + m_stmtName + ".txt",
+                    m_stats.toString(), true);
+        }
     }
 
     /**
