@@ -122,7 +122,7 @@ public class TestCoveringIndexPlans extends PlannerTestCase {
         }
         assertTrue(pn instanceof IndexScanPlanNode);
         IndexScanPlanNode ispn = (IndexScanPlanNode)pn;
-        assertEquals("IDX_1", ispn.getTargetIndexName());
+        assertEquals("IDX_1_TREE", ispn.getTargetIndexName());
         assertEquals(IndexLookupType.LT, ispn.getLookupType());
         assertEquals(3, ispn.getSearchKeyExpressions().size());
     }

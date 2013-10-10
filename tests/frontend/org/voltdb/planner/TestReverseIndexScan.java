@@ -120,6 +120,23 @@ public class TestReverseIndexScan extends PlannerTestCase {
         assertEquals(SortDirectionType.DESC, ispn.getSortDirection());
     }
 
+    public void test0033()
+    {
+        AbstractPlanNode pn = compile("select a, b from t where a = ? and b = ? and c < ? order by c desc;");
+        pn = pn.getChild(0);
+        if (pn != null) {
+            System.out.println(pn.toJSONString());
+        }
+        assertTrue(pn instanceof IndexScanPlanNode);
+        IndexScanPlanNode ispn = (IndexScanPlanNode)pn;
+        assertEquals("IDX_1_TREE", ispn.getTargetIndexName());
+        assertEquals(IndexLookupType.LT, ispn.getLookupType());
+        assertEquals(3, ispn.getSearchKeyExpressions().size());
+        assertEquals(2, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
+        assertEquals(1, ExpressionUtil.uncombine(ispn.getPredicate()).size());
+        assertEquals(SortDirectionType.DESC, ispn.getSortDirection());
+    }
+
     public void test004()
     {
         AbstractPlanNode pn = compile("select a from t where a = ? and b <= ?");
