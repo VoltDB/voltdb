@@ -542,15 +542,6 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public boolean isIV2Enabled() {
-        if (voltconfig == null)
-        {
-            voltconfig = new VoltDB.Configuration();
-        }
-        return voltconfig.m_enableIV2;
-    }
-
-    @Override
     public ScheduledFuture<?> schedulePriorityWork(Runnable work,
             long initialDelay, long delay, TimeUnit unit) {
         return null;

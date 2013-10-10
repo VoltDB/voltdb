@@ -958,16 +958,11 @@ public abstract class CatalogUtil {
                 }
             }
             else {
-                // Default partition detection on for IV2
-                if (VoltDB.instance().isIV2Enabled()) {
-                    catCluster.setNetworkpartition(true);
-                    CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
-                    SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
-                    sched.setPrefix(defaultPPDPrefix);
-                }
-                else {
-                    catCluster.setNetworkpartition(false);
-                }
+                // Default partition detection on
+                catCluster.setNetworkpartition(true);
+                CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
+                SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
+                sched.setPrefix(defaultPPDPrefix);
             }
 
             // copy admin mode configuration from xml to catalog

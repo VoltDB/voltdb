@@ -293,11 +293,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         return m_licenseApi;
     }
 
-    @Override
-    public boolean isIV2Enabled() {
-        return m_config.m_enableIV2;
-    }
-
     /**
      * Initialize all the global components, then initialize all the m_sites.
      */
@@ -310,9 +305,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 System.exit(-1);
             }
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
-            if (!config.m_enableIV2) {
-                consoleLog.warn("Running 3.0 preview (legacy mode).  THIS MODE IS DEPRECATED.");
-            }
 
             // If there's no deployment provide a default and put it under voltdbroot.
             if (config.m_pathToDeployment == null) {
@@ -463,41 +455,39 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_configuredNumberOfPartitions = clusterConfig.getPartitionCount();
 
                 // IV2 mailbox stuff
-                if (isIV2Enabled()) {
-                    m_cartographer = new Cartographer(m_messenger);
-                    List<Integer> partitions = null;
-                    if (isRejoin) {
-                        partitions = m_cartographer.getIv2PartitionsToReplace(topo);
-                        if (partitions.size() == 0) {
-                            VoltDB.crashLocalVoltDB("The VoltDB cluster already has enough nodes to satisfy " +
-                                    "the requested k-safety factor of " +
-                                    clusterConfig.getReplicationFactor() + ".\n" +
-                                    "No more nodes can join.", false, null);
-                        }
+                m_cartographer = new Cartographer(m_messenger);
+                List<Integer> partitions = null;
+                if (isRejoin) {
+                    partitions = m_cartographer.getIv2PartitionsToReplace(topo);
+                    if (partitions.size() == 0) {
+                        VoltDB.crashLocalVoltDB("The VoltDB cluster already has enough nodes to satisfy " +
+                                "the requested k-safety factor of " +
+                                clusterConfig.getReplicationFactor() + ".\n" +
+                                "No more nodes can join.", false, null);
                     }
-                    else {
-                        partitions = ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
-                    }
-                    for (int ii = 0; ii < partitions.size(); ii++) {
-                        Integer partition = partitions.get(ii);
-                        m_iv2InitiatorStartingTxnIds.put( partition, TxnEgo.makeZero(partition).getTxnId());
-                    }
-                    m_iv2Initiators = createIv2Initiators(
-                            partitions,
-                            m_config.m_startAction,
-                            m_partitionsToSitesAtStartupForExportInit);
-                    m_iv2InitiatorStartingTxnIds.put(
-                            MpInitiator.MP_INIT_PID,
-                            TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId());
-                    // Pass the local HSIds to the MPI so it can farm out buddy sites
-                    // to the RO MP site pool
-                    List<Long> localHSIds = new ArrayList<Long>();
-                    for (Initiator ii : m_iv2Initiators) {
-                        localHSIds.add(ii.getInitiatorHSId());
-                    }
-                    m_MPI = new MpInitiator(m_messenger, localHSIds, getStatsAgent());
-                    m_iv2Initiators.add(m_MPI);
                 }
+                else {
+                    partitions = ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
+                }
+                for (int ii = 0; ii < partitions.size(); ii++) {
+                    Integer partition = partitions.get(ii);
+                    m_iv2InitiatorStartingTxnIds.put( partition, TxnEgo.makeZero(partition).getTxnId());
+                }
+                m_iv2Initiators = createIv2Initiators(
+                        partitions,
+                        m_config.m_startAction,
+                        m_partitionsToSitesAtStartupForExportInit);
+                m_iv2InitiatorStartingTxnIds.put(
+                        MpInitiator.MP_INIT_PID,
+                        TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId());
+                // Pass the local HSIds to the MPI so it can farm out buddy sites
+                // to the RO MP site pool
+                List<Long> localHSIds = new ArrayList<Long>();
+                for (Initiator ii : m_iv2Initiators) {
+                    localHSIds.add(ii.getInitiatorHSId());
+                }
+                m_MPI = new MpInitiator(m_messenger, localHSIds, getStatsAgent());
+                m_iv2Initiators.add(m_MPI);
 
                 clusterConfig = new ClusterConfig(topo);
 
@@ -509,7 +499,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     }
                 }
 
-                if (isRejoin && isIV2Enabled()) {
+                if (isRejoin) {
                     SnapshotSaveAPI.recoveringSiteCount.set(partsToHSIdsToRejoin.size());
                     hostLog.info("Set recovering site count to " + partsToHSIdsToRejoin.size());
 
@@ -1243,8 +1233,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             assert(depCRC != -1);
 
             m_catalogContext = new CatalogContext(
-                    isIV2Enabled() ? TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId() : 0,//txnid
-                            0,//timestamp
+                            TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId(), //txnid
+                            0, //timestamp
                             catalog, null, depCRC, 0, -1);
 
             int numberOfNodes = m_deployment.getCluster().getHostcount();
@@ -1599,11 +1589,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public void run() {
 
-        if (!isIV2Enabled()) {
-            // start the separate EE threads
-            for (ExecutionSiteRunner r : m_runners) {
-                r.m_shouldStartRunning.countDown();
-            }
+        // start the separate EE threads
+        for (ExecutionSiteRunner r : m_runners) {
+            r.m_shouldStartRunning.countDown();
         }
 
         if (m_restoreAgent != null) {
@@ -1630,14 +1618,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         m_isRunning = true;
         try
         {
-            if (!isIV2Enabled()) {
-                m_currentThreadSite.run();
-            }
-            else {
-                while (m_isRunning) {
-                    Thread.sleep(1);
-                }
-            }
+            m_currentThreadSite.run();
         }
         catch (Throwable thrown)
         {
@@ -1697,12 +1678,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     ci.shutdown();
                 }
 
-                if (!isIV2Enabled()) {
-                    // tell all m_sites to stop their runloops
-                    if (m_localSites != null) {
-                        for (ExecutionSite site : m_localSites.values())
-                            site.startShutdown();
-                    }
+                // tell all m_sites to stop their runloops
+                if (m_localSites != null) {
+                    for (ExecutionSite site : m_localSites.values())
+                        site.startShutdown();
                 }
 
                 // tell the iv2 sites to stop their runloop
@@ -1715,26 +1694,24 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     m_cartographer.shutdown();
                 }
 
-                if (!isIV2Enabled()) {
-                    // try to join all threads but the main one
-                    // probably want to check if one of these is the current thread
-                    if (m_siteThreads != null) {
-                        for (Thread siteThread : m_siteThreads.values()) {
-                            if (Thread.currentThread().equals(siteThread) == false) {
-                                // don't interrupt here. the site will start shutdown when
-                                // it sees the shutdown flag set.
-                                siteThread.join();
-                            }
-                        }
-                    }
-
-                    // try to join the main thread (possibly this one)
-                    if (mainSiteThread != null) {
-                        if (Thread.currentThread().equals(mainSiteThread) == false) {
+                // try to join all threads but the main one
+                // probably want to check if one of these is the current thread
+                if (m_siteThreads != null) {
+                    for (Thread siteThread : m_siteThreads.values()) {
+                        if (Thread.currentThread().equals(siteThread) == false) {
                             // don't interrupt here. the site will start shutdown when
                             // it sees the shutdown flag set.
-                            mainSiteThread.join();
+                            siteThread.join();
                         }
+                    }
+                }
+
+                // try to join the main thread (possibly this one)
+                if (mainSiteThread != null) {
+                    if (Thread.currentThread().equals(mainSiteThread) == false) {
+                        // don't interrupt here. the site will start shutdown when
+                        // it sees the shutdown flag set.
+                        mainSiteThread.join();
                     }
                 }
 
