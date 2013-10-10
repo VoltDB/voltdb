@@ -395,16 +395,13 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                             index->moveToEnd(false);
                         } else {
                             while (!(inner_tuple = index->nextValue()).isNullTuple()) {
-                                printf("[NestloopIndexJoin]: tuple: '%s'\n", inner_tuple.debug("tablename").c_str());
                                 if (initial_expression != NULL && initial_expression->eval(&outer_tuple, &inner_tuple).isFalse()) {
                                     // just passed the first failed entry, so move 2 backward
-                                    printf("Break ####\n");
                                     index->moveToBeforePriorEntry();
                                     break;
                                 }
                             }
                             if (inner_tuple.isNullTuple()) {
-                                printf("[NestloopIndexJoin] is null...\n");
                                 index->moveToEnd(false);
                             }
                         }
