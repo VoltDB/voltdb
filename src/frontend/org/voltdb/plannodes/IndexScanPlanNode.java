@@ -614,7 +614,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             }
             else {
                 usageInfo = "\n" + indent;
-                if (m_lookupType == IndexLookupType.LT || m_lookupType == IndexLookupType.LTE) {
+                if (isReverseScan()) {
                     usageInfo += "reverse ";
                 }
                 // qualify whether the inequality matching covers all or only some index key components
@@ -629,7 +629,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 // Explain the criteria for continuinuing the scan such as
                 // "while (event_type = 1 AND event_start < x.start_time+30)"
                 // or label it as a scan "to the end"
-                usageInfo += explainEndKeys(asIndexed);
+                usageInfo += explainEndKeys();
             }
             // Introduce any additional filters not related to the index
             // that could cause rows to be skipped.
@@ -681,7 +681,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     /// Explain that this index scans "to end" of the index
     /// or only "while" an end expression involving indexed key values remains true.
-    private String explainEndKeys(String[] asIndexed)
+    private String explainEndKeys()
     {
         // By default, indexing starts at the start of the index.
         if (m_endExpression == null) {

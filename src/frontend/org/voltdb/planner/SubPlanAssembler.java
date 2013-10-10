@@ -492,15 +492,14 @@ public abstract class SubPlanAssembler {
 
         if (endingBoundExpr == null) {
             if (retval.sortDirection == SortDirectionType.DESC) {
-                if (retval.endExprs.size() == 0) { // no prefix equality filters
-                    if (startingBoundExpr != null) {
-                        retval.indexExprs.clear();
-                        AbstractExpression comparator = startingBoundExpr.getFilter();
-                        retval.endExprs.add(comparator);
-                    }
-                }
-                else { // there are prefix equality filters -- settle for a forward scan?
-                    retval.sortDirection = SortDirectionType.INVALID;
+                // Optimizable to use reverse scan.
+                if (startingBoundExpr != null) {
+                    int lastIdx = retval.indexExprs.size() -1;
+                    retval.indexExprs.remove(lastIdx);
+
+                    AbstractExpression comparator = startingBoundExpr.getFilter();
+                    retval.endExprs.add(comparator);
+                    retval.initialExpr.addAll(retval.indexExprs);
                 }
             }
         }
@@ -518,7 +517,7 @@ public abstract class SubPlanAssembler {
                     retval.lookupType = IndexLookupType.GTE;
                 }
             } else {
-                // optimizable.
+                // Optimizable to use reverse scan.
                 // only do reverse scan optimization when no lowerBoundExpr and lookup type is either < or <=.
                 if (upperBoundComparator.getExpressionType() == ExpressionType.COMPARE_LESSTHAN) {
                     retval.lookupType = IndexLookupType.LT;

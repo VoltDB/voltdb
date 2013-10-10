@@ -6,11 +6,11 @@ create table t (
   e bigint not null
 );
 
-create index idx_1_TREE on t (a, b, c, d);
-create index idx_2_TREE on t (e, a, b, c, d);
+create index IDX_1_TREE on t (a, b, c, d);
+create index IDX_2_TREE on t (e, a, b, c, d);
 
-create index cover2_TREE on t (a, b);
-create index cover3_TREE on t (a, c, b);
+create index COVER2_TREE on t (a, b);
+create index COVER3_TREE on t (a, c, b);
 
 
 CREATE TABLE data_reports (
@@ -23,3 +23,17 @@ CREATE TABLE data_reports (
   CONSTRAINT IDX_reportData_PK PRIMARY KEY (reportID,metricID,time,field)
 );
 PARTITION TABLE data_reports ON COLUMN appID;
+
+
+create table R (
+  a bigint ,
+  b bigint ,
+  c bigint ,
+  d bigint ,
+  e bigint , 
+  f bigint , 
+);
+
+create index R1_TREE on R (a);
+create index R2_TREE on R (b,c);
+create index R3_TREE on R (d, e, f);
