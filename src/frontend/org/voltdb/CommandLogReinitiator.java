@@ -101,12 +101,6 @@ public interface CommandLogReinitiator {
     public void returnAllSegments();
 
     /**
-     * Request an elastic index snapshot if the command log will replay @BalancePartitions transactions.
-     * @return true if successfully requested.
-     */
-    public boolean requestIndexSnapshot();
-
-    /**
      * Call @BalancePartitions until the partitions are balanced if necessary. Does nothing if the partitions are
      * already balanced or if the legacy hashinator is used.
      * @return true if the partitions are balanced successfully.
