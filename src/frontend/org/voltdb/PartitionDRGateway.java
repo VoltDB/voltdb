@@ -28,8 +28,6 @@ import org.voltdb.licensetool.LicenseApi;
  *
  */
 public class PartitionDRGateway {
-    protected final boolean m_iv2Enabled;
-
     /**
      * Load the full subclass if it should, otherwise load the
      * noop stub.
@@ -39,7 +37,6 @@ public class PartitionDRGateway {
      */
     public static PartitionDRGateway getInstance(int partitionId,
                                                  NodeDRGateway nodeGateway,
-                                                 boolean iv2Enabled,
                                                  boolean isRejoin)
     {
         final VoltDBInterface vdb = VoltDB.instance();
@@ -50,10 +47,10 @@ public class PartitionDRGateway {
         // try to load the real version of this class
         PartitionDRGateway pdrg = null;
         if (licensedToDR && nodeGateway != null) {
-            pdrg = tryToLoadProVersion(iv2Enabled);
+            pdrg = tryToLoadProVersion();
         }
         if (pdrg == null) {
-            pdrg = new PartitionDRGateway(iv2Enabled);
+            pdrg = new PartitionDRGateway();
         }
 
         // init the instance and return
@@ -65,21 +62,16 @@ public class PartitionDRGateway {
         return pdrg;
     }
 
-    private static PartitionDRGateway tryToLoadProVersion(boolean iv2Enalbed)
+    private static PartitionDRGateway tryToLoadProVersion()
     {
         try {
             Class<?> pdrgiClass = Class.forName("org.voltdb.dr.PartitionDRGatewayImpl");
-            Constructor<?> constructor = pdrgiClass.getConstructor(boolean.class);
-            Object obj = constructor.newInstance(iv2Enalbed);
+            Constructor<?> constructor = pdrgiClass.getConstructor();
+            Object obj = constructor.newInstance();
             return (PartitionDRGateway) obj;
         } catch (Exception e) {
         }
         return null;
-    }
-
-    public PartitionDRGateway(boolean iv2Enabled)
-    {
-        m_iv2Enabled = iv2Enabled;
     }
 
     // empty methods for community edition

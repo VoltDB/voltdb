@@ -653,9 +653,6 @@ public class TestCatalogUtil extends TestCase {
     // I'm not testing the legacy behavior here, just IV2
     public void testIv2PartitionDetectionSettings() throws Exception
     {
-        if (!VoltDB.checkTestEnvForIv2()) {
-            return;
-        }
         final String noElement =
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
