@@ -131,6 +131,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         List<TupleValueExpression> index_tves =
             new ArrayList<TupleValueExpression>();
         index_tves.addAll(ExpressionUtil.getTupleValueExpressions(inline_scan.getEndExpression()));
+        index_tves.addAll(ExpressionUtil.getTupleValueExpressions(inline_scan.getInitialExpression()));
         for (AbstractExpression search_exp : inline_scan.getSearchKeyExpressions())
         {
             index_tves.addAll(ExpressionUtil.getTupleValueExpressions(search_exp));
@@ -197,6 +198,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         resolvePredicate(m_wherePredicate, outer_schema, index_schema);
     }
 
+    @Override
     public void resolveSortDirection() {
         super.resolveSortDirection();
         // special treatment for NLIJ, when the outer table is a materialized scan node
@@ -264,6 +266,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
                 explainFilters(indent);
     }
 
+    @Override
     public void toJSONString(JSONStringer stringer) throws JSONException
     {
         super.toJSONString(stringer);
@@ -272,6 +275,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         }
     }
 
+    @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException
     {
         super.loadFromJSONObject(jobj, db);
