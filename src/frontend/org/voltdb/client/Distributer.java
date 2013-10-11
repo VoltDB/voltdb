@@ -574,12 +574,6 @@ class Distributer {
                 Thread.sleep(5);
             }
         } while(more);
-
-        synchronized (this) {
-            for (NodeConnection cxn : m_connections ) {
-                assert(cxn.m_callbacks.size() == 0);
-            }
-        }
     }
 
     Distributer() {
