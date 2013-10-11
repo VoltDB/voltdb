@@ -762,14 +762,17 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void truncateUndoLog(boolean rollback, long beginUndoToken, long txnId, long spHandle, List<UndoAction> undoLog)
     {
+        // Set the last committed txnId even if there is nothing to undo, as long as the txn is not rolling back.
+        if (!rollback) {
+            setLastCommittedTxn(txnId, spHandle);
+        }
+
         //Any new txnid will create a new undo quantum, including the same txnid again
         latestUndoTxnId = Long.MIN_VALUE;
         //If the begin undo token is not set the txn never did any work so there is nothing to undo/release
         if (beginUndoToken == Site.kInvalidUndoToken) return;
         if (rollback) {
-
             m_ee.undoUndoToken(beginUndoToken);
-            handleUndoLog(undoLog, true);
         }
         else {
             assert(latestUndoToken != Site.kInvalidUndoToken);
@@ -777,15 +780,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             if (latestUndoToken > beginUndoToken) {
                 m_ee.releaseUndoToken(latestUndoToken);
             }
-            m_lastCommittedTxnId = txnId;
-            if (TxnEgo.getPartitionId(m_lastCommittedSpHandle) != TxnEgo.getPartitionId(spHandle)) {
-                VoltDB.crashLocalVoltDB("Mismatch SpHandle partitiond id " +
-                        TxnEgo.getPartitionId(m_lastCommittedSpHandle) + ", " +
-                        TxnEgo.getPartitionId(spHandle), true, null);
-            }
-            m_lastCommittedSpHandle = spHandle;
-            handleUndoLog(undoLog, false);
         }
+        handleUndoLog(undoLog, rollback);
     }
 
     @Override
