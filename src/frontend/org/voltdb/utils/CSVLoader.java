@@ -341,7 +341,7 @@ public class CSVLoader {
             long ackCount = CSVPartitionProcessor.m_partitionAcknowledgedCount.get();
             m_log.debug("Parsing CSV file took " + readerTime + " milliseconds.");
             m_log.debug("Inserting Data took " + ((insertTimeEnd - insertTimeStart) - readerTime) + " milliseconds.");
-            m_log.debug("Inserted " + insertCount + " and acknowledged "
+            m_log.info("Read " + insertCount + " rows from file and successfully inserted "
                     + ackCount + " rows (final)");
             produceFiles(ackCount, insertCount);
             close_cleanup();
