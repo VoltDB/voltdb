@@ -55,7 +55,7 @@ class CSVPartitionProcessor implements Runnable {
     final AtomicLong m_partitionProcessedCount = new AtomicLong(0);
     //Incremented after insert is acknowledged by server.
     static AtomicLong m_partitionAcknowledgedCount = new AtomicLong(0);
-    protected static final VoltLogger m_log = new VoltLogger("CONSOLE");
+    protected static final VoltLogger m_log = new VoltLogger("CSVLOADER");
     static CountDownLatch m_processor_cdl;
     boolean m_errored = false;
     static int m_reportEveryNRows = 10000;
@@ -158,9 +158,9 @@ class CSVPartitionProcessor implements Runnable {
                     if (remarks != null && remarks.equalsIgnoreCase("PARTITION_COLUMN")) {
                         m_partitionColumnType = vtype;
                         m_partitionedColumnIndex = idx;
-                        m_log.info("Table " + m_config.table + " Partition Column Name is: "
+                        m_log.debug("Table " + m_config.table + " Partition Column Name is: "
                                 + procInfo.getString("COLUMN_NAME"));
-                        m_log.info("Table " + m_config.table + " Partition Column Type is: " + vtype.toString());
+                        m_log.debug("Table " + m_config.table + " Partition Column Type is: " + vtype.toString());
                     }
                 }
             }
@@ -200,8 +200,8 @@ class CSVPartitionProcessor implements Runnable {
             m_isMP = (m_partitionedColumnIndex == -1 ? true : false);
             if (!m_isMP) {
                 m_numProcessors = (hostcount * sitesPerHost) / (kfactor + 1);
-                m_log.info("Number of Partitions: " + m_numProcessors);
-                m_log.info("Batch Size is: " + m_config.batch);
+                m_log.debug("Number of Partitions: " + m_numProcessors);
+                m_log.info("CSV loader will attempt to load rows in batches of size: " + m_config.batch);
             }
         }
 
@@ -267,7 +267,7 @@ class CSVPartitionProcessor implements Runnable {
                     //If we see m_endOfData or processor has indicated to be in error stop further error processing.
                     //we must have reached maxerrors or end of processing.
                     if (lineList == m_endOfData || m_processor.m_errored) {
-                        m_log.info("Shutting down failure processor for  " + m_processor.m_processorName);
+                        m_log.debug("Shutting down failure processor for  " + m_processor.m_processorName);
                         break;
                     }
                     try {
@@ -284,7 +284,7 @@ class CSVPartitionProcessor implements Runnable {
                         submitWorkToServer(table, m_procName, cbmt);
                     } catch (IOException ioex) {
                         //Put this processor in error so we exit
-                        m_log.warn("Failure Processor failed, failures will not be processed: " + ioex);
+                        m_log.warn("Fallback to single row inserts failed, failures will not be processed: " + ioex);
                         m_failedQueue.clear();
                         m_failedQueue = null;
                         m_processor.m_errored = true;
@@ -292,7 +292,7 @@ class CSVPartitionProcessor implements Runnable {
                     }
                 } catch (InterruptedException ex) {
                     //Put this processor in error so we exit
-                    m_log.info("Stopped failure processor.");
+                    m_log.debug("Stopped failure processor.");
                     m_failedQueue.clear();
                     m_failedQueue = null;
                     m_processor.m_errored = true;
@@ -320,7 +320,9 @@ class CSVPartitionProcessor implements Runnable {
         public void clientCallback(ClientResponse response) throws Exception {
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 // Batch failed queue it for individual processing and find out which actually m_errored.
-                m_log.info("Batch Failed Will be processed by Failure Processor: " + response.getStatusString());
+                m_log.info("Unable to insert rows in a batch.  Attempting to insert them one-by-one.");
+                m_log.info("Note: this will result in reduced insertion performance.");
+                m_log.debug("Batch Failed Will be processed by Failure Processor: " + response.getStatusString());
                 m_processor.m_partitionProcessedCount.addAndGet(-1 * m_batchList.size());
                 if (!m_processor.m_errored) {
                     //If we have not reached the limit continue pushing to failure processor only if
@@ -364,7 +366,7 @@ class CSVPartitionProcessor implements Runnable {
             m_partitionProcessedCount.addAndGet(table.getRowCount());
         } else {
             //We failed to send work to cluster lets exit.
-            m_log.fatal("Failed to send procedure request to server.");
+            m_log.fatal("Failed to send CSV insert to VoltDB cluster.");
             System.exit(1);
         }
     }
@@ -453,7 +455,7 @@ class CSVPartitionProcessor implements Runnable {
                     if (m_csvClient.callProcedure(cbmt, procName, (Object[]) lineList.correctedLine)) {
                         m_partitionProcessedCount.incrementAndGet();
                     } else {
-                        m_log.fatal("Failed to send procedure request to server.");
+                        m_log.fatal("Failed to send CSV insert to VoltDB cluster.");
                         System.exit(1);
                     }
                 } catch (IOException ex) {
@@ -522,7 +524,7 @@ class CSVPartitionProcessor implements Runnable {
             m_log.error("Failed to process partitioned data: " + ex);
         } finally {
             CSVPartitionProcessor.m_processor_cdl.countDown();
-            m_log.info("Done Processing partition: " + m_partitionId + " Processed: " + m_partitionProcessedCount);
+            m_log.debug("Done Processing partition: " + m_partitionId + " Processed: " + m_partitionProcessedCount);
         }
     }
 }
