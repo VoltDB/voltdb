@@ -320,8 +320,9 @@ public class LocalCluster implements VoltServerConfig {
         startUp(clearLocalDataDirectories, ReplicationRole.NONE);
     }
 
-    public void setSiteCount(int siteCount) {
-        m_siteCount = siteCount;
+    public void setHostCount(int hostCount)
+    {
+        m_hostCount = hostCount;
         // Force recompilation
         m_compiled = false;
     }
@@ -615,6 +616,9 @@ public class LocalCluster implements VoltServerConfig {
                 subroot = VoltFile.getNewSubroot();
                 m_subRoots.add(subroot);
             } else {
+                if (m_subRoots.size() <= hostId) {
+                    m_subRoots.add(VoltFile.getNewSubroot());
+                }
                 subroot = m_subRoots.get(hostId);
             }
             cmdln.voltFilePrefix(subroot.getPath());
