@@ -22,12 +22,8 @@
  */
 package org.voltdb_testprocs.regressionsuites.sqltypesprocs;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.VoltProcedure;
 
-@ProcInfo(
-        partitionInfo = "PAUSE_RESUME.PKEY: 0",
-        singlePartition = true)
 public class Pause extends VoltProcedure {
 
     public long run(long flag) {
