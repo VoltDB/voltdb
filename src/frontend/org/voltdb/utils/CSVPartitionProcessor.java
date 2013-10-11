@@ -85,6 +85,8 @@ class CSVPartitionProcessor implements Runnable {
 
     //Queue of batch entries where some rows failed.
     private BlockingQueue<CSVLineWithMetaData> m_failedQueue = null;
+    //Counter that goes down when acknowledged so that drain is not needed.
+    private AtomicLong batchWaitCount = new AtomicLong(0);
 
     public CSVPartitionProcessor(Client client, long partitionId,
             int partitionColumnIndex, BlockingQueue<CSVLineWithMetaData> partitionQueue, CSVLineWithMetaData eod) {
@@ -281,7 +283,7 @@ class CSVPartitionProcessor implements Runnable {
 
                         PartitionSingleExecuteProcedureCallback cbmt =
                                 new PartitionSingleExecuteProcedureCallback(lineList, m_processor);
-                        submitWorkToServer(table, m_procName, cbmt);
+                        submitWorkToServer(table, m_procName, cbmt, true);
                     } catch (IOException ioex) {
                         //Put this processor in error so we exit
                         m_log.warn("Failure Processor failed, failures will not be processed: " + ioex);
@@ -329,8 +331,11 @@ class CSVPartitionProcessor implements Runnable {
                         m_failedQueue.addAll(m_batchList);
                     }
                 }
+                batchWaitCount.decrementAndGet();
                 return;
             }
+            //Successful invocations.
+            batchWaitCount.decrementAndGet();
             long executed = response.getResults()[0].asScalarLong();
             long currentCount = CSVPartitionProcessor.m_partitionAcknowledgedCount.addAndGet(executed);
             int newMultiple = (int) currentCount / m_reportEveryNRows;
@@ -349,7 +354,7 @@ class CSVPartitionProcessor implements Runnable {
      * @param cbmt callback.
      * @throws IOException
      */
-    private void submitWorkToServer(VoltTable table, String procName, ProcedureCallback cbmt) throws IOException {
+    private void submitWorkToServer(VoltTable table, String procName, ProcedureCallback cbmt, boolean fromFailure) throws IOException {
         boolean success;
         if (!CSVPartitionProcessor.m_isMP) {
             //If transaction is restarted because of wrong partition client will retry
@@ -362,6 +367,9 @@ class CSVPartitionProcessor implements Runnable {
         }
         if (success) {
             m_partitionProcessedCount.addAndGet(table.getRowCount());
+            if (!fromFailure) {
+                batchWaitCount.incrementAndGet();
+            }
         } else {
             //We failed to send work to cluster lets exit.
             m_log.fatal("Failed to send procedure request to server.");
@@ -386,7 +394,7 @@ class CSVPartitionProcessor implements Runnable {
                     if (table.getRowCount() > 0) {
                         PartitionProcedureCallback cbmt = new PartitionProcedureCallback(batchList, this);
                         try {
-                            submitWorkToServer(table, procName, cbmt);
+                            submitWorkToServer(table, procName, cbmt, false);
                         } catch (IOException ex) {
                             String[] info = {lineList.rawLine.toString(), ex.toString()};
                             m_errored = synchronizeErrorInfo(lineList.lineNumber, info);
@@ -413,7 +421,7 @@ class CSVPartitionProcessor implements Runnable {
                 if (table.getRowCount() >= m_config.batch) {
                     try {
                         PartitionProcedureCallback cbmt = new PartitionProcedureCallback(batchList, this);
-                        submitWorkToServer(table, procName, cbmt);
+                        submitWorkToServer(table, procName, cbmt, false);
                         //Clear table data as we start building new table with new rows.
                         table.clearRowData();
                         batchList = new ArrayList<CSVLineWithMetaData>();
@@ -510,8 +518,11 @@ class CSVPartitionProcessor implements Runnable {
             m_partitionQueue.clear();
             //Make sure all callbacks have been called and any failures are posted on failure queue before we
             //we put end of queue marker on failure processor.
-            m_csvClient.drain();
-
+            m_log.debug("Waiting for all batches acknowledged.");
+            while (batchWaitCount.get() > 0) {
+                Thread.sleep(1000);
+            }
+            m_log.debug("All batches acknowledged.");
             //Let partition processor drain on failure processing.
             if (failureProcessor != null) {
                 if (m_failedQueue != null) {
