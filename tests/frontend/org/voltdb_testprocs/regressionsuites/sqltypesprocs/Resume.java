@@ -28,7 +28,8 @@ import org.voltdb.ProcInfo;
 import org.voltdb.VoltProcedure;
 
 @ProcInfo (
-        singlePartition = false)
+        partitionInfo = "PAUSE_RESUME.PKEY: 0",
+        singlePartition = true)
 public class Resume extends VoltProcedure {
 
     public long run(long flag) {

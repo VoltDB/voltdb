@@ -26,15 +26,11 @@ import org.voltdb.ProcInfo;
 import org.voltdb.VoltProcedure;
 
 @ProcInfo(
-        singlePartition = false)
+        partitionInfo = "PAUSE_RESUME.PKEY: 0",
+        singlePartition = true)
 public class Pause extends VoltProcedure {
 
     public long run(long flag) {
-        System.out.println("Export is paused.");
-        System.out.println("Export is paused.");
-        System.out.println("Export is paused.");
-        System.out.println("Export is paused.");
-        System.out.println("Export is paused.");
         System.out.println("Export is paused.");
         System.setProperty("testpaused", "true");
         return 0;
