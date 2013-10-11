@@ -623,7 +623,8 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         validateTableOfLongs(table, expected);
     }
 
-    public void testMaterializedViewFieldMinMax() throws IOException, ProcCallException, Exception {
+    public void testMaterializedViewFieldMinMax() throws IOException, ProcCallException, Exception
+    {
         if (isHSQL()) { // hsql backend does not support the FIELD function
             return;
         }
@@ -732,6 +733,112 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
             "FROM V_R5_MIN_MAX ORDER BY DEPT").getResults()[0];
         System.out.println(table);
         validateTableOfLongs(table, expected);
+    }
+
+    public void testColumnWidthLimits() throws IOException, ProcCallException, Exception
+    {
+        if (isHSQL()) { // hsql backend does not support the FIELD function
+            return;
+        }
+        System.out.println("Test mat view VARCHAR limits...");
+        Client client = getClient();
+        // test that the arbitrary length limits imposed on matview columns prevent "disaster".
+        client.callProcedure("R6.insert", 0, 1, "{\"unused\":\"" +
+            "12345678901234567890123456789012345678901234567 50" +
+            "1234567890123456789012345678901234567890123456 100" +
+            "1234567890123456789012345678901234567890123456 150" +
+            "1234567890123456789012345678901234567890123456 200" +
+            "1234567890123456789012345678901234567890123456 250" +
+            "1234567890123456789012345678901234567890123456 300" +
+            "1234567890123456789012345678901234567890123456 350" +
+            "1234567890123456789012345678901234567890123456 400" +
+            "1234567890123456789012345678901234567890123456 450" +
+            "1234567890123456789012345678901234567890123456 500" +
+            "1234567890123456789012345678901234567890123456 550" +
+            "1234567890123456789012345678901234567890123456 600" +
+            "1234567890123456789012345678901234567890123456 650" +
+            "1234567890123456789012345678901234567890123456 700" +
+            "1234567890123456789012345678901234567890123456 750" +
+            "1234567890123456789012345678901234567890123456 800" +
+            "1234567890123456789012345678901234567890123456 850" +
+            "1234567890123456789012345678901234567890123456 900" +
+            "1234567890123456789012345678901234567890123456 950" +
+            "123456789012345678901234567890123456789012345 1000" +
+            "123456789012345678901234567890123456789012345 1050" +
+            "123456789012345678901234567890123456789012345 1100" +
+            "123456789012345678901234567890123456789012345 1150" +
+            "123456789012345678901234567890123456789012345 1200" +
+            "123456789012345678901234567890123456789012345 1250" +
+            "123456789012345678901234567890123456789012345 1300" +
+            "123456789012345678901234567890123456789012345 1350" +
+            "123456789012345678901234567890123456789012345 1400" +
+            "123456789012345678901234567890123456789012345 1450" +
+            "123456789012345678901234567890123456789012345 1500" +
+            "123456789012345678901234567890123456789012345 1550" +
+            "123456789012345678901234567890123456789012345 1600" +
+            "123456789012345678901234567890123456789012345 1650" +
+            "123456789012345678901234567890123456789012345 1700" +
+            "123456789012345678901234567890123456789012345 1750" +
+            "123456789012345678901234567890123456789012345 1800" +
+            "123456789012345678901234567890123456789012345 1850" +
+            "123456789012345678901234567890123456789012345 1900" +
+            "123456789012345678901234567890123456789012345 1950" +
+            "123456789012345678901234567890123456789012345 2000" +
+            "123456789012345678901234567890123456789012345 2050" +
+            "\", \"used\":\"9\"}");
+
+        // No problem for now until MAX_USED needs to be set to the over-long value.
+        client.callProcedure("R6.insert", 1, 1, "{\"unused\":\"1\", \"used\":\"" +
+            "12345678901234567890123456789012345678901234567 50" +
+            "1234567890123456789012345678901234567890123456 100" +
+            "1234567890123456789012345678901234567890123456 150" +
+            "1234567890123456789012345678901234567890123456 200" +
+            "1234567890123456789012345678901234567890123456 250" +
+            "1234567890123456789012345678901234567890123456 300" +
+            "1234567890123456789012345678901234567890123456 350" +
+            "1234567890123456789012345678901234567890123456 400" +
+            "1234567890123456789012345678901234567890123456 450" +
+            "1234567890123456789012345678901234567890123456 500" +
+            "1234567890123456789012345678901234567890123456 550" +
+            "1234567890123456789012345678901234567890123456 600" +
+            "1234567890123456789012345678901234567890123456 650" +
+            "1234567890123456789012345678901234567890123456 700" +
+            "1234567890123456789012345678901234567890123456 750" +
+            "1234567890123456789012345678901234567890123456 800" +
+            "1234567890123456789012345678901234567890123456 850" +
+            "1234567890123456789012345678901234567890123456 900" +
+            "1234567890123456789012345678901234567890123456 950" +
+            "123456789012345678901234567890123456789012345 1000" +
+            "123456789012345678901234567890123456789012345 1050" +
+            "123456789012345678901234567890123456789012345 1100" +
+            "123456789012345678901234567890123456789012345 1150" +
+            "123456789012345678901234567890123456789012345 1200" +
+            "123456789012345678901234567890123456789012345 1250" +
+            "123456789012345678901234567890123456789012345 1300" +
+            "123456789012345678901234567890123456789012345 1350" +
+            "123456789012345678901234567890123456789012345 1400" +
+            "123456789012345678901234567890123456789012345 1450" +
+            "123456789012345678901234567890123456789012345 1500" +
+            "123456789012345678901234567890123456789012345 1550" +
+            "123456789012345678901234567890123456789012345 1600" +
+            "123456789012345678901234567890123456789012345 1650" +
+            "123456789012345678901234567890123456789012345 1700" +
+            "123456789012345678901234567890123456789012345 1750" +
+            "123456789012345678901234567890123456789012345 1800" +
+            "123456789012345678901234567890123456789012345 1850" +
+            "123456789012345678901234567890123456789012345 1900" +
+            "123456789012345678901234567890123456789012345 1950" +
+            "123456789012345678901234567890123456789012345 2000" +
+            "123456789012345678901234567890123456789012345 2050" +
+            "\"}");
+        try {
+            // Problem: MAX_USED needs to fall back to the over-long value
+            // when the short value is removed.
+            client.callProcedure("R6.delete", 0);
+            fail();
+        } catch (Exception exc) {
+            assertTrue(exc.toString().contains("Object exceeds specified size"));
+        }
     }
 
     private void mvUpdateR4() throws IOException, ProcCallException {
@@ -1093,7 +1200,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         try {
             project0.addLiteralSchema(literalSchema);
         } catch (IOException e) {
-            assertFalse(true);
+            fail();
         }
 
         config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
@@ -1125,7 +1232,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         try {
             project1.addLiteralSchema(literalSchema);
         } catch (IOException e) {
-            assertFalse(true);
+            fail();
         }
 
         config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
@@ -1141,7 +1248,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         VoltProjectBuilder project = new VoltProjectBuilder();
         literalSchema =
                 "CREATE TABLE R1 ( " +
-                "id INTEGER DEFAULT '0' NOT NULL, " +
+                "id INTEGER NOT NULL, " +
                 "wage INTEGER, " +
                 "dept INTEGER, " +
                 "PRIMARY KEY (id) );" +
@@ -1159,7 +1266,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "AS SELECT ABS(dept), count(*), SUM(wage+id) FROM R1 GROUP BY ABS(dept);" +
 
                 "CREATE TABLE R2 ( " +
-                "id INTEGER DEFAULT '0' NOT NULL, " +
+                "id INTEGER NOT NULL, " +
                 "wage INTEGER, " +
                 "dept INTEGER, " +
                 "tm TIMESTAMP DEFAULT NULL, " +
@@ -1176,7 +1283,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 // R5 mv tests are mainly for string handling concerns
                 // -- it's a JSONic variant of R2 and its views -- a test for ENG-5292
                 "CREATE TABLE R5 ( " +
-                "id INTEGER DEFAULT '0' NOT NULL, " +
+                "id INTEGER NOT NULL, " +
                 "JSON_DATA VARCHAR(100)," +
                 // JSON FIELDS:
                 //   wage INTEGER
@@ -1191,6 +1298,22 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "MAX(FIELD(JSON_DATA, 'wage')), MIN(FIELD(JSON_DATA, 'tm_year')) " +
                 "FROM R5 " +
                 "GROUP BY  ABS(CAST(FIELD(JSON_DATA, 'dept') AS INTEGER));" +
+
+                // R6 mv tests our arbitrary string limitations
+                "CREATE TABLE R6 ( " +
+                "id INTEGER NOT NULL, " +
+                "grupo INTEGER NOT NULL, " +
+                "JSON_DATA VARCHAR(10000)," +
+                // JSON FIELDS:
+                //   unused - an unused string that pads the base table column just to show we can.
+                //   used  - a string that gets used in a mat view MIN column, triggering the
+                //           size limitation when it gets too large.
+                "PRIMARY KEY (ID) );" +
+
+                "CREATE VIEW V_R6_MIN_MAX (GRUPO, CNT, MAX_USED) " +
+                "AS SELECT grupo, COUNT(*), MAX(FIELD(JSON_DATA, 'used')) " +
+                "FROM R6 " +
+                "GROUP BY grupo;" +
 
                 // R3 mv tests are mainly for memory concerns
                 "CREATE TABLE R3 ( " +
@@ -1270,7 +1393,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         try {
             project.addLiteralSchema(literalSchema);
         } catch (IOException e) {
-            assertFalse(true);
+            fail();
         }
 
         //* Single-server configuration  -- please do not remove or corrupt this structured comment
