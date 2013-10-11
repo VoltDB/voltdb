@@ -110,10 +110,10 @@ public abstract class StatementCompiler {
         }
 
         // There is a hard-coded limit to the number of parameters that can be passed to the EE.
-        if (plan.parameters.length >= CompiledPlan.MAX_PARAM_COUNT) {
+        if (plan.parameters.length > CompiledPlan.MAX_PARAM_COUNT) {
             throw compiler.new VoltCompilerException(
                 "The statement's parameter count " + plan.parameters.length +
-                " must be less than " + CompiledPlan.MAX_PARAM_COUNT);
+                " must not exceed the maximum " + CompiledPlan.MAX_PARAM_COUNT);
         }
 
         // Check order determinism before accessing the detail which it caches.

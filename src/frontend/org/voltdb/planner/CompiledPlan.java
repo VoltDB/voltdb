@@ -42,7 +42,7 @@ import org.voltdb.types.PlanNodeType;
  */
 public class CompiledPlan {
 
-    public final static int MAX_PARAM_COUNT = 1000; // keep synched with value in EE VoltDBEngine.h
+    public final static int MAX_PARAM_COUNT = 1025; // keep synched with value in EE VoltDBEngine.h
 
     /** A complete plan graph for SP plans and the top part of MP plans */
     public AbstractPlanNode rootPlanGraph;

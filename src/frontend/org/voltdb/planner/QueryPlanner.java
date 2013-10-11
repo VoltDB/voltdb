@@ -204,7 +204,7 @@ public class QueryPlanner {
                 Pair<Integer, Object[]> info = buildParameterSetFromExtractedLiteralsAndReturnPartitionIndex(
                         plan.parameterTypes());
                 plan.partitioningKeyIndex = info.getFirst();
-                if (info.getSecond().length >= CompiledPlan.MAX_PARAM_COUNT) {
+                if (info.getSecond().length > CompiledPlan.MAX_PARAM_COUNT) {
                     throw new PlanningErrorException("Throw and catch to force a non-parameterized plan");
                 }
                 plan.extractedParamValues = ParameterSet.fromArrayNoCopy(info.getSecond());
