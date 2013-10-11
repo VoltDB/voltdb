@@ -80,6 +80,13 @@ public class CompleteTransactionTask extends TransactionTask
     public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
     throws IOException
     {
+        if (!m_txnState.isReadOnly() && !m_completeMsg.isRollback()) {
+            // ENG-5276: Need to set the last committed spHandle so that the rejoining site gets the accurate
+            // per-partition txnId set for the next snapshot. Normally, this is done through undo log truncation.
+            // Since the task is not run here, we need to set the last committed spHandle explicitly.
+            siteConnection.setLastCommittedTxn(m_txnState.txnId, m_txnState.m_spHandle);
+        }
+
         if (!m_completeMsg.isRestart()) {
             // future: offer to siteConnection.IBS for replay.
             doCommonSPICompleteActions();
