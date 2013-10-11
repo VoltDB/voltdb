@@ -268,7 +268,17 @@ public class RegressionSuite extends TestCase {
         return isLocalCluster() ? ((LocalCluster)m_config).internalPort(hostId) : VoltDB.DEFAULT_INTERNAL_PORT+hostId;
     }
 
+    static public void validateTableOfScalarLongs(VoltTable vt, long[] expected) {
+        assertNotNull(expected);
+        assertEquals(expected.length, vt.getRowCount());
+        int len = expected.length;
+        for (int i=0; i < len; i++) {
+            validateRowOfLongs(vt, new long[] {expected[i]});
+        }
+    }
+
     static public void validateTableOfLongs(VoltTable vt, long[][] expected) {
+        assertNotNull(expected);
         assertEquals(expected.length, vt.getRowCount());
         int len = expected.length;
         for (int i=0; i < len; i++) {

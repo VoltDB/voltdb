@@ -69,24 +69,211 @@ public class TestIndexReverseScanSuite extends RegressionSuite {
 
     }
 
-    public void testReverseScan() throws IOException, ProcCallException {
+    public void testReverseScanOneColumnIndex() throws IOException, ProcCallException {
         loadData();
 
-        Client client = this.getClient();
-        ClientResponse cr;
+        Client c = this.getClient();
         VoltTable vt;
-        long[][] expected;
-
         for (String tb: tbs) {
+            // (1) < case:
 
-            cr = client.callProcedure("@AdHoc", "SELECT a from " + tb + " where a < 3 order by a DESC");
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            vt = cr.getResults()[0];
-            expected = new long[][] {{2}, {1} };
-            System.out.println(vt.toString());
-            validateTableOfLongs(vt, expected);
+            // Underflow
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a < -60000000000 order by a DESC").getResults()[0];
+            assertEquals(0, vt.getRowCount());
 
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a < -3 order by a DESC").getResults()[0];
+            assertEquals(0, vt.getRowCount());
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a < 1 order by a DESC").getResults()[0];
+            assertEquals(0, vt.getRowCount());
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a < 2 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {1});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a < 4 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {3, 2, 1});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a < 5 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {4, 3, 2, 1});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a < 8 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {5, 4, 3, 2, 1});
+
+            // Overflow
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a < 6000000000000 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {5, 4, 3, 2, 1});
+
+
+            // (2) <= case:
+
+            // Underflow
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a <= -60000000000 order by a DESC").getResults()[0];
+            assertEquals(0, vt.getRowCount());
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a <= -3 order by a DESC").getResults()[0];
+            assertEquals(0, vt.getRowCount());
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a <= 1 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {1});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a <= 2 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {2, 1});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a <= 4 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {4, 3, 2, 1});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a <= 5 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {5, 4, 3, 2, 1});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a <= 8 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {5, 4, 3, 2, 1});
+
+            // Overflow
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a <= 6000000000000 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {5, 4, 3, 2, 1});
+
+
+            // (3) > case:
+            // Underflow
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > -60000000000 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {5, 4, 3, 2, 1});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > -3 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {5, 4, 3, 2, 1});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > 1 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {5, 4, 3, 2});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > 2 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {5, 4, 3});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > 4 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {5});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > 5 order by a DESC").getResults()[0];
+            assertEquals(0, vt.getRowCount());
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > 8 order by a DESC").getResults()[0];
+            assertEquals(0, vt.getRowCount());
+
+            // Overflow
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > 6000000000000 order by a DESC").getResults()[0];
+            assertEquals(0, vt.getRowCount());
+
+
+            // (3) >= case:
+            // Underflow
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a >= -60000000000 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {5, 4, 3, 2, 1});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a >= -3 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {5, 4, 3, 2, 1});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a >= 1 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {5, 4, 3, 2, 1});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a >= 2 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {5, 4, 3, 2});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a >= 4 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {5, 4});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a >= 5 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {5});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a >= 8 order by a DESC").getResults()[0];
+            assertEquals(0, vt.getRowCount());
+
+            // Overflow
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a >= 6000000000000 order by a DESC").getResults()[0];
+            assertEquals(0, vt.getRowCount());
+
+
+            // (4) between cases:
+            // (4.1) > , <
+            // > underflow
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > -60000000000 AND a < -50000000000  order by a DESC").getResults()[0];
+            assertEquals(0, vt.getRowCount());
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > -60000000000 AND a < -1  order by a DESC").getResults()[0];
+            assertEquals(0, vt.getRowCount());
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > -60000000000 AND a < 1  order by a DESC").getResults()[0];
+            assertEquals(0, vt.getRowCount());
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > -60000000000 AND a < 2  order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {1});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > -60000000000 AND a < 5  order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {4, 3, 2, 1});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > -60000000000 AND a < 6000000000000 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {5, 4, 3, 2, 1});
+
+            // > -3
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > -3 AND a < -2 order by a DESC").getResults()[0];
+            assertEquals(0, vt.getRowCount());
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > -3 AND a < 1 order by a DESC").getResults()[0];
+            assertEquals(0, vt.getRowCount());
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > -3 AND a < 2 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {1});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > -3 AND a < 5 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {4, 3, 2, 1});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > -3 AND a < 8 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {5, 4, 3, 2, 1});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > -3 AND a < 6000000000000 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {5, 4, 3, 2, 1});
+
+            // > 2
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > 2 AND a < -2 order by a DESC").getResults()[0];
+            assertEquals(0, vt.getRowCount());
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > 2 AND a < 1 order by a DESC").getResults()[0];
+            assertEquals(0, vt.getRowCount());
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > 2 AND a < 4 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {3});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > 2 AND a < 5 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {4, 3});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > 2 AND a < 8 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {5, 4, 3});
+
+            vt = c.callProcedure("@AdHoc", "SELECT a from " + tb + " where a > 2 AND a < 6000000000000 order by a DESC").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {5, 4, 3});
+
+            // > 8
+
+            // (4.2) > , <=
+
+            // (4.3) >= , <
+
+            // (4.4) >= , <=
+
+            // Should use sql coverage test cases.
+            // There are too many permutations.
         }
+
+    }
+
+    //  public void testReverseScanTwoColumnsIndex() throws IOException, ProcCallException {
+    //  }
+    //
+    //  public void testReverseScanThreeColumnsIndex() throws IOException, ProcCallException {
+    //  }
+
+    public void testReverseScanWithNulls() throws IOException, ProcCallException {
+        loadData();
+
+        Client c = this.getClient();
+        VoltTable vt;
+
     }
 
     //
@@ -96,11 +283,6 @@ public class TestIndexReverseScanSuite extends RegressionSuite {
     public TestIndexReverseScanSuite(String name) {
         super(name);
     }
-    static final Class<?>[] PROCEDURES = {
-        org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.CountT1A1.class,
-        org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.InsertF.class,
-        org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.InsertDims.class,
-        org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.SumGroupSingleJoin.class };
 
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;

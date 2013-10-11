@@ -93,13 +93,12 @@ public class TestIndexReverseScan extends PlannerTestCase {
                 "AND time >= '2013-09-29 00:00:00' AND time <= '2013-10-07 00:00:00' " +
                 "ORDER BY time DESC LIMIT 150";
 
-        checkReverseScan("SYS_IDX_IDX_REPORTDATA_PK", IndexLookupType.LTE,
-                3, 3, 2, SortDirectionType.DESC);
+        checkReverseScan("SYS_IDX_IDX_REPORTDATA_PK", IndexLookupType.LTE, 3, 3, 2, SortDirectionType.DESC);
     }
 
     public void testNonOptimizable()
     {
-        // One column index case.
+        // One column index cases.
         sql = "select * from R where a >= 1 AND a <= 9 ORDER BY b DESC";
         // Current code logic: if still needs order by node, the sort direction is Invalid.
         checkForwardScan("R1_TREE", IndexLookupType.GTE, 1, 1, 0, SortDirectionType.INVALID, true);
@@ -111,7 +110,7 @@ public class TestIndexReverseScan extends PlannerTestCase {
         sql = "select * from R where a >= 1 ORDER BY b desc";
         checkForwardScan("R1_TREE", IndexLookupType.GTE, 1, 0, 0, SortDirectionType.INVALID, true);
 
-        // Two columns index case.
+        // Two columns index cases.
         sql = "select * from R where b = 1 ORDER BY c";
         checkForwardScan("R2_TREE", IndexLookupType.GTE, 1, 1, 0, SortDirectionType.ASC);
 
@@ -120,6 +119,14 @@ public class TestIndexReverseScan extends PlannerTestCase {
 
         sql = "select * from R where b >= 1 ORDER BY c desc";
         checkForwardScan("R2_TREE", IndexLookupType.GTE, 1, 0, 0, SortDirectionType.INVALID, true);
+
+
+        // Three columns index cases.
+        sql = "select * from R where d = 1 AND e > 2 ORDER BY d desc, e desc, f asc";
+        checkForwardScan("R3_TREE", IndexLookupType.GT, 2, 1, 1, SortDirectionType.INVALID, true);
+
+        sql = "select * from R where d = 1 AND e > 2 ORDER BY e asc, f asc";
+        checkForwardScan("R3_TREE", IndexLookupType.GT, 2, 1, 1, SortDirectionType.ASC);
     }
 
     public void testOneColumnIndex()
@@ -132,7 +139,7 @@ public class TestIndexReverseScan extends PlannerTestCase {
 
         // Have one extra post predicate because of ENG-3913.
         sql = "select * from R where a > 1 ORDER BY a desc";
-        checkReverseScan("R1_TREE", IndexLookupType.GT, 0, 1, 1, SortDirectionType.DESC);
+        checkReverseScan("R1_TREE", IndexLookupType.GT, 0, 1, 1, false, SortDirectionType.DESC);
 
         sql = "select * from R where a >= 1 ORDER BY a desc";
         checkReverseScan("R1_TREE", IndexLookupType.GTE, 0, 1, 0, SortDirectionType.DESC);
@@ -150,40 +157,39 @@ public class TestIndexReverseScan extends PlannerTestCase {
         checkReverseScan("R1_TREE", IndexLookupType.LTE, 1, 1, 0, SortDirectionType.DESC);
     }
 
-    public void testTry()
-    {
 
-    }
-
+    // All forward scan cases should be supported in future by using the reverse scan check.
     public void testTwoColumnsIndex()
     {
         // Case 1: first column equal
-        sql = "select * from R where b = 1 ORDER BY c desc";
-        checkForwardScan("R2_TREE", IndexLookupType.GTE, 1, 1, 0, SortDirectionType.INVALID, true);
-        //checkReverseScan("R2_TREE", IndexLookupType.LTE, 1, 1, 0, SortDirectionType.DESC);
+        // [Unsupported cases]:
+//        sql = "select * from R where b = 1 ORDER BY c desc";
+//        checkReverseScan("R2_TREE", IndexLookupType.LTE, 1, 1, 0, SortDirectionType.DESC);
 
         sql = "select * from R where b = 1 AND c < 2 ORDER BY c desc";
         checkReverseScan("R2_TREE", IndexLookupType.LT, 2, 1, 1, SortDirectionType.DESC);
+
         sql = "select * from R where b = 1 AND c <= 2 ORDER BY c desc";
         checkReverseScan("R2_TREE", IndexLookupType.LTE, 2, 1, 1, SortDirectionType.DESC);
 
         // Switch the next few GT, GTE test cases to use reverse scan feature.
 
-        sql = "select * from R where b = 1 AND C > 3 ORDER BY c desc";
-        checkForwardScan("R2_TREE", IndexLookupType.GT, 2, 1, 0, SortDirectionType.INVALID, true);
-        // Have one extra post predicate because of ENG-3913.
-        //checkReverseScan("R2_TREE", IndexLookupType.GT, 1, 2, 1, SortDirectionType.DESC);
-        sql = "select * from R where b = 1 AND C >= 3 ORDER BY c desc";
-        checkForwardScan("R2_TREE", IndexLookupType.GTE, 2, 1, 0, SortDirectionType.INVALID, true);
-        //checkReverseScan("R2_TREE", IndexLookupType.GTE, 1, 2, 0, SortDirectionType.DESC);
+        // [Unsupported cases]:
+//        sql = "select * from R where b = 1 AND C > 3 ORDER BY c desc";
+//        checkReverseScan("R2_TREE", IndexLookupType.GT, 1, 2, 1, SortDirectionType.DESC);
+//        sql = "select * from R where b = 1 AND C >= 3 ORDER BY c desc";
+//        checkReverseScan("R2_TREE", IndexLookupType.GTE, 1, 2, 0, SortDirectionType.DESC);
 
         // Test between.
         sql = "select * from R where b = 1 AND C > 3 AND C < 6 ORDER BY c desc";
         checkReverseScan("R2_TREE", IndexLookupType.LT, 2, 2, 0, SortDirectionType.DESC);
+
         sql = "select * from R where b = 1 AND C > 3 AND C <= 6 ORDER BY c desc";
         checkReverseScan("R2_TREE", IndexLookupType.LTE, 2, 2, 0, SortDirectionType.DESC);
+
         sql = "select * from R where b = 1 AND C >= 3 AND C < 6 ORDER BY c desc";
         checkReverseScan("R2_TREE", IndexLookupType.LT, 2, 2, 0, SortDirectionType.DESC);
+
         sql = "select * from R where b = 1 AND C >= 3 AND C <= 6 ORDER BY c desc";
         checkReverseScan("R2_TREE", IndexLookupType.LTE, 2, 2, 0, SortDirectionType.DESC);
 
@@ -191,56 +197,68 @@ public class TestIndexReverseScan extends PlannerTestCase {
         // Case 2: first column less than
         sql = "select * from R where b < 1 ORDER BY b desc";
         checkReverseScan("R2_TREE", IndexLookupType.LT, 1, 0, 1, SortDirectionType.DESC);
+
         sql = "select * from R where b <= 1 ORDER BY b desc";
         checkReverseScan("R2_TREE", IndexLookupType.LTE, 1, 0, 1, SortDirectionType.DESC);
 
-       // The second column filter will be a post predicate, does not need to test all cases for the second column.
+        // The second column filter will be a post predicate, does not need to test all cases for the second column.
         sql = "select * from R where b <= 1 AND c < 2 ORDER BY b desc";
         checkReverseScan("R2_TREE", IndexLookupType.LTE, 1, 0, 2, SortDirectionType.DESC);
+
         sql = "select * from R where b < 1 AND c < 2 ORDER BY b desc";
         checkReverseScan("R2_TREE", IndexLookupType.LT, 1, 0, 2, SortDirectionType.DESC);
+
         sql = "select * from R where b <= 1 AND c <= 2 ORDER BY b desc";
         checkReverseScan("R2_TREE", IndexLookupType.LTE, 1, 0, 2, SortDirectionType.DESC);
+
         sql = "select * from R where b < 1 AND c <= 2 ORDER BY b desc";
         checkReverseScan("R2_TREE", IndexLookupType.LT, 1, 0, 2, SortDirectionType.DESC);
+
         sql = "select * from R where b < 1 AND c = 2 ORDER BY b desc";
         checkReverseScan("R2_TREE", IndexLookupType.LT, 1, 0, 2, SortDirectionType.DESC);
+
         sql = "select * from R where b <= 1 AND c = 2 ORDER BY b desc";
         checkReverseScan("R2_TREE", IndexLookupType.LTE, 1, 0, 2, SortDirectionType.DESC);
 
         // Order by the second column will not remove the order by node.
         sql = "select * from R where b < 1 ORDER BY c desc";
-        checkReverseScan("R2_TREE", IndexLookupType.LT, 1, 0, 1, SortDirectionType.INVALID, true);
+        checkReverseScan("R2_TREE", IndexLookupType.LT, 1, 0, 1, 1, false, SortDirectionType.INVALID, true);
+
         sql = "select * from R where b <= 1 ORDER BY c desc";
-        checkReverseScan("R2_TREE", IndexLookupType.LTE, 1, 0, 1, SortDirectionType.INVALID, true);
+        checkReverseScan("R2_TREE", IndexLookupType.LTE, 1, 0, 1, 1, false, SortDirectionType.INVALID, true);
+
         sql = "select * from R where b <= 1 AND c < 2 ORDER BY c desc";
-        checkReverseScan("R2_TREE", IndexLookupType.LTE, 1, 0, 2, SortDirectionType.INVALID, true);
+        checkReverseScan("R2_TREE", IndexLookupType.LTE, 1, 0, 2, 1, false, SortDirectionType.INVALID, true);
 
         // The second column filter will be a post predicate, does not need to test all cases for the second column.
         sql = "select * from R where b < 1 AND c < 2 ORDER BY c desc";
-        checkReverseScan("R2_TREE", IndexLookupType.LT, 1, 0, 2, SortDirectionType.INVALID, true);
+        checkReverseScan("R2_TREE", IndexLookupType.LT, 1, 0, 2, 1, false, SortDirectionType.INVALID, true);
+
         sql = "select * from R where b <= 1 AND c < 2 ORDER BY c desc";
-        checkReverseScan("R2_TREE", IndexLookupType.LTE, 1, 0, 2, SortDirectionType.INVALID, true);
+        checkReverseScan("R2_TREE", IndexLookupType.LTE, 1, 0, 2, 1, false, SortDirectionType.INVALID, true);
         // ...
 
 
         // Case 3: first column greater than
         // Have one extra post predicate because of ENG-3913.
         sql = "select * from R where b > 1 ORDER BY b desc";
-        checkReverseScan("R2_TREE", IndexLookupType.GT, 0, 1, 1, SortDirectionType.DESC);
+        checkReverseScan("R2_TREE", IndexLookupType.GT, 0, 1, 1, false, SortDirectionType.DESC);
 
         sql = "select * from R where b >= 1 ORDER BY b desc";
         checkReverseScan("R2_TREE", IndexLookupType.GTE, 0, 1, 0, SortDirectionType.DESC);
 
-        // The second column filter will be a post predicate, does not need to test all cases for the second column.
+        // The second column filter will be a post predicate, does not need to test all permutations.
         sql = "select * from R where b > 1 AND c > 2 ORDER BY b desc";
-        checkReverseScan("R2_TREE", IndexLookupType.GT, 0, 1, 2, SortDirectionType.DESC);
+        checkReverseScan("R2_TREE", IndexLookupType.GT, 0, 1, 2, false, SortDirectionType.DESC);
+
         sql = "select * from R where b >= 1 AND c > 2 ORDER BY b desc";
-        checkReverseScan("R2_TREE", IndexLookupType.GTE, 0, 1, 1, SortDirectionType.DESC);
+        checkReverseScan("R2_TREE", IndexLookupType.GTE, 0, 1, 1, false, SortDirectionType.DESC);
+
         sql = "select * from R where b > 1 AND c = 2 ORDER BY b desc";
-        checkReverseScan("R2_TREE", IndexLookupType.GT, 0, 1, 2, SortDirectionType.DESC);
+        checkReverseScan("R2_TREE", IndexLookupType.GT, 0, 1, 2, false, SortDirectionType.DESC);
+
         sql = "select * from R where b >= 1 AND c = 2 ORDER BY b desc";
-        checkReverseScan("R2_TREE", IndexLookupType.GTE, 0, 1, 1, SortDirectionType.DESC);
+        checkReverseScan("R2_TREE", IndexLookupType.GTE, 0, 1, 1, false, SortDirectionType.DESC);
         // ...
     }
 
@@ -253,17 +271,174 @@ public class TestIndexReverseScan extends PlannerTestCase {
         sql = "select * from R where d = 1 AND e <= 2 ORDER BY e desc";
         checkReverseScan("R3_TREE", IndexLookupType.LTE, 2, 1, 1, SortDirectionType.DESC);
 
-        // Test bettween.
+        // Test bettween with different order by.
         sql = "select * from R where d = 1 AND e > 2 AND e < 10 ORDER BY e desc";
         checkReverseScan("R3_TREE", IndexLookupType.LT, 2, 2, 0, SortDirectionType.DESC);
+
         sql = "select * from R where d = 1 AND e > 2 AND e <= 10 ORDER BY e desc";
         checkReverseScan("R3_TREE", IndexLookupType.LTE, 2, 2, 0, SortDirectionType.DESC);
+
         sql = "select * from R where d = 1 AND e >= 2 AND e < 10 ORDER BY e desc";
         checkReverseScan("R3_TREE", IndexLookupType.LT, 2, 2, 0, SortDirectionType.DESC);
+
         sql = "select * from R where d = 1 AND e >= 2 AND e <= 10 ORDER BY e desc";
         checkReverseScan("R3_TREE", IndexLookupType.LTE, 2, 2, 0, SortDirectionType.DESC);
 
+        sql = "select * from R where d = 1 AND e > 2 AND e < 10 ORDER BY e desc, f desc";
+        checkReverseScan("R3_TREE", IndexLookupType.LT, 2, 2, 0, SortDirectionType.DESC);
 
+        sql = "select * from R where d = 1 AND e > 2 AND e <= 10 ORDER BY e desc, f desc";
+        checkReverseScan("R3_TREE", IndexLookupType.LTE, 2, 2, 0, SortDirectionType.DESC);
+
+        sql = "select * from R where d = 1 AND e >= 2 AND e < 10 ORDER BY e desc, f desc";
+        checkReverseScan("R3_TREE", IndexLookupType.LT, 2, 2, 0, SortDirectionType.DESC);
+
+        sql = "select * from R where d = 1 AND e >= 2 AND e <= 10 ORDER BY e desc, f desc";
+        checkReverseScan("R3_TREE", IndexLookupType.LTE, 2, 2, 0, SortDirectionType.DESC);
+
+        sql = "select * from R where d = 1 AND e > 2 AND e < 10 ORDER BY d desc, e desc, f desc";
+        checkReverseScan("R3_TREE", IndexLookupType.LT, 2, 2, 0, SortDirectionType.DESC);
+
+        sql = "select * from R where d = 1 AND e > 2 AND e <= 10 ORDER BY d desc, e desc, f desc";
+        checkReverseScan("R3_TREE", IndexLookupType.LTE, 2, 2, 0, SortDirectionType.DESC);
+
+        sql = "select * from R where d = 1 AND e >= 2 AND e < 10 ORDER BY d desc, e desc, f desc";
+        checkReverseScan("R3_TREE", IndexLookupType.LT, 2, 2, 0, SortDirectionType.DESC);
+
+        sql = "select * from R where d = 1 AND e >= 2 AND e <= 10 ORDER BY d desc, e desc, f desc";
+        checkReverseScan("R3_TREE", IndexLookupType.LTE, 2, 2, 0, SortDirectionType.DESC);
+
+
+        // Test adding post filters.
+        // The third column filter will be a post predicate, does not need to test all permutations.
+        sql = "select * from R where d = 1 AND e > 2 AND e < 10 AND f = 5 ORDER BY e desc";
+        checkReverseScan("R3_TREE", IndexLookupType.LT, 2, 2, 1, false, SortDirectionType.DESC);
+
+        sql = "select * from R where d = 1 AND e > 2 AND e <= 10 AND f = 5 ORDER BY e desc";
+        checkReverseScan("R3_TREE", IndexLookupType.LTE, 2, 2, 1, false, SortDirectionType.DESC);
+
+        sql = "select * from R where d = 1 AND e >= 2 AND e < 10 AND f = 5 ORDER BY e desc";
+        checkReverseScan("R3_TREE", IndexLookupType.LT, 2, 2, 1, false, SortDirectionType.DESC);
+
+        sql = "select * from R where d = 1 AND e >= 2 AND e <= 10 AND f = 5 ORDER BY e desc";
+        checkReverseScan("R3_TREE", IndexLookupType.LTE, 2, 2, 1, false, SortDirectionType.DESC);
+
+        sql = "select * from R where d = 1 AND e > 2 AND e < 10 AND f >= 5 ORDER BY e desc";
+        checkReverseScan("R3_TREE", IndexLookupType.LT, 2, 2, 1, false, SortDirectionType.DESC);
+
+        sql = "select * from R where d = 1 AND e > 2 AND e <= 10 AND f <= 5 ORDER BY e desc";
+        checkReverseScan("R3_TREE", IndexLookupType.LTE, 2, 2, 1, false, SortDirectionType.DESC);
+
+        // Add one more order by.
+        sql = "select * from R where d = 1 AND e > 2 AND e < 10 AND f = 5 ORDER BY e desc, f desc";
+        checkReverseScan("R3_TREE", IndexLookupType.LT, 2, 2, 1, false, SortDirectionType.DESC);
+
+        sql = "select * from R where d = 1 AND e > 2 AND e <= 10 AND f = 5 ORDER BY e desc, f desc";
+        checkReverseScan("R3_TREE", IndexLookupType.LTE, 2, 2, 1, false, SortDirectionType.DESC);
+
+        sql = "select * from R where d = 1 AND e >= 2 AND e < 10 AND f = 5 ORDER BY e desc, f desc";
+        checkReverseScan("R3_TREE", IndexLookupType.LT, 2, 2, 1, false, SortDirectionType.DESC);
+
+        sql = "select * from R where d = 1 AND e >= 2 AND e <= 10 AND f = 5 ORDER BY e desc, f desc";
+        checkReverseScan("R3_TREE", IndexLookupType.LTE, 2, 2, 1, false, SortDirectionType.DESC);
+
+        sql = "select * from R where d = 1 AND e > 2 AND e < 10 AND f >= 5 ORDER BY e desc, f desc";
+        checkReverseScan("R3_TREE", IndexLookupType.LT, 2, 2, 1, false, SortDirectionType.DESC);
+
+        sql = "select * from R where d = 1 AND e > 2 AND e <= 10 AND f <= 5 ORDER BY e desc, f desc";
+        checkReverseScan("R3_TREE", IndexLookupType.LTE, 2, 2, 1, false, SortDirectionType.DESC);
+
+
+        // [Unsupported cases]:
+//        sql = "select * from R where d = 1 ORDER BY e desc, f desc";
+//        checkForwardScan("R3_TREE", IndexLookupType.GTE, 1, 1, 0, SortDirectionType.INVALID, true);
+//        sql = "select * from R where d = 1 AND e > 2 ORDER BY e desc";
+//        checkReverseScan("R3_TREE", IndexLookupType.GT, 1, 2, 1, SortDirectionType.DESC);
+//        sql = "select * from R where d = 1 AND e >= 2 ORDER BY d desc, e desc";
+//        checkReverseScan("R3_TREE", IndexLookupType.GTE, 1, 2, 1, SortDirectionType.DESC);
+//        sql = "select * from R where d = 1 AND e > 2 AND f = 5 ORDER BY e desc";
+//        checkReverseScan("R3_TREE", IndexLookupType.GT, 1, 2, 2, SortDirectionType.DESC);
+//        sql = "select * from R where d = 1 AND e >= 2 AND f = 5 ORDER BY e desc";
+//        checkReverseScan("R3_TREE", IndexLookupType.GTE, 1, 2, 1, SortDirectionType.DESC);
+
+    }
+
+    public void test_useless__orderby_confuses_planner()
+    {
+        // (1) In future, using forward scan.
+        // useless prefix order by.
+        sql = "select * from R where d = 1 AND e > 2 ORDER BY d desc, e asc, f asc";
+        checkForwardScan("R3_TREE", IndexLookupType.GT, 2, 1, 1, SortDirectionType.INVALID, true);
+
+        sql = "select * from R where d = 1 AND e > 2 AND f = 4 ORDER BY d desc, e asc, f asc";
+        checkForwardScan("R3_TREE", IndexLookupType.GT, 2, 1, 2, SortDirectionType.INVALID, true);
+
+        // useless post order by.
+        sql = "select * from R where d = 1 AND e > 2 AND f = 4 ORDER BY e asc, f desc";
+        checkForwardScan("R3_TREE", IndexLookupType.GT, 2, 1, 2, SortDirectionType.INVALID, true);
+
+
+        // (2) In future, using reverse scan.
+        // useless prefix order by.
+        sql = "select * from R where d = 1 AND e > 2 ORDER BY d desc, e desc, f desc";
+        checkForwardScan("R3_TREE", IndexLookupType.GT, 2, 1, 1, SortDirectionType.INVALID, true);
+
+        sql = "select * from R where d = 1 AND e > 2 ORDER BY d asc, e desc, f desc";
+        checkForwardScan("R3_TREE", IndexLookupType.GT, 2, 1, 1, SortDirectionType.INVALID, true);
+
+
+        sql = "select * from R where d = 1 AND e > 2 AND e < 10 ORDER BY d asc, e desc, f desc";
+        checkForwardScan("R3_TREE", IndexLookupType.GT, 2, 2, 1, SortDirectionType.INVALID, true);
+
+
+        sql = "select * from R where d = 1 AND e > 2 AND f = 5 ORDER BY d desc, e desc, f asc";
+        checkForwardScan("R3_TREE", IndexLookupType.GT, 2, 1, 2, SortDirectionType.INVALID, true);
+
+        sql = "select * from R where d = 1 AND e > 2 AND f = 5 ORDER BY d asc, e desc, f asc";
+        checkForwardScan("R3_TREE", IndexLookupType.GT, 2, 1, 2, SortDirectionType.INVALID, true);
+
+        sql = "select * from R where d = 1 AND e >= 2 AND e <= 10 AND f = 5 ORDER BY d desc, e desc, f asc";
+        checkForwardScan("R3_TREE", IndexLookupType.GTE, 2, 2, 1, SortDirectionType.INVALID, true);
+
+        // useless post order by.
+        sql = "select * from R where d = 1 AND e > 2 AND f = 5 ORDER BY e desc, f asc";
+        checkForwardScan("R3_TREE", IndexLookupType.GT, 2, 1, 2, SortDirectionType.INVALID, true);
+
+        sql = "select * from R where d = 1 AND e > 2 AND f = 5 ORDER BY e desc, f asc";
+        checkForwardScan("R3_TREE", IndexLookupType.GT, 2, 1, 2, SortDirectionType.INVALID, true);
+
+        sql = "select * from R where d = 1 AND e >= 2 AND e <= 10 AND f = 5 ORDER BY e desc, f asc";
+        checkForwardScan("R3_TREE", IndexLookupType.GTE, 2, 2, 1, SortDirectionType.INVALID, true);
+    }
+
+    public void testTry()
+    {
+        sql = "select * from R where a > 9 order by a desc";
+        checkReverseScan("R1_TREE", IndexLookupType.GT, 0, 1, 1, false, SortDirectionType.DESC);
+    }
+
+
+    // [Unsupported cases, but needs to be supported in future] ?
+    // Remove these test cases when we support them in future. But remember to turn them on in 2, 3 columns tests.
+    public void test_not_supported_cases_waitinglist() {
+
+        // (2) Two columns index cases.
+        sql = "select * from R where b = 1 ORDER BY c desc";
+        checkForwardScan("R2_TREE", IndexLookupType.GTE, 1, 1, 0, SortDirectionType.INVALID, true);
+
+        sql = "select * from R where b = 1 AND C > 3 ORDER BY c desc";
+        checkForwardScan("R2_TREE", IndexLookupType.GT, 2, 1, 0, SortDirectionType.INVALID, true);
+        // Have one extra post predicate because of ENG-3913.
+        //checkReverseScan("R2_TREE", IndexLookupType.GT, 1, 2, 1, SortDirectionType.DESC);
+        sql = "select * from R where b = 1 AND C >= 3 ORDER BY c desc";
+        checkForwardScan("R2_TREE", IndexLookupType.GTE, 2, 1, 0, SortDirectionType.INVALID, true);
+        //checkReverseScan("R2_TREE", IndexLookupType.GTE, 1, 2, 0, SortDirectionType.DESC);
+
+
+        // (3) Three columns index cases.
+
+        sql = "select * from R where d = 1 ORDER BY e desc, f desc";
+        checkForwardScan("R3_TREE", IndexLookupType.GTE, 1, 1, 0, SortDirectionType.INVALID, true);
 
         sql = "select * from R where d = 1 AND e > 2 ORDER BY e desc";
         // Have one extra post predicate because of ENG-3913.
@@ -272,26 +447,37 @@ public class TestIndexReverseScan extends PlannerTestCase {
 
         sql = "select * from R where d = 1 AND e >= 2 ORDER BY d desc, e desc";
         checkForwardScan("R3_TREE", IndexLookupType.GTE, 2, 1, 0, SortDirectionType.INVALID, true);
-        //checkReverseScan("R3_TREE", IndexLookupType.GT, 1, 2, 1, SortDirectionType.DESC);
+        //checkReverseScan("R3_TREE", IndexLookupType.GTE, 1, 2, 1, SortDirectionType.DESC);
 
-    }
+        sql = "select * from R where d = 1 AND e > 2 AND f = 5 ORDER BY e desc";
+        checkForwardScan("R3_TREE", IndexLookupType.GT, 2, 1, 2, SortDirectionType.INVALID, true);
+        //checkReverseScan("R3_TREE", IndexLookupType.GT, 1, 2, 2, SortDirectionType.DESC);
 
-    public void test_not_supported_cases() {
-
-        sql = "select * from R where d = 1 AND e > 2 ORDER BY d desc, e desc, f asc";
-        checkForwardScan("R3_TREE", IndexLookupType.GT, 2, 1, 1, SortDirectionType.INVALID, true);
-
+        sql = "select * from R where d = 1 AND e >= 2 AND f = 5 ORDER BY e desc";
+        checkForwardScan("R3_TREE", IndexLookupType.GTE, 2, 1, 1, SortDirectionType.INVALID, true);
+        //checkReverseScan("R3_TREE", IndexLookupType.GTE, 1, 2, 1, SortDirectionType.DESC);
     }
 
     private void checkReverseScan(String indexName, IndexLookupType lookupType,
             int searchKeys, int endKeys, int predicates, SortDirectionType sortType) {
 
-        checkReverseScan(indexName, lookupType, searchKeys, endKeys, predicates, sortType, false);
+        checkReverseScan(indexName, lookupType, searchKeys, endKeys, predicates,
+                searchKeys, true, sortType, false);
+    }
+
+    private void checkReverseScan(String indexName, IndexLookupType lookupType,
+            int searchKeys, int endKeys, int predicates, boolean artificial,
+            SortDirectionType sortType) {
+
+        checkReverseScan(indexName, lookupType, searchKeys, endKeys, predicates,
+                searchKeys, artificial, sortType, false);
     }
 
 
     private void checkReverseScan(String indexName, IndexLookupType lookupType,
-            int searchKeys, int endKeys, int predicates, SortDirectionType sortType, boolean needOrderby) {
+            int searchKeys, int endKeys, int predicates, int initials, boolean artificial,
+            SortDirectionType sortType, boolean needOrderby) {
+
         AbstractPlanNode pn = compile(sql);
         System.out.println(pn.toExplainPlanString());
 
@@ -312,17 +498,15 @@ public class TestIndexReverseScan extends PlannerTestCase {
         assertEquals(endKeys, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
         assertEquals(predicates, ExpressionUtil.uncombine(ispn.getPredicate()).size());
 
+        assertEquals(initials, ExpressionUtil.uncombine(ispn.getInitialExpression()).size());
+
         // Test artificial post predicate
-        if (predicates == 1) {
-            // Rule out of case: (1) ENG-3913. (2) b >= 1 AND c > 2 ORDER BY b desc.
-            if (lookupType != IndexLookupType.GT && lookupType != IndexLookupType.GTE) {
-                assertTrue(ispn.getPredicate().getExpressionType() == ExpressionType.OPERATOR_NOT);
-                assertTrue(ispn.getPredicate().getLeft().getExpressionType() == ExpressionType.OPERATOR_IS_NULL);
-            }
+        if (predicates == 1 && artificial) {
+            assertTrue(ispn.getPredicate().getExpressionType() == ExpressionType.OPERATOR_NOT);
+            assertTrue(ispn.getPredicate().getLeft().getExpressionType() == ExpressionType.OPERATOR_IS_NULL);
         } else if (predicates > 1) {
             assertTrue(ispn.getPredicate().getExpressionType() == ExpressionType.CONJUNCTION_AND);
         }
-        assertEquals(searchKeys, ExpressionUtil.uncombine(ispn.getInitialExpression()).size());
 
         // SortDirection can be INVALID because we use LookupType to determine
         // index scan direction instead in EE.
