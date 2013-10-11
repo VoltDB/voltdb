@@ -735,6 +735,18 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         return currentTxnState.recursableRun(this);
     }
 
+    @Override
+    public void setLastCommittedTxn(long txnId, long spHandle)
+    {
+        m_lastCommittedTxnId = txnId;
+        if (TxnEgo.getPartitionId(m_lastCommittedSpHandle) != TxnEgo.getPartitionId(spHandle)) {
+            VoltDB.crashLocalVoltDB("Mismatch SpHandle partitiond id " +
+                                    TxnEgo.getPartitionId(m_lastCommittedSpHandle) + ", " +
+                                    TxnEgo.getPartitionId(spHandle), true, null);
+        }
+        m_lastCommittedSpHandle = spHandle;
+    }
+
     private static void handleUndoLog(List<UndoAction> undoLog, boolean undo) {
         if (undoLog == null) return;
 

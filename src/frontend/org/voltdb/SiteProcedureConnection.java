@@ -105,6 +105,11 @@ public interface SiteProcedureConnection {
     public Map<Integer, List<VoltTable>> recursableRun(TransactionState currentTxnState);
 
     /**
+     * Set the last committed txnId and spHandle
+     */
+    public void setLastCommittedTxn(long txnId, long spHandle);
+
+    /**
      * IV2 commit / rollback interface to the EE
      */
     public void truncateUndoLog(boolean rollback, long token, long txnId, long spHandle, List<UndoAction> undoActions);

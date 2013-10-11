@@ -354,6 +354,12 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
+    public void setLastCommittedTxn(long txnId, long spHandle)
+    {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
     public void truncateUndoLog(boolean rollback, long beginUndoToken, long txnId, long spHandle,
             List<UndoAction> undoActions)
     {

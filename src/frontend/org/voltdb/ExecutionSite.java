@@ -1463,6 +1463,12 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         return null;
     }
 
+    @Override
+    public void setLastCommittedTxn(long txnId, long spHandle)
+    {
+
+    }
+
     public SiteTracker getSiteTracker() {
         return m_tracker;
     }
