@@ -493,13 +493,63 @@ public abstract class SubPlanAssembler {
         if (endingBoundExpr == null) {
             if (retval.sortDirection == SortDirectionType.DESC) {
                 // Optimizable to use reverse scan.
-                if (startingBoundExpr != null) {
-                    int lastIdx = retval.indexExprs.size() -1;
-                    retval.indexExprs.remove(lastIdx);
+                if (retval.endExprs.size() == 0) { // no prefix equality filters
+                    if (startingBoundExpr != null) {
+                        retval.indexExprs.clear();
+                        AbstractExpression comparator = startingBoundExpr.getFilter();
+                        retval.endExprs.add(comparator);
 
-                    AbstractExpression comparator = startingBoundExpr.getFilter();
-                    retval.endExprs.add(comparator);
-                    retval.initialExpr.addAll(retval.indexExprs);
+                        retval.initialExpr.addAll(retval.indexExprs);
+                        // Look up type here does not matter in EE, because the # of active search keys is 0.
+                        // EE use m_index->moveToEnd(false) to get END, setting scan to reverse scan.
+                        // retval.lookupType = IndexLookupType.LTE;
+                    }
+                }
+                else {
+                    // there are prefix equality filters -- possible for a reverse scan?
+
+                    // set forward scan.
+                    retval.sortDirection = SortDirectionType.INVALID;
+
+                    // Turn this part on when we have EE support for reverse scan with query GT and GTE.
+                    /*
+                    boolean isReverseScanPossible = true;
+                    if (filtersToCover.size() > 0) {
+                        // Look forward to see the remainning filters.
+                        for (int ii = coveredCount + 1; ii < keyComponentCount; ++ii) {
+                            if (indexedExprs == null) {
+                                coveringColId = indexedColIds[ii];
+                            } else {
+                                coveringExpr = indexedExprs.get(ii);
+                            }
+                            // Equality filters get first priority.
+                            boolean allowIndexedJoinFilters = (inListExpr == null);
+                            IndexableExpression eqExpr = getIndexableExpressionFromFilters(
+                                ExpressionType.COMPARE_EQUAL, ExpressionType.COMPARE_EQUAL,
+                                coveringExpr, coveringColId, table, filtersToCover,
+                                allowIndexedJoinFilters, KEEP_IN_POST_FILTERS);
+                            if (eqExpr == null) {
+                                isReverseScanPossible = false;
+                            }
+                        }
+                    }
+                    if (isReverseScanPossible) {
+                        if (startingBoundExpr != null) {
+                            int lastIdx = retval.indexExprs.size() -1;
+                            retval.indexExprs.remove(lastIdx);
+
+                            AbstractExpression comparator = startingBoundExpr.getFilter();
+                            retval.endExprs.add(comparator);
+                            retval.initialExpr.addAll(retval.indexExprs);
+
+                            retval.lookupType = IndexLookupType.LTE;
+                        }
+
+                    } else {
+                        // set forward scan.
+                        retval.sortDirection = SortDirectionType.INVALID;
+                    }
+                    */
                 }
             }
         }
@@ -755,11 +805,7 @@ public abstract class SubPlanAssembler {
                         // to match them with the query's "ORDER BY" expressions.
                         if (indexedExprs == null) {
                             ColumnRef nextColRef = indexedColRefs.get(jj);
-                            //TODO: match the TVE attributes as they may potentially be more
-                            // reliable than these colInfo attributes?
                             if (colInfo.expression instanceof TupleValueExpression &&
-                                //TODO: match the TVE attributes as they may potentially be more
-                                // reliable than these colInfo attributes?
                                 colInfo.tableName.equals(table.getTypeName()) &&
                                 colInfo.columnName.equals(nextColRef.getColumn().getTypeName())) {
                                 break;

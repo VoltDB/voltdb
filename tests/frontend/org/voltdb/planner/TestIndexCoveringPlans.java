@@ -27,11 +27,11 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.types.IndexLookupType;
 
-public class TestCoveringIndexPlans extends PlannerTestCase {
+public class TestIndexCoveringPlans extends PlannerTestCase {
     @Override
     protected void setUp() throws Exception {
         final boolean planForSinglePartition = true;
-        setupSchema(TestCoveringIndexPlans.class.getResource("testplans-indexvshash-ddl.sql"),
+        setupSchema(TestIndexCoveringPlans.class.getResource("testplans-indexvshash-ddl.sql"),
                     "testindexvshashplans", planForSinglePartition);
     }
 
