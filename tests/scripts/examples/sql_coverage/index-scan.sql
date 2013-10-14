@@ -5,7 +5,7 @@ INSERT INTO _table VALUES (_value[int16], _value[int16], _value[int16], _value[i
 INSERT INTO _table VALUES (_value[int16], 10, _value[int16], 20, _value[int16], _value[int16])
 
 
-SELECT * FROM _table WHERE A _cmp _value[int16] ORDER BY A _sortorderTwoTwo
+SELECT * FROM _table WHERE A _cmp _value[int16] ORDER BY A _sortorderTwo
 SELECT * FROM _table WHERE B _cmp _value[int16] AND C _cmp _value[int16] ORDER BY C _sortorderTwo 
 SELECT * FROM _table WHERE D _cmp _value[int16] AND E _cmp _value[int16] ORDER BY C _sortorderTwo 
 SELECT * FROM _table WHERE D _cmp _value[int16] AND E _cmp _value[int16] AND F _cmp _value[int16] ORDER BY E _sortorderTwo 
