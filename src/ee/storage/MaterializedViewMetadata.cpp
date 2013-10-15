@@ -351,7 +351,7 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueSequential(const TableTu
         }
         if (current.compare(existingValue) == 0) {
             if (!skippedOne) {
-                VOLT_ERROR("TRACE: Skip tuple: %s\n", tuple.debugNoHeader().c_str());
+                VOLT_TRACE("Skip tuple: %s\n", tuple.debugNoHeader().c_str());
                 skippedOne = true;
                 continue;
             }
