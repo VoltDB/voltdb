@@ -22,6 +22,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.TheHashinator.HashinatorConfig;
 
 import java.util.List;
 
@@ -68,7 +69,7 @@ public interface SystemProcedureExecutionContext {
     /**
      * Update the EE hashinator with the given configuration.
      */
-    public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config);
+    public void updateHashinator(HashinatorConfig config);
 
     boolean activateTableStream(int tableId, TableStreamType type, boolean undo, byte[] predicates);
 

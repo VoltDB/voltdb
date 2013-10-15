@@ -68,18 +68,20 @@ public class MurmurHash3
         return k;
     }
 
-    public static long hash3_x64_128(long value) {
+    public static int hash3_x64_128(long value) {
         return hash3_x64_128(value, 0);
     }
 
-    public static long hash3_x64_128(long value, long seed) {
+    public static int hash3_x64_128(long value, long seed) {
         ByteBuffer buf = ByteBuffer.allocate(8);
         buf.order(ByteOrder.LITTLE_ENDIAN);
         buf.putLong(value);
         return hash3_x64_128(buf, 0, 8, seed);
     }
 
-    public static long hash3_x64_128(ByteBuffer key, int offset, int length, long seed)
+    private final static long MASK = 0xFFFFFFFF00000000L;
+
+    public static int hash3_x64_128(ByteBuffer key, int offset, int length, long seed)
     {
         final int nblocks = length >> 4; // Process as 128-bit blocks.
 
@@ -155,6 +157,6 @@ public class MurmurHash3
         h1 += h2;
         h2 += h1;
 
-        return h1;
+        return (int)h1;
     }
 }

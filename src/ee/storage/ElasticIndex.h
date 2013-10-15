@@ -29,7 +29,7 @@ class ElasticIndexIterator;
 class PersistentTable;
 
 /// Hash value type.
-typedef int64_t ElasticHash;
+typedef int32_t ElasticHash;
 
 /**
  * Data for the elastic index key.
@@ -462,7 +462,7 @@ inline ElasticIndexHashRange::ElasticIndexHashRange(ElasticHash from, ElasticHas
  */
 inline ElasticIndexHashRange::ElasticIndexHashRange() :
     // min->min covers all possible values, min->max would not.
-    m_from(std::numeric_limits<int64_t>::min()), m_to(std::numeric_limits<int64_t>::min())
+    m_from(std::numeric_limits<int32_t>::min()), m_to(std::numeric_limits<int32_t>::min())
 {}
 
 /**

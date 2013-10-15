@@ -126,11 +126,11 @@ public:
     bool indexRemove(TableTuple &tuple);
     bool hasStreamType(TableStreamType streamType) const;
     ElasticIndex::iterator indexIterator();
-    ElasticIndex::iterator indexIteratorLowerBound(int64_t lowerBound);
-    ElasticIndex::iterator indexIteratorUpperBound(int64_t upperBound);
+    ElasticIndex::iterator indexIteratorLowerBound(int32_t lowerBound);
+    ElasticIndex::iterator indexIteratorUpperBound(int32_t upperBound);
     ElasticIndex::const_iterator indexIterator() const;
-    ElasticIndex::const_iterator indexIteratorLowerBound(int64_t lowerBound) const;
-    ElasticIndex::const_iterator indexIteratorUpperBound(int64_t upperBound) const;
+    ElasticIndex::const_iterator indexIteratorLowerBound(int32_t lowerBound) const;
+    ElasticIndex::const_iterator indexIteratorUpperBound(int32_t upperBound) const;
     ElasticIndex::iterator indexEnd();
     ElasticIndex::const_iterator indexEnd() const;
     boost::shared_ptr<ElasticIndexTupleRangeIterator>
@@ -602,12 +602,12 @@ inline ElasticIndex::iterator PersistentTableSurgeon::indexIterator() {
     return m_index->createIterator();
 }
 
-inline ElasticIndex::iterator PersistentTableSurgeon::indexIteratorLowerBound(int64_t lowerBound) {
+inline ElasticIndex::iterator PersistentTableSurgeon::indexIteratorLowerBound(int32_t lowerBound) {
     assert (m_index != NULL);
     return m_index->createLowerBoundIterator(lowerBound);
 }
 
-inline ElasticIndex::iterator PersistentTableSurgeon::indexIteratorUpperBound(int64_t upperBound) {
+inline ElasticIndex::iterator PersistentTableSurgeon::indexIteratorUpperBound(int32_t upperBound) {
     assert (m_index != NULL);
     return m_index->createUpperBoundIterator(upperBound);
 }
@@ -617,12 +617,12 @@ inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIterator() cons
     return m_index->createIterator();
 }
 
-inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIteratorLowerBound(int64_t lowerBound) const {
+inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIteratorLowerBound(int32_t lowerBound) const {
     assert (m_index != NULL);
     return m_index->createLowerBoundIterator(lowerBound);
 }
 
-inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIteratorUpperBound(int64_t upperBound) const {
+inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIteratorUpperBound(int32_t upperBound) const {
     assert (m_index != NULL);
     return m_index->createUpperBoundIterator(upperBound);
 }

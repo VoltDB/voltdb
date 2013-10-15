@@ -26,7 +26,7 @@
 
 namespace voltdb {
 
-typedef std::pair<int64_t, int64_t> srange_type;
+typedef std::pair<int32_t, int32_t> srange_type;
 
 class HashRangeExpression : public AbstractExpression {
 public:
@@ -58,9 +58,7 @@ public:
                     "eval:"
                     " Couldn't find tuple 1 (possible index scan planning error)");
         }
-        int64_t out[2];
-        tuple1->getNValue(this->value_idx).murmurHash3(out);
-        const int64_t hash = out[0];
+        const int32_t hash = tuple1->getNValue(this->value_idx).murmurHash3();
         /*
          * Bottom of a range is inclusive, top is exclusive
          */

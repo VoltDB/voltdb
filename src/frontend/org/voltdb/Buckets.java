@@ -24,7 +24,7 @@ import com.google.common.collect.TreeMultimap;
 import java.util.*;
 
 public class Buckets {
-    private final List<TreeSet<Long>> m_partitionTokens = new ArrayList<TreeSet<Long>>();
+    private final List<TreeSet<Integer>> m_partitionTokens = new ArrayList<TreeSet<Integer>>();
     private final int m_tokenCount;
     private final long m_tokenInterval;
 
@@ -34,10 +34,10 @@ public class Buckets {
         Preconditions.checkArgument(tokenCount % 2 == 0);
         m_tokenCount = tokenCount;
         m_tokenInterval = calculateTokenInterval(tokenCount);
-        m_partitionTokens.add(Sets.<Long>newTreeSet());
-        long token = Long.MIN_VALUE;
+        m_partitionTokens.add(Sets.<Integer>newTreeSet());
+        long token = Integer.MIN_VALUE;
         for (int ii = 0; ii < tokenCount; ii++) {
-            m_partitionTokens.get(0).add(token);
+            m_partitionTokens.get(0).add((int)token);
             token += m_tokenInterval;
         }
 
@@ -52,7 +52,7 @@ public class Buckets {
         }
 
         for (int ii = 0; ii < partitionCount; ii++) {
-            TreeSet<Long> d = Sets.newTreeSet();
+            TreeSet<Integer> d = Sets.newTreeSet();
             m_partitionTokens.add(d);
             loadSet.add(new LoadPair(m_partitionTokens.size() - 1, d)) ;
             addPartition(loadSet);
@@ -64,10 +64,10 @@ public class Buckets {
     }
 
     private static long calculateTokenInterval(int bucketCount) {
-        return ElasticHashinator.TokenCompressor.prepare(Long.MAX_VALUE / (bucketCount / 2));
+        return Integer.MAX_VALUE / (bucketCount / 2);
     }
 
-    public Buckets(SortedMap<Long, Integer> tokens) {
+    public Buckets(SortedMap<Integer, Integer> tokens) {
         Preconditions.checkNotNull(tokens);
         Preconditions.checkArgument(tokens.size() > 1);
         Preconditions.checkArgument(tokens.size() % 2 == 0);
@@ -76,20 +76,20 @@ public class Buckets {
 
         int partitionCount = new HashSet<Integer>(tokens.values()).size();
         for (int partition = 0; partition < partitionCount; partition++) {
-            m_partitionTokens.add(Sets.<Long>newTreeSet());
+            m_partitionTokens.add(Sets.<Integer>newTreeSet());
         }
-        for (Map.Entry<Long, Integer> e : tokens.entrySet()) {
-            TreeSet<Long> buckets = m_partitionTokens.get(e.getValue());
-            long token = e.getKey();
+        for (Map.Entry<Integer, Integer> e : tokens.entrySet()) {
+            TreeSet<Integer> buckets = m_partitionTokens.get(e.getValue());
+            int token = e.getKey();
             buckets.add(token);
         }
     }
 
-    public Map<Long, Integer> getTokens() {
-        ImmutableSortedMap.Builder<Long, Integer> b = ImmutableSortedMap.naturalOrder();
+    public Map<Integer, Integer> getTokens() {
+        ImmutableSortedMap.Builder<Integer, Integer> b = ImmutableSortedMap.naturalOrder();
         for (int partition = 0; partition < m_partitionTokens.size(); partition++) {
-            TreeSet<Long> tokens = m_partitionTokens.get(partition);
-            for (Long token : tokens) {
+            TreeSet<Integer> tokens = m_partitionTokens.get(partition);
+            for (Integer token : tokens) {
                 b.put( token, partition);
             }
         }
@@ -108,7 +108,7 @@ public class Buckets {
             if (mostLoaded.tokens.size() == leastLoaded.tokens.size()) return false;
             //Can't improve on off by one, just end up off by one again
             if (mostLoaded.tokens.size() == (leastLoaded.tokens.size() + 1)) return false;
-            long token = mostLoaded.tokens.pollFirst();
+            int token = mostLoaded.tokens.pollFirst();
             leastLoaded.tokens.add(token);
         } finally {
             loadSet.add(mostLoaded);
@@ -122,9 +122,9 @@ public class Buckets {
      */
     private static class LoadPair implements Comparable<LoadPair> {
         private final Integer partition;
-        private final TreeSet<Long> tokens;
+        private final TreeSet<Integer> tokens;
 
-        public LoadPair(Integer partition, TreeSet<Long> tokens) {
+        public LoadPair(Integer partition, TreeSet<Integer> tokens) {
             this.partition = partition;
             this.tokens = tokens;
         }

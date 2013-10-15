@@ -36,6 +36,7 @@ import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
+import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
@@ -475,14 +476,16 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      *
      * THIS METHOD IS CURRENTLY ONLY USED FOR TESTING
      */
-    public abstract int hashinate(Object value, TheHashinator.HashinatorType type, byte config[]);
+    public abstract int hashinate(
+            Object value,
+            HashinatorConfig config);
 
     /**
      * Updates the hashinator with new config
      * @param type hashinator type
      * @param config new hashinator config
      */
-    public abstract void updateHashinator(TheHashinator.HashinatorType type, byte[] config);
+    public abstract void updateHashinator(HashinatorConfig config);
 
     /**
      * Execute an arbitrary task that is described by the task id and serialized task parameters.
@@ -526,7 +529,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param partitionId id of partitioned assigned to this EE
      * @param hostId id of the host this EE is running on
      * @param hostname name of the host this EE is running on
-     * @param totalPartitions number of partitions in the cluster for the hashinator
      * @return error code
      */
     protected native int nativeInitialize(
@@ -536,9 +538,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int partitionId,
             int hostId,
             byte hostname[],
-            long tempTableMemory,
-            int hashinatorType,
-            byte hashinatorConfig[]);
+            long tempTableMemory);
 
     /**
      * Sets (or re-sets) all the shared direct byte buffers in the EE.
@@ -657,12 +657,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * in the parameter buffer
      * @return
      */
-    protected native int nativeHashinate(long pointer);
+    protected native int nativeHashinate(long pointer, long configPtr, int tokenCount);
 
     /**
      * Updates the EE's hashinator
      */
-    protected native void nativeUpdateHashinator(long pointer);
+    protected native void nativeUpdateHashinator(long pointer, int typeId, long configPtr, int tokenCount);
 
     /**
      * Retrieve the thread local counter of pooled memory that has been allocated

@@ -53,6 +53,19 @@ public abstract class TheHashinator {
         }
     };
 
+    public static class HashinatorConfig {
+        public final HashinatorType type;
+        public final byte configBytes[];
+        public final long configPtr;
+        public final int numTokens;
+        public HashinatorConfig(HashinatorType type, byte configBytes[], long configPtr, int numTokens) {
+            this.type = type;
+            this.configBytes = configBytes;
+            this.configPtr = configPtr;
+            this.numTokens = numTokens;
+        }
+    }
+
     /**
      * Uncompressed configuration data accessor.
      * @return configuration data bytes
@@ -131,10 +144,10 @@ public abstract class TheHashinator {
     abstract public int pHashinateLong(long value);
     abstract public int pHashinateBytes(byte[] bytes);
     abstract public long pGetConfigurationSignature();
-    abstract protected Pair<HashinatorType, byte[]> pGetCurrentConfig();
-    abstract public Map<Long, Integer> pPredecessors(int partition);
-    abstract public Pair<Long, Integer> pPredecessor(int partition, long token);
-    abstract public Map<Long, Long> pGetRanges(int partition);
+    abstract protected HashinatorConfig pGetCurrentConfig();
+    abstract public Map<Integer, Integer> pPredecessors(int partition);
+    abstract public Pair<Integer, Integer> pPredecessor(int partition, int token);
+    abstract public Map<Integer, Integer> pGetRanges(int partition);
     public abstract HashinatorType getConfigurationType();
     abstract public int pHashToPartition(VoltType type, Object obj);
 
@@ -435,15 +448,15 @@ public abstract class TheHashinator {
         throw new RuntimeException("Should not reach here");
     }
 
-    public static Pair<HashinatorType, byte[]> getCurrentConfig() {
+    public static HashinatorConfig getCurrentConfig() {
         return instance.get().getSecond().pGetCurrentConfig();
     }
 
-    public static Map<Long, Integer> predecessors(int partition) {
+    public static Map<Integer, Integer> predecessors(int partition) {
         return instance.get().getSecond().pPredecessors(partition);
     }
 
-    public static Pair<Long, Integer> predecessor(int partition, long token) {
+    public static Pair<Integer, Integer> predecessor(int partition, int token) {
         return instance.get().getSecond().pPredecessor(partition, token);
     }
 
@@ -454,7 +467,7 @@ public abstract class TheHashinator {
      * the corresponding end. Ranges returned in the map are [start, end).
      * The ranges may or may not be contiguous.
      */
-    public static Map<Long, Long> getRanges(int partition) {
+    public static Map<Integer, Integer> getRanges(int partition) {
         return instance.get().getSecond().pGetRanges(partition);
     }
 
@@ -493,7 +506,7 @@ public abstract class TheHashinator {
     public static Pair<Long, byte[]> getCurrentVersionedConfig()
     {
         Pair<Long, ? extends TheHashinator> currentHashinator = instance.get();
-        return Pair.of(currentHashinator.getFirst(), currentHashinator.getSecond().pGetCurrentConfig().getSecond());
+        return Pair.of(currentHashinator.getFirst(), currentHashinator.getSecond().pGetCurrentConfig().configBytes);
     }
 
     /**

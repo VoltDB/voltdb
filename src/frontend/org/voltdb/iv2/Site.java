@@ -58,6 +58,7 @@ import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStats;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
+import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
@@ -316,7 +317,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config)
+        public void updateHashinator(HashinatorConfig config)
         {
             Site.this.updateHashinator(config);
         }
@@ -426,7 +427,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     ExecutionEngine initializeEE(String serializedCatalog, final long timestamp)
     {
         String hostname = CoreUtils.getHostnameOrAddress();
-        Pair<TheHashinator.HashinatorType, byte[]> hashinatorConfig = TheHashinator.getCurrentConfig();
+        HashinatorConfig hashinatorConfig = TheHashinator.getCurrentConfig();
         ExecutionEngine eeTemp = null;
         try {
             if (m_backend == BackendTarget.NATIVE_EE_JNI) {
@@ -439,8 +440,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         hostname,
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getMaxtemptablesize(),
-                        hashinatorConfig.getFirst(),
-                        hashinatorConfig.getSecond());
+                        hashinatorConfig);
                 eeTemp.loadCatalog( timestamp, serializedCatalog);
             }
             else {
@@ -456,8 +456,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             getSystemsettings().get("systemsettings").getMaxtemptablesize(),
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPort,
-                            hashinatorConfig.getFirst(),
-                            hashinatorConfig.getSecond());
+                            hashinatorConfig);
                 eeTemp.loadCatalog( timestamp, serializedCatalog);
             }
         }
@@ -1079,9 +1078,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_numberOfPartitions = partitionCount;
     }
 
-    private void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config)
+    private void updateHashinator(HashinatorConfig config)
     {
-        m_ee.updateHashinator(config.getFirst(), config.getSecond());
+        m_ee.updateHashinator(config);
     }
 
     /**

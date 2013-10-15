@@ -26,10 +26,7 @@ namespace voltdb
  */
 ElasticHash ElasticIndex::generateHash(const PersistentTable &table, const TableTuple &tuple)
 {
-    int64_t hashValues[2];
-    tuple.getNValue(table.partitionColumn()).murmurHash3(hashValues);
-    // Only the least significant 8 bytes is used.
-    return hashValues[0];
+    return tuple.getNValue(table.partitionColumn()).murmurHash3();
 }
 
 ElasticIndexTupleRangeIterator::ElasticIndexTupleRangeIterator(

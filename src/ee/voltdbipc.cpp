@@ -427,8 +427,6 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         int hostId;
         int64_t logLevels;
         int64_t tempTableMemory;
-        int32_t hashinatorType;
-        int32_t hashinatorConfigLength;
         int32_t hostnameLength;
         char data[0];
     }__attribute__((packed));
@@ -442,11 +440,9 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     cs->hostId = ntohl(cs->hostId);
     cs->logLevels = ntohll(cs->logLevels);
     cs->tempTableMemory = ntohll(cs->tempTableMemory);
-    cs->hashinatorType = ntohl(cs->hashinatorType);
-    cs->hashinatorConfigLength = ntohl(cs->hashinatorConfigLength);
     cs->hostnameLength = ntohl(cs->hostnameLength);
 
-    std::string hostname(cs->data + cs->hashinatorConfigLength, cs->hostnameLength);
+    std::string hostname(cs->data, cs->hostnameLength);
     try {
         m_engine = new VoltDBEngine(new voltdb::IPCTopend(this), new voltdb::StdoutLogProxy());
         m_engine->getLogManager()->setLogLevels(cs->logLevels);
@@ -462,9 +458,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
                                  cs->partitionId,
                                  cs->hostId,
                                  hostname,
-                                 cs->tempTableMemory,
-                                 (HashinatorType)cs->hashinatorType,
-                                 (char*)cs->data) == true) {
+                                 cs->tempTableMemory) == true) {
             return kErrorCode_Success;
         }
     } catch (const FatalException &e) {
@@ -1149,7 +1143,7 @@ void VoltDBIPC::updateHashinator(struct ipc_command *cmd) {
 
     HashinatorType hashinatorType = static_cast<HashinatorType>(ntohl(hash->hashinatorType));
     try {
-        m_engine->updateHashinator(hashinatorType, hash->data);
+        m_engine->updateHashinator(hashinatorType, hash->data, NULL, 0);
     } catch (const FatalException &e) {
         crashVoltDB(e);
     }
