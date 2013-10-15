@@ -78,6 +78,7 @@ import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
+import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.LogKeys;
 
 import vanilla.java.affinity.impl.PosixJNAAffinity;
@@ -594,7 +595,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
     }
 
-    private boolean filter(TransactionInfoBaseMessage tibm)
+    static boolean filter(TransactionInfoBaseMessage tibm)
     {
         // don't log sysproc fragments or iv2 intiiate task messages.
         // this is all jealously; should be refactored to ask tibm
@@ -602,7 +603,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         // horrible introspection. This implementation mimics the
         // original live rejoin code for ExecutionSite...
         if (tibm instanceof FragmentTaskMessage && ((FragmentTaskMessage)tibm).isSysProcTask()) {
-            return true;
+            if (!SysProcFragmentId.isBalancePartitionsFragment(((FragmentTaskMessage) tibm).getPlanHash(0))) {
+                return true;
+            }
         }
         else if (tibm instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage)tibm;
