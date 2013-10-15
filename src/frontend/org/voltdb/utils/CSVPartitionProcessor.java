@@ -44,7 +44,7 @@ class CSVPartitionProcessor implements Runnable {
 
     static public CSVLoader.CSVConfig m_config;
     final Client m_csvClient;
-    //Queue for processing for this partition.
+    //Queue for processing for this partition
     final BlockingQueue<CSVLineWithMetaData> m_partitionQueue;
     final CSVLineWithMetaData m_endOfData;
     //Partition for which this processor thread is processing.
