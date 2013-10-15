@@ -380,16 +380,16 @@ public class TestCSVLoader extends TestCase {
             "3 ,1,1,11111111,first,1.10,1.11," + currentTime,
             "4 ,1,1,11111111,first,1.10,1.11," + currentTime,
             "1 ,1,1,11111111,first,1.10,1.11," + currentTime,
-            "2 ,1,1,11111111,first,1.10,1.11," + currentTime, //Whole batch fails.
+            "2 ,1,1,11111111,first,1.10,1.11," + currentTime, //Whole batch fails
             "5 ,1,1,11111111,first,1.10,1.11," + currentTime,
             "6 ,1,1,11111111,first,1.10,1.11," + currentTime,
             "1 ,1,1,11111111,first,1.10,1.11," + currentTime,
-            "2 ,1,1,11111111,first,1.10,1.11," + currentTime, //Whole batch fails.
+            "2 ,1,1,11111111,first,1.10,1.11," + currentTime, //Whole batch fails
             "7 ,1,1,11111111,first,1.10,1.11," + currentTime,
             "8 ,1,1,11111111,first,1.10,1.11," + currentTime,
             "11 ,1,1,11111111,first,1.10,1.11," + currentTime,
             "1 ,1,1,11111111,first,1.10,1.11," + currentTime,
-            "2 ,1,1,11111111,first,1.10,1.11," + currentTime, //Whole batch fails.
+            "2 ,1,1,11111111,first,1.10,1.11," + currentTime, //Whole batch fails
             "1 ,1,1,11111111,first,1.10,1.11," + currentTime,
             "12 ,1,1,11111111,first,1.10,1.11," + currentTime
         };
