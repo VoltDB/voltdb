@@ -212,6 +212,16 @@ function applyFormat(val)
     }
     return val;
 }
+function fmtd(v, l)
+{
+    v = v + "";
+    if (v.length < l)
+    {
+       v = Array(l-v.length+1).join("0") + v;
+    }
+    return v;
+}
+
 function printGrid(target, id, table)
 {
 	var src = '<table id="resultset-' + id + '" class="sortable tablesorter resultset-' + id + '" border="0" cellpadding="0" cellspacing="1"><thead class="ui-widget-header noborder"><tr>';
@@ -222,20 +232,34 @@ function printGrid(target, id, table)
     	for(var j = 0; j < table.schema.length; j++)
 	    	src += '<th>' + ( table.schema[j].name == "" ? ("Column " + (j+1)) : table.schema[j].name ) + '</th>';
     }
-	src += '</tr></thead><tbody>';
-	for(var j = 0; j < table.data.length; j++)
-	{
-		src += '<tr>';
-		for(var k = 0; k < table.data[j].length; k++)
-		{
-		    var val = table.data[j][k];
-		    val = applyFormat(val);
-			src += '<td align="' + (table.schema[k].type == 9 ? 'left' : 'right') + '">' + val + '</td>';
-		}
-		src += '</tr>';
-	}
-	src += '</tbody></table>';
-	$(target).append(src);
+    src += '</tr></thead><tbody>';
+    for(var j = 0; j < table.data.length; j++)
+    {
+        src += '<tr>';
+        for(var k = 0; k < table.data[j].length; k++)
+        {
+            var val = table.data[j][k];
+            var typ = table.schema[k].type;
+            if (typ == 11)
+            {
+                var us = val%1000;
+                var dt = new Date(val/1000);
+                val = fmtd(dt.getUTCFullYear(), 4) + "-"
+                    + fmtd((dt.getUTCMonth())+1, 2) + "-"
+                    + fmtd(dt.getUTCDate(), 2) + " "
+                    + fmtd(dt.getUTCHours(), 2) + ":"
+                    + fmtd(dt.getUTCMinutes(), 2) + ":"
+                    + fmtd(dt.getUTCSeconds(), 2) + "."
+                    + fmtd((dt.getUTCMilliseconds())*1000+us, 6);
+                typ = 9;
+            }
+            val = applyFormat(val);
+            src += '<td align="' + (typ == 9 ? 'left' : 'right') + '">' + val + '</td>';
+        }
+        src += '</tr>';
+    }
+    src += '</tbody></table>';
+    $(target).append(src);
     sorttable.makeSortable(document.getElementById('resultset-' + id));
 }
 function printFixed(target, id, table)
