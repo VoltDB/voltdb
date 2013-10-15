@@ -1244,7 +1244,7 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeUpdat
         HashinatorType hashinatorType = static_cast<HashinatorType>(type);
         //Fast path processing, just use the config given by pointer
         if (configPtr != 0) {
-            engine->updateHashinator(hashinatorType, NULL, reinterpret_cast<int32_t*>(configPtr), static_cast<uint32_t>(tokenCount));     
+            engine->updateHashinator(hashinatorType, NULL, reinterpret_cast<int32_t*>(configPtr), static_cast<uint32_t>(tokenCount));
             return;
         }
         updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated

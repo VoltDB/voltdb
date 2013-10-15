@@ -108,7 +108,7 @@ protected:
 private:
 
     ElasticHashinator(int32_t *tokens, uint32_t tokenCount, bool owned) : tokens(tokens), tokenCount(tokenCount), tokensOwner( owned ? tokens : NULL ) {}
-    
+
     const int32_t *tokens;
     const uint32_t tokenCount;
     boost::scoped_array<int32_t> tokensOwner;
@@ -118,7 +118,7 @@ private:
         uint32_t max = tokenCount - 1;
 
         while (min <= max) {
-            uint32_t mid = (min + max) >> 1;         
+            uint32_t mid = (min + max) >> 1;
             int32_t midval = tokens[mid * 2];
 
             if (midval < hash) {

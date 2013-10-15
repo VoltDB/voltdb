@@ -63,7 +63,7 @@ public:
         /*
          * Bottom of a range is inclusive, top is exclusive
          * Doing a binary search, is just a hair easier than std::lower_bound
-         */        
+         */
         uint32_t min = 0;
         uint32_t max = num_ranges - 1;
         while (min <= max) {
