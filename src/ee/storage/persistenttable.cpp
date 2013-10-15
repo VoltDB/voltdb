@@ -234,19 +234,19 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
     target.copyForPersistentInsert(source); // tuple in freelist must be already cleared
 
     try {
-        insertTupleCommon(target, fallible);
+        insertTupleCommon(source, target, fallible);
     } catch (ConstraintFailureException &e) {
         deleteTupleStorage(target); // also frees object columns
         throw;
     }
 }
 
-void PersistentTable::insertTupleCommon(TableTuple &target, bool fallible)
+void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible)
 {
     if (fallible) {
         // not null checks at first
         FAIL_IF(!checkNulls(target)) {
-            throw ConstraintFailureException(this, target, TableTuple(), CONSTRAINT_TYPE_NOT_NULL);
+            throw ConstraintFailureException(this, source, TableTuple(), CONSTRAINT_TYPE_NOT_NULL);
         }
     }
 
@@ -270,7 +270,7 @@ void PersistentTable::insertTupleCommon(TableTuple &target, bool fallible)
     }
 
     if (!tryInsertOnAllIndexes(&target)) {
-        throw ConstraintFailureException(this, target, TableTuple(),
+        throw ConstraintFailureException(this, source, TableTuple(),
                                          CONSTRAINT_TYPE_UNIQUE);
     }
 
@@ -886,7 +886,7 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple,
                                          int32_t &serializedTupleCount,
                                          size_t &tupleCountPosition) {
     try {
-        insertTupleCommon(tuple, true);
+        insertTupleCommon(tuple, tuple, true);
     } catch (ConstraintFailureException &e) {
         if (uniqueViolationOutput) {
             if (serializedTupleCount == 0) {
@@ -897,6 +897,8 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple,
             tuple.serializeTo(*uniqueViolationOutput);
             deleteTupleStorage(tuple);
             return;
+        } else {
+            throw;
         }
     }
 }

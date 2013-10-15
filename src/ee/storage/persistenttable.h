@@ -423,7 +423,11 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     void swapTuples(TableTuple &sourceTupleWithNewValues, TableTuple &destinationTuple);
 
-    void insertTupleCommon(TableTuple &target, bool fallible);
+    // The source tuple is used to create the ConstraintFailureException if one
+    // occurs. In case of exception, target tuple should be released, but the
+    // source tuple's memory should still be retained until the exception is
+    // handled.
+    void insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible);
     void insertTupleForUndo(char *tuple);
     void updateTupleForUndo(char* targetTupleToUpdate,
                             char* sourceTupleWithNewValues,
