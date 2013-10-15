@@ -46,7 +46,7 @@ TEST_F(ElasticHashinatorTest, TestMinMaxToken)
     output.writeInt(std::numeric_limits<int32_t>::max());
     output.writeInt(2);
 
-    boost::scoped_ptr<ElasticHashinator> hashinator(ElasticHashinator::newInstance(config.get()));
+    boost::scoped_ptr<ElasticHashinator> hashinator(ElasticHashinator::newInstance(config.get(), NULL, 0));
     EXPECT_EQ( 0, hashinator->partitionForToken(std::numeric_limits<int32_t>::min()));
     EXPECT_EQ( 0, hashinator->partitionForToken(std::numeric_limits<int32_t>::min() + 1));
 
@@ -66,7 +66,7 @@ TEST_F(ElasticHashinatorTest, TestMinMaxToken)
     output.writeInt(std::numeric_limits<int32_t>::max() - 1);
     output.writeInt(2);
 
-    hashinator.reset(ElasticHashinator::newInstance(config.get()));
+    hashinator.reset(ElasticHashinator::newInstance(config.get(), NULL, 0));
 
     EXPECT_EQ( 2, hashinator->partitionForToken(std::numeric_limits<int32_t>::min()));
     EXPECT_EQ( 0, hashinator->partitionForToken(std::numeric_limits<int32_t>::min() + 1));

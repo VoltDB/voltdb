@@ -58,9 +58,11 @@ class AddDropTableTest : public Test {
                              m_partitionId,
                              m_hostId,
                              m_hostName,
-                             DEFAULT_TEMP_TABLE_MEMORY,
-                             HASHINATOR_LEGACY,
-                             (char*)&partitionCount);
+                             DEFAULT_TEMP_TABLE_MEMORY);
+        m_engine->updateHashinator( HASHINATOR_LEGACY,
+                                   (char*)&partitionCount,
+                                    NULL,
+                                    0);
 
         std::string initialCatalog =
           "add / clusters cluster\n"

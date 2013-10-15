@@ -414,11 +414,9 @@ TEST_F(ExpressionTest, HashRange) {
 
     for (int ii = 0; ii < 100000; ii++) {
         NValue val = ValueFactory::getIntegerValue(rand());
-        int64_t out[2];
-        val.murmurHash3(out);
+        const int32_t hash = val.murmurHash3();
         t.setNValue(1, val);
         NValue inrange = e1->eval( &t );
-        const int64_t hash = out[0];
         if ((hash >= range1Min && hash < range1Max) ||
              (hash >= range2Min && hash < range2Max) ||
              (hash >= range3Min || hash < range3Max)) {

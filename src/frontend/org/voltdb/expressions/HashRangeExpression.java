@@ -148,8 +148,8 @@ public class HashRangeExpression extends AbstractValueExpression {
         stringer.key(Members.RANGES.name()).array();
         for (Map.Entry<Integer, Integer> e : m_ranges.entrySet()) {
             stringer.object();
-            stringer.key(Members.RANGE_START.name()).value(e.getKey());
-            stringer.key(Members.RANGE_END.name()).value(e.getValue());
+            stringer.key(Members.RANGE_START.name()).value(e.getKey().intValue());
+            stringer.key(Members.RANGE_END.name()).value(e.getValue().intValue());
             stringer.endObject();
         }
         stringer.endArray();

@@ -59,6 +59,12 @@ public:
                     " Couldn't find tuple 1 (possible index scan planning error)");
         }
         const int32_t hash = tuple1->getNValue(this->value_idx).murmurHash3();
+        
+        //The binary search blows up on only one range
+        if (num_ranges == 1) {
+            if (hash >= ranges[0].first && hash < ranges[0].second) return NValue::getTrue();
+            return NValue::getFalse();
+        }
 
         /*
          * Bottom of a range is inclusive, top is exclusive
