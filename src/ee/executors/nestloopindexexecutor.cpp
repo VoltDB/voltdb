@@ -390,14 +390,21 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                         // find the entry whose key is greater than search key,
                         // do a forward scan using initialExpr to find the correct
                         // start point to do reverse scan
-                        index->moveToGreaterThanKey(&index_values);
-                        while (!(inner_tuple = index->nextValue()).isNullTuple()) {
-                            if (initial_expression != NULL && initial_expression->eval(&inner_tuple, NULL).isFalse()) {
-                                break;
+                        bool isEnd = index->moveToGreaterThanKey(&index_values);
+                        if (isEnd) {
+                            index->moveToEnd(false);
+                        } else {
+                            while (!(inner_tuple = index->nextValue()).isNullTuple()) {
+                                if (initial_expression != NULL && initial_expression->eval(&outer_tuple, &inner_tuple).isFalse()) {
+                                    // just passed the first failed entry, so move 2 backward
+                                    index->moveToBeforePriorEntry();
+                                    break;
+                                }
+                            }
+                            if (inner_tuple.isNullTuple()) {
+                                index->moveToEnd(false);
                             }
                         }
-                        // just passed the first failed entry, so move 2 backward
-                        index->moveToBeforePriorEntry();
                     }
                     else {
                         return false;
