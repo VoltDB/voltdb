@@ -224,6 +224,15 @@ function applyFormat(val)
     }
     return val;
 }
+function fmtd(v, l)
+{
+    v = v + "";
+    if (v.length < l)
+    {
+       v = Array(l-v.length+1).join("0") + v;
+    }
+    return v;
+}
 
 function printGrid(target, id, table)
 {
@@ -242,8 +251,22 @@ function printGrid(target, id, table)
         for(var k = 0; k < table.data[j].length; k++)
         {
             var val = table.data[j][k];
+            var typ = table.schema[k].type;
+            if (typ == 11)
+            {
+                var us = val%1000;
+                var dt = new Date(val/1000);
+                val = fmtd(dt.getUTCFullYear(), 4) + "-"
+                    + fmtd((dt.getUTCMonth())+1, 2) + "-"
+                    + fmtd(dt.getUTCDate(), 2) + " "
+                    + fmtd(dt.getUTCHours(), 2) + ":"
+                    + fmtd(dt.getUTCMinutes(), 2) + ":"
+                    + fmtd(dt.getUTCSeconds(), 2) + "."
+                    + fmtd((dt.getUTCMilliseconds())*1000+us, 6);
+                typ = 9;
+            }
             val = applyFormat(val);
-            src += '<td align="' + (table.schema[k].type == 9 ? 'left' : 'right') + '">' + val + '</td>';
+            src += '<td align="' + (typ == 9 ? 'left' : 'right') + '">' + val + '</td>';
         }
         src += '</tr>';
     }
