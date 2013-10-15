@@ -324,9 +324,9 @@ if __name__ == "__main__":
     _fnamedict = {}
     filenames = [os.path.basename(f.name) for f in files]
     if len(filenames) - len(set(filenames)) > 0:
-        _fnamedict = {f.name: f.name for f in files if f.name not in fnamedict}
+        _fnamedict = dict((f.name,f.name) for f in files if f.name not in fnamedict)
     else:
-        _fnamedict = {f.name: os.path.basename(f.name) for f in files if f.name not in fnamedict}
+        _fnamedict = dict((f.name,os.path.basename(f.name)) for f in files if f.name not in fnamedict)
     fnamedict.update(_fnamedict)
 
     if options.outputfile:
