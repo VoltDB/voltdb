@@ -107,6 +107,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     private int m_rejoinState;
     private final TaskLog m_rejoinTaskLog;
     private JoinProducerBase.JoinCompletionAction m_replayCompletionAction;
+    // Don't update the last committed txnId and spHandle during the rejoin stage of live rejoin,
+    // the tasks will be replayed later.
+    private boolean m_enableUpdateLastCommittedTxn;
 
     // Enumerate execution sites by host.
     private static final AtomicInteger siteIndexCounter = new AtomicInteger(0);
@@ -360,6 +363,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_scheduler = scheduler;
         m_backend = backend;
         m_rejoinState = startAction.doesJoin() ? kStateRejoining : kStateRunning;
+        m_enableUpdateLastCommittedTxn = startAction != StartAction.LIVE_REJOIN;
         m_snapshotPriority = snapshotPriority;
         // need this later when running in the final thread.
         m_startupConfig = new StartupConfig(serializedCatalog, context.m_uniqueId);
@@ -738,6 +742,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void setLastCommittedTxn(long txnId, long spHandle)
     {
+        if (!m_enableUpdateLastCommittedTxn) {
+            return;
+        }
+
         m_lastCommittedTxnId = txnId;
         if (TxnEgo.getPartitionId(m_lastCommittedSpHandle) != TxnEgo.getPartitionId(spHandle)) {
             VoltDB.crashLocalVoltDB("Mismatch SpHandle partitiond id " +
@@ -983,6 +991,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         m_rejoinState = kStateReplayingRejoin;
         m_replayCompletionAction = replayComplete;
+        m_enableUpdateLastCommittedTxn = true;
         if (m_rejoinTaskLog != null) {
             m_rejoinTaskLog.setEarliestTxnId(
                     m_replayCompletionAction.getSnapshotTxnId());
