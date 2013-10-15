@@ -220,13 +220,6 @@ bool PersistentTable::insertTuple(TableTuple &source)
 
 void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
 {
-    if (fallible) {
-        // not null checks at first
-        FAIL_IF(!checkNulls(source)) {
-            throw ConstraintFailureException(this, source, TableTuple(), CONSTRAINT_TYPE_NOT_NULL);
-        }
-    }
-
     //
     // First get the next free tuple
     // This will either give us one from the free slot list, or
@@ -239,6 +232,24 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
     // Then copy the source into the target
     //
     target.copyForPersistentInsert(source); // tuple in freelist must be already cleared
+
+    try {
+        insertTupleCommon(target, fallible);
+    } catch (ConstraintFailureException &e) {
+        deleteTupleStorage(target); // also frees object columns
+        throw;
+    }
+}
+
+void PersistentTable::insertTupleCommon(TableTuple &target, bool fallible)
+{
+    if (fallible) {
+        // not null checks at first
+        FAIL_IF(!checkNulls(target)) {
+            throw ConstraintFailureException(this, target, TableTuple(), CONSTRAINT_TYPE_NOT_NULL);
+        }
+    }
+
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
         increaseStringMemCount(target.getNonInlinedMemorySize());
     }
@@ -259,8 +270,7 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
     }
 
     if (!tryInsertOnAllIndexes(&target)) {
-        deleteTupleStorage(target); // also frees object columns
-        throw ConstraintFailureException(this, source, TableTuple(),
+        throw ConstraintFailureException(this, target, TableTuple(),
                                          CONSTRAINT_TYPE_UNIQUE);
     }
 
@@ -279,7 +289,7 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
 
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
-        m_views[i]->processTupleInsert(source, fallible);
+        m_views[i]->processTupleInsert(target, fallible);
     }
 }
 
@@ -875,21 +885,9 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple,
                                          ReferenceSerializeOutput *uniqueViolationOutput,
                                          int32_t &serializedTupleCount,
                                          size_t &tupleCountPosition) {
-
-    // not null checks at first
-    FAIL_IF(!checkNulls(tuple)) {
-        throw ConstraintFailureException(this, tuple, TableTuple(),
-                                         CONSTRAINT_TYPE_NOT_NULL);
-    }
-
-    // Account for non-inlined memory allocated via bulk load or recovery
-    // Do this before unique constraints which might roll back the memory
-    if (m_schema->getUninlinedObjectColumnCount() != 0)
-    {
-        increaseStringMemCount(tuple.getNonInlinedMemorySize());
-    }
-
-    if (!tryInsertOnAllIndexes(&tuple)) {
+    try {
+        insertTupleCommon(tuple, true);
+    } catch (ConstraintFailureException &e) {
         if (uniqueViolationOutput) {
             if (serializedTupleCount == 0) {
                 serializeColumnHeaderTo(*uniqueViolationOutput);
@@ -899,20 +897,7 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple,
             tuple.serializeTo(*uniqueViolationOutput);
             deleteTupleStorage(tuple);
             return;
-        } else {
-            throw ConstraintFailureException(this, tuple, TableTuple(),
-                                             CONSTRAINT_TYPE_UNIQUE);
         }
-    }
-    UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
-    if (uq) {
-        char* tupleData = uq->allocatePooledCopy(tuple.address(), tuple.tupleLength());
-        uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, &m_surgeon));
-    }
-
-    // handle any materialized views
-    for (int i = 0; i < m_views.size(); i++) {
-        m_views[i]->processTupleInsert(tuple, true);
     }
 }
 

@@ -423,6 +423,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     void swapTuples(TableTuple &sourceTupleWithNewValues, TableTuple &destinationTuple);
 
+    void insertTupleCommon(TableTuple &target, bool fallible);
     void insertTupleForUndo(char *tuple);
     void updateTupleForUndo(char* targetTupleToUpdate,
                             char* sourceTupleWithNewValues,
