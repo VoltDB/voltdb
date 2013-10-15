@@ -23,12 +23,15 @@
 package org.voltdb_testprocs.regressionsuites.sqltypesprocs;
 
 import org.voltdb.VoltProcedure;
+import org.voltdb.export.ExportTestVerifier;
 
 public class Pause extends VoltProcedure {
 
     public long run(long flag) {
         System.out.println("Export is paused.");
-        System.setProperty("testpaused", "true");
+        synchronized (ExportTestVerifier.class) {
+            ExportTestVerifier.paused = true;
+        }
         return 0;
     }
 }
