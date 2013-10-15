@@ -1106,7 +1106,7 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
         hashinator.reset(LegacyHashinator::newInstance(hash->data));
         break;
     case HASHINATOR_ELASTIC:
-        hashinator.reset(ElasticHashinator::newInstance(hash->data));
+        hashinator.reset(ElasticHashinator::newInstance(hash->data, NULL, 0));
         break;
     default:
         try {

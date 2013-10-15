@@ -55,8 +55,10 @@ public:
      * The format is described in ElasticHashinator.java and basically describes the tokens
      * on the ring.
      *
-     * Config can be serialized or raw, if it is raw the pointer is stored and the and data
-     * can be shared across EEs and with Java
+     * Config can be serialized or raw, if it is raw the pointer is stored and the data
+     * can be shared across EEs and with Java.
+     * The raw version consists of an array of integers where even values are tokens and odd values are partitions.
+     *
      */
     static ElasticHashinator* newInstance(const char *config, int32_t *configPtr, uint32_t tokenCount) {
         if (configPtr == NULL) {

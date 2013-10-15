@@ -59,27 +59,24 @@ public:
                     " Couldn't find tuple 1 (possible index scan planning error)");
         }
         const int32_t hash = tuple1->getNValue(this->value_idx).murmurHash3();
+
         /*
          * Bottom of a range is inclusive, top is exclusive
-         */
-        for (int ii = 0; ii < num_ranges; ii++) {
-            const srange_type range = ranges[ii];
-            if (range.first < range.second) {
-                /*
-                 * The common case where the range doesn't span Long.MAX_VALUE to Long.MIN_VALUE
-                 */
-                if (range.first <= hash && hash < range.second) {
-                    return NValue::getTrue();
-                }
+         * Doing a binary search, is just a hair easier than std::lower_bound
+         */        
+        uint32_t min = 0;
+        uint32_t max = num_ranges - 1;
+        while (min <= max) {
+            uint32_t mid = (min + max) >> 1;
+            if (ranges[mid].second < hash) {
+                min = mid + 1;
+            } else if (ranges[mid].first >= hash) {
+                max = mid - 1;
             } else {
-                assert(ii == num_ranges - 1); //Always should be the last range
-                if (hash >= range.first || hash < range.second) {
-                    return NValue::getTrue();
-                }
-                //The loop will terminate and return false
+                return NValue::getTrue();
             }
-
         }
+
         return NValue::getFalse();
     }
 

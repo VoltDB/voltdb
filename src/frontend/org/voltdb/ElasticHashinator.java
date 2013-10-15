@@ -85,6 +85,10 @@ public class ElasticHashinator extends TheHashinator {
      */
     private final Supplier<ImmutableSortedMap<Integer, Integer>> m_tokensMap;
 
+    /*
+     * Pointer to an array of integers containing the tokens and partitions. Even values are tokens and odd values
+     * are partition ids.
+     */
     private final long m_tokens;
     private final int m_tokenCount;
 
