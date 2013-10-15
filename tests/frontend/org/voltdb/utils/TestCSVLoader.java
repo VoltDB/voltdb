@@ -79,8 +79,6 @@ public class TestCSVLoader extends TestCase {
 
 
     public void testSnapshotAndLoad () throws Exception {
-        if (!MiscUtils.isPro()) { return; } // feature disabled in community
-
         String my_schema =
                 "create table BLAH (" +
                         "clm_integer integer default 0 not null, " + // column that is partitioned on
@@ -342,7 +340,8 @@ public class TestCSVLoader extends TestCase {
         test_Interface(mySchema, myOptions, myData, invalidLineCnt, validLineCnt);
     }
 
-    //Test batch option that splits and gets constraint violations.
+    //Test batch option that and gets constraint violations.
+    //has a batch that fully fails and 2 batches that has 50% failure.
     public void testBatchOptionThatSplitsAndGetsViolations() throws Exception {
         String mySchema =
                 "create table BLAH ("
@@ -371,7 +370,7 @@ public class TestCSVLoader extends TestCase {
             "--escape=\\",
             "--skip=0",
             "--limitrows=100",
-            "--batch=2",
+            "--batch=2", //Batch size is small so we dont have to generate large dataset.
             "BlAh"
         };
         String currentTime = new TimestampType().toString();
@@ -380,18 +379,22 @@ public class TestCSVLoader extends TestCase {
             "2 ,1,1,11111111,first,1.10,1.11," + currentTime,
             "3 ,1,1,11111111,first,1.10,1.11," + currentTime,
             "4 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "1 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "2 ,1,1,11111111,first,1.10,1.11," + currentTime, //Whole batch fails
             "5 ,1,1,11111111,first,1.10,1.11," + currentTime,
             "6 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "1 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "2 ,1,1,11111111,first,1.10,1.11," + currentTime, //Whole batch fails
             "7 ,1,1,11111111,first,1.10,1.11," + currentTime,
             "8 ,1,1,11111111,first,1.10,1.11," + currentTime,
             "11 ,1,1,11111111,first,1.10,1.11," + currentTime,
             "1 ,1,1,11111111,first,1.10,1.11," + currentTime,
-            "2 ,1,1,11111111,first,1.10,1.11," + currentTime, //Whole batch fails.
-            "3 ,1,1,11111111,first,1.10,1.11," + currentTime,
-            "11 ,1,1,11111111,first,1.10,1.11," + currentTime
+            "2 ,1,1,11111111,first,1.10,1.11," + currentTime, //Whole batch fails
+            "1 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "12 ,1,1,11111111,first,1.10,1.11," + currentTime
         };
-        int invalidLineCnt = 4;
-        int validLineCnt = 9;
+        int invalidLineCnt = 7;
+        int validLineCnt = 10;
         test_Interface(mySchema, myOptions, myData, invalidLineCnt, validLineCnt);
     }
 
@@ -424,7 +427,7 @@ public class TestCSVLoader extends TestCase {
             "--escape=\\",
             "--skip=0",
             "--limitrows=100",
-            "--batch=2",
+            "--batch=2", //Batch size is small so we dont have to generate large dataset.
             "BlAh"
         };
         String currentTime = new TimestampType().toString();
