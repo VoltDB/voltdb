@@ -342,6 +342,103 @@ public class TestCSVLoader extends TestCase {
         test_Interface(mySchema, myOptions, myData, invalidLineCnt, validLineCnt);
     }
 
+    //Test batch option that splits and gets constraint violations.
+    public void testBatchOptionThatSplitsAndGetsViolations() throws Exception {
+        String mySchema =
+                "create table BLAH ("
+                + "clm_integer integer not null, "
+                + // column that is partitioned on
+                "clm_tinyint tinyint default 0, "
+                + "clm_smallint smallint default 0, "
+                + "clm_bigint bigint default 0, "
+                + "clm_string varchar(20) default null, "
+                + "clm_decimal decimal default null, "
+                + "clm_float float default null, "
+                + "clm_timestamp timestamp default null, "
+                + "PRIMARY KEY(clm_integer) "
+                + "); ";
+        String[] myOptions = {
+            "-f" + path_csv,
+            "--reportdir=" + reportDir,
+            //"--table=BLAH",
+            "--maxerrors=50",
+            //"-user",
+            "--user=",
+            "--password=",
+            "--port=",
+            "--separator=,",
+            "--quotechar=\"",
+            "--escape=\\",
+            "--skip=0",
+            "--limitrows=100",
+            "--batch=2",
+            "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String[] myData = {
+            "1 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "2 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "3 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "4 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "5 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "6 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "7 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "8 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "11 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "1 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "2 ,1,1,11111111,first,1.10,1.11," + currentTime, //Whole batch fails.
+            "3 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "11 ,1,1,11111111,first,1.10,1.11," + currentTime
+        };
+        int invalidLineCnt = 4;
+        int validLineCnt = 9;
+        test_Interface(mySchema, myOptions, myData, invalidLineCnt, validLineCnt);
+    }
+
+    //Test batch option that splits and gets constraint violations.
+    public void testBatchOptionThatSplitsAndGetsViolationsAndDataIsSmall() throws Exception {
+        String mySchema =
+                "create table BLAH ("
+                + "clm_integer integer not null, "
+                + // column that is partitioned on
+                "clm_tinyint tinyint default 0, "
+                + "clm_smallint smallint default 0, "
+                + "clm_bigint bigint default 0, "
+                + "clm_string varchar(20) default null, "
+                + "clm_decimal decimal default null, "
+                + "clm_float float default null, "
+                + "clm_timestamp timestamp default null, "
+                + "PRIMARY KEY(clm_integer) "
+                + "); ";
+        String[] myOptions = {
+            "-f" + path_csv,
+            "--reportdir=" + reportDir,
+            //"--table=BLAH",
+            "--maxerrors=50",
+            //"-user",
+            "--user=",
+            "--password=",
+            "--port=",
+            "--separator=,",
+            "--quotechar=\"",
+            "--escape=\\",
+            "--skip=0",
+            "--limitrows=100",
+            "--batch=2",
+            "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String[] myData = {
+            "1 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "2 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "2 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "1 ,1,1,11111111,first,1.10,1.11," + currentTime
+        };
+        int invalidLineCnt = 2;
+        int validLineCnt = 2;
+        test_Interface(mySchema, myOptions, myData, invalidLineCnt, validLineCnt);
+    }
+
     public void testOpenQuote() throws Exception
     {
         String mySchema =
