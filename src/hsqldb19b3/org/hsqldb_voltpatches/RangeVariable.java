@@ -1166,9 +1166,9 @@ final class RangeVariable {
         primaryIndex = rangeTable.getPrimaryIndex();
         primaryKey   = rangeTable.getPrimaryKey();
 
-        if (rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
-            throw new HSQLParseException("VoltDB does not support subqueries, consider using views instead");
-        }
+//        if (rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
+//            throw new HSQLParseException("VoltDB does not support subqueries, consider using views instead");
+//        }
 
         // get the index for this scan (/filter)
         // note: ignored if scan if full table scan
@@ -1182,6 +1182,13 @@ final class RangeVariable {
 
         if (tableAlias != null && !rangeTable.getName().name.equals(tableAlias)) {
             scan.attributes.put("tablealias", tableAlias.name);
+        }
+
+        if (rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
+            if (rangeTable instanceof TableDerived) {
+                VoltXMLElement subQuery = ((TableDerived) rangeTable).dataExpression.voltGetXML(session);
+                scan.children.add(subQuery);
+            }
         }
 
         // note if this is an outer join

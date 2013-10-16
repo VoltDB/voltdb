@@ -840,7 +840,8 @@ public abstract class StatementDMQL extends Statement {
         return null;
     }
 
-    protected void voltAppendParameters(Session session, VoltXMLElement xml)
+    static protected void voltAppendParameters(Session session, VoltXMLElement xml, ExpressionColumn[] parameters)
+//    protected void voltAppendParameters(Session session, VoltXMLElement xml)
     {
         VoltXMLElement parameterXML = new VoltXMLElement("parameters");
         xml.children.add(parameterXML);

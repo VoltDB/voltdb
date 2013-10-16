@@ -1460,7 +1460,7 @@ public class Expression {
         prototypes.put(OpTypes.SEQUENCE,      null); // not yet supported sequence type
         prototypes.put(OpTypes.SCALAR_SUBQUERY,null); // not yet supported subquery feature, query based row/table
         prototypes.put(OpTypes.ROW_SUBQUERY,  null); // not yet supported subquery feature
-        prototypes.put(OpTypes.TABLE_SUBQUERY,null); // not yet supported subquery feature
+        prototypes.put(OpTypes.TABLE_SUBQUERY,new VoltXMLElement("tablesubquery"));
         prototypes.put(OpTypes.ROW,           new VoltXMLElement("row")); // rows
         prototypes.put(OpTypes.TABLE,         new VoltXMLElement("table")); // not yet supported subquery feature, but needed for "in"
         prototypes.put(OpTypes.FUNCTION,      null); // not used (HSQL user-defined functions).
@@ -1702,6 +1702,16 @@ public class Expression {
                 throw new HSQLParseException("VoltDB could not determine the type in a CAST operation");
             }
             exp.attributes.put("valuetype", dataType.getNameString());
+            return exp;
+            
+        case OpTypes.TABLE_SUBQUERY:
+            if (subQuery == null || subQuery.queryExpression == null) {
+                throw new HSQLParseException("VoltDB could not determine the SubQuery");
+            }
+            // @TODO: SubQuery doesn't have an information about the query parameters
+            // Or maybe there is a way?
+            ExpressionColumn parameters[] = new ExpressionColumn[0];
+            exp.children.add(StatementQuery.voltGetXMLExpression(subQuery.queryExpression, parameters, session));
             return exp;
 
         default:

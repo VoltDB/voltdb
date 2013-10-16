@@ -157,7 +157,7 @@ public class StatementQuery extends StatementDMQL {
      * Returns true if the specified exprColumn index is in the list of column indices specified by groupIndex
      * @return true/false
      */
-    boolean isGroupByColumn(QuerySpecification select, int index) {
+    static boolean isGroupByColumn(QuerySpecification select, int index) {
         if (!select.isGrouped) {
             return false;
         }
@@ -183,10 +183,10 @@ public class StatementQuery extends StatementDMQL {
     VoltXMLElement voltGetStatementXML(Session session)
     throws HSQLParseException
     {
-        return voltGetXMLExpression(queryExpression, session);
+        return voltGetXMLExpression(queryExpression, parameters, session);
     }
 
-    VoltXMLElement voltGetXMLExpression(QueryExpression queryExpr, Session session)
+    static VoltXMLElement voltGetXMLExpression(QueryExpression queryExpr, ExpressionColumn parameters[], Session session)
     throws HSQLParseException
     {
         // "select" statements/clauses are always represented by a QueryExpression of type QuerySpecification.
@@ -199,7 +199,7 @@ public class StatementQuery extends StatementDMQL {
                 throw new HSQLParseException(queryExpr.operatorName() + " is not supported.");
             }
             QuerySpecification select = (QuerySpecification) queryExpr;
-            return voltGetXMLSpecification(select, session);
+            return voltGetXMLSpecification(select, parameters, session);
         } else if (exprType == QueryExpression.UNION || exprType == QueryExpression.UNION_ALL ||
                    exprType == QueryExpression.EXCEPT || exprType == QueryExpression.EXCEPT_ALL ||
                    exprType == QueryExpression.INTERSECT || exprType == QueryExpression.INTERSECT_ALL){
@@ -207,9 +207,9 @@ public class StatementQuery extends StatementDMQL {
             unionExpr.attributes.put("uniontype", queryExpr.operatorName());
 
             VoltXMLElement leftExpr = voltGetXMLExpression(
-                    queryExpr.getLeftQueryExpression(), session);
+                    queryExpr.getLeftQueryExpression(), parameters, session);
             VoltXMLElement rightExpr = voltGetXMLExpression(
-                    queryExpr.getRightQueryExpression(), session);
+                    queryExpr.getRightQueryExpression(), parameters, session);
             /**
              * Try to merge parent and the child nodes for UNION and INTERSECT (ALL) set operation.
              * In case of EXCEPT(ALL) operation only the left child can be merged with the parent in order to preserve
@@ -234,7 +234,7 @@ public class StatementQuery extends StatementDMQL {
         }
     }
 
-    VoltXMLElement voltGetXMLSpecification(QuerySpecification select, Session session)
+    static VoltXMLElement voltGetXMLSpecification(QuerySpecification select, ExpressionColumn parameters[], Session session)
     throws HSQLParseException {
 
         // select
@@ -417,7 +417,8 @@ public class StatementQuery extends StatementDMQL {
         }
 
         // parameters
-        voltAppendParameters(session, query);
+        voltAppendParameters(session, query, parameters);
+//        voltAppendParameters(session, query);
 
         // scans
         VoltXMLElement scans = new VoltXMLElement("tablescans");
@@ -460,7 +461,7 @@ public class StatementQuery extends StatementDMQL {
                 orderCols.children.add(xml);
             }
         }
-
+System.out.println(query.toString());
         return query;
     }
 
@@ -471,7 +472,7 @@ public class StatementQuery extends StatementDMQL {
      * @param columnName
      * @return table name this column belongs to
      */
-    protected void resolveUsingColumns(VoltXMLElement columns, RangeVariable[] rvs) throws HSQLParseException {
+    static protected void resolveUsingColumns(VoltXMLElement columns, RangeVariable[] rvs) throws HSQLParseException {
         // Only one OUTER join for a whole select is supported so far
         for (VoltXMLElement columnElmt : columns.children) {
             boolean innerJoin = true;
