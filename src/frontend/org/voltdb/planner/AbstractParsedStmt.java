@@ -69,12 +69,12 @@ public abstract class AbstractParsedStmt {
 
     // Store a table-hashed list of the columns actually used by this statement.
     // XXX An unfortunately counter-intuitive (but hopefully temporary) meaning here:
-    // if this is null, that means ALL the columns get used.
-    public HashMap<Integer, ArrayList<SchemaColumn>> scanColumns = new HashMap<Integer, ArrayList<SchemaColumn>>();
+    // if this is empty, that means ALL the columns get used.
+    public HashMap<Integer, HashSet<SchemaColumn>> scanColumns = new HashMap<Integer, HashSet<SchemaColumn>>();
 
     // Statement cache
-    public List<StmtCatalogCache> stmtCache = new ArrayList<StmtCatalogCache>();
-    public HashMap<String, Integer> aliasIndexMap = new HashMap<String, Integer>();
+    public List<StmtTableScan> stmtCache = new ArrayList<StmtTableScan>();
+    public HashMap<String, Integer> tableAliasIndexMap = new HashMap<String, Integer>();
 
     protected final String[] m_paramValues;
     protected final Database m_db;
@@ -186,8 +186,6 @@ public abstract class AbstractParsedStmt {
                 parseTable(node);
             } else if (node.name.equalsIgnoreCase("tablescans")) {
                 parseTables(node);
-            } else if (node.name.equalsIgnoreCase("scan_columns")) {
-                parseScanColumns(node);
             }
         }
     }
@@ -195,7 +193,6 @@ public abstract class AbstractParsedStmt {
     /**Miscellaneous post parse activity
      * .
      * @param sql
-     * @param db
      * @param joinOrder
      */
     void postParse(String sql, String joinOrder) {
@@ -354,15 +351,44 @@ public abstract class AbstractParsedStmt {
         }
 
         // add table to the query cache
-        addTableToQueryCache(tableName, tableAlias);
+        addTableToStmtCache(tableName, tableAlias);
 
         TupleValueExpression expr = new TupleValueExpression(tableName, tableAlias, columnName, alias);
         if (childExprs != null && !childExprs.isEmpty()) {
             expr.setChildExpressions(childExprs);
         }
         expr.resolveForDB(m_db);
+        addScanColumns(expr);
         return expr;
     }
+
+    /**
+     * Fills scanColumns with a list of the columns used in the plan, hashed by
+     * table name.
+     *
+     * @param columnsNode
+     */
+
+    void addScanColumns(TupleValueExpression tveColumn)
+    {
+            SchemaColumn col = new SchemaColumn(tveColumn.getTableName(),
+                                                tveColumn.getTableAlias(),
+                                                tveColumn.getColumnName(),
+                                                tveColumn.getColumnAlias(),
+                                                tveColumn);
+            HashSet<SchemaColumn> table_cols = null;
+            assert(tableAliasIndexMap.containsKey(tveColumn.getTableAlias()) == true);
+            int aliasIndex = tableAliasIndexMap.get(tveColumn.getTableAlias());
+            if (!scanColumns.containsKey(aliasIndex))
+            {
+                table_cols = new HashSet<SchemaColumn>();
+                scanColumns.put(aliasIndex, table_cols);
+            }
+            table_cols = scanColumns.get(aliasIndex);
+            table_cols.add(col);
+    }
+
+
 
     /**
     * Add table to the statement cache
@@ -370,19 +396,19 @@ public abstract class AbstractParsedStmt {
     * @param tableAlias
     * @return index into the cache array
     */
-    private int addTableToQueryCache(String tableName, String tableAlias) {
+    private int addTableToStmtCache(String tableName, String tableAlias) {
         // Create an index into the query Catalog cache
-        if (!aliasIndexMap.containsKey(tableAlias)) {
+        if (!tableAliasIndexMap.containsKey(tableAlias)) {
             int nextIndex = stmtCache.size();
-            aliasIndexMap.put(tableAlias, nextIndex);
-            StmtCatalogCache tableCache = new StmtCatalogCache();
+            tableAliasIndexMap.put(tableAlias, nextIndex);
+            StmtTableScan tableCache = new StmtTableScan();
             tableCache.m_tableAlias = tableAlias;
             tableCache.m_table = getTableFromDB(tableName);
             assert(tableCache.m_table != null);
             stmtCache.add(tableCache);
-            aliasIndexMap.put(tableAlias, nextIndex);
+            tableAliasIndexMap.put(tableAlias, nextIndex);
         }
-        return aliasIndexMap.get(tableAlias);
+        return tableAliasIndexMap.get(tableAlias);
     }
 
     /**
@@ -562,41 +588,6 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
-     * Parse the scan_columns element out of the HSQL-generated XML.
-     * Fills scanColumns with a list of the columns used in the plan, hashed by
-     * table name.
-     *
-     * @param columnsNode
-     */
-    void parseScanColumns(VoltXMLElement columnsNode)
-    {
-        for (VoltXMLElement child : columnsNode.children) {
-            assert(child.name.equals("columnref"));
-            AbstractExpression col_exp = parseExpressionTree(child);
-            // TupleValueExpressions are always specifically typed,
-            // so there is no need for expression type specialization, here.
-            assert(col_exp != null);
-            assert(col_exp instanceof TupleValueExpression);
-            TupleValueExpression tve = (TupleValueExpression)col_exp;
-            SchemaColumn col = new SchemaColumn(tve.getTableName(),
-                                                tve.getTableAlias(),
-                                                tve.getColumnName(),
-                                                tve.getColumnAlias(),
-                                                col_exp);
-            ArrayList<SchemaColumn> table_cols = null;
-            assert(aliasIndexMap.containsKey(tve.getTableAlias()) == true);
-            int aliasIndex = aliasIndexMap.get(tve.getTableAlias());
-            if (!scanColumns.containsKey(aliasIndex))
-            {
-                table_cols = new ArrayList<SchemaColumn>();
-                scanColumns.put(aliasIndex, table_cols);
-            }
-            table_cols = scanColumns.get(aliasIndex);
-            table_cols.add(col);
-        }
-    }
-
-    /**
     *
     * @param tableNode
     */
@@ -609,7 +600,7 @@ public abstract class AbstractParsedStmt {
             tableAlias = tableName;
         }
         // add table to the query cache
-        int aliasIdx = addTableToQueryCache(tableName, tableAlias);
+        int aliasIdx = addTableToStmtCache(tableName, tableAlias);
 
         AbstractExpression joinExpr = parseJoinCondition(tableNode);
         AbstractExpression whereExpr = parseWhereCondition(tableNode);
@@ -650,8 +641,6 @@ public abstract class AbstractParsedStmt {
     private void parseTables(VoltXMLElement tablesNode) {
         Set<String> visited = new HashSet<String>();
 
-        // temp restriction on number of tables for an outer join statement // 1st of 2 ALLOWED differences between AbstractParsedStmt.java
-        int tableCount = 0;                                                 //                      and AbstractParsedStmt.java_multi_table
         for (VoltXMLElement node : tablesNode.children) {
             if (node.name.equalsIgnoreCase("tablescan")) {
 
@@ -668,10 +657,6 @@ public abstract class AbstractParsedStmt {
 
                 parseTable(node);
                 visited.add(visitedTable);
-                ++tableCount;                                                                   //        2nd of 2 ALLOWED differences
-//                if (joinTree.hasOuterJoin() && tableCount > 2) {                                //     between AbstractParsedStmt.java
-//                    throw new PlanningErrorException("VoltDB does not support outer joins with more than two tables involved"); // and
-//                }                                                                               // AbstractParsedStmt.java_multi_table
             }
         }
     }
@@ -722,7 +707,7 @@ public abstract class AbstractParsedStmt {
         if (joinNode == null) {
             return;
         }
-        if (joinNode.m_tableAliasIndex != StmtCatalogCache.NULL_ALIAS_INDEX) {
+        if (joinNode.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) {
             // Leaf node. Simply un-combine expressions and move them to the inner lists
             // The expressions will be classified later at the join node level.
             // If this is a single table select then classification is not required.
@@ -747,13 +732,13 @@ public abstract class AbstractParsedStmt {
         whereList.addAll(ExpressionUtil.uncombineAny(joinNode.m_whereExpr));
 
         // Collect children expressions only if a child is a leaf. They are not classified yet
-        if (joinNode.m_leftNode.m_tableAliasIndex != StmtCatalogCache.NULL_ALIAS_INDEX) {
+        if (joinNode.m_leftNode.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) {
             joinList.addAll(joinNode.m_leftNode.m_joinInnerList);
             joinNode.m_leftNode.m_joinInnerList.clear();
             whereList.addAll(joinNode.m_leftNode.m_whereInnerList);
             joinNode.m_leftNode.m_whereInnerList.clear();
         }
-        if (joinNode.m_rightNode.m_tableAliasIndex != StmtCatalogCache.NULL_ALIAS_INDEX) {
+        if (joinNode.m_rightNode.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) {
             joinList.addAll(joinNode.m_rightNode.m_joinInnerList);
             joinNode.m_rightNode.m_joinInnerList.clear();
             whereList.addAll(joinNode.m_rightNode.m_whereInnerList);
@@ -927,17 +912,17 @@ public abstract class AbstractParsedStmt {
     private void pushDownExpressions(JoinNode joinNode) {
         assert (joinNode != null && joinNode.m_leftNode != null && joinNode.m_rightNode != null);
         JoinNode outerNode = joinNode.m_leftNode;
-        if (outerNode.m_tableAliasIndex == StmtCatalogCache.NULL_ALIAS_INDEX) {
+        if (outerNode.m_tableAliasIndex == StmtTableScan.NULL_ALIAS_INDEX) {
             pushDownExpressionsRecursively(outerNode, joinNode.m_whereOuterList);
         }
         JoinNode innerNode = joinNode.m_rightNode;
-        if (innerNode.m_tableAliasIndex == StmtCatalogCache.NULL_ALIAS_INDEX && joinNode.m_joinType == JoinType.INNER) {
+        if (innerNode.m_tableAliasIndex == StmtTableScan.NULL_ALIAS_INDEX && joinNode.m_joinType == JoinType.INNER) {
             pushDownExpressionsRecursively(innerNode, joinNode.m_whereInnerList);
         }
     }
 
     private void pushDownExpressionsRecursively(JoinNode joinNode, List<AbstractExpression> pushDownExprList) {
-        assert(joinNode.m_tableAliasIndex == StmtCatalogCache.NULL_ALIAS_INDEX);
+        assert(joinNode.m_tableAliasIndex == StmtTableScan.NULL_ALIAS_INDEX);
         // It is a join node. Classify pushed down expressions as inner, outer, or inner-outer
         // WHERE expressions.
         Collection<Integer> outerTables = joinNode.m_leftNode.generateTableJoinOrder();
@@ -959,8 +944,8 @@ public abstract class AbstractParsedStmt {
         List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(expr);
         for (TupleValueExpression tupleExpr : tves) {
             String tableAlias = tupleExpr.getTableAlias();
-            assert(aliasIndexMap.containsKey(tableAlias));
-            tables.add(aliasIndexMap.get(tableAlias));
+            assert(tableAliasIndexMap.containsKey(tableAlias));
+            tables.add(tableAliasIndexMap.get(tableAlias));
         }
     }
 

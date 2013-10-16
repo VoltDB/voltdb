@@ -164,7 +164,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 // the sub-trees with the different join type (id < 0)
                 Map<Integer, JoinNode> nodeNameMap = new HashMap<Integer, JoinNode>();
                 for (JoinNode tableNode : subTableNodes) {
-                    assert(tableNode.m_tableAliasIndex != StmtCatalogCache.NULL_ALIAS_INDEX);
+                    assert(tableNode.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX);
                     if (tableNode.m_id >= 0) {
                         nodeNameMap.put(tableNode.m_tableAliasIndex, tableNode);
                     }
@@ -176,8 +176,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                     if (subTableNodes.get(j).m_id >= 0) {
                         assert(tableNameIdx < tableAliases.size());
                         String tableAlias = tableAliases.get(tableNameIdx);
-                        assert(m_parsedStmt.aliasIndexMap.containsKey(tableAlias));
-                        int aliasIdx = m_parsedStmt.aliasIndexMap.get(tableAlias);
+                        assert(m_parsedStmt.tableAliasIndexMap.containsKey(tableAlias));
+                        int aliasIdx = m_parsedStmt.tableAliasIndexMap.get(tableAlias);
                         if (!nodeNameMap.containsKey(aliasIdx)) {
                             return false;
                         }
@@ -200,10 +200,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 finalSubTrees.add(0, joinOrderSubTree);
             } else {
                 for (JoinNode tableNode : subTableNodes) {
-                    assert(tableNode.m_tableAliasIndex != StmtCatalogCache.NULL_ALIAS_INDEX && tableNameIdx < tableAliases.size());
+                    assert(tableNode.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX && tableNameIdx < tableAliases.size());
                     if (tableNode.m_id >= 0) {
                         assert(m_parsedStmt.stmtCache.size() > tableNode.m_tableAliasIndex);
-                        StmtCatalogCache tableCache = m_parsedStmt.stmtCache.get(tableNode.m_tableAliasIndex);
+                        StmtTableScan tableCache = m_parsedStmt.stmtCache.get(tableNode.m_tableAliasIndex);
                         if (!tableAliases.get(tableNameIdx++).equals(tableCache.m_tableAlias)) {
                             return false;
                         }
@@ -335,7 +335,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
     private void simplifyOuterJoinRecursively(JoinNode joinNode, List<AbstractExpression> exprs) {
         assert (joinNode != null);
-        if (joinNode.m_tableAliasIndex != StmtCatalogCache.NULL_ALIAS_INDEX) {
+        if (joinNode.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) {
             // End of the recursion. Nothing to simplify
             return;
         }
@@ -355,7 +355,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         }
         if (innerNode != null) {
             for (AbstractExpression expr : exprs) {
-                if (innerNode.m_tableAliasIndex != StmtCatalogCache.NULL_ALIAS_INDEX) {
+                if (innerNode.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) {
                     String tableAlias = m_parsedStmt.stmtCache.get(innerNode.m_tableAliasIndex).m_tableAlias;
                     if (ExpressionUtil.isNullRejectingExpression(expr, tableAlias)) {
                         // We are done at this level
@@ -368,7 +368,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                     List<Integer> tableAliasIdxs = innerNode.generateTableJoinOrder();
                     boolean rejectNull = false;
                     for (int aliasIdx : tableAliasIdxs) {
-                        assert(aliasIdx != StmtCatalogCache.NULL_ALIAS_INDEX);
+                        assert(aliasIdx != StmtTableScan.NULL_ALIAS_INDEX);
                         String tableAlias = m_parsedStmt.stmtCache.get(aliasIdx).m_tableAlias;
                         if (ExpressionUtil.isNullRejectingExpression(expr, tableAlias)) {
                             // We are done at this level
@@ -510,7 +510,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      */
     private void generateAccessPaths(JoinNode joinNode) {
         assert(joinNode != null);
-        if (joinNode.m_tableAliasIndex != StmtCatalogCache.NULL_ALIAS_INDEX) {
+        if (joinNode.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) {
             // This is a select from a single table
             joinNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(joinNode.m_tableAliasIndex,
                     joinNode.m_joinInnerList,
@@ -539,7 +539,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         JoinNode outerChildNode = parentNode.m_leftNode;
         List<AbstractExpression> joinOuterList =  (parentNode.m_joinType == JoinType.INNER) ?
                 parentNode.m_joinOuterList : null;
-        if (outerChildNode.m_tableAliasIndex == StmtCatalogCache.NULL_ALIAS_INDEX) {
+        if (outerChildNode.m_tableAliasIndex == StmtTableScan.NULL_ALIAS_INDEX) {
             assert (outerChildNode.m_leftNode != null && outerChildNode.m_rightNode != null);
             generateOuterAccessPaths(outerChildNode);
             generateInnerAccessPaths(outerChildNode);
@@ -572,7 +572,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             parentNode.m_joinInnerList.addAll(parentNode.m_whereInnerList);
             parentNode.m_whereInnerList.clear();
         }
-        if (innerChildNode.m_tableAliasIndex == StmtCatalogCache.NULL_ALIAS_INDEX) {
+        if (innerChildNode.m_tableAliasIndex == StmtTableScan.NULL_ALIAS_INDEX) {
             assert (innerChildNode.m_leftNode != null && innerChildNode.m_rightNode != null);
             generateOuterAccessPaths(innerChildNode);
             generateInnerAccessPaths(innerChildNode);
@@ -687,7 +687,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      */
     private AbstractPlanNode getSelectSubPlanForJoinNode(JoinNode joinNode) {
         assert(joinNode != null);
-        if (joinNode.m_tableAliasIndex == StmtCatalogCache.NULL_ALIAS_INDEX) {
+        if (joinNode.m_tableAliasIndex == StmtTableScan.NULL_ALIAS_INDEX) {
             assert(joinNode.m_leftNode != null && joinNode.m_rightNode != null);
             // Outer node
             AbstractPlanNode outerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_leftNode);
@@ -920,7 +920,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         indexedExprs.addAll(indexExprs);
         indexedExprs.addAll(initialExpr);
         indexedExprs.addAll(endExprs);
-        assert(innerTableAliasIndex != StmtCatalogCache.NULL_ALIAS_INDEX);
+        assert(innerTableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX);
         String innerTableAlias = m_parsedStmt.stmtCache.get(innerTableAliasIndex).m_tableAlias;
         // Find an outer TVE by ignoring any TVEs based on the inner table.
         for (AbstractExpression indexed : indexedExprs) {

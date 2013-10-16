@@ -330,7 +330,7 @@ public class PartitioningForStatement implements Cloneable{
      *         -- partitioned tables that aren't joined or filtered by the same value.
      *         The caller can raise an alarm if there is more than one.
      */
-    public int analyzeForMultiPartitionAccess(List<StmtCatalogCache> tableAliasList,
+    public int analyzeForMultiPartitionAccess(List<StmtTableScan> tableAliasList,
             HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence)
     {
         TupleValueExpression tokenPartitionKey = null;
@@ -338,7 +338,7 @@ public class PartitioningForStatement implements Cloneable{
         int unfilteredPartitionKeyCount = 0;
 
         // Iterate over the tables to collect partition columns.
-        for (StmtCatalogCache tableAlias : tableAliasList) {
+        for (StmtTableScan tableAlias : tableAliasList) {
             // Replicated tables don't need filter coverage.
             if (tableAlias.m_table.getIsreplicated()) {
                 continue;

@@ -117,7 +117,7 @@ public abstract class SubPlanAssembler {
                                                                    List<AbstractExpression> joinExprs,
                                                                    List<AbstractExpression> filterExprs,
                                                                    List<AbstractExpression> postExprs) {
-        assert(tableAliasIdx != StmtCatalogCache.NULL_ALIAS_INDEX);
+        assert(tableAliasIdx != StmtTableScan.NULL_ALIAS_INDEX);
         Table table = m_parsedStmt.stmtCache.get(tableAliasIdx).m_table;
         ArrayList<AccessPath> paths = new ArrayList<AccessPath>();
         List<AbstractExpression> allJoinExprs = new ArrayList<AbstractExpression>();
@@ -1129,7 +1129,7 @@ public abstract class SubPlanAssembler {
      * @return The root of a plan graph to get the data.
      */
     protected AbstractPlanNode getAccessPlanForTable(int tableAliasIdx, AccessPath path) {
-        assert(tableAliasIdx != StmtCatalogCache.NULL_ALIAS_INDEX);
+        assert(tableAliasIdx != StmtTableScan.NULL_ALIAS_INDEX);
         assert(path != null);
 
         AbstractPlanNode scanNode = null;
@@ -1156,11 +1156,11 @@ public abstract class SubPlanAssembler {
     protected AbstractScanPlanNode
     getScanAccessPlanForTable(int tableAliasIdx, ArrayList<AbstractExpression> exprs)
     {
-        assert(tableAliasIdx != StmtCatalogCache.NULL_ALIAS_INDEX);
+        assert(tableAliasIdx != StmtTableScan.NULL_ALIAS_INDEX);
         assert(tableAliasIdx < m_parsedStmt.stmtCache.size());
         // build the scan node
         SeqScanPlanNode scanNode = new SeqScanPlanNode();
-        StmtCatalogCache tableCache = m_parsedStmt.stmtCache.get(tableAliasIdx);
+        StmtTableScan tableCache = m_parsedStmt.stmtCache.get(tableAliasIdx);
         scanNode.setTargetTableName(tableCache.m_table.getTypeName());
         scanNode.setTargetTableAlias(tableCache.m_tableAlias);
         //TODO: push scan column identification into "setTargetTableName"
@@ -1195,9 +1195,9 @@ public abstract class SubPlanAssembler {
         Index index = path.index;
         IndexScanPlanNode scanNode = new IndexScanPlanNode();
         AbstractPlanNode resultNode = scanNode;
-        assert(tableAliasIdx != StmtCatalogCache.NULL_ALIAS_INDEX);
+        assert(tableAliasIdx != StmtTableScan.NULL_ALIAS_INDEX);
         assert(tableAliasIdx < m_parsedStmt.stmtCache.size());
-        StmtCatalogCache tableCache = m_parsedStmt.stmtCache.get(tableAliasIdx);
+        StmtTableScan tableCache = m_parsedStmt.stmtCache.get(tableAliasIdx);
 
         // set sortDirection here becase it might be used for IN list
         scanNode.setSortDirection(path.sortDirection);

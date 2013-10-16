@@ -42,7 +42,7 @@ public class JoinNode implements Cloneable {
     // Right child
     public JoinNode m_rightNode = null;
     // index into the query catalog cache for a table alias
-    public int m_tableAliasIndex = StmtCatalogCache.NULL_ALIAS_INDEX;
+    public int m_tableAliasIndex = StmtTableScan.NULL_ALIAS_INDEX;
     // Join type
     public JoinType m_joinType = JoinType.INNER;
     // Join expression associated with this node
@@ -114,7 +114,7 @@ public class JoinNode implements Cloneable {
         if (m_whereExpr != null) {
             newNode.m_whereExpr = (AbstractExpression) m_whereExpr.clone();
         }
-        if (m_tableAliasIndex == StmtCatalogCache.NULL_ALIAS_INDEX) {
+        if (m_tableAliasIndex == StmtTableScan.NULL_ALIAS_INDEX) {
             assert(m_leftNode != null && m_rightNode != null);
             newNode.m_leftNode = (JoinNode) m_leftNode.clone();
             newNode.m_rightNode = (JoinNode) m_rightNode.clone();
@@ -139,7 +139,7 @@ public class JoinNode implements Cloneable {
         sb.append(indent).append("JOIN NODE id: " + m_id).append("\n");
 
         // Table
-        if (m_tableAliasIndex != StmtCatalogCache.NULL_ALIAS_INDEX) {
+        if (m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) {
             sb.append(indent).append("table alias index: ").append(m_tableAliasIndex).append("\n");
         }
 
@@ -153,7 +153,7 @@ public class JoinNode implements Cloneable {
         }
 
         // Join type
-        if (m_tableAliasIndex == StmtCatalogCache.NULL_ALIAS_INDEX) {
+        if (m_tableAliasIndex == StmtTableScan.NULL_ALIAS_INDEX) {
             sb.append(indent).append("join type: ").append(m_joinType.name()).append("\n");
         }
 
@@ -210,7 +210,7 @@ public class JoinNode implements Cloneable {
                 ExpressionUtil.collectPartitioningFilters(joinNode.m_whereInnerList,
                                                           equivalenceSet);
             }
-            if (joinNode.m_tableAliasIndex != StmtCatalogCache.NULL_ALIAS_INDEX) {
+            if (joinNode.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) {
                 assert joinNode.m_leftNode == null && joinNode.m_rightNode == null;
                 // HSQL sometimes tags single-table filters in inner joins as join clauses
                 // rather than where clauses? OR does analyzeJoinExpressions correct for this?
@@ -355,7 +355,7 @@ public class JoinNode implements Cloneable {
             generateLeafNodesJoinOrderRecursive(node.m_leftNode, leafNodes);
             generateLeafNodesJoinOrderRecursive(node.m_rightNode, leafNodes);
         } else {
-            assert(node.m_tableAliasIndex != StmtCatalogCache.NULL_ALIAS_INDEX);
+            assert(node.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX);
             leafNodes.add(node);
         }
     }
@@ -397,7 +397,7 @@ public class JoinNode implements Cloneable {
      * Returns true if one of the tree nodes has outer join
      */
     boolean hasOuterJoin() {
-        if (m_tableAliasIndex != StmtCatalogCache.NULL_ALIAS_INDEX) {
+        if (m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) {
             return false;
         }
         assert(m_leftNode != null && m_rightNode != null);
@@ -435,7 +435,7 @@ public class JoinNode implements Cloneable {
      * @param leafNodes - the list of the root nodes of the next sub-trees
      */
     private void extractSubTree(List<JoinNode> leafNodes) {
-        if (m_tableAliasIndex != StmtCatalogCache.NULL_ALIAS_INDEX) {
+        if (m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) {
             return;
         }
         JoinNode[] children = {m_leftNode, m_rightNode};
@@ -443,7 +443,7 @@ public class JoinNode implements Cloneable {
 
             // Leaf nodes don't have a significant join type,
             // test for them first and never attempt to start a new tree at a leaf.
-            if (child.m_tableAliasIndex != StmtCatalogCache.NULL_ALIAS_INDEX) {
+            if (child.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) {
                 continue;
             }
 
@@ -458,9 +458,9 @@ public class JoinNode implements Cloneable {
                 // Replace the join node with the temporary node having the id negated
                 // the tree at the later stage
                 // We also need to generate a dummy alias index to preserve JoinNode invariant
-                // that a node represent either a table (m_tableAliasIndex != StmtCatalogCache.NULL_ALIAS_INDEX) or
+                // that a node represent either a table (m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) or
                 // a join of two nodes m_leftNode != null && m_rightNode != null
-                int tempAliasIdx = StmtCatalogCache.NULL_ALIAS_INDEX - 1 - child.m_id;
+                int tempAliasIdx = StmtTableScan.NULL_ALIAS_INDEX - 1 - child.m_id;
                 JoinNode tempNode = new JoinNode(
                         -child.m_id, child.m_joinType, tempAliasIdx, child.m_joinExpr, child.m_whereExpr);
                 if (child == m_leftNode) {
@@ -481,7 +481,7 @@ public class JoinNode implements Cloneable {
     public static JoinNode reconstructJoinTreeFromTableNodes(List<JoinNode> tableNodes) {
         JoinNode root = null;
         for (JoinNode leafNode : tableNodes) {
-            assert(leafNode.m_tableAliasIndex != StmtCatalogCache.NULL_ALIAS_INDEX);
+            assert(leafNode.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX);
             JoinNode node = new JoinNode(leafNode.m_id, leafNode.m_joinType, leafNode.m_tableAliasIndex, null, null);
             if (root == null) {
                 root = node;
@@ -521,7 +521,7 @@ public class JoinNode implements Cloneable {
     private static boolean replaceChild(JoinNode root, JoinNode node) {
         // can't replace self
         assert (root != null && Math.abs(root.m_id) != Math.abs(node.m_id));
-        if (root.m_tableAliasIndex != StmtCatalogCache.NULL_ALIAS_INDEX) {
+        if (root.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) {
             return false;
         } else if (Math.abs(root.m_leftNode.m_id) == Math.abs(node.m_id)) {
             root.m_leftNode  = node;

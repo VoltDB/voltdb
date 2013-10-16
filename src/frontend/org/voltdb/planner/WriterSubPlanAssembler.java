@@ -76,7 +76,7 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
             // into the WHERE list.
             tableNode.m_whereInnerList.addAll(tableNode.m_joinInnerList);
             tableNode.m_joinInnerList.clear();
-            assert (tableNode.m_tableAliasIndex != StmtCatalogCache.NULL_ALIAS_INDEX);
+            assert (tableNode.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX);
             tableNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(tableNode.m_tableAliasIndex,
                     null,
                     tableNode.m_whereInnerList,

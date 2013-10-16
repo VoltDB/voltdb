@@ -197,23 +197,12 @@ public class TupleValueExpression extends AbstractValueExpression {
         return m_tableAlias;
     }
 
-    /**
-     * @param name the table name to set
-     */
-    public void setTableAlias(String alias) {
-        m_tableAlias = alias;
-    }
-
     public int getTableIndex() {
         return m_tableIdx;
     }
 
     public void setTableIndex(int idx) {
         m_tableIdx = idx;
-    }
-
-    public List<TupleValueExpression> getChildExpressions() {
-        return m_childrenTVE;
     }
 
     public void setChildExpressions(List<TupleValueExpression> childrenTVE) {
@@ -260,9 +249,6 @@ public class TupleValueExpression extends AbstractValueExpression {
         int result = 0;
         if (m_tableName != null) {
             result += m_tableName.hashCode();
-        }
-        if (m_tableAlias != null) {
-            result += m_tableAlias.hashCode();
         }
         if (m_columnName != null) {
             result += m_columnName.hashCode();
@@ -345,9 +331,6 @@ public class TupleValueExpression extends AbstractValueExpression {
             for (TupleValueExpression childTVE : m_childrenTVE) {
                 index = inputSchema.getIndexOfTve(childTVE);
                 if (index != -1) {
-                    // reset parent TVE table name and alias to the child ones.
-                    m_tableName = childTVE.m_tableName;
-                    m_tableAlias = childTVE.m_tableAlias;
                     break;
                 }
             }

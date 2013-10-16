@@ -250,7 +250,7 @@ public class TestPlansJoin extends PlannerTestCase {
     }
 
     public void testDisplayColumnFromUsingCondition() {
-        AbstractPlanNode pn = compile("select  max(A)  FROM R1 A JOIN R2 B USING(A)");
+        AbstractPlanNode pn = compile("select  max(A) FROM R1 JOIN R2 USING(A)");
         pn = pn.getChild(0);
         assertTrue(pn instanceof AggregatePlanNode);
         NodeSchema ns = pn.getOutputSchema();
@@ -261,7 +261,7 @@ public class TestPlansJoin extends PlannerTestCase {
             assertNotSame(-1, tve.getColumnIndex());
         }
 
-        pn = compile("select  distinct(A)  FROM R1 A JOIN R2 B USING(A)");
+        pn = compile("select  distinct(A) FROM R1 JOIN R2 USING(A)");
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         ns = pn.getOutputSchema();
@@ -281,7 +281,7 @@ public class TestPlansJoin extends PlannerTestCase {
             assertNotSame(-1, tve.getColumnIndex());
         }
 
-        pn = compile("select  A  FROM R1 A JOIN R2 B USING(A) ORDER BY A");
+        pn = compile("select  A  FROM R1 JOIN R2 USING(A) ORDER BY A");
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         ns = pn.getOutputSchema();
@@ -989,11 +989,6 @@ public class TestPlansJoin extends PlannerTestCase {
        // INNER JOIN with >5 tables.
        failToCompile("select R1.C FROM R3,R2, P1, P2, P3, R1 WHERE R3.A = R2.A and R2.A = P1.A and P1.A = P2.A and P3.A = P2.A and R1.C = R2.C",
                      "join of > 5 tables was requested without specifying a join order");
-//       // OUTER JOIN with more then two tables. Temporary restriction
-//       failToCompile("select R1.C FROM R1 LEFT OUTER JOIN R2 ON R1.C = R2.C RIGHT JOIN R3 ON R3.C = R1.C",
-//                     "VoltDB does not support outer joins with more than two tables involved");
-//       failToCompile("select R1.C FROM R1 LEFT JOIN R2 ON R1.C = R2.C, R3 WHERE R3.C = R1.C",
-//                     "VoltDB does not support outer joins with more than two tables involved");
    }
 
 

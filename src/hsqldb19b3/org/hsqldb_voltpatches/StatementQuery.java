@@ -230,7 +230,7 @@ public class StatementQuery extends StatementDMQL {
             }
             return unionExpr;
         } else {
-            throw new HSQLParseException(queryExpression.operatorName() + "  tuple set operator is not supported.");
+            throw new HSQLParseException(queryExpr.operatorName() + "  tuple set operator is not supported.");
         }
     }
 
@@ -274,11 +274,6 @@ public class StatementQuery extends StatementDMQL {
             }
         }
 
-        // columns that need to be output by the scans
-        VoltXMLElement scanCols = new VoltXMLElement("scan_columns");
-        query.children.add(scanCols);
-        assert(scanCols != null);
-
         // Just gather a mish-mash of every possible relevant expression
         // and uniq them later
         HsqlList col_list = new HsqlArrayList();
@@ -317,42 +312,6 @@ public class StatementQuery extends StatementDMQL {
                                                  Expression.emptyExpressionSet);
 
             }
-        }
-        HsqlList uniq_col_list = new HsqlArrayList();
-        for (int i = 0; i < col_list.size(); i++)
-        {
-            Expression orig = (Expression)col_list.get(i);
-            // Unfortunately, the equivalence check for the column expressions does not take
-            // table alias field into account -two expressions for the same table column but 
-            // different aliases considered to be identical by the HsqlList list
-            if (!uniq_col_list.contains(orig))
-            {
-                uniq_col_list.add(orig);
-            } else if (orig instanceof ExpressionColumn) {
-                ExpressionColumn columnExpr = (ExpressionColumn)orig;
-                int j = 0;
-                for (; j < uniq_col_list.size(); j++) {
-                    Expression unique = (Expression) uniq_col_list.get(j);
-                    assert (unique instanceof ExpressionColumn);
-                    ExpressionColumn uniqueExpr = (ExpressionColumn) unique;
-                    if ((columnExpr.rangeVariable.tableAlias != null &&
-                            columnExpr.rangeVariable.tableAlias.equals(uniqueExpr.rangeVariable.tableAlias) ||
-                            columnExpr.rangeVariable.tableAlias == null && 
-                            columnExpr.rangeVariable.rangeTable.equals(uniqueExpr.rangeVariable.rangeTable)) &&
-                            columnExpr.columnName.equals(uniqueExpr.columnName)) {
-                        break;
-                    }
-                }
-                if (j == uniq_col_list.size()) {
-                    uniq_col_list.add(orig);
-                }
-            }
-        }
-        for (int i = 0; i < uniq_col_list.size(); i++)
-        {
-            VoltXMLElement xml = ((Expression)uniq_col_list.get(i)).voltGetXML(session);
-            scanCols.children.add(xml);
-            assert(xml != null);
         }
 
         // columns
