@@ -559,7 +559,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     VoltDB.crashLocalVoltDB("Started a MP transaction during replay before completing " +
                             " open transaction.", false, null);
                 }
-                FragmentTask t = new FragmentTask(m_initiatorMailbox, m, global_replay_mpTxn);
+
+                TransactionTask t;
+                if (m.isSysProcTask()) {
+                    t = new SysprocFragmentTask(m_initiatorMailbox, m, global_replay_mpTxn);
+                } else {
+                    t = new FragmentTask(m_initiatorMailbox, m, global_replay_mpTxn);
+                }
+
                 if (!filter(tibm)) {
                     t.runFromTaskLog(this);
                 }
