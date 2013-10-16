@@ -446,7 +446,6 @@ public class ExportOnServerVerifier {
         final int overFlowSize = m_clientOverFlow.size();
 
         int dcount = 0;
-        int drainedPartitions = 0;
         long [] rec = new long [3];
 
         for (int partId: m_readUpTo.keySet()) {
@@ -461,7 +460,6 @@ public class ExportOnServerVerifier {
 
                 if ( trace == null) {
                     System.out.println("No more client txn IDs for partition id " + partId);
-                    drainedPartitions++;
                     break;
                 }
                 int recColumns = splitClientTrace(trace, rec);
@@ -486,7 +484,15 @@ public class ExportOnServerVerifier {
 
         readOrphanedClientRecords();
 
-        return drainedPartitions != m_clientIndexes.size();
+        return haveNotReadAllClientRecords();
+    }
+
+    private boolean haveNotReadAllClientRecords() {
+        int doneCount = 0;
+        for (Map.Entry<Integer, Boolean> e: m_clientComplete.entrySet()) {
+            if ( Boolean.TRUE.equals(e.getValue())) ++doneCount;
+        }
+        return doneCount == 0 || doneCount != m_clientIndexes.size();
     }
 
     private void readOrphanedClientRecords() throws IOException {
