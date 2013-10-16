@@ -455,7 +455,7 @@ public abstract class CatalogUtil {
             } else {
                 List<AbstractExpression> indexedExprs = null;
                 try {
-                    indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring, null);
+                    indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring);
                 } catch (JSONException e) {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
@@ -958,16 +958,11 @@ public abstract class CatalogUtil {
                 }
             }
             else {
-                // Default partition detection on for IV2
-                if (VoltDB.instance().isIV2Enabled()) {
-                    catCluster.setNetworkpartition(true);
-                    CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
-                    SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
-                    sched.setPrefix(defaultPPDPrefix);
-                }
-                else {
-                    catCluster.setNetworkpartition(false);
-                }
+                // Default partition detection on
+                catCluster.setNetworkpartition(true);
+                CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
+                SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
+                sched.setPrefix(defaultPPDPrefix);
             }
 
             // copy admin mode configuration from xml to catalog
@@ -1681,7 +1676,7 @@ public abstract class CatalogUtil {
             indexSize = getSortedCatalogItems(index.getColumns(), "index").size();
         } else {
             try {
-                indexSize = AbstractExpression.fromJSONArrayString(jsonstring, null).size();
+                indexSize = AbstractExpression.fromJSONArrayString(jsonstring).size();
             } catch (JSONException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();

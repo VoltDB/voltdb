@@ -85,7 +85,6 @@ public class CommandLine extends VoltDB.Configuration
         // final in baseclass: cl.m_commitLogDir = new File("/tmp");
         cl.m_timestampTestingSalt = m_timestampTestingSalt;
         cl.m_isRejoinTest = m_isRejoinTest;
-        cl.m_enableIV2 = m_enableIV2;
         cl.m_tag = m_tag;
         cl.m_vemTag = m_vemTag;
 
@@ -560,11 +559,6 @@ public class CommandLine extends VoltDB.Configuration
         if (m_internalInterface != null && (m_externalInterface != null && !m_externalInterface.isEmpty()))
         {
             cmdline.add("externalinterface"); cmdline.add(m_externalInterface);
-        }
-
-        if (m_enableIV2)
-        {
-            cmdline.add("enableiv2");
         }
 
         if (m_isEnterprise) {

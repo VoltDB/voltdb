@@ -72,7 +72,7 @@ import org.voltdb.utils.VoltTypeUtil;
  */
 public class DDLCompiler {
 
-    static final int MAX_COLUMNS = 1024;
+    static final int MAX_COLUMNS = 1024; // KEEP THIS < MAX_PARAM_COUNT to enable default CRUD update.
     static final int MAX_ROW_SIZE = 1024 * 1024 * 2;
 
     /**
@@ -1686,7 +1686,7 @@ public class DDLCompiler {
             // complex group by exprs
             if (groupbyExprs != null) {
                 try {
-                    indexedExprs = AbstractExpression.fromJSONArrayString(expressionjson, null);
+                    indexedExprs = AbstractExpression.fromJSONArrayString(expressionjson);
                 } catch (JSONException e) {
                     e.printStackTrace();
                     assert(false);

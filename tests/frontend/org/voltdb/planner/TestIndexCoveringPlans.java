@@ -27,11 +27,11 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.types.IndexLookupType;
 
-public class TestCoveringIndexPlans extends PlannerTestCase {
+public class TestIndexCoveringPlans extends PlannerTestCase {
     @Override
     protected void setUp() throws Exception {
         final boolean planForSinglePartition = true;
-        setupSchema(TestCoveringIndexPlans.class.getResource("testplans-indexvshash-ddl.sql"),
+        setupSchema(TestIndexCoveringPlans.class.getResource("testplans-indexvshash-ddl.sql"),
                     "testindexvshashplans", planForSinglePartition);
     }
 
@@ -122,7 +122,7 @@ public class TestCoveringIndexPlans extends PlannerTestCase {
         }
         assertTrue(pn instanceof IndexScanPlanNode);
         IndexScanPlanNode ispn = (IndexScanPlanNode)pn;
-        assertEquals("IDX_1", ispn.getTargetIndexName());
+        assertEquals("IDX_1_TREE", ispn.getTargetIndexName());
         assertEquals(IndexLookupType.LT, ispn.getLookupType());
         assertEquals(3, ispn.getSearchKeyExpressions().size());
     }

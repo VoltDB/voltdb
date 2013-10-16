@@ -72,7 +72,7 @@ public class CSVLoader {
      * log file name
      */
     static String pathLogfile = "csvloaderLog.log";
-    private static final VoltLogger m_log = new VoltLogger("CONSOLE");
+    private static final VoltLogger m_log = new VoltLogger("CSVLOADER");
     private static CSVConfig config = null;
     private static long latency = 0;
     private static long start = 0;
@@ -339,9 +339,9 @@ public class CSVLoader {
                 insertCount += pp.m_partitionProcessedCount.get();
             }
             long ackCount = CSVPartitionProcessor.m_partitionAcknowledgedCount.get();
-            m_log.info("Parsing CSV file took " + readerTime + " milliseconds.");
-            m_log.info("Inserting Data took " + ((insertTimeEnd - insertTimeStart) - readerTime) + " milliseconds.");
-            m_log.info("Inserted " + insertCount + " and acknowledged "
+            m_log.debug("Parsing CSV file took " + readerTime + " milliseconds.");
+            m_log.debug("Inserting Data took " + ((insertTimeEnd - insertTimeStart) - readerTime) + " milliseconds.");
+            m_log.info("Read " + insertCount + " rows from file and successfully inserted "
                     + ackCount + " rows (final)");
             produceFiles(ackCount, insertCount);
             close_cleanup();
@@ -416,7 +416,7 @@ public class CSVLoader {
     private static void produceFiles(long ackCount, long insertCount) {
         Map<Long, String[]> errorInfo = CSVFileReader.m_errorInfo;
         latency = System.currentTimeMillis() - start;
-        m_log.info("CSVLoader elapsed: " + latency / 1000F
+        m_log.info("Elapsed time: " + latency / 1000F
                 + " seconds");
 
         int bulkflush = 300; // by default right now
@@ -467,9 +467,9 @@ public class CSVLoader {
             out_reportfile.write("CSVLoader rate: " + insertCount
                     / elapsedTimeSec + " row/s\n");
 
-            m_log.info("invalid row file is generated to:" + pathInvalidrowfile);
-            m_log.info("log file is generated to:" + pathLogfile);
-            m_log.info("report file is generated to:" + pathReportfile);
+            m_log.info("Invalid row file: " + pathInvalidrowfile);
+            m_log.info("Log file: " + pathLogfile);
+            m_log.info("Report file: " + pathReportfile);
 
             out_invaliderowfile.flush();
             out_logfile.flush();

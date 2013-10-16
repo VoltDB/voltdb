@@ -874,7 +874,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             jarray = jobj.getJSONArray( Members.OUTPUT_SCHEMA.name() );
             int size = jarray.length();
             for( int i = 0; i < size; i++ ) {
-                m_outputSchema.addColumn( SchemaColumn.fromJSONObject(jarray.getJSONObject(i), db) );
+                m_outputSchema.addColumn( SchemaColumn.fromJSONObject(jarray.getJSONObject(i)) );
             }
         }
     }

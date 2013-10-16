@@ -179,7 +179,7 @@ def run_csvloader(schema, data_file):
                 print '[csvloader stderr] ' + l
             raise RuntimeError ("CSV Loader failed")
         # XXX seems that csvloader doesnt always returncode nonzero if it fails to load rows
-        m = re.search(r'^Inserted (\d+) and acknowledged (\d+) rows \(final\)$',
+        m = re.search(r'^Read (\d+) rows from file and successfully inserted (\d+) rows \(final\)$',
                         stdout, flags=re.M)
         if m is None or int(m.group(1)) != rowcount or m.group(1) != m.group(2):
             raise RuntimeError ("CSV Loader failed to load all rows")

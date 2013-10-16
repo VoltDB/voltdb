@@ -291,6 +291,30 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         return true;
     }
 
+    /**
+     * Deserialize 2 lists of AbstractExpressions from JSON format strings
+     * and determine whether the expressions at each position are equal.
+     * The issue that must be worked around is that json format string equality is sensitive
+     * to the valuetype and valuesize of each expression and its subexpressions,
+     * but AbstractExpression.equals is not -- overloaded abstract expressions are equal
+     * -- like applications of two overloads of the same function or operator applied to columns
+     * with the same name but different types.
+     * These overloads are sometimes allowable in live schema updates where more general changes
+     * might be forbidden.
+     * @return true iff the two strings represent lists of the same expressions,
+     * allowing for value type differences
+     */
+    public static boolean areOverloadedJSONExpressionLists(String jsontext1, String jsontext2)
+    {
+        try {
+            List<AbstractExpression> list1 = fromJSONArrayString(jsontext1);
+            List<AbstractExpression> list2 = fromJSONArrayString(jsontext2);
+            return list1.equals(list2);
+        } catch (JSONException je) {
+            return false;
+        }
+    }
+
     // Derived classes that define attributes should compare them in their refinements of this method.
     // This implementation is provided as a convenience for Operators et. al. that have no attributes that could differ.
     protected boolean hasEqualAttributes(AbstractExpression expr) {
@@ -444,9 +468,18 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         }
     }
 
-    abstract protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException;
+    protected void loadFromJSONObject(JSONObject obj) throws JSONException { }
 
-    public static AbstractExpression fromJSONObject(JSONObject obj, Database db) throws JSONException {
+    public static AbstractExpression fromJSONChild(JSONObject jobj, String label) throws JSONException
+    {
+        if(jobj.isNull(label)) {
+            return null;
+        }
+        return fromJSONObject(jobj.getJSONObject(label));
+    }
+
+    private static AbstractExpression fromJSONObject(JSONObject obj) throws JSONException
+    {
         ExpressionType type = ExpressionType.valueOf(obj.getString(Members.TYPE.name()));
         AbstractExpression expr;
         try {
@@ -464,79 +497,47 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         expr.m_valueType = VoltType.typeFromString(obj.getString(Members.VALUE_TYPE.name()));
         expr.m_valueSize = obj.getInt(Members.VALUE_SIZE.name());
 
-        JSONObject leftObject = null;
-        if (!obj.isNull(Members.LEFT.name())) {
-            try {
-                leftObject = obj.getJSONObject(Members.LEFT.name());
-            } catch (JSONException e) {
-                //ok for it not to be there.
-            }
-        }
-
-        if (leftObject != null) {
-            expr.m_left = AbstractExpression.fromJSONObject(obj.getJSONObject(Members.LEFT.name()), db);
-        }
-
-        JSONObject rightObject = null;
-        if (!obj.isNull(Members.RIGHT.name())) {
-            try {
-                rightObject = obj.getJSONObject(Members.RIGHT.name());
-            } catch (JSONException e) {
-                //ok for it not to be there.
-            }
-        }
-
-        if (rightObject != null) {
-            expr.m_right = AbstractExpression.fromJSONObject(obj.getJSONObject(Members.RIGHT.name()), db);
-        }
+        expr.m_left = AbstractExpression.fromJSONChild(obj, Members.LEFT.name());
+        expr.m_right = AbstractExpression.fromJSONChild(obj, Members.RIGHT.name());
 
         if (!obj.isNull(Members.ARGS.name())) {
+            JSONArray jarray = obj.getJSONArray(Members.ARGS.name());
             ArrayList<AbstractExpression> arguments = new ArrayList<AbstractExpression>();
-            try {
-                JSONArray argsObject = obj.getJSONArray(Members.ARGS.name());
-                if (argsObject != null) {
-                    for (int i = 0; i < argsObject.length(); i++) {
-                        JSONObject argObject = argsObject.getJSONObject(i);
-                        if (argObject != null) {
-                            arguments.add(AbstractExpression.fromJSONObject(argObject, db));
-                        }
-                    }
-                }
-            } catch (JSONException e) {
-                // ok for it not to be there?
-            }
+            loadFromJSONArray(arguments, jarray);
             expr.setArgs(arguments);
         }
 
-        expr.loadFromJSONObject(obj, db);
-
+        expr.loadFromJSONObject(obj);
         return expr;
     }
 
-    public static List<AbstractExpression> fromJSONArrayString(String jsontext, Database db) throws JSONException {
+    public static List<AbstractExpression> fromJSONArrayString(String jsontext) throws JSONException
+    {
         JSONArray jarray = new JSONArray(jsontext);
-        return loadFromJSONArray(null, jarray, db);
+        List<AbstractExpression> result = new ArrayList<AbstractExpression>();
+        loadFromJSONArray(result, jarray);
+        return result;
     }
 
-    public static List<AbstractExpression> loadFromJSONArray(List<AbstractExpression> starter, JSONObject parent, String key, Database db) throws JSONException {
-        if( parent.isNull( key ) ) {
-            return starter;
+    public static void loadFromJSONArrayChild(List<AbstractExpression> starter,
+                                              JSONObject parent, String label)
+    throws JSONException
+    {
+        if( parent.isNull(label) ) {
+            return;
         }
-        JSONArray jarray = parent.getJSONArray( key );
-        return loadFromJSONArray(starter, jarray, db);
+        JSONArray jarray = parent.getJSONArray(label);
+        loadFromJSONArray(starter, jarray);
     }
 
-    public static List<AbstractExpression> loadFromJSONArray(List<AbstractExpression> starter, JSONArray jarray, Database db) throws JSONException {
-        List<AbstractExpression> result = starter;
-        if (result == null) {
-            result = new ArrayList<AbstractExpression>();
-        }
+    private static void loadFromJSONArray(List<AbstractExpression> starter,
+                                          JSONArray jarray) throws JSONException
+    {
         int size = jarray.length();
         for( int i = 0 ; i < size; i++ ) {
             JSONObject tempjobj = jarray.getJSONObject( i );
-            result.add(fromJSONObject(tempjobj, db));
+            starter.add(fromJSONObject(tempjobj));
         }
-        return result;
     }
 
     /**
