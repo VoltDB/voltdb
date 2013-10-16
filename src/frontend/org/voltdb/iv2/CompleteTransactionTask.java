@@ -84,7 +84,7 @@ public class CompleteTransactionTask extends TransactionTask
             // ENG-5276: Need to set the last committed spHandle so that the rejoining site gets the accurate
             // per-partition txnId set for the next snapshot. Normally, this is done through undo log truncation.
             // Since the task is not run here, we need to set the last committed spHandle explicitly.
-            siteConnection.setLastCommittedTxn(m_txnState.txnId, m_txnState.m_spHandle);
+            siteConnection.setSpHandleForSnapshotDigest(m_txnState.m_spHandle);
         }
 
         if (!m_completeMsg.isRestart()) {

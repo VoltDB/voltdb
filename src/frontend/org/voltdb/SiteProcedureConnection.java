@@ -107,7 +107,7 @@ public interface SiteProcedureConnection {
     /**
      * Set the last committed txnId and spHandle
      */
-    public void setLastCommittedTxn(long txnId, long spHandle);
+    public void setSpHandleForSnapshotDigest(long spHandle);
 
     /**
      * IV2 commit / rollback interface to the EE

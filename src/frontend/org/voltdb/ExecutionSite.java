@@ -567,7 +567,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
          * is multi-part then the txnid and SpHandle will not be the same.
          */
         @Override
-        public long getLastCommittedSpHandle()                     { return lastCommittedTxnId; }
+        public long getSpHandleForSnapshotDigest()                     { return lastCommittedTxnId; }
         @Override
         public long getCurrentTxnId()                           { return m_currentTransactionState.txnId; }
         @Override
@@ -1464,7 +1464,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     }
 
     @Override
-    public void setLastCommittedTxn(long txnId, long spHandle)
+    public void setSpHandleForSnapshotDigest(long spHandle)
     {
 
     }
