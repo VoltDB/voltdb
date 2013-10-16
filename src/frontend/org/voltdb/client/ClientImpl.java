@@ -587,7 +587,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     }
 
     //Hidden method for getPartitionForParameter
-    public int getPartitionForParameter(byte typeValue, Object value) {
+    public long getPartitionForParameter(byte typeValue, Object value) {
         return m_distributer.getPartitionForParameter(typeValue, value);
 
     }

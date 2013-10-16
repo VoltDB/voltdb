@@ -992,7 +992,7 @@ class Distributer {
      * @param value the representative value
      * @return
      */
-    public int getPartitionForParameter(byte typeValue, Object value) {
+    public long getPartitionForParameter(byte typeValue, Object value) {
         if (m_hashinator == null) {
             return -1;
         }
