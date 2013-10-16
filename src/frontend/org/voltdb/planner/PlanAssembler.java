@@ -41,7 +41,6 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.ParsedSelectStmt.MVFixInfo;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -494,6 +493,11 @@ public class PlanAssembler {
         assert (subAssembler != null);
 
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
+
+        if (subSelectRoot != null && !m_parsedSelect.mvFixInfo.isJoinNodePossible(subSelectRoot)) {
+            return getNextSelectPlan();
+        }
+
         if (subSelectRoot == null) {
             m_recentErrorMsg = subAssembler.m_recentErrorMsg;
             return null;
@@ -539,19 +543,13 @@ public class PlanAssembler {
             if (m_parsedSelect.mayNeedAvgPushdown()) {
                 m_parsedSelect.switchOptimalSuiteForAvgPushdown();
             }
-        } else {
-            m_parsedSelect.mvFixInfo.needed = false;
         }
 
-
-        /*
-         * Establish the output columns for the sub select plan.
-         */
         root = handleAggregationOperators(root);
 
         // Process the re-aggregate plan node and insert it into the plan.
         boolean mvFixNeedsProjection = false;
-        if (m_parsedSelect.mvFixInfo.needed) {
+        if (m_parsedSelect.mvFixInfo.needed()) {
             AbstractPlanNode tmpRoot = root;
             root = handleMVBasedMultiPartQuery(root);
             if (root != tmpRoot) {
@@ -1122,7 +1120,7 @@ public class PlanAssembler {
             }
         }
 
-        if (m_parsedSelect.mvFixInfo.needed) {
+        if (m_parsedSelect.mvFixInfo.needed()) {
             // Do not push down limit for mv based distributed query.
             canPushDown = false;
         }
@@ -1193,9 +1191,9 @@ public class PlanAssembler {
     }
 
     AbstractPlanNode handleMVBasedMultiPartQuery (AbstractPlanNode root) {
-        MVFixInfo mvFixInfo = m_parsedSelect.mvFixInfo;
+        MaterializedViewFixInfo mvFixInfo = m_parsedSelect.mvFixInfo;
 
-        HashAggregatePlanNode reAggNode = new HashAggregatePlanNode(mvFixInfo.reAggNode);
+        HashAggregatePlanNode reAggNode = new HashAggregatePlanNode(mvFixInfo.getReAggregationPlanNode());
         reAggNode.clearChildren();
         reAggNode.clearParents();
 
@@ -1216,18 +1214,54 @@ public class PlanAssembler {
             parent.addAndLinkChild(reAggNode);
         }
 
-        // Set up the scan plan node's scan columns
-        // Add inline projection node for scan node.
+        // If it is joined query, replace the node under receive node with materialized view scan node.
+        AbstractScanPlanNode mvScanNode = null;
+
         assert(receiveNode instanceof ReceivePlanNode);
         AbstractPlanNode sendNode = receiveNode.getChild(0);
         assert(sendNode instanceof SendPlanNode);
         AbstractPlanNode sendNodeChild = sendNode.getChild(0);
-        List<AbstractScanPlanNode> scanList = sendNodeChild.getScanNodeList();
-        assert(scanList.size() == 1);
-        AbstractScanPlanNode scanNode = scanList.get(0);
-        assert(scanNode.getTargetTableName().equals(mvFixInfo.mvTable.getTypeName()));
 
-        scanNode.addInlinePlanNode(mvFixInfo.scanInlinedProjectionNode);
+        if (mvFixInfo.isJoin()) {
+            AbstractPlanNode joinNode = sendNodeChild;
+            // No agg, limit pushed down at this point.
+            assert(joinNode instanceof AbstractJoinPlanNode);
+
+            AbstractPlanNode reAggParent = null;
+            // Fix the node after Re-aggregation node.
+            if (root != reAggNode) {
+                reAggParent = reAggNode.getParent(0);
+            }
+            joinNode.clearParents();
+            reAggNode.clearParents();
+
+            // Get the MV scan node and
+            mvScanNode = mvFixInfo.grapScanNodeReplaceWithReAggNode(joinNode, reAggNode);
+            assert(mvScanNode != null);
+            mvScanNode.clearParents();
+            mvScanNode.clearChildren();
+
+            // replace joinNode with MV scan node on each partition.
+            sendNode.clearChildren();
+            sendNode.addAndLinkChild(mvScanNode);
+
+            // If reAggNode has parent node before we put it under join node,
+            // its parent will be the parent of the new join node. Update the root node.
+            if (reAggParent != null) {
+                reAggParent.clearChildren();
+                reAggParent.addAndLinkChild(joinNode);
+                root = reAggParent;
+            } else {
+                root = joinNode;
+            }
+        } else {
+            // Set up the scan plan node's scan columns. Add in-line projection node for scan node.
+            List<AbstractScanPlanNode> scanList = sendNodeChild.getScanNodeList();
+            mvScanNode = scanList.get(0);
+            assert(mvScanNode.getTargetTableName().equals(mvFixInfo.getMVTableName()));
+        }
+        mvScanNode.addInlinePlanNode(mvFixInfo.getScanInlinedProjectionNode());
+
         return root;
     }
 
@@ -1282,12 +1316,12 @@ public class PlanAssembler {
                 (root.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
                  ((IndexScanPlanNode) root).getSortDirection() == SortDirectionType.INVALID)) {
                 aggNode = new HashAggregatePlanNode();
-                if (!m_parsedSelect.mvFixInfo.needed) {
+                if (!m_parsedSelect.mvFixInfo.needed()) {
                     topAggNode = new HashAggregatePlanNode();
                 }
             } else {
                 aggNode = new AggregatePlanNode();
-                if (!m_parsedSelect.mvFixInfo.needed) {
+                if (!m_parsedSelect.mvFixInfo.needed()) {
                     topAggNode = new AggregatePlanNode();
                 }
             }

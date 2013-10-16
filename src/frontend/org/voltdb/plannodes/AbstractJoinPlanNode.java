@@ -234,6 +234,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         }
     }
 
+    @Override
     public boolean isContentDeterministic() {
         LimitPlanNode limit = (LimitPlanNode) getInlinePlanNode(PlanNodeType.LIMIT);
         if (super.isContentDeterministic() && limit != null) {
