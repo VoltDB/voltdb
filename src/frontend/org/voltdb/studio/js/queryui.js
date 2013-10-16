@@ -224,12 +224,13 @@ function applyFormat(val)
     }
     return val;
 }
-function fmtd(v, l)
+function lPadZero(v, len)
 {
+    // return a string left padded with zeros to length 'len'
     v = v + "";
-    if (v.length < l)
+    if (v.length < len)
     {
-       v = Array(l-v.length+1).join("0") + v;
+       v = Array(len-v.length+1).join("0") + v;
     }
     return v;
 }
@@ -256,14 +257,14 @@ function printGrid(target, id, table)
             {
                 var us = val%1000;
                 var dt = new Date(val/1000);
-                val = fmtd(dt.getUTCFullYear(), 4) + "-"
-                    + fmtd((dt.getUTCMonth())+1, 2) + "-"
-                    + fmtd(dt.getUTCDate(), 2) + " "
-                    + fmtd(dt.getUTCHours(), 2) + ":"
-                    + fmtd(dt.getUTCMinutes(), 2) + ":"
-                    + fmtd(dt.getUTCSeconds(), 2) + "."
-                    + fmtd((dt.getUTCMilliseconds())*1000+us, 6);
-                typ = 9;
+                val = lPadZero(dt.getUTCFullYear(), 4) + "-"
+                    + lPadZero((dt.getUTCMonth())+1, 2) + "-"
+                    + lPadZero(dt.getUTCDate(), 2) + " "
+                    + lPadZero(dt.getUTCHours(), 2) + ":"
+                    + lPadZero(dt.getUTCMinutes(), 2) + ":"
+                    + lPadZero(dt.getUTCSeconds(), 2) + "."
+                    + lPadZero((dt.getUTCMilliseconds())*1000+us, 6);
+                typ = 9;  //code for varchar
             }
             val = applyFormat(val);
             src += '<td align="' + (typ == 9 ? 'left' : 'right') + '">' + val + '</td>';
