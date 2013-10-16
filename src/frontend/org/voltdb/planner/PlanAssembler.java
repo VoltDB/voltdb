@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
@@ -323,16 +324,7 @@ public class PlanAssembler {
             }
         } else if (m_parsedSelect != null) {
             nextStmt = m_parsedSelect;
-            retval.rootPlanGraph = getNextSelectPlan();
-            retval.readOnly = true;
-            if (retval.rootPlanGraph != null)
-            {
-                // Check PlanColumn resource leakage later by recording the select stmt.
-                retval.selectStmt = m_parsedSelect;
-                boolean orderIsDeterministic = m_parsedSelect.isOrderDeterministic();
-                boolean contentIsDeterministic = (m_parsedSelect.hasLimitOrOffset() == false) || orderIsDeterministic;
-                retval.statementGuaranteesDeterminism(contentIsDeterministic, orderIsDeterministic);
-            }
+            retval = getNextSelectPlan();
         } else {
             retval.readOnly = false;
             if (m_parsedInsert != null) {
@@ -474,7 +466,7 @@ public class PlanAssembler {
         }
 
         CompiledPlan retval = new CompiledPlan();
-            retval.rootPlanGraph = subUnionRoot;
+        retval.rootPlanGraph = subUnionRoot;
         retval.readOnly = true;
         retval.sql = m_planSelector.m_sql;
         retval.statementGuaranteesDeterminism(contentIsDeterministic, orderIsDeterministic);
@@ -487,7 +479,69 @@ public class PlanAssembler {
         return retval;
     }
 
-    private AbstractPlanNode getNextSelectPlan() {
+    private CompiledPlan getNextSelectPlan() {
+        assert (subAssembler != null);
+
+        Map<String, AbstractParsedStmt> childrenStmt = m_parsedSelect.extractAndRemoveSubQueries();
+        if (childrenStmt.isEmpty()) {
+            // this is a simple select without any sub-queries
+            CompiledPlan retval = new CompiledPlan();
+            retval.rootPlanGraph = getNextSubSelectPlan();
+            retval.readOnly = true;
+            if (retval.rootPlanGraph != null)
+            {
+                // Check PlanColumn resource leakage later by recording the select stmt.
+                retval.selectStmt = m_parsedSelect;
+                boolean orderIsDeterministic = m_parsedSelect.isOrderDeterministic();
+                boolean contentIsDeterministic = (m_parsedSelect.hasLimitOrOffset() == false) || orderIsDeterministic;
+                retval.statementGuaranteesDeterminism(contentIsDeterministic, orderIsDeterministic);
+            }
+            return retval;
+        } else {
+            Map<String, CompiledPlan> childrenPlans = new HashMap<String, CompiledPlan>();
+            // Build the best plan for children first
+            boolean orderIsDeterministic = true;
+            boolean contentIsDeterministic = true;
+
+            // Build best plans for the children first
+            int planId = 0;
+            for (Map.Entry<String, AbstractParsedStmt>  parsedChildStmtEntry : childrenStmt.entrySet()) {
+                AbstractParsedStmt parsedChildStmt = parsedChildStmtEntry.getValue();
+                PartitioningForStatement partitioning = (PartitioningForStatement)m_partitioning.clone();
+                PlanSelector processor = (PlanSelector) m_planSelector.clone();
+                processor.m_planId = planId;
+                PlanAssembler assembler = new PlanAssembler(
+                        m_catalogCluster, m_catalogDb, partitioning, processor);
+                CompiledPlan bestChildPlan = assembler.getBestCostPlan(parsedChildStmt);
+                // make sure we got a winner
+                if (bestChildPlan == null) {
+                    if (m_recentErrorMsg == null) {
+                        m_recentErrorMsg = "Unable to plan for statement. Error unknown.";
+                    }
+                    return null;
+                }
+                childrenPlans.put(parsedChildStmtEntry.getKey(), bestChildPlan);
+                orderIsDeterministic = orderIsDeterministic && bestChildPlan.isOrderDeterministic();
+                contentIsDeterministic = contentIsDeterministic && bestChildPlan.isContentDeterministic();
+
+                // Make sure that next child's plans won't override current ones.
+                planId = processor.m_planId;
+
+            }
+            // Build the plan for the parent
+            CompiledPlan parentPlan = getBestCostPlan(m_parsedSelect);
+            orderIsDeterministic = orderIsDeterministic && parentPlan.isOrderDeterministic();
+            contentIsDeterministic = contentIsDeterministic && parentPlan.isContentDeterministic();
+            parentPlan.statementGuaranteesDeterminism(contentIsDeterministic, orderIsDeterministic);
+
+            parentPlan.readOnly = true;
+            parentPlan.sql = m_planSelector.m_sql;
+            // Connect children
+            return connectSubQueriesPlans(parentPlan, childrenPlans);
+        }
+    }
+
+    private AbstractPlanNode getNextSubSelectPlan() {
         assert (subAssembler != null);
 
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
@@ -562,6 +616,25 @@ public class PlanAssembler {
         }
 
         return root;
+    }
+
+    private CompiledPlan connectSubQueriesPlans(CompiledPlan parentPlan, Map<String, CompiledPlan> childrenPlans) {
+        connectSubQueriesPlansRecursively(parentPlan, parentPlan.rootPlanGraph, childrenPlans);
+        assert(childrenPlans.isEmpty() == true);
+        return parentPlan;
+    }
+
+    private void connectSubQueriesPlansRecursively(CompiledPlan parentPlan, AbstractPlanNode planNode, Map<String, CompiledPlan> childrenPlans) {
+        if (planNode instanceof SeqScanPlanNode) {
+            SeqScanPlanNode seqScanNode = (SeqScanPlanNode) planNode;
+            String tableAlias = seqScanNode.getTargetTableAlias();
+            CompiledPlan subQueryCompiledPlan = childrenPlans.get(tableAlias);
+            if (subQueryCompiledPlan != null) {
+                parentPlan.cost += subQueryCompiledPlan.cost;
+                seqScanNode.addAndLinkChild(subQueryCompiledPlan.rootPlanGraph);
+                childrenPlans.remove(tableAlias);
+            }
+        }
     }
 
     private boolean needProjectionNode (AbstractPlanNode root) {

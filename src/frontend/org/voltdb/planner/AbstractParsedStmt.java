@@ -18,6 +18,7 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -129,14 +130,14 @@ public abstract class AbstractParsedStmt {
             throw new RuntimeException("Unexpected Element: " + stmtTypeElement.name);
         }
 
+        // set SQL and Join Order
+        retval.setSql(sql, joinOrder);
+
         // parse tables and parameters
         retval.parseTablesAndParams(stmtTypeElement);
 
         // parse specifics
         retval.parse(stmtTypeElement);
-
-        // post parse action
-        retval.postParse(sql, joinOrder);
 
         return retval;
     }
@@ -190,12 +191,12 @@ public abstract class AbstractParsedStmt {
         }
     }
 
-    /**Miscellaneous post parse activity
+    /**Set SQl and Join Order
      * .
      * @param sql
      * @param joinOrder
      */
-    void postParse(String sql, String joinOrder) {
+    void setSql(String sql, String joinOrder) {
         this.sql = sql;
         this.joinOrder = joinOrder;
     }
@@ -351,24 +352,17 @@ public abstract class AbstractParsedStmt {
         }
 
         // add table to the query cache
-        addTableToStmtCache(tableName, tableAlias);
+        int tableIdx = addTableToStmtCache(tableName, tableAlias, null);
 
         TupleValueExpression expr = new TupleValueExpression(tableName, tableAlias, columnName, alias);
+        expr.setTableCacheIndex(tableIdx);
         if (childExprs != null && !childExprs.isEmpty()) {
             expr.setChildExpressions(childExprs);
         }
-        expr.resolveForDB(m_db);
+        expr.resolveForDB(stmtCache);
         addScanColumns(expr);
         return expr;
     }
-
-    /**
-     * Fills scanColumns with a list of the columns used in the plan, hashed by
-     * table name.
-     *
-     * @param columnsNode
-     */
-
     void addScanColumns(TupleValueExpression tveColumn)
     {
             SchemaColumn col = new SchemaColumn(tveColumn.getTableName(),
@@ -394,19 +388,42 @@ public abstract class AbstractParsedStmt {
     * Add table to the statement cache
     * @param tableName
     * @param tableAlias
+    * @param sybQuery possible sub query which defines this table
     * @return index into the cache array
     */
-    private int addTableToStmtCache(String tableName, String tableAlias) {
+    private int addTableToStmtCache(String tableName, String tableAlias, AbstractParsedStmt subQuery) {
         // Create an index into the query Catalog cache
         if (!tableAliasIndexMap.containsKey(tableAlias)) {
             int nextIndex = stmtCache.size();
-            tableAliasIndexMap.put(tableAlias, nextIndex);
-            StmtTableScan tableCache = new StmtTableScan();
-            tableCache.m_tableAlias = tableAlias;
-            tableCache.m_table = getTableFromDB(tableName);
-            assert(tableCache.m_table != null);
-            stmtCache.add(tableCache);
-            tableAliasIndexMap.put(tableAlias, nextIndex);
+            if (subQuery == null) {
+                // this is a real table
+                tableAliasIndexMap.put(tableAlias, nextIndex);
+                StmtTableScan tableCache = new StmtTableScan();
+                tableCache.m_tableAlias = tableAlias;
+                tableCache.m_table = getTableFromDB(tableName);
+                assert(tableCache.m_table != null);
+                stmtCache.add(tableCache);
+                tableAliasIndexMap.put(tableAlias, nextIndex);
+            } else {
+                // Recursively add all the sub-query tables to the parent cache.
+                // They will be used for the column index resolution.
+                StmtTableScan tempTableCache = new StmtTableScan();
+                stmtCache.add(tempTableCache);
+                tableAliasIndexMap.put(tableAlias, nextIndex);
+                tempTableCache.m_children = new int[subQuery.stmtCache.size()];
+                int idx = 0;
+                for (StmtTableScan tableCache: subQuery.stmtCache) {
+                    if (tableCache.m_table == null) {
+                        // this is a sub-query itself. Skip it
+                        // The constituent tables are in the cache themselves
+                        continue;
+                    }
+                    ++nextIndex;
+                    stmtCache.add(tableCache);
+                    tableAliasIndexMap.put(tableCache.m_tableAlias, nextIndex);
+                    tempTableCache.m_children[idx++] = nextIndex;
+                }
+            }
         }
         return tableAliasIndexMap.get(tableAlias);
     }
@@ -588,6 +605,41 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
+     * Parse the scan_columns element out of the HSQL-generated XML.
+     * Fills scanColumns with a list of the columns used in the plan, hashed by
+     * table name.
+     *
+     * @param columnsNode
+     */
+    void parseScanColumns(VoltXMLElement columnsNode)
+    {
+//        for (VoltXMLElement child : columnsNode.children) {
+//            assert(child.name.equals("columnref"));
+//            AbstractExpression col_exp = parseExpressionTree(child);
+//            // TupleValueExpressions are always specifically typed,
+//            // so there is no need for expression type specialization, here.
+//            assert(col_exp != null);
+//            assert(col_exp instanceof TupleValueExpression);
+//            TupleValueExpression tve = (TupleValueExpression)col_exp;
+//            SchemaColumn col = new SchemaColumn(tve.getTableName(),
+//                                                tve.getTableAlias(),
+//                                                tve.getColumnName(),
+//                                                tve.getColumnAlias(),
+//                                                col_exp);
+//            ArrayList<SchemaColumn> table_cols = null;
+//            assert(aliasIndexMap.containsKey(tve.getTableAlias()) == true);
+//            int aliasIndex = aliasIndexMap.get(tve.getTableAlias());
+//            if (!scanColumns.containsKey(aliasIndex))
+//            {
+//                table_cols = new ArrayList<SchemaColumn>();
+//                scanColumns.put(aliasIndex, table_cols);
+//            }
+//            table_cols = scanColumns.get(aliasIndex);
+//            table_cols.add(col);
+//        }
+    }
+
+    /**
     *
     * @param tableNode
     */
@@ -599,22 +651,26 @@ public abstract class AbstractParsedStmt {
         if (tableAlias == null) {
             tableAlias = tableName;
         }
+        // Possible sub-query
+        AbstractParsedStmt subQuery = parseSubQuery(tableNode);
+
         // add table to the query cache
-        int aliasIdx = addTableToStmtCache(tableName, tableAlias);
+        int aliasIdx = addTableToStmtCache(tableName, tableAlias, subQuery);
 
         AbstractExpression joinExpr = parseJoinCondition(tableNode);
         AbstractExpression whereExpr = parseWhereCondition(tableNode);
 
-        Table table = getTableFromDB(tableName);
-        tableList.add(table);
-
-        // @TODO ENG_3038 This method of building join trees works for joins without
-        // sub-queries
+        //Table table = getTableFromDB(tableName);
+        if (stmtCache.get(aliasIdx).m_table != null) {
+            tableList.add(stmtCache.get(aliasIdx).m_table);
+        }
 
         // The join type of the leaf node is always INNER
         // For a new tree its node's ids start with 0 and keep incrementing by 1
         int nodeId = (joinTree == null) ? 0 : joinTree.m_id + 1;
-        JoinNode leafNode = new JoinNode(nodeId, JoinType.INNER, aliasIdx, joinExpr, whereExpr);
+        JoinNode leafNode = (subQuery == null) ?
+                new JoinNode(nodeId, JoinType.INNER, aliasIdx, joinExpr, whereExpr) :
+                new JoinNode(nodeId, JoinType.INNER, aliasIdx, joinExpr, whereExpr, subQuery);
 
         if (joinTree == null) {
             // this is the first table
@@ -997,6 +1053,22 @@ public abstract class AbstractParsedStmt {
             retval += "\t(" + String.valueOf(i++) + ") " + expr.toString() + "\n";
 
         return retval;
+    }
+
+    private AbstractParsedStmt parseSubQuery(VoltXMLElement tableScan) {
+        AbstractParsedStmt subQuery = null;
+        for (VoltXMLElement childNode : tableScan.children) {
+            if (childNode.name.equalsIgnoreCase("tablesubquery")) {
+                if (!childNode.children.isEmpty()) {
+                    subQuery = AbstractParsedStmt.parse(sql, childNode.children.get(0), m_paramValues, m_db, joinOrder);
+                    // Propagate parameters from the parent to the child
+                    subQuery.m_paramsById.putAll(m_paramsById);
+                    subQuery.m_paramList = Arrays.copyOf(m_paramList, m_paramList.length);
+                    break;
+                }
+            }
+        }
+        return subQuery;
     }
 
     /** Parse a where or join clause. This behavior is common to all kinds of statements.

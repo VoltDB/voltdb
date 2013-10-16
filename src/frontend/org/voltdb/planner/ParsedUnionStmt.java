@@ -90,21 +90,18 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         }
     }
 
-    /**Miscellaneous post parse activity
+    /**Set SQL and Join Order
      * .
      * @param sql
      * @param db
      * @param joinOrder
      */
     @Override
-    void postParse(String sql, String joinOrder)
+    void setSql(String sql, String joinOrder)
     {
         for (AbstractParsedStmt selectStmt : m_children) {
-            selectStmt.postParse(sql, joinOrder);
+            selectStmt.setSql(sql, joinOrder);
         }
-
-        // these just shouldn't happen right?
-        assert(noTableSelectionList.size() == 0);
 
         this.sql = sql;
         this.joinOrder = joinOrder;

@@ -293,6 +293,34 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         return false;
     }
+
+    /**
+     * Returns a map of sub-queries which are part of this query.
+     * The key is the table alias for the sub-query.
+     * Only immediate children are returned.
+     * @return List<AbstractParsedStmt> - list of sub-queries from this query
+     */
+    public Map<String, AbstractParsedStmt> extractAndRemoveSubQueries() {
+        Map<String, AbstractParsedStmt> subQueries = new HashMap<String, AbstractParsedStmt>();
+        extractAndRemoveSubQueries(joinTree, subQueries);
+        return subQueries;
+    }
+
+    private void extractAndRemoveSubQueries(JoinNode joinTree, Map<String, AbstractParsedStmt> subQueries) {
+        if (joinTree.m_subQuery != null) {
+            assert (joinTree.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX);
+            String tableAlias = stmtCache.get(joinTree.m_tableAliasIndex).m_tableAlias;
+            subQueries.put(tableAlias, joinTree.m_subQuery);
+            joinTree.m_subQuery = null;
+        }
+        if (joinTree.m_leftNode != null) {
+            extractAndRemoveSubQueries(joinTree.m_leftNode, subQueries);
+        }
+        if (joinTree.m_rightNode != null) {
+            extractAndRemoveSubQueries(joinTree.m_rightNode, subQueries);
+        }
+    }
+
     /**
      * Continue adding TVEs from DisplayColumns that are left in function needComplexAggregation().
      * After this function, aggResultColumns construction work.

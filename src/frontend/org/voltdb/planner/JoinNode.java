@@ -37,6 +37,14 @@ import org.voltdb.types.JoinType;
  */
 public class JoinNode implements Cloneable {
 
+    public enum NodeType {
+        JOIN,
+        LEAF,
+        SUBQUERY
+    }
+
+    // Node Type
+    public NodeType m_nodeType = null;
     // Left child
     public JoinNode m_leftNode = null;
     // Right child
@@ -51,6 +59,8 @@ public class JoinNode implements Cloneable {
     public AbstractExpression m_whereExpr = null;
     // Node id. Must be unique within a given tree
     public int m_id = 0;
+    // Sub Query
+    public AbstractParsedStmt m_subQuery = null;
 
     // Buckets for children expression classification
     public final ArrayList<AbstractExpression> m_joinOuterList = new ArrayList<AbstractExpression>();
@@ -75,10 +85,27 @@ public class JoinNode implements Cloneable {
      * @param id - node id
      */
     JoinNode(int id, JoinType joinType, int tableAliasIdx, AbstractExpression joinExpr, AbstractExpression  whereExpr) {
-        this(id, joinType);
+        this(id, joinType, NodeType.LEAF);
         m_tableAliasIndex = tableAliasIdx;
         m_joinExpr = joinExpr;
         m_whereExpr = whereExpr;
+    }
+
+    /**
+     * Construct a leaf node
+     * @param id - node unique id
+     * @param joinType - join type
+     * @param table - join table index
+     * @param joinExpr - join expression
+     * @param whereExpr - filter expression
+     * @param id - node id
+     */
+    JoinNode(int id, JoinType joinType, int tableAliasIdx, AbstractExpression joinExpr, AbstractExpression  whereExpr, AbstractParsedStmt subQuery) {
+        this(id, joinType, NodeType.SUBQUERY);
+        m_tableAliasIndex = tableAliasIdx;
+        m_joinExpr = joinExpr;
+        m_whereExpr = whereExpr;
+        m_subQuery = subQuery;
     }
 
     /**
@@ -89,7 +116,7 @@ public class JoinNode implements Cloneable {
      * @param rightNode - right node
      */
     JoinNode(int id, JoinType joinType, JoinNode leftNode, JoinNode rightNode) {
-        this(id, joinType);
+        this(id, joinType, NodeType.JOIN);
         m_leftNode = leftNode;
         m_rightNode = rightNode;
     }
@@ -97,9 +124,10 @@ public class JoinNode implements Cloneable {
     /**
      * Construct an empty join node
      */
-    private JoinNode(int id, JoinType joinType) {
+    private JoinNode(int id, JoinType joinType, NodeType nodeType) {
         m_id = id;
         m_joinType = joinType;
+        m_nodeType = nodeType;
     }
 
     /**
@@ -107,7 +135,7 @@ public class JoinNode implements Cloneable {
      */
     @Override
     public Object clone() {
-        JoinNode newNode = new JoinNode(m_id, m_joinType);
+        JoinNode newNode = new JoinNode(m_id, m_joinType, m_nodeType);
         if (m_joinExpr != null) {
             newNode.m_joinExpr = (AbstractExpression) m_joinExpr.clone();
         }
@@ -120,6 +148,10 @@ public class JoinNode implements Cloneable {
             newNode.m_rightNode = (JoinNode) m_rightNode.clone();
         } else {
             newNode.m_tableAliasIndex = m_tableAliasIndex;
+        }
+        if (m_subQuery != null) {
+            // @TODO: We really don't need to clone the Sub Query.
+            newNode.m_subQuery = m_subQuery;
         }
         return newNode;
     }
@@ -458,7 +490,7 @@ public class JoinNode implements Cloneable {
                 // Replace the join node with the temporary node having the id negated
                 // the tree at the later stage
                 // We also need to generate a dummy alias index to preserve JoinNode invariant
-                // that a node represent either a table (m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) or
+                // that a node represent either a table (m_tableAliasIndex != StmtCatalogCache.NULL_ALIAS_INDEX) or
                 // a join of two nodes m_leftNode != null && m_rightNode != null
                 int tempAliasIdx = StmtTableScan.NULL_ALIAS_INDEX - 1 - child.m_id;
                 JoinNode tempNode = new JoinNode(

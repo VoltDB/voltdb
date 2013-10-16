@@ -94,14 +94,17 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
         if ((plan instanceof SeqScanPlanNode) == false) {
             return plan;
         }
-        assert(plan.getChildCount() == 0);
-
-        // got here? we're got ourselves a sequential scan
         SeqScanPlanNode scanNode = (SeqScanPlanNode) plan;
 
+        if (scanNode.isSubQuery() == true) {
+            // This is a sub-query and can't have indexes
+            return plan;
+        }
+
+        // got here? we're got ourselves a sequential scan over a real table
+        assert (scanNode.getChildCount() == 0);
         String tableName = scanNode.getTargetTableName();
         Table table = db.getTables().get(tableName);
-        assert(table != null);
 
         Index indexToScan = null;
 

@@ -340,7 +340,7 @@ public class PartitioningForStatement implements Cloneable{
         // Iterate over the tables to collect partition columns.
         for (StmtTableScan tableAlias : tableAliasList) {
             // Replicated tables don't need filter coverage.
-            if (tableAlias.m_table.getIsreplicated()) {
+            if (tableAlias.m_table == null || tableAlias.m_table.getIsreplicated()) {
                 continue;
             }
 

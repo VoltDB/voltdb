@@ -118,7 +118,6 @@ public abstract class SubPlanAssembler {
                                                                    List<AbstractExpression> filterExprs,
                                                                    List<AbstractExpression> postExprs) {
         assert(tableAliasIdx != StmtTableScan.NULL_ALIAS_INDEX);
-        Table table = m_parsedStmt.stmtCache.get(tableAliasIdx).m_table;
         ArrayList<AccessPath> paths = new ArrayList<AccessPath>();
         List<AbstractExpression> allJoinExprs = new ArrayList<AbstractExpression>();
         List<AbstractExpression> allExprs = new ArrayList<AbstractExpression>();
@@ -136,6 +135,12 @@ public abstract class SubPlanAssembler {
 
         AccessPath naivePath = getRelevantNaivePath(allJoinExprs, filterExprs);
         paths.add(naivePath);
+
+        Table table = m_parsedStmt.stmtCache.get(tableAliasIdx).m_table;
+        if (table == null) {
+            // This is a sub-query
+            return paths;
+        }
 
         CatalogMap<Index> indexes = table.getIndexes();
 
@@ -1161,7 +1166,11 @@ public abstract class SubPlanAssembler {
         // build the scan node
         SeqScanPlanNode scanNode = new SeqScanPlanNode();
         StmtTableScan tableCache = m_parsedStmt.stmtCache.get(tableAliasIdx);
-        scanNode.setTargetTableName(tableCache.m_table.getTypeName());
+        if (tableCache.m_table != null) {
+            // This is a real table and not a sub-query
+            scanNode.setTargetTableName(tableCache.m_table.getTypeName());
+            scanNode.setSubQuery(true);
+        }
         scanNode.setTargetTableAlias(tableCache.m_tableAlias);
         //TODO: push scan column identification into "setTargetTableName"
         // (on the way to enabling it for DML plans).

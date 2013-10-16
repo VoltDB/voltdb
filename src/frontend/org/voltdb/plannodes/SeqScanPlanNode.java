@@ -25,7 +25,9 @@ import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.types.PlanNodeType;
 
 public class SeqScanPlanNode extends AbstractScanPlanNode {
-
+    // Flag marking the sub-query plan
+    private boolean m_isSubQuery = false;
+    
     public SeqScanPlanNode() {
         super();
     }
@@ -48,22 +50,45 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
     @Override
     public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
         Table target = db.getTables().getIgnoreCase(m_targetTableName);
-        assert(target != null);
-        DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(target.getTypeName());
-        // This maxTuples value estimates the number of tuples fetched from the sequential scan.
-        // It's a vague measure of the cost of the scan.
-        // Its accuracy depends a lot on what kind of post-filtering or projection needs to happen, if any.
-        // The tuplesRead value is also used to estimate the number of RESULT rows, regardless of
-        // how effective post-filtering might be -- as if all rows passed the filters.
-        // This is at least semi-consistent with the ignoring of post-filter effects in IndexScanPlanNode.
-        // In effect, though, it gives index scans an "unfair" advantage when they reduce the estimated result size
-        // by taking into account the indexed filters -- follow-on plan steps, sorts (etc.), are costed lower
-        // as if they are operating on fewer rows than would have come out of the seqscan,
-        // though that's nonsense.
-        // In any case, it's important to keep an eye on any changes (discounts) to SeqScanPlanNode's costing
-        // here to make sure that SeqScanPlanNode never gains an unfair advantage over IndexScanPlanNode.
-        m_estimatedProcessedTupleCount = tableEstimates.maxTuples;
-        m_estimatedOutputTupleCount = tableEstimates.maxTuples;
+        if (target != null) {
+            // This is a real table and not a sub-query
+            DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(target.getTypeName());
+            // This maxTuples value estimates the number of tuples fetched from the sequential scan.
+            // It's a vague measure of the cost of the scan.
+            // Its accuracy depends a lot on what kind of post-filtering or projection needs to happen, if any.
+            // The tuplesRead value is also used to estimate the number of RESULT rows, regardless of
+            // how effective post-filtering might be -- as if all rows passed the filters.
+            // This is at least semi-consistent with the ignoring of post-filter effects in IndexScanPlanNode.
+            // In effect, though, it gives index scans an "unfair" advantage when they reduce the estimated result size
+            // by taking into account the indexed filters -- follow-on plan steps, sorts (etc.), are costed lower
+            // as if they are operating on fewer rows than would have come out of the seqscan,
+            // though that's nonsense.
+            // In any case, it's important to keep an eye on any changes (discounts) to SeqScanPlanNode's costing
+            // here to make sure that SeqScanPlanNode never gains an unfair advantage over IndexScanPlanNode.
+            m_estimatedProcessedTupleCount = tableEstimates.maxTuples;
+            m_estimatedOutputTupleCount = tableEstimates.maxTuples;
+        } else {
+            // For the sub-query the cost estimates will be calculated separately
+            m_estimatedProcessedTupleCount = 0;
+            m_estimatedOutputTupleCount = 0;
+        }
+    }
+
+    /**
+     * Set the sub-query flag
+     * @param isSubQuery
+     */
+    
+    public void setSubQuery(boolean isSubQuery) {
+        m_isSubQuery = isSubQuery;
+    }
+
+    /**
+     * Accessor to return the sub-query flag
+     * @return m_isSubQuery
+     */
+    public boolean isSubQuery() {
+        return m_isSubQuery;
     }
 
     @Override
