@@ -738,6 +738,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void setSpHandleForSnapshotDigest(long spHandle)
     {
+        // During rejoin, the spHandle is updated even though the site is not executing the tasks. If it's a live
+        // rejoin, all logged tasks will be replayed. So the spHandle may go backward and forward again. It should
+        // stop at the same point after replay.
         if (m_spHandleForSnapshotDigest < spHandle) {
             m_spHandleForSnapshotDigest = spHandle;
         }
@@ -755,7 +758,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
     }
 
-    private void setLastCommittedTxn(long spHandle)
+    private void setLastCommittedSpHandle(long spHandle)
     {
         if (TxnEgo.getPartitionId(m_lastCommittedSpHandle) != TxnEgo.getPartitionId(spHandle)) {
             VoltDB.crashLocalVoltDB("Mismatch SpHandle partitiond id " +
@@ -767,11 +770,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void truncateUndoLog(boolean rollback, long beginUndoToken, long txnId, long spHandle, List<UndoAction> undoLog)
+    public void truncateUndoLog(boolean rollback, long beginUndoToken, long spHandle, List<UndoAction> undoLog)
     {
         // Set the last committed txnId even if there is nothing to undo, as long as the txn is not rolling back.
         if (!rollback) {
-            setLastCommittedTxn(spHandle);
+            setLastCommittedSpHandle(spHandle);
         }
 
         //Any new txnid will create a new undo quantum, including the same txnid again
