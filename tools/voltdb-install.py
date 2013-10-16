@@ -280,7 +280,7 @@ URL: http://www.voltdb.com
 Provides: voltdb
 Conflicts: voltdb
 Requires: libgcc >= 4.1.2, libstdc++ >= 4.1.2, python >= 2.6
-Requires: java >= 1.6_25, java-devel >= 1.6_25
+Requires: java >= 1.7_13, java-devel >= 1.7_13
 Prefix: %(prefix)s
 
 BuildRoot: %%{_tmppath}/%%{name}-%%{version}-%%{release}

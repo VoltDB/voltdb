@@ -151,7 +151,7 @@ class JavaRunner(object):
         self.initialize()
         if not os.path.exists(outdir):
             os.makedirs(outdir)
-        utility.run_cmd('javac', '-target', '1.6', '-source', '1.6',
+        utility.run_cmd('javac', '-target', '1.7', '-source', '1.7',
                           '-classpath', self.classpath, '-d', outdir, *srcfiles)
 
 #===============================================================================
