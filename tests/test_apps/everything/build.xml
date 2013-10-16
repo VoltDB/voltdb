@@ -90,7 +90,7 @@ JAVA COMPILATION
 
 <target name="srccompile">
     <mkdir dir='${build.dir}' />
-    <javac target="1.6" srcdir="${src.dir}" destdir='${build.dir}' debug='true' encoding='UTF-8'>
+    <javac target="1.7" source="1.7" srcdir="${src.dir}" destdir='${build.dir}' debug='true' encoding='UTF-8'>
         <compilerarg value="-Xlint:deprecation"/>
         <classpath refid="project.classpath" />
     </javac>

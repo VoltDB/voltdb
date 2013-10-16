@@ -41,7 +41,6 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.base.*;
-import jsr166y.LinkedTransferQueue;
 
 import org.voltcore.logging.VoltLogger;
 

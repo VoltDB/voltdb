@@ -20,11 +20,10 @@ package org.voltdb.iv2;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedTransferQueue;
 
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
-
-import jsr166y.LinkedTransferQueue;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
