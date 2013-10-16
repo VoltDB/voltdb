@@ -219,17 +219,23 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // Prepare for the mv based distributed query fix only if it might be required.
         if (tableList.size() == 1) {
             // Do not handle joined query case case.
-            mvFixInfo.mvTable = tableList.get(0);
-            processMVBasedQueryFix(mvFixInfo, m_db, scanColumns, joinTree);
+            Table mvTable = tableList.get(0);
+            Set<SchemaColumn> mvNewScanColumns = new HashSet<SchemaColumn>();
+            // For a COUNT(*)-only scan, size is 0, otherwise it is 1.
+            assert(scanColumns.keySet().size() <= 1);
+            if (scanColumns.keySet().size() == 1) {
+                mvNewScanColumns.addAll(scanColumns.get(mvTable.getTypeName()));
+            }
+            processMVBasedQueryFix(mvFixInfo, m_db, mvTable, mvNewScanColumns, joinTree);
         }
     }
 
-    private static void processMVBasedQueryFix(MVFixInfo mvFixInfo, Database db,
-            Map<String, ArrayList<SchemaColumn>> scanColumns, JoinNode joinTree)
+    private static void processMVBasedQueryFix(MVFixInfo mvFixInfo, Database db, Table mvTable,
+            Set<SchemaColumn> mvNewScanColumns, JoinNode joinTree)
     {
         // Check valid cases first
-        String mvTableName = mvFixInfo.mvTable.getTypeName();
-        Table srcTable = mvFixInfo.mvTable.getMaterializer();
+        String mvTableName = mvTable.getTypeName();
+        Table srcTable = mvTable.getMaterializer();
         if (srcTable == null) {
             return;
         }
@@ -274,6 +280,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 }
             }
         }
+        assert(numOfGroupByColumns > 0);
         if (partitionColInGroupbyCols) {
             // Group by columns contain partition column from source table.
             // Then, query on mv table will have duplicates from each partition.
@@ -283,8 +290,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         // Start to do real processing now.
         mvFixInfo.needed = true;
+        mvFixInfo.mvTable = mvTable;
 
-        Set<SchemaColumn> mvNewScanColumns = new HashSet<SchemaColumn>();
         Set<SchemaColumn> mvDDLGroupbyColumns = new HashSet<SchemaColumn>();
         Map<String, ExpressionType> mvColumnAggType = new HashMap<String, ExpressionType>();
 
@@ -299,30 +306,24 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             mvColumnAggType.put(mvCol.getName(), reAggType);
         }
         NodeSchema inlineProjSchema = new NodeSchema();
-        // COUNT(*) size is 0, otherwise it is 1.
-        assert(scanColumns.keySet().size() <= 1);
-        if (scanColumns.keySet().size() == 1) {
-            mvNewScanColumns.addAll(scanColumns.get(mvTableName));
-        }
         // construct new projection columns for scan plan node.
         for (SchemaColumn scol: mvNewScanColumns) {
             inlineProjSchema.addColumn(scol);
         }
 
-        assert(numOfGroupByColumns > 0);
         for (int i = 0; i < numOfGroupByColumns; i++) {
             Column mvCol = mvColumnArray.get(i);
+            String colName = mvCol.getName();
 
             TupleValueExpression tve = new TupleValueExpression();
             tve.setColumnIndex(i);
-            tve.setColumnName(mvCol.getName());
+            tve.setColumnName(colName);
             tve.setTableName(mvTableName);
-            tve.setColumnAlias(mvCol.getName());
+            tve.setColumnAlias(colName);
             tve.setValueType(VoltType.get((byte)mvCol.getType()));
             tve.setValueSize(mvCol.getSize());
 
-            SchemaColumn scol = new SchemaColumn( mvTableName,
-                    mvCol.getName(),mvCol.getName(), tve);
+            SchemaColumn scol = new SchemaColumn(mvTableName, colName, colName, tve);
 
             mvDDLGroupbyColumns.add(scol);
             if (!mvNewScanColumns.contains(scol)) {
