@@ -1099,7 +1099,7 @@ public abstract class CatalogUtil {
             ConnectorProperty prop = catconn.getConfig().add(ExportDataProcessor.EXPORT_TO_TYPE);
             prop.setName(ExportDataProcessor.EXPORT_TO_TYPE);
             //Override for tests
-            String dexportClientClassName = System.getProperty("exportclass", exportClientClassName);
+            String dexportClientClassName = System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE, exportClientClassName);
             prop.setValue(dexportClientClassName);
         }
 
