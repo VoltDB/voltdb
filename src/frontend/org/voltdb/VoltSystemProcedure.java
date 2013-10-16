@@ -17,8 +17,6 @@
 
 package org.voltdb;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -37,7 +35,8 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
-import org.voltdb.messaging.FastSerializer;
+import org.voltdb.dtxn.UndoAction;
+import org.voltdb.iv2.MpTransactionState;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 
@@ -233,20 +232,6 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
             SynthesizedPlanFragment pf = pfs[ii];
             dependencyIds.add(pf.outputDepId);
 
-            // serialize parameters
-            ByteBuffer parambytes = null;
-            if (pf.parameters != null) {
-                FastSerializer fs = new FastSerializer();
-                try {
-                    pf.parameters.writeExternal(fs);
-                }
-                catch (IOException e) {
-                    e.printStackTrace();
-                    assert (false);
-                }
-                parambytes = fs.getBuffer();
-            }
-
             log.trace(
                     "Sending fragment " + pf.fragmentId + " dependency " + pf.outputDepId +
                     " from " + CoreUtils.hsIdToString(m.getHSId()) + "-" +
@@ -266,7 +251,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                             false,
                             fragIdToHash(pf.fragmentId),
                             pf.outputDepId,
-                            parambytes,
+                            pf.parameters,
                             false,
                             m_runner.getTxnState().isForReplay());
             m.send(pf.siteId, ftm);
@@ -386,20 +371,6 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                 assert ((pf.outputDepId & DtxnConstants.MULTIPARTITION_DEPENDENCY) == DtxnConstants.MULTIPARTITION_DEPENDENCY);
             }
 
-            // serialize parameters
-            ByteBuffer parambytes = null;
-            if (pf.parameters != null) {
-                FastSerializer fs = new FastSerializer();
-                try {
-                    pf.parameters.writeExternal(fs);
-                }
-                catch (IOException e) {
-                    e.printStackTrace();
-                    assert (false);
-                }
-                parambytes = fs.getBuffer();
-            }
-
             FragmentTaskMessage task = FragmentTaskMessage.createWithOneFragment(
                     txnState.initiatorHSId,
                     m_site.getCorrespondingSiteId(),
@@ -408,7 +379,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                     txnState.isReadOnly(),
                     fragIdToHash(pf.fragmentId),
                     pf.outputDepId,
-                    parambytes,
+                    pf.parameters,
                     false,
                     txnState.isForReplay());
             if (pf.inputDepIds != null) {
@@ -447,5 +418,18 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     protected void noteOperationalFailure(String errMsg) {
         m_runner.m_statusCode = ClientResponse.OPERATIONAL_FAILURE;
         m_runner.m_statusString = errMsg;
+    }
+
+    protected void registerUndoAction(UndoAction action) {
+        m_runner.getTxnState().registerUndoAction(action);
+    }
+
+    protected long getMasterHSId(int partition) {
+        TransactionState txnState = m_runner.getTxnState();
+        if (txnState instanceof MpTransactionState) {
+            return ((MpTransactionState) txnState).getMasterHSId(partition);
+        } else {
+            throw new RuntimeException("SP sysproc doesn't support getting the master HSID");
+        }
     }
 }

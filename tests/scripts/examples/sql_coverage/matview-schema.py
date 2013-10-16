@@ -23,40 +23,26 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 {
-    "P1": {
+    "P_MATVIEW": {
         "columns": (("ID", FastSerializer.VOLTTYPE_INTEGER),
-                    ("TINY", FastSerializer.VOLTTYPE_TINYINT),
-                    ("SMALL", FastSerializer.VOLTTYPE_SMALLINT),
-                    ("BIG", FastSerializer.VOLTTYPE_BIGINT)),
-        "partitions": (),
-        "indexes": ("ID")
-        },
-    "MATP1": {
-        "columns": (("BIG", FastSerializer.VOLTTYPE_BIGINT),
+                    ("BIG", FastSerializer.VOLTTYPE_BIGINT),
                     ("NUM", FastSerializer.VOLTTYPE_BIGINT),
-                    ("IDCOUNT", FastSerializer.VOLTTYPE_BIGINT),
                     ("TINYCOUNT", FastSerializer.VOLTTYPE_BIGINT),
                     ("SMALLCOUNT", FastSerializer.VOLTTYPE_BIGINT),
                     ("BIGCOUNT", FastSerializer.VOLTTYPE_BIGINT),
                     ("TINYSUM", FastSerializer.VOLTTYPE_BIGINT),
-                    ("SMALLSUM", FastSerializer.VOLTTYPE_BIGINT)),
-        "partitions": (),
-        "indexes": ()
-        },
-    "R1": {
+                    ("SMALLSUM", FastSerializer.VOLTTYPE_BIGINT),
+        ),
+    },
+    "R_MATVIEW": {
         "columns": (("ID", FastSerializer.VOLTTYPE_INTEGER),
-                    ("TINY", FastSerializer.VOLTTYPE_TINYINT),
-                    ("SMALL", FastSerializer.VOLTTYPE_SMALLINT),
-                    ("BIG", FastSerializer.VOLTTYPE_BIGINT)),
-        "partitions": (),
-        "indexes": ("ID")
-        },
-    "MATR1": {
-        "columns": (("BIG", FastSerializer.VOLTTYPE_BIGINT),
+                    ("BIG", FastSerializer.VOLTTYPE_BIGINT),
                     ("NUM", FastSerializer.VOLTTYPE_BIGINT),
+                    ("TINYCOUNT", FastSerializer.VOLTTYPE_BIGINT),
+                    ("SMALLCOUNT", FastSerializer.VOLTTYPE_BIGINT),
+                    ("BIGCOUNT", FastSerializer.VOLTTYPE_BIGINT),
                     ("TINYSUM", FastSerializer.VOLTTYPE_BIGINT),
-                    ("SMALLSUM", FastSerializer.VOLTTYPE_BIGINT)),
-        "partitions": (),
-        "indexes": ()
-        }
-    }
+                    ("SMALLSUM", FastSerializer.VOLTTYPE_BIGINT),
+        ),
+    },
+}

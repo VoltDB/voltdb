@@ -30,10 +30,17 @@ import org.voltdb.VoltTable;
 
 @ProcInfo(singlePartition = false)
 public class OrderByOneIndex extends VoltProcedure {
-    public final SQLStmt select = new SQLStmt("select * from O3 where PK1=3 and I4>=5 order by I3 desc limit 3;");
+    public final SQLStmt select =
+            new SQLStmt("select * from O3 where PK1=3 and I4>=5 order by I3 desc limit 3;");
+    public final SQLStmt select_silly = // sort desc then asc by the same column should change nothing
+            new SQLStmt("select * from O3 where PK1=3 and I4>=5 order by I3 desc, I3 limit 3;");
 
-    public VoltTable[] run() {
-        voltQueueSQL(select);
+    public VoltTable[] run(int testSillyCase) {
+        if (testSillyCase == 0) {
+            voltQueueSQL(select);
+        } else {
+            voltQueueSQL(select_silly);
+        }
         return voltExecuteSQL();
     }
 }

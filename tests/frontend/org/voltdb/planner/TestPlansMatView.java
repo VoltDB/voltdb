@@ -77,10 +77,11 @@ public class TestPlansMatView extends PlannerTestCase {
 
     public void testMultipartitionedMatView()
     {
-        List<AbstractPlanNode> pns = compileToFragments("SELECT V_D1 FROM VNP WHERE V_D2 = 1;");
-        System.out.println(pns.get(0).toExplainPlanString());
-        assertEquals(2, pns.size());
-        System.out.println(pns.get(1).toExplainPlanString());
+        // Add support for Where in ENG-5177
+//        List<AbstractPlanNode> pns = compileToFragments("SELECT V_D1 FROM VNP WHERE V_D2 = 1;");
+//        System.out.println(pns.get(0).toExplainPlanString());
+//        assertEquals(2, pns.size());
+//        System.out.println(pns.get(1).toExplainPlanString());
     }
 
     public void testReplicatedMatView()
@@ -132,6 +133,35 @@ public class TestPlansMatView extends PlannerTestCase {
         assertTrue(explainedFragment.contains(" using \"ENG4826_VP_ALT_ORDER\""));
 
         // TODO: gloves-off MP testing of VP
+    }
+
+    public void testMinMaxMatViews() {
+        System.out.println("Running testMinMaxMatViews:");
+        List<AbstractPlanNode> pns;
+
+        pns = compileToFragments("SELECT * FROM VPM WHERE V_D1 = 1");
+        assertEquals(2, pns.size());
+        System.out.println(pns.get(0).toExplainPlanString());
+        System.out.println(pns.get(1).toExplainPlanString());
+
+        pns = compileToFragments("SELECT * FROM VPM WHERE V_D2 = 1");
+        assertEquals(2, pns.size());
+        System.out.println(pns.get(0).toExplainPlanString());
+        System.out.println(pns.get(1).toExplainPlanString());
+
+        pns = compileToFragments("SELECT * FROM VRM WHERE V_D1 = 1");
+        assertEquals(1, pns.size());
+        System.out.println(pns.get(0).toExplainPlanString());
+
+        pns = compileToFragments("SELECT * FROM VRM WHERE V_D2 = 1");
+        assertEquals(1, pns.size());
+        System.out.println(pns.get(0).toExplainPlanString());
+
+        pns = compileToFragments("SELECT * FROM VPM, VRM WHERE VPM.V_D2 = VRM.V_D1");
+        assertEquals(2, pns.size());
+        System.out.println(pns.get(0).toExplainPlanString());
+        System.out.println(pns.get(1).toExplainPlanString());
+
     }
 
 }

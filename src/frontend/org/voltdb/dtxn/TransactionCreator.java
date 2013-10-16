@@ -32,7 +32,7 @@ public interface TransactionCreator
             boolean isReadOnly,
             boolean isSinglePartition,
             boolean isEverySite,
-            int partitions[],
+            int partition,
             int messageSize,
             long now);
 
@@ -45,12 +45,9 @@ public interface TransactionCreator
             boolean isReadOnly,
             boolean isSinglePartition,
             boolean isEverySite,
-            int partitions[],
+            int partition,
             int messageSize,
             long now);
-
-    public void setSendHeartbeats(boolean val);
-    public void sendHeartbeat(long txnId);
 
     /*
      * Only used in IV2. Send a marker for the position of a multi-part transaction in
@@ -67,12 +64,6 @@ public interface TransactionCreator
      * @param partitionId
      */
     public void sendEOLMessage(int partitionId);
-
-    /**
-     * Whether or not the initiator is on back pressure.
-     * @return
-     */
-    public abstract boolean isOnBackPressure();
 
     public abstract void bindAdapter(Connection adapter);
 }

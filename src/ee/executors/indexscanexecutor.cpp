@@ -392,14 +392,21 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             // find the entry whose key is greater than search key,
             // do a forward scan using initialExpr to find the correct
             // start point to do reverse scan
-            m_index->moveToGreaterThanKey(&m_searchKey);
-            while (!(m_tuple = m_index->nextValue()).isNullTuple()) {
-                if (initial_expression != NULL && initial_expression->eval(&m_tuple, NULL).isFalse()) {
-                    break;
+            bool isEnd = m_index->moveToGreaterThanKey(&m_searchKey);
+            if (isEnd) {
+                m_index->moveToEnd(false);
+            } else {
+                while (!(m_tuple = m_index->nextValue()).isNullTuple()) {
+                    if (initial_expression != NULL && initial_expression->eval(&m_tuple, NULL).isFalse()) {
+                        // just passed the first failed entry, so move 2 backward
+                        m_index->moveToBeforePriorEntry();
+                        break;
+                    }
+                }
+                if (m_tuple.isNullTuple()) {
+                    m_index->moveToEnd(false);
                 }
             }
-            // just passed the first failed entry, so move 2 backward
-            m_index->moveToBeforePriorEntry();
         }
         else {
             return false;

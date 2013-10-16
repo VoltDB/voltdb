@@ -118,7 +118,7 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
     }
 
     public void addDefaultExport() {
-        addExport("org.voltdb.export.processors.RawProcessor", true, null);
+        addExport(true /* enabled */);
 
         /* Fixed after the loader completes. */
         // setTableAsExportOnly("WAREHOUSE");

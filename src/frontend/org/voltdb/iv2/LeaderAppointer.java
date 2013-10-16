@@ -312,18 +312,21 @@ public class LeaderAppointer implements Promotable
         // Crank up the leader caches.  Use blocking startup so that we'll have valid point-in-time caches later.
         m_iv2appointees.start(true);
         m_iv2masters.start(true);
+        ImmutableMap<Integer, Long> appointees = m_iv2appointees.pointInTimeCache();
         // Figure out what conditions we assumed leadership under.
-        if (m_iv2appointees.pointInTimeCache().size() == 0)
+        if (appointees.size() == 0)
         {
             tmLog.debug("LeaderAppointer in startup");
             m_state.set(AppointerState.CLUSTER_START);
         }
         else if (m_state.get() == AppointerState.INIT) {
+            ImmutableMap<Integer, Long> masters = m_iv2masters.pointInTimeCache();
             try {
-                if ((m_iv2appointees.pointInTimeCache().size() != getInitialPartitionCount()) ||
-                        (m_iv2masters.pointInTimeCache().size() != getInitialPartitionCount())) {
+                if ((appointees.size() < getInitialPartitionCount()) ||
+                    (masters.size() < getInitialPartitionCount()) ||
+                    (appointees.size() != masters.size())) {
                     // If we are promoted and the appointees or masters set is partial, the previous appointer failed
-                    // during startup (at least for now, until we add add/remove a partition on the fly).
+                    // during startup (at least for now, until we add remove a partition on the fly).
                     VoltDB.crashGlobalVoltDB("Detected failure during startup, unable to start", false, null);
                 }
             } catch (IllegalAccessException e) {
@@ -373,7 +376,7 @@ public class LeaderAppointer implements Promotable
             // call our callback, get the current full set of replicas, and
             // appoint a new leader if the seeded one has actually failed
             Map<Integer, Long> masters = m_iv2masters.pointInTimeCache();
-            tmLog.info("LeaderAppointer repairing with master set: " + masters);
+            tmLog.info("LeaderAppointer repairing with master set: " + CoreUtils.hsIdValueMapToString(masters));
             for (Entry<Integer, Long> master : masters.entrySet()) {
                 int partId = master.getKey();
                 String dir = LeaderElector.electionDirForPartition(partId);

@@ -26,10 +26,11 @@ import java.util.List;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper_voltpatches.Environment;
 import org.apache.zookeeper_voltpatches.Version;
+import org.voltcore.utils.CoreUtils;
 
 /**
  * Provide insight into the runtime environment.
- * 
+ *
  */
 public class Environment {
     public static class Entry {
@@ -63,12 +64,7 @@ public class Environment {
         ArrayList<Entry> l = new ArrayList<Entry>();
         put(l, "zookeeper.version", Version.getFullVersion());
 
-        try {
-            put(l, "host.name", InetAddress.getLocalHost()
-                    .getCanonicalHostName());
-        } catch (UnknownHostException e) {
-            put(l, "host.name", "<NA>");
-        }
+        put(l, "host.name", CoreUtils.getHostnameOrAddress());
 
         put(l, "java.version", System.getProperty("java.version", "<NA>"));
         put(l, "java.vendor", System.getProperty("java.vendor", "<NA>"));

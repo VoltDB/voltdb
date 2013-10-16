@@ -56,8 +56,8 @@ public class SaveRestoreBase extends RegressionSuite {
     @Override
     public void tearDown() throws Exception
     {
-        deleteTestFiles();
         super.tearDown();
+        deleteTestFiles();
     }
 
     private void deleteRecursively(File f) {
@@ -65,9 +65,24 @@ public class SaveRestoreBase extends RegressionSuite {
             for (File f2 : f.listFiles()) {
                 deleteRecursively(f2);
             }
-            assertTrue(f.delete());
+            boolean deleted = f.delete();
+            if (!deleted) {
+                if (!f.exists()) return;
+                System.err.println("Couldn't delete " + f.getPath());
+                System.err.println("Remaining files are:");
+                for (File f2 : f.listFiles()) {
+                    System.err.println("    " + f2.getPath());
+                }
+                //Recurse until stack overflow trying to delete, y not rite?
+                deleteRecursively(f);
+            }
         } else  {
-            assertTrue(f.delete());
+            boolean deleted = f.delete();
+            if (!deleted) {
+                if (!f.exists()) return;
+                System.err.println("Couldn't delete " + f.getPath());
+            }
+            assertTrue(deleted);
         }
     }
 

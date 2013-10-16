@@ -33,7 +33,7 @@ function clean() {
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -target 1.6 -source 1.6 -classpath $APPCLASSPATH:gson-2.2.2.jar -d obj \
+    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH:gson-2.2.2.jar -d obj \
         src/json/*.java \
         src/json/procedures/*.java
     # stop if compilation fails

@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.util.List;
+import java.util.Map;
 
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
@@ -31,7 +32,7 @@ import org.voltdb.CommandLog;
  */
 public interface InitiatorMessageHandler
 {
-    void updateReplicas(List<Long> replicas);
+    void updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters);
 
     void setCommandLog(CommandLog cl);
     void setMailbox(Mailbox mailbox);

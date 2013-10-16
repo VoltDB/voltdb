@@ -944,7 +944,7 @@ Apache Cassandra GCInspector.java, MumurHash.java
 // domain. The author hereby disclaims copyright to this source code.
 
 ================================================================================
-Guava 12.0
+Guava 15.0
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -1065,6 +1065,16 @@ emma_ant
  * the terms of the Common Public License v1.0 which accompanies this distribution,
  * and is available at http://www.eclipse.org/legal/cpl-v10.html
  */
+
+================================================================================
+gradle-wrapper.jar
+
+The License is accompanied by a NOTICE
+   =========================================================================
+   ==  NOTICE file corresponding to the section 4 d of                    ==
+   ==  the Apache License, Version 2.0,                                   ==
+   ==  in this case for the Gradle distribution.                          ==
+   =========================================================================
 
 ================================================================================
 japex

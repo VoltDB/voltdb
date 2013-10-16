@@ -102,7 +102,7 @@ public class TestJoinOrder extends PlannerTestCase {
                 n = n.getChild(0);
             }
             assertTrue(joinOrder[i].equals(s.getTargetTableName()));
-         }
+        }
 
         try {
             compileWithInvalidJoinOrder("select * FROM T1, T2, T3 LEFT JOIN T4 ON T3.C = T4.D LEFT JOIN T5 ON T3.C = T5.E, T6,T7",

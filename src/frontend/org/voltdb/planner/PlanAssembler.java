@@ -41,6 +41,8 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.ParsedSelectStmt.MVFixInfo;
+import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -62,6 +64,7 @@ import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.types.IndexType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 import org.voltdb.utils.CatalogUtil;
@@ -532,15 +535,29 @@ public class PlanAssembler {
             }
         }
 
-
-        if (root instanceof ReceivePlanNode && m_parsedSelect.mayNeedAvgPushdown()) {
-            m_parsedSelect.switchOptimalSuite();
+        if (root instanceof ReceivePlanNode) {
+            if (m_parsedSelect.mayNeedAvgPushdown()) {
+                m_parsedSelect.switchOptimalSuiteForAvgPushdown();
+            }
+        } else {
+            m_parsedSelect.mvFixInfo.needed = false;
         }
+
 
         /*
          * Establish the output columns for the sub select plan.
          */
         root = handleAggregationOperators(root);
+
+        // Process the re-aggregate plan node and insert it into the plan.
+        boolean mvFixNeedsProjection = false;
+        if (m_parsedSelect.mvFixInfo.needed) {
+            AbstractPlanNode tmpRoot = root;
+            root = handleMVBasedMultiPartQuery(root);
+            if (root != tmpRoot) {
+                mvFixNeedsProjection = true;
+            }
+        }
 
         if (m_parsedSelect.hasComplexAgg()) {
             AbstractPlanNode aggNode = root.getChild(0);
@@ -552,7 +569,7 @@ public class PlanAssembler {
             root = handleOrderBy(root);
         }
 
-        if (needProjectionNode(root)) {
+        if (mvFixNeedsProjection || needProjectionNode(root)) {
             root = addProjection(root);
         }
 
@@ -565,7 +582,7 @@ public class PlanAssembler {
     }
 
     private boolean needProjectionNode (AbstractPlanNode root) {
-        if ((root.getPlanNodeType() == PlanNodeType.AGGREGATE) ||
+        if ( (root.getPlanNodeType() == PlanNodeType.AGGREGATE) ||
                 (root.getPlanNodeType() == PlanNodeType.HASHAGGREGATE) ||
                 (root.getPlanNodeType() == PlanNodeType.DISTINCT) ||
                 (root.getPlanNodeType() == PlanNodeType.PROJECTION)) {
@@ -583,7 +600,6 @@ public class PlanAssembler {
         }
         // TODO(XIN): Maybe we can remove this projection node for more cases
         // as optimization in the future.
-
         return true;
     }
 
@@ -918,19 +934,9 @@ public class PlanAssembler {
 
         ProjectionPlanNode projectionNode =
             new ProjectionPlanNode();
-        NodeSchema proj_schema = new NodeSchema();
 
         // Build the output schema for the projection based on the display columns
-        for (ParsedSelectStmt.ParsedColInfo outputCol : m_parsedSelect.displayColumns)
-        {
-            assert(outputCol.expression != null);
-            SchemaColumn col = new SchemaColumn(outputCol.tableName,
-                                                outputCol.tableAlias,
-                                                outputCol.columnName,
-                                                outputCol.alias,
-                                                outputCol.expression);
-            proj_schema.addColumn(col);
-        }
+        NodeSchema proj_schema = m_parsedSelect.getFinalProjectionSchema();
         projectionNode.setOutputSchema(proj_schema);
 
         // if the projection can be done inline...
@@ -1028,12 +1034,10 @@ public class PlanAssembler {
                 if (jsonExpr.isEmpty()) {
                     for (ColumnRef cref : index.getColumns()) {
                         Column col = cref.getColumn();
+                        // Can not set table Alias here, only table name
                         TupleValueExpression tve = new TupleValueExpression(table.getTypeName(),
                                                                             col.getName(),
                                                                             col.getIndex());
-                        tve.setExpressionType(ExpressionType.VALUE_TUPLE);
-                        tve.setHasAggregate(false);
-                        // Can not set table Alias here, only table name
                         tve.setValueSize(col.getSize());
                         tve.setValueType(VoltType.get((byte) col.getType()));
                         indexExpressions.add(tve);
@@ -1042,7 +1046,7 @@ public class PlanAssembler {
                 // if this is a fancy expression-based index...
                 else {
                     try {
-                        indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, null);
+                        indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr);
                     } catch (JSONException e) {
                         e.printStackTrace(); // danger will robinson
                         assert(false);
@@ -1115,6 +1119,11 @@ public class PlanAssembler {
             }
         }
 
+        if (m_parsedSelect.mvFixInfo.needed) {
+            // Do not push down limit for mv based distributed query.
+            canPushDown = false;
+        }
+
         /*
          * Push down the limit plan node when possible even if offset is set. If
          * the plan is for a partitioned table, do the push down. Otherwise,
@@ -1180,6 +1189,45 @@ public class PlanAssembler {
         }
     }
 
+    AbstractPlanNode handleMVBasedMultiPartQuery (AbstractPlanNode root) {
+        MVFixInfo mvFixInfo = m_parsedSelect.mvFixInfo;
+
+        HashAggregatePlanNode reAggNode = new HashAggregatePlanNode(mvFixInfo.reAggNode);
+        reAggNode.clearChildren();
+        reAggNode.clearParents();
+
+        AbstractPlanNode receiveNode = root;
+        // Find receive plan node and insert the constructed re-aggregation plan node.
+        if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
+            reAggNode.addAndLinkChild(root);
+            root = reAggNode;
+        } else {
+            List<AbstractPlanNode> recList = root.findAllNodesOfType(PlanNodeType.RECEIVE);
+            assert(recList.size() == 1);
+            receiveNode = recList.get(0);
+
+            AbstractPlanNode parent = receiveNode.getParent(0);
+            receiveNode.clearParents();
+            parent.clearChildren();
+            reAggNode.addAndLinkChild(receiveNode);
+            parent.addAndLinkChild(reAggNode);
+        }
+
+        // Set up the scan plan node's scan columns
+        // Add inline projection node for scan node.
+        assert(receiveNode instanceof ReceivePlanNode);
+        AbstractPlanNode sendNode = receiveNode.getChild(0);
+        assert(sendNode instanceof SendPlanNode);
+        AbstractPlanNode sendNodeChild = sendNode.getChild(0);
+        List<AbstractScanPlanNode> scanList = sendNodeChild.getScanNodeList();
+        assert(scanList.size() == 1);
+        AbstractScanPlanNode scanNode = scanList.get(0);
+        assert(scanNode.getTargetTableName().equals(mvFixInfo.mvTable.getTypeName()));
+
+        scanNode.addInlinePlanNode(mvFixInfo.scanInlinedProjectionNode);
+        return root;
+    }
+
     AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
         AggregatePlanNode aggNode = null;
 
@@ -1191,7 +1239,21 @@ public class PlanAssembler {
          * expressions. Catch that case by checking the grouped flag
          */
         if (containsAggregateExpression || m_parsedSelect.isGrouped()) {
-            AggregatePlanNode topAggNode;
+            AggregatePlanNode topAggNode = null;
+            if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
+                AbstractPlanNode candidate = root.getChild(0).getChild(0);
+                // do the type check here, no need to find substitute if it is already an IndexScan node
+                if (candidate.getPlanNodeType() == PlanNodeType.SEQSCAN) {
+                    candidate = indexAccessForGroupByExprs(candidate);
+                    if (candidate.getPlanNodeType() == PlanNodeType.INDEXSCAN) {
+                        candidate.clearParents();
+                        root.getChild(0).clearChildren();
+                        root.getChild(0).addAndLinkChild(candidate);
+                    }
+                }
+            } else {
+                root = indexAccessForGroupByExprs(root);
+            }
             // A hash is required to build up per-group aggregates in parallel vs.
             // when there is only one aggregation over the entire table OR when the
             // per-group aggregates are being built serially from the ordered output
@@ -1212,14 +1274,19 @@ public class PlanAssembler {
             // This is the less ambitious aspect of issue ENG-4096. The more ambitious aspect
             // is that the ability to by-pass use of the hash could actually motivate selection of
             // a compatible index scan, even when one would not be motivated by a WHERE or ORDER BY clause.
+
             if (m_parsedSelect.isGrouped() &&
                 (root.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
                  ((IndexScanPlanNode) root).getSortDirection() == SortDirectionType.INVALID)) {
                 aggNode = new HashAggregatePlanNode();
-                topAggNode = new HashAggregatePlanNode();
+                if (!m_parsedSelect.mvFixInfo.needed) {
+                    topAggNode = new HashAggregatePlanNode();
+                }
             } else {
                 aggNode = new AggregatePlanNode();
-                topAggNode = new AggregatePlanNode();
+                if (!m_parsedSelect.mvFixInfo.needed) {
+                    topAggNode = new AggregatePlanNode();
+                }
             }
 
             int outputColumnIndex = 0;
@@ -1284,6 +1351,7 @@ public class PlanAssembler {
                                 top_expression_type = ExpressionType.AGGREGATE_SUM;
                             }
                         }
+
                         /*
                          * For min() and max(), the pushed-down aggregate node
                          * doesn't change. An extra aggregate node of the same
@@ -1339,12 +1407,6 @@ public class PlanAssembler {
             }
 
             for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.groupByColumns) {
-                if (agg_schema.find(col.tableName, col.tableAlias, col.columnName, col.alias) == null) {
-                    throw new PlanningErrorException("GROUP BY column " + col.alias +
-                                                     " is not in the display columns." +
-                                                     " Please specify " + col.alias +
-                                                     " as a display column.");
-                }
                 aggNode.addGroupByExpression(col.expression);
 
                 if (topAggNode != null) {
@@ -1361,8 +1423,10 @@ public class PlanAssembler {
 
             }
 
-            NodeSchema newSchema = m_parsedSelect.getNewSchema();
+            NodeSchema newSchema = m_parsedSelect.getFinalProjectionSchema();
+            // Never push down aggregation for MV fix case.
             root = pushDownAggregate(root, aggNode, topAggNode, m_parsedSelect.hasComplexAgg(), newSchema);
+
         }
 
         if (m_parsedSelect.isGrouped()) {
@@ -1378,6 +1442,84 @@ public class PlanAssembler {
 
         // Handle DISTINCT if it is not redundant with aggregation/grouping.
         return handleDistinct(root);
+    }
+
+    AbstractPlanNode indexAccessForGroupByExprs(AbstractPlanNode root) {
+        if (root.getPlanNodeType() == PlanNodeType.SEQSCAN && m_parsedSelect.isGrouped()) {
+            Table targetTable = m_catalogDb.getTables().get(((SeqScanPlanNode)root).getTargetTableName());
+            CatalogMap<Index> allIndexes = targetTable.getIndexes();
+            ArrayList<ParsedColInfo> groupBys = m_parsedSelect.groupByColumns;
+
+            for (Index index : allIndexes) {
+                if (!IndexType.isScannable(index.getType())) {
+                    continue;
+                }
+
+                boolean replacable = true;
+                String exprsjson = index.getExpressionsjson();
+                if (exprsjson.isEmpty()) {
+                    List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
+                    if (groupBys.size() > indexedColRefs.size()) {
+                        continue;
+                    }
+                    for (int i = 0; i < groupBys.size(); i++) {
+                        // don't compare column idx here, because resolveColumnIndex is not yet called
+                        if (groupBys.get(i).expression.getExpressionType() != ExpressionType.VALUE_TUPLE) {
+                            replacable = false;
+                            break;
+                        }
+                        // ignore order of keys in GROUP BY expr
+                        boolean foundMatch = false;
+                        for (int j = 0; j < groupBys.size(); j++) {
+                            if (indexedColRefs.get(j).getColumn().getName().equals(groupBys.get(i).columnName)) {
+                                foundMatch = true;
+                                break;
+                            }
+                        }
+                        if (!foundMatch) {
+                            replacable = false;
+                            break;
+                        }
+                    }
+                    if (replacable) {
+                        IndexScanPlanNode indexScanNode = new IndexScanPlanNode((SeqScanPlanNode)root, null, index, SortDirectionType.ASC);
+                        return indexScanNode;
+                    }
+                } else {
+                    // either pure expression index or mix of expressions and simple columns
+                    List<AbstractExpression> indexedExprs = null;
+                    try {
+                        indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson);
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                        assert(false);
+                        return root;
+                    }
+                    if (groupBys.size() > indexedExprs.size()) {
+                        continue;
+                    }
+                    for (int i = 0; i < groupBys.size(); i++) {
+                        // ignore order of keys in GROUP BY expr
+                        boolean foundMatch = false;
+                        for (int j = 0; j < groupBys.size(); j++) {
+                            if (groupBys.get(i).expression.equals(indexedExprs.get(j))) {
+                                foundMatch = true;
+                                break;
+                            }
+                        }
+                        if (!foundMatch) {
+                            replacable = false;
+                            break;
+                        }
+                    }
+                    if (replacable) {
+                        IndexScanPlanNode indexScanNode = new IndexScanPlanNode((SeqScanPlanNode)root, null, index, SortDirectionType.ASC);
+                        return indexScanNode;
+                    }
+                }
+            }
+        }
+        return root;
     }
 
     /**

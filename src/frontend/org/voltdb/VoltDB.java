@@ -24,10 +24,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -50,6 +48,7 @@ public class VoltDB {
     public static final int DEFAULT_ADMIN_PORT = 21211;
     public static final int DEFAULT_INTERNAL_PORT = 3021;
     public static final int DEFAULT_ZK_PORT = 2181;
+    public static final int DEFAULT_IPC_PORT = 10000;
     public static final String DEFAULT_EXTERNAL_INTERFACE = "";
     public static final String DEFAULT_INTERNAL_INTERFACE = "";
     public static final int DEFAULT_DR_PORT = 5555;
@@ -57,27 +56,6 @@ public class VoltDB {
     public static final int INITIATOR_SITE_ID = 0;
     public static final int SITES_TO_HOST_DIVISOR = 100;
     public static final int MAX_SITES_PER_HOST = 128;
-
-    // Utility to calculate whether Iv2 is enabled or not for test cases.
-    // There are several ways to enable Iv2, of course. Ideally, use a cluster
-    // command line flag (enableiv2). Second best, use the VOLT_ENABLEIV2
-    // environment variable.
-    //
-    // IMPORTANT: To determine if Iv2 is enabled at runtime,
-    // call RealVoltDB.isIV2Enabled();
-    public static boolean checkTestEnvForIv2()
-    {
-        String iv2 = System.getenv().get("VOLT_ENABLEIV2");
-        if (iv2 == null) {
-            iv2 = System.getProperty("VOLT_ENABLEIV2");
-        }
-        if (iv2 != null && iv2.equalsIgnoreCase("false")) {
-            return false;
-        }
-        else {
-            return true;
-        }
-    }
 
     // Utility to try to figure out if this is a test case.  Various junit targets in
     // build.xml set this environment variable to give us a hint
@@ -97,11 +75,6 @@ public class VoltDB {
 
     // The name of the SQLStmt implied by a statement procedure's sql statement.
     public static final String ANON_STMT_NAME = "sql";
-
-    public static boolean createForRejoin(StartAction startAction)
-    {
-        return startAction.doesRejoin();
-    }
 
     //The GMT time zone you know and love
     public static final TimeZone GMT_TIMEZONE = TimeZone.getTimeZone("GMT+0");
@@ -130,7 +103,7 @@ public class VoltDB {
     /** Encapsulates VoltDB configuration parameters */
     public static class Configuration {
 
-        public List<Integer> m_ipcPorts = Collections.synchronizedList(new LinkedList<Integer>());
+        public int m_ipcPort = DEFAULT_IPC_PORT;
 
         protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
@@ -218,16 +191,12 @@ public class VoltDB {
         /** true if we're running the rejoin tests. Not used in production. */
         public boolean m_isRejoinTest = false;
 
-        /** set to true to run with iv2 initiation. Good Luck! */
-        public boolean m_enableIV2 = true;
-
         public final Queue<String> m_networkCoreBindings = new ArrayDeque<String>();
         public final Queue<String> m_computationCoreBindings = new ArrayDeque<String>();
         public final Queue<String> m_executionCoreBindings = new ArrayDeque<String>();
         public String m_commandLogBinding = null;
 
         public Configuration() {
-            m_enableIV2 = VoltDB.checkTestEnvForIv2();
             // Set start action create.  The cmd line validates that an action is specified, however,
             // defaulting it to create for local cluster test scripts
             m_startAction = StartAction.CREATE;
@@ -243,7 +212,6 @@ public class VoltDB {
         public Configuration(PortGenerator ports) {
             // Default iv2 configuration to the environment settings.
             // Let explicit command line override the environment.
-            m_enableIV2 = VoltDB.checkTestEnvForIv2();
             m_port = ports.nextClient();
             m_adminPort = ports.nextAdmin();
             m_internalPort = ports.next();
@@ -255,9 +223,6 @@ public class VoltDB {
 
         public Configuration(String args[]) {
             String arg;
-
-            // let the command line override the environment setting for enable iv2.
-            m_enableIV2 = VoltDB.checkTestEnvForIv2();
 
             for (int i=0; i < args.length; ++i) {
                 arg = args[i];
@@ -429,14 +394,11 @@ public class VoltDB {
                     m_pathToDeployment = args[++i];
                 } else if (arg.equals("license")) {
                     m_pathToLicense = args[++i];
-                } else if (arg.equalsIgnoreCase("ipcports")) {
-                    String portList = args[++i];
-                    String ports[] = portList.split(",");
-                    for (String port : ports) {
-                        m_ipcPorts.add(Integer.valueOf(port));
-                    }
+                } else if (arg.equalsIgnoreCase("ipcport")) {
+                    String portStr = args[++i];
+                    m_ipcPort = Integer.valueOf(portStr);
                 } else if (arg.equals("enableiv2")) {
-                    m_enableIV2 = true;
+                    // noop because IV2 is always on now
                 } else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     usage();
@@ -447,10 +409,10 @@ public class VoltDB {
             // If no action is specified, issue an error.
             if (null == m_startAction) {
                 if (org.voltdb.utils.MiscUtils.isPro()) {
-                    hostLog.fatal("You must specify a startup action, either create, recover, replica, rejoin, or compile.");
+                    hostLog.fatal("You must specify a startup action, either create, recover, replica, rejoin, collect, or compile.");
                 } else
                 {
-                    hostLog.fatal("You must specify a startup action, either create, recover, rejoin, or compile.");
+                    hostLog.fatal("You must specify a startup action, either create, recover, rejoin, collect, or compile.");
                 }
                 usage();
                 System.exit(-1);
@@ -499,14 +461,6 @@ public class VoltDB {
                 hostLog.fatal("The hostname is missing.");
             }
 
-            if (m_backend.isIPC) {
-                if (m_ipcPorts.isEmpty()) {
-                    isValid = false;
-                    hostLog.fatal("Specified an IPC backend but did not supply a , " +
-                            " separated list of ports via ipcports param");
-                }
-            }
-
             // require deployment file location
             if (m_startAction != StartAction.REJOIN && m_startAction != StartAction.LIVE_REJOIN
                     && m_startAction != StartAction.JOIN) {
@@ -552,12 +506,14 @@ public class VoltDB {
                 message = "Usage: voltdb create catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
                         + "       voltdb replica catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml> \n"
                         + "       voltdb recover [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
-                        + "       voltdb [live] rejoin host <hostname>\n";
+                        + "       voltdb [live] rejoin host <hostname>\n"
+                        + "       voltdb add host <hostname>\n";
             } else {
                 message = "Usage: voltdb create  catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>]\n"
                         + "       voltdb recover [host <hostname>] [deployment <deployment.xml>]\n"
                         + "       voltdb rejoin host <hostname>\n";
             }
+            message += "       voltdb collect [<option> ...] <path-to-voltdbroot> (run voltdb collect -h for more details)\n";
             message += "       voltdb compile [<option> ...] [<ddl-file> ...]  (run voltdb compile -h for more details)\n";
             os.print(message);
             // Log it to log4j as well, which will capture the output to a file for (hopefully never) cases where VEM has issues (it generates command lines).

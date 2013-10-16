@@ -29,6 +29,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
@@ -42,7 +43,6 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 import com.google.common.base.Charsets;
@@ -1086,12 +1086,17 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateTableStream(int tableId, TableStreamType streamType, SnapshotPredicates predicates) {
+    public boolean activateTableStream(
+            int tableId,
+            TableStreamType streamType,
+            long undoQuantumToken,
+            byte[] predicates) {
         m_data.clear();
         m_data.putInt(Commands.ActivateTableStream.m_id);
         m_data.putInt(tableId);
         m_data.putInt(streamType.ordinal());
-        m_data.put(predicates.toBytes()); // predicates
+        m_data.putLong(undoQuantumToken);
+        m_data.put(predicates); // predicates
 
         try {
             m_data.flip();
@@ -1116,8 +1121,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public int[] tableStreamSerializeMore(int tableId, TableStreamType streamType,
-                                          List<BBContainer> outputBuffers) {
+    public Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType streamType,
+                                                      List<BBContainer> outputBuffers) {
         try {
             m_data.clear();
             m_data.putInt(Commands.TableStreamSerializeMore.m_id);
@@ -1153,13 +1158,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             remainingBuffer.flip();
             final long remaining = remainingBuffer.getLong();
 
-            /*
-             * Error or no more tuple data for this table.
-             */
-            if (remaining == -1 || remaining == -2) {
-                return new int[] {(int) remaining + 1};
-            }
-
             final int[] serialized = new int[count];
             for (int i = 0; i < count; i++) {
                 ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
@@ -1179,7 +1177,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 }
             }
 
-            return serialized;
+            return Pair.of(remaining, serialized);
         } catch (final IOException e) {
             System.out.println("Exception: " + e.getMessage());
             throw new RuntimeException(e);

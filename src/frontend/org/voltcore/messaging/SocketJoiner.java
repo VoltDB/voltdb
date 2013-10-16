@@ -44,7 +44,9 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.network.ReverseDNSCache;
 import org.voltdb.VoltDB;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * SocketJoiner runs all the time listening for new nodes in the cluster. Since it is a dedicated thread
@@ -134,13 +136,14 @@ public class SocketJoiner {
             // if an internal interface was specified, see if it matches any
             // of the forms of the leader address we've bound to.
             if (m_internalInterface != null && !m_internalInterface.equals("")) {
-                if (!m_internalInterface.equals(m_coordIp.getHostName()) &&
+                if (!m_internalInterface.equals(ReverseDNSCache.hostnameOrAddress(m_coordIp.getAddress())) &&
                     !m_internalInterface.equals(m_coordIp.getAddress().getCanonicalHostName()) &&
                     !m_internalInterface.equals(m_coordIp.getAddress().getHostAddress()))
                 {
                     String msg = "The provided internal interface (" + m_internalInterface +
                     ") does not match the specified leader address (" +
-                    m_coordIp.getHostName() + ", " + m_coordIp.getAddress().getHostAddress() +
+                     ReverseDNSCache.hostnameOrAddress(m_coordIp.getAddress()) +
+                    ", " + m_coordIp.getAddress().getHostAddress() +
                     "). This will result in either a cluster which fails to start" +
                     " or an unintended network topology. The leader will now exit;" +
                     " correct your specified leader and interface and try restarting.";
@@ -187,7 +190,7 @@ public class SocketJoiner {
                 } catch (InterruptedException e) {
 
                 } catch (Throwable e) {
-                    org.voltdb.VoltDB.crashLocalVoltDB("Error in socket joiner run loop", false, e);
+                    org.voltdb.VoltDB.crashLocalVoltDB("Error in socket joiner run loop", true, e);
                 }
             }
         });
@@ -248,6 +251,7 @@ public class SocketJoiner {
              */
             if (m_listenerSockets.isEmpty()) {
                 LOG.fatal("Failed to bind to " + inetsockaddr);
+                MiscUtils.printPortsInUse(hostLog);
                 throw e;
             }
         }

@@ -42,20 +42,22 @@ public class AdHocMayhemThread extends Thread {
     Random r = new Random(0);
     long counter = 0;
     final Client client;
+    final float mpRatio;
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
     final AtomicBoolean m_needsBlock = new AtomicBoolean(false);
     final Semaphore txnsOutstanding = new Semaphore(100);
 
-    public AdHocMayhemThread(Client client) {
+    public AdHocMayhemThread(Client client, float mpRatio) {
         setName("AdHocMayhemThread");
 
         this.client = client;
+        this.mpRatio = mpRatio;
     }
 
     private String nextAdHoc() {
 
-        // 1/5 of all adhocs are MP
-        boolean replicated = (counter % 5) == 0;
+        // mpRatio % of all adhocs are MP
+        boolean replicated = (counter % 100) < (this.mpRatio * 100.);
         boolean batched = (counter % 11) == 0;
 
         // batched statements can go rw, wr or ww

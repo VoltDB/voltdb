@@ -67,8 +67,6 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Group;
-import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Procedure;
@@ -125,9 +123,11 @@ public class VoltCompiler {
     String m_jarOutputPath = null;
     String m_currentFilename = null;
     Map<String, String> m_ddlFilePaths = new HashMap<String, String>();
+    String[] m_addedClasses = null;
 
     // generated html text for catalog report
     String m_report = null;
+    String m_reportPath = null;
 
     InMemoryJarfile m_jarOutput = null;
     Catalog m_catalog = null;
@@ -566,11 +566,12 @@ public class VoltCompiler {
 
         // generate the catalog report and write it to disk
         try {
-            m_report = ReportMaker.report(m_catalog);
+            m_report = ReportMaker.report(m_catalog, m_warnings);
             File file = new File("catalog-report.html");
             FileWriter fw = new FileWriter(file);
             fw.write(m_report);
             fw.close();
+            m_reportPath = file.getAbsolutePath();
         } catch (IOException e) {
             e.printStackTrace();
             return null;
@@ -822,7 +823,7 @@ public class VoltCompiler {
                     // if this is a fancy expression-based index...
                     else {
                         try {
-                            List<AbstractExpression> indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, null);
+                            List<AbstractExpression> indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr);
                             for (AbstractExpression expr: indexExpressions) {
                                 if (expr instanceof TupleValueExpression &&
                                         ((TupleValueExpression) expr).getColumnName().equals(c.getName()) ) {
@@ -888,8 +889,38 @@ public class VoltCompiler {
             Collection<ProcedureDescriptor> allProcs = voltDdlTracker.getProcedureDescriptors();
             compileProcedures(db, hsql, allProcs, classDependencies, whichProcs);
         }
+
+        // add extra classes from the DDL
+        m_addedClasses = voltDdlTracker.m_extraClassses;
+        addExtraClasses();
     }
 
+    /**
+     * Once the DDL file is over, take all of the extra classes found and add them to the jar.
+     */
+    private void addExtraClasses() throws VoltCompilerException {
+
+        List<String> addedClasses = new ArrayList<String>();
+
+        for (String className : m_addedClasses) {
+            try {
+                Class<?> clz = Class.forName(className);
+
+                if (addClassToJar(clz)) {
+                    addedClasses.add(className);
+                }
+
+            } catch (Exception e) {
+                String msg = "Class %s could not be loaded/found/added to the jar. " +
+                             "";
+                msg = String.format(msg, className);
+                throw new VoltCompilerException(msg);
+            }
+
+            // reset the added classes to the actual added classes
+            m_addedClasses = addedClasses.toArray(new String[0]);
+        }
+    }
 
     /**
      * @param db the database entry in the catalog
@@ -1460,44 +1491,6 @@ public class VoltCompiler {
         return cls;
     }
 
-    void grantExportToGroup( final String groupName, final Database catdb)
-        throws VoltCompilerException
-    {
-        assert groupName != null && ! groupName.trim().isEmpty() && catdb != null;
-
-        // Catalog Connector
-        // Relying on schema's enforcement of at most 1 connector
-        org.voltdb.catalog.Connector catconn = catdb.getConnectors().getIgnoreCase("0");
-        if (catconn == null) {
-            catconn = catdb.getConnectors().add("0");
-        }
-
-        final Group group = catdb.getGroups().getIgnoreCase(groupName);
-        if (group == null) {
-            throw new VoltCompilerException("Export has a role " + groupName + " that does not exist");
-        }
-
-        GroupRef groupRef = catconn.getAuthgroups().getIgnoreCase(groupName);
-
-        if      (groupRef == null) {
-            groupRef = catconn.getAuthgroups().add(groupName);
-            groupRef.setGroup(group);
-        }
-        else if (groupRef.getGroup() == null) {
-                groupRef.setGroup(group);
-        }
-
-        if (groupRef.getGroup() != group) {
-            throw new VoltCompilerException(
-                    "Mismatched group reference found in export connector auth groups: " +
-                    "it references '" + groupRef.getGroup().getTypeName() +
-                    "(" + System.identityHashCode(groupRef.getGroup()) +") " +
-                    "', when it should reference '" + group.getTypeName() +
-                    "(" + System.identityHashCode(group) +")" +
-                    "' instead");
-        }
-    }
-
     private void compileExport(final ExportType export, final Database catdb)
         throws VoltCompilerException
     {
@@ -1517,20 +1510,6 @@ public class VoltCompiler {
         org.voltdb.catalog.Connector catconn = catdb.getConnectors().getIgnoreCase("0");
         if (catconn == null) {
             catconn = catdb.getConnectors().add("0");
-        }
-
-        // add authorized users and groups
-        final ArrayList<String> groupslist = new ArrayList<String>();
-
-        // @groups
-        if (export.getGroups() != null) {
-            for (String group : export.getGroups().split(",")) {
-                groupslist.add(group);
-            }
-        }
-
-        for (String groupName : groupslist) {
-            grantExportToGroup(groupName, catdb);
         }
 
         // Catalog Connector.ConnectorTableInfo
@@ -1739,6 +1718,23 @@ public class VoltCompiler {
             }
             outputStream.println("------------------------------------------\n");
 
+            if (m_addedClasses.length > 0) {
+
+                if (m_addedClasses.length > 10) {
+                    outputStream.printf("Added %d additional classes to the catalog jar.\n\n",
+                            m_addedClasses.length);
+                }
+                else {
+                    String logMsg = "Added the following additional classes to the catalog jar:\n";
+                    for (String className : m_addedClasses) {
+                        logMsg += "  " + className + "\n";
+                    }
+                    outputStream.println(logMsg);
+                }
+
+                outputStream.println("------------------------------------------\n");
+            }
+
             //
             // post-compile summary and legend.
             //
@@ -1798,6 +1794,9 @@ public class VoltCompiler {
                         "\thttp://voltdb.com/docs/UsingVoltDB/ChapAppDesign.php\n\n");
             }
             outputStream.println("------------------------------------------\n");
+            outputStream.println("Full catalog report can be found at file://" + m_reportPath + "\n" +
+                        "\t or can be viewed at \"http://localhost:8080\" when the server is running.\n");
+            outputStream.println("------------------------------------------\n");
         }
         if (feedbackStream != null) {
             for (Feedback fb : m_warnings) {
@@ -1836,11 +1835,15 @@ public class VoltCompiler {
     // this needs to be reset in the main compile func
     private static final HashSet<Class<?>> cachedAddedClasses = new HashSet<Class<?>>();
 
-    public void addClassToJar(final Class<?> cls)
+    /**
+     * Return true if the class was added. Return false if the class was already in the
+     * jar. Throw and exception if the class can't be added for another reason.
+     */
+    public boolean addClassToJar(final Class<?> cls)
     throws VoltCompiler.VoltCompilerException {
 
         if (cachedAddedClasses.contains(cls)) {
-            return;
+            return false;
         } else {
             cachedAddedClasses.add(cls);
         }
@@ -1883,7 +1886,7 @@ public class VoltCompiler {
             e.printStackTrace();
             System.exit(-1);
             // Prevent warning  about fis possibly being null below.
-            return;
+            return false;
         }
 
         assert(fileSize > 0);
@@ -1901,6 +1904,7 @@ public class VoltCompiler {
         }
 
         m_jarOutput.put(packagePath, fileBytes);
+        return true;
     }
 
     /**

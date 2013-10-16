@@ -155,6 +155,9 @@ public class Benchmark {
         @Option(desc = "Allow experimental in-procedure adhoc statments.")
         boolean allowinprocadhoc = false;
 
+        @Option(desc = "Allow set ratio of mp to sp workload.")
+        float mpratio = (float)0.20;
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -169,6 +172,7 @@ public class Benchmark {
             if (maxvaluesize <= 0) exitWithMessageAndUsage("maxvaluesize must be > 0");
             if (entropy <= 0) exitWithMessageAndUsage("entropy must be > 0");
             if (entropy > 127) exitWithMessageAndUsage("entropy must be <= 127");
+            if (mpratio < 0.0 || mpratio > 1.0) exitWithMessageAndUsage("mpRatio must be between 0.0 and 1.0");
         }
 
         @Override
@@ -460,25 +464,28 @@ public class Benchmark {
         log.info("Running benchmark...");
 
         BigTableLoader partitionedLoader = new BigTableLoader(client, "bigp",
-                (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize);
+                         (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50);
         partitionedLoader.start();
         BigTableLoader replicatedLoader = new BigTableLoader(client, "bigr",
-                (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize);
+                         (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3);
         replicatedLoader.start();
 
         ReadThread readThread = new ReadThread(client, config.threads, config.threadoffset,
-                config.allowinprocadhoc);
+                config.allowinprocadhoc, config.mpratio);
         readThread.start();
 
-        AdHocMayhemThread adHocMayhemThread = new AdHocMayhemThread(client);
+        AdHocMayhemThread adHocMayhemThread = new AdHocMayhemThread(client, config.mpratio);
         if (!config.disableadhoc) {
             adHocMayhemThread.start();
         }
 
+        InvokeDroppedProcedureThread idpt = new InvokeDroppedProcedureThread(client);
+        idpt.start();
+
         List<ClientThread> clientThreads = new ArrayList<ClientThread>();
         for (byte cid = (byte) config.threadoffset; cid < config.threadoffset + config.threads; cid++) {
             ClientThread clientThread = new ClientThread(cid, txnCount, client, processor, permits,
-                    config.allowinprocadhoc);
+                    config.allowinprocadhoc, config.mpratio);
             clientThread.start();
             clientThreads.add(clientThread);
         }
@@ -496,6 +503,7 @@ public class Benchmark {
         partitionedLoader.shutdown();
         readThread.shutdown();
         adHocMayhemThread.shutdown();
+        idpt.shutdown();
         for (ClientThread clientThread : clientThreads) {
             clientThread.shutdown();
         }
@@ -503,6 +511,7 @@ public class Benchmark {
         partitionedLoader.join();
         readThread.join();
         adHocMayhemThread.join();
+        idpt.join();
         for (ClientThread clientThread : clientThreads) {
             clientThread.join();
         }

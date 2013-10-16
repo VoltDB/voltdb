@@ -46,16 +46,18 @@ public class BigTableLoader extends Thread {
     final long targetCount;
     final String tableName;
     final int rowSize;
+    final int batchSize;
     final Random r = new Random(0);
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
 
-    BigTableLoader(Client client, String tableName, int targetCount, int rowSize) {
+    BigTableLoader(Client client, String tableName, int targetCount, int rowSize, int batchSize) {
         setName("BigTableLoader");
 
         this.client = client;
         this.tableName = tableName;
         this.targetCount = targetCount;
         this.rowSize = rowSize;
+        this.batchSize = batchSize;
 
         // make this run more than other threads
         setPriority(getPriority() + 1);
@@ -107,9 +109,9 @@ public class BigTableLoader extends Thread {
         try {
             long currentRowCount = getRowCount();
             while ((currentRowCount < targetCount) && (m_shouldContinue.get())) {
-                CountDownLatch latch = new CountDownLatch(25);
-                // try to insert 5 random rows
-                for (int i = 0; i < 25; i++) {
+                CountDownLatch latch = new CountDownLatch(batchSize);
+                // try to insert batchSize random rows
+                for (int i = 0; i < batchSize; i++) {
                     long p = Math.abs(r.nextLong());
                     client.callProcedure(new InsertCallback(latch), tableName.toUpperCase() + "TableInsert", p, data);
                 }

@@ -49,7 +49,9 @@
 #include <string>
 #include <vector>
 #include <cassert>
+#include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
+#include "common/types.h"
 #include "common/ids.h"
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
@@ -59,6 +61,8 @@
 #include "storage/PersistentTableStats.h"
 #include "storage/TableStreamerInterface.h"
 #include "storage/RecoveryContext.h"
+#include "storage/ElasticIndex.h"
+#include "storage/CopyOnWriteIterator.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
 
@@ -83,8 +87,80 @@ class MaterializedViewMetadata;
 class RecoveryProtoMsg;
 class TupleOutputStreamProcessor;
 class ReferenceSerializeInput;
-class ElasticScanner;
+class PersistentTable;
 
+/**
+ * Interface used by contexts, scanners, iterators, and undo actions to access
+ * normally-private stuff in PersistentTable.
+ * Holds persistent state produced by contexts, e.g. the elastic index.
+ */
+class PersistentTableSurgeon {
+    friend class PersistentTable;
+    friend class ::CopyOnWriteTest;
+
+public:
+
+    TBMap &getData();
+    void insertTupleForUndo(char *tuple);
+    void updateTupleForUndo(char* targetTupleToUpdate,
+                            char* sourceTupleWithNewValues,
+                            bool revertIndexes);
+    bool deleteTuple(TableTuple &tuple, bool fallible=true);
+    void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
+    void deleteTupleRelease(char* tuple);
+    void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
+    void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock);
+    uint32_t getTupleCount() const;
+
+    // Elastic index methods. Used by ElasticContext.
+    void clearIndex();
+    void createIndex();
+    void dropIndex();
+    bool hasIndex() const;
+    bool isIndexEmpty() const;
+    size_t indexSize() const;
+    bool isIndexingComplete() const;
+    void setIndexingComplete();
+    bool indexHas(TableTuple &tuple) const;
+    bool indexAdd(TableTuple &tuple);
+    bool indexRemove(TableTuple &tuple);
+    bool hasStreamType(TableStreamType streamType) const;
+    ElasticIndex::iterator indexIterator();
+    ElasticIndex::iterator indexIteratorLowerBound(int64_t lowerBound);
+    ElasticIndex::iterator indexIteratorUpperBound(int64_t upperBound);
+    ElasticIndex::const_iterator indexIterator() const;
+    ElasticIndex::const_iterator indexIteratorLowerBound(int64_t lowerBound) const;
+    ElasticIndex::const_iterator indexIteratorUpperBound(int64_t upperBound) const;
+    ElasticIndex::iterator indexEnd();
+    ElasticIndex::const_iterator indexEnd() const;
+    boost::shared_ptr<ElasticIndexTupleRangeIterator>
+            getIndexTupleRangeIterator(const ElasticIndexHashRange &range);
+    void activateSnapshot();
+
+private:
+
+    /**
+     * Only PersistentTable can call the constructor.
+     */
+    PersistentTableSurgeon(PersistentTable &table);
+
+    /**
+     * Only PersistentTable can call the destructor.
+     */
+    virtual ~PersistentTableSurgeon();
+
+    PersistentTable &m_table;
+
+    /**
+     * Elastic index.
+     */
+    boost::scoped_ptr<ElasticIndex> m_index;
+
+    /**
+     * Set to true after handleStreamMore() was called once after building the index.
+     */
+    bool m_indexingComplete;
+};
 
 /**
  * Represents a non-temporary table which permanently resides in
@@ -114,17 +190,9 @@ class ElasticScanner;
 
 class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                         public TupleMovementListener {
-    friend class CopyOnWriteContext;
-    friend class CopyOnWriteIterator;
-    friend class ::CopyOnWriteTest;
+    friend class PersistentTableSurgeon;
     friend class TableFactory;
-    friend class TableTuple;
-    friend class TableIterator;
-    friend class PersistentTableStats;
-    friend class PersistentTableUndoDeleteAction;
-    friend class PersistentTableUndoInsertAction;
-    friend class PersistentTableUndoUpdateAction;
-    friend class ElasticScanner;
+    friend class ::CopyOnWriteTest;
     friend class ::CompactionTest_BasicCompaction;
     friend class ::CompactionTest_CompactionWithCopyOnWrite;
 
@@ -223,12 +291,15 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     /** Add/drop/list materialized views to this table */
     void addMaterializedView(MaterializedViewMetadata *view);
 
-    /** Prepare table for streaming from serialized data. */
+    /**
+     * Prepare table for streaming from serialized data.
+     * Return true on success or false if it was already active.
+     */
     bool activateStream(TupleSerializer &tupleSerializer,
-                                 TableStreamType streamType,
-                                 int32_t partitionId,
-                                 CatalogId tableId,
-                                 ReferenceSerializeInput &serializeIn);
+                        TableStreamType streamType,
+                        int32_t partitionId,
+                        CatalogId tableId,
+                        ReferenceSerializeInput &serializeIn);
 
     void dropMaterializedView(MaterializedViewMetadata *targetView);
     void segregateMaterializedViews(std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & start,
@@ -236,14 +307,15 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                                     std::vector<catalog::MaterializedViewInfo*> &survivingInfosOut,
                                     std::vector<MaterializedViewMetadata*> &survivingViewsOut,
                                     std::vector<MaterializedViewMetadata*> &obsoleteViewsOut);
-    void updateMaterializedViewTargetTable(PersistentTable* target);
+    void updateMaterializedViewTargetTable(PersistentTable* target, catalog::MaterializedViewInfo* targetMvInfo);
 
     /**
      * Attempt to stream more tuples from the table to the provided
      * output stream.
-     * Return remaining tuple count, 0 if done, or -1 on error.
+     * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
      */
     int64_t streamMore(TupleOutputStreamProcessor &outputStreams,
+                       TableStreamType streamType,
                        std::vector<int> &retPositions);
 
     /**
@@ -295,12 +367,21 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return m_tupleCount == 0;
     }
 
-
     virtual int64_t validatePartitioning(TheHashinator *hashinator, int32_t partitionId);
 
   private:
 
-    bool activateStreamInternal(CatalogId tableId, boost::shared_ptr<TableStreamerInterface> tableStreamer);
+    /**
+     * Prepare table for streaming from serialized data (internal for tests).
+     * Use custom TableStreamer provided.
+     * Return true on success or false if it was already active.
+     */
+    bool activateWithCustomStreamer(TupleSerializer &tupleSerializer,
+                                    TableStreamType streamType,
+                                    boost::shared_ptr<TableStreamerInterface> tableStreamer,
+                                    CatalogId tableId,
+                                    std::vector<std::string> &predicateStrings,
+                                    bool skipInternalActivation);
 
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
         if (nextBlock != NULL) {
@@ -409,8 +490,168 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
     TBMap m_data;
     int m_failedCompactionCount;
+
+    // This is a testability feature not intended for use in product logic.
     int m_invisibleTuplesPendingDeleteCount;
+
+    // Surgeon passed to classes requiring "deep" access to avoid excessive friendship.
+    PersistentTableSurgeon m_surgeon;
 };
+
+inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :
+    m_table(table),
+    m_indexingComplete(false)
+{}
+
+inline PersistentTableSurgeon::~PersistentTableSurgeon()
+{}
+
+inline TBMap &PersistentTableSurgeon::getData() {
+    return m_table.m_data;
+}
+
+inline void PersistentTableSurgeon::insertTupleForUndo(char *tuple) {
+    m_table.insertTupleForUndo(tuple);
+}
+
+inline void PersistentTableSurgeon::updateTupleForUndo(char* targetTupleToUpdate,
+                                                       char* sourceTupleWithNewValues,
+                                                       bool revertIndexes) {
+    m_table.updateTupleForUndo(targetTupleToUpdate, sourceTupleWithNewValues, revertIndexes);
+}
+
+inline bool PersistentTableSurgeon::deleteTuple(TableTuple &tuple, bool fallible) {
+    return m_table.deleteTuple(tuple, fallible);
+}
+
+inline void PersistentTableSurgeon::deleteTupleForUndo(char* tupleData, bool skipLookup) {
+    m_table.deleteTupleForUndo(tupleData, skipLookup);
+}
+
+inline void PersistentTableSurgeon::deleteTupleRelease(char* tuple) {
+    m_table.deleteTupleRelease(tuple);
+}
+
+inline void PersistentTableSurgeon::deleteTupleStorage(TableTuple &tuple, TBPtr block) {
+    m_table.deleteTupleStorage(tuple, block);
+}
+
+inline void PersistentTableSurgeon::snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
+    m_table.snapshotFinishedScanningBlock(finishedBlock, nextBlock);
+}
+
+inline bool PersistentTableSurgeon::hasIndex() const {
+    return (m_index != NULL);
+}
+
+inline bool PersistentTableSurgeon::isIndexEmpty() const {
+    assert (m_index != NULL);
+    return (m_index->size() == (size_t)0);
+}
+
+inline size_t PersistentTableSurgeon::indexSize() const {
+    assert (m_index != NULL);
+    return m_index->size();
+}
+
+inline bool PersistentTableSurgeon::isIndexingComplete() const {
+    assert (m_index != NULL);
+    return m_indexingComplete;
+}
+
+inline void PersistentTableSurgeon::setIndexingComplete() {
+    assert (m_index != NULL);
+    m_indexingComplete = true;
+}
+
+inline void PersistentTableSurgeon::createIndex() {
+    assert(m_index == NULL);
+    m_index.reset(new ElasticIndex());
+    m_indexingComplete = false;
+}
+
+inline void PersistentTableSurgeon::dropIndex() {
+    assert(m_indexingComplete == true);
+    m_index.reset(NULL);
+    m_indexingComplete = false;
+}
+
+inline void PersistentTableSurgeon::clearIndex() {
+    assert (m_index != NULL);
+    m_index->clear();
+    m_indexingComplete = false;
+}
+
+inline bool PersistentTableSurgeon::indexHas(TableTuple &tuple) const {
+    assert (m_index != NULL);
+    return m_index->has(m_table, tuple);
+}
+
+inline bool PersistentTableSurgeon::indexAdd(TableTuple &tuple) {
+    assert (m_index != NULL);
+    return m_index->add(m_table, tuple);
+}
+
+inline bool PersistentTableSurgeon::indexRemove(TableTuple &tuple) {
+    assert (m_index != NULL);
+    return m_index->remove(m_table, tuple);
+}
+
+inline ElasticIndex::iterator PersistentTableSurgeon::indexIterator() {
+    assert (m_index != NULL);
+    return m_index->createIterator();
+}
+
+inline ElasticIndex::iterator PersistentTableSurgeon::indexIteratorLowerBound(int64_t lowerBound) {
+    assert (m_index != NULL);
+    return m_index->createLowerBoundIterator(lowerBound);
+}
+
+inline ElasticIndex::iterator PersistentTableSurgeon::indexIteratorUpperBound(int64_t upperBound) {
+    assert (m_index != NULL);
+    return m_index->createUpperBoundIterator(upperBound);
+}
+
+inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIterator() const {
+    assert (m_index != NULL);
+    return m_index->createIterator();
+}
+
+inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIteratorLowerBound(int64_t lowerBound) const {
+    assert (m_index != NULL);
+    return m_index->createLowerBoundIterator(lowerBound);
+}
+
+inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIteratorUpperBound(int64_t upperBound) const {
+    assert (m_index != NULL);
+    return m_index->createUpperBoundIterator(upperBound);
+}
+
+inline ElasticIndex::iterator PersistentTableSurgeon::indexEnd() {
+    assert (m_index != NULL);
+    return m_index->end();
+}
+
+inline ElasticIndex::const_iterator PersistentTableSurgeon::indexEnd() const {
+    assert (m_index != NULL);
+    return m_index->end();
+}
+
+inline uint32_t PersistentTableSurgeon::getTupleCount() const {
+    return m_table.m_tupleCount;
+}
+
+inline bool PersistentTableSurgeon::hasStreamType(TableStreamType streamType) const {
+    return m_table.m_tableStreamer->hasStreamType(streamType);
+}
+
+inline boost::shared_ptr<ElasticIndexTupleRangeIterator>
+PersistentTableSurgeon::getIndexTupleRangeIterator(const ElasticIndexHashRange &range) {
+    assert(m_index != NULL);
+    assert(m_table.m_schema != NULL);
+    return boost::shared_ptr<ElasticIndexTupleRangeIterator>(
+            new ElasticIndexTupleRangeIterator(*m_index, *m_table.m_schema, range));
+}
 
 inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {
     assert (m_tempTuple.m_data);
@@ -427,6 +668,12 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
     // The tempTuple is forever!
     assert(&tuple != &m_tempTuple);
 
+    // Let the context handle it as needed. Do this before freeing the memory
+    // of non-inlined columns
+    if (m_tableStreamer != NULL) {
+        m_tableStreamer->notifyTupleDelete(tuple);
+    }
+
     // This frees referenced strings -- when could possibly be a better time?
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
         decreaseStringMemCount(tuple.getNonInlinedMemorySize());
@@ -440,11 +687,6 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
     if (tuple.isPendingDelete()) {
         tuple.setPendingDeleteFalse();
         --m_invisibleTuplesPendingDeleteCount;
-    }
-
-    // Let the context handle it as needed.
-    if (m_tableStreamer != NULL) {
-        m_tableStreamer->notifyTupleDelete(tuple);
     }
 
     if (block.get() == NULL) {

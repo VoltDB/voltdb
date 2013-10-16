@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.google.common.collect.Multimap;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -89,11 +90,11 @@ public class ClusterConfig
      * @param partToHost    A map of new partitions to their corresponding replica host IDs.
      * @throws JSONException
      */
-    public static void addPartitions(JSONObject topo, Map<Integer, Collection<Integer>> partToHost)
+    public static void addPartitions(JSONObject topo, Multimap<Integer, Integer> partToHost)
         throws JSONException
     {
         JSONArray partitions = topo.getJSONArray("partitions");
-        for (Map.Entry<Integer, Collection<Integer>> e : partToHost.entrySet()) {
+        for (Map.Entry<Integer, Collection<Integer>> e : partToHost.asMap().entrySet()) {
             int partition = e.getKey();
             Collection<Integer> hosts = e.getValue();
 

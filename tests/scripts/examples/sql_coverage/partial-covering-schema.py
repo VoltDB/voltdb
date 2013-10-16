@@ -30,7 +30,7 @@
                     ("A3", FastSerializer.VOLTTYPE_INTEGER),
                     ("A4", FastSerializer.VOLTTYPE_INTEGER)),
         "partitions": (),
-        "indexes": ("ID")
+        "indexes": ("ID",)
         },
     "PARTIAL_COVERING_HASH" : {
         "columns": (("ID", FastSerializer.VOLTTYPE_INTEGER),
@@ -39,7 +39,7 @@
                     ("A3", FastSerializer.VOLTTYPE_INTEGER),
                     ("A4", FastSerializer.VOLTTYPE_INTEGER)),
         "partitions": (),
-        "indexes": ("ID")
+        "indexes": ("ID",)
         }
 
     }

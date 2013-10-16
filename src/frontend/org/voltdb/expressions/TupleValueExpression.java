@@ -274,7 +274,8 @@ public class TupleValueExpression extends AbstractValueExpression {
     }
 
     @Override
-    protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {
+    protected void loadFromJSONObject(JSONObject obj) throws JSONException
+    {
         m_columnIndex = obj.getInt(Members.COLUMN_IDX.name());
         m_tableName = obj.getString(Members.TABLE_NAME.name());
         m_tableAlias = obj.getString(Members.TABLE_ALIAS.name());

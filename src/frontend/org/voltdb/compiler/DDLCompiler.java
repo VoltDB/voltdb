@@ -56,6 +56,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
+import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
@@ -71,7 +72,7 @@ import org.voltdb.utils.VoltTypeUtil;
  */
 public class DDLCompiler {
 
-    static final int MAX_COLUMNS = 1024;
+    static final int MAX_COLUMNS = 1024; // KEEP THIS < MAX_PARAM_COUNT to enable default CRUD update.
     static final int MAX_ROW_SIZE = 1024 * 1024 * 2;
 
     /**
@@ -223,6 +224,32 @@ public class DDLCompiler {
             );
 
     /**
+     * IMPORT CLASS with pattern for matching classfiles in
+     * the current classpath.
+     */
+    static final Pattern importClassPattern = Pattern.compile(
+            "(?i)" +                                // (ignore case)
+            "\\A" +                                 // (start statement)
+            "IMPORT\\s+CLASS\\s+" +                 // IMPORT CLASS
+            "([^;]+)" +                             // (1) class matching pattern
+            ";\\z"                                  // (end statement)
+            );
+
+    /**
+     * Check that the classname pattern from import class is valid.
+     */
+    static final Pattern validClassMatcherWildcardPattern = Pattern.compile(
+            "\\A" +                                 // (start statement)
+            "[\\p{L}\\*]+" +                        // (first part starts with char or *)
+            "[\\p{L}\\d\\*]*" +                     // (followed by any number of word chars or *)
+            "(\\." +                                // (optionally repeat with . separators)
+            "[\\p{L}\\*]+" +                        //  (first part starts with char or *)
+            "[\\p{L}\\d\\*]*" +                     //  (followed by any number of word chars or *)
+            ")*" +                                  // (end repeat)
+            "\\z"                                   // (end statement)
+            );
+
+    /**
      * Regex to parse the CREATE ROLE statement with optional WITH clause.
      * Leave the WITH clause argument as a single group because regexes
      * aren't capable of producing a variable number of groups.
@@ -317,7 +344,8 @@ public class DDLCompiler {
      * </pre>
      */
     static final Pattern voltdbStatementPrefixPattern = Pattern.compile(
-            "(?i)((?<=\\ACREATE\\s{0,1024})(?:PROCEDURE|ROLE)|\\APARTITION|\\AREPLICATE|\\AEXPORT)\\s"
+            "(?i)((?<=\\ACREATE\\s{0,1024})" +
+            "(?:PROCEDURE|ROLE)|\\APARTITION|\\AREPLICATE|\\AEXPORT|\\AIMPORT)\\s"
             );
 
     static final String TABLE = "TABLE";
@@ -330,8 +358,7 @@ public class DDLCompiler {
     enum Permission {
         adhoc,
         sysproc,
-        defaultproc,
-        export;
+        defaultproc;
 
         static String toListString() {
             return Arrays.asList(values()).toString();
@@ -343,8 +370,11 @@ public class DDLCompiler {
     String m_fullDDL = "";
     int m_currLineNo = 1;
 
-    /// Partition descriptors parsed from DDL PARTITION or REPLICATE statements.
+    // Partition descriptors parsed from DDL PARTITION or REPLICATE statements.
     final VoltDDLElementTracker m_tracker;
+
+    // used to match imported class with those in the classpath
+    ClassMatcher m_classMatcher = new ClassMatcher();
 
     HashMap<String, Column> columnMap = new HashMap<String, Column>();
     HashMap<String, Index> indexMap = new HashMap<String, Index>();
@@ -443,6 +473,11 @@ public class DDLCompiler {
         } catch (IOException e) {
             throw m_compiler.new VoltCompilerException("Error closing schema file");
         }
+
+        // process extra classes
+        m_tracker.addExtraClasses(m_classMatcher.getMatchedClassList());
+        // possibly save some memory
+        m_classMatcher.clear();
     }
 
     /**
@@ -620,6 +655,23 @@ public class DDLCompiler {
             return true;
         }
 
+        // match IMPORT CLASS statements
+        statementMatcher = importClassPattern.matcher(statement);
+        if (statementMatcher.matches()) {
+            String classNameStr = statementMatcher.group(1);
+
+            // check that the match pattern is a valid match pattern
+            Matcher wildcardMatcher = validClassMatcherWildcardPattern.matcher(classNameStr);
+            if (!wildcardMatcher.matches()) {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "Invalid IMPORT CLASS match expression: '%s'",
+                        classNameStr)); // remove trailing semicolon
+            }
+
+            m_classMatcher.addPattern(classNameStr);
+            return true;
+        }
+
         // matches if it is CREATE ROLE [WITH <permission> [, <permission> ...]]
         // group 1 is role name
         // group 2 is comma-separated permission list or null if there is no WITH clause
@@ -656,9 +708,6 @@ public class DDLCompiler {
                         break;
                     case defaultproc:
                         catGroup.setDefaultproc(true);
-                        break;
-                    case export:
-                        m_compiler.grantExportToGroup(roleName, db);
                         break;
                     }
                 }
@@ -724,8 +773,9 @@ public class DDLCompiler {
     }
 
     public void compileToCatalog(Database db) throws VoltCompilerException {
-        String hexDDL = Encoder.hexEncode(m_fullDDL);
-        db.getCatalog().execute("set " + db.getPath() + " schema \"" + hexDDL + "\"");
+        // note this will need to be decompressed to be used
+        String binDDL = Encoder.compressAndBase64Encode(m_fullDDL);
+        db.setSchema(binDDL);
 
         VoltXMLElement xmlCatalog;
         try
@@ -1093,13 +1143,8 @@ public class DDLCompiler {
                 }
             }
         }
-        if (defaultvalue != null && defaultvalue.equals("NULL"))
-            defaultvalue = null;
         if (defaulttype != null) {
             // fyi: Historically, VoltType class initialization errors get reported on this line (?).
-            if (defaultvalue == null) {
-                defaulttype = "NULL";
-            }
             defaulttype = Integer.toString(VoltType.typeFromString(defaulttype).getValue());
         }
 
@@ -1208,16 +1253,14 @@ public class DDLCompiler {
         dummy.setTable(table);
 
         // "parse" the expression trees for an expression-based index (vs. a simple column value index)
-        AbstractExpression[] exprs = null;
+        List<AbstractExpression> exprs = null;
         for (VoltXMLElement subNode : node.children) {
             if (subNode.name.equals("exprs")) {
-                exprs = new AbstractExpression[subNode.children.size()];
-                int j = 0;
+                exprs = new ArrayList<AbstractExpression>();
                 for (VoltXMLElement exprNode : subNode.children) {
-                    exprs[j] = dummy.parseExpressionTree(exprNode);
-                    exprs[j].resolveForTable(table);
-                    exprs[j].finalizeValueTypes();
-                    ++j;
+                    exprs.add( dummy.parseExpressionTree(exprNode) );
+                    exprs.get(exprs.size()-1).resolveForTable(table);
+                    exprs.get(exprs.size()-1).finalizeValueTypes();
                 }
             }
         }
@@ -1354,7 +1397,7 @@ public class DDLCompiler {
         indexMap.put(name, index);
     }
 
-    private static String convertToJSONArray(AbstractExpression[] exprs) throws JSONException {
+    private static String convertToJSONArray(List<AbstractExpression> exprs) throws JSONException {
         JSONStringer stringer = new JSONStringer();
         stringer.array();
         for (AbstractExpression abstractExpression : exprs) {
@@ -1493,24 +1536,51 @@ public class DDLCompiler {
 
             List<Column> srcColumnArray = CatalogUtil.getSortedCatalogItems(srcTable.getColumns(), "index");
             List<Column> destColumnArray = CatalogUtil.getSortedCatalogItems(destTable.getColumns(), "index");
+            List<AbstractExpression> groupbyExprs = null;
 
-            // add the group by columns from the src table
-            for (int i = 0; i < stmt.groupByColumns.size(); i++) {
-                ParsedSelectStmt.ParsedColInfo gbcol = stmt.groupByColumns.get(i);
-                Column srcCol = srcColumnArray.get(gbcol.index);
-                ColumnRef cref = matviewinfo.getGroupbycols().add(srcCol.getTypeName());
-                // groupByColumns is iterating in order of groups. Store that grouping order
-                // in the column ref index. When the catalog is serialized, it will, naturally,
-                // scramble this order like a two year playing dominos, presenting the data
-                // in a meaningless sequence.
-                cref.setIndex(i);           // the column offset in the view's grouping order
-                cref.setColumn(srcCol);     // the source column from the base (non-view) table
+            if (stmt.hasComplexGroupby()) {
+                groupbyExprs = new ArrayList<AbstractExpression>();
+                for (ParsedColInfo col: stmt.groupByColumns) {
+                    groupbyExprs.add(col.expression);
+                }
+                // Parse group by expressions to json string
+                String groupbyExprsJson = null;
+                try {
+                    groupbyExprsJson = convertToJSONArray(groupbyExprs);
+                } catch (JSONException e) {
+                    throw m_compiler.new VoltCompilerException ("Unexpected error serializing non-column " +
+                            "expressions for group by expressions: " + e.toString());
+                }
+                matviewinfo.setGroupbyexpressionsjson(groupbyExprsJson);
+
+            } else {
+                // add the group by columns from the src table
+                for (int i = 0; i < stmt.groupByColumns.size(); i++) {
+                    ParsedSelectStmt.ParsedColInfo gbcol = stmt.groupByColumns.get(i);
+                    Column srcCol = srcColumnArray.get(gbcol.index);
+                    ColumnRef cref = matviewinfo.getGroupbycols().add(srcCol.getTypeName());
+                    // groupByColumns is iterating in order of groups. Store that grouping order
+                    // in the column ref index. When the catalog is serialized, it will, naturally,
+                    // scramble this order like a two year playing dominos, presenting the data
+                    // in a meaningless sequence.
+                    cref.setIndex(i);           // the column offset in the view's grouping order
+                    cref.setColumn(srcCol);     // the source column from the base (non-view) table
+                }
+
+                // parse out the group by columns into the dest table
+                for (int i = 0; i < stmt.groupByColumns.size(); i++) {
+                    ParsedSelectStmt.ParsedColInfo col = stmt.displayColumns.get(i);
+                    Column destColumn = destColumnArray.get(i);
+                    processMaterializedViewColumn(matviewinfo, srcTable, destColumn,
+                            ExpressionType.VALUE_TUPLE, (TupleValueExpression)col.expression);
+                }
             }
 
+            // Set up COUNT(*) column
             ParsedSelectStmt.ParsedColInfo countCol = stmt.displayColumns.get(stmt.groupByColumns.size());
             assert(countCol.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR);
             assert(countCol.expression.getLeft() == null);
-            processMaterializedViewColumn(matviewinfo, srcTable, destTable,
+            processMaterializedViewColumn(matviewinfo, srcTable,
                     destColumnArray.get(stmt.groupByColumns.size()),
                     ExpressionType.AGGREGATE_COUNT_STAR, null);
 
@@ -1529,13 +1599,52 @@ public class DDLCompiler {
             pkConstraint.setType(ConstraintType.PRIMARY_KEY.getValue());
             pkConstraint.setIndex(pkIndex);
 
-            // parse out the group by columns into the dest table
-            for (int i = 0; i < stmt.groupByColumns.size(); i++) {
+            // prepare info for aggregation columns.
+            List<AbstractExpression> aggregationExprs = new ArrayList<AbstractExpression>();
+            boolean hasAggregationExprs = false;
+            boolean hasMinOrMaxAgg = false;
+            ArrayList<AbstractExpression> minMaxAggs = new ArrayList<AbstractExpression>();
+            for (int i = stmt.groupByColumns.size() + 1; i < stmt.displayColumns.size(); i++) {
                 ParsedSelectStmt.ParsedColInfo col = stmt.displayColumns.get(i);
-                Column destColumn = destColumnArray.get(i);
+                AbstractExpression aggExpr = col.expression.getLeft();
+                if (aggExpr.getExpressionType() != ExpressionType.VALUE_TUPLE) {
+                    hasAggregationExprs = true;
+                }
+                aggregationExprs.add(aggExpr);
+                if (col.expression.getExpressionType() ==  ExpressionType.AGGREGATE_MIN ||
+                        col.expression.getExpressionType() == ExpressionType.AGGREGATE_MAX) {
+                    hasMinOrMaxAgg = true;
+                    minMaxAggs.add(aggExpr);
+                }
+            }
 
-                processMaterializedViewColumn(matviewinfo, srcTable, destTable, destColumn,
-                        ExpressionType.VALUE_TUPLE, (TupleValueExpression)col.expression);
+            // set Aggregation Expressions.
+            if (hasAggregationExprs) {
+                String aggregationExprsJson = null;
+                try {
+                    aggregationExprsJson = convertToJSONArray(aggregationExprs);
+                } catch (JSONException e) {
+                    throw m_compiler.new VoltCompilerException ("Unexpected error serializing non-column " +
+                            "expressions for aggregation expressions: " + e.toString());
+                }
+                matviewinfo.setAggregationexpressionsjson(aggregationExprsJson);
+            }
+
+            if (hasMinOrMaxAgg) {
+                // TODO: deal with minMaxAggs, i.e. if only one min/max agg, try to find the index
+                // with group by cols followed by this agg col; if multiple min/max aggs, decide
+                // what to do (probably the index on group by cols is the best choice)
+                Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs);
+                if (found != null) {
+                    matviewinfo.setIndexforminmax(found.getTypeName());
+                } else {
+                    matviewinfo.setIndexforminmax("");
+                    m_compiler.addWarn("No index found to support min() / max() UPDATE and DELETE on Materialized View " +
+                            matviewinfo.getTypeName() +
+                            ", and a sequential scan might be issued when current min / max value is updated / deleted.");
+                }
+            } else {
+                matviewinfo.setIndexforminmax("");
             }
 
             // parse out the aggregation columns into the dest table
@@ -1544,15 +1653,107 @@ public class DDLCompiler {
                 Column destColumn = destColumnArray.get(i);
 
                 AbstractExpression colExpr = col.expression.getLeft();
-                assert(colExpr.getExpressionType() == ExpressionType.VALUE_TUPLE);
-                processMaterializedViewColumn(matviewinfo, srcTable, destTable, destColumn,
-                        col.expression.getExpressionType(), (TupleValueExpression)colExpr);
+                TupleValueExpression tve = null;
+                if (colExpr.getExpressionType() == ExpressionType.VALUE_TUPLE) {
+                    tve = (TupleValueExpression)colExpr;
+                }
+                processMaterializedViewColumn(matviewinfo, srcTable, destColumn,
+                        col.expression.getExpressionType(), tve);
 
                 // Correctly set the type of the column so that it's consistent.
                 // Otherwise HSQLDB might promote types differently than Volt.
                 destColumn.setType(col.expression.getValueType().getValue());
             }
         }
+    }
+
+    // if the materialized view has MIN / MAX, try to find an index defined on the source table
+    // covering all group by cols / exprs to avoid expensive tablescan, must be full key coverage
+    private static Index findBestMatchIndexForMatviewMinOrMax(MaterializedViewInfo matviewinfo, Table srcTable, List<AbstractExpression> groupbyExprs) {
+        CatalogMap<Index> allIndexes = srcTable.getIndexes();
+
+        ArrayList<Index> candidates = new ArrayList<Index>();
+
+        for (Index index : allIndexes) {
+            String expressionjson = index.getExpressionsjson();
+            if (groupbyExprs == null && !expressionjson.isEmpty() ||
+                    groupbyExprs != null && expressionjson.isEmpty()) {
+                continue;
+            }
+            List<AbstractExpression> indexedExprs = null;
+            List<ColumnRef> indexedColRefs = null;
+
+            // complex group by exprs
+            if (groupbyExprs != null) {
+                try {
+                    indexedExprs = AbstractExpression.fromJSONArrayString(expressionjson);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                    assert(false);
+                    return null;
+                }
+
+                if (!prefixCompatibleExprs(indexedExprs, groupbyExprs)) {
+                    continue;
+                } else {
+                    candidates.add(index);
+                }
+            }
+            // simple group by cols
+            else {
+                indexedColRefs = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
+                List<ColumnRef> groupbyColRefs = CatalogUtil.getSortedCatalogItems(matviewinfo.getGroupbycols(), "index");
+
+                if (indexedColRefs.size() > groupbyColRefs.size()) {
+                    continue;
+                }
+
+                List<Integer> indexedColIds = new ArrayList<Integer>();
+                List<Integer> groupbyColIds = new ArrayList<Integer>();
+
+                for (ColumnRef cr : indexedColRefs) {
+                    indexedColIds.add(cr.getColumn().getIndex());
+                }
+                for (ColumnRef cr : groupbyColRefs) {
+                    groupbyColIds.add(cr.getColumn().getIndex());
+                }
+
+                boolean found = true;
+                for (int i = 0; i < indexedColIds.size(); i++) {
+                    if (!indexedColIds.contains(groupbyColIds.get(i))) {
+                        found = false;
+                        break;
+                    }
+                }
+                if (found) {
+                    candidates.add(index);
+                }
+            }
+        }
+
+        // return the widest index (match best)
+        Index ret = null;
+        for (Index index : candidates) {
+            if (ret == null) {
+                ret = index;
+            } else if (CatalogUtil.getCatalogIndexSize(index) > CatalogUtil.getCatalogIndexSize(ret)) {
+                ret = index;
+            }
+        }
+        return ret;
+    }
+
+    // srcExprs is the prefix of destExprs
+    private static boolean prefixCompatibleExprs(List<AbstractExpression> srcExprs, List<AbstractExpression> destExprs) {
+        if (srcExprs.size() > destExprs.size()) {
+            return false;
+        }
+        for (int i = 0; i < srcExprs.size(); i ++) {
+            if (!srcExprs.contains(destExprs.get(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -1580,32 +1781,13 @@ public class DDLCompiler {
             throw m_compiler.new VoltCompilerException(msg);
         }
 
-        if (stmt.hasComplexGroupby()) {
-            msg += "contains an expression involving a group by. " +
-                    "Expressions with group by are not currently supported in views.";
-            throw m_compiler.new VoltCompilerException(msg);
-        }
-
-        if (stmt.hasComplexAgg()) {
-            msg += "contains an expression involving an aggregate function. " +
-                    "Expressions with aggregate functions are not currently supported in views.";
-            throw m_compiler.new VoltCompilerException(msg);
-        }
-
-
         int i;
         for (i = 0; i < groupColCount; i++) {
             ParsedSelectStmt.ParsedColInfo gbcol = stmt.groupByColumns.get(i);
             ParsedSelectStmt.ParsedColInfo outcol = stmt.displayColumns.get(i);
 
-            if (outcol.expression.getExpressionType() != ExpressionType.VALUE_TUPLE) {
-                msg += "must have column at index " + String.valueOf(i) + " be " + gbcol.alias;
-                throw m_compiler.new VoltCompilerException(msg);
-            }
-
-            TupleValueExpression expr = (TupleValueExpression) outcol.expression;
-            if (expr.getColumnIndex() != gbcol.index) {
-                msg += "must have column at index " + String.valueOf(i) + " be " + gbcol.alias;
+            if (!outcol.expression.equals(gbcol.expression)) {
+                msg += "must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.";
                 throw m_compiler.new VoltCompilerException(msg);
             }
         }
@@ -1619,18 +1801,16 @@ public class DDLCompiler {
         for (i++; i < displayColCount; i++) {
             ParsedSelectStmt.ParsedColInfo outcol = stmt.displayColumns.get(i);
             if ((outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_COUNT) &&
-                    (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_SUM)) {
-                msg += "must have non-group by columns aggregated by sum or count.";
-                throw m_compiler.new VoltCompilerException(msg);
-            }
-            if (outcol.expression.getLeft().getExpressionType() != ExpressionType.VALUE_TUPLE) {
-                msg += "must have non-group by columns use only one level of aggregation.";
+                    (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_SUM) &&
+                    (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MIN) &&
+                    (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MAX)) {
+                msg += "must have non-group by columns aggregated by sum, count, min or max.";
                 throw m_compiler.new VoltCompilerException(msg);
             }
         }
     }
 
-    void processMaterializedViewColumn(MaterializedViewInfo info, Table srcTable, Table destTable,
+    void processMaterializedViewColumn(MaterializedViewInfo info, Table srcTable,
             Column destColumn, ExpressionType type, TupleValueExpression colExpr)
             throws VoltCompiler.VoltCompilerException {
 

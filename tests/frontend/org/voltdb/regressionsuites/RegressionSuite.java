@@ -33,6 +33,7 @@ import java.util.Random;
 import junit.framework.TestCase;
 
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientConfigForTest;
@@ -265,5 +266,54 @@ public class RegressionSuite extends TestCase {
      */
     public int internalPort(int hostId) {
         return isLocalCluster() ? ((LocalCluster)m_config).internalPort(hostId) : VoltDB.DEFAULT_INTERNAL_PORT+hostId;
+    }
+
+    static public void validateTableOfScalarLongs(VoltTable vt, long[] expected) {
+        assertNotNull(expected);
+        assertEquals(expected.length, vt.getRowCount());
+        int len = expected.length;
+        for (int i=0; i < len; i++) {
+            validateRowOfLongs(vt, new long[] {expected[i]});
+        }
+    }
+
+    static public void validateTableOfLongs(VoltTable vt, long[][] expected) {
+        assertNotNull(expected);
+        assertEquals(expected.length, vt.getRowCount());
+        int len = expected.length;
+        for (int i=0; i < len; i++) {
+            validateRowOfLongs(vt, expected[i]);
+        }
+    }
+
+    static public void validateRowOfLongs(VoltTable vt, long [] expected) {
+        int len = expected.length;
+        assertTrue(vt.advanceRow());
+        for (int i=0; i < len; i++) {
+            long actual = -10000000;
+            // ENG-4295: hsql bug: HSQLBackend sometimes returns wrong column type.
+            try {
+                actual = vt.getLong(i);
+            } catch (IllegalArgumentException ex) {
+                try {
+                    actual = (long) vt.getDouble(i);
+                } catch (IllegalArgumentException newEx) {
+                    try {
+                        actual = vt.getTimestampAsLong(i);
+                    } catch (IllegalArgumentException exTm) {
+                        try {
+                            actual = vt.getDecimalAsBigDecimal(i).longValueExact();
+                        } catch (IllegalArgumentException newerEx) {
+                            newerEx.printStackTrace();
+                            fail();
+                        }
+                    } catch (ArithmeticException newestEx) {
+                        newestEx.printStackTrace();
+                        fail();
+                    }
+                }
+            }
+            assertEquals(expected[i], actual);
+        }
     }
 }

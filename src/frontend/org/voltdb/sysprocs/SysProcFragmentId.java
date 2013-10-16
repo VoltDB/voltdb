@@ -109,9 +109,13 @@ public class SysProcFragmentId
     public static final long PF_restoreDistributePartitionedTableAsPartitioned = 74;    // partitioned to partitioned
     public static final long PF_restoreDistributePartitionedTableAsReplicated = 75;     // partitioned to replicated
     public static final long PF_restoreDistributeReplicatedTableAsPartitioned = 76;     // replicated to replicated
+    public static final long PF_restoreHashinatorScan = 77;
+    public static final long PF_restoreHashinatorScanResults = 78;
+    public static final long PF_restoreDistributeHashinator = 79;
+    public static final long PF_restoreDistributeHashinatorResults = 80;
 
     // @StartSampler
-    public static final long PF_startSampler = 80;
+    public static final long PF_startSampler = 90;
 
     // @Quiesce
     public static final long PF_quiesce_sites = 100;
@@ -158,10 +162,16 @@ public class SysProcFragmentId
         return (fragId == PF_updateCatalog || fragId == PF_updateCatalogAggregate);
     }
 
-    // @Update topology
-    public static final long PF_updateTopology = 230;
-    public static final long PF_updateTopologyAggregate = 231;
+    // @BalancePartitions
+    public static final long PF_prepBalancePartitions = 228;
+    public static final long PF_prepBalancePartitionsAggregate = 229;
+    public static final long PF_balancePartitions = 230;
+    public static final long PF_balancePartitionsAggregate = 231;
+    public static final long PF_balancePartitionsData = 232;
 
     public static final long PF_validatePartitioning = 240;
     public static final long PF_validatePartitioningResults = 241;
+
+    public static final long PF_matchesHashinator = 250;
+    public static final long PF_matchesHashinatorResults = 251;
 }

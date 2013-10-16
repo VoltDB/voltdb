@@ -58,7 +58,8 @@ public abstract class OpsAgent
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final byte JSON_PAYLOAD = 0;
     private static final byte OPS_PAYLOAD = 1;
-    private static final int MAX_IN_FLIGHT_REQUESTS = 5;
+    // ENG-5125
+    private static final int MAX_IN_FLIGHT_REQUESTS = 20;
     static int OPS_COLLECTION_TIMEOUT = 60 * 1000;
 
     private long m_nextRequestId = 0;

@@ -33,7 +33,7 @@ def get_branches(hostname, port, days):
 
     mydate = datetime.datetime.today()-datetime.timedelta(days=days)
 
-    query = "select branch, count(*) from app_stats where ts >= '%s' group by branch order by 2 desc" % \
+    query = "select branch, count(*) from app_stats where date >= '%s' group by branch order by 1 asc" % \
                     mydate.strftime('%Y-%m-%d 00:00:00')
 
     conn = FastSerializer(hostname, port)
@@ -47,6 +47,19 @@ def get_branches(hostname, port, days):
         branches.append(str(row[0]))
 
     return branches
+
+def get_min_date(hostname, port):
+
+    query = "select min(date) from app_stats"
+
+    conn = FastSerializer(hostname, port)
+    proc = VoltProcedure(conn, '@AdHoc',
+                         [FastSerializer.VOLTTYPE_STRING])
+    resp = proc.call([query])
+    conn.close()
+
+    ndays = datetime.datetime.today()-resp.tables[0].tuples[0][0]
+    return ndays.days+1
 
 def get_stats(hostname, port, days, branch):
     """Get statistics of all runs
@@ -92,8 +105,9 @@ def get_stats(hostname, port, days, branch):
 class Plot:
     DPI = 100.0
 
-    def __init__(self, title, xlabel, ylabel, filename, w, h):
+    def __init__(self, title, xlabel, ylabel, filename, w, h, ndays):
         self.filename = filename
+        self.ndays = ndays
         self.legends = {}
         w = w == None and 1200 or w
         h = h == None and 400 or h
@@ -116,14 +130,15 @@ class Plot:
         self.ax.xaxis.set_major_formatter(formatter)
         ymin, ymax = plt.ylim()
         plt.ylim((ymin-(ymax-ymin)*0.1, ymax+(ymax-ymin)*0.1))
-        xmin, xmax = plt.xlim()
-        plt.xlim((xmin-0.3, xmax+0.3))
-        plt.legend(prop={'size': 10}, loc=0)
+        xmax = datetime.datetime.today().toordinal()
+        plt.xlim((xmax-self.ndays, xmax))
+        plt.legend(prop={'size': 10}, loc=2)
         plt.savefig(self.filename, format="png", transparent=False,
                     bbox_inches="tight", pad_inches=0.2)
+        plt.close('all')
 
 
-def plot(title, xlabel, ylabel, filename, width, height, app, data, data_type):
+def plot(title, xlabel, ylabel, filename, width, height, app, data, data_type, ndays):
     plot_data = dict()
     for run in data:
         if run['nodes'] not in plot_data:
@@ -142,7 +157,7 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, data_type):
         return
 
     i = 0
-    pl = Plot(title, xlabel, ylabel, filename, width, height)
+    pl = Plot(title, xlabel, ylabel, filename, width, height, ndays)
     sorted_data = sorted(plot_data.items(), key=lambda x: x[0])
     for k, v in sorted_data:
         pl.plot(v['time'], v[data_type], COLORS(i), MARKERS[i], k)
@@ -168,7 +183,7 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, data_type):
 def generate_index_file(filenames):
     row = """
       <tr>
-        <td>%s on %s</td>
+        <td width="100">%s</td>
         <td><a href="%s"><img src="%s" width="400" height="200"/></a></td>
         <td><a href="%s"><img src="%s" width="400" height="200"/></a></td>
         <td><a href="%s"><img src="%s" width="400" height="200"/></a></td>
@@ -177,8 +192,10 @@ def generate_index_file(filenames):
 
     sep = """
      </table>
-     <hr>
-     <table>
+     <table frame="box">
+     <tr>
+         <th colspan="4"><a name="%s">%s</a></th>
+     </tr>
 """
 
     full_content = """
@@ -187,20 +204,43 @@ def generate_index_file(filenames):
     <title>Performance Graphs</title>
   </head>
   <body>
-    <table>
+    <table frame="box">
 %s
     </table>
   </body>
 </html>
 """
 
+    hrow = """
+    <tr>
+        <td><a href=#%s>%s</a></td>
+        <td><a href=#%s>%s</a></td>
+        <td><a href=#%s>%s</a></td>
+        <td><a href=#%s>%s</a></td>
+    </tr>
+"""
+    toc = sorted(list(set([x[0] for x in filenames])))
+    h = map(lambda x:(x.replace(' ','%20'), x), toc)
+    n = 4
+    z = n-len(h)%n
+    while z > 0 and z < n:
+        h.append(('',''))
+        z -= 1
+
     rows = []
+    t = ()
+    for i in range(1, len(h)+1):
+        t += tuple(h[i-1])
+        if i%n == 0:
+            rows.append(hrow % t)
+            t = ()
+
     last_app = None
     for i in filenames:
         if i[0] != last_app:
-            rows.append(sep)
+            rows.append(sep % (i[0], i[0]))
             last_app = i[0]
-        rows.append(row % (i[0], i[4], i[1], i[1], i[2], i[2], i[3], i[3]))
+        rows.append(row % (i[4], i[1], i[1], i[2], i[2], i[3], i[3]))
 
     return full_content % ''.join(rows)
 
@@ -223,9 +263,10 @@ def main():
 
     prefix = sys.argv[2]
     path = os.path.join(sys.argv[1], sys.argv[2])
-    ndays = 2000
     if len(sys.argv) >=4:
         ndays = int(sys.argv[3])
+    else:
+        ndays = get_min_date(STATS_SERVER, 21212)
     width = None
     height = None
     if len(sys.argv) >= 5:
@@ -235,9 +276,14 @@ def main():
 
     # show all the history
     branches = get_branches(STATS_SERVER, 21212, ndays)
-    if 'master' in branches:
-        branches.remove('master')
-        branches.insert(0,'master')
+    branches.sort
+    i=0
+    for p in ['master', 'release-']:
+        for b in branches:
+            if b.startswith(p):
+                x=branches.pop(branches.index(b))
+                branches.insert(i, x)
+                i+=1
     root_path = path
     filenames = []              # (appname, latency, throughput)
     iorder = 0
@@ -258,17 +304,17 @@ def main():
             throughput_filename = '%s-throughput-%s.png' % (prefix, app_filename)
             filenames.append((app, latency95_filename, latency99_filename, throughput_filename, branch, iorder))
 
-            plot(app + " latency95", "Time", "Latency (ms)",
+            plot(app + " latency95 on " + branch, "Time", "Latency (ms)",
                  path + "-latency95-" + app_filename + ".png", width, height, app,
-                 data, 'lat95')
+                 data, 'lat95', ndays)
 
-            plot(app + " latency99", "Time", "Latency (ms)",
+            plot(app + " latency99 on " + branch, "Time", "Latency (ms)",
                  path + "-latency99-" + app_filename + ".png", width, height, app,
-                 data, 'lat99')
+                 data, 'lat99', ndays)
 
-            plot(app + " throughput(best)", "Time", "Throughput (txns/sec)",
+            plot(app + " throughput(best) on " + branch, "Time", "Throughput (txns/sec)",
                  path + "-throughput-" + app_filename + ".png", width, height, app,
-                 data, 'tps')
+                 data, 'tps', ndays)
 
     # generate index file
     index_file = open(root_path + '-index.html', 'w')

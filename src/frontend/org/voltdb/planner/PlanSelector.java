@@ -148,7 +148,8 @@ public class PlanSelector implements Cloneable {
     /** Picks the best cost plan for a given raw plan
      * @param rawplan
      */
-   public void considerCandidatePlan(CompiledPlan rawplan) {
+    public void considerCandidatePlan(CompiledPlan rawplan) {
+        //System.out.println(String.format("[Raw plan]:%n%s", rawplan.rootPlanGraph.toExplainPlanString()));
 
         // run the set of microptimizations, which may return many plans (or not)
         List<CompiledPlan> optimizedPlans = MicroOptimizationRunner.applyAll(rawplan, m_db, m_detMode);
@@ -172,18 +173,21 @@ public class PlanSelector implements Cloneable {
             // filename for debug output
             String filename = String.valueOf(m_planId++);
 
+            //System.out.println(String.format("[new plan]: Cost:%f%n%s", plan.cost, plan.rootPlanGraph.toExplainPlanString()));
+
             // find the minimum cost plan
             if (m_bestPlan == null || plan.cost < m_bestPlan.cost) {
                 // free the PlanColumns held by the previous best plan
                 m_bestPlan = plan;
                 m_bestFilename = filename;
+                //System.out.println("[Best plan] gets updated ***\n");
             }
 
             outputPlan(plan, planGraph, filename);
         }
-   }
+    }
 
-   public void finalizeOutput() {
+    public void finalizeOutput() {
         if (m_quietPlanner) {
             return;
         }

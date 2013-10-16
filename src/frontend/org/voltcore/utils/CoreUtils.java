@@ -37,21 +37,14 @@ import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
-import jsr166y.LinkedTransferQueue;
+import com.google.common.base.*;
 
 import org.voltcore.logging.VoltLogger;
 
+import org.voltcore.network.ReverseDNSCache;
 import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 import com.google.common.collect.ImmutableList;
@@ -284,35 +277,43 @@ public class CoreUtils {
      *         if we can find one; the empty string otherwise
      */
     public static String getHostnameOrAddress() {
-        try {
-            final InetAddress addr = InetAddress.getLocalHost();
-            return addr.getHostName();
-        } catch (UnknownHostException e) {
-            try {
-                // XXX-izzy Won't we randomly pull localhost here sometimes?
-                Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
-                if (interfaces == null) {
-                    return "";
-                }
-                NetworkInterface intf = interfaces.nextElement();
-                Enumeration<InetAddress> addresses = intf.getInetAddresses();
-                while (addresses.hasMoreElements()) {
-                    InetAddress address = addresses.nextElement();
-                    if (address instanceof Inet4Address) {
-                        return address.getHostAddress();
+        final InetAddress addr = m_localAddressSupplier.get();
+        if (addr == null) return "";
+        return ReverseDNSCache.hostnameOrAddress(addr);
+    }
+
+    private static final Supplier<InetAddress> m_localAddressSupplier =
+            Suppliers.memoizeWithExpiration(new Supplier<InetAddress>() {
+                @Override
+                public InetAddress get() {
+                    try {
+                        final InetAddress addr = InetAddress.getLocalHost();
+                        return addr;
+                    } catch (UnknownHostException e) {
+                        try {
+                            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+                            if (interfaces == null) {
+                                return null;
+                            }
+                            NetworkInterface intf = interfaces.nextElement();
+                            Enumeration<InetAddress> addresses = intf.getInetAddresses();
+                            while (addresses.hasMoreElements()) {
+                                InetAddress address = addresses.nextElement();
+                                if (address instanceof Inet4Address) {
+                                    return address;
+                                }
+                            }
+                            addresses = intf.getInetAddresses();
+                            if (addresses.hasMoreElements()) {
+                                return addresses.nextElement();
+                            }
+                            return null;
+                        } catch (SocketException e1) {
+                            return null;
+                        }
                     }
                 }
-                addresses = intf.getInetAddresses();
-                if (addresses.hasMoreElements())
-                {
-                    return addresses.nextElement().getHostAddress();
-                }
-                return "";
-            } catch (SocketException e1) {
-                return "";
-            }
-        }
-    }
+            }, 3600, TimeUnit.SECONDS);
 
     /**
      * Return the local IP address, if it's resolvable.  If not,
@@ -322,32 +323,7 @@ public class CoreUtils {
      *         if we can find one; the empty string otherwise
      */
     public static InetAddress getLocalAddress() {
-        try {
-            final InetAddress addr = InetAddress.getLocalHost();
-            return addr;
-        } catch (UnknownHostException e) {
-            try {
-                Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
-                if (interfaces == null) {
-                    return null;
-                }
-                NetworkInterface intf = interfaces.nextElement();
-                Enumeration<InetAddress> addresses = intf.getInetAddresses();
-                while (addresses.hasMoreElements()) {
-                    InetAddress address = addresses.nextElement();
-                    if (address instanceof Inet4Address) {
-                        return address;
-                    }
-                }
-                addresses = intf.getInetAddresses();
-                if (addresses.hasMoreElements()) {
-                    return addresses.nextElement();
-                }
-                return null;
-            } catch (SocketException e1) {
-                return null;
-            }
-        }
+        return m_localAddressSupplier.get();
     }
 
     public static long getHSIdFromHostAndSite(int host, int site) {
@@ -450,17 +426,31 @@ public class CoreUtils {
             if (!first) sb.append(", ");
             first = false;
             sb.append(CoreUtils.hsIdToString(entry.getKey()));
-            sb.append(entry.getValue());
+            sb.append("->").append(entry.getValue());
         }
         sb.append('}');
         return sb.toString();
     }
 
-    public static String hsIdEntriesToString(Collection<Map.Entry<Long, Long>> entries) {
+    public static String hsIdValueMapToString(Map<?, Long> m) {
         StringBuilder sb = new StringBuilder();
         sb.append('{');
         boolean first = true;
-        for (Map.Entry<Long, Long> entry : entries) {
+        for (Map.Entry<?, Long> entry : m.entrySet()) {
+            if (!first) sb.append(", ");
+            first = false;
+            sb.append(entry.getKey()).append("->");
+            sb.append(CoreUtils.hsIdToString(entry.getValue()));
+        }
+        sb.append('}');
+        return sb.toString();
+    }
+
+    public static String hsIdMapToString(Map<Long, Long> m) {
+        StringBuilder sb = new StringBuilder();
+        sb.append('{');
+        boolean first = true;
+        for (Map.Entry<Long, Long> entry : m.entrySet()) {
             if (!first) sb.append(", ");
             first = false;
             sb.append(CoreUtils.hsIdToString(entry.getKey())).append(" -> ");
@@ -473,4 +463,40 @@ public class CoreUtils {
     public static int availableProcessors() {
         return Math.max(1, Runtime.getRuntime().availableProcessors());
     }
+
+    public static final class RetryException extends RuntimeException {}
+    public static final <T> T retryHelper(
+            Callable<T> callable,
+            Long maxAttempts,
+            int startInterval,
+            TimeUnit startUnit,
+            int maxInterval,
+            TimeUnit maxUnit) {
+        Preconditions.checkNotNull(maxUnit);
+        Preconditions.checkNotNull(startUnit);
+        Preconditions.checkArgument(startUnit.toMillis(startInterval) >= 1);
+        Preconditions.checkArgument(maxUnit.toMillis(maxInterval) >= 1);
+        Preconditions.checkNotNull(callable);
+
+        long attemptsMax = maxAttempts == null ? Long.MAX_VALUE : maxAttempts;
+        long interval = startUnit.toMillis(startInterval);
+        long intervalMax = maxUnit.toMillis(maxInterval);
+        for (long ii = 0; ii < attemptsMax; ii++) {
+            try {
+                return callable.call();
+            } catch (RetryException e) {
+                try {
+                    interval *= 2;
+                    interval = Math.min(intervalMax, interval);
+                    Thread.sleep(interval);
+                } catch (InterruptedException e2) {
+                    Throwables.propagate(e2);
+                }
+            } catch (Exception e3) {
+                Throwables.propagate(e3);
+            }
+        }
+        return null;
+    }
+
 }

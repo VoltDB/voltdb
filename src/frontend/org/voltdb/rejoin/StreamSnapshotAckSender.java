@@ -30,16 +30,16 @@ public class StreamSnapshotAckSender implements Runnable {
     private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
 
     private final Mailbox m_mb;
-    private final LinkedBlockingQueue<Pair<Long, Pair<Long, Integer>>> m_blockIndices =
-            new LinkedBlockingQueue<Pair<Long, Pair<Long, Integer>>>();
+    private final LinkedBlockingQueue<Pair<Long, RejoinDataAckMessage>> m_blockIndices =
+        new LinkedBlockingQueue<Pair<Long, RejoinDataAckMessage>>();
 
     public StreamSnapshotAckSender(Mailbox mb) {
         m_mb = mb;
     }
 
     public void close() {
-        // an index of -1 will terminate the thread
-        m_blockIndices.offer(Pair.of(-1L, Pair.of(-1L, -1)));
+        // null message terminates the thread
+        m_blockIndices.offer(Pair.of(-1L, (RejoinDataAckMessage) null));
     }
 
     /**
@@ -47,34 +47,31 @@ public class StreamSnapshotAckSender implements Runnable {
      * @param hsId The mailbox to send the ack to
      * @param blockIndex
      */
-    public void ack(long hsId, long targetId, int blockIndex) {
-        m_blockIndices.offer(Pair.of(hsId, Pair.of(targetId, blockIndex)));
+    public void ack(long hsId, boolean isEOS, long targetId, int blockIndex) {
+        m_blockIndices.offer(Pair.of(hsId, new RejoinDataAckMessage(isEOS, targetId, blockIndex)));
     }
 
     @Override
     public void run() {
         while (true) {
             long hsId;
-            long targetId;
-            int blockIndex;
+            RejoinDataAckMessage ackMsg;
             try {
-                Pair<Long, Pair<Long, Integer>> blockToAck = m_blockIndices.take();
-                hsId = blockToAck.getFirst();
-                targetId = blockToAck.getSecond().getFirst();
-                blockIndex = blockToAck.getSecond().getSecond();
+                Pair<Long, RejoinDataAckMessage> work = m_blockIndices.take();
+                hsId = work.getFirst();
+                ackMsg = work.getSecond();
             } catch (InterruptedException e1) {
                 break;
             }
 
-            if (blockIndex == -1) {
+            if (ackMsg == null) {
                 rejoinLog.debug(m_blockIndices.size() + " acks remaining, " +
                         "terminating ack sender");
                 // special value of -1 terminates the thread
                 break;
             }
 
-            RejoinDataAckMessage msg = new RejoinDataAckMessage(targetId, blockIndex);
-            m_mb.send(hsId, msg);
+            m_mb.send(hsId, ackMsg);
         }
     }
 }

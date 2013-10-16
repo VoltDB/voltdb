@@ -44,6 +44,7 @@ import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultMetaData;
+import org.hsqldb_voltpatches.types.Type;
 
 /**
  * Implementation of Statement for query expressions.<p>
@@ -250,24 +251,31 @@ public class StatementQuery extends StatementDMQL {
             }
             try {
                 // read offset. it may be a parameter token.
+                VoltXMLElement offset = new VoltXMLElement("offset");
                 if (limitCondition.nodes[0].isParam == false) {
-                    Integer offset = (Integer)limitCondition.nodes[0].getValue(session);
-                    if (offset > 0) {
-                        query.attributes.put("offset", offset.toString());
+                    Integer offsetValue = (Integer)limitCondition.nodes[0].getValue(session);
+                    if (offsetValue > 0) {
+                        Expression expr = new ExpressionValue(offsetValue, Type.SQL_BIGINT);
+                        offset.children.add(expr.voltGetXML(session));
+                        offset.attributes.put("offset", offsetValue.toString());
                     }
+                } else {
+                    offset.attributes.put("offset_paramid", limitCondition.nodes[0].getUniqueId(session));
                 }
-                else {
-                    query.attributes.put("offset_paramid", limitCondition.nodes[0].getUniqueId(session));
-                }
+                query.children.add(offset);
 
                 // read limit. it may be a parameter token.
+                VoltXMLElement limit = new VoltXMLElement("limit");
                 if (limitCondition.nodes[1].isParam == false) {
-                    Integer limit = (Integer)limitCondition.nodes[1].getValue(session);
-                    query.attributes.put("limit", limit.toString());
+                    Integer limitValue = (Integer)limitCondition.nodes[1].getValue(session);
+                    Expression expr = new ExpressionValue(limitValue, Type.SQL_BIGINT);
+                    limit.children.add(expr.voltGetXML(session));
+                    limit.attributes.put("limit", limitValue.toString());
+                } else {
+                    limit.attributes.put("limit_paramid", limitCondition.nodes[1].getUniqueId(session));
                 }
-                else {
-                    query.attributes.put("limit_paramid", limitCondition.nodes[1].getUniqueId(session));
-                }
+                query.children.add(limit);
+
             } catch (HsqlException ex) {
                 // XXX really?
                 ex.printStackTrace();

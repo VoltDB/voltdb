@@ -485,6 +485,8 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
 
     assert(m_catalog != NULL);
     VOLT_DEBUG("Loading catalog...");
+
+    VOLT_TRACE("Catalog string contents:\n%s\n",catalogPayload.c_str());
     m_catalog->execute(catalogPayload);
 
 
@@ -727,7 +729,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                  indexIter != catalogTable->indexes().end();
                  indexIter++)
             {
-                std::string indexName = indexIter->first;
+                std::string indexName = indexIter->second->name();
                 std::string catalogIndexId = TableCatalogDelegate::getIndexIdString(*indexIter->second);
 
                 // Look for an index on the table to match the catalog index
@@ -840,9 +842,6 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                         targetTable = newTargetTable;
                     }
                 }
-                DEBUG_STREAM_HERE("Adding new mat view " << targetTable->name() << "@" << targetTable <<
-                                  " was @" << oldTargetTable <<
-                                  " on " << persistenttable->name() << "@" << persistenttable);
                 // This is not a leak -- the view metadata is self-installing into the new table.
                 // Also, it guards its targetTable from accidental deletion with a refcount bump.
                 new MaterializedViewMetadata(persistenttable, targetTable, currInfo);
@@ -1151,13 +1150,11 @@ void VoltDBEngine::initMaterializedViews(bool addAll) {
             PersistentTable *destTable = dynamic_cast<PersistentTable*>(m_tables[destCatalogTable->relativeIndex()]);
             // connect source and destination tables
             if (addAll || catalogView->wasAdded()) {
-                DEBUG_STREAM_HERE("Adding new mat view " << destTable->name() <<
-                                  " on " << srcTable->name());
                 // This is not a leak -- the materialized view is self-installing into srcTable.
                 new MaterializedViewMetadata(srcTable, destTable, catalogView);
             } else {
                 // Ensure that the materialized view is using the latest version of the target table.
-                srcTable->updateMaterializedViewTargetTable(destTable);
+                srcTable->updateMaterializedViewTargetTable(destTable, catalogView);
             }
         }
     }
@@ -1367,6 +1364,7 @@ ExecutorContext * VoltDBEngine::getExecutorContext() {
 bool VoltDBEngine::activateTableStream(
         const CatalogId tableId,
         TableStreamType streamType,
+        int64_t undoToken,
         ReferenceSerializeInput &serializeIn) {
     Table* found = getTable(tableId);
     if (! found) {
@@ -1379,14 +1377,16 @@ bool VoltDBEngine::activateTableStream(
         return false;
     }
 
+    setUndoToken(undoToken);
+
     // Crank up the necessary persistent table streaming mechanism(s).
-    if (table->activateStream(m_tupleSerializer, streamType, m_partitionId, tableId, serializeIn)) {
+    if (!table->activateStream(m_tupleSerializer, streamType, m_partitionId, tableId, serializeIn)) {
         return false;
     }
 
     // keep track of snapshotting tables. a table already in cow mode
     // can not be re-activated for cow mode.
-    if (streamType == TABLE_STREAM_SNAPSHOT) {
+    if (tableStreamTypeIsSnapshot(streamType)) {
         if (m_snapshottingTables.find(tableId) != m_snapshottingTables.end()) {
             assert(false);
             return false;
@@ -1402,18 +1402,13 @@ bool VoltDBEngine::activateTableStream(
 /**
  * Serialize tuples to output streams from a table in COW mode.
  * Overload that serializes a stream position array.
- * Returns:
- *  0-n: remaining tuple count
- *  -1: streaming was completed by the previous call
- *  -2: error, e.g. when no longer in COW mode.
- * Note that -1 is only returned once after the previous call serialized all
- * remaining tuples. Further calls are considered errors and will return -2.
+ * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
  */
 int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
                                                const TableStreamType streamType,
                                                ReferenceSerializeInput &serialize_in)
 {
-    int64_t remaining = -2;
+    int64_t remaining = TABLE_STREAM_SERIALIZATION_ERROR;
     try {
         std::vector<int> positions;
         remaining = tableStreamSerializeMore(tableId, streamType, serialize_in, positions);
@@ -1435,12 +1430,12 @@ int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
             }
         }
         VOLT_DEBUG("tableStreamSerializeMore: deserialized %d buffers, %ld remaining",
-                   (int)positions.size(), remaining);
+                   (int)positions.size(), (long)remaining);
     }
     catch (SerializableEEException &e) {
         resetReusedResultOutputBuffer();
         e.serialize(getExceptionOutputSerializer());
-        remaining = -2; // error
+        remaining = TABLE_STREAM_SERIALIZATION_ERROR;
     }
 
     return remaining;
@@ -1449,12 +1444,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
 /**
  * Serialize tuples to output streams from a table in COW mode.
  * Overload that populates a position vector provided by the caller.
- * Returns:
- *  0-n: remaining tuple count
- *  -1: streaming was completed by the previous call
- *  -2: error, e.g. when no longer in COW mode.
- * Note that -1 is only returned once after the previous call serialized all
- * remaining tuples. Further calls are considered errors and will return -2.
+ * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
  */
 int64_t VoltDBEngine::tableStreamSerializeMore(
         const CatalogId tableId,
@@ -1484,35 +1474,30 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
     // time (it doesn't see the hasMore return code).
     int64_t remaining = -1;
     PersistentTable *table = NULL;
-    switch (streamType) {
-        case TABLE_STREAM_SNAPSHOT: {
-            // If a completed table is polled, return 0 bytes serialized. The
-            // Java engine will always poll a fully serialized table one more
-            // time (it doesn't see the hasMore return code).  Note that the
-            // dynamic cast was already verified in activateCopyOnWrite.
-            table = findInMapOrNull(tableId, m_snapshottingTables);
-            break;
+    if (tableStreamTypeIsSnapshot(streamType)) {
+        // If a completed table is polled, return 0 bytes serialized. The
+        // Java engine will always poll a fully serialized table one more
+        // time (it doesn't see the hasMore return code).  Note that the
+        // dynamic cast was already verified in activateCopyOnWrite.
+        table = findInMapOrNull(tableId, m_snapshottingTables);
+    }
+    else if (tableStreamTypeIsValid(streamType)) {
+        Table* found = getTable(tableId);
+        if (found) {
+            table = dynamic_cast<PersistentTable*>(found);
         }
-
-        case TABLE_STREAM_RECOVERY: {
-            Table* found = getTable(tableId);
-            if (found) {
-                table = dynamic_cast<PersistentTable*>(found);
-            }
-            break;
-        }
-
-        default:
-            // Failure.
-            return -2;
+    }
+    else {
+        // Failure.
+        return -1;
     }
 
     // Perform the streaming.
     if (table != NULL) {
-        remaining = table->streamMore(outputStreams, retPositions);
+        remaining = table->streamMore(outputStreams, streamType, retPositions);
 
         // Clear it from the snapshot table as appropriate.
-        if (remaining <= 0 && streamType == TABLE_STREAM_SNAPSHOT) {
+        if (remaining <= 0 && tableStreamTypeIsSnapshot(streamType)) {
             m_snapshottingTables.erase(tableId);
             table->decrementRefcount();
         }

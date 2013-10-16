@@ -36,8 +36,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
-import org.voltdb.export.ExportTestClient;
-import org.voltdb.exportclient.ExportClientException;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing1;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing2;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing3;
@@ -224,33 +223,6 @@ public class TestSecuritySuite extends RegressionSuite {
         assertTrue(exceptionThrown);
     }
 
-    public void testAllowedExportConnectorPermissions() throws ExportClientException {
-        // user1 can connect (in groups list)
-        ExportTestClient eclient = new ExportTestClient(1, port(0));
-        eclient.addCredentials("user1", "password");
-        eclient.connect();
-        eclient.disconnect();
-
-        // Expected to throw an exception on failure
-        assertTrue(true);
-    }
-
-    public void testRejectedExportConnectorPermissions() {
-        boolean caught = false;
-        ExportTestClient eclient = new ExportTestClient(1, port(0));
-        try {
-            // bad group
-            eclient.addCredentials("user2", "password");
-            eclient.connect();
-        }
-        catch (ExportClientException e) {
-            caught = true;
-        }
-        assertTrue(caught);
-
-        eclient.disconnect();
-    }
-
     // Tests permissions applied to auto-generated default CRUD procedures.
     public void testDefaultProcPermissions() throws Exception {
         Client client;
@@ -326,10 +298,10 @@ public class TestSecuritySuite extends RegressionSuite {
         project.addGroups(groups);
         project.setSecurityEnabled(true);
 
-        ArrayList<String> elgroups = new ArrayList<String>();
-        elgroups.add("group1");
-
-        project.addExport("org.voltdb.export.processors.RawProcessor", true /*enabled*/, elgroups);
+        // export disabled in community
+        if (MiscUtils.isPro()) {
+            project.addExport(true /*enabled*/);
+        }
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 1 Local Site/Partitions running on JNI backend

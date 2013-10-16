@@ -21,7 +21,6 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 
@@ -127,13 +126,7 @@ public class SchemaColumn
     @Override
     public int hashCode () {
         // based on implementation of equals
-        int result = 0;
-        if (m_tableAlias != null && !m_tableAlias.equals("")) {
-            result = m_tableAlias.hashCode();
-        } else {
-            result = m_tableName.hashCode();
-        }
-
+        int result = m_tableName.hashCode();
         if (m_columnName != null && !m_columnName.equals("")) {
             result += m_columnName.hashCode();
         } else if (m_columnAlias != null && !m_columnAlias.equals("")) {
@@ -249,7 +242,8 @@ public class SchemaColumn
         stringer.endObject();
     }
 
-    public static SchemaColumn fromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+    public static SchemaColumn fromJSONObject(JSONObject jobj) throws JSONException
+    {
         String tableName = "";
         String tableAlias = "";
         String columnName = "";
@@ -258,9 +252,7 @@ public class SchemaColumn
         if( !jobj.isNull( Members.COLUMN_NAME.name() ) ){
             columnName = jobj.getString( Members.COLUMN_NAME.name() );
         }
-        if( !jobj.isNull( Members.EXPRESSION.name() ) ) {
-            expression = AbstractExpression.fromJSONObject( jobj.getJSONObject( Members.EXPRESSION.name() ), db);
-        }
+        expression = AbstractExpression.fromJSONChild(jobj, Members.EXPRESSION.name());
         return new SchemaColumn( tableName, tableAlias, columnName, columnAlias, expression );
     }
 

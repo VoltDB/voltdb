@@ -51,9 +51,9 @@ import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
-import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
@@ -61,8 +61,9 @@ import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
-import org.voltdb.export.processors.RawProcessor;
+import org.voltdb.export.ExportInternalMessage;
 import org.voltdb.fault.FaultHandler;
 import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault;
@@ -71,7 +72,6 @@ import org.voltdb.iv2.JoinProducerBase;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.MockExecutionEngine;
 import org.voltdb.messaging.CompleteTransactionMessage;
-import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -86,8 +86,6 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
 import org.voltdb.utils.CachedByteBufferAllocator;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
-
-import com.google.common.collect.ImmutableMap;
 
 /**
  * The main executor of transactional work in the system. Controls running
@@ -167,7 +165,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         return latestUndoToken;
     }
 
-    @Override
     public long getNextUndoToken() {
         return ++latestUndoToken;
     }
@@ -175,7 +172,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     // Each execution site manages snapshot using a SnapshotSiteProcessor
     private final SnapshotSiteProcessor m_snapshotter;
 
-    private RecoverySiteProcessor m_recoveryProcessor = null;
     // The following variables are used for new rejoin
     private StreamSnapshotSink m_rejoinSnapshotProcessor = null;
     private volatile long m_rejoinSnapshotTxnId = -1;
@@ -444,72 +440,14 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     }
 
     /**
-     * Passed to recovery processors which forward non-recovery messages to this handler.
-     * Also used when recovery is enabled and there is no recovery processor for messages
-     * received once the priority queue is initialized and returning txns. It is necessary
-     * to do the special prehandling in this handler where txnids that are earlier then what
-     * has been released from the queue during recovery because multi-part txns can involve
-     * the recovering partition after the queue has already released work after the multi-part txn.
-     * The recovering partition was going to give an empty responses anyways so it is fine to do
-     * that in this message handler.
-     */
-    private final MessageHandler m_recoveryMessageHandler = new MessageHandler() {
-        @Override
-        public void handleMessage(VoltMessage message, long txnId) {
-            if (message instanceof TransactionInfoBaseMessage) {
-                long noticeTxnId = ((TransactionInfoBaseMessage)message).getTxnId();
-                /**
-                 * If the recovery processor and by extension this site receives
-                 * a message regarding a txnid < the current supplied txnId then
-                 * the message is for a multi-part txn that this site is a member of
-                 * but doesn't have any info for. Send an ack with no extra processing.
-                 */
-                if (noticeTxnId < txnId) {
-                    if (message instanceof CompleteTransactionMessage) {
-                        CompleteTransactionMessage complete = (CompleteTransactionMessage)message;
-                        CompleteTransactionResponseMessage ctrm =
-                            new CompleteTransactionResponseMessage(complete, m_siteId);
-                        m_mailbox.send(complete.getCoordinatorHSId(), ctrm);
-                    } else if (message instanceof FragmentTaskMessage) {
-                        FragmentTaskMessage ftask = (FragmentTaskMessage)message;
-                        FragmentResponseMessage response = new FragmentResponseMessage(ftask, m_siteId);
-                        response.setRecovering(true);
-                        response.setStatus(FragmentResponseMessage.SUCCESS, null);
-
-                        // add a dummy table for all of the expected dependency ids
-                        for (int i = 0; i < ftask.getFragmentCount(); i++) {
-                            response.addDependency(ftask.getOutputDepId(i),
-                                    new VoltTable(new VoltTable.ColumnInfo("DUMMY", VoltType.BIGINT)));
-                        }
-
-                        m_mailbox.send(response.getDestinationSiteId(), response);
-                    } else {
-                        handleMailboxMessageNonRecursable(message);
-                    }
-                } else {
-                    handleMailboxMessageNonRecursable(message);
-                }
-            } else {
-                handleMailboxMessageNonRecursable(message);
-            }
-
-        }
-    };
-
-    /**
      * This is invoked after all recovery data has been received/sent. The processor can be nulled out for GC.
      */
     private final Runnable m_onRejoinCompletion = new Runnable() {
         @Override
         public void run() {
             final long now = System.currentTimeMillis();
-            final boolean liveRejoin = m_recoveryProcessor == null;
+            final boolean liveRejoin = true;
             long transferred = 0;
-            if (m_recoveryProcessor != null) {
-                transferred = m_recoveryProcessor.bytesTransferred();
-            } else {
-                transferred = m_rejoinSnapshotBytes;
-            }
             final long bytesTransferredTotal = m_recoveryBytesTransferred.addAndGet(transferred);
             final long megabytes = transferred / (1024 * 1024);
             final double megabytesPerSecond = megabytes / ((now - m_recoveryStartTime) / 1000.0);
@@ -525,7 +463,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                         duration + " seconds at a rate of " +
                         throughput + " tasks/second");
             }
-            m_recoveryProcessor = null;
             m_rejoinSnapshotProcessor = null;
             m_rejoinSnapshotTxnId = -1;
             m_rejoinSnapshotFinished = false;
@@ -634,10 +571,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         @Override
         public long getCurrentTxnId()                           { return m_currentTransactionState.txnId; }
         @Override
-        public long getNextUndo()                               { return getNextUndoToken(); }
-        @Override
-        public ImmutableMap<String, ProcedureRunner> getProcedures() { return m_loadedProcedures.procs; }
-        @Override
         public long getSiteId()                                 { return m_siteId; }
         @Override
         public boolean isLowestSiteId()                         { return m_siteId == m_tracker.getLowestSiteForHost(getHostId()); }
@@ -649,8 +582,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         public long getCatalogCRC()                             { return m_context.getCatalogCRC(); }
         @Override
         public int getCatalogVersion()                          { return m_context.catalogVersion; }
-        @Override
-        public SiteTracker getSiteTracker()                     { return m_tracker; }
         @Override
         public SiteTracker getSiteTrackerForSnapshot()          { return m_tracker; }
         @Override
@@ -687,7 +618,19 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         @Override
         public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config)
         {
-            //To change body of implemented methods use File | Settings | File Templates.
+        }
+
+        @Override
+        public boolean activateTableStream(int tableId, TableStreamType type, boolean undo, byte[] predicates)
+        {
+            return false;
+        }
+
+        @Override
+        public Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
+                                                          List<DBBPool.BBContainer> outputBuffers)
+        {
+            return Pair.of(0l, new int[0]);
         }
     }
 
@@ -707,7 +650,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         m_mailbox = null;
 
         // initialize the DR gateway
-        m_partitionDRGateway = new PartitionDRGateway(false);
+        m_partitionDRGateway = new PartitionDRGateway();
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
@@ -751,7 +694,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
         // initialize the DR gateway
         m_partitionDRGateway =
-            PartitionDRGateway.getInstance(partitionId, nodeDRGateway, false, m_rejoining);
+            PartitionDRGateway.getInstance(partitionId, nodeDRGateway, m_rejoining);
 
         if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
             ee = new MockExecutionEngine();
@@ -849,8 +792,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                     if (message == null) {
                         //Will return null if there is no work, safe to block on the mailbox if there is no work
                         boolean hadWork =
-                            (m_snapshotter.doSnapshotWork(m_systemProcedureContext,
-                                    ee) != null);
+                            (m_snapshotter.doSnapshotWork(m_systemProcedureContext) != null);
 
                         /*
                          * Do rejoin work here before it blocks on the mailbox
@@ -875,7 +817,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                         handleMailboxMessage(message);
                     } else {
                         //idle, do snapshot work
-                        m_snapshotter.doSnapshotWork(m_systemProcedureContext, ee);
+                        m_snapshotter.doSnapshotWork(m_systemProcedureContext);
                         // do some rejoin work
                         doRejoinWork();
                     }
@@ -967,7 +909,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             // m_recoveryLog.info("table " + tableId + ": " + table.toString());
 
             // Long.MAX_VALUE is a no-op don't track undo token
-            loadTable(m_rejoinSnapshotTxnId, tableId, table, false, Long.MAX_VALUE);
+            loadTable(m_rejoinSnapshotTxnId, tableId, table, false, false);
             doneWork = true;
         } else if (m_rejoinSnapshotProcessor.isEOF()) {
             m_rejoinLog.debug("Rejoin snapshot transfer is finished");
@@ -1006,7 +948,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         m_recoveryStartTime = System.currentTimeMillis();
 
         // Construct a snapshot stream receiver
-        m_rejoinSnapshotProcessor = new StreamSnapshotSink();
+        m_rejoinSnapshotProcessor = new StreamSnapshotSink(VoltDB.instance().getHostMessenger().createMailbox());
 
         long hsId = m_rejoinSnapshotProcessor.initialize(1, null);
 
@@ -1182,8 +1124,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     }
 
     private void handleMailboxMessage(VoltMessage message) {
-        if (m_rejoining == true && m_recoveryProcessor == null && m_currentTransactionState != null) {
-            m_recoveryMessageHandler.handleMessage(message, m_currentTransactionState.txnId);
+        if (m_rejoining == true && m_currentTransactionState != null) {
         } else {
             handleMailboxMessageNonRecursable(message);
         }
@@ -1237,7 +1178,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
              * rejoin. New rejoin request cannot be processed now. Telling the
              * rejoining site to retry later.
              */
-            if (m_recoveryProcessor != null || m_rejoinSnapshotProcessor != null) {
+            if (m_rejoinSnapshotProcessor != null) {
                 m_rejoinLog.error("ExecutionSite is not ready to handle " +
                         "recovery request from site " +
                         CoreUtils.hsIdToString(rm.sourceSite()));
@@ -1252,17 +1193,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                     "Recovery initiate received at site " + CoreUtils.hsIdToString(m_siteId) +
                     " from site " + CoreUtils.hsIdToString(rm.sourceSite()) + " requesting recovery start before txnid " +
                     recoveringPartitionTxnId);
-
-            m_recoveryProcessor = RecoverySiteProcessorSource.createProcessor(
-                        this,
-                        rm,
-                        m_context.database,
-                        m_tracker,
-                        ee,
-                        m_mailbox,
-                        m_siteId,
-                        m_onRejoinCompletion,
-                        m_recoveryMessageHandler);
         }
         else if (message instanceof RejoinMessage) {
             RejoinMessage rm = (RejoinMessage) message;
@@ -1277,23 +1207,22 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             {
             }
         }
-        else if (message instanceof RawProcessor.ExportInternalMessage) {
-            RawProcessor.ExportInternalMessage exportm =
-                (RawProcessor.ExportInternalMessage) message;
+        else if (message instanceof ExportInternalMessage) {
+            ExportInternalMessage exportm = (ExportInternalMessage) message;
             ee.exportAction(exportm.m_m.isSync(),
                                 exportm.m_m.getAckOffset(),
                                 0,
                                 exportm.m_m.getPartitionId(),
                                 exportm.m_m.getSignature());
         } else if (message instanceof PotentialSnapshotWorkMessage) {
-            m_snapshotter.doSnapshotWork(m_systemProcedureContext, ee);
+            m_snapshotter.doSnapshotWork(m_systemProcedureContext);
         }
         else if (message instanceof ExecutionSiteLocalSnapshotMessage) {
             hostLog.info("Executing local snapshot. Completing any on-going snapshots.");
 
             // first finish any on-going snapshot
             try {
-                HashSet<Exception> completeSnapshotWork = m_snapshotter.completeSnapshotWork(m_systemProcedureContext, ee);
+                HashSet<Exception> completeSnapshotWork = m_snapshotter.completeSnapshotWork(m_systemProcedureContext);
                 if (completeSnapshotWork != null && !completeSnapshotWork.isEmpty()) {
                     for (Exception e : completeSnapshotWork) {
                         hostLog.error("Error completing in progress snapshot.", e);
@@ -1323,6 +1252,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                                       null,
                                       m_systemProcedureContext,
                                       CoreUtils.getHostnameOrAddress(),
+                                      null,
                                       TransactionIdManager
                                           .getTimestampFromTransactionId(snapshotMsg.m_roadblockTransactionId));
             if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty() &&
@@ -1412,12 +1342,14 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
     @Override
     public void initiateSnapshots(
+            SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
             List<SnapshotDataTarget> targets,
             long txnId,
             int numLiveHosts,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
-        m_snapshotter.initiateSnapshots(ee, tasks, targets, txnId, numLiveHosts, exportSequenceNumbers);
+        m_snapshotter.initiateSnapshots(m_systemProcedureContext, format, tasks, targets, txnId, numLiveHosts,
+                                        exportSequenceNumbers);
     }
 
     /*
@@ -1426,7 +1358,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
      */
     @Override
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException {
-        return m_snapshotter.completeSnapshotWork(m_systemProcedureContext, ee);
+        return m_snapshotter.completeSnapshotWork(m_systemProcedureContext);
     }
 
 
@@ -1457,7 +1389,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             String tableName,
             VoltTable data,
             boolean returnUniqueViolations,
-            long undoToken)
+            boolean undo)
     throws VoltAbortException
     {
         Cluster cluster = m_context.cluster;
@@ -1473,7 +1405,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
         }
 
-        return loadTable(txnId, table.getRelativeIndex(), data, returnUniqueViolations, undoToken);
+        return loadTable(txnId, table.getRelativeIndex(), data, returnUniqueViolations, undo);
     }
 
     /**
@@ -1484,12 +1416,12 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     @Override
     public byte[] loadTable(long txnId, int tableId,
             VoltTable data, boolean returnUniqueViolations,
-            long undoToken) {
+            boolean undo) {
         return ee.loadTable(tableId, data,
                      txnId,
                      lastCommittedTxnId,
                      returnUniqueViolations,
-                     undoToken);
+                     undo ? getNextUndoToken() : Long.MAX_VALUE);
     }
 
     @Override
@@ -1511,14 +1443,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             lastCommittedTxnId,
             txnIdAsUniqueId,
             readOnly ? Long.MAX_VALUE : getNextUndoToken());
-    }
-
-    @Override
-    public void simulateExecutePlanFragments(long txnId, boolean readOnly) {
-        if (!readOnly) {
-            // pretend real work was done
-            getNextUndoToken();
-        }
     }
 
     /**
@@ -1688,7 +1612,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
     // do-nothing implementation of IV2 SiteProcedeConnection API
     @Override
-    public void truncateUndoLog(boolean rollback, long token, long txnId, long spHandle) {
+    public void truncateUndoLog(boolean rollback, long token, long txnId, long spHandle, List<UndoAction> undoLog) {
         throw new RuntimeException("Unsupported IV2-only API.");
     }
 
@@ -1758,7 +1682,8 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     @Override
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction ignored,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            boolean requireExistingSequenceNumbers) {
         throw new RuntimeException("setRejoinComplete is an IV2-only interface.");
     }
 

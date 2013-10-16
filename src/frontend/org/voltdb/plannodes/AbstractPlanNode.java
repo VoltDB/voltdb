@@ -393,6 +393,12 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         child.m_parents.add(this);
     }
 
+    // called by PushDownLimit, re-link the child without changing the order
+    public void setAndLinkChild(int index, AbstractPlanNode child) {
+        m_children.set(index, child);
+        child.m_parents.add(this);
+    }
+
     /** Remove child from this node.
      * @param child to remove.
      */
@@ -868,7 +874,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             jarray = jobj.getJSONArray( Members.OUTPUT_SCHEMA.name() );
             int size = jarray.length();
             for( int i = 0; i < size; i++ ) {
-                m_outputSchema.addColumn( SchemaColumn.fromJSONObject(jarray.getJSONObject(i), db) );
+                m_outputSchema.addColumn( SchemaColumn.fromJSONObject(jarray.getJSONObject(i)) );
             }
         }
     }

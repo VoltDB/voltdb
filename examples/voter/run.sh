@@ -27,7 +27,7 @@ APPCLASSPATH=$CLASSPATH:$({ \
 CLIENTCLASSPATH=$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
     \ls -1 "$VOLTDB_LIB"/commons-cli-1.2.jar; \
-    \ls -1 "$VOLTDB_LIB"/guava-12.0.jar; \
+    \ls -1 "$VOLTDB_LIB"/guava-15.0.jar; \
 } 2> /dev/null | paste -sd ':' - )
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
@@ -42,7 +42,7 @@ function clean() {
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -target 1.6 -source 1.6 -classpath $APPCLASSPATH -d obj \
+    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH -d obj \
         src/voter/*.java \
         src/voter/procedures/*.java
     # stop if compilation fails

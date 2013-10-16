@@ -11,30 +11,37 @@ def str_search_2 = "performance-" + str_nextrelease
 def str_search_3 = "endurance-" + str_nextrelease
 def str_oldbranch = "master"
 
-def str_branch = "stream-refactor"
+def str_branch = "ENG-5057-csvloader"
 boolean enable_performance = false
 boolean enable_systemtest = false
+boolean enable_supers = false
+boolean replace = true // delete existing jobs, if any dont change there is a bug -pr
 
 def workspace_name = str_search_1.replace("nextrelease", str_branch)
 //whitespace separated list of email addresses
-def recipientlist = "prosegay@voltdb.com"
+def recipientlist = "qa@voltdb.com"
 
 AbstractProject kit = null
 downstream = ""
 
 alljobs = []
 
+def view = Hudson.instance.getView("system tests")
+
+/*
 for (item in Hudson.instance.items) {
    if (! item.disabled && (item.getName().contains(str_search_1) ||
                 item.getName().contains(str_search_2) ||
                            item.getName().contains(str_search_3))) {
-                  
-    if (item.getName().contains("kit-"))
+*/
+for(item in view.getItems()) {
+    if (item.disabled)
+         continue
+    if (item.getName().startsWith("kit-"))
       alljobs.add(0, item)
     else
       alljobs.add(item)
    }
-}
 
 for(item in alljobs)
 {
@@ -45,7 +52,10 @@ for(item in alljobs)
 
       // delete existing job with new name
       if (Hudson.instance.getJob(newName))
-            Hudson.instance.getJob(newName).delete()
+            if (replace)
+                Hudson.instance.getJob(newName).delete()
+            else
+                continue
 
       // copy the job, disable and save it
       def job = Hudson.instance.copy(item, newName)
@@ -77,17 +87,18 @@ for(item in alljobs)
 
     // option to remove cron triggers and trigger everthing from the kit build
     if (true) {
+        println "getTrigger"
         try {
-            t = job.getTrigger(triggers.TimerTrigger)
-            //println t.getSpec() // crontab specification as string ie. "0 22 * * *"
-            // to create a new trigger use addTrigger(new Trigger("0 22 * * *"))
-            if (t != null)
-              job.removeTrigger(t.getDescriptor())
-            if (project != kit) {
-              // make a list of all jobs for a BuildTrigger for the kit build job
-              downstream = downstream + "," + project.getName() // make a list of downstream projects
-            }
-        catch(e) { println "no Timer Trigger found" }
+        t = job.getTrigger(triggers.TimerTrigger)  
+        println t.getSpec() // crontab specification as string ie. "0 22 * * *"
+        // to create a new trigger use addTrigger(new Trigger("0 22 * * *"))
+        if (t != null)
+          job.removeTrigger(t.getDescriptor())
+        if (project != kit) {
+          // make a list of all jobs for a BuildTrigger for the kit build job
+          downstream = downstream + "," + project.getName() // make a list of downstream projects
+        }
+      } catch(e) { println "no timer trigger found" }
     }
 
     // option to modify build timeout
@@ -110,8 +121,13 @@ for(item in alljobs)
 
       if (project.getName().startsWith("performance-"))
           project.disabled = !enable_performance
-      if (project.getName().startsWith("system-test-"))
+      else if (project.getName().startsWith("system-test-"))
           project.disabled = !enable_systemtest
+      else if (project.getName().startsWith("test-"))
+          project.disabled = !enable_supers
+     else
+          project.disabled = false
+
 
       project.save()
 

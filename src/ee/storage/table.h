@@ -383,7 +383,12 @@ protected:
     void resetTable();
 
     bool compactionPredicate() {
-        assert(m_tuplesPinnedByUndo == 0);
+        //Unfortunate work around for the fact that multiple undo quantums cause this to happen
+        //Ideally there would be one per transaction and we could hard fail or
+        //the undo log would only trigger compaction once per transaction
+        if (m_tuplesPinnedByUndo != 0) {
+            return false;
+        }
         return allocatedTupleCount() - activeTupleCount() > (m_tuplesPerBlock * 3) && loadFactor() < .95;
     }
 

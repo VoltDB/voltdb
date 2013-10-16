@@ -35,7 +35,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.PriorityBlockingQueue;
 
-import com.google.common.collect.ImmutableSet;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -45,7 +44,6 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
-
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.export.ExportManager;
@@ -57,6 +55,8 @@ import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
+
+import com.google.common.collect.ImmutableSet;
 
 /**
  * This breaks up VoltDB initialization tasks into discrete units.
@@ -282,12 +282,7 @@ public class Inits {
                     hostLog.debug(String.format("Sending %d catalog bytes", catalogBytes.length));
 
                     long catalogTxnId;
-                    if (m_rvdb.isIV2Enabled()) {
-                        catalogTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
-                    } else {
-                        catalogTxnId =
-                                org.voltdb.TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0);
-                    }
+                    catalogTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
 
                     // get a hash of the catalog - should never actually throw
                     MessageDigest md = null;
@@ -417,11 +412,7 @@ public class Inits {
             }
 
             if (logEnabled) {
-                if (!m_config.m_isEnterprise) {
-                    hostLog.warn(
-                            "Command logging requested in deployment file but can't be enabled in Community Edition.");
-                }
-                else {
+                if (m_config.m_isEnterprise) {
                     try {
                         Class<?> loggerClass = MiscUtils.loadProClass("org.voltdb.CommandLogImpl",
                                                                    "Command logging", false);
@@ -622,9 +613,19 @@ public class Inits {
         @Override
         public void run() {
             // Initialize the complex partitioning scheme
+            int partitionCount;
+            if (m_config.m_startAction == StartAction.JOIN) {
+                // Initialize the hashinator with the existing partition count in the cluster,
+                // don't include the partitions that we're adding because they shouldn't contain
+                // any ranges yet.
+                partitionCount = m_rvdb.m_cartographer.getPartitionCount();
+            } else {
+                partitionCount = m_rvdb.m_configuredNumberOfPartitions;
+            }
+
             TheHashinator.initialize(
-                    TheHashinator.getConfiguredHashinatorClass(),
-                    TheHashinator.getConfigureBytes(m_rvdb.m_configuredNumberOfPartitions));
+                TheHashinator.getConfiguredHashinatorClass(),
+                TheHashinator.getConfigureBytes(partitionCount));
         }
     }
 

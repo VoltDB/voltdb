@@ -23,39 +23,43 @@
 
 package org.voltdb.iv2;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.doReturn;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-import junit.framework.TestCase;
-
+import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.InOrder;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.Pair;
-import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.TheHashinator;
+import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 
-public class TestMpPromoteAlgo extends TestCase
+public class TestMpPromoteAlgo
 {
+    Pair<Long,byte[]> m_hashinatorConfig;
+
     long txnEgo(long handle)
     {
         // repair log uses long.max_value in the header response
@@ -103,11 +107,12 @@ public class TestMpPromoteAlgo extends TestCase
 
 
     Iv2RepairLogResponseMessage makeRealAckResponse(long requestId,
-            long sourceHSId, int sequence, int ofTotal, long handle)
+            long sourceHSId, int sequence, int ofTotal, long handle,
+            Pair<Long,byte[]> versionedHashinatorConfig)
     {
         assertEquals(0, sequence);
-        Iv2RepairLogResponseMessage m = new Iv2RepairLogResponseMessage(requestId, sequence,
-            ofTotal, handle, handle, null);
+        Iv2RepairLogResponseMessage m = new Iv2RepairLogResponseMessage(requestId,
+            ofTotal, handle, handle, versionedHashinatorConfig);
         m.m_sourceHSId = sourceHSId;
         return m;
     }
@@ -131,6 +136,17 @@ public class TestMpPromoteAlgo extends TestCase
 //        when(m.getRequestId()).thenReturn(requestId);
 //        return m;
 //    }
+
+    @BeforeClass
+    static public void initializeHashinator() {
+        TheHashinator.setConfiguredHashinatorType(HashinatorType.ELASTIC);
+        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(8));
+    }
+
+    @Before
+    public void setUp() {
+        m_hashinatorConfig = TheHashinator.getCurrentVersionedConfigCooked();
+    }
 
     // verify that responses are correctly unioned and ordered.
     @Test
@@ -194,19 +210,24 @@ public class TestMpPromoteAlgo extends TestCase
         verify(mailbox, times(1)).send(any(long[].class), any(Iv2RepairLogRequestMessage.class));
 
         // has a frag for txn 1000. MP handle is 1000L
-        algo.deliver(makeRealAckResponse(requestId, 1L, 0, 2, txnEgo(1000L)));
+        algo.deliver(makeRealAckResponse(requestId, 1L, 0, 2, txnEgo(1000L), m_hashinatorConfig));
         algo.deliver(makeRealFragResponse(requestId, 1L, 1, 2, txnEgo(1000L)));
 
         // has only the normal ack. Never saw an MP transaction.
-        algo.deliver(makeRealAckResponse(requestId, 2L, 0, 1, Long.MAX_VALUE));
+        algo.deliver(makeRealAckResponse(requestId, 2L, 0, 1, Long.MAX_VALUE, m_hashinatorConfig));
 
         // also has a complete. MP handle is 1000L
-        algo.deliver(makeRealAckResponse(requestId, 3L, 0, 3, txnEgo(1000L)));
+        // and deliver a newer version of the hashinator config
+        Pair<Long,byte[]> torv3 = Pair.of(
+                m_hashinatorConfig.getFirst()+1,
+                m_hashinatorConfig.getSecond()
+                );
+        algo.deliver(makeRealAckResponse(requestId, 3L, 0, 3, txnEgo(1000L), torv3));
         algo.deliver(makeRealFragResponse(requestId, 3L, 1, 3, txnEgo(1000L)));
         algo.deliver(makeRealCompleteResponse(requestId, 3L, 2, 3, txnEgo(1000L)));
 
         // deliver the same complete from the MPI's repair log
-        algo.deliver(makeRealAckResponse(requestId, 4L, 0, 2, txnEgo(1000L)));
+        algo.deliver(makeRealAckResponse(requestId, 4L, 0, 2, txnEgo(1000L), m_hashinatorConfig));
         algo.deliver(makeRealCompleteResponse(requestId, 4L, 1, 2, txnEgo(1000L)));
 
         // Verify that we send a complete to every site.
@@ -217,6 +238,9 @@ public class TestMpPromoteAlgo extends TestCase
         verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
         Pair<Boolean, Long> real_result = result.get();
         assertEquals(txnEgo(1000L), (long)real_result.getSecond());
+
+        // check if the hashinator was updated to the newer version
+        assertEquals(torv3.getFirst(), TheHashinator.getCurrentVersionedConfig().getFirst());
     }
 
     @Test
@@ -237,7 +261,7 @@ public class TestMpPromoteAlgo extends TestCase
         // Master 1
         // First, everyone completed
         // has a frag for txn 1000. MP handle is 1000L
-        algo.deliver(makeRealAckResponse(requestId,      1L, 0, 8, txnEgo(1000L)));
+        algo.deliver(makeRealAckResponse(requestId,      1L, 0, 8, txnEgo(1000L), m_hashinatorConfig));
         algo.deliver(makeRealFragResponse(requestId,     1L, 1, 8, txnEgo(1000L)));
         algo.deliver(makeRealCompleteResponse(requestId, 1L, 2, 8, txnEgo(1000L)));
         // Second, 3 will lose complete
@@ -251,7 +275,7 @@ public class TestMpPromoteAlgo extends TestCase
 
         // Master 2
         // has only the normal ack. Never saw an MP transaction.
-        algo.deliver(makeRealAckResponse(requestId,      2L, 0, 6, txnEgo(1000L)));
+        algo.deliver(makeRealAckResponse(requestId,      2L, 0, 6, txnEgo(1000L), m_hashinatorConfig));
         algo.deliver(makeRealFragResponse(requestId,     2L, 1, 6, txnEgo(1000L)));
         algo.deliver(makeRealCompleteResponse(requestId, 2L, 2, 6, txnEgo(1000L)));
         // second, 3 loses complete
@@ -262,7 +286,7 @@ public class TestMpPromoteAlgo extends TestCase
 
         // Master 3
         // also has a complete. MP handle is 1000L
-        algo.deliver(makeRealAckResponse(requestId,      3L, 0, 4, txnEgo(1000L)));
+        algo.deliver(makeRealAckResponse(requestId,      3L, 0, 4, txnEgo(1000L), m_hashinatorConfig));
         algo.deliver(makeRealFragResponse(requestId,     3L, 1, 4, txnEgo(1000L)));
         algo.deliver(makeRealCompleteResponse(requestId, 3L, 2, 4, txnEgo(1000L)));
         // 3 loses complete
@@ -270,7 +294,7 @@ public class TestMpPromoteAlgo extends TestCase
 
         // MPI
         // Deliver the last complete
-        algo.deliver(makeRealAckResponse(requestId, 4L, 0, 2, txnEgo(1002L)));
+        algo.deliver(makeRealAckResponse(requestId, 4L, 0, 2, txnEgo(1002L), m_hashinatorConfig));
         algo.deliver(makeRealCompleteResponse(requestId, 4L, 1, 2, txnEgo(1002L)));
 
         // We should send to all hosts in all cases for all non-truncated MP txns now
@@ -301,16 +325,16 @@ public class TestMpPromoteAlgo extends TestCase
         verify(mailbox, times(1)).send(any(long[].class), any(Iv2RepairLogRequestMessage.class));
 
         // has only the normal ack. Never saw an MP transaction.
-        algo.deliver(makeRealAckResponse(requestId, 1L, 0, 1, Long.MAX_VALUE));
+        algo.deliver(makeRealAckResponse(requestId, 1L, 0, 1, Long.MAX_VALUE, m_hashinatorConfig));
 
         // has only the normal ack. Never saw an MP transaction.
-        algo.deliver(makeRealAckResponse(requestId, 2L, 0, 1, Long.MAX_VALUE));
+        algo.deliver(makeRealAckResponse(requestId, 2L, 0, 1, Long.MAX_VALUE, m_hashinatorConfig));
 
         // has only the normal ack. Never saw an MP transaction.
-        algo.deliver(makeRealAckResponse(requestId, 3L, 0, 1, Long.MAX_VALUE));
+        algo.deliver(makeRealAckResponse(requestId, 3L, 0, 1, Long.MAX_VALUE, m_hashinatorConfig));
 
         // has only the normal ack. Never saw an MP transaction.
-        algo.deliver(makeRealAckResponse(requestId, 4L, 0, 1, Long.MAX_VALUE));
+        algo.deliver(makeRealAckResponse(requestId, 4L, 0, 1, Long.MAX_VALUE, m_hashinatorConfig));
 
         // verify that the discovered txn id is 0 (the correct starting txnid).
         Pair<Boolean, Long> real_result = result.get();
@@ -335,14 +359,14 @@ public class TestMpPromoteAlgo extends TestCase
         verify(mailbox, times(1)).send(any(long[].class), any(Iv2RepairLogRequestMessage.class));
 
         // has a frag for txn 1000. MP handle is 1000L
-        algo.deliver(makeRealAckResponse(requestId, 1L, 0, 2, txnEgo(1000L)));
+        algo.deliver(makeRealAckResponse(requestId, 1L, 0, 2, txnEgo(1000L), m_hashinatorConfig));
         algo.deliver(makeRealFragResponse(requestId, 1L, 1, 2, txnEgo(1000L)));
 
         // has only the normal ack. Never saw an MP transaction.
-        algo.deliver(makeRealAckResponse(requestId, 2L, 0, 1, Long.MAX_VALUE));
+        algo.deliver(makeRealAckResponse(requestId, 2L, 0, 1, Long.MAX_VALUE, m_hashinatorConfig));
 
         // deliver the same complete from the MPI's repair log
-        algo.deliver(makeRealAckResponse(requestId, 4L, 0, 2, txnEgo(1000L)));
+        algo.deliver(makeRealAckResponse(requestId, 4L, 0, 2, txnEgo(1000L), m_hashinatorConfig));
         algo.deliver(makeRealCompleteResponse(requestId, 4L, 1, 2, txnEgo(1000L)));
 
         // Verify that we send a complete to every site.

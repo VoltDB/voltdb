@@ -20,26 +20,21 @@ package org.voltdb.iv2;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Iterator;
-import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.exceptions.TransactionRestartException;
-
-import org.voltdb.messaging.FragmentResponseMessage;
-import org.voltdb.messaging.FragmentTaskMessage;
 
 public class TransactionTaskQueue
 {
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    final private SiteTaskerQueue m_taskQueue;
+    final protected SiteTaskerQueue m_taskQueue;
 
     /*
      * Multi-part transactions create a backlog of tasks behind them. A queue is
      * created for each multi-part task to maintain the backlog until the next
      * multi-part task.
      */
-    Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
+    private Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
 
     TransactionTaskQueue(SiteTaskerQueue queue)
     {
@@ -89,49 +84,6 @@ public class TransactionTaskQueue
         return retval;
     }
 
-    // repair is used by MPI repair to inject a repair task into the
-    // SiteTaskerQueue.  Before it does this, it unblocks the MP transaction
-    // that may be running in the Site thread and causes it to rollback by
-    // faking an unsuccessful FragmentResponseMessage.
-    synchronized void repair(SiteTasker task, List<Long> masters)
-    {
-        // At the MPI's TransactionTaskQueue, we know that there can only be
-        // one transaction in the SiteTaskerQueue at a time, because the
-        // TransactionTaskQueue will only release one MP transaction to the
-        // SiteTaskerQueue at a time.  So, when we offer this repair task, we
-        // know it will be the next thing to run once we poison the current
-        // TXN.
-        m_taskQueue.offer(task);
-        Iterator<TransactionTask> iter = m_backlog.iterator();
-        if (iter.hasNext()) {
-            MpProcedureTask next = (MpProcedureTask)iter.next();
-            next.doRestart(masters);
-            // get head
-            // Only the MPI's TransactionTaskQueue is ever called in this way, so we know
-            // that the TransactionTasks we pull out of it have to be MP transactions, so this
-            // cast is safe
-            MpTransactionState txn = (MpTransactionState)next.getTransactionState();
-            // inject poison pill
-            FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false);
-            FragmentResponseMessage poison =
-                new FragmentResponseMessage(dummy, 0L); // Don't care about source HSID here
-            // Provide a TransactionRestartException which will be converted
-            // into a ClientResponse.RESTART, so that the MpProcedureTask can
-            // detect the restart and take the appropriate actions.
-            TransactionRestartException restart = new TransactionRestartException(
-                    "Transaction being restarted due to fault recovery or shutdown.", next.getTxnId());
-            poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
-            txn.offerReceivedFragmentResponse(poison);
-            // Now, iterate through the rest of the data structure and update the partition masters
-            // for all MpProcedureTasks not at the head of the TransactionTaskQueue
-            while (iter.hasNext())
-            {
-                next = (MpProcedureTask)iter.next();
-                next.updateMasters(masters);
-            }
-        }
-    }
-
     // Add a local method to offer to the SiteTaskerQueue so we have
     // a single point we can log through.
     private void taskQueueOffer(TransactionTask task)
@@ -142,9 +94,10 @@ public class TransactionTaskQueue
 
     /**
      * Try to offer as many runnable Tasks to the SiteTaskerQueue as possible.
+     * @param txnId The transaction ID of the TransactionTask which is completing and causing the flush
      * @return the number of TransactionTasks queued to the SiteTaskerQueue
      */
-    synchronized int flush()
+    synchronized int flush(long txnId)
     {
         int offered = 0;
         // If the first entry of the backlog is a completed transaction, clear it so it no longer

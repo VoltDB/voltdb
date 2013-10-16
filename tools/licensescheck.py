@@ -93,6 +93,98 @@ def verifySprintf(f, content):
         return 1
     return 0
 
+def verifyGetHostName(f, content):
+    if not (f.endswith('.java')):
+        return 0
+    num = content.count('getHostName()')
+    errorfmt = "ERROR: \"%s\" should contain %d instances of InetAddress.getHostName() but contained %d instances. If you added or moved calls to getHostName() update licensecheck or consider using ReverseDNSCache. Think carefully."
+    if f.endswith('/JMXStatsManager.java'):
+        if num != 1:
+            print(errorfmt % (f, 1, num))
+            return 1
+        else:
+            return 0
+
+    if f.endswith('/ReverseDNSCache.java'):
+        if num != 1:
+            print(errorfmt % (f, 1, num))
+            return 1
+        else:
+            return 0
+
+    if f.endswith('/ConnectionUtil.java'):
+        if num != 1:
+            print(errorfmt % (f, 1, num))
+            return 1
+        else:
+            return 0
+
+    if f.endswith('/ExportOnServerVerifier.java'):
+        return 0
+
+
+    if num > 0:
+        print("ERROR: \"%s\" contains %d calls to InetAddress.getHostName(). You should use ReverseDNSCache to avoid performance issues with broken DNS configs" % (f, num))
+        return 1
+
+    return 0
+
+def verifyGetCanonicalHostName(f, content):
+    if not (f.endswith('.java')):
+        return 0
+    num = content.count('getCanonicalHostName()')
+    errorfmt = "ERROR: \"%s\" should contain %d instances of InetAddress.getCanonicalHostName() but contained %d instances. If you added or moved calls to getCanonicalHostName() update licensecheck or consider using ReverseDNSCache. Think carefully."
+
+    if f.endswith('/SocketJoiner.java'):
+        if num != 1:
+            print(errorfmt % (f, 1, num))
+            return 1
+        else:
+            return 0
+
+    if num > 0:
+        print("ERROR: \"%s\" contains %d calls to InetAddress.getCanonicalHostName(). You should use ReverseDNSCache to avoid performance issues with broken DNS configs" % (f, num))
+        return 1
+    return 0
+
+def verifyJavaUtilExchanger(f, content):
+    if not (f.endswith('.java')):
+        return 0
+    num = content.count('Exchanger')
+    if num > 0:
+        print("ERROR: \"%s\" contains %d instances of what appear to be java.util.concurrent.Exchanger. Exchanger is almost always the wrong construct for use in Volt, if you are exchanging null all the time on one side what you really wanted was SettableFuture. Exchanger, especially with timeouts can lead to deadlocks." % (f, num))
+        return 1
+    return 0
+
+
+def verifyGetLocalHost(f, content):
+    if not (f.endswith('.java')):
+        return 0
+    num = content.count('getLocalHost()')
+    errorfmt = "ERROR: \"%s\" should contain %d instances of InetAddress.getLocalHost() but contained %d instances. If you added or moved calls to getLocalHost() update licensecheck or consider using CoreUtils.getHostnameOrAddress. Think carefully."
+
+    if f.endswith('/JMXStatsManager.java'):
+        if num != 1:
+            print(errorfmt % (f, 1, num))
+            return 1
+        else:
+            return 0
+
+    if f.endswith('/CoreUtils.java'):
+        if num != 1:
+            print(errorfmt % (f, 1, num))
+            return 1
+        else:
+            return 0
+
+    if f.endswith('/ExportDataHTTPPublisher.java'):
+        return 0
+
+    if num > 0:
+        print("ERROR: \"%s\" contains %d calls to InetAddress.getLocalHost(). This method can be very slow in some configurations so use CoreUtils.getHostnameOrAddress which cahces the result" % (f, num))
+        return 1
+    return 0
+
 def verifyGetStringChars(f, content):
     if not (f.endswith('.cpp') or f.endswith('.c') or f.endswith('.h') or f.endswith('.hpp')):
         return 0
@@ -163,7 +255,7 @@ def fixTabs(f, content):
     cleanlines = []
     for line in content.split("\n"):
         while '\t' in line:
-            (pre, post) = line.split('\t')
+            (pre, post) = line.split('\t', 1)
             # replace each tab with a complement of up to 4 spaces -- I suppose this could be made adjustable.
             # go ahead and allow trailing whitespace -- clean it up later
             line = pre + ("    "[(len(pre) % 4 ): 4]) + post
@@ -238,6 +330,18 @@ def processFile(f, fix, approvedLicensesJavaC, approvedLicensesPython):
     found += retval
 
     retval = verifyGetStringChars(f, content)
+    found += retval
+
+    retval = verifyGetHostName(f, content)
+    found += retval
+
+    retval = verifyGetCanonicalHostName(f, content)
+    found += retval
+
+    retval = verifyGetLocalHost(f, content)
+    found += retval
+
+    retval = verifyJavaUtilExchanger(f, content)
     found += retval
 
     return (fixed, found)

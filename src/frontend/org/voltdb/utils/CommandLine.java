@@ -61,7 +61,7 @@ public class CommandLine extends VoltDB.Configuration
     public CommandLine makeCopy() {
         CommandLine cl = new CommandLine(m_startAction);
         // first copy the base class fields
-        cl.m_ipcPorts.addAll(m_ipcPorts);
+        cl.m_ipcPort = m_ipcPort;
         cl.m_backend = m_backend;
         cl.m_leader = m_leader;
         cl.m_pathToCatalog = m_pathToCatalog;
@@ -85,7 +85,6 @@ public class CommandLine extends VoltDB.Configuration
         // final in baseclass: cl.m_commitLogDir = new File("/tmp");
         cl.m_timestampTestingSalt = m_timestampTestingSalt;
         cl.m_isRejoinTest = m_isRejoinTest;
-        cl.m_enableIV2 = m_enableIV2;
         cl.m_tag = m_tag;
         cl.m_vemTag = m_vemTag;
 
@@ -224,7 +223,7 @@ public class CommandLine extends VoltDB.Configuration
     }
 
     public CommandLine ipcPort(int port) {
-        m_ipcPorts.add(port);
+        m_ipcPort = port;
         return this;
     }
 
@@ -562,11 +561,6 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("externalinterface"); cmdline.add(m_externalInterface);
         }
 
-        if (m_enableIV2)
-        {
-            cmdline.add("enableiv2");
-        }
-
         if (m_isEnterprise) {
             cmdline.add("license"); cmdline.add(m_pathToLicense);
         }
@@ -584,9 +578,9 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add(nonJvmOptions);
         }
 
-        if ((m_ipcPorts != null) && (m_ipcPorts.size() > 0)) {
-            cmdline.add("ipcports");
-            cmdline.add(org.apache.commons.lang3.StringUtils.join(m_ipcPorts, ","));
+        if (m_backend.isIPC) {
+            cmdline.add("ipcport");
+            cmdline.add(String.valueOf(m_ipcPort));
         }
 
         if (target() == BackendTarget.NATIVE_EE_IPC) {
