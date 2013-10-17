@@ -360,7 +360,7 @@ public abstract class AbstractParsedStmt {
      * @param tveColumn - scan column to add
      */
 
-    void addScanColumn(TupleValueExpression tveColumn)
+    private void addScanColumn(TupleValueExpression tveColumn)
     {
         // add table to the query cache
         int tableCacheIdx = addTableToStmtCache(tveColumn.getTableName(), tveColumn.getTableAlias());
