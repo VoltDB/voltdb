@@ -525,7 +525,7 @@ class CSVPartitionProcessor implements Runnable {
             //we put end of queue marker on failure processor.
             m_log.debug("Waiting for all batches acknowledged.");
             while (m_batchWaitCount.get() > 0) {
-                Thread.sleep(1000);
+                Thread.sleep(100);
             }
             m_log.debug("All batches acknowledged.");
             //Let partition processor drain on failure processing.
