@@ -218,7 +218,17 @@ public class MaterializedViewFixInfo {
         if (rootNode instanceof AbstractScanPlanNode) {
             AbstractScanPlanNode scanNode = (AbstractScanPlanNode) rootNode;
             if (scanNode.getTargetTableName().equals(getMVTableName())) {
-                return scanNode;
+                assert(scanNode.getParentCount() == 1);
+                AbstractPlanNode parent = scanNode.getParent(0);
+
+                // Find the i-th child index, and replace it.
+                for (int i = 0; i < parent.getChildCount(); i++) {
+                    AbstractPlanNode child = parent.getChild(i);
+                    if (child == scanNode) {
+                        parent.setAndLinkChild(i, scanNode);
+                        return scanNode;
+                    }
+                }
             }
         }
         return null;
