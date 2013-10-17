@@ -494,10 +494,6 @@ public class PlanAssembler {
 
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
 
-        if (subSelectRoot != null && !m_parsedSelect.mvFixInfo.isJoinNodePossible(subSelectRoot)) {
-            return getNextSelectPlan();
-        }
-
         if (subSelectRoot == null) {
             m_recentErrorMsg = subAssembler.m_recentErrorMsg;
             return null;
@@ -542,6 +538,14 @@ public class PlanAssembler {
         if (root instanceof ReceivePlanNode) {
             if (m_parsedSelect.mayNeedAvgPushdown()) {
                 m_parsedSelect.switchOptimalSuiteForAvgPushdown();
+            }
+        } else {
+            m_parsedSelect.mvFixInfo.setNeeded(false);
+        }
+
+        if (m_parsedSelect.mvFixInfo.needed()) {
+            if (!m_parsedSelect.mvFixInfo.isJoinNodePossible(subSelectRoot)) {
+                return getNextSelectPlan();
             }
         }
 
