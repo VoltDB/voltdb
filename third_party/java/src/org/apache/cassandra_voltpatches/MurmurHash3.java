@@ -158,6 +158,7 @@ public class MurmurHash3
         h2 += h1;
 
         //Shift so that we use the higher order bits in case we want to use the lower order ones later
+        //Also use the h1 higher order bits because it provided much better performance in voter, consistent too
         return (int)(h1 >>> 32);
     }
 }
