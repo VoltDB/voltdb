@@ -314,7 +314,7 @@ public class MaterializedViewFixInfo {
 
     private void processWhereClause(JoinNode joinTree, List<Column> mvColumnArray) {
         // (1) Process where clause.
-        AbstractExpression where = processJoinTree(joinTree);
+        AbstractExpression where = analyseJoinTree(joinTree);
 
         if (where != null) {
             // Collect all TVEs that need to be do re-aggregation in coordinator.
@@ -363,7 +363,7 @@ public class MaterializedViewFixInfo {
         }
     }
 
-    private AbstractExpression processJoinTree(JoinNode joinTree) {
+    private AbstractExpression analyseJoinTree(JoinNode joinTree) {
         assert(joinTree != null);
         AbstractExpression where = null;
         if (joinTree.m_leftNode == null) {

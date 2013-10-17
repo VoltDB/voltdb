@@ -263,8 +263,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // For all tables in this query, the # of tables that need to be fixed should not exceed one.
         for (Table mvTable: tableList) {
             Set<SchemaColumn> mvNewScanColumns = new HashSet<SchemaColumn>();
-            // For a COUNT(*)-only scan, size is 0, otherwise it is not.
-            if (scanColumns.keySet().size() != 0) {
+            // For a COUNT(*)-only scan, key size is 0, not contained.
+            // For a joined query without selected columns from table TB, TB is not contained as well.
+            if (scanColumns.containsKey(mvTable.getTypeName())) {
                 mvNewScanColumns.addAll(scanColumns.get(mvTable.getTypeName()));
             }
 
