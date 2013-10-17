@@ -29,6 +29,7 @@ HOST="localhost"
 # remove build artifacts
 function clean() {
     rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput $APPNAME-alt.jar voltdbroot voltdbroot
 }
 
 # compile the source code for procedures and the client
