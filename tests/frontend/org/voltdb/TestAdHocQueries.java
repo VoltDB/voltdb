@@ -156,9 +156,8 @@ public class TestAdHocQueries extends AdHocQueryTester {
             assertEquals( 3, results[3].getLong(1));
 
 
-            results = m_client.callProcedure("executeSQLSP", 24, "select * from parted1 order by partval").getResults();
-
             if (TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY) {
+                results = m_client.callProcedure("executeSQLSP", 24, "select * from parted1 order by partval").getResults();
                 for (int ii = 0; ii < 4; ii++) {
                     assertEquals( 1, results[ii].getRowCount());
                     assertTrue(results[ii].advanceRow());
@@ -166,22 +165,23 @@ public class TestAdHocQueries extends AdHocQueryTester {
                     assertEquals( 4, results[ii].getLong(1));
                 }
             } else {
+                results = m_client.callProcedure("executeSQLSP", 23, "select * from parted1 order by partval").getResults();
                 for (int ii = 0; ii < 4; ii++) {
                     //The third statement does an exact equality match
                     if (ii == 2) {
                         assertEquals( 1, results[ii].getRowCount());
                         assertTrue(results[ii].advanceRow());
-                        assertEquals(24, results[ii].getLong(0));
-                        assertEquals( 4, results[ii].getLong(1));
+                        assertEquals(23, results[ii].getLong(0));
+                        assertEquals( 3, results[ii].getLong(1));
                         continue;
                     }
-                    assertEquals( 3, results[ii].getRowCount());
+                    assertEquals( 2, results[ii].getRowCount());
                     assertTrue(results[ii].advanceRow());
                     assertEquals(23, results[ii].getLong(0));
                     assertEquals( 3, results[ii].getLong(1));
                     assertTrue(results[ii].advanceRow());
-                    assertEquals(24, results[ii].getLong(0));
-                    assertEquals( 4, results[ii].getLong(1));
+                    assertEquals(25, results[ii].getLong(0));
+                    assertEquals( 5, results[ii].getLong(1));
                 }
             }
         }
