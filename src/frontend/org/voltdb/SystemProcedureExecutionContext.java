@@ -30,7 +30,7 @@ public interface SystemProcedureExecutionContext {
 
     public Cluster getCluster();
 
-    public long getLastCommittedSpHandle();
+    public long getSpHandleForSnapshotDigest();
 
     public long getCurrentTxnId();
 

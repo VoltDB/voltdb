@@ -46,12 +46,14 @@ public class AdHocMayhemThread extends Thread {
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
     final AtomicBoolean m_needsBlock = new AtomicBoolean(false);
     final Semaphore txnsOutstanding = new Semaphore(100);
+    final Semaphore m_permits;
 
-    public AdHocMayhemThread(Client client, float mpRatio) {
+    public AdHocMayhemThread(Client client, float mpRatio, Semaphore permits) {
         setName("AdHocMayhemThread");
 
         this.client = client;
         this.mpRatio = mpRatio;
+        this.m_permits = permits;
     }
 
     private String nextAdHoc() {
@@ -165,6 +167,7 @@ public class AdHocMayhemThread extends Thread {
             // call a transaction
             String sql = nextAdHoc();
             try {
+                m_permits.acquire();
                 client.callProcedure(new AdHocCallback(), "@AdHoc", sql);
             }
             catch (NoConnectionsException e) {

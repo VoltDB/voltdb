@@ -129,7 +129,6 @@ public class SpProcedureTask extends ProcedureTask
             // eventual encapsulation.
             siteConnection.truncateUndoLog(m_txnState.needsRollback(),
                     m_txnState.getBeginUndoToken(),
-                    m_txnState.txnId,
                     m_txnState.m_spHandle,
                     m_txnState.getUndoLog());
         }
@@ -168,7 +167,6 @@ public class SpProcedureTask extends ProcedureTask
             // eventual encapsulation.
             siteConnection.truncateUndoLog(m_txnState.needsRollback(),
                     m_txnState.getBeginUndoToken(),
-                    m_txnState.txnId,
                     m_txnState.m_spHandle,
                     m_txnState.getUndoLog());
         }
