@@ -345,28 +345,25 @@ public abstract class AbstractParsedStmt {
             tableAlias = tableName;
         }
 
-        // add table to the query cache
-        int tableCacheIdx = addTableToStmtCache(tableName, tableAlias);
-
         TupleValueExpression expr = new TupleValueExpression(tableName, tableAlias, columnName, alias);
         if (childExprs != null && !childExprs.isEmpty()) {
             expr.setChildExpressions(childExprs);
         }
         expr.resolveForDB(m_db);
-        addScanColumn(tableCacheIdx, expr);
+        addScanColumn(expr);
         return expr;
     }
 
     /**
      * Collect unique columns used in the plan for a given table.
      *
-     * @param tableCacheIdx
      * @param tveColumn - scan column to add
      */
 
-    void addScanColumn(int tableCacheIdx, TupleValueExpression tveColumn)
+    void addScanColumn(TupleValueExpression tveColumn)
     {
-        assert (tableCacheIdx != StmtTableScan.NULL_ALIAS_INDEX);
+        // add table to the query cache
+        int tableCacheIdx = addTableToStmtCache(tveColumn.getTableName(), tveColumn.getTableAlias());
 
         SchemaColumn col = new SchemaColumn(tveColumn.getTableName(),
                 tveColumn.getTableAlias(),
