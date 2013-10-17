@@ -358,7 +358,7 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
-     * Collect a set of unique columns used in the plan for a given table.
+     * Collect unique columns used in the plan for a given table.
      *
      * @param tableCacheIdx
      * @param tveColumn - scan column to add
