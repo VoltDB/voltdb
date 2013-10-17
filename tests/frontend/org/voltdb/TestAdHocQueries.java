@@ -166,6 +166,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 }
             } else {
                 results = m_client.callProcedure("executeSQLSP", 23, "select * from parted1 order by partval").getResults();
+                //These constants break when partitioning changes
                 for (int ii = 0; ii < 4; ii++) {
                     //The third statement does an exact equality match
                     if (ii == 2) {

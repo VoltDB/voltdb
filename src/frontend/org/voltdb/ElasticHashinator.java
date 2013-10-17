@@ -154,7 +154,7 @@ public class ElasticHashinator extends TheHashinator {
      * partitions from existing hashinator.
      * @param tokens
      */
-    private ElasticHashinator(Map<Integer, Integer> tokens) {
+    private ElasticHashinator(SortedMap<Integer, Integer> tokens) {
         m_tokensMap = Suppliers.ofInstance(ImmutableSortedMap.copyOf(tokens));
         Preconditions.checkArgument(m_tokensMap.get().firstEntry().getKey().equals(Integer.MIN_VALUE));
         m_tokens = unsafe.allocateMemory(8 * tokens.size());
@@ -200,9 +200,12 @@ public class ElasticHashinator extends TheHashinator {
     private byte[] toBytes() {
         ByteBuffer buf = ByteBuffer.allocate(4 + (m_tokenCount * 8));
         buf.putInt(m_tokenCount);
+        int lastToken = Integer.MIN_VALUE;
         for (int ii = 0; ii < m_tokenCount; ii++) {
             final long ptr = m_tokens + (ii * 8);
             final int token = unsafe.getInt(ptr);
+            Preconditions.checkArgument(token >= lastToken);
+            lastToken = token;
             final int pid = unsafe.getInt(ptr + 4);
             buf.putInt(token);
             buf.putInt(pid);
@@ -236,9 +239,15 @@ public class ElasticHashinator extends TheHashinator {
      */
     public ElasticHashinator addToken(int token, int partition)
     {
-        HashMap<Integer, Integer> newTokens = Maps.newHashMap(m_tokensMap.get());
-        newTokens.put(token, partition);
-        return new ElasticHashinator(newTokens);
+        ImmutableSortedMap.Builder<Integer, Integer> b = ImmutableSortedMap.naturalOrder();
+        for (Map.Entry<Integer, Integer> e : m_tokensMap.get().entrySet()) {
+            if (e.getKey().intValue() == token) {
+                continue;
+            }
+            b.put(e.getKey(), e.getValue());
+        }
+        b.put(token, partition);
+        return new ElasticHashinator(b.build());
     }
 
     @Override
@@ -417,8 +426,12 @@ public class ElasticHashinator extends TheHashinator {
         buf.putInt(m_tokenCount);
 
         // Keep tokens and partition ids separate to aid compression.
+        int lastToken = Integer.MIN_VALUE;
         for (int ii = 0; ii < m_tokenCount; ii++) {
-            buf.putInt(unsafe.getInt(m_tokens + (ii * 8)));
+            int token = unsafe.getInt(m_tokens + (ii * 8));
+            Preconditions.checkArgument(token >= lastToken);
+            lastToken = token;
+            buf.putInt(token);
         }
         for (int ii = 0; ii < m_tokenCount; ii++) {
             buf.putInt(unsafe.getInt(m_tokens + (ii * 8) + 4));

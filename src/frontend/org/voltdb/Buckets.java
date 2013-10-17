@@ -85,7 +85,7 @@ public class Buckets {
         }
     }
 
-    public Map<Integer, Integer> getTokens() {
+    public SortedMap<Integer, Integer> getTokens() {
         ImmutableSortedMap.Builder<Integer, Integer> b = ImmutableSortedMap.naturalOrder();
         for (int partition = 0; partition < m_partitionTokens.size(); partition++) {
             TreeSet<Integer> tokens = m_partitionTokens.get(partition);
