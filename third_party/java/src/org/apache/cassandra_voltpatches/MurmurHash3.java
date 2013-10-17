@@ -157,6 +157,7 @@ public class MurmurHash3
         h1 += h2;
         h2 += h1;
 
-        return (int)h1;
+        //Shift so that we use the higher order bits in case we want to use the lower order ones later
+        return (int)(h1 >>> 32);
     }
 }

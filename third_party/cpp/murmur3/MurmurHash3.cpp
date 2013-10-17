@@ -143,7 +143,8 @@ int32_t MurmurHash3_x64_128 ( const void * key, const int len,
   h1 += h2;
   h2 += h1;
 
-  return static_cast<int32_t>(h1);
+  //Shift so that we use the higher order bits in case we want to use the lower order ones later
+  return static_cast<int32_t>(h1 >> 32);
 }
 }
 //-----------------------------------------------------------------------------
