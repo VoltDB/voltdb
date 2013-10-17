@@ -1194,50 +1194,51 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
             validateTableOfScalarLongs(vt, new long[] {24, 45, 85, 101});
 
+            if (!isHSQL()) {
+                sql = "Select v_p1.v_sum_age from v_p1 join v_r4 on v_p1.v_cnt = v_r4.v_cnt " +
+                        "where v_p1.v_sum_rent > 15 order by v_p1.v_sum_age;";
+                sql = sql.replace("v_p1", tb);
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+                validateTableOfScalarLongs(vt, new long[] {85, 101});
 
-            sql = "Select v_p1.v_sum_age from v_p1 join v_r4 on v_p1.v_cnt = v_r4.v_cnt " +
-                    "where v_p1.v_sum_rent > 15 order by v_p1.v_sum_age;";
-            sql = sql.replace("v_p1", tb);
-            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {85, 101});
-
-
-            // test where
-            sql = "Select v_p1.v_sum_age from v_p1 join v_r4 on v_p1.v_cnt = v_r4.v_cnt  " +
-                    "where v_p1.v_sum_rent > 15 order by v_p1.v_sum_age;";
-            sql = sql.replace("v_p1", tb);
-            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {85, 101});
-
-
-            sql = "Select v_p1.v_sum_age as c1, v_r4.v_sum_rent as c2 from v_p1 join v_r4 " +
-                    "on v_p1.v_cnt >= v_r4.v_cnt " +
-                    "where v_p1.v_sum_rent > -1 and v_p1.v_g1 > 15 and v_p1.v_cnt <= 2 " +
-                    "order by c1, c2 ";
-            sql = sql.replace("v_p1", tb);
-            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-            validateTableOfLongs(vt, new long[][] {{24,8}, {45, 8}, {45, 13} });
+                // test where
+                sql = "Select v_p1.v_sum_age from v_p1 join v_r4 on v_p1.v_cnt = v_r4.v_cnt  " +
+                        "where v_p1.v_sum_rent > 15 order by v_p1.v_sum_age;";
+                sql = sql.replace("v_p1", tb);
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+                validateTableOfScalarLongs(vt, new long[] {85, 101});
 
 
+                sql = "Select v_p1.v_sum_age as c1, v_r4.v_sum_rent as c2 from v_p1 join v_r4 " +
+                        "on v_p1.v_cnt >= v_r4.v_cnt " +
+                        "where v_p1.v_sum_rent > -1 and v_p1.v_g1 > 15 and v_p1.v_cnt <= 2 " +
+                        "order by c1, c2 ";
+                sql = sql.replace("v_p1", tb);
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+                validateTableOfLongs(vt, new long[][] {{24,8}, {45, 8}, {45, 13} });
 
-            // Test aggregation.
-            sql = "Select SUM(v_p1.v_sum_age) as c1, MAX(v_r4.v_sum_rent) as c2 from v_p1 join v_r4 " +
-                    "on v_p1.v_cnt >= v_r4.v_cnt " +
-                    "where v_p1.v_sum_rent > -1 and v_p1.v_g1 > 15 and v_p1.v_cnt <= 2 " +
-                    "order by c1, c2 ";
-            sql = sql.replace("v_p1", tb);
-            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-            validateTableOfLongs(vt, new long[][] {{114,13}});
 
-            sql = "Select v_p1.v_g2 as c0 , SUM(v_p1.v_sum_age) as c1, MAX(v_p1.v_sum_rent) as c2 " +
-                    "from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
-                    "where v_p1.v_cnt < 4 " +
-                    "group by v_p1.v_g2 " +
-                    "order by c0, c1, c2 ";
-            sql = sql.replace("v_p1", tb);
-            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-            System.out.println(vt);
-            validateTableOfLongs(vt, new long[][] {{2, 93, 13}, {3, 170, 37}});
+
+                // Test aggregation.
+                sql = "Select SUM(v_p1.v_sum_age) as c1, MAX(v_r4.v_sum_rent) as c2 from v_p1 join v_r4 " +
+                        "on v_p1.v_cnt >= v_r4.v_cnt " +
+                        "where v_p1.v_sum_rent > -1 and v_p1.v_g1 > 15 and v_p1.v_cnt <= 2 " +
+                        "order by c1, c2 ";
+                sql = sql.replace("v_p1", tb);
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+                validateTableOfLongs(vt, new long[][] {{114,13}});
+
+                sql = "Select v_p1.v_g2 as c0 , SUM(v_p1.v_sum_age) as c1, MAX(v_p1.v_sum_rent) as c2 " +
+                        "from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
+                        "where v_p1.v_cnt < 4 " +
+                        "group by v_p1.v_g2 " +
+                        "order by c0, c1, c2 ";
+                sql = sql.replace("v_p1", tb);
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+                System.out.println(vt);
+                validateTableOfLongs(vt, new long[][] {{2, 93, 13}, {3, 170, 37}});
+            }
+
         }
     }
 
