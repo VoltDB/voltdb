@@ -67,11 +67,6 @@ public abstract class AbstractParsedStmt {
     //User specified join order, null if none is specified
     public String joinOrder = null;
 
-    // Store a table-hashed list of the columns actually used by this statement.
-    // XXX An unfortunately counter-intuitive (but hopefully temporary) meaning here:
-    // if this is empty, that means ALL the columns get used.
-    public HashMap<Integer, HashSet<SchemaColumn>> scanColumns = new HashMap<Integer, HashSet<SchemaColumn>>();
-
     // Statement cache
     public List<StmtTableScan> stmtCache = new ArrayList<StmtTableScan>();
     public HashMap<String, Integer> tableAliasIndexMap = new HashMap<String, Integer>();
@@ -351,41 +346,39 @@ public abstract class AbstractParsedStmt {
         }
 
         // add table to the query cache
-        addTableToStmtCache(tableName, tableAlias);
+        int tableCacheIdx = addTableToStmtCache(tableName, tableAlias);
 
         TupleValueExpression expr = new TupleValueExpression(tableName, tableAlias, columnName, alias);
         if (childExprs != null && !childExprs.isEmpty()) {
             expr.setChildExpressions(childExprs);
         }
         expr.resolveForDB(m_db);
-        addScanColumns(expr);
+        addScanColumn(tableCacheIdx, expr);
         return expr;
     }
 
     /**
-     * Fills scanColumns with a list of the columns used in the plan, hashed by
-     * table name.
+     * Collect a set of unique columns used in the plan for a given table.
      *
-     * @param columnsNode
+     * @param tableCacheIdx
+     * @param tveColumn - scan column to add
      */
 
-    void addScanColumns(TupleValueExpression tveColumn)
+    void addScanColumn(int tableCacheIdx, TupleValueExpression tveColumn)
     {
-            SchemaColumn col = new SchemaColumn(tveColumn.getTableName(),
-                                                tveColumn.getTableAlias(),
-                                                tveColumn.getColumnName(),
-                                                tveColumn.getColumnAlias(),
-                                                tveColumn);
-            HashSet<SchemaColumn> table_cols = null;
-            assert(tableAliasIndexMap.containsKey(tveColumn.getTableAlias()) == true);
-            int aliasIndex = tableAliasIndexMap.get(tveColumn.getTableAlias());
-            if (!scanColumns.containsKey(aliasIndex))
-            {
-                table_cols = new HashSet<SchemaColumn>();
-                scanColumns.put(aliasIndex, table_cols);
-            }
-            table_cols = scanColumns.get(aliasIndex);
-            table_cols.add(col);
+        assert (tableCacheIdx != StmtTableScan.NULL_ALIAS_INDEX);
+
+        SchemaColumn col = new SchemaColumn(tveColumn.getTableName(),
+                tveColumn.getTableAlias(),
+                tveColumn.getColumnName(),
+                tveColumn.getColumnAlias(),
+                tveColumn);
+
+        StmtTableScan tableCache = stmtCache.get(tableCacheIdx);
+        if (tableCache.m_scanColumns == null) {
+            tableCache.m_scanColumns = new HashSet<SchemaColumn>();
+        }
+        tableCache.m_scanColumns.add(col);
     }
 
 
@@ -969,20 +962,19 @@ public abstract class AbstractParsedStmt {
         }
 
         retval += "\nSCAN COLUMNS:\n";
-        if (!scanColumns.isEmpty())
-        {
-            for (int aliasIdx : scanColumns.keySet())
-            {
-                retval += "\tTable Alias: " + stmtCache.get(aliasIdx).m_tableAlias + ":\n";
-                for (SchemaColumn col : scanColumns.get(aliasIdx))
+        boolean hasAll = true;
+        for (StmtTableScan tableCache : stmtCache) {
+            if (tableCache.m_scanColumns != null) {
+                hasAll = false;
+                retval += "\tTable Alias: " + tableCache.m_tableAlias + ":\n";
+                for (SchemaColumn col : tableCache.m_scanColumns)
                 {
                     retval += "\t\tColumn: " + col.getColumnName() + ": ";
                     retval += col.getExpression().toString() + "\n";
                 }
             }
         }
-        else
-        {
+        if (hasAll == true) {
             retval += "\tALL\n";
         }
 
