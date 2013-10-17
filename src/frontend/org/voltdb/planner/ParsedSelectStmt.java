@@ -224,7 +224,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // For a COUNT(*)-only scan, size is 0, otherwise it is 1.
             assert(scanColumns.keySet().size() <= 1);
             if (scanColumns.keySet().size() == 1) {
-                mvNewScanColumns.addAll(scanColumns.get(mvTable.getTypeName()));
+                mvNewScanColumns.addAll(scanColumns.get(0));
             }
             processMVBasedQueryFix(mvFixInfo, m_db, mvTable, mvNewScanColumns, joinTree);
         }
@@ -323,7 +323,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             tve.setValueType(VoltType.get((byte)mvCol.getType()));
             tve.setValueSize(mvCol.getSize());
 
-            SchemaColumn scol = new SchemaColumn(mvTableName, colName, colName, tve);
+            SchemaColumn scol = new SchemaColumn(mvTableName, null, colName, colName, tve);
 
             mvDDLGroupbyColumns.add(scol);
             if (!mvNewScanColumns.contains(scol)) {
