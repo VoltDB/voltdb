@@ -197,8 +197,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     // Advanced in complete transaction.
-    long m_lastCommittedTxnId = 0;
     long m_lastCommittedSpHandle = 0;
+    long m_spHandleForSnapshotDigest = 0;
     long m_currentTxnId = Long.MIN_VALUE;
     long m_lastTxnTime = System.currentTimeMillis();
 
@@ -224,8 +224,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public long getLastCommittedSpHandle() {
-            return m_lastCommittedSpHandle;
+        public long getSpHandleForSnapshotDigest() {
+            return m_spHandleForSnapshotDigest;
         }
 
         @Override
@@ -363,8 +363,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_snapshotPriority = snapshotPriority;
         // need this later when running in the final thread.
         m_startupConfig = new StartupConfig(serializedCatalog, context.m_uniqueId);
-        m_lastCommittedTxnId = TxnEgo.makeZero(partitionId).getTxnId();
         m_lastCommittedSpHandle = TxnEgo.makeZero(partitionId).getTxnId();
+        m_spHandleForSnapshotDigest = m_lastCommittedSpHandle;
         m_currentTxnId = Long.MIN_VALUE;
         m_initiatorMailbox = initiatorMailbox;
         m_coreBindIds = coreBindIds;
@@ -735,6 +735,17 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         return currentTxnState.recursableRun(this);
     }
 
+    @Override
+    public void setSpHandleForSnapshotDigest(long spHandle)
+    {
+        // During rejoin, the spHandle is updated even though the site is not executing the tasks. If it's a live
+        // rejoin, all logged tasks will be replayed. So the spHandle may go backward and forward again. It should
+        // stop at the same point after replay.
+        if (m_spHandleForSnapshotDigest < spHandle) {
+            m_spHandleForSnapshotDigest = spHandle;
+        }
+    }
+
     private static void handleUndoLog(List<UndoAction> undoLog, boolean undo) {
         if (undoLog == null) return;
 
@@ -747,17 +758,31 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
     }
 
-    @Override
-    public void truncateUndoLog(boolean rollback, long beginUndoToken, long txnId, long spHandle, List<UndoAction> undoLog)
+    private void setLastCommittedSpHandle(long spHandle)
     {
+        if (TxnEgo.getPartitionId(m_lastCommittedSpHandle) != TxnEgo.getPartitionId(spHandle)) {
+            VoltDB.crashLocalVoltDB("Mismatch SpHandle partitiond id " +
+                                    TxnEgo.getPartitionId(m_lastCommittedSpHandle) + ", " +
+                                    TxnEgo.getPartitionId(spHandle), true, null);
+        }
+        m_lastCommittedSpHandle = spHandle;
+        setSpHandleForSnapshotDigest(m_lastCommittedSpHandle);
+    }
+
+    @Override
+    public void truncateUndoLog(boolean rollback, long beginUndoToken, long spHandle, List<UndoAction> undoLog)
+    {
+        // Set the last committed txnId even if there is nothing to undo, as long as the txn is not rolling back.
+        if (!rollback) {
+            setLastCommittedSpHandle(spHandle);
+        }
+
         //Any new txnid will create a new undo quantum, including the same txnid again
         latestUndoTxnId = Long.MIN_VALUE;
         //If the begin undo token is not set the txn never did any work so there is nothing to undo/release
         if (beginUndoToken == Site.kInvalidUndoToken) return;
         if (rollback) {
-
             m_ee.undoUndoToken(beginUndoToken);
-            handleUndoLog(undoLog, true);
         }
         else {
             assert(latestUndoToken != Site.kInvalidUndoToken);
@@ -765,15 +790,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             if (latestUndoToken > beginUndoToken) {
                 m_ee.releaseUndoToken(latestUndoToken);
             }
-            m_lastCommittedTxnId = txnId;
-            if (TxnEgo.getPartitionId(m_lastCommittedSpHandle) != TxnEgo.getPartitionId(spHandle)) {
-                VoltDB.crashLocalVoltDB("Mismatch SpHandle partitiond id " +
-                        TxnEgo.getPartitionId(m_lastCommittedSpHandle) + ", " +
-                        TxnEgo.getPartitionId(spHandle), true, null);
-            }
-            m_lastCommittedSpHandle = spHandle;
-            handleUndoLog(undoLog, false);
         }
+        handleUndoLog(undoLog, rollback);
     }
 
     @Override
@@ -1041,7 +1059,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         //Necessary to quiesce before updating the catalog
         //so export data for the old generation is pushed to Java.
-        m_ee.quiesce(m_lastCommittedTxnId);
+        m_ee.quiesce(m_lastCommittedSpHandle);
         m_ee.updateCatalog(m_context.m_uniqueId, diffCmds);
 
         return true;

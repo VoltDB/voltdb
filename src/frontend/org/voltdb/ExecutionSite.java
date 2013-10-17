@@ -567,7 +567,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
          * is multi-part then the txnid and SpHandle will not be the same.
          */
         @Override
-        public long getLastCommittedSpHandle()                     { return lastCommittedTxnId; }
+        public long getSpHandleForSnapshotDigest()                     { return lastCommittedTxnId; }
         @Override
         public long getCurrentTxnId()                           { return m_currentTransactionState.txnId; }
         @Override
@@ -1463,6 +1463,12 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         return null;
     }
 
+    @Override
+    public void setSpHandleForSnapshotDigest(long spHandle)
+    {
+
+    }
+
     public SiteTracker getSiteTracker() {
         return m_tracker;
     }
@@ -1612,7 +1618,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
     // do-nothing implementation of IV2 SiteProcedeConnection API
     @Override
-    public void truncateUndoLog(boolean rollback, long token, long txnId, long spHandle, List<UndoAction> undoLog) {
+    public void truncateUndoLog(boolean rollback, long token, long spHandle, List<UndoAction> undoLog) {
         throw new RuntimeException("Unsupported IV2-only API.");
     }
 
