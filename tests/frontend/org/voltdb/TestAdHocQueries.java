@@ -364,7 +364,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
             assertEquals(1, result.getRowCount());
 
             try {
-                env.m_client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (0, 0, 0);", 2);
+                env.m_client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (0, 0, 0);", TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY ? 1 : 2);
                 fail("Badly partitioned insert failed to throw expected exception");
             }
             catch (Exception e) {}

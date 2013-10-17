@@ -28,6 +28,8 @@ import java.io.IOException;
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.TheHashinator;
+import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.UpdateNewOrder;
@@ -243,7 +245,7 @@ public class TestMultiPartitionSuite extends RegressionSuite {
         // test mispartitioned update
         client.callProcedure("NEW_ORDER.insert", 0, 0, 0);
         try {
-            client.callProcedure(MispartitionedUpdate.class.getSimpleName(), 0);
+            client.callProcedure(MispartitionedUpdate.class.getSimpleName(), TheHashinator.getConfiguredHashinatorType() == HashinatorType.LEGACY ? 0 : 1);
             fail();
         }
         catch (Exception e) {
