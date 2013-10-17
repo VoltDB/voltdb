@@ -43,9 +43,8 @@ public:
                     throwFatalException("Ranges overlap or are out of order");
                 }
             }
-            if (ranges[ii].first >= ranges[ii].second && ii != num_ranges - 1) {
-                throwFatalException("Range begin is >= range end and it isn't the last "
-                        "range that might span Long.MAX_VALUE to Long.MIN_VALUE");
+            if (ranges[ii].first > ranges[ii].second) {
+                throwFatalException("Range begin is > range end, we don't support spanning Long.MAX to Long.MIN");
             }
         }
 };
@@ -62,21 +61,24 @@ public:
 
         //The binary search blows up on only one range
         if (num_ranges == 1) {
-            if (hash >= ranges[0].first && hash < ranges[0].second) return NValue::getTrue();
+            if (hash >= ranges[0].first && hash <= ranges[0].second) return NValue::getTrue();
             return NValue::getFalse();
         }
 
         /*
-         * Bottom of a range is inclusive, top is exclusive
+         * Bottom of a range is inclusive as well as the top. Necessary because we no longer support wrapping
+         * from Integer.MIN_VALUE
          * Doing a binary search, is just a hair easier than std::lower_bound
          */
-        uint32_t min = 0;
-        uint32_t max = num_ranges - 1;
+        int32_t min = 0;
+        int32_t max = num_ranges - 1;
         while (min <= max) {
+            assert(min >= 0);
+            assert(max >= 0);
             uint32_t mid = (min + max) >> 1;
             if (ranges[mid].second < hash) {
                 min = mid + 1;
-            } else if (ranges[mid].first >= hash) {
+            } else if (ranges[mid].first > hash) {
                 max = mid - 1;
             } else {
                 return NValue::getTrue();

@@ -114,10 +114,12 @@ private:
     boost::scoped_array<int32_t> tokensOwner;
 
     int32_t partitionForToken(int32_t hash) const {
-        uint32_t min = 0;
-        uint32_t max = tokenCount - 1;
+        int32_t min = 0;
+        int32_t max = tokenCount - 1;
 
         while (min <= max) {
+            assert(min >= 0);
+            assert(max >= 0);
             uint32_t mid = (min + max) >> 1;
             int32_t midval = tokens[mid * 2];
 

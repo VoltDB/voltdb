@@ -59,7 +59,8 @@ TEST_F(ElasticHashinatorTest, TestMinMaxToken)
     output.initializeWithPosition(config.get(), 4 + (12 * 3), 0);
 
     output.writeInt(3);
-    output.writeInt(std::numeric_limits<int32_t>::min() + 1);
+    //output.writeInt(std::numeric_limits<int32_t>::min() + 1);
+    output.writeInt(std::numeric_limits<int32_t>::min());
     output.writeInt(0);
     output.writeInt(0);
     output.writeInt(1);
@@ -68,7 +69,9 @@ TEST_F(ElasticHashinatorTest, TestMinMaxToken)
 
     hashinator.reset(ElasticHashinator::newInstance(config.get(), NULL, 0));
 
-    EXPECT_EQ( 2, hashinator->partitionForToken(std::numeric_limits<int32_t>::min()));
+    //This used to test wrapping, but we aren't allowing wrapping anymore (always have a token at Integer.MIN_VALUE)
+    //EXPECT_EQ( 2, hashinator->partitionForToken(std::numeric_limits<int32_t>::min()));
+    EXPECT_EQ( 0, hashinator->partitionForToken(std::numeric_limits<int32_t>::min()));
     EXPECT_EQ( 0, hashinator->partitionForToken(std::numeric_limits<int32_t>::min() + 1));
 
     EXPECT_EQ( 1, hashinator->partitionForToken(0));
