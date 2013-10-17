@@ -25,10 +25,8 @@ package org.voltdb.jni;
 
 import junit.framework.TestCase;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.LegacyHashinator;
 import org.voltdb.ParameterSet;
-import org.voltdb.RunningProcedureContext;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -128,7 +126,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
-                3, 2, 42, Long.MAX_VALUE, new RunningProcedureContext());
+                3, 2, 42, Long.MAX_VALUE);
         assertEquals(1, m_ee.m_callsFromEE);
         assertEquals(longOpThreshold, m_ee.m_lastTuplesAccessed);
     }

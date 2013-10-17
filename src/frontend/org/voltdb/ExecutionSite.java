@@ -1432,8 +1432,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             Object[] parameterSets,
             long txnId,//txnid is both sphandle and uniqueid pre-iv2
             long txnIdAsUniqueId,
-            boolean readOnly,
-            RunningProcedureContext rProcContext) throws EEException
+            boolean readOnly) throws EEException
     {
         return ee.executePlanFragments(
             numFragmentIds,
@@ -1443,8 +1442,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             txnId,
             lastCommittedTxnId,
             txnIdAsUniqueId,
-            readOnly ? Long.MAX_VALUE : getNextUndoToken(),
-            rProcContext);
+            readOnly ? Long.MAX_VALUE : getNextUndoToken());
     }
 
     /**
@@ -1703,4 +1701,10 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     public long[] validatePartitioning(long[] tableIds, int hashinatorType, byte[] hashinatorConfig) {
         throw new UnsupportedOperationException();
     }
+
+    @Override
+    public void setBatch(int batchIndex) {}
+
+    @Override
+    public void startProcedure(String procedureName) {}
 }

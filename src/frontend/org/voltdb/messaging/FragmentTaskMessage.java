@@ -121,28 +121,15 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     // If this flag is set, the message should contain a single fragment with the
     // desired output dep ID, but no real work to do.
     boolean m_emptyForRestart = false;
+
     int m_inputDepCount = 0;
     Iv2InitiateTaskMessage m_initiateTask;
     ByteBuffer m_initiateTaskBuffer;
 
-    byte[] m_procNameInBytes = "".getBytes();
-    short m_voltExecuteSQLIndex;
-    short m_batchIndexBase;
-    public void setRunningProcedureContext(String procName,
-                short voltExecuteSQLIndex,
-                short batchIndexBase) {
-        m_procNameInBytes = procName.getBytes();
-        m_voltExecuteSQLIndex = voltExecuteSQLIndex;
-        m_batchIndexBase = batchIndexBase;
-    }
-    public byte[] getProcNameInBytes() {
-        return m_procNameInBytes;
-    }
-    public short getVoltExecuteSQLIndex() {
-        return m_voltExecuteSQLIndex;
-    }
-    public short getBatchIndexBase() {
-        return m_batchIndexBase;
+    int m_currentBatchIndex = 0;
+
+    public int getCurrentBatchIndex() {
+        return m_currentBatchIndex;
     }
 
     /** Empty constructor for de-serialization */
@@ -191,13 +178,15 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_items = ftask.m_items;
         m_initiateTask = ftask.m_initiateTask;
         m_emptyForRestart = ftask.m_emptyForRestart;
-        m_procNameInBytes = ftask.m_procNameInBytes;
-        m_voltExecuteSQLIndex = ftask.m_voltExecuteSQLIndex;
-        m_batchIndexBase = ftask.m_batchIndexBase;
+        m_currentBatchIndex = ftask.m_currentBatchIndex;
         if (ftask.m_initiateTaskBuffer != null) {
             m_initiateTaskBuffer = ftask.m_initiateTaskBuffer.duplicate();
         }
         assert(selfCheck());
+    }
+
+    public void setBatch(int batchIndex) {
+        m_currentBatchIndex = batchIndex;
     }
 
     /**
@@ -490,17 +479,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // Fragment ID block (20 bytes per sha1-hash)
         msgsize += 20 * m_items.size();
 
-        // Procedure name gets an length (2) and the name (.length)
-        msgsize += 2;
-        if(m_procNameInBytes.length != 0) {
-                msgsize += m_procNameInBytes.length;
-        }
-
-        // voltDBExecuteSQLIndex gets an length (2)
-        msgsize += 2;
-
-        // batchIndexBase gets an length (2)
-        msgsize += 2;
+        // int for which batch (4)
+        msgsize += 4;
 
         //nested initiate task message length prefix
         msgsize += 4;
@@ -623,19 +603,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             }
         }
 
-        // Procedure name
-        if (m_procNameInBytes.length != 0) {
-            buf.putShort((short)m_procNameInBytes.length);
-            buf.put(m_procNameInBytes);
-        } else {
-           buf.putShort((short)0);
-        }
-
-        // voltExecuteIndex
-        buf.putShort(m_voltExecuteSQLIndex);
-
-        // batchIndexBase
-        buf.putShort(m_batchIndexBase);
+        // two ints for context within batches
+        buf.putInt(m_currentBatchIndex);
 
         if (m_initiateTaskBuffer != null) {
             ByteBuffer dup = m_initiateTaskBuffer.duplicate();
@@ -727,18 +696,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             }
         }
 
-        // Procedure name
-        short procNameLen = buf.getShort();
-        if(procNameLen > 0) {
-            m_procNameInBytes = new byte[procNameLen];
-            buf.get(m_procNameInBytes);
-        }
-
-        // votExecuteSQLIndex
-        m_voltExecuteSQLIndex = buf.getShort();
-
-        // batchIndexBase
-        m_batchIndexBase = buf.getShort();
+        // ints for batch context
+        m_currentBatchIndex = buf.getInt();
 
         int initiateTaskMessageLength = buf.getInt();
         if (initiateTaskMessageLength > 0) {

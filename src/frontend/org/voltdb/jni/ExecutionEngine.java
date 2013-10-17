@@ -32,7 +32,6 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
-import org.voltdb.RunningProcedureContext;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
@@ -90,7 +89,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     private int m_eeCacheSize = 0;
 
     /** Context information of the current running procedure*/
-    private RunningProcedureContext m_rProcContext = new RunningProcedureContext();
+    String m_currentProcedureName = null;
+    int m_currentBatchIndex = 0;
     private boolean m_readOnly;
     private long m_startTime;
     private long m_logDuration = 1000;
@@ -318,10 +318,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     public boolean fragmentProgressUpdate(int batchIndex,
-            String planNodeName,
-            String lastAccessedTable,
-            long lastAccessedTableSize,
-            long tuplesFound) {
+                                          String planNodeName,
+                                          String lastAccessedTable,
+                                          long lastAccessedTableSize,
+                                          long tuplesFound)
+    {
         ++m_callsFromEE;
         m_lastTuplesAccessed = tuplesFound;
 
@@ -330,9 +331,15 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
         if(duration > m_logDuration) {
             VoltLogger log = new VoltLogger("CONSOLE");
-            log.info("Procedure "+m_rProcContext.m_procedureName+" is taking a long time to execute -- "+duration/1000.0+" seconds spent accessing "
-                    +tuplesFound+" tuples. Current plan fragment "+planNodeName+" in query "+(m_rProcContext.m_batchIndexBase+batchIndex+1)
-                    +" of batch "+(m_rProcContext.m_voltExecuteSQLIndex+1)+" on site "+CoreUtils.hsIdToString(m_siteId)+".");
+            String msg = String.format("Procedure %s is taking a long time to execute -- %.2f seconds spent accessing " +
+                    "%d tuples. Current plan fragment %s in call %d to voltExecuteSQL on site %s.",
+                    m_currentProcedureName,
+                    duration / 1000.0,
+                    tuplesFound,
+                    planNodeName,
+                    m_currentBatchIndex,
+                    CoreUtils.hsIdToString(m_siteId));
+            log.info(msg);
             m_logDuration = (m_logDuration < 30000) ? 2*m_logDuration : 30000;
         }
         // Return true if we want to interrupt ee. Otherwise return false
@@ -384,6 +391,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Pass diffs to apply to the EE's catalog to update it */
     abstract public void updateCatalog(final long timestamp, final String diffCommands) throws EEException;
 
+    public void setBatch(int batchIndex) {
+        m_currentBatchIndex = batchIndex;
+    }
+
+    public void startProcedure(String procedureName) {
+        m_currentProcedureName = procedureName;
+    }
+
     /** Run multiple plan fragments */
     public VoltTable[] executePlanFragments(int numFragmentIds,
                                             long[] planFragmentIds,
@@ -392,15 +407,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                             long spHandle,
                                             long lastCommittedSpHandle,
                                             long uniqueId,
-                                            long undoQuantumToken,
-                                            RunningProcedureContext rProcContext) throws EEException
+                                            long undoQuantumToken) throws EEException
     {
         try {
-            if(rProcContext != null) {
-                m_rProcContext = rProcContext;
-            }
             // For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
             m_readOnly = (undoQuantumToken == Long.MAX_VALUE) ? true : false;
+            // update context
+
+
             // Consider put the following line in EEJNI.coreExecutePlanFrag... before where the native method is called?
             m_startTime = System.currentTimeMillis();
             VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,

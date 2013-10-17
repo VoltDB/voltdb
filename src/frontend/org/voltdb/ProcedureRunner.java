@@ -115,7 +115,7 @@ public class ProcedureRunner {
     protected final PureJavaCrc32C m_inputCRC = new PureJavaCrc32C();
 
     // running procedure info
-    protected RunningProcedureContext m_rProcContext;
+    protected int m_batchIndex;
 
     // Used to get around the "abstract" for StmtProcedures.
     // Path of least resistance?
@@ -143,8 +143,6 @@ public class ProcedureRunner {
         m_site = site;
         m_systemProcedureContext = sysprocContext;
         m_csp = csp;
-        m_rProcContext = new RunningProcedureContext();
-        m_rProcContext.m_procedureName = this.m_procedureName;
 
         m_procedure.init(this);
 
@@ -203,13 +201,15 @@ public class ProcedureRunner {
         // reset the hash of results
         m_inputCRC.reset();
 
+        // reset batch context info
+        m_batchIndex = -1;
+
         // use local var to avoid warnings about reassigning method argument
         Object[] paramList = paramListIn;
 
         ClientResponseImpl retval = null;
         // assert no sql is queued
         assert(m_batch.size() == 0);
-        assert(m_rProcContext.m_voltExecuteSQLIndex == 0);
 
         try {
             m_statsCollector.beginProcedure();
@@ -351,7 +351,6 @@ public class ProcedureRunner {
             m_cachedSingleStmt.params = null;
             m_cachedSingleStmt.expectation = null;
             m_seenFinalBatch = false;
-            m_rProcContext = new RunningProcedureContext();
         }
 
         return retval;
@@ -575,7 +574,9 @@ public class ProcedureRunner {
 
             // memo-ize the original batch size here
             int batchSize = m_batch.size();
-            m_rProcContext.m_voltExecuteSQLIndex++;
+            // increment the number of voltExecuteSQL calls for this proc
+            m_batchIndex++;
+            m_site.setBatch(m_batchIndex);
 
             // if batch is small (or reasonable size), do it in one go
             if (batchSize <= MAX_BATCH_SIZE) {
@@ -601,7 +602,6 @@ public class ProcedureRunner {
                     //  this means subBatch will be empty after running and since subBatch is a
                     //  view on the larger batch, it removes subBatch.size() elements from m_batch.
                     results.add(executeQueriesInABatch(subBatch, finalSubBatch));
-                    m_rProcContext.m_batchIndexBase += subSize;
                 }
 
                 // merge the list of lists into something returnable
@@ -1187,7 +1187,7 @@ public class ProcedureRunner {
                                           state.m_localFragsAreNonTransactional && finalTask);
 
        if (!state.m_distributedTask.isEmpty()) {
-           state.m_distributedTask.setRunningProcedureContext(m_procedureName, m_rProcContext.m_voltExecuteSQLIndex, m_rProcContext.m_batchIndexBase);
+           state.m_distributedTask.setBatch(m_batchIndex);
            m_txnState.createAllParticipatingFragmentWork(state.m_distributedTask);
        }
 
@@ -1236,7 +1236,6 @@ public class ProcedureRunner {
            params,
            m_txnState.m_spHandle,
            m_txnState.uniqueId,
-           m_catProc.getReadonly(),
-           m_rProcContext);
+           m_catProc.getReadonly());
     }
 }

@@ -97,8 +97,10 @@ public interface SiteProcedureConnection {
             Object[] parameterSets,
             long spHandle,
             long uniqueId,
-            boolean readOnly,
-            RunningProcedureContext rProcContext) throws EEException;
+            boolean readOnly) throws EEException;
+
+    public void setBatch(int batchIndex);
+    public void startProcedure(String procedureName);
 
     /**
      * Legacy recursable execution interface for MP transaction states.
