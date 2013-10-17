@@ -1127,196 +1127,6 @@ public:
     T_ValueSet m_shuffles;
 };
 
-class ElasticTableScrambler {
-public:
-
-    ElasticTableScrambler(CopyOnWriteTest &test,
-                          int npartitions, int tuplesPerBlock, int numInitial,
-                          int freqInsert, int freqDelete, int freqUpdate, int freqCompaction) :
-        m_test(test),
-        m_npartitions(npartitions),
-        m_tuplesPerBlock(tuplesPerBlock),
-        m_numInitial(numInitial),
-        m_freqInsert(freqInsert),
-        m_freqDelete(freqDelete),
-        m_freqUpdate(freqUpdate),
-        m_freqCompaction(freqCompaction),
-        m_icycle(0)
-    {}
-
-    void initialize() {
-        m_test.initTable(true, m_npartitions, static_cast<int>(m_test.m_tupleWidth * (m_tuplesPerBlock + sizeof(int32_t))));
-
-        m_test.m_table->deleteAllTuples(true);
-        m_test.addRandomUniqueTuples(m_test.m_table, m_numInitial, &m_test.m_initial);
-    }
-
-    void scramble() {
-        // Make sure to offset the initial cycles based on the frequency.
-        if (m_freqInsert > 0 && (m_icycle + m_freqInsert - 1) % m_freqInsert == 0) {
-            m_test.doRandomInsert(m_test.m_table, &m_test.m_inserts);
-        }
-
-        if (m_freqDelete > 0 && (m_icycle + m_freqDelete - 1) % m_freqDelete == 0) {
-            m_test.doRandomDelete(m_test.m_table, &m_test.m_deletes);
-        }
-
-        if (m_freqUpdate > 0 && (m_icycle + m_freqUpdate - 1) % m_freqUpdate == 0) {
-            m_test.doRandomUpdate(m_test.m_table, &m_test.m_updatesSrc, &m_test.m_updatesTgt);
-        }
-
-        if (m_freqCompaction > 0 && (m_icycle + m_freqCompaction - 1) % m_freqCompaction == 0) {
-            size_t churn = m_test.m_table->activeTupleCount() / 2;
-            // Delete half the tuples to create enough fragmentation for
-            // compaction to happen.
-            for (size_t i = 0; i < churn; i++) {
-                m_test.doRandomDelete(m_test.m_table, &m_test.m_deletes);
-            }
-            m_test.doForcedCompaction(m_test.m_table);
-            // Re-insert the same number of tuples.
-            for (size_t i = 0; i < churn; i++) {
-                m_test.doRandomInsert(m_test.m_table, &m_test.m_inserts);
-            }
-        }
-        m_icycle++;
-    }
-
-    CopyOnWriteTest &m_test;
-
-    int m_npartitions;
-    int m_tuplesPerBlock;
-    int m_numInitial;
-    int m_freqInsert;
-    int m_freqDelete;
-    int m_freqUpdate;
-    int m_freqCompaction;
-    int m_icycle;
-};
-
-/**
- * Tests that a snapshot scan and an elastic index can coexist.
- * The sequence is:
- *  1) Populate tables.
- *  2) Perform elastic index scan.
- *  3) Perform snapshot scan.
- *  4) Check the index.
- */
-TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
-    const int NUM_PARTITIONS = 1;
-    const int TUPLES_PER_BLOCK = 50;
-    const int NUM_INITIAL = 300;
-    const int NUM_CYCLES = 300;
-    const int FREQ_INSERT = 1;
-    const int FREQ_DELETE = 10;
-    const int FREQ_UPDATE = 5;
-    const int FREQ_COMPACTION = 100;
-
-    // These ranges test edge conditions and also that hash range expressions
-    // and elastic index predicates filter the same way.
-    T_HashRangeVector testRanges;
-    const int32_t maxint = std::numeric_limits<int32_t>::max();
-    const int32_t minint = std::numeric_limits<int32_t>::min();
-    testRanges.push_back(T_HashRange(0, maxint));
-//Don't support wrapping
-//    testRanges.push_back(T_HashRange(maxint, 0));
-    testRanges.push_back(T_HashRange(minint, 0));
-//Don't support wrapping
-//    testRanges.push_back(T_HashRange(0, minint));
-    testRanges.push_back(T_HashRange(minint, maxint));
-//Don't support wrapping
-//    testRanges.push_back(T_HashRange(maxint, minint, true));    // empty range
-    testRanges.push_back(T_HashRange(-maxint/2, +maxint/2));
-//Don't support wrapping
-//    testRanges.push_back(T_HashRange(+maxint/2, -maxint/2));
-    testRanges.push_back(T_HashRange(0, 0));
-    testRanges.push_back(T_HashRange(-maxint/2, +maxint/2));
-    testRanges.push_back(T_HashRange(maxint, maxint));
-
-    for (int itest = 0; itest < testRanges.size(); ++itest) {
-        resetTest();
-
-        ElasticTableScrambler tableScrambler(*this,
-                                             NUM_PARTITIONS, TUPLES_PER_BLOCK, NUM_INITIAL,
-                                             FREQ_INSERT, FREQ_DELETE,
-                                             FREQ_UPDATE, FREQ_COMPACTION);
-
-        // Clear and populate the table.
-        tableScrambler.initialize();
-
-        // Generate separate predicates for two sequential index tests done in each iteration.
-        // Using a different predicate when regenerating assures that it isn't always empty.
-        T_HashRange &testRange1 = testRanges[itest];
-        T_HashRange &testRange2 = testRanges[(itest + 1) % testRanges.size()];
-        std::vector<std::string> predicateStrings1, predicateStrings2;
-        StreamPredicateList predicates1, predicates2;
-        predicateStrings1.push_back(generateHashRangePredicate(testRange1));
-        predicateStrings2.push_back(generateHashRangePredicate(testRange2));
-        parsePredicateList(predicateStrings1, predicates1);
-        parsePredicateList(predicateStrings2, predicates2);
-
-        // Generate the elastic index.
-        streamElasticIndex(predicateStrings1, true);
-
-        // Do some scrambling.
-        for (size_t icycle = 0; icycle < NUM_CYCLES; icycle++) {
-            tableScrambler.scramble();
-        }
-
-        // Stream a snapshot, mutate tuples, and check against original tuples.
-        T_ValueSet originalTuples;
-        getTableValueSet(originalTuples);
-        T_ValueSet COWTuples;
-        int totalSnapped;
-        streamSnapshot(NUM_MUTATIONS, NUM_MUTATIONS, COWTuples, totalSnapped);
-        checkTuples(NUM_INITIAL + (m_tuplesInserted - m_tuplesDeleted), originalTuples, COWTuples);
-        ElasticIndex *directIndex = getElasticIndex();
-        checkIndex(testRange1.label("direct"), directIndex, predicates1, false);
-        size_t indexSizeBefore = directIndex->size();
-        size_t tableSizeBefore = m_table->activeTupleCount();
-
-        // Materialize the index and validate. Undo every other test cycle.
-        ElasticIndex streamedIndex;
-        size_t totalStreamed;
-        bool undo = (itest % 2 == 1);
-        materializeIndex(streamedIndex, testRange1, undo, totalStreamed);
-        checkIndex(testRange1.label("streamed"), &streamedIndex, predicates1, true);
-        size_t indexSizeAfter = directIndex->size();
-        size_t tableSizeAfter = m_table->activeTupleCount();
-        if (testRange1.m_empty || undo) {
-            ASSERT_EQ(indexSizeAfter, indexSizeBefore);
-            ASSERT_EQ(tableSizeAfter, tableSizeBefore);
-        }
-        else {
-            ASSERT_EQ(0, indexSizeAfter);
-            ASSERT_LT(tableSizeAfter, tableSizeBefore);
-        }
-        if (!undo) {
-            ASSERT_EQ(indexSizeBefore-indexSizeAfter, tableSizeBefore-tableSizeAfter);
-        }
-
-        // Clear the index and validate.
-        if (!undo) {
-            clearIndex(testRange1, true);
-            ASSERT_EQ(NULL, getElasticIndex());
-        }
-        else if (undo && itest == 1) {
-            clearIndex(testRange1, false);
-            ASSERT_NE(NULL, getElasticIndex());
-        }
-
-        // Also make sure we can re-stream the index.
-        if (!undo) {
-            ElasticIndex streamedIndex2;
-            size_t totalStreamed2;
-            streamElasticIndex(predicateStrings2, false);
-            materializeIndex(streamedIndex2, testRange2, false, totalStreamed2);
-            checkIndex(testRange2.label("streamed"), &streamedIndex2, predicates2, true);
-        }
-
-        itest++;
-    }
-}
-
 TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
     initTable(true, 1, 0);
 
@@ -1785,6 +1595,72 @@ public:
     TableStreamType m_type;
 };
 
+class ElasticTableScrambler {
+public:
+
+    ElasticTableScrambler(CopyOnWriteTest &test,
+                          int npartitions, int tuplesPerBlock, int numInitial,
+                          int freqInsert, int freqDelete, int freqUpdate, int freqCompaction) :
+        m_test(test),
+        m_npartitions(npartitions),
+        m_tuplesPerBlock(tuplesPerBlock),
+        m_numInitial(numInitial),
+        m_freqInsert(freqInsert),
+        m_freqDelete(freqDelete),
+        m_freqUpdate(freqUpdate),
+        m_freqCompaction(freqCompaction),
+        m_icycle(0)
+    {}
+
+    void initialize() {
+        m_test.initTable(true, m_npartitions, static_cast<int>(m_test.m_tupleWidth * (m_tuplesPerBlock + sizeof(int32_t))));
+
+        m_test.m_table->deleteAllTuples(true);
+        m_test.addRandomUniqueTuples(m_test.m_table, m_numInitial, &m_test.m_initial);
+    }
+
+    void scramble() {
+        // Make sure to offset the initial cycles based on the frequency.
+        if (m_freqInsert > 0 && (m_icycle + m_freqInsert - 1) % m_freqInsert == 0) {
+            m_test.doRandomInsert(m_test.m_table, &m_test.m_inserts);
+        }
+
+        if (m_freqDelete > 0 && (m_icycle + m_freqDelete - 1) % m_freqDelete == 0) {
+            m_test.doRandomDelete(m_test.m_table, &m_test.m_deletes);
+        }
+
+        if (m_freqUpdate > 0 && (m_icycle + m_freqUpdate - 1) % m_freqUpdate == 0) {
+            m_test.doRandomUpdate(m_test.m_table, &m_test.m_updatesSrc, &m_test.m_updatesTgt);
+        }
+
+        if (m_freqCompaction > 0 && (m_icycle + m_freqCompaction - 1) % m_freqCompaction == 0) {
+            size_t churn = m_test.m_table->activeTupleCount() / 2;
+            // Delete half the tuples to create enough fragmentation for
+            // compaction to happen.
+            for (size_t i = 0; i < churn; i++) {
+                m_test.doRandomDelete(m_test.m_table, &m_test.m_deletes);
+            }
+            m_test.doForcedCompaction(m_test.m_table);
+            // Re-insert the same number of tuples.
+            for (size_t i = 0; i < churn; i++) {
+                m_test.doRandomInsert(m_test.m_table, &m_test.m_inserts);
+            }
+        }
+        m_icycle++;
+    }
+
+    CopyOnWriteTest &m_test;
+
+    int m_npartitions;
+    int m_tuplesPerBlock;
+    int m_numInitial;
+    int m_freqInsert;
+    int m_freqDelete;
+    int m_freqUpdate;
+    int m_freqCompaction;
+    int m_icycle;
+};
+
 // Test the elastic scanner.
 TEST_F(CopyOnWriteTest, ElasticScanner) {
 
@@ -1934,6 +1810,129 @@ TEST_F(CopyOnWriteTest, ElasticIndex) {
     }
 
     checkIndex("ElasticIndex", getElasticIndex(), predicates, false);
+}
+
+/**
+ * Tests that a snapshot scan and an elastic index can coexist.
+ * The sequence is:
+ *  1) Populate tables.
+ *  2) Perform elastic index scan.
+ *  3) Perform snapshot scan.
+ *  4) Check the index.
+ */
+TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
+    const int NUM_PARTITIONS = 1;
+    const int TUPLES_PER_BLOCK = 50;
+    const int NUM_INITIAL = 300;
+    const int NUM_CYCLES = 300;
+    const int FREQ_INSERT = 1;
+    const int FREQ_DELETE = 10;
+    const int FREQ_UPDATE = 5;
+    const int FREQ_COMPACTION = 100;
+
+    // These ranges test edge conditions and also that hash range expressions
+    // and elastic index predicates filter the same way.
+    T_HashRangeVector testRanges;
+    const int32_t maxint = std::numeric_limits<int32_t>::max();
+    const int32_t minint = std::numeric_limits<int32_t>::min();
+    testRanges.push_back(T_HashRange(0, maxint));
+//Don't support wrapping
+//    testRanges.push_back(T_HashRange(maxint, 0));
+    testRanges.push_back(T_HashRange(minint, 0));
+//Don't support wrapping
+//    testRanges.push_back(T_HashRange(0, minint));
+    testRanges.push_back(T_HashRange(minint, maxint));
+//Don't support wrapping
+//    testRanges.push_back(T_HashRange(maxint, minint, true));    // empty range
+    testRanges.push_back(T_HashRange(-maxint/2, +maxint/2));
+//Don't support wrapping
+//    testRanges.push_back(T_HashRange(+maxint/2, -maxint/2));
+//    testRanges.push_back(T_HashRange(0, 0));
+//    testRanges.push_back(T_HashRange(maxint, maxint));
+
+    for (int itest = 0; itest < testRanges.size(); ++itest) {
+        resetTest();
+
+        ElasticTableScrambler tableScrambler(*this,
+                                             NUM_PARTITIONS, TUPLES_PER_BLOCK, NUM_INITIAL,
+                                             FREQ_INSERT, FREQ_DELETE,
+                                             FREQ_UPDATE, FREQ_COMPACTION);
+
+        // Clear and populate the table.
+        tableScrambler.initialize();
+
+        // Generate separate predicates for two sequential index tests done in each iteration.
+        // Using a different predicate when regenerating assures that it isn't always empty.
+        T_HashRange &testRange1 = testRanges[itest];
+        T_HashRange &testRange2 = testRanges[(itest + 1) % testRanges.size()];
+        std::vector<std::string> predicateStrings1, predicateStrings2;
+        StreamPredicateList predicates1, predicates2;
+        predicateStrings1.push_back(generateHashRangePredicate(testRange1));
+        predicateStrings2.push_back(generateHashRangePredicate(testRange2));
+        parsePredicateList(predicateStrings1, predicates1);
+        parsePredicateList(predicateStrings2, predicates2);
+
+        // Generate the elastic index.
+        streamElasticIndex(predicateStrings1, true);
+
+        // Do some scrambling.
+        for (size_t icycle = 0; icycle < NUM_CYCLES; icycle++) {
+            tableScrambler.scramble();
+        }
+
+        // Stream a snapshot, mutate tuples, and check against original tuples.
+        T_ValueSet originalTuples;
+        getTableValueSet(originalTuples);
+        T_ValueSet COWTuples;
+        int totalSnapped;
+        streamSnapshot(NUM_MUTATIONS, NUM_MUTATIONS, COWTuples, totalSnapped);
+        checkTuples(NUM_INITIAL + (m_tuplesInserted - m_tuplesDeleted), originalTuples, COWTuples);
+        ElasticIndex *directIndex = getElasticIndex();
+        checkIndex(testRange1.label("direct"), directIndex, predicates1, false);
+        size_t indexSizeBefore = directIndex->size();
+        size_t tableSizeBefore = m_table->activeTupleCount();
+
+        // Materialize the index and validate. Undo every other test cycle.
+        ElasticIndex streamedIndex;
+        size_t totalStreamed;
+        bool undo = (itest % 2 == 1);
+        materializeIndex(streamedIndex, testRange1, undo, totalStreamed);
+        checkIndex(testRange1.label("streamed"), &streamedIndex, predicates1, true);
+        size_t indexSizeAfter = directIndex->size();
+        size_t tableSizeAfter = m_table->activeTupleCount();
+        if (testRange1.m_empty || undo) {
+            ASSERT_EQ(indexSizeAfter, indexSizeBefore);
+            ASSERT_EQ(tableSizeAfter, tableSizeBefore);
+        }
+        else {
+            ASSERT_EQ(0, indexSizeAfter);
+            ASSERT_LT(tableSizeAfter, tableSizeBefore);
+        }
+        if (!undo) {
+            ASSERT_EQ(indexSizeBefore-indexSizeAfter, tableSizeBefore-tableSizeAfter);
+        }
+
+        // Clear the index and validate.
+        if (!undo) {
+            clearIndex(testRange1, true);
+            ASSERT_EQ(NULL, getElasticIndex());
+        }
+        else if (undo && itest == 1) {
+            clearIndex(testRange1, false);
+            ASSERT_NE(NULL, getElasticIndex());
+        }
+
+        // Also make sure we can re-stream the index.
+        if (!undo) {
+            ElasticIndex streamedIndex2;
+            size_t totalStreamed2;
+            streamElasticIndex(predicateStrings2, false);
+            materializeIndex(streamedIndex2, testRange2, false, totalStreamed2);
+            checkIndex(testRange2.label("streamed"), &streamedIndex2, predicates2, true);
+        }
+
+        itest++;
+    }
 }
 
 int main() {
