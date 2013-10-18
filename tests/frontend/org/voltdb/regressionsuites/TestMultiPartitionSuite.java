@@ -245,7 +245,7 @@ public class TestMultiPartitionSuite extends RegressionSuite {
         // test mispartitioned update
         client.callProcedure("NEW_ORDER.insert", 0, 0, 0);
         try {
-            client.callProcedure(MispartitionedUpdate.class.getSimpleName(), TheHashinator.getConfiguredHashinatorType() == HashinatorType.LEGACY ? 0 : 1);
+            client.callProcedure(MispartitionedUpdate.class.getSimpleName(), 0);
             fail();
         }
         catch (Exception e) {
