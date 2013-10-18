@@ -17,11 +17,7 @@
 
 package org.voltdb.expressions;
 
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Database;
-import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.utils.VoltTypeUtil;
 
@@ -40,9 +36,6 @@ public class OperatorExpression extends AbstractExpression {
         //
         super();
     }
-
-    @Override
-    protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {}
 
     @Override
     public boolean needsRightExpression() {

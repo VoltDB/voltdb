@@ -21,7 +21,6 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Database;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.TimestampType;
@@ -169,7 +168,8 @@ public class ConstantValueExpression extends AbstractValueExpression {
     }
 
     @Override
-    public void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {
+    public void loadFromJSONObject(JSONObject obj) throws JSONException
+    {
         m_isNull = false;
         if (!obj.isNull(Members.VALUE.name())) {
             m_value = obj.getString(Members.VALUE.name());

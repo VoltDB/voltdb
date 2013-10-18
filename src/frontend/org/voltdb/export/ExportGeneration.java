@@ -720,19 +720,14 @@ public class ExportGeneration {
         // In iv2, truncation at the per-partition txn id recorded in the snapshot.
         for (HashMap<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
             for (ExportDataSource source : dataSources.values()) {
-                if (VoltDB.instance().isIV2Enabled()) {
-                    Long truncationPoint = partitionToTxnId.get(source.getPartitionId());
-                    if (truncationPoint == null) {
-                        exportLog.error("Snapshot " + txnId +
-                                " does not include truncation point for partition " +
-                                source.getPartitionId());
-                    }
-                    else {
-                        tasks.add(source.truncateExportToTxnId(truncationPoint));
-                    }
+                Long truncationPoint = partitionToTxnId.get(source.getPartitionId());
+                if (truncationPoint == null) {
+                    exportLog.error("Snapshot " + txnId +
+                            " does not include truncation point for partition " +
+                            source.getPartitionId());
                 }
                 else {
-                    tasks.add(source.truncateExportToTxnId(txnId));
+                    tasks.add(source.truncateExportToTxnId(truncationPoint));
                 }
             }
         }

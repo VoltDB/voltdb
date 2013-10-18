@@ -423,6 +423,11 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     void swapTuples(TableTuple &sourceTupleWithNewValues, TableTuple &destinationTuple);
 
+    // The source tuple is used to create the ConstraintFailureException if one
+    // occurs. In case of exception, target tuple should be released, but the
+    // source tuple's memory should still be retained until the exception is
+    // handled.
+    void insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible);
     void insertTupleForUndo(char *tuple);
     void updateTupleForUndo(char* targetTupleToUpdate,
                             char* sourceTupleWithNewValues,
@@ -668,6 +673,12 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
     // The tempTuple is forever!
     assert(&tuple != &m_tempTuple);
 
+    // Let the context handle it as needed. Do this before freeing the memory
+    // of non-inlined columns
+    if (m_tableStreamer != NULL) {
+        m_tableStreamer->notifyTupleDelete(tuple);
+    }
+
     // This frees referenced strings -- when could possibly be a better time?
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
         decreaseStringMemCount(tuple.getNonInlinedMemorySize());
@@ -681,11 +692,6 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
     if (tuple.isPendingDelete()) {
         tuple.setPendingDeleteFalse();
         --m_invisibleTuplesPendingDeleteCount;
-    }
-
-    // Let the context handle it as needed.
-    if (m_tableStreamer != NULL) {
-        m_tableStreamer->notifyTupleDelete(tuple);
     }
 
     if (block.get() == NULL) {

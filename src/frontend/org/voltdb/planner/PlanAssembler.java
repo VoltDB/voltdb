@@ -41,8 +41,8 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.planner.ParsedSelectStmt.MVFixInfo;
+import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -538,17 +538,6 @@ public class PlanAssembler {
         if (root instanceof ReceivePlanNode) {
             if (m_parsedSelect.mayNeedAvgPushdown()) {
                 m_parsedSelect.switchOptimalSuiteForAvgPushdown();
-            }
-
-            if (m_parsedSelect.mvFixInfo.needed) {
-                // Guard to prevent wrong answer queries.
-                // Continue give wrong answers possibly for joined query on MV.
-//                if (m_parsedSelect.tableList.size() != 1) {
-//                    String errorMsg = String.format("Unsupported query joined with materialized table %s",
-//                            m_parsedSelect.mvFixInfo.mvTable.getTypeName());
-//                    throw new PlanningErrorException(errorMsg);
-//                }
-
             }
         } else {
             m_parsedSelect.mvFixInfo.needed = false;
@@ -1060,7 +1049,7 @@ public class PlanAssembler {
                 // if this is a fancy expression-based index...
                 else {
                     try {
-                        indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, null);
+                        indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr);
                     } catch (JSONException e) {
                         e.printStackTrace(); // danger will robinson
                         assert(false);
@@ -1506,7 +1495,7 @@ public class PlanAssembler {
                     // either pure expression index or mix of expressions and simple columns
                     List<AbstractExpression> indexedExprs = null;
                     try {
-                        indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, null);
+                        indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson);
                     } catch (JSONException e) {
                         e.printStackTrace();
                         assert(false);

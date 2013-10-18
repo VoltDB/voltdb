@@ -1238,6 +1238,35 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
     }
 
+    public void testENG4146() throws IOException, ProcCallException {
+        System.out.println("STARTING insert no json string...");
+        Client client = getClient();
+        VoltTable result = null;
+        if (!isHSQL()) {
+            // it used to throw EE exception
+            // when inserting a non-json encoded var char into a column that has a field() index;
+            client.callProcedure("NO_JSON.insert",  1, "jpiekos1", "foo", "no json");
+
+            result = client.callProcedure("@AdHoc","select id, var1, var2, var3 from no_json;").getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals(1, result.getLong(0));
+
+            assertEquals("jpiekos1", result.getString(1));
+            assertEquals("foo", result.getString(2));
+            assertEquals("no json", result.getString(3));
+
+            client.callProcedure("NO_JSON.insert",  2, "jpiekos2", "foo2", "no json2");
+
+            result = client.callProcedure("@AdHoc","select id from no_json " +
+                    "order by var2, field(var3,'color');").getResults()[0];
+            validateTableOfLongs(result, new long[][] {{1},{2}});
+
+            result = client.callProcedure("@AdHoc","select id from no_json " +
+                    "where var2 = 'foo' and field(var3,'color') = 'red';").getResults()[0];
+            assertTrue(result.getRowCount() == 0);
+        }
+    }
+
 
     //
     // JUnit / RegressionSuite boilerplate

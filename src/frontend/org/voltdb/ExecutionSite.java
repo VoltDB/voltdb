@@ -87,8 +87,6 @@ import org.voltdb.utils.CachedByteBufferAllocator;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 
-import com.google.common.collect.ImmutableMap;
-
 /**
  * The main executor of transactional work in the system. Controls running
  * stored procedures and manages the execution engine's running of plan
@@ -569,7 +567,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
          * is multi-part then the txnid and SpHandle will not be the same.
          */
         @Override
-        public long getLastCommittedSpHandle()                     { return lastCommittedTxnId; }
+        public long getSpHandleForSnapshotDigest()                     { return lastCommittedTxnId; }
         @Override
         public long getCurrentTxnId()                           { return m_currentTransactionState.txnId; }
         @Override
@@ -652,7 +650,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         m_mailbox = null;
 
         // initialize the DR gateway
-        m_partitionDRGateway = new PartitionDRGateway(false);
+        m_partitionDRGateway = new PartitionDRGateway();
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
@@ -696,7 +694,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
         // initialize the DR gateway
         m_partitionDRGateway =
-            PartitionDRGateway.getInstance(partitionId, nodeDRGateway, false, m_rejoining);
+            PartitionDRGateway.getInstance(partitionId, nodeDRGateway, m_rejoining);
 
         if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
             ee = new MockExecutionEngine();
@@ -1465,6 +1463,12 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         return null;
     }
 
+    @Override
+    public void setSpHandleForSnapshotDigest(long spHandle)
+    {
+
+    }
+
     public SiteTracker getSiteTracker() {
         return m_tracker;
     }
@@ -1614,7 +1618,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
     // do-nothing implementation of IV2 SiteProcedeConnection API
     @Override
-    public void truncateUndoLog(boolean rollback, long token, long txnId, long spHandle, List<UndoAction> undoLog) {
+    public void truncateUndoLog(boolean rollback, long token, long spHandle, List<UndoAction> undoLog) {
         throw new RuntimeException("Unsupported IV2-only API.");
     }
 

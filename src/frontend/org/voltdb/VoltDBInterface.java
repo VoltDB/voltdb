@@ -17,7 +17,6 @@
 package org.voltdb;
 
 import java.util.ArrayList;
-import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -72,7 +71,6 @@ public interface VoltDBInterface
     public String getVersionString();
     public HostMessenger getHostMessenger();
     public ArrayList<ClientInterface> getClientInterfaces();
-    public Map<Long, ExecutionSite> getLocalSites();
     public OpsAgent getOpsAgent(OpsSelector selector);
     // Keep this method to centralize the cast to StatsAgent for
     // existing code
@@ -205,6 +203,4 @@ public interface VoltDBInterface
      * Return the license api. This may be null in community editions!
      */
      public LicenseApi getLicenseApi();
-
-     public boolean isIV2Enabled();
 }

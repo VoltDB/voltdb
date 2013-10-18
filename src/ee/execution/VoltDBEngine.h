@@ -87,7 +87,7 @@
 #define ENGINE_ERRORCODE_ERROR 1
 
 #define MAX_BATCH_COUNT 1000
-#define MAX_PARAM_COUNT 1000 // or whatever
+#define MAX_PARAM_COUNT 1025 // keep in synch with value in CompiledPlan.java
 
 namespace catalog {
 class Catalog;

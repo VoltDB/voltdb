@@ -263,7 +263,7 @@ public:
      *      data, but chosen values for this index.  So, searchKey has
      *      to contain values in this index's entry order.
      */
-    virtual void moveToGreaterThanKey(const TableTuple *searchKey)
+    virtual bool moveToGreaterThanKey(const TableTuple *searchKey)
     {
         throwFatalException("Invoked TableIndex virtual method moveToGreaterThanKey which has no implementation");
     };

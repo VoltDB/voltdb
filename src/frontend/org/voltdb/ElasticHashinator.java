@@ -17,14 +17,13 @@
 package org.voltdb;
 
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.util.*;
-import java.util.zip.DeflaterOutputStream;
-import java.util.zip.InflaterOutputStream;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 
 import org.apache.cassandra_voltpatches.MurmurHash3;
 import org.voltcore.utils.Pair;
@@ -36,7 +35,7 @@ import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.UnmodifiableIterator;
-import static org.voltdb.TheHashinator.valueToBytes;
+import org.voltdb.utils.CompressionService;
 
 /**
  * A hashinator that uses Murmur3_x64_128 to hash values and a consistent hash ring
@@ -362,7 +361,8 @@ public class ElasticHashinator extends TheHashinator {
             // the time to close it.
             // else there is no open range, keep on going.
             if (start != null) {
-                ranges.put(start, token);
+                //Range end is inclusive so do token - 1
+                ranges.put(start, token - 1);
                 start = null;
             }
 
@@ -372,13 +372,11 @@ public class ElasticHashinator extends TheHashinator {
             }
         }
 
-        // if there is an open range when we get here, it means that
-        // the last token on the ring belongs to the partition, and
-        // it wraps around the origin of the ring, so close the range
-        // with the the very first token on the ring.
+        // if there is an open range when we get here
+        // It is the last token which implicity ends at the next max value
         if (start != null) {
             assert first != null;
-            ranges.put(start, first);
+            ranges.put(start, Integer.MAX_VALUE);
         }
 
         return ranges;
@@ -437,18 +435,11 @@ public class ElasticHashinator extends TheHashinator {
             buf.putInt(unsafe.getInt(m_tokens + (ii * 8) + 4));
         }
 
-        // Compress (deflate) the bytes and cache the results.
-        ByteArrayOutputStream bos = new ByteArrayOutputStream(buf.array().length);
-        DeflaterOutputStream dos = new DeflaterOutputStream(bos);
         try {
-            dos.write(buf.array());
-            dos.close();
+            return CompressionService.gzipBytes(buf.array());
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to compress bytes", e);
         }
-        catch (IOException e) {
-            throw new RuntimeException(String.format(
-                    "Failed to deflate cooked bytes: %s", e.toString()));
-        }
-        return bos.toByteArray();
     }
 
     /**
@@ -511,16 +502,12 @@ public class ElasticHashinator extends TheHashinator {
     private Pair<Long, Integer> updateCooked(byte[] compressedData)
     {
         // Uncompress (inflate) the bytes.
-        ByteArrayOutputStream bos = new ByteArrayOutputStream((int)(compressedData.length * 1.5));
-        InflaterOutputStream dos = new InflaterOutputStream(bos);
+        byte[] cookedBytes;
         try {
-            dos.write(compressedData);
-            dos.close();
-        }
-        catch (IOException e) {
+            cookedBytes = CompressionService.gunzipBytes(compressedData);
+        } catch (IOException e) {
             throw new RuntimeException("Unable to decompress elastic hashinator data.");
         }
-        byte[] cookedBytes = bos.toByteArray();
 
         int numEntries = (cookedBytes.length >= 4
                                 ? ByteBuffer.wrap(cookedBytes).getInt()

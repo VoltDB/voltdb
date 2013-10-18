@@ -22,7 +22,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
@@ -467,10 +466,18 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         }
 
         LimitPlanNode limit = (LimitPlanNode)m_inlineNodes.get(PlanNodeType.LIMIT);
-        if (limit != null && limit.getLimit() > 0) {
-            m_estimatedOutputTupleCount = Math.min(m_estimatedOutputTupleCount, limit.getLimit());
-            if (m_predicate == null) {
-                m_estimatedProcessedTupleCount = limit.getLimit() + limit.getOffset();
+        if (limit != null) {
+            int limitInt = limit.getLimit();
+            if (limitInt == -1) {
+                // If Limit ?, it's likely to be a small number. So pick up 50 here.
+                limitInt = 50;
+            }
+
+            m_estimatedOutputTupleCount = Math.min(m_estimatedOutputTupleCount, limitInt);
+            int offsetInt = limit.getOffset();
+
+            if (m_predicate == null && offsetInt == 0) {
+                m_estimatedProcessedTupleCount = limitInt;
             }
         }
     }
@@ -510,26 +517,13 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         m_forDeterminismOnly = jobj.optBoolean(Members.DETERMINISM_ONLY.name());
         m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
         m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
-        JSONObject tempjobj = null;
         //load end_expression
-        if( !jobj.isNull( Members.END_EXPRESSION.name() ) ) {
-            tempjobj = jobj.getJSONObject( Members.END_EXPRESSION.name() );
-            m_endExpression = AbstractExpression.fromJSONObject( tempjobj, db);
-        }
+        m_endExpression = AbstractExpression.fromJSONChild(jobj, Members.END_EXPRESSION.name());
         // load initial_expression
-        if ( !jobj.isNull(Members.INITIAL_EXPRESSION.name() ) ) {
-            tempjobj = jobj.getJSONObject( Members.INITIAL_EXPRESSION.name() );
-            m_initialExpression = AbstractExpression.fromJSONObject(tempjobj,  db);
-        }
+        m_initialExpression = AbstractExpression.fromJSONChild(jobj, Members.INITIAL_EXPRESSION.name());
         //load searchkey_expressions
-        if( !jobj.isNull( Members.SEARCHKEY_EXPRESSIONS.name() ) ) {
-            JSONArray jarray = jobj.getJSONArray( Members.SEARCHKEY_EXPRESSIONS.name() );
-            int size = jarray.length();
-            for( int i = 0 ; i < size; i++ ) {
-                tempjobj = jarray.getJSONObject( i );
-                m_searchkeyExpressions.add( AbstractExpression.fromJSONObject(tempjobj, db));
-            }
-        }
+        AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
+                Members.SEARCHKEY_EXPRESSIONS.name());
     }
 
     @Override
@@ -579,7 +573,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             else {
                 try {
                     List<AbstractExpression> indexExpressions =
-                        AbstractExpression.fromJSONArrayString(jsonExpr, null);
+                        AbstractExpression.fromJSONArrayString(jsonExpr);
                     int ii = 0;
                     for (AbstractExpression ae : indexExpressions) {
                         asIndexed[ii++] = ae.explain(m_targetTableName);
@@ -606,7 +600,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             }
             else {
                 usageInfo = "\n" + indent;
-                if (m_lookupType == IndexLookupType.LT || m_lookupType == IndexLookupType.LTE) {
+                if (isReverseScan()) {
                     usageInfo += "reverse ";
                 }
                 // qualify whether the inequality matching covers all or only some index key components
@@ -621,7 +615,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 // Explain the criteria for continuinuing the scan such as
                 // "while (event_type = 1 AND event_start < x.start_time+30)"
                 // or label it as a scan "to the end"
-                usageInfo += explainEndKeys(asIndexed);
+                usageInfo += explainEndKeys();
             }
             // Introduce any additional filters not related to the index
             // that could cause rows to be skipped.
@@ -673,7 +667,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     /// Explain that this index scans "to end" of the index
     /// or only "while" an end expression involving indexed key values remains true.
-    private String explainEndKeys(String[] asIndexed)
+    private String explainEndKeys()
     {
         // By default, indexing starts at the start of the index.
         if (m_endExpression == null) {
@@ -703,57 +697,22 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // except those (post-)predicates are artifact predicates we
     // added for reverse scan purpose only
     public boolean isPredicatesOptimizableForAggregate() {
-
         // for reverse scan, need to examine "added" predicates
         List<AbstractExpression> predicates = ExpressionUtil.uncombine(m_predicate);
-        // if the size of predicates doesn't equal 2, can't be our added artifact predicates
-        // TODO: someday when index scans on non-nullable values are recognized, soften this
-        // test to make the NOT NULL predicate optional
-        if (predicates.size() != 2) {
+        // if the size of predicates doesn't equal 1, can't be our added artifact predicates
+        if (predicates.size() != 1) {
             return false;
         }
-        // examin each possible "added" predicates
-        // the 1st predicate must matches the last searchKey and the 2nd is NOT NULL expr
+        // examin the possible "added" predicates: NOT NULL expr.
         AbstractExpression expr = predicates.get(0);
-        if (expr.getExpressionType() != ExpressionType.COMPARE_LESSTHAN &&
-                expr.getExpressionType() != ExpressionType.COMPARE_LESSTHANOREQUALTO) {
-            return false;
-        }
-        int searchKeyCount = m_searchkeyExpressions.size();
-        String exprsjson = m_catalogIndex.getExpressionsjson();
-        AbstractExpression left = expr.getLeft();
-        if (exprsjson.isEmpty()) {
-            if (left.getExpressionType() != ExpressionType.VALUE_TUPLE) {
-                return false;
-            }
-            if (((TupleValueExpression)left).getColumnIndex() !=
-                    CatalogUtil.getSortedCatalogItems(m_catalogIndex.getColumns(), "index").get(searchKeyCount - 1).getColumn().getIndex()) {
-                return false;
-            }
-        } else {
-            List<AbstractExpression> indexedExprs = null;
-            try {
-                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, null);
-            } catch (JSONException e) {
-                e.printStackTrace();
-                assert(false);
-                return false;
-            }
-            if (left.equals(indexedExprs.get(searchKeyCount - 1))) {
-                return false;
-            }
-        }
-        if (!expr.getRight().equals(m_searchkeyExpressions.get(searchKeyCount - 1))) {
-            return false;
-        }
-        expr = predicates.get(1);
         if (expr.getExpressionType() != ExpressionType.OPERATOR_NOT) {
             return false;
         }
         if (expr.getLeft().getExpressionType() != ExpressionType.OPERATOR_IS_NULL) {
             return false;
         }
-        if (!expr.getLeft().getLeft().equals(predicates.get(0).getLeft())) {
+        // Not reverse scan.
+        if (m_lookupType != IndexLookupType.LT && m_lookupType != IndexLookupType.LTE) {
             return false;
         }
 

@@ -46,6 +46,14 @@ public class SysprocFragmentTask extends TransactionTask
     final FragmentTaskMessage m_fragmentMsg;
     Map<Integer, List<VoltTable>> m_inputDeps;
 
+    // This constructor is used during live rejoin log replay.
+    SysprocFragmentTask(Mailbox mailbox,
+                        FragmentTaskMessage message,
+                        ParticipantTransactionState txnState)
+    {
+        this(mailbox, txnState, null, message, null);
+    }
+
     SysprocFragmentTask(Mailbox mailbox,
                  ParticipantTransactionState txnState,
                  TransactionTaskQueue queue,
@@ -135,7 +143,13 @@ public class SysprocFragmentTask extends TransactionTask
     @Override
     public void runFromTaskLog(SiteProcedureConnection siteConnection)
     {
-        throw new RuntimeException("Not implemented: replay sysproc during live rejoin.");
+        if (!m_txnState.isReadOnly()) {
+            if (m_txnState.getBeginUndoToken() == Site.kInvalidUndoToken) {
+                m_txnState.setBeginUndoToken(siteConnection.getLatestUndoToken());
+            }
+        }
+
+        processFragmentTask(siteConnection);
     }
 
 

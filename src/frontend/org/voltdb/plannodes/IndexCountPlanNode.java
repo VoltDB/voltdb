@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
@@ -171,7 +170,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             indexSize = indexedColRefs.size();
         } else {
             try {
-                indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring, null);
+                indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring);
                 indexSize = indexedExprs.size();
             } catch (JSONException e) {
                 // TODO Auto-generated catch block
@@ -339,20 +338,10 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
         JSONObject tempjobj = null;
         //load end_expression
-        if( !jobj.isNull( Members.ENDKEY_EXPRESSIONS.name() ) ) {
-            JSONArray jarray = jobj.getJSONArray(Members.ENDKEY_EXPRESSIONS.name());
-            int size = jarray.length();
-            for( int i = 0; i < size; i++ ){
-                tempjobj = jarray.getJSONObject(i);
-                m_endkeyExpressions.add( AbstractExpression.fromJSONObject( tempjobj, db) );
-            }
-        }
-        JSONArray jarray = jobj.getJSONArray( Members.SEARCHKEY_EXPRESSIONS.name() );
-        int size = jarray.length();
-        for( int i = 0 ; i < size; i++ ) {
-            tempjobj = jarray.getJSONObject( i );
-            m_searchkeyExpressions.add( AbstractExpression.fromJSONObject(tempjobj, db));
-        }
+        AbstractExpression.loadFromJSONArrayChild(m_endkeyExpressions, jobj,
+                Members.ENDKEY_EXPRESSIONS.name());
+        AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
+                Members.SEARCHKEY_EXPRESSIONS.name());
     }
 
     @Override

@@ -29,7 +29,6 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
-import org.voltdb.ExecutionSite;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.StatsAgent;
@@ -162,8 +161,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             new HashMap<Integer, ArrayDeque<VoltTable>>();
 
         private final VoltLogger hostLog = new VoltLogger("HOST");
-        private final VoltLogger log = new VoltLogger(ExecutionSite.class.getName());
-
 
         /**
          * Add a single dependency. Exists only for test cases.
@@ -244,8 +241,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                     // Prevent warnings.
                     return;
                 }
-                if (log.isTraceEnabled()) {
-                    log.l7dlog(Level.TRACE, LogKeys.org_voltdb_ExecutionSite_ImportingDependency.name(),
+                if (hostLog.isTraceEnabled()) {
+                    hostLog.l7dlog(Level.TRACE, LogKeys.org_voltdb_ExecutionSite_ImportingDependency.name(),
                                new Object[] { dependencyId, dependency.getClass().getName(), dependency.toString() },
                                null);
                 }
