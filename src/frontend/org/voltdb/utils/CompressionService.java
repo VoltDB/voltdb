@@ -16,6 +16,7 @@
  */
 package org.voltdb.utils;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -24,6 +25,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.zip.DeflaterOutputStream;
+import java.util.zip.InflaterOutputStream;
 
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
@@ -335,5 +338,23 @@ public final class CompressionService {
             }
         }
         return m_executor.submit(task);
+    }
+
+    public static byte[] gzipBytes(byte[] rawBytes) throws IOException
+    {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream(rawBytes.length);
+        DeflaterOutputStream dos = new DeflaterOutputStream(bos);
+        dos.write(rawBytes);
+        dos.close();
+        return bos.toByteArray();
+    }
+
+    public static byte[] gunzipBytes(byte[] compressedBytes) throws IOException
+    {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream((int)(compressedBytes.length * 1.5));
+        InflaterOutputStream dos = new InflaterOutputStream(bos);
+        dos.write(compressedBytes);
+        dos.close();
+        return bos.toByteArray();
     }
 }

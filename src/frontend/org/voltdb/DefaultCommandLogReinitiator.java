@@ -70,12 +70,6 @@ public class DefaultCommandLogReinitiator implements CommandLogReinitiator
     }
 
     @Override
-    public boolean requestIndexSnapshot()
-    {
-        return true;
-    }
-
-    @Override
     public boolean checkAndBalancePartitions()
     {
         return true;

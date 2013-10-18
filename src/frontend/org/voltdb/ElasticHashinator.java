@@ -17,7 +17,6 @@
 package org.voltdb;
 
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.NoSuchAlgorithmException;
@@ -29,8 +28,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.zip.DeflaterOutputStream;
-import java.util.zip.InflaterOutputStream;
 
 import org.apache.cassandra_voltpatches.MurmurHash3;
 import org.voltcore.utils.Pair;
@@ -42,7 +39,7 @@ import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.UnmodifiableIterator;
-import static org.voltdb.TheHashinator.valueToBytes;
+import org.voltdb.utils.CompressionService;
 
 /**
  * A hashinator that uses Murmur3_x64_128 to hash values and a consistent hash ring
@@ -89,15 +86,15 @@ public class ElasticHashinator extends TheHashinator {
     /**
      * Encapsulates all knowledge of how to compress/uncompress hash tokens.
      */
-    private static class TokenCompressor {
+    public static class TokenCompressor {
         final static long TOKEN_MASK = 0xFFFFFFFF00000000L;
         final static int COMPRESSED_SIZE = 4;
 
         /**
-         * Prepare token for compression.
+         * Drop the lower-order bits of the token.
          * @return cleaned up token
          */
-        static long prepare(long token) {
+        public static long prepare(long token) {
             return token & TOKEN_MASK;
         }
 
@@ -105,7 +102,7 @@ public class ElasticHashinator extends TheHashinator {
          * Compress token.
          * @return compressed token
          */
-        static int compress(long token) {
+        public static int compress(long token) {
             return (int)(token >>> 32);
         }
 
@@ -113,7 +110,7 @@ public class ElasticHashinator extends TheHashinator {
          * Uncompress token.
          * @return uncompressed token
          */
-        static long uncompress(int token) {
+        public static long uncompress(int token) {
             return (long)token << 32;
         }
     }
@@ -455,18 +452,11 @@ public class ElasticHashinator extends TheHashinator {
             buf.putInt(partitionId);
         }
 
-        // Compress (deflate) the bytes and cache the results.
-        ByteArrayOutputStream bos = new ByteArrayOutputStream(buf.array().length);
-        DeflaterOutputStream dos = new DeflaterOutputStream(bos);
         try {
-            dos.write(buf.array());
-            dos.close();
+            return CompressionService.gzipBytes(buf.array());
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to compress bytes", e);
         }
-        catch (IOException e) {
-            throw new RuntimeException(String.format(
-                    "Failed to deflate cooked bytes: %s", e.toString()));
-        }
-        return bos.toByteArray();
     }
 
     /**
@@ -501,16 +491,12 @@ public class ElasticHashinator extends TheHashinator {
     private ImmutableSortedMap<Long, Integer> updateCooked(byte[] compressedData)
     {
         // Uncompress (inflate) the bytes.
-        ByteArrayOutputStream bos = new ByteArrayOutputStream((int)(compressedData.length * 1.5));
-        InflaterOutputStream dos = new InflaterOutputStream(bos);
+        byte[] cookedBytes;
         try {
-            dos.write(compressedData);
-            dos.close();
-        }
-        catch (IOException e) {
+            cookedBytes = CompressionService.gunzipBytes(compressedData);
+        } catch (IOException e) {
             throw new RuntimeException("Unable to decompress elastic hashinator data.");
         }
-        byte[] cookedBytes = bos.toByteArray();
 
         int numEntries = (cookedBytes.length >= 4
                                 ? ByteBuffer.wrap(cookedBytes).getInt()
