@@ -23,6 +23,11 @@ import com.google.common.collect.TreeMultimap;
 
 import java.util.*;
 
+/**
+ * Helper class for distributing a fixed number of buckets over some number of partitions.
+ * Can handle adding new partitions by taking buckets from existing partitions and assigning them
+ * to new ones
+ */
 public class Buckets {
     private final List<TreeSet<Integer>> m_partitionTokens = new ArrayList<TreeSet<Integer>>();
     private final int m_tokenCount;
@@ -59,6 +64,10 @@ public class Buckets {
         }
     }
 
+    /*
+     * Loop and balance data after a partition is added until no
+     * more balancing can be done
+     */
     private void addPartition(TreeSet<LoadPair> loadSet) {
         while (doNextBalanceOp(loadSet)) {}
     }
@@ -97,7 +106,8 @@ public class Buckets {
     }
 
     /*
-     * Return the token that will be replaced with a different partition
+     * Take a token from the most loaded partition and move it to the least loaded partition
+     * If no available balancing operation is available return false
      */
     private boolean doNextBalanceOp(TreeSet<LoadPair> loadSet) {
         LoadPair mostLoaded = loadSet.pollLast();
