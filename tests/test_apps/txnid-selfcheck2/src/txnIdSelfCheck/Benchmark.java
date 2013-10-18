@@ -147,7 +147,7 @@ public class Benchmark {
         boolean disableadhoc = false;
 
         @Option(desc = "Maximum TPS rate for benchmark.")
-        int ratelimit = 100000;
+        int ratelimit = Integer.MAX_VALUE;
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
@@ -464,17 +464,17 @@ public class Benchmark {
         log.info("Running benchmark...");
 
         BigTableLoader partitionedLoader = new BigTableLoader(client, "bigp",
-                         (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50);
+                         (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits);
         partitionedLoader.start();
         BigTableLoader replicatedLoader = new BigTableLoader(client, "bigr",
-                         (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3);
+                         (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits);
         replicatedLoader.start();
 
         ReadThread readThread = new ReadThread(client, config.threads, config.threadoffset,
-                config.allowinprocadhoc, config.mpratio);
+                config.allowinprocadhoc, config.mpratio, permits);
         readThread.start();
 
-        AdHocMayhemThread adHocMayhemThread = new AdHocMayhemThread(client, config.mpratio);
+        AdHocMayhemThread adHocMayhemThread = new AdHocMayhemThread(client, config.mpratio, permits);
         if (!config.disableadhoc) {
             adHocMayhemThread.start();
         }

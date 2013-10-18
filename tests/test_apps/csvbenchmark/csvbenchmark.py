@@ -33,6 +33,7 @@ from subprocess import Popen,PIPE
 import shlex
 import datetime
 from voltdbclient import FastSerializer, VoltProcedure
+import time
 
 CSVLOADER = "bin/csvloader"
 #SQLCMD = "$VOLTDB_HOME/bin/sqlcmd --servers=%s" % servers
@@ -165,8 +166,10 @@ def run_csvloader(schema, data_file):
         cmd += " %s -f %s" % (schema, data_file)
         if options.VERBOSE:
             print "starting csvloader with command: " + cmd
+        start_time = time.time()
         p = Popen(shlex.split(cmd), stdout=PIPE, stderr=PIPE)
         (stdout, stderr) = p.communicate()
+        run_time = time.time() - start_time
         stdout_lines = stdout.split('\n')
         if options.VERBOSE:
             for l in stdout_lines:
@@ -179,18 +182,13 @@ def run_csvloader(schema, data_file):
                 print '[csvloader stderr] ' + l
             raise RuntimeError ("CSV Loader failed")
         # XXX seems that csvloader doesnt always returncode nonzero if it fails to load rows
-        m = re.search(r'^Inserted (\d+) and acknowledged (\d+) rows \(final\)$',
+        m = re.search(r'^Read (\d+) rows from file and successfully inserted (\d+) rows \(final\)$',
                         stdout, flags=re.M)
         if m is None or int(m.group(1)) != rowcount or m.group(1) != m.group(2):
             raise RuntimeError ("CSV Loader failed to load all rows")
         if int(before_row_count) + rowcount != int(actual_row_count):
             raise RuntimeError ("Actual table row count was not as expected exp:%d act:%d" % (rowcount,actual_row_count))
-        stats = csvloader_getstatistics(stdout)
-        print "try %d %s elapsed: %f parsing: %f inserting: %f" % ((I+1, schema)+stats)
-        elapsed_results.append(stats[0])
-        parsing_results.append(stats[1])
-        loading_results.append(stats[2])
-
+        elapsed_results.append(float(run_time))
 
     def analyze_results(perf_results):
         #print "raw perf_results: %s" % perf_results
@@ -200,43 +198,13 @@ def run_csvloader(schema, data_file):
         return (average(pr), std(pr))
 
     avg, stddev = analyze_results(elapsed_results)
-    parsing, foo = analyze_results(parsing_results)
-    loading, foo = analyze_results(loading_results)
-    print "statistics for %s execution time avg: %f stddev: %f rows/sec: %f rows: %d file size: %d tries: %d parsing: %f inserting: %f" %\
-                 (schema, avg, stddev, rowcount/avg, rowcount, os.path.getsize(data_file), options.TRIES, parsing, loading)
+    print "statistics for %s execution time avg: %f stddev: %f rows/sec: %f rows: %d file size: %d tries: %d" %\
+                 (schema, avg, stddev, rowcount/avg, rowcount, os.path.getsize(data_file), options.TRIES)
     if options.statsfile:
         with open(options.statsfile, "a") as sf:
             # report duration in milliseconds for stats collector
             print >>sf, "%s,%d,%d,0,0,0,0" % (schema, int(round(avg*1000.0)), rowcount)
     return (rowcount, avg, stddev)
-
-def csvloader_getstatistics(lines):
-    def setscale(tuple):
-        value, scale = tuple
-        if value == None:
-            return float("nan")
-        v = float(value) if '.' in value else int(value)
-        if scale == 'seconds':
-            return v
-        if scale == 'milliseconds':
-            return v/1000.0
-        elif scale == 'microseconds':
-            return v/1000000.0
-        else:
-            raise Runtimeerror ("unknown scale factor")
-    elapsed = float("nan")
-    parsing = float("nan")
-    inserting = float("nan")
-    m = re.search(r'^CSVLoader elapsed: (\d+\.*\d*)\s+(\w*seconds)$', lines, flags=re.M)
-    if m and m.lastindex > 0:
-        elapsed = setscale(m.groups())
-    m = re.search(r'Parsing CSV file took (\d+\.*\d)\s+(\w*seconds).$', lines, flags=re.M)
-    if m and m.lastindex > 0:
-        parsing = setscale(m.groups())
-    m = re.search(r'Inserting Data took (\d+\.*\d)\s+(\w*seconds).$', lines, flags=re.M)
-    if m and m.lastindex > 0:
-        inserting = setscale(m.groups())
-    return (elapsed, parsing, inserting)
 
 def get_table_row_count(table_name):
     host = random.choice(options.servers)

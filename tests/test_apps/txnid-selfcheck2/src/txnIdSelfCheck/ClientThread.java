@@ -53,7 +53,7 @@ public class ClientThread extends Thread {
          * across client process lifetimes.
          */
         static Type typeFromId(float mpRatio, boolean allowInProcAdhoc) {
-            Random rn = new Random();
+            Random rn = new Random(31); // sequence must be deterministic
             if (rn.nextFloat() < mpRatio) {
                 int r = rn.nextInt(19);
                 if (allowInProcAdhoc && (r < 1)) return ADHOC_MP;  // 0% or ~5% of MP workload

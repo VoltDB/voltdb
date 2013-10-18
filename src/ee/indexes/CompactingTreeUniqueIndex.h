@@ -138,11 +138,12 @@ class CompactingTreeUniqueIndex : public TableIndex
         m_keyIter = m_entries.lowerBound(KeyType(searchKey));
     }
 
-    void moveToGreaterThanKey(const TableTuple *searchKey)
+    bool moveToGreaterThanKey(const TableTuple *searchKey)
     {
         ++m_lookups;
         m_forward = true;
         m_keyIter = m_entries.upperBound(KeyType(searchKey));
+        return m_keyIter.isEnd();
     }
 
     void moveToLessThanKey(const TableTuple *searchKey)
@@ -166,13 +167,13 @@ class CompactingTreeUniqueIndex : public TableIndex
         m_forward = false;
         if (m_keyIter.isEnd()) {
             m_keyIter = m_entries.rbegin();
-            return;
+        } else {
+            // go back 2 entries
+            // entries: [..., A, B, C, ...], currently m_keyIter = C (not NULL if reach here)
+            // B is the entry we just evaluated and didn't pass initial_expression test (can not be NULL)
+            // so A is the correct starting point (can be NULL)
+            m_keyIter.movePrev();
         }
-        // go back 2 entries
-        // entries: [..., A, B, C, ...], currently m_keyIter = C (not NULL if reach here)
-        // B is the entry we just evaluated and didn't pass initial_expression test (can not be NULL)
-        // so A is the correct starting point (can be NULL)
-        m_keyIter.movePrev();
         m_keyIter.movePrev();
     }
 

@@ -26,6 +26,7 @@ package txnIdSelfCheck;
 import java.io.IOException;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -49,8 +50,9 @@ public class BigTableLoader extends Thread {
     final int batchSize;
     final Random r = new Random(0);
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
+    final Semaphore m_permits;
 
-    BigTableLoader(Client client, String tableName, int targetCount, int rowSize, int batchSize) {
+    BigTableLoader(Client client, String tableName, int targetCount, int rowSize, int batchSize, Semaphore permits) {
         setName("BigTableLoader");
 
         this.client = client;
@@ -58,6 +60,7 @@ public class BigTableLoader extends Thread {
         this.targetCount = targetCount;
         this.rowSize = rowSize;
         this.batchSize = batchSize;
+        m_permits = permits;
 
         // make this run more than other threads
         setPriority(getPriority() + 1);
@@ -113,6 +116,7 @@ public class BigTableLoader extends Thread {
                 // try to insert batchSize random rows
                 for (int i = 0; i < batchSize; i++) {
                     long p = Math.abs(r.nextLong());
+                    m_permits.acquire();
                     client.callProcedure(new InsertCallback(latch), tableName.toUpperCase() + "TableInsert", p, data);
                 }
                 latch.await(10, TimeUnit.SECONDS);

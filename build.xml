@@ -20,8 +20,8 @@
     <attribute name="includes" default=""/>
     <sequential>
         <javac
-            target="1.6"
-            source="1.6"
+            target="1.7"
+            source="1.7"
             srcdir="@{srcdir}"
             destdir="@{destdir}"
             excludes="@{excludes}"
@@ -173,30 +173,11 @@
     <!-- Standard junit fileset -->
     <include name='org/hsqldb_voltpatches/**/Test*.class'/>
     <include name='org/voltcore/**/Test*.class' />
-    <include name='org/voltdb/Test*.class'/>
-    <include name='org/voltdb/catalog/Test*.class'/>
-    <include name='org/voltdb/client/Test*.class'/>
-    <include name='org/voltdb/compiler/Test*.class'/>
-    <include name='org/voltdb/dtxn/Test*.class'/>
-    <include name='org/voltdb/export/Test*.class'/>
-    <include name='org/voltdb/export/**/Test*.class'/>
-    <include name='org/voltdb/exportclient/Test*.class'/>
-    <include name='org/voltdb/expressions/Test*.class'/>
-    <include name='org/voltdb/iv2/Test*.class'/>
-    <include name='org/voltdb/jdbc/Test*.class'/>
-    <include name='org/voltdb/jni/Test*.class'/>
-    <include name='org/voltdb/messaging/Test*.class'/>
-    <!-- Can not find following 3 dir, but was in old set, so keep them -->
-    <include name='org/voltdb/messaging/**/*Test.class'/>
-    <include name='org/voltdb/network/**/Test*.class'/>
-    <include name='org/voltdb/network/**/*Test.class'/>
-    <include name='org/voltdb/planner/Test*.class'/>
-    <include name='org/voltdb/plannodes/Test*.class'/>
-    <include name='org/voltdb/rejoin/Test*.class'/>
-    <include name='org/voltdb/sysprocs/saverestore/Test*.class'/>
-    <include name='org/voltdb/types/Test*.class'/>
-    <include name='org/voltdb/utils/Test*.class'/>
+    <include name='org/voltdb/**/Test*.class'/>
+
+    <!-- Exclude nested classes -->
     <exclude name="**/*$*.class"/>
+    <exclude name="org/voltdb/regressionsuites/*.class"/>
     <exclude name="org/voltdb/quarantine/**/*.class"/>
     <exclude name="**/TestExportBase.class"/>
     <!-- Excluded pro tests -->
@@ -1549,7 +1530,7 @@ TEST CASES
 		</tests>
 	</run_junit>
 </target>
-	
+
 <target name="junit_quarantine" description="Run testcases which fail unpredictably.">
     <run_junit>
         <tests>
