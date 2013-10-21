@@ -25,21 +25,15 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-@VOLT.Command(description = 'Configure project settings.',
-              arguments = (
-                  VOLT.StringArgument('keyvalue', 'KEY=VALUE assignment',
-                                      min_count = 1, max_count = None),))
-def config(runner):
-    bad = []
-    for arg in runner.opts.keyvalue:
-        if arg.find('=') == -1:
-            bad.append(arg)
-    if bad:
-        runner.abort('Bad arguments (must be KEY=VALUE format):', bad)
-    for arg in runner.opts.keyvalue:
-        key, value = [s.strip() for s in arg.split('=', 1)]
-        # Default to 'volt.' if simple name is given.
-        if key.find('.') == -1:
-            key = 'volt.%s' % key
-        runner.config.set_local(key, value)
-        runner.info('Configuration: %s=%s' % (key, value))
+@VOLT.Command(
+    description = 'Add host to the VoltDB cluster.',
+    options = (
+        VOLT.StringOption ('-H', '--host', 'host',
+                           'Host to Add'),
+    )
+)
+def add(runner):
+    if runner.opts.host == None: 
+        runner.abort_with_help('Host must be specified in add operation.')
+    runner.args.extend(['add', 'host', runner.opts.host])
+    runner.java.execute('org.voltdb.VoltDB', None, *runner.args)

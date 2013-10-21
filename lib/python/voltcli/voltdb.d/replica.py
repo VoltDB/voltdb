@@ -25,29 +25,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import sys
-
-def show_config(runner):
-    if not runner.opts.arg:
-        # All labels.
-        for (key, value) in runner.config.query_pairs():
-            sys.stdout.write('%s=%s\n' % (key, value))
-    else:
-        # Specific keys requested.
-        for filter in runner.opts.arg:
-            n = 0
-            for (key, value) in runner.config.query_pairs(filter = filter):
-                sys.stdout.write('%s=%s\n' % (key, d[key]))
-                n += 1
-            if n == 0:
-                sys.stdout.write('%s *not found*\n' % filter)
-
-@VOLT.Multi_Command(
-    description  = 'Display various types of information.',
-    modifiers = [
-        VOLT.Modifier('config', show_config,
-                      'Display all or specific configuration key/value pairs.',
-                      arg_name = 'KEY')]
-)
-def show(runner):
+@VOLT.Server('replica',
+             description = 'Start the VoltDB replica of the database.')
+def replica(runner):
     runner.go()

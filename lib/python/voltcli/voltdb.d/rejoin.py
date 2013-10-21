@@ -25,7 +25,21 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-@VOLT.Server('rejoin',
-             description = 'Rejoin host to the VoltDB cluster.')
+@VOLT.Command(
+    description = 'Rejoin host to the VoltDB cluster.',
+    options = (
+        VOLT.StringOption ('-H', '--host', 'host',
+                           'Host to Join the Cluster'),
+        VOLT.BooleanOption ('-L', '--live', 'live',
+                           'IS this a Live Rejoin?'),
+    )
+)
 def rejoin(runner):
-    runner.go()
+    if runner.opts.host == None: 
+        runner.abort_with_help('Host must be specified in rejoin operation.')
+    if runner.opts.live:
+        runner.args.extend(['live', 'rejoin', 'host', runner.opts.host])
+    else:
+        runner.args.extend(['rejoin', 'host', runner.opts.host])
+    
+    runner.java.execute('org.voltdb.VoltDB', None, *runner.args)
