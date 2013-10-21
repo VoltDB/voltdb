@@ -167,7 +167,7 @@ public class Benchmark {
             if (threadoffset < 0) exitWithMessageAndUsage("threadoffset must be >= 0");
             if (threads <= 0) exitWithMessageAndUsage("threads must be > 0");
             if (threadoffset > 127) exitWithMessageAndUsage("threadoffset must be within [0, 127]");
-            if (threadoffset + threads > 128) exitWithMessageAndUsage("max thread offset must be <= 127");
+            if (threadoffset + threads > 127) exitWithMessageAndUsage("max thread offset must be <= 127");
             if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
 
             if (minvaluesize <= 0) exitWithMessageAndUsage("minvaluesize must be > 0");
@@ -340,7 +340,7 @@ public class Benchmark {
      * disk to make it available to apprunner
      */
     private void schedulePeriodicCheckpoint() throws IOException {
-        checkpointTimer = new Timer();
+        checkpointTimer = new Timer("Checkpoint Timer", true);
         TimerTask checkpointTask = new TimerTask() {
             @Override
             public void run() {
@@ -365,7 +365,7 @@ public class Benchmark {
      * It calls printStatistics() every displayInterval seconds
      */
     private void schedulePeriodicStats() {
-        timer = new Timer();
+        timer = new Timer("Stats Timer", true);
         TimerTask statsPrinting = new TimerTask() {
             @Override
             public void run() { printStatistics(); }
@@ -379,7 +379,7 @@ public class Benchmark {
      * Create a Timer task to refresh ratelimit permits
      */
     private void scheduleRefreshPermits() {
-        permitsTimer = new Timer();
+        permitsTimer = new Timer("Ratelimiter Permits Timer", true);
         TimerTask refreshPermits = new TimerTask() {
             @Override
             public void run() { rateLimiter.updateActivePermits(System.currentTimeMillis()); }
@@ -504,8 +504,10 @@ public class Benchmark {
             clientThread.start();
             clientThreads.add(clientThread);
         }
+        log.info("All threads started...");
 
-        Thread.sleep(1000l * config.duration);
+        // subtract time spent initializing threads and starting them
+        Thread.sleep((1000l * config.duration) - (System.currentTimeMillis() - benchmarkStartTS));
 
         replicatedLoader.shutdown();
         partitionedLoader.shutdown();
