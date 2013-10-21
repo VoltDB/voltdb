@@ -72,8 +72,7 @@ function server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE host $HOST
+    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
 # run the voltdb server locally
@@ -81,8 +80,7 @@ function server-legacy() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment_legacy.xml \
-        license $LICENSE host $HOST
+    $VOLTDB create -d deployment_legacy.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
 function server-custom() {
@@ -94,8 +92,7 @@ function server-custom() {
     cd ..
     cp customexport.jar $VOLTDB_LIB/extension/customexport.jar
     # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment_custom.xml \
-        license $LICENSE host $HOST
+    $VOLTDB create -d deployment_custom.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
 # run the voltdb server locally
@@ -103,16 +100,18 @@ function server1() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment_multinode.xml \
-        license $LICENSE host $HOST:3021 internalport 3024 enableiv2
+    $VOLTDB create -d deployment_multinode.xml -l $LICENSE -H $HOST:3021 $APPNAME.jar
+    #$VOLTDB create catalog $APPNAME.jar deployment deployment_multinode.xml \
+        #license $LICENSE host $HOST:3021 internalport 3024 enableiv2
 }
 
 function server2() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment_multinode.xml \
-        license $LICENSE host $HOST:3021 internalport 3022 adminport 21215 port 21216 zkport 2182 enableiv2
+    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+    #$VOLTDB create catalog $APPNAME.jar deployment deployment_multinode.xml \
+        #license $LICENSE host $HOST:3021 internalport 3022 adminport 21215 port 21216 zkport 2182 enableiv2
 }
 
 function server3() {
