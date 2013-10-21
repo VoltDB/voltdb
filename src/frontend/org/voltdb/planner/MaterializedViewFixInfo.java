@@ -335,7 +335,7 @@ public class MaterializedViewFixInfo {
     private AbstractExpression analyzeJoinTreeFilters(JoinNode joinTree) {
         assert(joinTree != null);
         AbstractExpression where = null;
-        if (joinTree.m_table == null) {
+        if (joinTree.m_leftNode == null) {
             // Non-join case.
             assert(joinTree.m_whereExpr == null);
             // Follow HSQL's logic to store the where expression in joinExpr for single table.
