@@ -539,14 +539,15 @@ public class PlanAssembler {
             if (m_parsedSelect.mayNeedAvgPushdown()) {
                 m_parsedSelect.switchOptimalSuiteForAvgPushdown();
             }
-        } else {
-            m_parsedSelect.mvFixInfo.setNeeded(false);
-        }
-
-        if (m_parsedSelect.mvFixInfo.needed()) {
-            if (!m_parsedSelect.mvFixInfo.isJoinNodePossible(subSelectRoot)) {
+            if (m_parsedSelect.mvFixInfo.needed() && m_parsedSelect.mvFixInfo.isJoin()
+                    && subSelectRoot.hasInlinedIndexScanOfTable(m_parsedSelect.mvFixInfo.getMVTableName())) {
+                // MV partitioned joined query needs reAggregation work on coordinator.
+                // Index scan on MV table can not be supported.
+                // So, in-lined index scan of Nested loop index join can not be possible.
                 return getNextSelectPlan();
             }
+        } else {
+            m_parsedSelect.mvFixInfo.setNeeded(false);
         }
 
         root = handleAggregationOperators(root);
@@ -1240,7 +1241,7 @@ public class PlanAssembler {
             reAggNode.clearParents();
 
             // Get the MV scan node and
-            mvScanNode = mvFixInfo.grapScanNodeReplaceWithReAggNode(joinNode, reAggNode);
+            mvScanNode = mvFixInfo.graspScanNodeReplaceWithReAggNode(joinNode, reAggNode);
             assert(mvScanNode != null);
             mvScanNode.clearParents();
             mvScanNode.clearChildren();

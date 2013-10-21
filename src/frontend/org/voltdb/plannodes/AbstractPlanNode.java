@@ -542,6 +542,21 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         return m_isInline;
     }
 
+    /**
+     * Refer to the override implementation on NestLoopIndexJoin node.
+     * @param tableName
+     * @return whether this node has an inlined index scan node or not.
+     */
+    public boolean hasInlinedIndexScanOfTable(String tableName) {
+        for (int i = 0; i < getChildCount(); i++) {
+            AbstractPlanNode child = getChild(i);
+            if (child.hasInlinedIndexScanOfTable(tableName) == false) {
+                return false;
+            }
+        }
+        return false;
+    }
+
 
     /**
      * @return the dominator list for a node

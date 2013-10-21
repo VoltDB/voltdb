@@ -34,17 +34,13 @@ import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
-import org.voltdb.plannodes.IndexScanPlanNode;
-import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
-import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.CatalogUtil;
 
 public class MaterializedViewFixInfo {
@@ -53,85 +49,47 @@ public class MaterializedViewFixInfo {
      */
 
     // New inlined projection node for the scan node, contain extra group by columns.
-    private ProjectionPlanNode scanInlinedProjectionNode = null;
+    private ProjectionPlanNode m_scanInlinedProjectionNode = null;
     // New re-Aggregation plan node on the coordinator to eliminate the duplicated rows.
-    private HashAggregatePlanNode reAggNode = null;
+    private HashAggregatePlanNode m_reAggNode = null;
 
     // Does this mv partitioned based query needs to be fixed.
-    private boolean needed = false;
+    private boolean m_needed = false;
     // materialized view table
-    private Table mvTable = null;
+    private Table m_mvTable = null;
 
     // number of group-by s.
-    private int numOfGroupByColumns;
+    private int m_numOfGroupByColumns;
 
-    private Set<SchemaColumn> mvNewScanColumns;
-
-    private boolean isJoin = false;
+    private boolean m_isJoin = false;
 
     public boolean needed () {
-        return needed;
+        return m_needed;
     }
 
     public void setNeeded (boolean need) {
-        needed = need;
+        m_needed = need;
     }
 
     public boolean isJoin () {
-        return isJoin;
+        return m_isJoin;
     }
 
-    public void setJoinQuery (boolean join) {
-        isJoin = join;
-    }
-
-    public void setMVTable (Table tb) {
-        mvTable = tb;
+    public void setIsJoin (boolean join) {
+        m_isJoin = join;
     }
 
     public String getMVTableName () {
-        assert(mvTable != null);
-        return mvTable.getTypeName();
+        assert(m_mvTable != null);
+        return m_mvTable.getTypeName();
     }
 
     public ProjectionPlanNode getScanInlinedProjectionNode () {
-        return scanInlinedProjectionNode;
+        return m_scanInlinedProjectionNode;
     }
 
     public HashAggregatePlanNode getReAggregationPlanNode () {
-        return reAggNode;
-    }
-
-
-    private boolean recursivelyFindInlinedNode(AbstractPlanNode joinNode) {
-        for (int i = 0; i < joinNode.getChildCount(); i++) {
-            AbstractPlanNode child = joinNode.getChild(i);
-            if (recursivelyFindInlinedNode(child) == false) {
-                return false;
-            }
-        }
-        if (joinNode instanceof NestLoopIndexPlanNode) {
-            IndexScanPlanNode idxScanNode = (IndexScanPlanNode)joinNode.getInlinePlanNode(PlanNodeType.INDEXSCAN);
-            if (idxScanNode.getTargetTableName().equals(getMVTableName())) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /**
-     * MV partitioned joined query needs reAggregation work on coordinator. Index scan can not be supported.
-     * So, in-lined index scan of Nested loop index join can not be possible.
-     * @param subSelectRoot
-     * @return
-     */
-    public boolean isJoinNodePossible(AbstractPlanNode subSelectRoot) {
-        if (!needed() || !isJoin()) {
-            return true;
-        }
-        assert (subSelectRoot instanceof AbstractJoinPlanNode);
-        return recursivelyFindInlinedNode(subSelectRoot);
+        return m_reAggNode;
     }
 
     /**
@@ -139,10 +97,11 @@ public class MaterializedViewFixInfo {
      * Set the need flag to true, only if it needs to be fixed.
      * @return
      */
-    public boolean checkNeedFix() {
+    public boolean checkNeedFix(Table table) {
         // Check valid cases first
-        String mvTableName = mvTable.getTypeName();
-        Table srcTable = mvTable.getMaterializer();
+
+        String mvTableName = table.getTypeName();
+        Table srcTable = table.getMaterializer();
         if (srcTable == null) {
             return false;
         }
@@ -155,7 +114,7 @@ public class MaterializedViewFixInfo {
         MaterializedViewInfo mvInfo = srcTable.getViews().get(mvTableName);
 
         // Justify whether partition column is in group by column list or not
-        boolean partitionColInGroupbyCols = false;
+
         String complexGroupbyJson = mvInfo.getGroupbyexpressionsjson();
         if (complexGroupbyJson.length() > 0) {
             List<AbstractExpression> mvComplexGroupbyCols = null;
@@ -164,51 +123,50 @@ public class MaterializedViewFixInfo {
             } catch (JSONException e) {
                 e.printStackTrace();
             }
-            numOfGroupByColumns = mvComplexGroupbyCols.size();
+            m_numOfGroupByColumns = mvComplexGroupbyCols.size();
 
             for (AbstractExpression expr: mvComplexGroupbyCols) {
                 if (expr instanceof TupleValueExpression) {
                     TupleValueExpression tve = (TupleValueExpression) expr;
                     if (tve.getColumnName().equals(partitionColName)) {
-                        partitionColInGroupbyCols = true;
-                        break;
+                        // If group by columns contain partition column from source table.
+                        // Then, query on MV table will have duplicates from each partition.
+                        // There is no need to fix this case, so just return.
+                        return false;
                     }
                 }
             }
         } else {
             CatalogMap<ColumnRef> mvSimpleGroupbyCols = mvInfo.getGroupbycols();
-            numOfGroupByColumns = mvSimpleGroupbyCols.size();
+            m_numOfGroupByColumns = mvSimpleGroupbyCols.size();
 
             for (ColumnRef colRef: mvSimpleGroupbyCols) {
                 if (colRef.getColumn().getName().equals(partitionColName)) {
-                    partitionColInGroupbyCols = true;
-                    break;
+                    // If group by columns contain partition column from source table.
+                    // Then, query on MV table will have duplicates from each partition.
+                    // There is no need to fix this case, so just return.
+                    return false;
                 }
             }
         }
-        assert(numOfGroupByColumns > 0);
-        if (partitionColInGroupbyCols) {
-            // Group by columns contain partition column from source table.
-            // Then, query on mv table will have duplicates from each partition.
-            // There is no need to fix this case, so just return.
-            return false;
-        }
+        assert(m_numOfGroupByColumns > 0);
 
-        needed = true;
+        m_mvTable = table;
+        m_needed = true;
         return true;
     }
 
 
     /**
-     * Grab the scan node on MV table from the join node.
+     * Grasp the scan node on MV table from the join node.
      * This scan node can not be in-lined, so it should be as a child of a join node.
      * @param rootNode
      */
-    public AbstractScanPlanNode grapScanNodeReplaceWithReAggNode(AbstractPlanNode rootNode, AbstractPlanNode reAggNode) {
+    public AbstractScanPlanNode graspScanNodeReplaceWithReAggNode(AbstractPlanNode rootNode, AbstractPlanNode reAggNode) {
         // MV table scan node can not be in in-lined nodes.
         for (int i = 0; i < rootNode.getChildCount(); i++) {
             AbstractPlanNode child = rootNode.getChild(i);
-            AbstractPlanNode scanNodeFromChild = grapScanNodeReplaceWithReAggNode(child, reAggNode);
+            AbstractPlanNode scanNodeFromChild = graspScanNodeReplaceWithReAggNode(child, reAggNode);
             if (scanNodeFromChild != null) {
                 rootNode.setAndLinkChild(i, reAggNode);
                 return (AbstractScanPlanNode) scanNodeFromChild;
@@ -241,7 +199,7 @@ public class MaterializedViewFixInfo {
      */
     public void processMVBasedQueryFix(Set<SchemaColumn> scanColumns, JoinNode joinTree) {
         List<Column> mvColumnArray =
-                CatalogUtil.getSortedCatalogItems(mvTable.getColumns(), "index");
+                CatalogUtil.getSortedCatalogItems(m_mvTable.getColumns(), "index");
 
         processInlineProjectionsAndReAggNode(scanColumns, mvColumnArray);
         processWhereClause(joinTree, mvColumnArray);
@@ -249,20 +207,17 @@ public class MaterializedViewFixInfo {
     }
 
     private void processInlineProjectionsAndReAggNode(Set<SchemaColumn> scanColumns, List<Column> mvColumnArray) {
-        assert(needed);
-        mvNewScanColumns = scanColumns;
-        String mvTableName = mvTable.getTypeName();
-
-        Set<SchemaColumn> mvDDLGroupbyColumns = new HashSet<SchemaColumn>();
-        Map<String, ExpressionType> mvColumnAggType = new HashMap<String, ExpressionType>();
+        assert(m_needed);
+        String mvTableName = m_mvTable.getTypeName();
 
         // (1) construct new projection columns for scan plan node.
+        Set<SchemaColumn> mvDDLGroupbyColumns = new HashSet<SchemaColumn>();
         NodeSchema inlineProjSchema = new NodeSchema();
-        for (SchemaColumn scol: mvNewScanColumns) {
+        for (SchemaColumn scol: scanColumns) {
             inlineProjSchema.addColumn(scol);
         }
 
-        for (int i = 0; i < numOfGroupByColumns; i++) {
+        for (int i = 0; i < m_numOfGroupByColumns; i++) {
             Column mvCol = mvColumnArray.get(i);
             String colName = mvCol.getName();
 
@@ -277,18 +232,21 @@ public class MaterializedViewFixInfo {
             SchemaColumn scol = new SchemaColumn(mvTableName, colName, colName, tve);
 
             mvDDLGroupbyColumns.add(scol);
-            if (!mvNewScanColumns.contains(scol)) {
-                mvNewScanColumns.add(scol);
+            if (!scanColumns.contains(scol)) {
+                scanColumns.add(scol);
                 // construct new projection columns for scan plan node.
                 inlineProjSchema.addColumn(scol);
             }
         }
-        scanInlinedProjectionNode = new ProjectionPlanNode();
-        scanInlinedProjectionNode.setOutputSchema(inlineProjSchema);
-
+        m_scanInlinedProjectionNode = new ProjectionPlanNode();
+        m_scanInlinedProjectionNode.setOutputSchema(inlineProjSchema);
 
         // (2) Construct the reAggregation Node.
-        for (Column mvCol: mvColumnArray) {
+
+        // Record the re-aggregation type for each scan columns.
+        Map<String, ExpressionType> mvColumnAggType = new HashMap<String, ExpressionType>();
+        for (int i = m_numOfGroupByColumns; i < mvColumnArray.size(); i++) {
+            Column mvCol = mvColumnArray.get(i);
             ExpressionType reAggType = ExpressionType.get(mvCol.getAggregatetype());
             if (reAggType == ExpressionType.AGGREGATE_COUNT_STAR ||
                     reAggType == ExpressionType.AGGREGATE_COUNT) {
@@ -298,38 +256,39 @@ public class MaterializedViewFixInfo {
         }
 
         // Construct the reAggregation plan node's aggSchema
-        reAggNode = new HashAggregatePlanNode();
+        m_reAggNode = new HashAggregatePlanNode();
         int outputColumnIndex = 0;
+        // inlineProjSchema contains the group by columns, while aggSchema may do not.
         NodeSchema aggSchema = new NodeSchema();
 
         // Construct reAggregation node's aggregation and group by list.
-        for (SchemaColumn scol: mvNewScanColumns) {
+        for (SchemaColumn scol: scanColumns) {
             if (mvDDLGroupbyColumns.contains(scol)) {
                 // Add group by expression.
-                reAggNode.addGroupByExpression(scol.getExpression());
+                m_reAggNode.addGroupByExpression(scol.getExpression());
             } else {
                 ExpressionType reAggType = mvColumnAggType.get(scol.getColumnName());
                 assert(reAggType != null);
                 AbstractExpression agg_input_expr = scol.getExpression();
                 assert(agg_input_expr instanceof TupleValueExpression);
                 // Add aggregation information.
-                reAggNode.addAggregate(reAggType, false, outputColumnIndex, agg_input_expr);
+                m_reAggNode.addAggregate(reAggType, false, outputColumnIndex, agg_input_expr);
             }
             aggSchema.addColumn(scol);
             outputColumnIndex++;
         }
-        reAggNode.setOutputSchema(aggSchema);
+        m_reAggNode.setOutputSchema(aggSchema);
 
     }
 
     private void processWhereClause(JoinNode joinTree, List<Column> mvColumnArray) {
         // (1) Process where clause.
-        AbstractExpression where = analyseJoinTree(joinTree);
+        AbstractExpression where = analyzeJoinTree(joinTree);
 
         if (where != null) {
             // Collect all TVEs that need to be do re-aggregation in coordinator.
             List<TupleValueExpression> needReAggTVEs = new ArrayList<TupleValueExpression>();
-            for (int i=numOfGroupByColumns; i < mvColumnArray.size(); i++) {
+            for (int i=m_numOfGroupByColumns; i < mvColumnArray.size(); i++) {
                 Column mvCol = mvColumnArray.get(i);
                 TupleValueExpression tve = new TupleValueExpression();
                 tve.setColumnIndex(i);
@@ -364,7 +323,7 @@ public class MaterializedViewFixInfo {
             }
             AbstractExpression aggPostExpr = ExpressionUtil.combine(aggPostExprs);
             // Add post filters for the reAggregation node.
-            reAggNode.setPostPredicate(aggPostExpr);
+            m_reAggNode.setPostPredicate(aggPostExpr);
 
             AbstractExpression scanFilters = ExpressionUtil.combine(pushdownExprs);
             // Update new filters for the scanNode.
@@ -373,7 +332,7 @@ public class MaterializedViewFixInfo {
         }
     }
 
-    private AbstractExpression analyseJoinTree(JoinNode joinTree) {
+    private AbstractExpression analyzeJoinTree(JoinNode joinTree) {
         assert(joinTree != null);
         AbstractExpression where = null;
         if (joinTree.m_leftNode == null) {

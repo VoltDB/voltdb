@@ -255,7 +255,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      */
     private void prepareMVBasedQueryFix() {
         if (tableList.size() > 1) {
-            mvFixInfo.setJoinQuery(true);
+            mvFixInfo.setIsJoin(true);
         }
 
         // Handle joined query case case.
@@ -263,14 +263,13 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // For all tables in this query, the # of tables that need to be fixed should not exceed one.
         for (Table mvTable: tableList) {
             Set<SchemaColumn> mvNewScanColumns = new HashSet<SchemaColumn>();
+            List <SchemaColumn> columns = scanColumns.get(mvTable.getTypeName());
             // For a COUNT(*)-only scan, key size is 0, not contained.
             // For a joined query without selected columns from table TB, TB is not contained as well.
-            if (scanColumns.containsKey(mvTable.getTypeName())) {
-                mvNewScanColumns.addAll(scanColumns.get(mvTable.getTypeName()));
+            if (columns != null) {
+                mvNewScanColumns.addAll(columns);
             }
-
-            mvFixInfo.setMVTable(mvTable);
-            if (mvFixInfo.checkNeedFix()) {
+            if (mvFixInfo.checkNeedFix(mvTable)) {
                 mvFixInfo.processMVBasedQueryFix(mvNewScanColumns, joinTree);
                 break;
             }
