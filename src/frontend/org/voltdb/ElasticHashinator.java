@@ -422,14 +422,17 @@ public class ElasticHashinator extends TheHashinator {
         ByteBuffer buf = ByteBuffer.allocate(4 + (m_tokenCount * 8));
 
         buf.putInt(m_tokenCount);
-
         // Keep tokens and partition ids separate to aid compression.
-        int lastToken = Integer.MIN_VALUE;
-        for (int ii = 0; ii < m_tokenCount; ii++) {
-            int token = unsafe.getInt(m_tokens + (ii * 8));
-            Preconditions.checkArgument(token >= lastToken);
-            lastToken = token;
-            buf.putInt(token);
+        for (int zz = 3; zz >= 0; zz--) {
+            int lastToken = Integer.MIN_VALUE;
+            for (int ii = 0; ii < m_tokenCount; ii++) {
+                int token = unsafe.getInt(m_tokens + (ii * 8));
+                Preconditions.checkArgument(token >= lastToken);
+                lastToken = token;
+                token = token >>> (zz * 8);
+                token = token & 0xFF;
+                buf.put((byte)token);
+            }
         }
         for (int ii = 0; ii < m_tokenCount; ii++) {
             buf.putInt(unsafe.getInt(m_tokens + (ii * 8) + 4));
@@ -520,9 +523,18 @@ public class ElasticHashinator extends TheHashinator {
         long tokens = unsafe.allocateMemory(8 * numEntries);
         ByteBuffer tokenBuf = ByteBuffer.wrap(cookedBytes, 4, tokensSize);
         ByteBuffer partitionBuf = ByteBuffer.wrap(cookedBytes, 4 + tokensSize, partitionsSize);
+        int tokensArray[] = new int[numEntries];
+        for (int zz = 3; zz >= 0; zz--) {
+            for (int ii = 0; ii < numEntries; ii++) {
+                int value = tokenBuf.get();
+                value = (value << (zz * 8)) & (0xFF << (zz * 8));
+                tokensArray[ii] = (tokensArray[ii] | value);
+            }
+        }
+
         int lastToken = Integer.MIN_VALUE;
         for (int ii = 0; ii < numEntries; ii++) {
-            int token = tokenBuf.getInt();
+            int token = tokensArray[ii];
             Preconditions.checkArgument(token >= lastToken);
             lastToken = token;
             long ptr = tokens + (ii * 8);
