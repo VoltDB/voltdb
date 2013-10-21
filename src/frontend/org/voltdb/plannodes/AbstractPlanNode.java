@@ -550,10 +550,11 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     public boolean hasInlinedIndexScanOfTable(String tableName) {
         for (int i = 0; i < getChildCount(); i++) {
             AbstractPlanNode child = getChild(i);
-            if (child.hasInlinedIndexScanOfTable(tableName) == false) {
-                return false;
+            if (child.hasInlinedIndexScanOfTable(tableName) == true) {
+                return true;
             }
         }
+
         return false;
     }
 

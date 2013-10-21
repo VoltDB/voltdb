@@ -162,11 +162,11 @@ public class MaterializedViewFixInfo {
      * This scan node can not be in-lined, so it should be as a child of a join node.
      * @param rootNode
      */
-    public AbstractScanPlanNode graspScanNodeReplaceWithReAggNode(AbstractPlanNode rootNode, AbstractPlanNode reAggNode) {
+    public AbstractScanPlanNode replaceAndReturnScanNode(AbstractPlanNode rootNode, AbstractPlanNode reAggNode) {
         // MV table scan node can not be in in-lined nodes.
         for (int i = 0; i < rootNode.getChildCount(); i++) {
             AbstractPlanNode child = rootNode.getChild(i);
-            AbstractPlanNode scanNodeFromChild = graspScanNodeReplaceWithReAggNode(child, reAggNode);
+            AbstractPlanNode scanNodeFromChild = replaceAndReturnScanNode(child, reAggNode);
             if (scanNodeFromChild != null) {
                 rootNode.setAndLinkChild(i, reAggNode);
                 return (AbstractScanPlanNode) scanNodeFromChild;
@@ -283,7 +283,7 @@ public class MaterializedViewFixInfo {
 
     private void processWhereClause(JoinNode joinTree, List<Column> mvColumnArray) {
         // (1) Process where clause.
-        AbstractExpression where = analyzeJoinTree(joinTree);
+        AbstractExpression where = analyzeJoinTreeFilters(joinTree);
 
         if (where != null) {
             // Collect all TVEs that need to be do re-aggregation in coordinator.
@@ -332,10 +332,10 @@ public class MaterializedViewFixInfo {
         }
     }
 
-    private AbstractExpression analyzeJoinTree(JoinNode joinTree) {
+    private AbstractExpression analyzeJoinTreeFilters(JoinNode joinTree) {
         assert(joinTree != null);
         AbstractExpression where = null;
-        if (joinTree.m_leftNode == null) {
+        if (joinTree.m_table == null) {
             // Non-join case.
             assert(joinTree.m_whereExpr == null);
             // Follow HSQL's logic to store the where expression in joinExpr for single table.

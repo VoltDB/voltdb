@@ -1241,7 +1241,7 @@ public class PlanAssembler {
             reAggNode.clearParents();
 
             // Get the MV scan node and
-            mvScanNode = mvFixInfo.graspScanNodeReplaceWithReAggNode(joinNode, reAggNode);
+            mvScanNode = mvFixInfo.replaceAndReturnScanNode(joinNode, reAggNode);
             assert(mvScanNode != null);
             mvScanNode.clearParents();
             mvScanNode.clearChildren();
