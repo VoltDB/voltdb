@@ -213,7 +213,13 @@ class ServerVerb(JavaVerb):
                              'the deployment configuration file path',
                              default = 'deployment.xml'),
             cli.HostOption('-H', '--host', 'host', 'the host', default = 'localhost'),
-            cli.StringOption('-l', '--license', 'license', 'the license file path'))
+            cli.StringOption('-l', '--license', 'license', 'the license file path'),
+            cli.StringOption(None, '--internalinterface', 'internalinterface', None),
+            cli.StringOption(None, '--internalport', 'internalport', None),
+            cli.StringOption(None, '--zkport', 'zkport', None),
+            cli.StringOption(None, '--replicationport', 'replicationport', None),
+            cli.StringOption(None, '--adminport', 'adminport', None),
+            cli.StringOption(None, '--externalinterface', 'externalinterface', None))
         self.add_arguments(
             cli.StringArgument('catalog',
                                'the application catalog jar file path'))
@@ -240,6 +246,18 @@ class ServerVerb(JavaVerb):
                 final_args.extend(['port', runner.opts.host.port])
         if runner.opts.license:
             final_args.extend(['license', runner.opts.license])
+        if runner.opts.internalinterface:
+            final_args.extend(['internalinterface', runner.opts.internalinterface])
+        if runner.opts.internalport:
+            final_args.extend(['internalport', runner.opts.internalport])
+        if runner.opts.zkport:
+            final_args.extend(['zkport', runner.opts.zkport])
+        if runner.opts.replicationport:
+            final_args.extend(['replicationport', runner.opts.replicationport])
+        if runner.opts.adminport:
+            final_args.extend(['adminport', runner.opts.adminport])
+        if runner.opts.externalinterface:
+            final_args.extend(['externalinterface', runner.opts.externalinterface])
         if runner.args:
             final_args.extend(runner.args)
         self.run_java(runner, *final_args)

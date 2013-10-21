@@ -397,8 +397,6 @@ public class VoltDB {
                 } else if (arg.equalsIgnoreCase("ipcport")) {
                     String portStr = args[++i];
                     m_ipcPort = Integer.valueOf(portStr);
-                } else if (arg.equals("enableiv2")) {
-                    // noop because IV2 is always on now
                 } else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     usage();

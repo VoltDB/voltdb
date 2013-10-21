@@ -30,10 +30,29 @@
     options = (
         VOLT.StringOption ('-H', '--host', 'host',
                            'Host to Add'),
+        VOLT.StringOption(None, '--internalinterface', 'internalinterface', None),
+        VOLT.StringOption(None, '--internalport', 'internalport', None),
+        VOLT.StringOption(None, '--zkport', 'zkport', None),
+        VOLT.StringOption(None, '--replicationport', 'replicationport', None),
+        VOLT.StringOption(None, '--adminport', 'adminport', None),
+        VOLT.StringOption(None, '--externalinterface', 'externalinterface', None),
     )
 )
 def add(runner):
     if runner.opts.host == None: 
         runner.abort_with_help('Host must be specified in add operation.')
     runner.args.extend(['add', 'host', runner.opts.host])
+    if runner.opts.internalinterface:
+        runner.args.extend(['internalinterface', runner.opts.internalinterface])
+    if runner.opts.internalport:
+        runner.args.extend(['internalport', runner.opts.internalport])
+    if runner.opts.zkport:
+        runner.args.extend(['zkport', runner.opts.zkport])
+    if runner.opts.replicationport:
+        runner.args.extend(['replicationport', runner.opts.replicationport])
+    if runner.opts.adminport:
+        runner.args.extend(['adminport', runner.opts.adminport])
+    if runner.opts.externalinterface:
+        runner.args.extend(['externalinterface', runner.opts.externalinterface])
+
     runner.java.execute('org.voltdb.VoltDB', None, *runner.args)
