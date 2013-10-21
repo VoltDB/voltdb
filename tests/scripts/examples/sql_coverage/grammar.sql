@@ -32,9 +32,6 @@
 {_sortorder |= " ASC "}
 {_sortorder |= " DESC "}
 
-{_sortorderTwo |= " ASC "}
-{_sortorderTwo |= " DESC "}
-
 {_math |= " + "}
 {_math |= " - "}
 {_math |= " * "}
