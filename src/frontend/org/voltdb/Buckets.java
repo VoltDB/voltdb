@@ -51,6 +51,8 @@ public class Buckets {
     }
 
     public void addPartitions(int partitionCount) {
+        //Can't have more partitions than tokens
+        Preconditions.checkArgument(m_tokenCount > m_partitionTokens.size() + partitionCount);
         TreeSet<LoadPair> loadSet = Sets.newTreeSet();
         for (int ii = 0; ii < m_partitionTokens.size(); ii++) {
             loadSet.add(new LoadPair(ii, m_partitionTokens.get(ii)));
