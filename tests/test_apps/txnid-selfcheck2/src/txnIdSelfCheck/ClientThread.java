@@ -80,6 +80,7 @@ public class ClientThread extends Thread {
         throws Exception
     {
         setName("ClientThread(CID=" + String.valueOf(cid) + ")");
+        setDaemon(true);
 
 
         m_type = Type.typeFromId(mpRatio, allowInProcAdhoc);
@@ -91,8 +92,18 @@ public class ClientThread extends Thread {
 
         String sql1 = String.format("select * from partitioned where cid = %d order by rid desc limit 1", cid);
         String sql2 = String.format("select * from replicated  where cid = %d order by rid desc limit 1", cid);
-        VoltTable t1 = client.callProcedure("@AdHoc", sql1).getResults()[0];
-        VoltTable t2 = client.callProcedure("@AdHoc", sql2).getResults()[0];
+        VoltTable t1;
+        VoltTable t2;
+        while (true) {
+            try {
+                  t1 = client.callProcedure("@AdHoc", sql1).getResults()[0];
+                  t2 = client.callProcedure("@AdHoc", sql2).getResults()[0];
+                  break;
+            }
+            catch (Exception e) {
+                log.warn("ClientThread threw exception in initialization, will retry", e);
+            }
+        }
 
         long pNextRid = (t1.getRowCount() == 0) ? 1 : t1.fetchRow(0).getLong("rid") + 1;
         long rNextRid = (t2.getRowCount() == 0) ? 1 : t2.fetchRow(0).getLong("rid") + 1;

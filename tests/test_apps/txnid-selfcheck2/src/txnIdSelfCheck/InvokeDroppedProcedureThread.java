@@ -48,6 +48,7 @@ public class InvokeDroppedProcedureThread extends Thread {
 
     public InvokeDroppedProcedureThread(Client client) {
         setName("InvokeDroppedProcedureThread");
+        setDaemon(true);
 
         this.client = client;
     }
