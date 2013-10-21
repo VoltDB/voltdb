@@ -375,6 +375,13 @@ public class ExportOnServerVerifier {
                     Long rowTxnId = Long.parseLong(row[6].trim());
                     Long rowId = Long.parseLong(row[7].trim());
 
+                    if (TxnEgo.getPartitionId(rowTxnId) != partition) {
+                        System.err.println("ERROR: mismatched exported partition for txid " + rowTxnId +
+                                ", tx says it belongs to " + TxnEgo.getPartitionId(rowTxnId) +
+                                ", while export record says " + partition);
+                        partition = TxnEgo.getPartitionId(rowTxnId);
+                    }
+
                     txout.printf("%d:%d\n", rowTxnId, rowId);
 
                     Long previous = m_rowTxnIds.get(partition).put(rowTxnId,rowId);
@@ -442,7 +449,7 @@ public class ExportOnServerVerifier {
     }
 
     private boolean readEnoughClientRecords() throws IOException, ValidationErr {
-        final int maxOverFlow = m_clientIndexes.size() * 10000;
+        final int maxOverFlow = m_clientIndexes.size() * 1000;
         final int overFlowSize = m_clientOverFlow.size();
 
         int dcount = 0;
@@ -455,14 +462,18 @@ public class ExportOnServerVerifier {
                 upTo += 1000;
             }
 
-            for( int i = 0; i < upTo; ++i) {
+            INNER: for( int i = 0; i < upTo; ++i) {
+
                 String trace = readNextClientFileLine(partId);
 
                 if ( trace == null) {
+                    m_readUpTo.get(partId).set(0);
                     System.out.println("No more client txn IDs for partition id " + partId);
-                    break;
+                    break INNER;
                 }
+
                 int recColumns = splitClientTrace(trace, rec);
+
                 if (recColumns == rec.length) {
                     long rowid = rec[0];
                     long txid = rec[1];
@@ -630,6 +641,7 @@ public class ExportOnServerVerifier {
                         System.err.println("ERROR: mismatched exported partition for txid " + rowTxnId +
                                 ", tx says it belongs to " + TxnEgo.getPartitionId(rowTxnId) +
                                 ", while export record says " + partition);
+                        partition = TxnEgo.getPartitionId(rowTxnId);
                     }
 
                     txout.printf("%d:%d\n", rowTxnId, rowId);
@@ -1085,18 +1097,25 @@ public class ExportOnServerVerifier {
                 f.delete();
             }
 
-            if (Boolean.TRUE.equals(m_clientComplete.get(partId))) return null;
+            if (m_clientComplete.containsKey(partId)) return null;
 
             clientFiles = checkForMoreClientFiles(partId);
 
-            if (clientFiles.length == 0) return null;
+            if (clientFiles.length == 0) {
+                m_clientComplete.put(partId,true);
+                return null;
+            }
             clientIndex = 0;
         }
 
         File clientFile = clientFiles[clientIndex];
-        System.out.println("INFO clientlog: Opening client file: " + clientFile.getName() + " for partition id " + partId);
+        System.out.println(
+                "INFO clientlog: Opening client file: " + clientFile.getName()
+              + " for partition id " + partId
+              );
+
         if (clientFile.getName().endsWith("-last")) {
-            m_clientComplete.put(partId,true);
+            m_clientComplete.put(partId,false);
         }
 
         BufferedReader reader = new BufferedReader(
@@ -1111,15 +1130,23 @@ public class ExportOnServerVerifier {
         String line = null;
         do {
             if (reader == null) {
+
                 reader = openNextClientFile(partId);
+
+                if (reader == null) {
+                    if (m_clientComplete.containsKey(partId)) {
+                        m_clientComplete.put(partId, true);
+                    }
+                    break;
+                }
+
                 m_clientReaders.put(partId, reader);
             }
-
-            if (reader == null) break;
 
             line = reader.readLine();
             if (line == null) {
                 try { reader.close(); } catch (Exception ignoreIt) {};
+                m_clientReaders.remove(partId);
                 reader = null;
             }
 
