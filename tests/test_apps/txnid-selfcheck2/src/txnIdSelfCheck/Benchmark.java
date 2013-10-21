@@ -74,6 +74,8 @@ public class Benchmark {
     long benchmarkStartTS;
     // Timer for writing the checkpoint count for apprunner
     Timer checkpointTimer;
+    // Timer for refreshing ratelimit permits
+    Timer permitsTimer;
 
     final TxnId2RateLimiter rateLimiter;
 
@@ -147,7 +149,7 @@ public class Benchmark {
         boolean disableadhoc = false;
 
         @Option(desc = "Maximum TPS rate for benchmark.")
-        int ratelimit = 100000;
+        int ratelimit = Integer.MAX_VALUE;
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
@@ -374,6 +376,18 @@ public class Benchmark {
     }
 
     /**
+     * Create a Timer task to refresh ratelimit permits
+     */
+    private void scheduleRefreshPermits() {
+        permitsTimer = new Timer();
+        TimerTask refreshPermits = new TimerTask() {
+            @Override
+            public void run() { rateLimiter.updateActivePermits(System.currentTimeMillis()); }
+        };
+        permitsTimer.scheduleAtFixedRate(refreshPermits, 0, 10);
+    }
+
+    /**
      * Prints a one line update on performance that can be printed
      * periodically during a benchmark.
      */
@@ -458,23 +472,24 @@ public class Benchmark {
         lastProgressTimestamp = System.currentTimeMillis();
         schedulePeriodicStats();
         schedulePeriodicCheckpoint();
+        scheduleRefreshPermits();
 
         // Run the benchmark loop for the requested duration
         // The throughput may be throttled depending on client configuration
         log.info("Running benchmark...");
 
         BigTableLoader partitionedLoader = new BigTableLoader(client, "bigp",
-                         (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50);
+                         (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits);
         partitionedLoader.start();
         BigTableLoader replicatedLoader = new BigTableLoader(client, "bigr",
-                         (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3);
+                         (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits);
         replicatedLoader.start();
 
         ReadThread readThread = new ReadThread(client, config.threads, config.threadoffset,
-                config.allowinprocadhoc, config.mpratio);
+                config.allowinprocadhoc, config.mpratio, permits);
         readThread.start();
 
-        AdHocMayhemThread adHocMayhemThread = new AdHocMayhemThread(client, config.mpratio);
+        AdHocMayhemThread adHocMayhemThread = new AdHocMayhemThread(client, config.mpratio, permits);
         if (!config.disableadhoc) {
             adHocMayhemThread.start();
         }
@@ -490,14 +505,7 @@ public class Benchmark {
             clientThreads.add(clientThread);
         }
 
-        final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
-
-        long currentTs = System.currentTimeMillis();
-        while (benchmarkEndTime > currentTs) {
-            rateLimiter.updateActivePermits(currentTs);
-            Thread.yield();
-            currentTs = System.currentTimeMillis();
-        }
+        Thread.sleep(1000l * config.duration);
 
         replicatedLoader.shutdown();
         partitionedLoader.shutdown();
@@ -526,6 +534,7 @@ public class Benchmark {
         // block until all outstanding txns return
         client.drain();
         client.close();
+        permitsTimer.cancel();
 
         log.info(HORIZONTAL_RULE);
         log.info("Benchmark Complete");
