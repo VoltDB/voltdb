@@ -74,6 +74,8 @@ public class Benchmark {
     long benchmarkStartTS;
     // Timer for writing the checkpoint count for apprunner
     Timer checkpointTimer;
+    // Timer for refreshing ratelimit permits
+    Timer permitsTimer;
 
     final TxnId2RateLimiter rateLimiter;
 
@@ -165,7 +167,7 @@ public class Benchmark {
             if (threadoffset < 0) exitWithMessageAndUsage("threadoffset must be >= 0");
             if (threads <= 0) exitWithMessageAndUsage("threads must be > 0");
             if (threadoffset > 127) exitWithMessageAndUsage("threadoffset must be within [0, 127]");
-            if (threadoffset + threads > 128) exitWithMessageAndUsage("max thread offset must be <= 127");
+            if (threadoffset + threads > 127) exitWithMessageAndUsage("max thread offset must be <= 127");
             if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
 
             if (minvaluesize <= 0) exitWithMessageAndUsage("minvaluesize must be > 0");
@@ -338,7 +340,7 @@ public class Benchmark {
      * disk to make it available to apprunner
      */
     private void schedulePeriodicCheckpoint() throws IOException {
-        checkpointTimer = new Timer();
+        checkpointTimer = new Timer("Checkpoint Timer", true);
         TimerTask checkpointTask = new TimerTask() {
             @Override
             public void run() {
@@ -363,7 +365,7 @@ public class Benchmark {
      * It calls printStatistics() every displayInterval seconds
      */
     private void schedulePeriodicStats() {
-        timer = new Timer();
+        timer = new Timer("Stats Timer", true);
         TimerTask statsPrinting = new TimerTask() {
             @Override
             public void run() { printStatistics(); }
@@ -371,6 +373,18 @@ public class Benchmark {
         timer.scheduleAtFixedRate(statsPrinting,
                                   config.displayinterval * 1000,
                                   config.displayinterval * 1000);
+    }
+
+    /**
+     * Create a Timer task to refresh ratelimit permits
+     */
+    private void scheduleRefreshPermits() {
+        permitsTimer = new Timer("Ratelimiter Permits Timer", true);
+        TimerTask refreshPermits = new TimerTask() {
+            @Override
+            public void run() { rateLimiter.updateActivePermits(System.currentTimeMillis()); }
+        };
+        permitsTimer.scheduleAtFixedRate(refreshPermits, 0, 10);
     }
 
     /**
@@ -458,6 +472,7 @@ public class Benchmark {
         lastProgressTimestamp = System.currentTimeMillis();
         schedulePeriodicStats();
         schedulePeriodicCheckpoint();
+        scheduleRefreshPermits();
 
         // Run the benchmark loop for the requested duration
         // The throughput may be throttled depending on client configuration
@@ -489,15 +504,10 @@ public class Benchmark {
             clientThread.start();
             clientThreads.add(clientThread);
         }
+        log.info("All threads started...");
 
-        final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
-
-        long currentTs = System.currentTimeMillis();
-        while (benchmarkEndTime > currentTs) {
-            rateLimiter.updateActivePermits(currentTs);
-            Thread.yield();
-            currentTs = System.currentTimeMillis();
-        }
+        // subtract time spent initializing threads and starting them
+        Thread.sleep((1000l * config.duration) - (System.currentTimeMillis() - benchmarkStartTS));
 
         replicatedLoader.shutdown();
         partitionedLoader.shutdown();
@@ -526,6 +536,7 @@ public class Benchmark {
         // block until all outstanding txns return
         client.drain();
         client.close();
+        permitsTimer.cancel();
 
         log.info(HORIZONTAL_RULE);
         log.info("Benchmark Complete");

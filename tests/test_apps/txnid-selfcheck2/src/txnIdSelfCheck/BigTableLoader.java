@@ -54,6 +54,7 @@ public class BigTableLoader extends Thread {
 
     BigTableLoader(Client client, String tableName, int targetCount, int rowSize, int batchSize, Semaphore permits) {
         setName("BigTableLoader");
+        setDaemon(true);
 
         this.client = client;
         this.tableName = tableName;

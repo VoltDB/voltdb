@@ -57,6 +57,7 @@ public class ReadThread extends Thread {
             boolean allowInProcAdhoc, float mpRatio, Semaphore permits)
     {
         setName("ReadThread");
+        setDaemon(true);
 
         this.client = client;
         this.threadCount = threadCount;
