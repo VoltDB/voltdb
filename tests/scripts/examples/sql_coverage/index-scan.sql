@@ -9,7 +9,7 @@
 {_dvalue |= "20"}
 {_dvalue |= "_value[int16]"} 
 
-INSERT INTO _table VALUES (_value[int16], _bvalue, _value[int16], _value[int16], _dvalue, _value[int16])
+INSERT INTO _table VALUES (_value[int16], _bvalue, _value[int16], _dvalue, _value[int16], _value[int16])
 
 INSERT INTO _table VALUES (_value[int16], 10, _value[int16], 20, _value[int16], _value[int16])
 
@@ -58,9 +58,9 @@ SELECT * FROM _table WHERE B <= _value[int16] AND C >= _value[int16] AND C <= _v
 
 
 --- (3) Test reverse scan three columns case:
-SELECT * FROM _table WHERE D = _value[int16] ORDER BY E DESC
-SELECT * FROM _table WHERE D = _value[int16] ORDER BY E DESC, F DESC 
-SELECT * FROM _table WHERE D = _value[int16] AND E _cmp _value[int16] ORDER BY E DESC 
+SELECT * FROM _table WHERE D = _dvalue ORDER BY E DESC
+SELECT * FROM _table WHERE D = _dvalue ORDER BY E DESC, F DESC
+SELECT * FROM _table WHERE D = _dvalue AND E _cmp _value[int16] ORDER BY E DESC
 
 --- (3.1) D = ? AND E ?
 SELECT * FROM _table WHERE D = _dvalue AND E _cmp _value[int16] ORDER BY E DESC 
