@@ -69,6 +69,7 @@ import com.google.common.base.Throwables;
 import com.jcraft.jsch.ChannelSftp;
 import com.jcraft.jsch.ChannelSftp.LsEntry;
 import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.JSchException;
 import com.jcraft.jsch.Session;
 import com.jcraft.jsch.SftpATTRS;
 import com.jcraft.jsch.SftpException;
@@ -92,6 +93,7 @@ public class ExportOnServerVerifier {
         ChannelSftp channel;
         String path;
         boolean activeSeen = false;
+        boolean fileSeen = false;
     }
 
     public static class ValidationErr extends Exception {
@@ -409,9 +411,9 @@ public class ExportOnServerVerifier {
                 {
                     emptyRemovalCycles = 0;
                 }
-                else if (++emptyRemovalCycles >= 10)
+                else if (++emptyRemovalCycles >= 20)
                 {
-                    System.err.println("ERROR: 10 check cycles failed to match client tx ids with exported tx id -- bailing out");
+                    System.err.println("ERROR: 20 check cycles failed to match client tx ids with exported tx id -- bailing out");
                     System.exit(1);
                 }
 
@@ -462,9 +464,14 @@ public class ExportOnServerVerifier {
                 upTo += 1000;
             }
 
-            INNER: for( int i = 0; i < upTo; ++i) {
+            boolean keepReadingBecauseItIsTheLastFile = false;
+
+            INNER: for( int i = 0; i < upTo || keepReadingBecauseItIsTheLastFile; ++i) {
 
                 String trace = readNextClientFileLine(partId);
+
+                keepReadingBecauseItIsTheLastFile =
+                        Boolean.FALSE.equals(m_clientComplete.get(partId));
 
                 if ( trace == null) {
                     m_readUpTo.get(partId).set(0);
@@ -536,6 +543,7 @@ public class ExportOnServerVerifier {
                     } else if (line != null) {
                         System.out.println("WARN read malformed trace " + line + " in " + f);
                     }
+                    line = in.readLine();
                 }
             } finally {
                 f.delete();
@@ -680,9 +688,9 @@ public class ExportOnServerVerifier {
                 {
                     emptyRemovalCycles = 0;
                 }
-                else if (++emptyRemovalCycles >= 10)
+                else if (++emptyRemovalCycles >= 20)
                 {
-                    System.err.println("ERROR: 10 check cycles failed to match client tx ids with exported tx id -- bailing out");
+                    System.err.println("ERROR: 20 check cycles failed to match client tx ids with exported tx id -- bailing out");
                     System.exit(1);
                 }
 
@@ -817,9 +825,11 @@ public class ExportOnServerVerifier {
                 int trackerModifyTime = rh.channel.stat(rh.path + "/" + TRACKER_FILENAME).getMTime();
 
                 boolean activeInRemote = false;
+                boolean filesInRemote = false;
 
                 for (LsEntry entry : files) {
-                    activeInRemote = activeInRemote || entry.getFilename().startsWith("active");
+                    activeInRemote = activeInRemote || entry.getFilename().trim().toLowerCase().startsWith("active");
+                    filesInRemote = filesInRemote || entry.getFilename().trim().toLowerCase().startsWith("active");
 
                     if (    !entry.getFilename().equals(".") &&
                             !entry.getFilename().equals("..") &&
@@ -832,13 +842,14 @@ public class ExportOnServerVerifier {
                             Matcher mtc = EXPORT_FILENAME_REGEXP.matcher(entry.getFilename());
                             if (mtc.matches()) {
                                 paths.add(entryFileName);
+                                filesInRemote = true;
                             } else {
                                 System.err.println(
                                         "ERROR: " + entryFileName +
                                         " does not match expected export file name pattern");
                             }
                         }
-                        else if (entry.getFilename().startsWith("active-"))
+                        else if (entry.getFilename().trim().toLowerCase().startsWith("active-"))
                         {
                             int activeModifyTime = entry.getAttrs().getMTime();
                             if ((trackerModifyTime - activeModifyTime) > 120)
@@ -854,10 +865,16 @@ public class ExportOnServerVerifier {
                 touchActiveTracker(rh);
 
                 rh.activeSeen = rh.activeSeen || activeInRemote;
+                rh.fileSeen = rh.fileSeen || filesInRemote;
+
                 if( activeInRemote) activeFound++;
 
                 Collections.sort(paths, comparator);
                 if (!paths.isEmpty()) pathsFromAllNodes.add(Pair.of(rh.channel, paths));
+            }
+
+            if (!m_clientComplete.isEmpty()) {
+                printExportFileSituation(pathsFromAllNodes, activeFound);
             }
 
             if( pathsFromAllNodes.isEmpty() && activeFound == 0 && allActiveSeen())
@@ -905,6 +922,35 @@ public class ExportOnServerVerifier {
         }
     }
 
+    private void printExportFileSituation(List<Pair<ChannelSftp, List<String>>> pathsFromAllNodes, int activeFound) {
+        System.out.println("\n================= E X P O R T  F I L E S  S I T U A T I O N ======================");
+        System.out.println("On                      " + new Date());
+        System.out.println("Active Found Count is   " + activeFound);
+        System.out.println("All active seen flag is " + allActiveSeen());
+        if (!allActiveSeen()) {
+            for (RemoteHost host: m_hosts) {
+                if (!host.activeSeen) {
+                    String hn = "(unknown)";
+                    try {
+                        hn = host.channel.getSession().getHost();
+                    } catch (JSchException ignoreIt) {}
+                    System.out.println("\tno active file was detected on " + hn);
+                }
+            }
+        }
+        for (Pair<ChannelSftp, List<String>> p: pathsFromAllNodes) {
+            String hn = "(unknown)";
+            try {
+                hn = p.getFirst().getSession().getHost();
+            } catch (JSchException ignoreIt) {}
+            System.out.println("On "+hn+" I found the following files");
+            for (String f: p.getSecond()) {
+                System.out.println("\t" + f);
+            }
+        }
+        System.out.println("==================================================================================\n");
+    }
+
 
     private boolean sameFiles( File [] a, File [] b, Comparator<File> comparator) {
         if( a == null || b == null) {
@@ -917,13 +963,18 @@ public class ExportOnServerVerifier {
         return Arrays.equals(a, b);
     }
 
+    public boolean onlyLastFileLeft(File [] files) {
+        return files != null && files.length == 1  && files[0].getName().trim().endsWith("-last");
+    }
+
     private File[] checkForMoreFiles(File path, File[] files, FileFilter acceptor,
                                    Comparator<File> comparator) throws ValidationErr
     {
         File [] oldFiles = files;
         int emptyRetries = 50;
         long start_time = System.currentTimeMillis();
-        while (sameFiles(files, oldFiles, comparator) || ( files.length == 0 && emptyRetries >=0))
+
+        while (sameFiles(files, oldFiles, comparator) || (files.length == 0 && emptyRetries >=0))
         {
             files = path.listFiles(acceptor);
             emptyRetries = (files.length > 0 ? 50 : emptyRetries - 1);
@@ -931,6 +982,12 @@ public class ExportOnServerVerifier {
             long now = System.currentTimeMillis();
             if ((now - start_time) > FILE_TIMEOUT_MS)
             {
+                Arrays.sort(files, comparator);
+                System.err.println("ERROR Polling for client files timed out, the current list of files is:");
+                for (File f: files) {
+                    System.err.println("\t"+ f);
+                }
+
                 throw new ValidationErr("Timed out waiting on new files in " + path.getName()+ ".\n" +
                                         "This indicates a mismatch in the transaction streams between the client logs and the export data or the death of something important.",
                                         null, null);
@@ -1014,6 +1071,8 @@ public class ExportOnServerVerifier {
 
     private File[] checkForMoreClientFiles(int partId) throws ValidationErr{
 
+        if (m_clientComplete.containsKey(partId)) return new File[0];
+
         File clientPath = m_clientPaths.get(partId);
         if (clientPath == null) {
             clientPath = new File(m_clientPath, Integer.toString(partId));
@@ -1093,9 +1152,6 @@ public class ExportOnServerVerifier {
         }
 
         if (clientIndex == clientFiles.length) {
-            for (File f: clientFiles) {
-                f.delete();
-            }
 
             if (m_clientComplete.containsKey(partId)) return null;
 
@@ -1114,7 +1170,7 @@ public class ExportOnServerVerifier {
               + " for partition id " + partId
               );
 
-        if (clientFile.getName().endsWith("-last")) {
+        if (clientFile.getName().trim().toLowerCase().endsWith("-last")) {
             m_clientComplete.put(partId,false);
         }
 
@@ -1137,7 +1193,7 @@ public class ExportOnServerVerifier {
                     if (m_clientComplete.containsKey(partId)) {
                         m_clientComplete.put(partId, true);
                     }
-                    break;
+                    return null;
                 }
 
                 m_clientReaders.put(partId, reader);
@@ -1146,7 +1202,11 @@ public class ExportOnServerVerifier {
             line = reader.readLine();
             if (line == null) {
                 try { reader.close(); } catch (Exception ignoreIt) {};
+
+                int index = m_clientIndexes.get(partId) - 1;
+                m_clientFiles.get(partId)[index].delete();
                 m_clientReaders.remove(partId);
+
                 reader = null;
             }
 
@@ -1159,7 +1219,7 @@ public class ExportOnServerVerifier {
         boolean seen = true;
         for (RemoteHost host: m_hosts)
         {
-            seen = seen && host.activeSeen;
+            seen = seen && (host.activeSeen || !host.fileSeen);
         }
         return seen;
     }
@@ -1286,7 +1346,7 @@ public class ExportOnServerVerifier {
             long txnId = ovfitr.next();
             int partid = TxnEgo.getPartitionId(txnId);
 
-            if (m_readUpTo.get(partid).decrementAndGet() > 0)
+            if (m_readUpTo.get(partid).decrementAndGet() >= 0)
             {
                 ovfitr.remove();
             }
