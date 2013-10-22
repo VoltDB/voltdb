@@ -38,13 +38,13 @@ import java.util.SortedMap;
 public class IndexSnapshotRequestConfig extends SnapshotRequestConfig {
     public static class PartitionRanges {
         public final int partitionId;
-        public final SortedMap<Long, Long> ranges;
+        public final SortedMap<Integer, Integer> ranges;
 
         /**
          * @param partitionId    The partition that currently owns the ranges
          * @param ranges         The ranges to index on this partition
          */
-        public PartitionRanges(int partitionId, Map<Long, Long> ranges)
+        public PartitionRanges(int partitionId, Map<Integer, Integer> ranges)
         {
             this.partitionId = partitionId;
             this.ranges = ImmutableSortedMap.copyOf(ranges);
@@ -81,12 +81,12 @@ public class IndexSnapshotRequestConfig extends SnapshotRequestConfig {
                     JSONObject rangeObj = partitionObj.getJSONObject(pidStr);
                     Iterator rangeKey = rangeObj.keys();
 
-                    ImmutableSortedMap.Builder<Long, Long> rangeBuilder =
+                    ImmutableSortedMap.Builder<Integer, Integer> rangeBuilder =
                         ImmutableSortedMap.naturalOrder();
                     while (rangeKey.hasNext()) {
                         String rangeStartStr = (String) rangeKey.next();
-                        long rangeStart = Long.parseLong(rangeStartStr);
-                        long rangeEnd = rangeObj.getLong(rangeStartStr);
+                        int rangeStart = Integer.parseInt(rangeStartStr);
+                        int rangeEnd = rangeObj.getInt(rangeStartStr);
                         rangeBuilder.put(rangeStart, rangeEnd);
                     }
 
@@ -114,7 +114,7 @@ public class IndexSnapshotRequestConfig extends SnapshotRequestConfig {
         for (PartitionRanges partitionRange : partitionRanges) {
             stringer.key(Integer.toString(partitionRange.partitionId)).object();
 
-            for (Map.Entry<Long, Long> rangeEntry : partitionRange.ranges.entrySet()) {
+            for (Map.Entry<Integer, Integer> rangeEntry : partitionRange.ranges.entrySet()) {
                 stringer.key(rangeEntry.getKey().toString()).value(rangeEntry.getValue());
             }
 

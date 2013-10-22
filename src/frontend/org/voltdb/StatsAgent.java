@@ -25,6 +25,7 @@ import org.voltcore.network.Connection;
 import org.voltcore.utils.Pair;
 
 import org.voltdb.TheHashinator.HashinatorType;
+import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 
@@ -296,8 +297,8 @@ public class StatsAgent extends OpsAgent
                             new VoltTable.ColumnInfo("HASHTYPE", VoltType.STRING),
                             new VoltTable.ColumnInfo("HASHCONFIG", VoltType.VARBINARY));
             tables[1] = vt;
-            Pair<HashinatorType, byte[]> hashConfig = TheHashinator.getCurrentConfig();
-            vt.addRow(hashConfig.getFirst().toString(), hashConfig.getSecond());
+            HashinatorConfig hashConfig = TheHashinator.getCurrentConfig();
+            vt.addRow(hashConfig.type.toString(), hashConfig.configBytes);
         }
         psr.aggregateTables = tables;
 

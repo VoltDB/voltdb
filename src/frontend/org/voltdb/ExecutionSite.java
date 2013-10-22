@@ -616,7 +616,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         }
 
         @Override
-        public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config)
+        public void updateHashinator(TheHashinator.HashinatorConfig config)
         {
         }
 

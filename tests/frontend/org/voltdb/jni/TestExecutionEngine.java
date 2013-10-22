@@ -38,6 +38,7 @@ import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorType;
+import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -163,8 +164,7 @@ public class TestExecutionEngine extends TestCase {
                                 0,
                                 "",
                                 100,
-                                HashinatorType.LEGACY,
-                                configBytes));
+                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0)));
             }
         };
         destEEThread.start();
@@ -275,8 +275,7 @@ public class TestExecutionEngine extends TestCase {
                                 0,
                                 "",
                                 100,
-                                HashinatorType.LEGACY,
-                                configBytes));
+                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0)));
             }
         };
         destEEThread.start();
@@ -290,7 +289,7 @@ public class TestExecutionEngine extends TestCase {
 
         SnapshotPredicates predicates = new SnapshotPredicates(-1);
         predicates.addPredicate(new HashRangeExpressionBuilder()
-                                        .put(0x0000000000000000L, 0x7fffffffffffffffL)
+                                        .put(0x00000000, 0x7fffffff)
                                         .build(0),
                                 true);
 
@@ -334,8 +333,7 @@ public class TestExecutionEngine extends TestCase {
                         0,
                         "",
                         100,
-                        HashinatorType.LEGACY,
-                        LegacyHashinator.getConfigureBytes(1));
+                        new HashinatorConfig(HashinatorType.LEGACY, LegacyHashinator.getConfigureBytes(1), 0, 0));
         m_project = new TPCCProjectBuilder();
         m_catalog = m_project.createTPCCSchemaCatalog();
     }
