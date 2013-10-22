@@ -682,7 +682,6 @@ DISTRIBUTION
         </copy>
         <copy todir="${dist.dir}@{distlabel}/tools">
             <fileset dir="${base.dir}/tools">
-                <include name="volt" />
             </fileset>
         </copy>
         <copy todir="${dist.dir}@{distlabel}/lib">
@@ -698,7 +697,6 @@ DISTRIBUTION
         </chmod>
         <chmod perm="ugo+rx">
             <fileset dir="${dist.dir}@{distlabel}/tools">
-                <include name="volt" />
             </fileset>
         </chmod>
     </sequential>
