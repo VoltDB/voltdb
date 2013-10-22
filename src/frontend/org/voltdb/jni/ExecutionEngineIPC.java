@@ -29,12 +29,14 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorType;
+import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
@@ -42,7 +44,6 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 import com.google.common.base.Charsets;
@@ -518,8 +519,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int tempTableMemory,
             final BackendTarget target,
             final int port,
-            final HashinatorType type,
-            final byte config[]) {
+            final HashinatorConfig hashinatorConfig) {
         super(siteId, partitionId);
 
         // m_counter = 0;
@@ -545,8 +545,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 m_hostId,
                 m_hostname,
                 1024 * 1024 * tempTableMemory,
-                type,
-                config);
+                hashinatorConfig);
     }
 
     /** Utility method to generate an EEXception that can be overriden by derived classes**/
@@ -579,8 +578,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int hostId,
             final String hostname,
             final long tempTableMemory,
-            final HashinatorType hashinatorType,
-            final byte hashinatorConfig[])
+            final HashinatorConfig hashinatorConfig)
     {
         synchronized(printLockObject) {
             System.out.println("Initializing an IPC EE " + this + " for hostId " + hostId + " siteId " + siteId + " from thread " + Thread.currentThread().getId());
@@ -594,10 +592,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putInt(hostId);
         m_data.putLong(EELoggers.getLogLevels());
         m_data.putLong(tempTableMemory);
-        m_data.putInt(hashinatorType.typeId());
-        m_data.putInt(hashinatorConfig.length);
         m_data.putInt((short)hostname.length());
-        m_data.put(hashinatorConfig);
         m_data.put(hostname.getBytes(Charsets.UTF_8));
         try {
             m_data.flip();
@@ -608,6 +603,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             throw new RuntimeException(e);
         }
         checkErrorCode(result);
+        updateHashinator(hashinatorConfig);
     }
 
     /** write the catalog as a UTF-8 byte string via connection */
@@ -1086,12 +1082,17 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateTableStream(int tableId, TableStreamType streamType, SnapshotPredicates predicates) {
+    public boolean activateTableStream(
+            int tableId,
+            TableStreamType streamType,
+            long undoQuantumToken,
+            byte[] predicates) {
         m_data.clear();
         m_data.putInt(Commands.ActivateTableStream.m_id);
         m_data.putInt(tableId);
         m_data.putInt(streamType.ordinal());
-        m_data.put(predicates.toBytes()); // predicates
+        m_data.putLong(undoQuantumToken);
+        m_data.put(predicates); // predicates
 
         try {
             m_data.flip();
@@ -1116,8 +1117,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public int[] tableStreamSerializeMore(int tableId, TableStreamType streamType,
-                                          List<BBContainer> outputBuffers) {
+    public Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType streamType,
+                                                      List<BBContainer> outputBuffers) {
         try {
             m_data.clear();
             m_data.putInt(Commands.TableStreamSerializeMore.m_id);
@@ -1153,13 +1154,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             remainingBuffer.flip();
             final long remaining = remainingBuffer.getLong();
 
-            /*
-             * Error or no more tuple data for this table.
-             */
-            if (remaining == -1 || remaining == -2) {
-                return new int[] {(int) remaining + 1};
-            }
-
             final int[] serialized = new int[count];
             for (int i = 0; i < count; i++) {
                 ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
@@ -1179,7 +1173,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 }
             }
 
-            return serialized;
+            return Pair.of(remaining, serialized);
         } catch (final IOException e) {
             System.out.println("Exception: " + e.getMessage());
             throw new RuntimeException(e);
@@ -1301,7 +1295,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public int hashinate(Object value, HashinatorType type, byte config[])
+    public int hashinate(Object value, HashinatorConfig config)
     {
         ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(value);
 
@@ -1314,9 +1308,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
         m_data.clear();
         m_data.putInt(Commands.Hashinate.m_id);
-        m_data.putInt(type.typeId());
-        m_data.putInt(config.length);
-        m_data.put(config);
+        m_data.putInt(config.type.typeId());
+        m_data.putInt(config.configBytes.length);
+        m_data.put(config.configBytes);
         m_data.put(fser.getBuffer());
         try {
             m_data.flip();
@@ -1339,13 +1333,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public void updateHashinator(HashinatorType type, byte[] config)
+    public void updateHashinator(HashinatorConfig config)
     {
         m_data.clear();
         m_data.putInt(Commands.updateHashinator.m_id);
-        m_data.putInt(type.typeId());
-        m_data.putInt(config.length);
-        m_data.put(config);
+        m_data.putInt(config.type.typeId());
+        m_data.putInt(config.configBytes.length);
+        m_data.put(config.configBytes);
         try {
             m_data.flip();
             m_connection.write();

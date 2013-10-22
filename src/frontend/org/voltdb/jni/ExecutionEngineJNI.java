@@ -24,11 +24,13 @@ import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
+import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
@@ -37,7 +39,6 @@ import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FastSerializer.BufferGrowCallback;
-import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 import com.google.common.base.Throwables;
@@ -98,8 +99,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int hostId,
             final String hostname,
             final int tempTableMemory,
-            final TheHashinator.HashinatorType hashinatorType,
-            final byte hashinatorConfig[])
+            final HashinatorConfig hashinatorConfig)
     {
         // base class loads the volt shared library.
         super(siteId, partitionId);
@@ -123,8 +123,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     partitionId,
                     hostId,
                     getStringBytes(hostname),
-                    tempTableMemory * 1024 * 1024,
-                    hashinatorType.typeId(), hashinatorConfig);
+                    tempTableMemory * 1024 * 1024);
         checkErrorCode(errorCode);
         fsForParameterSet = new FastSerializer(true, new BufferGrowCallback() {
             @Override
@@ -144,6 +143,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 deserializer.buffer(), deserializer.buffer().capacity(),
                 exceptionBuffer, exceptionBuffer.capacity());
         checkErrorCode(errorCode);
+        updateHashinator(hashinatorConfig);
         //LOG.info("Initialized Execution Engine");
     }
 
@@ -457,29 +457,27 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateTableStream(int tableId, TableStreamType streamType, SnapshotPredicates predicates) {
-        return nativeActivateTableStream(pointer, tableId, streamType.ordinal(), predicates.toBytes());
+    public boolean activateTableStream(int tableId, TableStreamType streamType,
+                                       long undoQuantumToken,
+                                       byte[] predicates) {
+        return nativeActivateTableStream(pointer, tableId, streamType.ordinal(),
+                                         undoQuantumToken, predicates);
     }
 
     @Override
-    public int[] tableStreamSerializeMore(int tableId,
-                                          TableStreamType streamType,
-                                          List<BBContainer> outputBuffers) {
+    public Pair<Long, int[]> tableStreamSerializeMore(int tableId,
+                                                      TableStreamType streamType,
+                                                      List<BBContainer> outputBuffers) {
         //Clear is destructive, do it before the native call
         deserializer.clear();
+        byte[] bytes = outputBuffers != null
+                            ? SnapshotUtil.OutputBuffersToBytes(outputBuffers)
+                            : null;
         long remaining = nativeTableStreamSerializeMore(pointer,
                                                         tableId,
                                                         streamType.ordinal(),
-                                                        SnapshotUtil.OutputBuffersToBytes(outputBuffers));
+                                                        bytes);
         int[] positions = null;
-        // -1 is end of stream.
-        if (remaining == -1) {
-            return new int[] {0};
-        }
-        // -2 is an error.
-        if (remaining == -2) {
-            return new int[] {-1};
-        }
         assert(deserializer != null);
         int count;
         try {
@@ -489,14 +487,14 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 for (int i = 0; i < count; i++) {
                     positions[i] = deserializer.readInt();
                 }
-                return positions;
+                return Pair.of(remaining, positions);
             }
         } catch (final IOException ex) {
             LOG.error("Failed to deserialize position array" + ex);
             throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
         }
 
-        return new int[] {0};
+        return Pair.of(remaining, new int[] {0});
     }
 
     /**
@@ -535,9 +533,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public int hashinate(Object value, TheHashinator.HashinatorType hashinatorType, byte hashinatorConfig[])
+    public int hashinate(
+            Object value,
+            HashinatorConfig config)
     {
-        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(value, hashinatorType.typeId(), hashinatorConfig);
+        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(value, config.type.typeId(), config.configBytes);
 
         // serialize the param set
         fsForParameterSet.clear();
@@ -547,23 +547,25 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             throw new RuntimeException(exception); // can't happen
         }
 
-        return nativeHashinate(pointer);
+        return nativeHashinate(pointer, config.configPtr, config.numTokens);
     }
 
     @Override
-    public void updateHashinator(TheHashinator.HashinatorType type, byte[] config)
+    public void updateHashinator(HashinatorConfig config)
     {
-        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(type.typeId(), config);
+        if (config.configPtr == 0) {
+            ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(config.configBytes);
 
-        // serialize the param set
-        fsForParameterSet.clear();
-        try {
-            parameterSet.writeExternal(fsForParameterSet);
-        } catch (final IOException exception) {
-            throw new RuntimeException(exception); // can't happen
+            // serialize the param set
+            fsForParameterSet.clear();
+            try {
+                parameterSet.writeExternal(fsForParameterSet);
+            } catch (final IOException exception) {
+                throw new RuntimeException(exception); // can't happen
+            }
         }
 
-        nativeUpdateHashinator(pointer);
+        nativeUpdateHashinator(pointer, config.type.typeId(), config.configPtr, config.numTokens);
     }
 
     @Override

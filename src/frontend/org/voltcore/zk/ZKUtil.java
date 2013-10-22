@@ -495,4 +495,13 @@ public class ZKUtil {
 
         abstract protected void pProcess(final WatchedEvent event);
     }
+
+    public static void deleteRecursively(ZooKeeper zk, String dir) throws KeeperException, InterruptedException
+    {
+        List<String> children = zk.getChildren(dir, false);
+        for (String child : children) {
+            deleteRecursively(zk, joinZKPath(dir, child));
+        }
+        zk.delete(dir, -1);
+    }
 }

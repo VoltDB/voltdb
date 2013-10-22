@@ -151,7 +151,7 @@ public class FragmentResponseMessage extends VoltMessage {
         return m_dependencies.get(index);
     }
 
-    public RuntimeException getException() {
+    public SerializableException getException() {
         return m_exception;
     }
 

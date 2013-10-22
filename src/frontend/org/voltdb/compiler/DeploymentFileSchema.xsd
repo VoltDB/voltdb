@@ -60,7 +60,7 @@
     <xs:attribute name="hostcount" type="xs:int" default="1"/>
     <xs:attribute name="sitesperhost" type="xs:int" default="2"/>
     <xs:attribute name="kfactor" type="xs:int" default="0"/>
-    <xs:attribute name="elastic" type="xs:string" default="disabled"/>
+    <xs:attribute name="elastic" type="xs:string" default="enabled"/>
   </xs:complexType>
 
   <!-- <paths> -->
@@ -224,16 +224,10 @@
   <!-- <export> -->
   <xs:complexType name="exportType">
     <xs:sequence>
-      <xs:element name="onserver" type="ExportOnServerType" minOccurs="0" maxOccurs="1"/>
-    </xs:sequence>
-    <xs:attribute name="enabled" type="xs:boolean" default="true"/>
-  </xs:complexType>
-
-  <xs:complexType name="ExportOnServerType">
-    <xs:sequence>
       <xs:element name="configuration" type="ExportConfigurationType" minOccurs="0" maxOccurs="1"/>
     </xs:sequence>
-    <xs:attribute name="exportto" type="ServerExportEnum" default="file"/>
+    <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+    <xs:attribute name="target" type="ServerExportEnum" default="file"/>
     <xs:attribute name="exportconnectorclass" type="xs:string" default=""/>
   </xs:complexType>
 

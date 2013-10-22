@@ -76,9 +76,6 @@ protected:
     void registerGlobally(CatalogType *catObj);
     void unregisterGlobally(CatalogType *catObj);
 
-    static std::vector<std::string> splitString(const std::string &str, char delimiter);
-    static std::vector<std::string> splitToTwoString(const std::string &str, char delimiter);
-
     void addUnresolvedInfo(std::string path, CatalogType *type, std::string fieldName);
 private:
     void resolveUnresolvedInfo(std::string path);

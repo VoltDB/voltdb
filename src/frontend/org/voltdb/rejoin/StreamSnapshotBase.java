@@ -17,12 +17,60 @@
 
 package org.voltdb.rejoin;
 
+import org.voltcore.messaging.VoltMessage;
+import org.voltdb.exceptions.SerializableException;
+
 /**
  * Base class for reading and writing snapshot streams over the network.
  */
 public abstract class StreamSnapshotBase {
-    protected static final int typeOffset = 0; // 1 byte
-    protected static final int tableIdOffset = typeOffset + 1; // 4 bytes
-    protected static final int blockIndexOffset = tableIdOffset + 4; // 4 bytes
-    protected static final int contentOffset = blockIndexOffset + 4;
+    public static final int typeOffset = 0; // 1 byte
+    public static final int blockIndexOffset = typeOffset + 1; // 4 bytes
+    public static final int tableIdOffset = blockIndexOffset + 4; // 4 bytes
+    public static final int contentOffset = tableIdOffset + 4;
+
+    public static interface MessageFactory {
+        public VoltMessage makeDataMessage(long targetId, byte[] data);
+
+        public boolean isAckEOS(VoltMessage msg);
+        public long getAckTargetId(VoltMessage msg);
+        public int getAckBlockIndex(VoltMessage msg);
+        public SerializableException getException(VoltMessage msg);
+    }
+
+    public static class DefaultMessageFactory implements MessageFactory {
+        @Override
+        public VoltMessage makeDataMessage(long targetId, byte[] data)
+        {
+            return new RejoinDataMessage(targetId, data);
+        }
+
+        @Override
+        public boolean isAckEOS(VoltMessage msg)
+        {
+            assert msg instanceof RejoinDataAckMessage;
+            return ((RejoinDataAckMessage) msg).isEOS();
+        }
+
+        @Override
+        public long getAckTargetId(VoltMessage msg)
+        {
+            assert msg instanceof RejoinDataAckMessage;
+            return ((RejoinDataAckMessage) msg).getTargetId();
+        }
+
+        @Override
+        public int getAckBlockIndex(VoltMessage msg)
+        {
+            assert msg instanceof RejoinDataAckMessage;
+            return ((RejoinDataAckMessage) msg).getBlockIndex();
+        }
+
+        @Override
+        public  SerializableException getException(VoltMessage msg)
+        {
+            return null;
+        }
+    }
+
 }

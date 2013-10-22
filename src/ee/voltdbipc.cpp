@@ -133,6 +133,7 @@ typedef struct {
     struct ipc_command cmd;
     voltdb::CatalogId tableId;
     voltdb::TableStreamType streamType;
+    int64_t undoToken;
     char data[0];
 }__attribute__((packed)) activate_tablestream;
 
@@ -426,8 +427,6 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         int hostId;
         int64_t logLevels;
         int64_t tempTableMemory;
-        int32_t hashinatorType;
-        int32_t hashinatorConfigLength;
         int32_t hostnameLength;
         char data[0];
     }__attribute__((packed));
@@ -441,11 +440,9 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     cs->hostId = ntohl(cs->hostId);
     cs->logLevels = ntohll(cs->logLevels);
     cs->tempTableMemory = ntohll(cs->tempTableMemory);
-    cs->hashinatorType = ntohl(cs->hashinatorType);
-    cs->hashinatorConfigLength = ntohl(cs->hashinatorConfigLength);
     cs->hostnameLength = ntohl(cs->hostnameLength);
 
-    std::string hostname(cs->data + cs->hashinatorConfigLength, cs->hostnameLength);
+    std::string hostname(cs->data, cs->hostnameLength);
     try {
         m_engine = new VoltDBEngine(new voltdb::IPCTopend(this), new voltdb::StdoutLogProxy());
         m_engine->getLogManager()->setLogLevels(cs->logLevels);
@@ -461,9 +458,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
                                  cs->partitionId,
                                  cs->hostId,
                                  hostname,
-                                 cs->tempTableMemory,
-                                 (HashinatorType)cs->hashinatorType,
-                                 (char*)cs->data) == true) {
+                                 cs->tempTableMemory) == true) {
             return kErrorCode_Success;
         }
     } catch (const FatalException &e) {
@@ -933,10 +928,11 @@ int8_t VoltDBIPC::activateTableStream(struct ipc_command *cmd) {
     // Provide access to the serialized message data, i.e. the predicates.
     void* offset = activateTableStreamCommand->data;
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(activate_tablestream));
+    int64_t undoToken = ntohll(activateTableStreamCommand->undoToken);
     ReferenceSerializeInput serialize_in(offset, sz);
 
     try {
-        if (m_engine->activateTableStream(tableId, streamType, serialize_in)) {
+        if (m_engine->activateTableStream(tableId, streamType, undoToken, serialize_in)) {
             return kErrorCode_Success;
         } else {
             return kErrorCode_Error;
@@ -1110,7 +1106,7 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
         hashinator.reset(LegacyHashinator::newInstance(hash->data));
         break;
     case HASHINATOR_ELASTIC:
-        hashinator.reset(ElasticHashinator::newInstance(hash->data));
+        hashinator.reset(ElasticHashinator::newInstance(hash->data, NULL, 0));
         break;
     default:
         try {
@@ -1147,7 +1143,7 @@ void VoltDBIPC::updateHashinator(struct ipc_command *cmd) {
 
     HashinatorType hashinatorType = static_cast<HashinatorType>(ntohl(hash->hashinatorType));
     try {
-        m_engine->updateHashinator(hashinatorType, hash->data);
+        m_engine->updateHashinator(hashinatorType, hash->data, NULL, 0);
     } catch (const FatalException &e) {
         crashVoltDB(e);
     }

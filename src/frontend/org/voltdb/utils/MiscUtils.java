@@ -473,10 +473,19 @@ public class MiscUtils {
             /*
              * Don't do DNS resolution, don't use names for port numbers
              */
-            Process p = Runtime.getRuntime().exec("lsof -i -n -P");
+            ProcessBuilder pb = new ProcessBuilder("lsof", "-i", "-n", "-P");
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
             java.io.InputStreamReader reader = new java.io.InputStreamReader(p.getInputStream());
             java.io.BufferedReader br = new java.io.BufferedReader(reader);
-            String str = null;
+            String str = br.readLine();
+            log.fatal("Logging ports that are bound for listening, " +
+                      "this doesn't include ports bound by outgoing connections " +
+                      "which can also cause a failure to bind");
+            log.fatal("The PID of this process is " + CLibrary.getpid());
+            if (str != null) {
+                log.fatal(str);
+            }
             while((str = br.readLine()) != null) {
                 if (str.contains("LISTEN")) {
                     log.fatal(str);

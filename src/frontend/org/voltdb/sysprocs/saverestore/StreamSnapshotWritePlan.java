@@ -18,55 +18,41 @@
 package org.voltdb.sysprocs.saverestore;
 
 import java.io.IOException;
-
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Sets;
-import com.google.common.collect.TreeMultimap;
-import com.google.common.primitives.Longs;
 import org.json_voltpatches.JSONObject;
-
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
-
 import org.voltdb.PostSnapshotTask;
-import org.voltdb.TheHashinator;
-import org.voltdb.VoltDB;
-import org.voltdb.catalog.Table;
-
-import org.voltdb.dtxn.SiteTracker;
-
-import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.HashRangeExpression;
-import org.voltdb.rejoin.StreamSnapshotAckReceiver;
-import org.voltdb.rejoin.StreamSnapshotDataTarget;
-
 import org.voltdb.SnapshotDataFilter;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
-
-import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.SystemProcedureExecutionContext;
-
-import org.voltdb.utils.CatalogUtil;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.catalog.Table;
+import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.rejoin.StreamSnapshotAckReceiver;
+import org.voltdb.rejoin.StreamSnapshotDataTarget;
+import org.voltdb.sysprocs.SnapshotRegistry;
+import org.voltdb.utils.CatalogUtil;
+
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
+import com.google.common.primitives.Longs;
 
 /**
  * Create a snapshot write plan for snapshots streamed to other sites
@@ -76,13 +62,16 @@ import org.voltdb.VoltTable;
  */
 public class StreamSnapshotWritePlan extends SnapshotWritePlan
 {
+    @Override
     protected boolean createSetupInternal(
             String file_path, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
             JSONObject jsData, SystemProcedureExecutionContext context,
             String hostname, final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            SiteTracker tracker, long timestamp) throws IOException
+            SiteTracker tracker,
+            HashinatorSnapshotData hashinatorData,
+            long timestamp) throws IOException
     {
         assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty());
 
@@ -90,7 +79,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             new StreamSnapshotRequestConfig(jsData, context.getDatabase());
         final List<StreamSnapshotRequestConfig.Stream> localStreams =
             filterRemoteStreams(config.streams, Longs.asList(tracker.getLocalSites()));
-        final Map<Long, Integer> tokensToAdd = createTokensToAdd(localStreams);
+        final Set<Integer> partitionsToAdd = getPartitionsToAdd(localStreams);
 
         // Coalesce a truncation snapshot if shouldTruncate is true
         if (config.shouldTruncate) {
@@ -99,18 +88,19 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
              * down in the digest so that we can check if enough command log is collected on
              * replay.
              */
-            final int newPartitionCount =
-                calculateNewPartitionCount(context.getNumberOfPartitions(), tokensToAdd);
+            final int newPartitionCount = context.getNumberOfPartitions() + partitionsToAdd.size();
             coalesceTruncationSnapshotPlan(file_path, file_nonce, txnId, partitionTransactionIds,
                                            jsData, context, hostname, result,
-                                           exportSequenceNumbers, tracker, timestamp,
+                                           exportSequenceNumbers, tracker,
+                                           hashinatorData,
+                                           timestamp,
                                            newPartitionCount);
         }
 
         // Create post snapshot update hashinator work
         List<Integer> localPartitions = tracker.getPartitionsForHost(context.getHostId());
-        if (!tokensToAdd.isEmpty()) {
-            createUpdateHashinatorTasksForSites(localPartitions, tokensToAdd, txnId);
+        if (!partitionsToAdd.isEmpty()) {
+            createUpdatePartitionCountTasksForSites(localPartitions, partitionsToAdd);
         }
 
         // Mark snapshot start in registry
@@ -131,21 +121,14 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             schemas.put(table.getRelativeIndex(), schemaTable.getSchemaBytes());
         }
 
-        List<DataTargetInfo> sdts = createDataTargets(localStreams, schemas);
-
-        // Pick a pair of source to destination for each stream to ship the replicated table data.
-        Multimap<Long, Long> replicatedSrcToDst = pickOnePairPerStream(config.streams);
-        if (SNAP_LOG.isDebugEnabled()) {
-            SNAP_LOG.debug("Picked the following sites to transfer replicated table: " +
-                           CoreUtils.hsIdEntriesToString(replicatedSrcToDst.entries()));
-        }
+        List<DataTargetInfo> sdts = createDataTargets(localStreams, hashinatorData, schemas);
 
         // If there's no work to do on this host, just claim success, return an empty plan,
         // and things will sort themselves out properly
 
         // For each table, create tasks where each task has a data target.
         for (final Table table : config.tables) {
-            createTasksForTable(table, sdts, replicatedSrcToDst, numTables, snapshotRecord);
+            createTasksForTable(table, sdts, numTables, snapshotRecord);
             result.addRow(context.getHostId(), hostname, table.getTypeName(), "SUCCESS", "");
         }
 
@@ -153,11 +136,20 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     }
 
     private List<DataTargetInfo> createDataTargets(List<StreamSnapshotRequestConfig.Stream> localStreams,
+                                                   HashinatorSnapshotData hashinatorData,
                                                    Map<Integer, byte[]> schemas)
     {
+        byte[] hashinatorConfig = null;
+        if (hashinatorData != null) {
+            ByteBuffer hashinatorConfigBuf = ByteBuffer.allocate(8 + hashinatorData.m_serData.length);
+            hashinatorConfigBuf.putLong(hashinatorData.m_version);
+            hashinatorConfigBuf.put(hashinatorData.m_serData);
+            hashinatorConfig =  hashinatorConfigBuf.array();
+        }
+
         List<DataTargetInfo> sdts = Lists.newArrayList();
 
-        if (!localStreams.isEmpty()) {
+        if (!localStreams.isEmpty() && !schemas.isEmpty()) {
             Mailbox mb = VoltDB.instance().getHostMessenger().createMailbox();
             StreamSnapshotDataTarget.SnapshotSender sender = new StreamSnapshotDataTarget.SnapshotSender(mb);
             StreamSnapshotAckReceiver ackReceiver = new StreamSnapshotAckReceiver(mb);
@@ -177,8 +169,8 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                     sdts.add(new DataTargetInfo(stream,
                                                 srcHSId,
                                                 destHSId,
-                                                new StreamSnapshotDataTarget(destHSId, schemas, mb,
-                                                                             sender, ackReceiver)));
+                                                new StreamSnapshotDataTarget(destHSId, hashinatorConfig,
+                                                                             schemas, sender, ackReceiver)));
                 }
             }
         }
@@ -205,14 +197,16 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                                                 SystemProcedureExecutionContext context,
                                                 String hostname, VoltTable result,
                                                 Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-                                                SiteTracker tracker, long timestamp,
+                                                SiteTracker tracker,
+                                                HashinatorSnapshotData hashinatorData,
+                                                long timestamp,
                                                 int newPartitionCount)
         throws IOException
     {
         NativeSnapshotWritePlan plan = new NativeSnapshotWritePlan();
         plan.createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds,
                                  jsData, context, hostname, result, exportSequenceNumbers,
-                                 tracker, timestamp, newPartitionCount);
+                                 tracker, hashinatorData, timestamp, newPartitionCount);
         m_targets.addAll(plan.m_targets);
         m_taskListsForHSIds.putAll(plan.m_taskListsForHSIds);
     }
@@ -233,33 +227,10 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             }
 
             localStreams.add(new StreamSnapshotRequestConfig.Stream(streamPairs,
-                                                                    stream.partition,
-                                                                    stream.ranges));
+                                                                    stream.newPartition));
         }
 
         return localStreams;
-    }
-
-    /**
-     * Pick one (source, destination) pair from each stream for replicated table data transfer.
-     * Picking multiple pairs from each stream will result in duplicated replicated table data.
-     *
-     * @param streams
-     * @return A map of (source, destination)
-     */
-    private Multimap<Long, Long>
-    pickOnePairPerStream(Collection<StreamSnapshotRequestConfig.Stream> streams)
-    {
-        Multimap<Long, Long> replicatedSrcToDst = HashMultimap.create();
-
-        for (StreamSnapshotRequestConfig.Stream stream : streams) {
-            // Use a tree map so that it's deterministic across nodes
-            TreeMultimap<Long, Long> partitionStreamPairs = TreeMultimap.create(stream.streamPairs);
-            Entry<Long, Long> candidate = partitionStreamPairs.entries().iterator().next();
-            replicatedSrcToDst.put(candidate.getKey(), candidate.getValue());
-        }
-
-        return replicatedSrcToDst;
     }
 
     /**
@@ -267,37 +238,12 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
      */
     private void createTasksForTable(Table table,
                                      List<DataTargetInfo> dataTargets,
-                                     Multimap<Long, Long> replicatedSrcToDst,
                                      AtomicInteger numTables,
                                      SnapshotRegistry.Snapshot snapshotRecord)
     {
         // srcHSId -> tasks
         Multimap<Long, SnapshotTableTask> tasks = ArrayListMultimap.create();
         for (DataTargetInfo targetInfo : dataTargets) {
-            // Create a predicate for the table task
-            AbstractExpression predicate = null;
-            boolean deleteTuples = false;
-            if (!table.getIsreplicated()) {
-                predicate = createPredicateForTableStream(table, targetInfo.stream);
-                // Only delete tuples if there is a predicate, e.g. elastic join
-                if (predicate != null) {
-                    deleteTuples = true;
-                }
-            } else {
-                // If the current (source, destination) pair is not in the replicated table source
-                // list, then it shouldn't send any replicated table data.
-                // TODO: Remove this once non-blocking elastic join is implemented.
-                if (!replicatedSrcToDst.containsEntry(targetInfo.srcHSId, targetInfo.dstHSId)) {
-                    if (SNAP_LOG.isDebugEnabled()) {
-                        SNAP_LOG.debug("Skipping replicated table " + table.getTypeName() +
-                                       " for source destination pair " +
-                                       CoreUtils.hsIdToString(targetInfo.srcHSId) + " -> " +
-                                       CoreUtils.hsIdToString(targetInfo.dstHSId));
-                    }
-                    continue;
-                }
-            }
-
             final Runnable onClose = new TargetStatsClosure(targetInfo.dataTarget,
                                                             table.getTypeName(),
                                                             numTables,
@@ -308,8 +254,8 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                 new SnapshotTableTask(table,
                                       targetInfo.dataTarget,
                                       new SnapshotDataFilter[0], // This task no longer needs partition filtering
-                                      predicate,
-                                      deleteTuples);
+                                      null,
+                                      false);
 
             tasks.put(targetInfo.srcHSId, task);
             m_targets.add(targetInfo.dataTarget);
@@ -331,53 +277,25 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         }
     }
 
-    private static AbstractExpression
-    createPredicateForTableStream(Table table, StreamSnapshotRequestConfig.Stream stream)
-    {
-        HashRangeExpression predicate = null;
-
-        if (stream.partition != null) {
-            if (SNAP_LOG.isTraceEnabled()) {
-                SNAP_LOG.trace("Partition " + stream.partition + " has ranges " + stream.ranges);
-            }
-            predicate = new HashRangeExpression();
-            predicate.setRanges(stream.ranges);
-            predicate.setHashColumnIndex(table.getPartitioncolumn().getIndex());
-        }
-
-        return predicate;
-    }
-
     /**
      * Look at all streams and consolidate the ranges of all streams.
      * @return A map of tokens to partition IDs
      */
-    private static Map<Long, Integer> createTokensToAdd(Collection<StreamSnapshotRequestConfig.Stream> streams)
+    private static Set<Integer> getPartitionsToAdd(Collection<StreamSnapshotRequestConfig.Stream> streams)
     {
-        ImmutableMap.Builder<Long, Integer> tokenBuilder = ImmutableMap.builder();
+        ImmutableSet.Builder<Integer> builder = ImmutableSet.builder();
         for (StreamSnapshotRequestConfig.Stream stream : streams) {
-            if (stream.partition != null && stream.ranges != null) {
-                for (long token : stream.ranges.keySet()) {
-                    tokenBuilder.put(token, stream.partition);
-                }
+            if (stream.newPartition != null) {
+                builder.add(stream.newPartition);
             }
         }
-        return tokenBuilder.build();
+        return builder.build();
     }
 
-    private static int calculateNewPartitionCount(int currentPartitionCount,
-                                                  Map<Long, Integer> tokensToPartitions)
+    private static void createUpdatePartitionCountTasksForSites(Collection<Integer> localPartitions,
+                                                                Set<Integer> partitionsToAdd)
     {
-        return (currentPartitionCount + Sets.newHashSet(tokensToPartitions.values()).size());
-    }
-
-    private static void createUpdateHashinatorTasksForSites(Collection<Integer> localPartitions,
-                                                            Map<Long, Integer> tokensToPartitions,
-                                                            long txnId)
-    {
-        byte[] configBytes = TheHashinator.addPartitions(tokensToPartitions);
-        PostSnapshotTask task = new UpdateHashinator(ImmutableSet.copyOf(tokensToPartitions.values()),
-                                                     txnId, configBytes);
+        PostSnapshotTask task = new UpdatePartitionCount(partitionsToAdd);
         assert !localPartitions.isEmpty();
         Iterator<Integer> iter = localPartitions.iterator();
         while (iter.hasNext()) {
@@ -387,43 +305,23 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     }
 
     /**
-     * A post-snapshot site task that updates the hashinator in both Java and EE,
-     * runs on all sites. Only one site will succeed in updating the Java hashinator.
+     * A post-snapshot site task that updates the partition count on each site.
      */
-    private static class UpdateHashinator implements PostSnapshotTask {
+    private static class UpdatePartitionCount implements PostSnapshotTask {
         private final Set<Integer> m_newPartitions;
-        // txnId of the snapshot MP txn, used for hashinator update
-        private final long m_txnId;
-        // This site should update the Java hashinator if this is not null
-        private final byte[] m_javaHashinatorConfig;
 
-        public UpdateHashinator(Set<Integer> newPartitions,
-                                long txnId,
-                                byte[] javaHashinatorConfig)
+        public UpdatePartitionCount(Set<Integer> newPartitions)
         {
             m_newPartitions = newPartitions;
-            m_txnId = txnId;
-            m_javaHashinatorConfig = javaHashinatorConfig;
         }
 
         @Override
         public void run(SystemProcedureExecutionContext context)
         {
-            SNAP_LOG.debug("P" + context.getPartitionId() +
-                               " updating Java hashinator with new partitions: " +
-                               m_newPartitions);
-            // Update the Java hashinator, sites will race to do this, only one will succeed
-            TheHashinator.updateHashinator(TheHashinator.getConfiguredHashinatorType().hashinatorClass,
-                                           m_txnId,
-                                           m_javaHashinatorConfig);
-
             if (SNAP_LOG.isDebugEnabled()) {
                 SNAP_LOG.debug("P" + context.getPartitionId() +
-                               " updated the hashinator with new partitions: " + m_newPartitions);
+                               " updating partition count with new partitions: " + m_newPartitions);
             }
-            // Update EE hashinator
-            Pair<TheHashinator.HashinatorType, byte[]> currentConfig = TheHashinator.getCurrentConfig();
-            context.updateHashinator(currentConfig);
 
             // Update partition count stored on this site
             context.setNumberOfPartitions(context.getNumberOfPartitions() + m_newPartitions.size());
@@ -435,8 +333,10 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
      * table target, we can create the predicate associated with it.
      */
     private static class DataTargetInfo {
+        @SuppressWarnings("unused")
         public final StreamSnapshotRequestConfig.Stream stream;
         public final long srcHSId;
+        @SuppressWarnings("unused")
         public final long dstHSId;
         public final StreamSnapshotDataTarget dataTarget;
 

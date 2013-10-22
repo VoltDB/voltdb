@@ -35,7 +35,6 @@ import org.voltdb.StartAction;
 import org.voltdb.StarvationTracker;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
-import org.voltdb.VoltDB;
 import org.voltdb.rejoin.TaskLog;
 
 /**
@@ -73,7 +72,7 @@ public abstract class BaseInitiator implements Initiator
 
         if (startAction == StartAction.JOIN) {
             joinProducer = new ElasticJoinProducer(m_partitionId, scheduler.m_tasks);
-        } else if (VoltDB.createForRejoin(startAction)) {
+        } else if (startAction.doesRejoin()) {
             joinProducer = new RejoinProducer(m_partitionId, scheduler.m_tasks, isLiveRejoin);
         } else {
             joinProducer = null;
@@ -136,7 +135,7 @@ public abstract class BaseInitiator implements Initiator
             }
 
             // demote rejoin to create for initiators that aren't rejoinable.
-            if (VoltDB.createForRejoin(startAction) && !isRejoinable()) {
+            if (startAction.doesJoin() && !isRejoinable()) {
                 startAction = StartAction.CREATE;
             }
 
@@ -149,7 +148,6 @@ public abstract class BaseInitiator implements Initiator
                                        m_initiatorMailbox.getHSId(),
                                        backend, catalogContext,
                                        serializedCatalog,
-                                       catalogContext.m_transactionId,
                                        m_partitionId,
                                        numberOfPartitions,
                                        startAction,

@@ -91,7 +91,8 @@ PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetS
     m_partitionColumn(partitionColumn),
     stats_(this),
     m_failedCompactionCount(0),
-    m_invisibleTuplesPendingDeleteCount(0)
+    m_invisibleTuplesPendingDeleteCount(0),
+    m_surgeon(*this)
 {
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
@@ -219,13 +220,6 @@ bool PersistentTable::insertTuple(TableTuple &source)
 
 void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
 {
-    if (fallible) {
-        // not null checks at first
-        FAIL_IF(!checkNulls(source)) {
-            throw ConstraintFailureException(this, source, TableTuple(), CONSTRAINT_TYPE_NOT_NULL);
-        }
-    }
-
     //
     // First get the next free tuple
     // This will either give us one from the free slot list, or
@@ -238,6 +232,24 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
     // Then copy the source into the target
     //
     target.copyForPersistentInsert(source); // tuple in freelist must be already cleared
+
+    try {
+        insertTupleCommon(source, target, fallible);
+    } catch (ConstraintFailureException &e) {
+        deleteTupleStorage(target); // also frees object columns
+        throw;
+    }
+}
+
+void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible)
+{
+    if (fallible) {
+        // not null checks at first
+        FAIL_IF(!checkNulls(target)) {
+            throw ConstraintFailureException(this, source, TableTuple(), CONSTRAINT_TYPE_NOT_NULL);
+        }
+    }
+
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
         increaseStringMemCount(target.getNonInlinedMemorySize());
     }
@@ -258,7 +270,6 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
     }
 
     if (!tryInsertOnAllIndexes(&target)) {
-        deleteTupleStorage(target); // also frees object columns
         throw ConstraintFailureException(this, source, TableTuple(),
                                          CONSTRAINT_TYPE_UNIQUE);
     }
@@ -272,13 +283,13 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
         UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
         if (uq) {
             char* tupleData = uq->allocatePooledCopy(target.address(), target.tupleLength());
-            uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, this));
+            uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, &m_surgeon));
         }
     }
 
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
-        m_views[i]->processTupleInsert(source, fallible);
+        m_views[i]->processTupleInsert(target, fallible);
     }
 }
 
@@ -426,7 +437,7 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         char* newTupleData = uq->allocatePooledCopy(targetTupleToUpdate.address(), tupleLength);
         uq->registerUndoAction(new (*uq) PersistentTableUndoUpdateAction(oldTupleData, newTupleData,
                                                                          oldObjects, newObjects,
-                                                                         this, someIndexGotUpdated));
+                                                                         &m_surgeon, someIndexGotUpdated));
     } else {
         // This is normally handled by the Undo Action's release (i.e. when there IS an Undo Action)
         // -- though maybe even that case should delegate memory management back to the PersistentTable
@@ -539,7 +550,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
             m_tuplesPinnedByUndo++;
             ++m_invisibleTuplesPendingDeleteCount;
             // Create and register an undo action.
-            uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), this), this);
+            uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), &m_surgeon), this);
             return true;
         }
     }
@@ -817,8 +828,6 @@ PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target, cata
             return;
         }
     }
-    DEBUG_STREAM_HERE("Failed to find mat view " << targetName << "@" << target <<
-                      " in " << m_views.size() << " on " << name() << "@" << this);
     assert(false); // Should have found an existing view for the table.
 }
 
@@ -876,21 +885,9 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple,
                                          ReferenceSerializeOutput *uniqueViolationOutput,
                                          int32_t &serializedTupleCount,
                                          size_t &tupleCountPosition) {
-
-    // not null checks at first
-    FAIL_IF(!checkNulls(tuple)) {
-        throw ConstraintFailureException(this, tuple, TableTuple(),
-                                         CONSTRAINT_TYPE_NOT_NULL);
-    }
-
-    // Account for non-inlined memory allocated via bulk load or recovery
-    // Do this before unique constraints which might roll back the memory
-    if (m_schema->getUninlinedObjectColumnCount() != 0)
-    {
-        increaseStringMemCount(tuple.getNonInlinedMemorySize());
-    }
-
-    if (!tryInsertOnAllIndexes(&tuple)) {
+    try {
+        insertTupleCommon(tuple, tuple, true);
+    } catch (ConstraintFailureException &e) {
         if (uniqueViolationOutput) {
             if (serializedTupleCount == 0) {
                 serializeColumnHeaderTo(*uniqueViolationOutput);
@@ -901,19 +898,8 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple,
             deleteTupleStorage(tuple);
             return;
         } else {
-            throw ConstraintFailureException(this, tuple, TableTuple(),
-                                             CONSTRAINT_TYPE_UNIQUE);
+            throw;
         }
-    }
-    UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
-    if (uq) {
-        char* tupleData = uq->allocatePooledCopy(tuple.address(), tuple.tupleLength());
-        uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, this));
-    }
-
-    // handle any materialized views
-    for (int i = 0; i < m_views.size(); i++) {
-        m_views[i]->processTupleInsert(tuple, true);
     }
 }
 
@@ -928,67 +914,69 @@ bool PersistentTable::activateStream(
     int32_t partitionId,
     CatalogId tableId,
     ReferenceSerializeInput &serializeIn) {
-    return activateStreamInternal(
-        tableId,
-        boost::shared_ptr<TableStreamer>(
-            new TableStreamer(tupleSerializer, streamType, partitionId, serializeIn)));
-}
-
-/** Prepare table for streaming. */
-bool PersistentTable::activateStreamInternal(
-     CatalogId tableId,
-     boost::shared_ptr<TableStreamerInterface> tableStreamer) {
-
-    // Expect m_tableStreamer to be null. Only make it fatal in debug builds.
-    assert(m_tableStreamer == NULL);
+    /*
+     * Allow multiple stream types for the same partition by holding onto the
+     * TableStreamer object. TableStreamer enforces which multiple stream type
+     * combinations are allowed. Expect the partition ID not to change.
+     */
+    assert(m_tableStreamer == NULL || partitionId == m_tableStreamer->getPartitionID());
     if (m_tableStreamer == NULL) {
-        m_tableStreamer = tableStreamer;
+        m_tableStreamer.reset(new TableStreamer(partitionId, *this, tableId));
     }
 
-    // true => context is already active.
-    if (m_tableStreamer->isAlreadyActive()) {
-        return true;
-    }
-
-    // false => no tuples.
-    if (m_tupleCount == 0) {
-        return false;
-    }
-
-    //TODO: Move this special case snapshot code into the COW context.
-    // Probably want to move all of the snapshot-related stuff there.
-    if (m_tableStreamer->getStreamType() == TABLE_STREAM_SNAPSHOT) {
-        //All blocks are now pending snapshot
-        m_blocksPendingSnapshot.swap(m_blocksNotPendingSnapshot);
-        m_blocksPendingSnapshotLoad.swap(m_blocksNotPendingSnapshotLoad);
-        assert(m_blocksNotPendingSnapshot.empty());
-        for (int ii = 0; ii < m_blocksNotPendingSnapshotLoad.size(); ii++) {
-            assert(m_blocksNotPendingSnapshotLoad[ii]->empty());
+    std::vector<std::string> predicateStrings;
+    // Grab snapshot or elastic stream predicates.
+    if (tableStreamTypeHasPredicates(streamType)) {
+        int npreds = serializeIn.readInt();
+        if (npreds > 0) {
+            predicateStrings.reserve(npreds);
+            for (int ipred = 0; ipred < npreds; ipred++) {
+                std::string spred = serializeIn.readTextString();
+                predicateStrings.push_back(spred);
+            }
         }
     }
 
-    if (m_tableStreamer->activateStream(*this, tableId)) {
-        return false;
-    }
+    return m_tableStreamer->activateStream(m_surgeon, tupleSerializer, streamType, predicateStrings);
+}
 
-    return true;
+/**
+ * Prepare table for streaming from serialized data (internal for tests).
+ * Use custom TableStreamer provided.
+ * Return true on success or false if it was already active.
+ */
+bool PersistentTable::activateWithCustomStreamer(
+    TupleSerializer &tupleSerializer,
+    TableStreamType streamType,
+    boost::shared_ptr<TableStreamerInterface> tableStreamer,
+    CatalogId tableId,
+    std::vector<std::string> &predicateStrings,
+    bool skipInternalActivation) {
+
+    // Expect m_tableStreamer to be null. Only make it fatal in debug builds.
+    assert(m_tableStreamer == NULL);
+    m_tableStreamer = tableStreamer;
+    bool success = !skipInternalActivation;
+    if (!skipInternalActivation) {
+        success = m_tableStreamer->activateStream(m_surgeon,
+                                                  tupleSerializer,
+                                                  streamType,
+                                                  predicateStrings);
+    }
+    return success;
 }
 
 /**
  * Attempt to serialize more tuples from the table to the provided output streams.
- * Return remaining tuple count, 0 if done, or -1 on error.
+ * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
  */
 int64_t PersistentTable::streamMore(TupleOutputStreamProcessor &outputStreams,
+                                    TableStreamType streamType,
                                     std::vector<int> &retPositions) {
     if (m_tableStreamer.get() == NULL) {
-        return -1;
+        return TABLE_STREAM_SERIALIZATION_ERROR;
     }
-    int64_t remaining = m_tableStreamer->streamMore(outputStreams, retPositions);
-    if (remaining <= 0) {
-        // clang needs the cast for some reason.
-        m_tableStreamer.reset((TableStreamer*)NULL);
-    }
-    return remaining;
+    return m_tableStreamer->streamMore(outputStreams, streamType, retPositions);
 }
 
 /**
@@ -1196,8 +1184,7 @@ void PersistentTable::doIdleCompaction() {
 }
 
 void PersistentTable::doForcedCompaction() {
-    if (   m_tableStreamer.get() != NULL
-        && m_tableStreamer->getActiveStreamType() == TABLE_STREAM_RECOVERY) {
+    if (m_tableStreamer.get() != NULL && m_tableStreamer->hasStreamType(TABLE_STREAM_RECOVERY)) {
         LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO,
             "Deferring compaction until recovery is complete.");
         return;
@@ -1332,6 +1319,16 @@ int64_t PersistentTable::validatePartitioning(TheHashinator *hashinator, int32_t
         }
     }
     return mispartitionedRows;
+}
+
+void PersistentTableSurgeon::activateSnapshot() {
+    //All blocks are now pending snapshot
+    m_table.m_blocksPendingSnapshot.swap(m_table.m_blocksNotPendingSnapshot);
+    m_table.m_blocksPendingSnapshotLoad.swap(m_table.m_blocksNotPendingSnapshotLoad);
+    assert(m_table.m_blocksNotPendingSnapshot.empty());
+    for (int ii = 0; ii < m_table.m_blocksNotPendingSnapshotLoad.size(); ii++) {
+        assert(m_table.m_blocksNotPendingSnapshotLoad[ii]->empty());
+    }
 }
 
 } // namespace voltdb

@@ -55,7 +55,6 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.sysprocs.SnapshotSave;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 import com.google.common.base.Throwables;
@@ -846,7 +845,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
              * Construct a result to send to the client right now via ZK
              * saying we queued it to run later
              */
-            VoltTable result = SnapshotSave.constructNodeResultsTable();
+            VoltTable result = SnapshotUtil.constructNodeResultsTable();
             result.addRow(-1,
                     CoreUtils.getHostnameOrAddress(),
                     "",
@@ -1599,7 +1598,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             else {
                 // need to construct a success response of some sort here to indicate the truncation attempt
                 // was successfully attempted
-                VoltTable result = SnapshotSave.constructNodeResultsTable();
+                VoltTable result = SnapshotUtil.constructNodeResultsTable();
                 result.addRow(-1,
                         CoreUtils.getHostnameOrAddress(),
                         "",
@@ -1618,7 +1617,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
 
         if (requestExists) {
-            VoltTable result = org.voltdb.sysprocs.SnapshotSave.constructNodeResultsTable();
+            VoltTable result = SnapshotUtil.constructNodeResultsTable();
             result.addRow(-1,
                     CoreUtils.getHostnameOrAddress(),
                     "",

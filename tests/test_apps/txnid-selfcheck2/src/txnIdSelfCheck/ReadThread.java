@@ -51,17 +51,20 @@ public class ReadThread extends Thread {
     final Semaphore txnsOutstanding = new Semaphore(100);
     final boolean allowInProcAdhoc;
     final float mpRatio;
+    final Semaphore m_permits;
 
     public ReadThread(Client client, int threadCount, int threadOffset,
-            boolean allowInProcAdhoc, float mpRatio)
+            boolean allowInProcAdhoc, float mpRatio, Semaphore permits)
     {
         setName("ReadThread");
+        setDaemon(true);
 
         this.client = client;
         this.threadCount = threadCount;
         this.threadOffset = threadOffset;
         this.allowInProcAdhoc = allowInProcAdhoc;
         this.mpRatio = mpRatio;
+        this.m_permits = permits;
     }
 
     void shutdown() {
@@ -128,6 +131,7 @@ public class ReadThread extends Thread {
 
             // call a transaction
             try {
+                m_permits.acquire();
                 client.callProcedure(new ReadCallback(), procName, cid);
             }
             catch (NoConnectionsException e) {

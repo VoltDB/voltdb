@@ -34,11 +34,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-
-import jsr166y.ThreadLocalRandom;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -574,12 +573,6 @@ class Distributer {
                 Thread.sleep(5);
             }
         } while(more);
-
-        synchronized (this) {
-            for (NodeConnection cxn : m_connections ) {
-                assert(cxn.m_callbacks.size() == 0);
-            }
-        }
     }
 
     Distributer() {
@@ -724,9 +717,9 @@ class Distributer {
                         if (partitionReplicas != null && partitionReplicas.length > 0) {
                             cxn = partitionReplicas[ThreadLocalRandom.current().nextInt(partitionReplicas.length)];
                             if (cxn.hadBackPressure()) {
-                                //See if there is one without backpressure
+                                //See if there is one without backpressure, make sure it's still connected
                                 for (NodeConnection nc : partitionReplicas) {
-                                    if (!nc.hadBackPressure()) {
+                                    if (!nc.hadBackPressure() && nc.m_isConnected) {
                                         cxn = nc;
                                         break;
                                     }
@@ -745,6 +738,12 @@ class Distributer {
                             backpressure = false;
                         }
                     }
+                }
+                if (cxn != null && !cxn.m_isConnected) {
+                    // Would be nice to log something here
+                    // Client affinity picked a connection that was actually disconnected.  Reset to null
+                    // and let the round-robin choice pick a connection
+                    cxn = null;
                 }
             }
             if (cxn == null) {
@@ -904,12 +903,14 @@ class Distributer {
         //First table contains the description of partition ids master/slave relationships
         VoltTable vt = tables[0];
 
+        //In future let TOPO return cooked bytes when cooked and we use correct recipie
+        boolean cooked = false;
         if (tables.length == 1) {
             //Just in case the new client connects to the old version of Volt that only returns 1 topology table
             // We're going to get the MPI back in this table, so subtract it out from the number of partitions.
             int numPartitions = vt.getRowCount() - 1;
             m_hashinator = TheHashinator.getHashinator(LegacyHashinator.class,
-                    LegacyHashinator.getConfigureBytes(numPartitions));
+                    LegacyHashinator.getConfigureBytes(numPartitions), cooked);
         } else {
             //Second table contains the hash function
             boolean advanced = tables[1].advanceRow();
@@ -920,7 +921,7 @@ class Distributer {
             }
             m_hashinator = TheHashinator.getHashinator(
                     HashinatorType.valueOf(tables[1].getString("HASHTYPE")).hashinatorClass,
-                    tables[1].getVarbinary("HASHCONFIG"));
+                    tables[1].getVarbinary("HASHCONFIG"), cooked);
         }
         m_partitionMasters.clear();
         m_partitionReplicas.clear();
@@ -996,5 +997,12 @@ class Distributer {
             return -1;
         }
         return m_hashinator.getHashedPartitionForParameter(typeValue, value);
+    }
+
+    public HashinatorType getHashinatorType() {
+        if (m_hashinator == null) {
+            return HashinatorType.LEGACY;
+        }
+        return m_hashinator.getConfigurationType();
     }
 }

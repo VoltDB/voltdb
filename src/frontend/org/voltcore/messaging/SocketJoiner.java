@@ -46,6 +46,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.network.ReverseDNSCache;
 import org.voltdb.VoltDB;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * SocketJoiner runs all the time listening for new nodes in the cluster. Since it is a dedicated thread
@@ -250,6 +251,7 @@ public class SocketJoiner {
              */
             if (m_listenerSockets.isEmpty()) {
                 LOG.fatal("Failed to bind to " + inetsockaddr);
+                MiscUtils.printPortsInUse(hostLog);
                 throw e;
             }
         }

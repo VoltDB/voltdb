@@ -17,7 +17,7 @@
 
 package org.voltdb.iv2;
 
-import jsr166y.LinkedTransferQueue;
+import java.util.concurrent.LinkedTransferQueue;
 
 import org.voltdb.StarvationTracker;
 

@@ -470,7 +470,7 @@ this.AddConnection = function(connection, success)
             src += '<ul>'
             src += '<li class="folder closed"><span>Parameters</span>';
             src += '<ul>'
-            for(var i = 0; i < connection.Metadata['sysprocs'][k][paramCount].length-1; i++) 
+            for(var i = 0; i < connection.Metadata['sysprocs'][k][paramCount].length-1; i++)
                 src += '<li class="paramin"><span>' + connection.Metadata['sysprocs'][k][paramCount][i] + '</span></li>';
             src += '<li class="paramreturn"><span>' + connection.Metadata['sysprocs'][k][paramCount][i] + '</span></li>';
             src += '</ul>';

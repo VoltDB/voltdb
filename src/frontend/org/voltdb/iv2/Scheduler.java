@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
@@ -55,7 +56,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
     protected VoltLogger hostLog = new VoltLogger("HOST");
 
     // A null task that unblocks the site task queue, used during shutdown
-    protected static final SiteTasker m_nullTask = new SiteTasker() {
+    static final SiteTasker m_nullTask = new SiteTasker() {
         @Override
         public void run(SiteProcedureConnection siteConnection)
         {
@@ -74,7 +75,6 @@ abstract public class Scheduler implements InitiatorMessageHandler
     // IZZY: We should refactor this to be inviolable in the future.
     final protected SiteTaskerQueue m_tasks;
     protected Mailbox m_mailbox;
-    final protected TransactionTaskQueue m_pendingTasks;
     protected boolean m_isLeader = false;
     private TxnEgo m_txnEgo;
     final protected int m_partitionId;
@@ -105,7 +105,6 @@ abstract public class Scheduler implements InitiatorMessageHandler
     Scheduler(int partitionId, SiteTaskerQueue taskQueue)
     {
         m_tasks = taskQueue;
-        m_pendingTasks = new TransactionTaskQueue(m_tasks);
         m_partitionId = partitionId;
         m_txnEgo = TxnEgo.makeZero(partitionId);
     }
@@ -195,7 +194,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
     abstract public void shutdown();
 
     @Override
-    abstract public void updateReplicas(List<Long> replicas);
+    abstract public void updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters);
 
     abstract public void deliver(VoltMessage message);
 

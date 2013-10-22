@@ -49,7 +49,6 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
     , m_searchKeyValue(m_groupByColumnCount)
     , m_aggColumnCount(parseAggregation(mvInfo))
 {
-// DEBUG_STREAM_HERE("New mat view on source table " << srcTable->name() << " @" << srcTable << " view table " << m_target->name() << " @" << m_target);
     // best not to have to worry about the destination table disappearing out from under the source table that feeds it.
     VOLT_TRACE("construct materializedViewMetadata...");
 
@@ -86,7 +85,6 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
 }
 
 MaterializedViewMetadata::~MaterializedViewMetadata() {
-// DEBUG_STREAM_HERE("Delete mat view " << m_target->name() << " w/ table @" << m_target);
     freeBackedTuples();
     delete m_filterPredicate;
     for (int ii = 0; ii < m_groupByExprs.size(); ++ii) {

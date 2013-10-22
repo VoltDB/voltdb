@@ -76,7 +76,6 @@ public class LocalCluster implements VoltServerConfig {
     protected int m_siteCount;
     int m_hostCount;
     int m_kfactor = 0;
-    boolean m_enableIv2 = false;
     protected BackendTarget m_target;
     protected String m_jarFileName;
     boolean m_running = false;
@@ -219,7 +218,6 @@ public class LocalCluster implements VoltServerConfig {
             log4j = "file://" + System.getProperty("user.dir") + "/tests/log4j-allconsole.xml";
         }
 
-        m_enableIv2 = enableIv2 || VoltDB.checkTestEnvForIv2();
         m_procBuilder = new ProcessBuilder();
 
         // set the working directory to obj/release/prod
@@ -320,6 +318,13 @@ public class LocalCluster implements VoltServerConfig {
     @Override
     public void startUp(boolean clearLocalDataDirectories) {
         startUp(clearLocalDataDirectories, ReplicationRole.NONE);
+    }
+
+    public void setHostCount(int hostCount)
+    {
+        m_hostCount = hostCount;
+        // Force recompilation
+        m_compiled = false;
     }
 
     void startLocalServer(boolean clearLocalDataDirectories) {
@@ -611,6 +616,9 @@ public class LocalCluster implements VoltServerConfig {
                 subroot = VoltFile.getNewSubroot();
                 m_subRoots.add(subroot);
             } else {
+                if (m_subRoots.size() <= hostId) {
+                    m_subRoots.add(VoltFile.getNewSubroot());
+                }
                 subroot = m_subRoots.get(hostId);
             }
             cmdln.voltFilePrefix(subroot.getPath());
@@ -1004,9 +1012,6 @@ public class LocalCluster implements VoltServerConfig {
             prefix += "OneFail";
         if (m_failureState == FailureState.ONE_RECOVERING)
             prefix += "OneRecov";
-        if (m_enableIv2) {
-            prefix += "-IV2";
-        }
         return prefix +
             "-" + String.valueOf(m_siteCount) +
             "-" + String.valueOf(m_hostCount) +
@@ -1019,10 +1024,6 @@ public class LocalCluster implements VoltServerConfig {
             prefix += "-OneFail";
         if (m_failureState == FailureState.ONE_RECOVERING)
             prefix += "-OneRecov";
-        if (m_enableIv2) {
-            prefix += "-IV2";
-        }
-
         return prefix +
             "-" + String.valueOf(m_siteCount) +
             "-" + String.valueOf(m_hostCount) +

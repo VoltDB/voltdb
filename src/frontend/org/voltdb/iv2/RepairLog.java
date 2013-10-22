@@ -17,7 +17,10 @@
 
 package org.voltdb.iv2;
 
-import java.util.ArrayList;
+import java.util.ArrayDeque;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Deque;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -26,6 +29,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.TheHashinator;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -34,7 +38,9 @@ import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 
 /**
  * The repair log stores messages received from a PI in case they need to be
- * shared with less informed RIs should the PI shed its mortal coil.
+ * shared with less informed RIs should the PI shed its mortal coil.  This includes
+ * recording and sharing messages starting and completing multipartition transactions
+ * so that a new MPI can repair the cluster state on promotion.
  */
 public class RepairLog
 {
@@ -93,14 +99,27 @@ public class RepairLog
         {
             return m_type == IS_MP;
         }
+
+        boolean canTruncate(long handle)
+        {
+            if (isSP() && m_handle <= handle) {
+                return true;
+            }
+            else if (isMP() && m_txnId <= handle) {
+                return true;
+            }
+            return false;
+        }
     }
 
     // log storage.
-    final List<Item> m_log;
+    final Deque<Item> m_logSP;
+    final Deque<Item> m_logMP;
 
     RepairLog()
     {
-        m_log = new ArrayList<Item>();
+        m_logSP = new ArrayDeque<Item>();
+        m_logMP = new ArrayDeque<Item>();
     }
 
     // get the HSID for dump logging
@@ -113,11 +132,11 @@ public class RepairLog
     void setLeaderState(boolean isLeader)
     {
         m_isLeader = isLeader;
-        // The leader doesn't truncate its own log; if promoted,
+        // The leader doesn't truncate its own SP log; if promoted,
         // wipe out the SP portion of the existing log. This promotion
         // action always happens after repair is completed.
         if (m_isLeader) {
-            truncate(Long.MIN_VALUE, Long.MAX_VALUE);
+            truncate(Long.MAX_VALUE, IS_SP);
         }
     }
 
@@ -131,16 +150,16 @@ public class RepairLog
             // Just don't log them to the repair log.
             if (!m.isReadOnly()) {
                 m_lastSpHandle = m.getSpHandle();
-                truncate(Long.MIN_VALUE, m.getTruncationHandle());
-                m_log.add(new Item(IS_SP, m, m.getSpHandle(), m.getTxnId()));
+                truncate(m.getTruncationHandle(), IS_SP);
+                m_logSP.add(new Item(IS_SP, m, m.getSpHandle(), m.getTxnId()));
             }
         } else if (msg instanceof FragmentTaskMessage) {
             final TransactionInfoBaseMessage m = (TransactionInfoBaseMessage)msg;
             if (!m.isReadOnly()) {
-                truncate(m.getTruncationHandle(), Long.MIN_VALUE);
+                truncate(m.getTruncationHandle(), IS_MP);
                 // only log the first fragment of a procedure (and handle 1st case)
                 if (m.getTxnId() > m_lastMpHandle || m_lastMpHandle == Long.MAX_VALUE) {
-                    m_log.add(new Item(IS_MP, m, m.getSpHandle(), m.getTxnId()));
+                    m_logMP.add(new Item(IS_MP, m, m.getSpHandle(), m.getTxnId()));
                     m_lastMpHandle = m.getTxnId();
                     m_lastSpHandle = m.getSpHandle();
                 }
@@ -151,8 +170,8 @@ public class RepairLog
             // transaction.  We don't want to log it in the repair log.
             CompleteTransactionMessage ctm = (CompleteTransactionMessage)msg;
             if (!ctm.isReadOnly() && !ctm.isRestart()) {
-                truncate(ctm.getTruncationHandle(), Long.MIN_VALUE);
-                m_log.add(new Item(IS_MP, ctm, ctm.getSpHandle(), ctm.getTxnId()));
+                truncate(ctm.getTruncationHandle(), IS_MP);
+                m_logMP.add(new Item(IS_MP, ctm, ctm.getSpHandle(), ctm.getTxnId()));
                 //Restore will send a complete transaction message with a lower mp transaction id because
                 //the restore transaction precedes the loading of the right mp transaction id from the snapshot
                 //Hence Math.max
@@ -171,20 +190,24 @@ public class RepairLog
     }
 
     // trim unnecessary log messages.
-    private void truncate(long mpHandle, long spHandle)
+    private void truncate(long handle, boolean isSP)
     {
-        // MIN signals no truncation work to do.
-        if (spHandle == Long.MIN_VALUE && mpHandle == Long.MIN_VALUE) {
+        // MIN value means no work to do, is a startup condition
+        if (handle == Long.MIN_VALUE) {
             return;
         }
 
-        Iterator<RepairLog.Item> it = m_log.iterator();
+        Iterator<RepairLog.Item> it;
+        if (isSP) {
+            it = m_logSP.iterator();
+        }
+        else {
+            it = m_logMP.iterator();
+        }
+
         while (it.hasNext()) {
             RepairLog.Item item = it.next();
-            if (item.isSP() && item.m_handle <= spHandle) {
-                it.remove();
-            }
-            else if (item.isMP() && item.m_txnId <= mpHandle) {
+            if (item.canTruncate(handle)) {
                 it.remove();
             }
         }
@@ -196,33 +219,52 @@ public class RepairLog
         return m_lastSpHandle;
     }
 
+    Comparator<Item> m_handleComparator = new Comparator<Item>()
+    {
+        @Override
+        public int compare(Item i1, Item i2)
+        {
+            if (i1.getHandle() < i2.getHandle()) {
+                return -1;
+            }
+            else if (i1.getHandle() > i2.getHandle()) {
+                return 1;
+            }
+            return 0;
+        }
+    };
+
     // produce the contents of the repair log.
     public List<Iv2RepairLogResponseMessage> contents(long requestId, boolean forMPI)
     {
         List<Item> items = new LinkedList<Item>();
-        Iterator<Item> it = m_log.iterator();
-        while (it.hasNext()) {
-            Item i = it.next();
-            if (!forMPI || i.isMP()) {
-                items.add(i);
-            }
+        // All cases include the log of MP transactions
+        items.addAll(m_logMP);
+        // SP repair requests also want the SP transactions
+        if (!forMPI) {
+            items.addAll(m_logSP);
         }
+
+        // Contents need to be sorted in increasing spHandle order
+        Collections.sort(items, m_handleComparator);
 
         int ofTotal = items.size() + 1;
         tmLog.debug("Responding with " + ofTotal + " repair log parts.");
         List<Iv2RepairLogResponseMessage> responses =
             new LinkedList<Iv2RepairLogResponseMessage>();
 
-        int seq = 0;
-        Iv2RepairLogResponseMessage header =
-            new Iv2RepairLogResponseMessage(
-                    requestId,
-                    seq++,
-                    ofTotal,
-                    m_lastSpHandle,
-                    m_lastMpHandle,
-                    null); // no payload. just an ack.
-        responses.add(header);
+        // this constructor sets its sequence no to 0 as ack
+        // messages are first in the sequence
+        Iv2RepairLogResponseMessage hheader =
+                new Iv2RepairLogResponseMessage(
+                        requestId,
+                        ofTotal,
+                        m_lastSpHandle,
+                        m_lastMpHandle,
+                        TheHashinator.getCurrentVersionedConfigCooked());
+        responses.add(hheader);
+
+        int seq = responses.size();
 
         Iterator<Item> itemator = items.iterator();
         while (itemator.hasNext()) {

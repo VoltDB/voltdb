@@ -28,19 +28,19 @@ import java.util.Map.Entry;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
-import org.voltdb.ExecutionSite;
+import org.voltcore.utils.Pair;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
+import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTableUtil;
@@ -161,8 +161,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             new HashMap<Integer, ArrayDeque<VoltTable>>();
 
         private final VoltLogger hostLog = new VoltLogger("HOST");
-        private final VoltLogger log = new VoltLogger(ExecutionSite.class.getName());
-
 
         /**
          * Add a single dependency. Exists only for test cases.
@@ -243,8 +241,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                     // Prevent warnings.
                     return;
                 }
-                if (log.isTraceEnabled()) {
-                    log.l7dlog(Level.TRACE, LogKeys.org_voltdb_ExecutionSite_ImportingDependency.name(),
+                if (hostLog.isTraceEnabled()) {
+                    hostLog.l7dlog(Level.TRACE, LogKeys.org_voltdb_ExecutionSite_ImportingDependency.name(),
                                new Object[] { dependencyId, dependency.getClass().getName(), dependency.toString() },
                                null);
                 }
@@ -319,17 +317,22 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Interface frontend invokes to communicate to CPP execution engine.
      */
 
-    abstract public boolean activateTableStream(final int tableId, TableStreamType type, SnapshotPredicates predicates);
+    abstract public boolean activateTableStream(final int tableId,
+                                                TableStreamType type,
+                                                long undoQuantumToken,
+                                                byte[] predicates);
 
     /**
      * Serialize more tuples from the specified table that already has a stream enabled
+     *
      * @param tableId Catalog ID of the table to serialize
      * @param outputBuffers Buffers to receive serialized tuple data
-     * @return A positive number indicating the number of bytes serialized or 0 if there is no more data.
-     *        -1 is returned if there is an error (such as the table not having the specified stream type activated).
+     * @return The first number in the pair indicates that there is more data if it's positive,
+     * 0 if it's the end of stream, or -1 if there was an error. The second value of the pair is the serialized bytes
+     * for each output buffer.
      */
-    public abstract int[] tableStreamSerializeMore(int tableId, TableStreamType type,
-                                                   List<DBBPool.BBContainer> outputBuffers);
+    public abstract Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
+                                                               List<DBBPool.BBContainer> outputBuffers);
 
     public abstract void processRecoveryMessage( ByteBuffer buffer, long pointer);
 
@@ -470,14 +473,16 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      *
      * THIS METHOD IS CURRENTLY ONLY USED FOR TESTING
      */
-    public abstract int hashinate(Object value, TheHashinator.HashinatorType type, byte config[]);
+    public abstract int hashinate(
+            Object value,
+            HashinatorConfig config);
 
     /**
      * Updates the hashinator with new config
      * @param type hashinator type
      * @param config new hashinator config
      */
-    public abstract void updateHashinator(TheHashinator.HashinatorType type, byte[] config);
+    public abstract void updateHashinator(HashinatorConfig config);
 
     /**
      * Execute an arbitrary task that is described by the task id and serialized task parameters.
@@ -521,7 +526,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param partitionId id of partitioned assigned to this EE
      * @param hostId id of the host this EE is running on
      * @param hostname name of the host this EE is running on
-     * @param totalPartitions number of partitions in the cluster for the hashinator
      * @return error code
      */
     protected native int nativeInitialize(
@@ -531,9 +535,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int partitionId,
             int hostId,
             byte hostname[],
-            long tempTableMemory,
-            int hashinatorType,
-            byte hashinatorConfig[]);
+            long tempTableMemory);
 
     /**
      * Sets (or re-sets) all the shared direct byte buffers in the EE.
@@ -652,12 +654,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * in the parameter buffer
      * @return
      */
-    protected native int nativeHashinate(long pointer);
+    protected native int nativeHashinate(long pointer, long configPtr, int tokenCount);
 
     /**
      * Updates the EE's hashinator
      */
-    protected native void nativeUpdateHashinator(long pointer);
+    protected native void nativeUpdateHashinator(long pointer, int typeId, long configPtr, int tokenCount);
 
     /**
      * Retrieve the thread local counter of pooled memory that has been allocated
@@ -695,10 +697,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param pointer Pointer to an engine instance
      * @param tableId Catalog ID of the table
      * @param streamType type of stream to activate
+     * @param undoQuantumToken Undo quantum allowing destructive index clearing to be undone
      * @param data serialized predicates
      * @return <code>true</code> on success and <code>false</code> on failure
      */
-    protected native boolean nativeActivateTableStream(long pointer, int tableId, int streamType, byte[] data);
+    protected native boolean nativeActivateTableStream(long pointer, int tableId, int streamType, long undoQuantumToken, byte[] data);
 
     /**
      * Serialize more tuples from the specified table that has an active stream of the specified type

@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
 
 /**
  * Message from a client interface to an initiator, instructing the
@@ -37,6 +38,9 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
     private long m_handle = Long.MIN_VALUE;
     private long m_txnId;
 
+    // Only set when sequence is 0
+    private long m_hashinatorVersion = Long.MIN_VALUE;
+
     // The original task that is must be replicated for
     // repair. Note: if the destination repair log is
     // empty, a repair log response message is returned
@@ -44,6 +48,9 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
     // payload (because the requester must know that the
     // log request was processed and that no logs exist.)
     private VoltMessage m_payload = null;
+
+    // Only set when sequence is 0
+    private byte [] m_hashinatorConfig = new byte[0];
 
     /** Empty constructor for de-serialization */
     Iv2RepairLogResponseMessage() {
@@ -60,6 +67,20 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         m_handle = spHandle;
         m_txnId = txnId;
         m_payload = payload;
+    }
+
+    public Iv2RepairLogResponseMessage(long requestId, int ofTotal,
+            long spHandle, long txnId,
+            Pair<Long, byte[]> versionedHashinatorConfig)
+    {
+        super();
+        m_requestId = requestId;
+        m_sequence = 0;
+        m_ofTotal = ofTotal;
+        m_handle = spHandle;
+        m_txnId = txnId;
+        m_hashinatorVersion = versionedHashinatorConfig.getFirst();
+        m_hashinatorConfig = versionedHashinatorConfig.getSecond();
     }
 
     public long getRequestId()
@@ -91,6 +112,20 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         return m_payload;
     }
 
+    /**
+     * Get version/config with the config in compressed (wire) format.
+     * @return version/config pair
+     */
+    public Pair<Long, byte[]> getHashinatorVersionedConfig()
+    {
+        return Pair.of(m_hashinatorVersion, m_hashinatorConfig);
+    }
+
+    public boolean hasHashinatorConfig()
+    {
+        return m_sequence == 0 && m_hashinatorConfig.length > 0;
+    }
+
     @Override
     public int getSerializedSize()
     {
@@ -102,6 +137,11 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         msgsize += 8; // txnId
         if (m_payload != null) {
             msgsize += m_payload.getSerializedSize();
+        }
+        if (m_hashinatorConfig.length > 0) {
+            msgsize += 8; // hashinator version
+            msgsize += 4; // config size
+            msgsize += m_hashinatorConfig.length;
         }
         return msgsize;
     }
@@ -124,6 +164,11 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
             }
             buf.put(paybuf);
         }
+        if (m_hashinatorConfig.length > 0) {
+            buf.putLong(m_hashinatorVersion);
+            buf.putInt(m_hashinatorConfig.length);
+            buf.put(m_hashinatorConfig);
+        }
 
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
@@ -144,8 +189,12 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
             VoltDbMessageFactory messageFactory = new VoltDbMessageFactory();
             m_payload = messageFactory.createMessageFromBuffer(buf, m_sourceHSId);
         }
+        // only the first packet with sequence 0 has the hashinator configurations
         else {
             m_payload = null;
+            m_hashinatorVersion = buf.getLong();
+            m_hashinatorConfig = new byte[buf.getInt()];
+            buf.get(m_hashinatorConfig);
         }
     }
 
@@ -170,6 +219,11 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         }
         else {
             sb.append(m_payload.toString());
+        }
+        if (m_hashinatorConfig.length > 0)
+        {
+            sb.append( " HASHINATOR VERSION: ");
+            sb.append(m_hashinatorVersion);
         }
         return sb.toString();
     }

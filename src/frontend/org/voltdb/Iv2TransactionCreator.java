@@ -80,27 +80,8 @@ public class Iv2TransactionCreator implements TransactionCreator
     }
 
     @Override
-    public void setSendHeartbeats(boolean val)
-    {
-        // Iv2 does not require heartbeating.
-    }
-
-    @Override
-    public void sendHeartbeat(long txnId)
-    {
-        // Iv2 does not require heartbeating.
-    }
-
-    @Override
-    public boolean isOnBackPressure()
-    {
-        return false;
-    }
-
-    @Override
     public void bindAdapter(Connection adapter) {
         m_ci.bindAdapter(adapter);
     }
-
 }
 

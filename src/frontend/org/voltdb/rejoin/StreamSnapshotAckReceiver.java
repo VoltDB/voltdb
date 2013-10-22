@@ -17,9 +17,11 @@
 
 package org.voltdb.rejoin;
 
+import com.google.common.base.Preconditions;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
+import org.voltdb.exceptions.SerializableException;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -37,13 +39,21 @@ public class StreamSnapshotAckReceiver implements Runnable {
     private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
 
     private final Mailbox m_mb;
+    private final StreamSnapshotBase.MessageFactory m_msgFactory;
     private final Map<Long, AckCallback> m_callbacks;
     private final AtomicInteger m_expectedEOFs;
 
     volatile Exception m_lastException = null;
 
-    public StreamSnapshotAckReceiver(Mailbox mb) {
+    public StreamSnapshotAckReceiver(Mailbox mb)
+    {
+        this(mb, new StreamSnapshotBase.DefaultMessageFactory());
+    }
+
+    public StreamSnapshotAckReceiver(Mailbox mb, StreamSnapshotBase.MessageFactory msgFactory) {
+        Preconditions.checkArgument(mb != null);
         m_mb = mb;
+        m_msgFactory = msgFactory;
         m_callbacks = Collections.synchronizedMap(new HashMap<Long, AckCallback>());
         m_expectedEOFs = new AtomicInteger();
     }
@@ -67,32 +77,34 @@ public class StreamSnapshotAckReceiver implements Runnable {
                     continue;
                 }
 
-                assert (msg instanceof RejoinDataAckMessage);
-                RejoinDataAckMessage ackMsg = (RejoinDataAckMessage) msg;
+                // TestMidRejoinDeath ignores acks to trigger the watchdog
+                if (StreamSnapshotDataTarget.m_rejoinDeathTestMode && (m_msgFactory.getAckTargetId(msg) == 1)) {
+                    continue;
+                }
 
-                if (ackMsg.isEOS()) {
+                SerializableException se = m_msgFactory.getException(msg);
+                if (se != null) {
+                    m_lastException = se;
+                    rejoinLog.error("Received exception in ack receiver", se);
+                    return;
+                }
+
+                AckCallback ackCallback = m_callbacks.get(m_msgFactory.getAckTargetId(msg));
+                if (ackCallback == null) {
+                    rejoinLog.error("Unknown target ID " + m_msgFactory.getAckTargetId(msg) +
+                                    " in stream snapshot ack message");
+                } else if (m_msgFactory.getAckBlockIndex(msg) != -1) {
+                    ackCallback.receiveAck(m_msgFactory.getAckBlockIndex(msg));
+                }
+
+                if (m_msgFactory.isAckEOS(msg)) {
                     // EOS message indicates end of stream.
                     // The receiver is shared by multiple data targets, each of them will
                     // send an end of stream message, must wait until all end of stream
                     // messages are received before terminating the thread.
                     if (m_expectedEOFs.decrementAndGet() == 0) {
                         break;
-                    } else {
-                        continue;
                     }
-                }
-
-                // TestMidRejoinDeath ignores acks to trigger the watchdog
-                if (StreamSnapshotDataTarget.m_rejoinDeathTestMode && (ackMsg.getTargetId() == 1)) {
-                    continue;
-                }
-
-                AckCallback ackCallback = m_callbacks.get(ackMsg.getTargetId());
-                if (ackCallback == null) {
-                    rejoinLog.error("Unknown target ID " + ackMsg.getTargetId() +
-                                    " in stream snapshot ack message");
-                } else {
-                    ackCallback.receiveAck(ackMsg.getBlockIndex());
                 }
             }
         } catch (Exception e) {

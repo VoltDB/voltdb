@@ -49,9 +49,6 @@ public interface TransactionCreator
             int messageSize,
             long now);
 
-    public void setSendHeartbeats(boolean val);
-    public void sendHeartbeat(long txnId);
-
     /*
      * Only used in IV2. Send a marker for the position of a multi-part transaction in
      * a single part transaction stream for a partition. The sentinel is blocks
@@ -67,12 +64,6 @@ public interface TransactionCreator
      * @param partitionId
      */
     public void sendEOLMessage(int partitionId);
-
-    /**
-     * Whether or not the initiator is on back pressure.
-     * @return
-     */
-    public abstract boolean isOnBackPressure();
 
     public abstract void bindAdapter(Connection adapter);
 }

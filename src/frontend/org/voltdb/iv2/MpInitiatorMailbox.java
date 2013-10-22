@@ -18,12 +18,12 @@
 package org.voltdb.iv2;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedTransferQueue;
 
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
-
-import jsr166y.LinkedTransferQueue;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -61,6 +61,24 @@ public class MpInitiatorMailbox extends InitiatorMailbox
                         }
                     },
                     "MpInitiator deliver", 1024 * 128);
+
+    private final LinkedTransferQueue<Runnable> m_sendQueue = new LinkedTransferQueue<Runnable>();
+    private final Thread m_sendThread = new Thread(null,
+                    new Runnable() {
+                        @Override
+                        public void run() {
+                            while (true) {
+                                try {
+                                    m_sendQueue.take().run();
+                                } catch (TerminateThreadException e) {
+                                    break;
+                                } catch (Exception e) {
+                                    tmLog.error("Unexpected exception in MpInitiator send thread", e);
+                                }
+                            }
+                        }
+                    },
+                    "MpInitiator send", 1024 * 128);
 
     @Override
     public void setRepairAlgo(final RepairAlgo algo)
@@ -173,6 +191,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
     {
         super(partitionId, scheduler, messenger, repairLog, rejoinProducer);
         m_taskThread.start();
+        m_sendThread.start();
     }
 
       @Override
@@ -193,16 +212,23 @@ public class MpInitiatorMailbox extends InitiatorMailbox
                   throw new TerminateThreadException();
               }
           });
+          m_sendQueue.offer(new Runnable() {
+              @Override
+              public void run() {
+                  throw new TerminateThreadException();
+              }
+          });
           m_taskThread.join();
+          m_sendThread.join();
       }
 
 
     @Override
-    public void updateReplicas(final List<Long> replicas) {
+    public void updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters) {
         m_taskQueue.offer(new Runnable() {
             @Override
             public void run() {
-                updateReplicasInternal(replicas);
+                updateReplicasInternal(replicas, partitionMasters);
             }
         });
     }
@@ -266,5 +292,42 @@ public class MpInitiatorMailbox extends InitiatorMailbox
     void deliverToRepairLog(VoltMessage msg) {
         assert(Thread.currentThread().getId() == m_taskThreadId);
         m_repairLog.deliver(msg);
+    }
+
+    // Change the send() behavior for the MPI's mailbox so that
+    // messages sent from multiple read-only sites will
+    // have a serialized order to all hosts.
+    private void sendInternal(long destHSId, VoltMessage message)
+    {
+        message.m_sourceHSId = getHSId();
+        m_messenger.send(destHSId, message);
+    }
+
+    @Override
+    public void send(final long destHSId, final VoltMessage message)
+    {
+        m_sendQueue.offer(new Runnable() {
+            @Override
+            public void run() {
+                sendInternal(destHSId, message);
+            }
+        });
+    }
+
+    private void sendInternal(long[] destHSIds, VoltMessage message)
+    {
+        message.m_sourceHSId = getHSId();
+        m_messenger.send(destHSIds, message);
+    }
+
+    @Override
+    public void send(final long[] destHSIds, final VoltMessage message)
+    {
+        m_sendQueue.offer(new Runnable() {
+            @Override
+            public void run() {
+                sendInternal(destHSIds, message);
+            }
+        });
     }
 }

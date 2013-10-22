@@ -28,9 +28,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.eq;
+import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -57,8 +55,11 @@ import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
+import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
 import org.voltcore.network.VoltNetworkPool;
+import org.voltcore.utils.DeferredSerialization;
+import org.voltcore.utils.Pair;
 import org.voltdb.ClientInterface.ClientInputHandler;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -74,6 +75,7 @@ import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.messaging.FastSerializer;
+import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.planner.CorePlan;
 import org.voltdb.utils.CatalogUtil;
@@ -87,7 +89,7 @@ public class TestClientInterface {
     private HostMessenger m_messenger;
     private ClientInputHandler m_handler;
     private Cartographer m_cartographer;
-    private Connection m_cxn;
+    private SimpleClientResponseAdapter m_cxn;
     private ZooKeeper m_zk;
 
     // real context
@@ -116,7 +118,7 @@ public class TestClientInterface {
         m_handler = mock(ClientInputHandler.class);
         m_cartographer = mock(Cartographer.class);
         m_zk = mock(ZooKeeper.class);
-        m_cxn = mock(Connection.class);
+        m_cxn = mock(SimpleClientResponseAdapter.class);
 
 
         /*
@@ -135,10 +137,12 @@ public class TestClientInterface {
         doReturn(32L).when(m_messenger).getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
         doAnswer(new Answer<Object>() {
             @Override
-            public Object answer(InvocationOnMock invocation) {
+            public Object answer(InvocationOnMock invocation)
+            {
                 return null;
             }
         }).when(m_cxn).queueTask(any(Runnable.class));
+        doReturn(m_cxn).when(m_cxn).writeStream();
         m_ci = spy(new ClientInterface(null, VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT,
                                        m_context, m_messenger, ReplicationRole.NONE,
                                        m_cartographer, m_allPartitions));
@@ -172,7 +176,7 @@ public class TestClientInterface {
         CatalogUtil.compileDeploymentAndGetCRC(catalog, deploymentPath, true);
 
         m_context = new CatalogContext(0, 0, catalog, bytes, 0, 0, 0);
-        TheHashinator.initialize(LegacyHashinator.class, LegacyHashinator.getConfigureBytes(3));
+        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(3));
     }
 
     @After
@@ -221,32 +225,36 @@ public class TestClientInterface {
      * @return StoredProcedureInvocation object passed to createTransaction()
      * @throws IOException
      */
-    private StoredProcedureInvocation readAndCheck(ByteBuffer msg, String procName, Object partitionParam,
-                                                   boolean isAdmin, boolean isReadonly, boolean isSinglePart,
-                                                   boolean isEverySite) throws Exception {
+    private Iv2InitiateTaskMessage readAndCheck(ByteBuffer msg, String procName, Object partitionParam,
+                                                boolean isReadonly, boolean isSinglePart) throws Exception {
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
 
+        return checkInitMsgSent(procName, partitionParam, isReadonly, isSinglePart);
+    }
+
+    private Iv2InitiateTaskMessage checkInitMsgSent(String procName, Object partitionParam,
+                                                    boolean isReadonly, boolean isSinglePart)
+    {
+
         ArgumentCaptor<Long> destinationCaptor =
-                ArgumentCaptor.forClass(Long.class);
+            ArgumentCaptor.forClass(Long.class);
         ArgumentCaptor<Iv2InitiateTaskMessage> messageCaptor =
-                ArgumentCaptor.forClass(Iv2InitiateTaskMessage.class);
+            ArgumentCaptor.forClass(Iv2InitiateTaskMessage.class);
         verify(m_messenger).send(destinationCaptor.capture(), messageCaptor.capture());
 
         Iv2InitiateTaskMessage message = messageCaptor.getValue();
-        //assertEquals(isAdmin, message.); // is admin
         assertEquals(isReadonly, message.isReadOnly()); // readonly
         assertEquals(isSinglePart, message.isSinglePartition()); // single-part
-        //assertEquals(isEverySite, message.g); // every site
         assertEquals(procName, message.getStoredProcedureName());
         if (isSinglePart) {
             int expected = TheHashinator.getPartitionForParameter(VoltType.typeFromObject(partitionParam).getValue(),
-                    partitionParam);
+                                                                  partitionParam);
             assertEquals(new Long(m_cartographer.getHSIdForMaster(expected)), destinationCaptor.getValue());
         } else {
             assertEquals(new Long(m_cartographer.getHSIdForMultiPartitionInitiator()), destinationCaptor.getValue());
         }
-        return message.getStoredProcedureInvocation();
+        return message;
     }
 
     @Test
@@ -449,7 +457,7 @@ public class TestClientInterface {
     public void testUserProc() throws Exception {
         ByteBuffer msg = createMsg("hello", 1);
         StoredProcedureInvocation invocation =
-                readAndCheck(msg, "hello", 1, false, true, true, false);
+                readAndCheck(msg, "hello", 1, true, true).getStoredProcedureInvocation();
         assertEquals(1, invocation.getParameterAtIndex(0));
     }
 
@@ -482,7 +490,7 @@ public class TestClientInterface {
 
         byte[] partitionParam = {0, 0, 0, 0, 0, 0, 0, 4};
         ByteBuffer msg = createMsg("@LoadSinglepartitionTable", partitionParam, "a", table);
-        readAndCheck(msg, "@LoadSinglepartitionTable", partitionParam, false, false, true, false);
+        readAndCheck(msg, "@LoadSinglepartitionTable", partitionParam, false, true);
     }
 
     @Test
@@ -559,5 +567,60 @@ public class TestClientInterface {
         finally {
             logConfig.setEnabled(wasEnabled);
         }
+    }
+
+    @Test
+    public void testTransactionRestart() throws Exception {
+        initMsgAndSendRestartResp(true);
+    }
+
+    @Test
+    public void testTransactionRestartIgnored() throws Exception {
+        // fake operation mode as command log recovery so that it won't restart the txn
+        doReturn(OperationMode.INITIALIZING).when(m_volt).getMode();
+        initMsgAndSendRestartResp(false);
+
+
+    }
+
+    private void initMsgAndSendRestartResp(boolean shouldRestart) throws Exception
+    {
+        // restart will update the hashinator config, initialize it now
+        TheHashinator.constructHashinator(TheHashinator.getConfiguredHashinatorClass(),
+                                          TheHashinator.getConfigureBytes(3),
+                                          false);
+        Pair<Long, byte[]> hashinatorConfig = TheHashinator.getCurrentVersionedConfig();
+        long newHashinatorVersion = hashinatorConfig.getFirst() + 1;
+
+        ByteBuffer msg = createMsg("hello", 1);
+        Iv2InitiateTaskMessage initMsg = readAndCheck(msg, "hello", 1, true, true);
+        assertEquals(1, initMsg.getStoredProcedureInvocation().getParameterAtIndex(0));
+
+        // fake a restart response
+        InitiateResponseMessage respMsg = new InitiateResponseMessage(initMsg);
+        respMsg.setMispartitioned(true, initMsg.getStoredProcedureInvocation(),
+                                  Pair.of(newHashinatorVersion, hashinatorConfig.getSecond()));
+
+        // reset the message so that we can check for restart later
+        reset(m_messenger);
+
+        // Deliver a restart response
+        m_ci.m_mailbox.deliver(respMsg);
+
+        // Make sure that the txn is NOT restarted
+        ArgumentCaptor<DeferredSerialization> respCaptor = ArgumentCaptor.forClass(DeferredSerialization.class);
+        verify(m_cxn).enqueue(respCaptor.capture());
+        DeferredSerialization resp = respCaptor.getValue();
+
+        if (shouldRestart) {
+            assertEquals(0, resp.serialize().length);
+            checkInitMsgSent("hello", 1, true, true);
+        } else {
+            assertEquals(1, resp.serialize().length);
+            verify(m_messenger, never()).send(anyLong(), any(VoltMessage.class));
+        }
+
+        // the hashinator should've been updated in either case
+        assertEquals(newHashinatorVersion, TheHashinator.getCurrentVersionedConfig().getFirst().longValue());
     }
 }

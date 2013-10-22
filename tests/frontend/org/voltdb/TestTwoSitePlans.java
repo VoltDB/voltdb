@@ -32,6 +32,7 @@ import junit.framework.TestCase;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.InsertNewOrder;
+import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
@@ -113,8 +114,7 @@ public class TestTwoSitePlans extends TestCase {
                                 0,
                                 "",
                                 100,
-                                HashinatorType.LEGACY,
-                                configBytes));
+                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0)));
             }
         };
         site1Thread.start();
@@ -132,8 +132,7 @@ public class TestTwoSitePlans extends TestCase {
                                 0,
                                 "",
                                 100,
-                                HashinatorType.LEGACY,
-                                configBytes));
+                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0)));
             }
         };
         site2Thread.start();
