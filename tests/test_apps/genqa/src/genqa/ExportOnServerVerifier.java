@@ -414,6 +414,7 @@ public class ExportOnServerVerifier {
                 else if (++emptyRemovalCycles >= 20)
                 {
                     System.err.println("ERROR: 20 check cycles failed to match client tx ids with exported tx id -- bailing out");
+                    dumpUnmatchedSituation();
                     System.exit(1);
                 }
 
@@ -566,6 +567,20 @@ public class ExportOnServerVerifier {
         return out;
     }
 
+    private PrintWriter gzipWriterTo( File fh) throws IOException
+    {
+        if (fh.exists() && fh.isFile() && fh.canRead() && fh.canWrite())
+        {
+            fh.delete();
+        }
+        PrintWriter out =
+                new PrintWriter(
+                        new OutputStreamWriter(
+                                new GZIPOutputStream(
+                                        new FileOutputStream(fh), 16384)));
+        return out;
+    }
+
     void verifySkinny() throws Exception
     {
 
@@ -691,6 +706,7 @@ public class ExportOnServerVerifier {
                 else if (++emptyRemovalCycles >= 20)
                 {
                     System.err.println("ERROR: 20 check cycles failed to match client tx ids with exported tx id -- bailing out");
+                    dumpUnmatchedSituation();
                     System.exit(1);
                 }
 
@@ -918,6 +934,67 @@ public class ExportOnServerVerifier {
             else if (!hadOne)
             {
                 Thread.sleep(1200);
+            }
+        }
+    }
+
+    void dumpUnmatchedSituation() {
+        File unmatchedDH = new File("unmatched");
+        unmatchedDH.mkdir();
+        if (   !unmatchedDH.exists()
+            || !unmatchedDH.isDirectory()
+            || !unmatchedDH.canRead()
+            || !unmatchedDH.canExecute()
+            || !unmatchedDH.canWrite()) {
+            System.err.println("cannot access/create the unmatched directory");
+            return;
+        }
+
+        TreeMap<Integer,File> partFHs = new TreeMap<>();
+
+        for (int partid: m_clientIndexes.keySet()) {
+            File partDH = new File(unmatchedDH,Integer.toString(partid));
+            partDH.mkdir();
+            partFHs.put(partid,partDH);
+        }
+
+        for (int partid: m_clientIndexes.keySet()) {
+
+            int excnt = 0;
+            int clcnt = 0;
+
+            File clientFH = new File(partFHs.get(partid),"recorded.gz");
+            File exportFH = new File(partFHs.get(partid),"exported.gz");
+
+            try (
+                    PrintWriter clout = gzipWriterTo(clientFH);
+                    PrintWriter exout = gzipWriterTo(exportFH);
+            ) {
+                Iterator<Map.Entry<Long, Long>> itr = m_clientTxnIds.entrySet().iterator();
+                while (itr.hasNext()) {
+                    Map.Entry<Long, Long> e = itr.next();
+                    if (TxnEgo.getPartitionId(e.getKey()) == partid) {
+                        clout.printf("%d:%d\n", e.getKey(),e.getValue());
+                        itr.remove();
+                        ++clcnt;
+                    }
+                }
+
+                itr = m_rowTxnIds.get(partid).entrySet().iterator();
+                while (itr.hasNext()) {
+                    Map.Entry<Long, Long> e = itr.next();
+                    exout.printf("%d:%d\n", e.getKey(),e.getValue());
+                    itr.remove();
+                    ++excnt;
+                }
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to dump unmatched for partition " + partid, e);
+            }
+            if (clcnt == 0) {
+                clientFH.delete();
+            }
+            if (excnt == 0) {
+                exportFH.delete();
             }
         }
     }
