@@ -550,9 +550,13 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         return nativeHashinate(pointer, config.configPtr, config.numTokens);
     }
 
+    //Store a reference to the config to prevent it from being GCed while the EE
+    //is retaining a reference to it the native hash data
+    private HashinatorConfig m_configRef;
     @Override
     public void updateHashinator(HashinatorConfig config)
     {
+        m_configRef = config;
         if (config.configPtr == 0) {
             ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(config.configBytes);
 
