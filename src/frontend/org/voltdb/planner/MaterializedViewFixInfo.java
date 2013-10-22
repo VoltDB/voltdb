@@ -63,6 +63,9 @@ public class MaterializedViewFixInfo {
 
     private boolean m_isJoin = false;
 
+    // mv scan node for join query.
+    AbstractScanPlanNode m_scanNode = null;
+
     public boolean needed () {
         return m_needed;
     }
@@ -156,40 +159,32 @@ public class MaterializedViewFixInfo {
         return true;
     }
 
-
     /**
      * Grasp the scan node on MV table from the join node.
      * This scan node can not be in-lined, so it should be as a child of a join node.
-     * @param rootNode
+     * @param joinNode
      */
-    public AbstractScanPlanNode replaceAndReturnScanNode(AbstractPlanNode rootNode, AbstractPlanNode reAggNode) {
+    public boolean replaceScanNodeWithReAggNode(AbstractPlanNode joinNode, AbstractPlanNode reAggNode) {
         // MV table scan node can not be in in-lined nodes.
-        for (int i = 0; i < rootNode.getChildCount(); i++) {
-            AbstractPlanNode child = rootNode.getChild(i);
-            AbstractPlanNode scanNodeFromChild = replaceAndReturnScanNode(child, reAggNode);
-            if (scanNodeFromChild != null) {
-                rootNode.setAndLinkChild(i, reAggNode);
-                return (AbstractScanPlanNode) scanNodeFromChild;
-            }
-        }
+        for (int i = 0; i < joinNode.getChildCount(); i++) {
+            AbstractPlanNode child = joinNode.getChild(i);
 
-        if (rootNode instanceof AbstractScanPlanNode) {
-            AbstractScanPlanNode scanNode = (AbstractScanPlanNode) rootNode;
-            if (scanNode.getTargetTableName().equals(getMVTableName())) {
-                assert(scanNode.getParentCount() == 1);
-                AbstractPlanNode parent = scanNode.getParent(0);
-
-                // Find the i-th child index, and replace it.
-                for (int i = 0; i < parent.getChildCount(); i++) {
-                    AbstractPlanNode child = parent.getChild(i);
-                    if (child == scanNode) {
-                        parent.setAndLinkChild(i, scanNode);
-                        return scanNode;
-                    }
+            if (child instanceof AbstractScanPlanNode) {
+                AbstractScanPlanNode scanNode = (AbstractScanPlanNode) child;
+                if (!scanNode.getTargetTableName().equals(getMVTableName())) {
+                    continue;
+                }
+                joinNode.setAndLinkChild(i, reAggNode);
+                m_scanNode = scanNode;
+                return true;
+            } else {
+                boolean replaced = replaceScanNodeWithReAggNode(child, reAggNode);
+                if (replaced) {
+                    return true;
                 }
             }
         }
-        return null;
+        return false;
     }
 
     /**
@@ -281,6 +276,17 @@ public class MaterializedViewFixInfo {
 
     }
 
+
+    private int fromNumberOfTables(List<AbstractExpression> tves) {
+        Set<String> tableNames = new HashSet<String>();
+        for (AbstractExpression tve: tves) {
+            assert(tve instanceof TupleValueExpression);
+            tableNames.add(((TupleValueExpression) tve).getTableName());
+        }
+
+        return tableNames.size();
+    }
+
     private void processWhereClause(JoinNode joinTree, List<Column> mvColumnArray) {
         // (1) Process where clause.
         AbstractExpression where = analyzeJoinTreeFilters(joinTree);
@@ -301,31 +307,36 @@ public class MaterializedViewFixInfo {
                 needReAggTVEs.add(tve);
             }
 
-            List<AbstractExpression> pushdownExprs = new ArrayList<AbstractExpression>();
+            List<AbstractExpression> remaningExprs = new ArrayList<AbstractExpression>();
             List<AbstractExpression> aggPostExprs = new ArrayList<AbstractExpression>();
             // Check where clause.
             List<AbstractExpression> exprs = ExpressionUtil.uncombine(where);
 
             for (AbstractExpression expr: exprs) {
                 ArrayList<AbstractExpression> tves = expr.findBaseTVEs();
-                boolean pushdown = true;
-                for (TupleValueExpression needReAggTVE: needReAggTVEs) {
-                    if (tves.contains(needReAggTVE)) {
-                        pushdown = false;
-                        break;
+
+                boolean reAggPostExprs = false;
+                // If the expression is built on a join expression referencing two tables,
+                // There is no need to handle it.
+                if (fromNumberOfTables(tves) == 1) {
+                    for (TupleValueExpression needReAggTVE: needReAggTVEs) {
+                        if (tves.contains(needReAggTVE)) {
+                            reAggPostExprs = true;
+                            break;
+                        }
                     }
                 }
-                if (pushdown) {
-                    pushdownExprs.add(expr);
-                } else {
+                if (reAggPostExprs) {
                     aggPostExprs.add(expr);
+                } else {
+                    remaningExprs.add(expr);
                 }
             }
             AbstractExpression aggPostExpr = ExpressionUtil.combine(aggPostExprs);
             // Add post filters for the reAggregation node.
             m_reAggNode.setPostPredicate(aggPostExpr);
 
-            AbstractExpression scanFilters = ExpressionUtil.combine(pushdownExprs);
+            AbstractExpression scanFilters = ExpressionUtil.combine(remaningExprs);
             // Update new filters for the scanNode.
             boolean updated = updateJoinFilters(joinTree, scanFilters);
             assert(updated);

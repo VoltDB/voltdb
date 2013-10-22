@@ -1241,7 +1241,8 @@ public class PlanAssembler {
             reAggNode.clearParents();
 
             // Get the MV scan node and
-            mvScanNode = mvFixInfo.replaceAndReturnScanNode(joinNode, reAggNode);
+            mvFixInfo.replaceScanNodeWithReAggNode(joinNode, reAggNode);
+            mvScanNode = mvFixInfo.m_scanNode;
             assert(mvScanNode != null);
             mvScanNode.clearParents();
             mvScanNode.clearChildren();
@@ -1758,7 +1759,7 @@ public class PlanAssembler {
     {
         assert(root != null);
         AbstractPlanNode accessPlanTemp = root;
-        if (root instanceof ReceivePlanNode) {
+        if (root instanceof ReceivePlanNode && !m_parsedSelect.mvFixInfo.needed()) {
             // Temporarily strip send/receive pair
             accessPlanTemp = root.getChild(0).getChild(0);
             accessPlanTemp.clearParents();

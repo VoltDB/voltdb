@@ -400,7 +400,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
             checkMVFix_reAgg("SELECT v_sum_c1 FROM " + tb + " order by v_sum_c1 limit 1", 2, 1);
             // test distinct down.
             checkMVReaggreateFeature("SELECT distinct v_sum_c1 FROM " + tb + " limit 1", true,
-                    -1, -1, 2, 1, true, true, false);
+                    -1, -1, 2, 1, false, true, false);
         }
     }
 
@@ -415,12 +415,18 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 false, false, false);
     }
 
-    public void testMVBasedQuery_AggQueryEdge() {
+    public void testMVBasedQuery_EdgeCases() {
         // No aggregation will be pushed down.
         checkMVFix_TopAgg_ReAgg("SELECT count(*) FROM V_P1", 0, 1, 2, 0);
         checkMVFix_TopAgg_ReAgg("SELECT SUM(v_a1) FROM V_P1", 0, 1, 2, 0);
         checkMVFix_TopAgg_ReAgg("SELECT count(v_a1) FROM V_P1", 0, 1, 2, 0);
         checkMVFix_TopAgg_ReAgg("SELECT max(v_a1) FROM V_P1", 0, 1, 2, 0);
+
+        // No disctinct will be pushed down.
+        // ENG-5364.
+        // In future,  a little efficient way is to push down distinct for part of group by columns only.
+        checkMVFix_reAgg("SELECT distinct v_a1 FROM V_P1", 2, 0);
+        checkMVFix_reAgg("SELECT distinct v_cnt FROM V_P1", 2, 1);
     }
 
     private void checkMVFix_TopAgg_ReAgg(
@@ -546,10 +552,14 @@ public class TestPlansGroupBy extends PlannerTestCase {
         // Find re-aggregation node.
         assertTrue(p instanceof ReceivePlanNode);
         assertTrue(p.getParent(0) instanceof HashAggregatePlanNode);
-        String reAggNodeStr = p.getParent(0).toExplainPlanString().toLowerCase();
+        HashAggregatePlanNode reAggNode = (HashAggregatePlanNode) p.getParent(0);
+        String reAggNodeStr = reAggNode.toExplainPlanString().toLowerCase();
         if (aggFilter != null) {
             assertTrue(reAggNodeStr.contains(aggFilter));
+        } else {
+            assertNull(reAggNode.getPostPredicate());
         }
+
         if (scanFilter != null) {
             assertFalse(reAggNodeStr.contains(scanFilter));
         }
@@ -603,11 +613,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
         String sql = "";
 
         // Test agg query on join.
-        sql = "select v_p1.v_cnt, v_p1.v_b1, SUM(v_p1.v_sum_d1) " +
-                "from v_p1 inner join v_r1 on v_p1.v_cnt = v_r1.v_cnt join r1v on v_p1.v_cnt = r1v.v_cnt " +
-                "where v_p1.v_cnt > 1 and v_p1.v_a1 > 2 and v_p1.v_sum_c1 < 3 and v_r1.v_b1 < 4 " +
-                "group by v_p1.v_cnt, v_p1.v_b1 ";
-        checkMVFixWithJoin(sql, 2, 1, 2, 3, "(v_sum_c1 < 3) and (v_cnt > 1)", "v_a1 > 2");
+        sql = "select v_p1.v_cnt from v_r1 inner join v_p1 on v_r1.v_sum_c1 = v_p1.v_sum_d1 ";
+        checkMVFixWithJoin_reAgg(sql, 2, 2, null, null);
+
     }
 
     /**
@@ -628,6 +636,10 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 "where v_p1.v_cnt > 1 and v_p1.v_a1 > 2 and v_p1.v_sum_c1 < 3 and v_r1.v_b1 < 4 ";
         checkMVFixWithJoin_reAgg(sql, 2, 2, "(v_cnt > 1) and (v_sum_c1 < 3)", "v_a1 > 2");
 
+        // join on different columns.
+        sql = "select v_p1.v_cnt from v_r1 inner join v_p1 on v_r1.v_sum_c1 = v_p1.v_sum_d1 ";
+        checkMVFixWithJoin_reAgg(sql, 2, 2, null, null);
+
 
         // Three tables joins.
         sql = "select v_r1.v_a1, v_r1.v_cnt from v_p1 inner join v_r1 on v_p1.v_a1 = v_r1.v_a1 " +
@@ -637,6 +649,11 @@ public class TestPlansGroupBy extends PlannerTestCase {
         sql = "select v_r1.v_cnt, v_r1.v_a1 from v_p1 inner join v_r1 on v_p1.v_cnt = v_r1.v_cnt " +
                 "join r1v on v_p1.v_cnt = r1v.v_cnt ";
         checkMVFixWithJoin_reAgg(sql, 2, 1, null, null);
+
+        // join on different columns.
+        sql = "select v_p1.v_cnt from v_r1 inner join v_p1 on v_r1.v_sum_c1 = v_p1.v_sum_d1 " +
+                "join r1v on v_p1.v_cnt = r1v.v_sum_c1";
+        checkMVFixWithJoin_reAgg(sql, 2, 2, null, null);
 
         sql = "select v_r1.v_cnt, v_r1.v_a1 from v_p1 inner join v_r1 on v_p1.v_cnt = v_r1.v_cnt " +
                 "join r1v on v_p1.v_cnt = r1v.v_cnt " +
