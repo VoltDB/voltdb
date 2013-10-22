@@ -167,6 +167,13 @@
                      "ddl": "DDL.sql",
                      "template": "index-count1.sql",
                      "normalizer": "normalizer.py"},
+
+# To test index scan: forward scan, reverse scan
+    "index-scan": {"schema": "index-scan-schema.py",
+        "ddl": "index-DDL.sql",
+        "template": "index-scan.sql",
+        "normalizer": "normalizer.py"},
+
 # This suite written to test push-down of aggregates and limits in combination
 # with indexes, projections and order-by.
     "pushdown": {"schema": "pushdown-schema.py",

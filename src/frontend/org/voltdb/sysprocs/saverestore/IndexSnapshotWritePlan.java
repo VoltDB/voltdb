@@ -112,7 +112,7 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
      * @param table     The table to build the elastic index on
      * @param ranges    The hash ranges that the index should include
      */
-    public static AbstractExpression createIndexExpressionForTable(Table table, Map<Long, Long> ranges)
+    public static AbstractExpression createIndexExpressionForTable(Table table, Map<Integer, Integer> ranges)
     {
         HashRangeExpression predicate = new HashRangeExpression();
         predicate.setRanges(ranges);

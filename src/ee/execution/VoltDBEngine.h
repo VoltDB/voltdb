@@ -145,9 +145,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                         int32_t partitionId,
                         int32_t hostId,
                         std::string hostname,
-                        int64_t tempTableMemoryLimit,
-                        HashinatorType type,
-                        char *hashinatorConfig);
+                        int64_t tempTableMemoryLimit);
         virtual ~VoltDBEngine();
 
         inline int32_t getClusterIndex() const { return m_clusterIndex; }
@@ -382,7 +380,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         size_t tableHashCode(int32_t tableId);
 
-        void updateHashinator(HashinatorType type, const char *config);
+        void updateHashinator(HashinatorType type, const char *config, int32_t *configPtr, uint32_t numTokens);
 
         /*
          * Execute an arbitrary task represented by the task id and serialized parameters.

@@ -1098,7 +1098,9 @@ public abstract class CatalogUtil {
         if (exportClientClassName != null && exportClientClassName.trim().length() > 0) {
             ConnectorProperty prop = catconn.getConfig().add(ExportDataProcessor.EXPORT_TO_TYPE);
             prop.setName(ExportDataProcessor.EXPORT_TO_TYPE);
-            prop.setValue(exportClientClassName);
+            //Override for tests
+            String dexportClientClassName = System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE, exportClientClassName);
+            prop.setValue(dexportClientClassName);
         }
 
         ExportConfigurationType exportConfiguration = exportType.getConfiguration();

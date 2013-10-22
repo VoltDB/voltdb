@@ -26,10 +26,7 @@ namespace voltdb
  */
 ElasticHash ElasticIndex::generateHash(const PersistentTable &table, const TableTuple &tuple)
 {
-    int64_t hashValues[2];
-    tuple.getNValue(table.partitionColumn()).murmurHash3(hashValues);
-    // Only the least significant 8 bytes is used.
-    return hashValues[0];
+    return tuple.getNValue(table.partitionColumn()).murmurHash3();
 }
 
 ElasticIndexTupleRangeIterator::ElasticIndexTupleRangeIterator(
@@ -46,37 +43,13 @@ ElasticIndexTupleRangeIterator::ElasticIndexTupleRangeIterator(
 void ElasticIndexTupleRangeIterator::reset()
 {
     m_iter = m_index.createLowerBoundIterator(m_range.getLowerBound());
-    if (m_range.wrapsAround()) {
-        m_end = m_index.end();
-        m_lastIteration = false;
-    }
-    else {
-        m_end = m_index.createUpperBoundIterator(m_range.getUpperBound());
-        m_lastIteration = true;
-    }
-}
-
-bool ElasticIndexTupleRangeIterator::wrap()
-{
-    if (m_lastIteration) {
-        return false;
-    }
-    // Wrap back to the beginning.
-    m_iter = m_index.createIterator();
-    m_end  = m_index.createUpperBoundIterator(m_range.getUpperBound());
-    m_lastIteration = true;
-    if (m_iter == m_end) {
-        return false;
-    }
-    return true;
+    m_end = m_index.createUpperBoundIterator(m_range.getUpperBound());
 }
 
 bool ElasticIndexTupleRangeIterator::next(TableTuple &tuple)
 {
     if (m_iter == m_end) {
-        if (!wrap()) {
-            return false;
-        }
+        return false;
     }
     tuple = TableTuple(m_iter++->getTupleAddress(), &m_schema);
     return true;
