@@ -15,23 +15,31 @@
 {_fromviews |= "V_P2"}
 {_fromviews |= "V_P2_ABS"}
 {_fromviews |= "V_R2"}
+
+{_fromtablesForJoin |= "V_P2"}
+{_fromtablesForJoin |= "V_P2_ABS"}
+{_fromtablesForJoin |= "V_R2"}
+{_fromtablesForJoin |= "R2V"}
+
 {@fromtables = "_fromviews"}
-
-
 {@jointype = " INNER "}
+
 -- Replace the join type with the next line when ENG-5178 is fixed.
 -- {@jointype = "_jointype"}
 
 INSERT INTO @dmltable VALUES (_id, _value[int16], _value[int16], _value[int16], _value[int16])
 <basic-select.sql>
+{@fromtables = "_fromtablesForJoin"}
 <join-template.sql>
 
 INSERT INTO @dmltable VALUES (_id, _value[int16], _value[int16], _value[int16], _value[int16])
 INSERT INTO dmltable VALUES (_id, 1010, 1010, 1010, 1010)
 INSERT INTO dmltable VALUES (_id, 1020, 1020, 1020, 1020)
 
+{@fromtables = "_fromviews"}
 -- Repeat queries with forced data value overlaps between tables.
 <basic-select.sql>
+{@fromtables = "_fromtablesForJoin"}
 <join-template.sql>
 
 
