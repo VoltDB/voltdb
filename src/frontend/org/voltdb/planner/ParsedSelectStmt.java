@@ -269,7 +269,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (columns != null) {
                 mvNewScanColumns.addAll(columns);
             }
-            if (mvFixInfo.checkNeedFix(mvTable)) {
+            if (mvFixInfo.checkFixNeeded(mvTable)) {
                 mvFixInfo.processMVBasedQueryFix(mvNewScanColumns, joinTree);
                 break;
             }

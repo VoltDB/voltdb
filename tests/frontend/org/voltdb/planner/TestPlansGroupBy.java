@@ -532,15 +532,20 @@ public class TestPlansGroupBy extends PlannerTestCase {
         for (AbstractPlanNode apn: pns) {
             System.out.println(apn.toExplainPlanString());
         }
-        checkMVFixWithWhere(aggFilter, scanFilter);
+        checkMVFixWithWhere( aggFilter == null? null: new String[] {aggFilter},
+                    scanFilter == null? null: new String[] {scanFilter});
     }
 
-    private void checkMVFixWithWhere(String aggFilter, String scanFilter) {
-        if (aggFilter != null) {
-            aggFilter = aggFilter.toLowerCase();
+    private void checkMVFixWithWhere(String[] aggFilters, String[] scanFilters) {
+        if (aggFilters != null) {
+            for (int i = 0; i < aggFilters.length; i++) {
+                aggFilters[i] = aggFilters[i].toLowerCase();
+            }
         }
-        if (scanFilter != null) {
-            scanFilter = scanFilter.toLowerCase();
+        if (scanFilters != null) {
+            for (int i = 0; i < scanFilters.length; i++) {
+                scanFilters[i] = scanFilters[i].toLowerCase();
+            }
         }
 
         AbstractPlanNode p = pns.get(0);
@@ -554,14 +559,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertTrue(p.getParent(0) instanceof HashAggregatePlanNode);
         HashAggregatePlanNode reAggNode = (HashAggregatePlanNode) p.getParent(0);
         String reAggNodeStr = reAggNode.toExplainPlanString().toLowerCase();
-        if (aggFilter != null) {
-            assertTrue(reAggNodeStr.contains(aggFilter));
+        if (aggFilters != null) {
+            for (String aggFilter: aggFilters) {
+                assertTrue(reAggNodeStr.contains(aggFilter));
+            }
         } else {
             assertNull(reAggNode.getPostPredicate());
         }
-
-        if (scanFilter != null) {
-            assertFalse(reAggNodeStr.contains(scanFilter));
+        if (scanFilters != null) {
+            for (String scanFilter: scanFilters) {
+                assertFalse(reAggNodeStr.contains(scanFilter));
+            }
         }
 
         // Find scan node.
@@ -569,11 +577,15 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assert(p.getScanNodeList().size() == 1);
         p = p.getScanNodeList().get(0);
         String scanNodeStr = p.toExplainPlanString().toLowerCase();
-        if (scanFilter != null) {
-            assertTrue(scanNodeStr.contains(scanFilter));
+        if (scanFilters != null) {
+            for (String scanFilter: scanFilters) {
+                assertTrue(scanNodeStr.contains(scanFilter));
+            }
         }
-        if (aggFilter != null) {
-            assertFalse(scanNodeStr.contains(aggFilter));
+        if (aggFilters != null) {
+            for (String aggFilter: aggFilters) {
+                assertFalse(scanNodeStr.contains(aggFilter));
+            }
         }
     }
 
@@ -595,27 +607,51 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkMVFixWithJoin(sql, -1, -1, numGroupbyOfReaggNode, numAggsOfReaggNode, aggFilter, scanFilter);
     }
 
+    private void checkMVFixWithJoin_reAgg_noOrder (String sql, int numGroupbyOfReaggNode, int numAggsOfReaggNode,
+            String[] aggFilters, String[] scanFilters) {
+        checkMVFixWithJoin_noOrder(sql, -1, -1, numGroupbyOfReaggNode, numAggsOfReaggNode, aggFilters, scanFilters);
+    }
+
     private void checkMVFixWithJoin (String sql, int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
             int numGroupbyOfReaggNode, int numAggsOfReaggNode, String aggFilter, String scanFilter) {
+        checkMVFixWithJoin_noOrder(sql, numGroupbyOfTopAggNode, numAggsOfTopAggNode,
+                numGroupbyOfReaggNode, numAggsOfReaggNode,
+                aggFilter == null ? null: new String[] {aggFilter},
+                scanFilter == null ? null: new String[] {scanFilter}
+        );
+    }
 
-        pns = compileToFragments(sql);
-        for (AbstractPlanNode apn: pns) {
-            System.out.println(apn.toExplainPlanString());
+    private void checkMVFixWithJoin_noOrder (String sql, int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
+            int numGroupbyOfReaggNode, int numAggsOfReaggNode, String[] aggFilters, String[] scanFilters) {
+
+        //String[] joinType = {"inner join", "left join", "right join"};
+        String[] joinType = {"inner join"};
+
+        for (int i = 0; i < joinType.length; i++) {
+            String newsql = sql.replace("@joinType", joinType[i]);
+            pns = compileToFragments(newsql);
+            System.out.println("Query:" + newsql);
+            for (AbstractPlanNode apn: pns) {
+                System.out.println(apn.toExplainPlanString());
+            }
+            // No join node under receive node.
+            checkMVReaggreateFeature(true, numGroupbyOfTopAggNode, numAggsOfTopAggNode,
+                    numGroupbyOfReaggNode, numAggsOfReaggNode, false, false, false);
+
+            checkMVFixWithWhere(aggFilters, scanFilters);
         }
-        // No join node under receive node.
-        checkMVReaggreateFeature(true, numGroupbyOfTopAggNode, numAggsOfTopAggNode,
-                numGroupbyOfReaggNode, numAggsOfReaggNode, false, false, false);
-
-        checkMVFixWithWhere(aggFilter, scanFilter);
     }
 
     public void testTry() {
         String sql = "";
 
         // Test agg query on join.
-        sql = "select v_p1.v_cnt from v_r1 inner join v_p1 on v_r1.v_sum_c1 = v_p1.v_sum_d1 ";
-        checkMVFixWithJoin_reAgg(sql, 2, 2, null, null);
+//        sql = "select v_cnt from v_p1 left join v_r1 on v_p1.v_cnt = v_r1.v_cnt " +
+//                "where v_p1.v_cnt > 1 and v_p1.v_a1 > 2 and v_p1.v_sum_c1 < 3 and v_r1.v_b1 < 4 ";
+//        checkMVFixWithJoin_reAgg(sql, 2, 2, "(v_cnt > 1) and (v_sum_c1 < 3)", "v_a1 > 2");
 
+//        sql = "select v_p1.v_a1 from v_p1 right join v_r1 on v_p1.v_a1 = v_r1.v_a1";
+//        checkMVFixWithJoin_reAgg(sql, 2, 0, null, null);
     }
 
     /**
@@ -626,44 +662,47 @@ public class TestPlansGroupBy extends PlannerTestCase {
         String sql = "";
 
         // Two tables joins.
-        checkMVFixWithJoin_reAgg("select v_a1 from v_p1 inner join v_r1 using(v_a1);", 2, 0, null, null);
+        sql = "select v_a1 from v_p1 @joinType v_r1 using(v_a1)";
+        checkMVFixWithJoin_reAgg(sql, 2, 0, null, null);
 
-        sql = "select v_a1 from v_p1 inner join v_r1 using(v_a1) " +
+        sql = "select v_a1 from v_p1 @joinType v_r1 using(v_a1) " +
                 "where v_a1 > 1 and v_p1.v_cnt > 2 and v_r1.v_b1 < 3 ";
         checkMVFixWithJoin_reAgg(sql, 2, 1, "v_cnt > 2", "v_a1 > 1");
 
-        sql = "select v_cnt from v_p1 inner join v_r1 on v_p1.v_cnt = v_r1.v_cnt " +
+        sql = "select v_cnt from v_p1 @joinType v_r1 on v_p1.v_cnt = v_r1.v_cnt " +
                 "where v_p1.v_cnt > 1 and v_p1.v_a1 > 2 and v_p1.v_sum_c1 < 3 and v_r1.v_b1 < 4 ";
         checkMVFixWithJoin_reAgg(sql, 2, 2, "(v_cnt > 1) and (v_sum_c1 < 3)", "v_a1 > 2");
 
         // join on different columns.
-        sql = "select v_p1.v_cnt from v_r1 inner join v_p1 on v_r1.v_sum_c1 = v_p1.v_sum_d1 ";
+        sql = "select v_p1.v_cnt from v_r1 @joinType v_p1 on v_r1.v_sum_c1 = v_p1.v_sum_d1 ";
         checkMVFixWithJoin_reAgg(sql, 2, 2, null, null);
 
 
         // Three tables joins.
-        sql = "select v_r1.v_a1, v_r1.v_cnt from v_p1 inner join v_r1 on v_p1.v_a1 = v_r1.v_a1 " +
-                "join r1v on v_p1.v_a1 = r1v.v_a1 ";
+        sql = "select v_r1.v_a1, v_r1.v_cnt from v_p1 @joinType v_r1 on v_p1.v_a1 = v_r1.v_a1 " +
+                "@joinType r1v on v_p1.v_a1 = r1v.v_a1 ";
         checkMVFixWithJoin_reAgg(sql, 2, 0, null, null);
 
-        sql = "select v_r1.v_cnt, v_r1.v_a1 from v_p1 inner join v_r1 on v_p1.v_cnt = v_r1.v_cnt " +
-                "join r1v on v_p1.v_cnt = r1v.v_cnt ";
+        sql = "select v_r1.v_cnt, v_r1.v_a1 from v_p1 @joinType v_r1 on v_p1.v_cnt = v_r1.v_cnt " +
+                "@joinType r1v on v_p1.v_cnt = r1v.v_cnt ";
         checkMVFixWithJoin_reAgg(sql, 2, 1, null, null);
 
         // join on different columns.
-        sql = "select v_p1.v_cnt from v_r1 inner join v_p1 on v_r1.v_sum_c1 = v_p1.v_sum_d1 " +
-                "join r1v on v_p1.v_cnt = r1v.v_sum_c1";
+        sql = "select v_p1.v_cnt from v_r1 @joinType v_p1 on v_r1.v_sum_c1 = v_p1.v_sum_d1 " +
+                "@joinType r1v on v_p1.v_cnt = r1v.v_sum_c1";
         checkMVFixWithJoin_reAgg(sql, 2, 2, null, null);
 
-        sql = "select v_r1.v_cnt, v_r1.v_a1 from v_p1 inner join v_r1 on v_p1.v_cnt = v_r1.v_cnt " +
-                "join r1v on v_p1.v_cnt = r1v.v_cnt " +
+        sql = "select v_r1.v_cnt, v_r1.v_a1 from v_p1 @joinType v_r1 on v_p1.v_cnt = v_r1.v_cnt " +
+                "@joinType r1v on v_p1.v_cnt = r1v.v_cnt " +
                 "where v_p1.v_cnt > 1 and v_p1.v_a1 > 2 and v_p1.v_sum_c1 < 3 and v_r1.v_b1 < 4 ";
-        checkMVFixWithJoin_reAgg(sql, 2, 2, "(v_cnt > 1) and (v_sum_c1 < 3)", "v_a1 > 2");
+        checkMVFixWithJoin_reAgg_noOrder(sql, 2, 2,
+                new String[] {"v_cnt > 1", "v_sum_c1 < 3"}, new String[] {"v_a1 > 2"});
 
-        sql = "select v_r1.v_cnt, v_r1.v_a1 from v_p1 inner join v_r1 on v_p1.v_cnt = v_r1.v_cnt " +
-                "join r1v on v_p1.v_cnt = r1v.v_cnt where v_p1.v_cnt > 1 and v_p1.v_a1 > 2 and " +
+        sql = "select v_r1.v_cnt, v_r1.v_a1 from v_p1 @joinType v_r1 on v_p1.v_cnt = v_r1.v_cnt " +
+                "@joinType r1v on v_p1.v_cnt = r1v.v_cnt where v_p1.v_cnt > 1 and v_p1.v_a1 > 2 and " +
                 "v_p1.v_sum_c1 < 3 and v_r1.v_b1 < 4 and r1v.v_sum_c1 > 6";
-        checkMVFixWithJoin_reAgg(sql, 2, 2, "(v_cnt > 1) and (v_sum_c1 < 3)", "v_a1 > 2");
+        checkMVFixWithJoin_reAgg_noOrder(sql, 2, 2,
+                new String[] {"v_cnt > 1", "v_sum_c1 < 3"}, new String[] {"v_a1 > 2"});
 
     }
 
@@ -675,65 +714,66 @@ public class TestPlansGroupBy extends PlannerTestCase {
         String sql = "";
 
         // Two tables joins.
-        checkMVFixWithJoin("select sum(v_a1) from v_p1 inner join v_r1 using(v_a1);", 0, 1, 2, 0, null, null);
+        sql = "select sum(v_a1) from v_p1 @joinType v_r1 using(v_a1)";
+        checkMVFixWithJoin(sql, 0, 1, 2, 0, null, null);
 
-        sql = "select v_p1.v_b1, sum(v_a1) from v_p1 inner join v_r1 using(v_a1) group by v_p1.v_b1;";
+        sql = "select v_p1.v_b1, sum(v_a1) from v_p1 @joinType v_r1 using(v_a1) group by v_p1.v_b1;";
         checkMVFixWithJoin(sql, 1, 1, 2, 0, null, null);
 
-        sql = "select v_p1.v_b1, v_p1.v_cnt, sum(v_a1) from v_p1 inner join v_r1 using(v_a1) " +
+        sql = "select v_p1.v_b1, v_p1.v_cnt, sum(v_a1) from v_p1 @joinType v_r1 using(v_a1) " +
                 "group by v_p1.v_b1, v_p1.v_cnt;";
         checkMVFixWithJoin(sql, 2, 1, 2, 1, null, null);
 
-        sql = "select v_p1.v_b1, v_p1.v_cnt, sum(v_p1.v_a1) from v_p1 inner join v_r1 on v_p1.v_a1 = v_r1.v_a1 " +
+        sql = "select v_p1.v_b1, v_p1.v_cnt, sum(v_p1.v_a1) from v_p1 @joinType v_r1 on v_p1.v_a1 = v_r1.v_a1 " +
                 "where v_p1.v_a1 > 1 AND v_p1.v_cnt < 8 group by v_p1.v_b1, v_p1.v_cnt;";
         checkMVFixWithJoin(sql, 2, 1, 2, 1, "v_cnt < 8", "v_a1 > 1");
 
-        sql = "select v_p1.v_b1, v_p1.v_cnt, sum(v_a1), max(v_p1.v_sum_c1) from v_p1 inner join v_r1 " +
+        sql = "select v_p1.v_b1, v_p1.v_cnt, sum(v_a1), max(v_p1.v_sum_c1) from v_p1 @joinType v_r1 " +
                 "on v_p1.v_a1 = v_r1.v_a1 " +
                 "where v_p1.v_a1 > 1 AND v_p1.v_cnt < 8 group by v_p1.v_b1, v_p1.v_cnt;";
         checkMVFixWithJoin(sql, 2, 2, 2, 2, "v_cnt < 8", "v_a1 > 1");
 
 
 
-        sql = "select v_r1.v_b1, sum(v_a1) from v_p1 inner join v_r1 using(v_a1) group by v_r1.v_b1;";
+        sql = "select v_r1.v_b1, sum(v_a1) from v_p1 @joinType v_r1 using(v_a1) group by v_r1.v_b1;";
         checkMVFixWithJoin(sql, 1, 1, 2, 0, null, null);
 
-        sql = "select v_r1.v_b1, v_r1.v_cnt, sum(v_a1) from v_p1 inner join v_r1 using(v_a1) " +
+        sql = "select v_r1.v_b1, v_r1.v_cnt, sum(v_a1) from v_p1 @joinType v_r1 using(v_a1) " +
                 "group by v_r1.v_b1, v_r1.v_cnt;";
         checkMVFixWithJoin(sql, 2, 1, 2, 0, null, null);
 
-        sql = "select v_r1.v_b1, v_p1.v_cnt, sum(v_a1) from v_p1 inner join v_r1 using(v_a1) " +
+        sql = "select v_r1.v_b1, v_p1.v_cnt, sum(v_a1) from v_p1 @joinType v_r1 using(v_a1) " +
                 "group by v_r1.v_b1, v_p1.v_cnt;";
         checkMVFixWithJoin(sql, 2, 1, 2, 1, null, null);
 
 
         // Three tables joins.
-        sql = "select MAX(v_r1.v_a1) from v_p1 inner join v_r1 on v_p1.v_a1 = v_r1.v_a1 " +
-                "join r1v on v_p1.v_a1 = r1v.v_a1 ";
+        sql = "select MAX(v_r1.v_a1) from v_p1 @joinType v_r1 on v_p1.v_a1 = v_r1.v_a1 " +
+                "@joinType r1v on v_p1.v_a1 = r1v.v_a1 ";
         checkMVFixWithJoin(sql, 0, 1, 2, 0, null, null);
 
-        sql = "select MIN(v_p1.v_cnt) from v_p1 inner join v_r1 on v_p1.v_cnt = v_r1.v_cnt " +
-                "join r1v on v_p1.v_cnt = r1v.v_cnt ";
+        sql = "select MIN(v_p1.v_cnt) from v_p1 @joinType v_r1 on v_p1.v_cnt = v_r1.v_cnt " +
+                "@joinType r1v on v_p1.v_cnt = r1v.v_cnt ";
         checkMVFixWithJoin(sql, 0, 1, 2, 1, null, null);
 
-        sql = "select MIN(v_p1.v_cnt) from v_p1 inner join v_r1 on v_p1.v_cnt = v_r1.v_cnt " +
-                "join r1v on v_p1.v_cnt = r1v.v_cnt " +
+        sql = "select MIN(v_p1.v_cnt) from v_p1 @joinType v_r1 on v_p1.v_cnt = v_r1.v_cnt " +
+                "@joinType r1v on v_p1.v_cnt = r1v.v_cnt " +
                 "where v_p1.v_cnt > 1 AND v_p1.v_a1 < 5 AND v_r1.v_b1 > 9";
         checkMVFixWithJoin(sql, 0, 1, 2, 1, "v_cnt > 1", "v_a1 < 5");
 
 
         sql = "select v_p1.v_cnt, v_p1.v_b1, SUM(v_p1.v_sum_d1) " +
-                "from v_p1 inner join v_r1 on v_p1.v_cnt = v_r1.v_cnt join r1v on v_p1.v_cnt = r1v.v_cnt " +
+                "from v_p1 @joinType v_r1 on v_p1.v_cnt = v_r1.v_cnt @joinType r1v on v_p1.v_cnt = r1v.v_cnt " +
                 "group by v_p1.v_cnt, v_p1.v_b1";
         checkMVFixWithJoin(sql, 2, 1, 2, 2, null, null);
 
         sql = "select v_p1.v_cnt, v_p1.v_b1, SUM(v_p1.v_sum_d1), MAX(v_r1.v_a1)  " +
-                "from v_p1 inner join v_r1 on v_p1.v_cnt = v_r1.v_cnt join r1v on v_p1.v_cnt = r1v.v_cnt " +
+                "from v_p1 @joinType v_r1 on v_p1.v_cnt = v_r1.v_cnt @joinType r1v on v_p1.v_cnt = r1v.v_cnt " +
                 "group by v_p1.v_cnt, v_p1.v_b1";
         checkMVFixWithJoin(sql, 2, 2, 2, 2, null, null);
 
         sql = "select v_p1.v_cnt, v_p1.v_b1, SUM(v_p1.v_sum_d1) " +
-                "from v_p1 inner join v_r1 on v_p1.v_cnt = v_r1.v_cnt join r1v on v_p1.v_cnt = r1v.v_cnt " +
+                "from v_p1 @joinType v_r1 on v_p1.v_cnt = v_r1.v_cnt @joinType r1v on v_p1.v_cnt = r1v.v_cnt " +
                 "where v_p1.v_cnt > 1 and v_p1.v_a1 > 2 and v_p1.v_sum_c1 < 3 and v_r1.v_b1 < 4 " +
                 "group by v_p1.v_cnt, v_p1.v_b1 ";
         checkMVFixWithJoin(sql, 2, 1, 2, 3, "(v_sum_c1 < 3) and (v_cnt > 1)", "v_a1 > 2");

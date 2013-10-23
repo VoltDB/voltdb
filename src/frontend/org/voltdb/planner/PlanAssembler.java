@@ -547,6 +547,17 @@ public class PlanAssembler {
                 return getNextSelectPlan();
             }
         } else {
+            // Edge cases: left outer join with replicated table.
+//            List<AbstractPlanNode> recList = root.findAllNodesOfType(PlanNodeType.RECEIVE);
+//            if (recList.size() == 1) {
+//                if (recList.get(0).getParent(0) instanceof NestLoopPlanNode) {
+//                    NestLoopPlanNode nlj = (NestLoopPlanNode)recList.get(0).getParent(0);
+//                    if (nlj.getJoinType() == JoinType.LEFT) {
+//                        // Need to fix the edge case.
+//                    }
+//                }
+//            }
+
             m_parsedSelect.mvFixInfo.setNeeded(false);
         }
 
@@ -1195,6 +1206,7 @@ public class PlanAssembler {
         }
     }
 
+
     AbstractPlanNode handleMVBasedMultiPartQuery (AbstractPlanNode root) {
         MaterializedViewFixInfo mvFixInfo = m_parsedSelect.mvFixInfo;
 
@@ -1213,15 +1225,14 @@ public class PlanAssembler {
             receiveNode = recList.get(0);
 
             AbstractPlanNode parent = receiveNode.getParent(0);
-            receiveNode.clearParents();
-            parent.clearChildren();
+            boolean result = parent.replaceChild(receiveNode, reAggNode);
+            assert(result);
+
             reAggNode.addAndLinkChild(receiveNode);
-            parent.addAndLinkChild(reAggNode);
         }
 
         // If it is joined query, replace the node under receive node with materialized view scan node.
         AbstractScanPlanNode mvScanNode = null;
-
         assert(receiveNode instanceof ReceivePlanNode);
         AbstractPlanNode sendNode = receiveNode.getChild(0);
         assert(sendNode instanceof SendPlanNode);
@@ -1241,7 +1252,8 @@ public class PlanAssembler {
             reAggNode.clearParents();
 
             // Get the MV scan node and
-            mvFixInfo.replaceScanNodeWithReAggNode(joinNode, reAggNode);
+            boolean replaced = mvFixInfo.replaceScanNodeWithReAggNode(joinNode, reAggNode);
+            assert(replaced);
             mvScanNode = mvFixInfo.m_scanNode;
             assert(mvScanNode != null);
             mvScanNode.clearParents();

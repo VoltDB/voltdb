@@ -424,9 +424,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         if (idx == m_children.size()) {
             return false;
         }
-        oldChild.removeFromGraph();
-        m_children.add(idx, newChild);
-        newChild.m_parents.add(this);
+        oldChild.m_parents.clear();
+        setAndLinkChild(idx, newChild);
         return true;
     }
 

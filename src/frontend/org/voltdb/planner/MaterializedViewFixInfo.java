@@ -63,7 +63,7 @@ public class MaterializedViewFixInfo {
 
     private boolean m_isJoin = false;
 
-    // mv scan node for join query.
+    // Scan Node for join query.
     AbstractScanPlanNode m_scanNode = null;
 
     public boolean needed () {
@@ -100,9 +100,8 @@ public class MaterializedViewFixInfo {
      * Set the need flag to true, only if it needs to be fixed.
      * @return
      */
-    public boolean checkNeedFix(Table table) {
+    public boolean checkFixNeeded(Table table) {
         // Check valid cases first
-
         String mvTableName = table.getTypeName();
         Table srcTable = table.getMaterializer();
         if (srcTable == null) {
@@ -187,20 +186,6 @@ public class MaterializedViewFixInfo {
         return false;
     }
 
-    /**
-     * Start to do real materialized view processing to fix the duplicates problem.
-     * @param scanColumns
-     * @param joinTree
-     */
-    public void processMVBasedQueryFix(Set<SchemaColumn> scanColumns, JoinNode joinTree) {
-        List<Column> mvColumnArray =
-                CatalogUtil.getSortedCatalogItems(m_mvTable.getColumns(), "index");
-
-        processInlineProjectionsAndReAggNode(scanColumns, mvColumnArray);
-        processWhereClause(joinTree, mvColumnArray);
-
-    }
-
     private void processInlineProjectionsAndReAggNode(Set<SchemaColumn> scanColumns, List<Column> mvColumnArray) {
         assert(m_needed);
         String mvTableName = m_mvTable.getTypeName();
@@ -237,7 +222,6 @@ public class MaterializedViewFixInfo {
         m_scanInlinedProjectionNode.setOutputSchema(inlineProjSchema);
 
         // (2) Construct the reAggregation Node.
-
         // Record the re-aggregation type for each scan columns.
         Map<String, ExpressionType> mvColumnAggType = new HashMap<String, ExpressionType>();
         for (int i = m_numOfGroupByColumns; i < mvColumnArray.size(); i++) {
@@ -276,134 +260,101 @@ public class MaterializedViewFixInfo {
 
     }
 
-
-    private int fromNumberOfTables(List<AbstractExpression> tves) {
-        Set<String> tableNames = new HashSet<String>();
+    private boolean fromMVTableOnly(List<AbstractExpression> tves) {
+        String mvTableName = m_mvTable.getTypeName();
         for (AbstractExpression tve: tves) {
             assert(tve instanceof TupleValueExpression);
-            tableNames.add(((TupleValueExpression) tve).getTableName());
+            String tveTableName = ((TupleValueExpression)tve).getTableName();
+            if (!mvTableName.equals(tveTableName)) {
+                return false;
+            }
         }
-
-        return tableNames.size();
+        return true;
     }
 
-    private void processWhereClause(JoinNode joinTree, List<Column> mvColumnArray) {
-        // (1) Process where clause.
-        AbstractExpression where = analyzeJoinTreeFilters(joinTree);
+    private void collectReAggNodePostExpressions(JoinNode joinTree,
+            List<TupleValueExpression> needReAggTVEs, List<AbstractExpression> aggPostExprs) {
+        if (joinTree.m_leftNode != null) {
+            collectReAggNodePostExpressions(joinTree.m_leftNode, needReAggTVEs, aggPostExprs);
+        }
+        if (joinTree.m_rightNode != null) {
+            collectReAggNodePostExpressions(joinTree.m_rightNode, needReAggTVEs, aggPostExprs);
+        }
+        if (joinTree.m_table != null) {
+            joinTree.m_joinExpr = processFilters(joinTree.m_joinExpr, needReAggTVEs, aggPostExprs);
 
-        if (where != null) {
+            // For outer join filters. Inner join or single table query will have whereExpr be null.
+            joinTree.m_whereExpr = processFilters(joinTree.m_whereExpr, needReAggTVEs, aggPostExprs);
+        }
+    }
+
+    private AbstractExpression processFilters (AbstractExpression filters,
+            List<TupleValueExpression> needReAggTVEs, List<AbstractExpression> aggPostExprs) {
+        if (filters != null) {
             // Collect all TVEs that need to be do re-aggregation in coordinator.
-            List<TupleValueExpression> needReAggTVEs = new ArrayList<TupleValueExpression>();
-            for (int i=m_numOfGroupByColumns; i < mvColumnArray.size(); i++) {
-                Column mvCol = mvColumnArray.get(i);
-                TupleValueExpression tve = new TupleValueExpression();
-                tve.setColumnIndex(i);
-                tve.setColumnName(mvCol.getName());
-                tve.setTableName(getMVTableName());
-                tve.setColumnAlias(mvCol.getName());
-                tve.setValueType(VoltType.get((byte)mvCol.getType()));
-                tve.setValueSize(mvCol.getSize());
-
-                needReAggTVEs.add(tve);
-            }
-
             List<AbstractExpression> remaningExprs = new ArrayList<AbstractExpression>();
-            List<AbstractExpression> aggPostExprs = new ArrayList<AbstractExpression>();
             // Check where clause.
-            List<AbstractExpression> exprs = ExpressionUtil.uncombine(where);
+            List<AbstractExpression> exprs = ExpressionUtil.uncombine(filters);
 
             for (AbstractExpression expr: exprs) {
                 ArrayList<AbstractExpression> tves = expr.findBaseTVEs();
 
-                boolean reAggPostExprs = false;
+                boolean canPushdown = true;
                 // If the expression is built on a join expression referencing two tables,
                 // There is no need to handle it.
-                if (fromNumberOfTables(tves) == 1) {
+                if (fromMVTableOnly(tves)) {
                     for (TupleValueExpression needReAggTVE: needReAggTVEs) {
                         if (tves.contains(needReAggTVE)) {
-                            reAggPostExprs = true;
+                            canPushdown = false;
                             break;
                         }
                     }
                 }
-                if (reAggPostExprs) {
-                    aggPostExprs.add(expr);
-                } else {
+                if (canPushdown) {
                     remaningExprs.add(expr);
+                } else {
+                    aggPostExprs.add(expr);
                 }
             }
-            AbstractExpression aggPostExpr = ExpressionUtil.combine(aggPostExprs);
-            // Add post filters for the reAggregation node.
-            m_reAggNode.setPostPredicate(aggPostExpr);
-
-            AbstractExpression scanFilters = ExpressionUtil.combine(remaningExprs);
+            AbstractExpression remaningFilters = ExpressionUtil.combine(remaningExprs);
             // Update new filters for the scanNode.
-            boolean updated = updateJoinFilters(joinTree, scanFilters);
-            assert(updated);
+            return remaningFilters;
         }
-    }
-
-    private AbstractExpression analyzeJoinTreeFilters(JoinNode joinTree) {
-        assert(joinTree != null);
-        AbstractExpression where = null;
-        if (joinTree.m_leftNode == null) {
-            // Non-join case.
-            assert(joinTree.m_whereExpr == null);
-            // Follow HSQL's logic to store the where expression in joinExpr for single table.
-            where = joinTree.m_joinExpr;
-
-        } else {
-            // Join case.
-            where = findJoinFilters(joinTree);
-        }
-
-        return where;
-    }
-
-    private AbstractExpression findJoinFilters(JoinNode joinTree) {
-        AbstractExpression result = null;
-        if (joinTree.m_leftNode != null) {
-            result = findJoinFilters(joinTree.m_leftNode);
-            if (result != null) {
-                return result;
-            }
-        }
-        if (joinTree.m_rightNode != null) {
-            result = findJoinFilters(joinTree.m_rightNode);
-            if (result != null) {
-                return result;
-            }
-        }
-
-        if (joinTree.m_table != null && joinTree.m_table.getTypeName().equals(getMVTableName())) {
-            return joinTree.m_joinExpr;
-        }
-
         return null;
     }
 
+    /**
+     * Start to do real materialized view processing to fix the duplicates problem.
+     * @param scanColumns
+     * @param joinTree
+     */
+    public void processMVBasedQueryFix(Set<SchemaColumn> scanColumns, JoinNode joinTree) {
+        List<Column> mvColumnArray =
+                CatalogUtil.getSortedCatalogItems(m_mvTable.getColumns(), "index");
 
-    private boolean updateJoinFilters(JoinNode joinTree, AbstractExpression scanFilters) {
-        boolean update = false;
-        if (joinTree.m_leftNode != null) {
-            update = updateJoinFilters(joinTree.m_leftNode, scanFilters);
-            if (update) {
-                return update;
-            }
-        }
-        if (joinTree.m_rightNode != null) {
-            update = updateJoinFilters(joinTree.m_rightNode, scanFilters);
-            if (update) {
-                return update;
-            }
+        processInlineProjectionsAndReAggNode(scanColumns, mvColumnArray);
+
+        // Collect all TVEs that need to be do re-aggregation in coordinator.
+        List<TupleValueExpression> needReAggTVEs = new ArrayList<TupleValueExpression>();
+        List<AbstractExpression> aggPostExprs = new ArrayList<AbstractExpression>();
+
+        for (int i=m_numOfGroupByColumns; i < mvColumnArray.size(); i++) {
+            Column mvCol = mvColumnArray.get(i);
+            TupleValueExpression tve = new TupleValueExpression();
+            tve.setColumnIndex(i);
+            tve.setColumnName(mvCol.getName());
+            tve.setTableName(getMVTableName());
+            tve.setColumnAlias(mvCol.getName());
+            tve.setValueType(VoltType.get((byte)mvCol.getType()));
+            tve.setValueSize(mvCol.getSize());
+
+            needReAggTVEs.add(tve);
         }
 
-        if (joinTree.m_table.getTypeName().equals(getMVTableName())) {
-            joinTree.m_joinExpr = scanFilters;
-            update = true;
-        }
+        collectReAggNodePostExpressions(joinTree, needReAggTVEs, aggPostExprs);
 
-        return update;
+        AbstractExpression aggPostExpr = ExpressionUtil.combine(aggPostExprs);
+        // Add post filters for the reAggregation node.
+        m_reAggNode.setPostPredicate(aggPostExpr);
     }
-
 }
