@@ -23,18 +23,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.ParameterSet;
-import org.voltdb.StatsSelector;
-import org.voltdb.TableStreamType;
+import org.voltcore.utils.Pair;
+import org.voltdb.*;
 import org.voltdb.TheHashinator.HashinatorType;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.export.ExportProtoMessage;
-import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 
 public class MockExecutionEngine extends ExecutionEngine {
 
@@ -180,14 +175,14 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateTableStream(int tableId, TableStreamType type, SnapshotPredicates predicates) {
+    public boolean activateTableStream(int tableId, TableStreamType type, long undoQuantumToken, byte[] predicates) {
         return false;
     }
 
     @Override
-    public int[] tableStreamSerializeMore(int tableId, TableStreamType type,
-                                          List<DBBPool.BBContainer> outputBuffers) {
-        return new int[] {0};
+    public Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
+                                                      List<BBContainer> outputBuffers) {
+        return Pair.of(0l, new int[] {0});
     }
 
     @Override
@@ -211,12 +206,12 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public int hashinate(Object value, HashinatorType type, byte config[]) {
+    public int hashinate(Object value, TheHashinator.HashinatorConfig config) {
         return 0;
     }
 
     @Override
-    public void updateHashinator(HashinatorType type, byte[] config)
+    public void updateHashinator(TheHashinator.HashinatorConfig config)
     {
 
     }

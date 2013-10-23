@@ -62,8 +62,8 @@ class MockTopend : public Topend {
         }
         partitionIds.push(partitionId);
         signatures.push(signature);
-        blocks.push_back(shared_ptr<StreamBlock>(new StreamBlock(block)));
-        data.push_back(shared_ptr<char>(block->rawPtr()));
+        blocks.push_back(boost::shared_ptr<StreamBlock>(new StreamBlock(block)));
+        data.push_back(boost::shared_ptr<char>(block->rawPtr()));
         receivedExportBuffer = true;
     }
 
@@ -88,8 +88,8 @@ class MockTopend : public Topend {
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length) {}
     queue<int32_t> partitionIds;
     queue<std::string> signatures;
-    vector<shared_ptr<StreamBlock> > blocks;
-    vector<shared_ptr<char> > data;
+    vector<boost::shared_ptr<StreamBlock> > blocks;
+    vector<boost::shared_ptr<char> > data;
     bool receivedExportBuffer;
 };
 
@@ -193,7 +193,7 @@ TEST_F(StreamedTableTest, BaseCase) {
     // poll from the table and make sure we get "stuff", releasing as
     // we go.  This just makes sure we don't fail catastrophically and
     // that things are basically as we expect.
-    vector<shared_ptr<StreamBlock> >::iterator begin = m_topend->blocks.begin();
+    vector<boost::shared_ptr<StreamBlock> >::iterator begin = m_topend->blocks.begin();
     int64_t uso = (*begin)->uso();
     EXPECT_EQ(uso, 0);
     size_t offset = (*begin)->offset();
@@ -204,7 +204,7 @@ TEST_F(StreamedTableTest, BaseCase) {
             break;
         }
 
-        shared_ptr<StreamBlock> block = *begin;
+        boost::shared_ptr<StreamBlock> block = *begin;
         uso = block->uso();
         EXPECT_EQ(uso, offset);
         offset += block->offset();

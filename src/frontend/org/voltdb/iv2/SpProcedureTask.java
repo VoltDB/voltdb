@@ -129,8 +129,8 @@ public class SpProcedureTask extends ProcedureTask
             // eventual encapsulation.
             siteConnection.truncateUndoLog(m_txnState.needsRollback(),
                     m_txnState.getBeginUndoToken(),
-                    m_txnState.txnId,
-                    m_txnState.m_spHandle);
+                    m_txnState.m_spHandle,
+                    m_txnState.getUndoLog());
         }
         m_txnState.setDone();
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
@@ -167,8 +167,8 @@ public class SpProcedureTask extends ProcedureTask
             // eventual encapsulation.
             siteConnection.truncateUndoLog(m_txnState.needsRollback(),
                     m_txnState.getBeginUndoToken(),
-                    m_txnState.txnId,
-                    m_txnState.m_spHandle);
+                    m_txnState.m_spHandle,
+                    m_txnState.getUndoLog());
         }
         doCommonSPICompleteActions();
     }

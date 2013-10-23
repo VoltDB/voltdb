@@ -29,12 +29,13 @@ HOST="localhost"
 # remove build artifacts
 function clean() {
     rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput $APPNAME-alt.jar voltdbroot voltdbroot
 }
 
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -target 1.6 -source 1.6 -classpath $CLASSPATH -d obj \
+    javac -target 1.7 -source 1.7 -classpath $CLASSPATH -d obj \
         src/txnIdSelfCheck/*.java \
         src/txnIdSelfCheck/procedures/*.java
     # stop if compilation fails

@@ -171,7 +171,7 @@ public class SnapshotConverter {
         snapshotNames.add(snapshotName);
         SpecificSnapshotFilter filter = new SpecificSnapshotFilter(snapshotNames);
         for (File directory : directories) {
-            SnapshotUtil.retrieveSnapshotFiles( directory, snapshots, filter, 0, false, CONSOLE_LOG);
+            SnapshotUtil.retrieveSnapshotFiles( directory, snapshots, filter, false, CONSOLE_LOG);
         }
 
         if (snapshots.size() > 1) {

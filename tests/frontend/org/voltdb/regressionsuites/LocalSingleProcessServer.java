@@ -29,9 +29,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.StartAction;
 import org.voltdb.ServerThread;
-import org.voltdb.VoltDB;
+import org.voltdb.StartAction;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.VoltProjectBuilder;
 
@@ -199,7 +198,6 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
         config.m_pathToCatalog = m_jarFileName;
         config.m_pathToDeployment = m_pathToDeployment;
         config.m_startAction = StartAction.CREATE;
-        config.m_enableIV2 = VoltDB.checkTestEnvForIv2();
 
         m_siteProcess = new EEProcess(m_target, m_siteCount, "LocalSingleProcessServer.log");
         config.m_ipcPort = m_siteProcess.port();

@@ -27,6 +27,9 @@
 #include "catalog/table.h"
 #include "catalog/materializedviewinfo.h"
 #include "expressions/abstractexpression.h"
+#include "expressions/tuplevalueexpression.h"
+#include "expressions/constantvalueexpression.h"
+#include "expressions/comparisonexpression.h"
 #include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
 #include "storage/persistenttable.h"
@@ -36,65 +39,21 @@
 
 namespace voltdb {
 
-MaterializedViewMetadata::MaterializedViewMetadata(
-        PersistentTable *srcTable, PersistentTable *destTable, catalog::MaterializedViewInfo *mvInfo)
-        : m_target(destTable), m_filterPredicate(NULL)
+MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
+                                                   PersistentTable *destTable,
+                                                   catalog::MaterializedViewInfo *mvInfo)
+    : m_srcTable(srcTable), m_target(destTable), m_index(destTable->primaryKeyIndex())
+    , m_indexForMinMax(NULL)
+    , m_filterPredicate(parsePredicate(mvInfo))
+    , m_groupByColumnCount(parseGroupBy(mvInfo)) // also loads m_groupByExprs/Columns as needed
+    , m_searchKeyValue(m_groupByColumnCount)
+    , m_aggColumnCount(parseAggregation(mvInfo))
 {
-// DEBUG_STREAM_HERE("New mat view on source table " << srcTable->name() << " @" << srcTable << " view table " << m_target->name() << " @" << m_target);
     // best not to have to worry about the destination table disappearing out from under the source table that feeds it.
     VOLT_TRACE("construct materializedViewMetadata...");
 
     m_target->incrementRefcount();
     srcTable->addMaterializedView(this);
-    // try to load the predicate from the catalog view
-    parsePredicate(mvInfo);
-    VOLT_TRACE("Start to parse complex group by");
-    parseComplexGroupby(mvInfo);
-    if (m_groupbyExprs.size() != 0) {
-        m_groupByColumnCount = (int32_t)m_groupbyExprs.size();
-    } else {
-        m_groupByColumnCount = mvInfo->groupbycols().size();
-    }
-
-    // set up the group by columns from the catalog info
-    m_groupByColumns = new int32_t[m_groupByColumnCount];
-
-    if (m_groupbyExprs.size() == 0) {
-        std::map<std::string, catalog::ColumnRef*>::const_iterator colRefIterator;
-        for (colRefIterator = mvInfo->groupbycols().begin();
-                colRefIterator != mvInfo->groupbycols().end();
-                colRefIterator++)
-        {
-            int32_t grouping_order_offset = colRefIterator->second->index();
-            m_groupByColumns[grouping_order_offset] = colRefIterator->second->column()->index();
-        }
-    }
-
-    parseComplexAggregation(mvInfo);
-
-    // set up the mapping from input col to output col
-    m_outputColumnCount = mvInfo->dest()->columns().size();
-    m_outputColumnSrcTableIndexes = new int32_t[m_outputColumnCount];
-    m_outputColumnAggTypes = new ExpressionType[m_outputColumnCount];
-    std::map<std::string, catalog::Column*>::const_iterator colIterator;
-    // iterate the source table
-    for (colIterator = mvInfo->dest()->columns().begin(); colIterator != mvInfo->dest()->columns().end(); colIterator++) {
-        const catalog::Column *destCol = colIterator->second;
-        int destIndex = destCol->index();
-
-        m_outputColumnAggTypes[destIndex] = static_cast<ExpressionType>(destCol->aggregatetype());
-        const catalog::Column *srcCol = destCol->matviewsource();
-
-        // We set its matview for Complex Aggregation case
-        if (srcCol) {
-            m_outputColumnSrcTableIndexes[destIndex] = srcCol->index();
-        }
-        else {
-            m_outputColumnSrcTableIndexes[destIndex] = -1;
-        }
-    }
-
-    m_index = m_target->primaryKeyIndex();
 
     // When updateTupleWithSpecificIndexes needs to be called,
     // the context is lost that identifies which base table columns potentially changed.
@@ -108,6 +67,9 @@ MaterializedViewMetadata::MaterializedViewMetadata(
             m_updatableIndexList.push_back(index);
         }
     }
+
+    // handle index for min / max support
+    setIndexForMinMax(mvInfo->indexForMinMax());
 
     allocateBackedTuples();
 
@@ -123,17 +85,13 @@ MaterializedViewMetadata::MaterializedViewMetadata(
 }
 
 MaterializedViewMetadata::~MaterializedViewMetadata() {
-// DEBUG_STREAM_HERE("Delete mat view " << m_target->name() << " w/ table @" << m_target);
     freeBackedTuples();
-    delete[] m_groupByColumns;
-    delete[] m_outputColumnSrcTableIndexes;
-    delete[] m_outputColumnAggTypes;
     delete m_filterPredicate;
-    for (int ii = 0; ii < m_groupbyExprs.size(); ++ii) {
-        delete m_groupbyExprs[ii];
+    for (int ii = 0; ii < m_groupByExprs.size(); ++ii) {
+        delete m_groupByExprs[ii];
     }
-    for (int ii = 0; ii < m_aggregationExprs.size(); ++ii) {
-        delete m_aggregationExprs[ii];
+    for (int ii = 0; ii < m_aggExprs.size(); ++ii) {
+        delete m_aggExprs[ii];
     }
     m_target->decrementRefcount();
 }
@@ -154,6 +112,20 @@ void MaterializedViewMetadata::setTargetTable(PersistentTable * target)
     oldTarget->decrementRefcount();
 }
 
+void MaterializedViewMetadata::setIndexForMinMax(std::string indexForMinOrMax)
+{
+    m_indexForMinMax = NULL;
+    if (indexForMinOrMax.compare("") != 0) {
+        std::vector<TableIndex*> candidates = m_srcTable->allIndexes();
+        for (int i = 0; i < candidates.size(); i++) {
+            if (indexForMinOrMax.compare(candidates[i]->getName()) == 0) {
+                m_indexForMinMax = candidates[i];
+                break;
+            }
+        }
+    }
+}
+
 void MaterializedViewMetadata::freeBackedTuples()
 {
     delete[] m_searchKeyBackingStore;
@@ -163,10 +135,10 @@ void MaterializedViewMetadata::freeBackedTuples()
 
 void MaterializedViewMetadata::allocateBackedTuples()
 {
-    m_searchKey = TableTuple(m_index->getKeySchema());
+    m_searchKeyTuple = TableTuple(m_index->getKeySchema());
     m_searchKeyBackingStore = new char[m_index->getKeySchema()->tupleLength() + 1];
     memset(m_searchKeyBackingStore, 0, m_index->getKeySchema()->tupleLength() + 1);
-    m_searchKey.move(m_searchKeyBackingStore);
+    m_searchKeyTuple.move(m_searchKeyBackingStore);
 
     m_existingTuple = TableTuple(m_target->schema());
 
@@ -182,42 +154,223 @@ void MaterializedViewMetadata::allocateBackedTuples()
 }
 
 
-void MaterializedViewMetadata::parsePredicate(catalog::MaterializedViewInfo *mvInfo) {
+AbstractExpression* MaterializedViewMetadata::parsePredicate(catalog::MaterializedViewInfo *mvInfo)
+{
     std::string hexString = mvInfo->predicate();
-    if (hexString.size() == 0)
-        return;
-
+    if (hexString.size() == 0) {
+        return NULL;
+    }
     assert (hexString.length() % 2 == 0);
     int bufferLength = (int)hexString.size() / 2 + 1;
     boost::shared_array<char> buffer(new char[bufferLength]);
     catalog::Catalog::hexDecodeString(hexString, buffer.get());
 
     PlannerDomRoot domRoot(buffer.get());
-    if (!domRoot.isNull()) {
-        PlannerDomValue expr = domRoot.rootObject();
-        m_filterPredicate = AbstractExpression::buildExpressionTree(expr);
+    if (domRoot.isNull()) {
+        return NULL;
     }
+    PlannerDomValue expr = domRoot.rootObject();
+    return AbstractExpression::buildExpressionTree(expr);
 }
 
-void MaterializedViewMetadata::parseComplexGroupby(catalog::MaterializedViewInfo *mvInfo) {
+std::size_t MaterializedViewMetadata::parseGroupBy(catalog::MaterializedViewInfo *mvInfo)
+{
     const std::string expressionsAsText = mvInfo->groupbyExpressionsJson();
     if (expressionsAsText.length() == 0) {
-        return;
+        // set up the group by columns from the catalog info
+        const catalog::CatalogMap<catalog::ColumnRef>& columns = mvInfo->groupbycols();
+        m_groupByColIndexes.resize(columns.size());
+        for (catalog::CatalogMap<catalog::ColumnRef>::field_map_iter colRefIterator = columns.begin();
+             colRefIterator != columns.end(); colRefIterator++) {
+            int32_t grouping_order_offset = colRefIterator->second->index();
+            m_groupByColIndexes[grouping_order_offset] = colRefIterator->second->column()->index();
+        }
+        return columns.size();
     }
     VOLT_TRACE("Group by Expression: %s\n", expressionsAsText.c_str());
-    ExpressionUtil::loadIndexedExprsFromJson(m_groupbyExprs, expressionsAsText);
+    ExpressionUtil::loadIndexedExprsFromJson(m_groupByExprs, expressionsAsText);
+    return m_groupByExprs.size();
 }
 
-void MaterializedViewMetadata::parseComplexAggregation(catalog::MaterializedViewInfo *mvInfo) {
+std::size_t MaterializedViewMetadata::parseAggregation(catalog::MaterializedViewInfo *mvInfo)
+{
     const std::string expressionsAsText = mvInfo->aggregationExpressionsJson();
-    if (expressionsAsText.length() == 0) {
-        return;
+    bool usesComplexAgg = expressionsAsText.length() > 0;
+    // set up the mapping from input col to output col
+    const catalog::CatalogMap<catalog::Column>& columns = mvInfo->dest()->columns();
+    m_aggTypes.resize(columns.size() - m_groupByColumnCount - 1);
+    if ( ! usesComplexAgg) {
+        m_aggColIndexes.resize(m_aggTypes.size());
     }
-    VOLT_TRACE("Aggregate Expression: %s\n", expressionsAsText.c_str());
-    ExpressionUtil::loadIndexedExprsFromJson(m_aggregationExprs, expressionsAsText);
+    for (catalog::CatalogMap<catalog::Column>::field_map_iter colIterator = columns.begin();
+         colIterator != columns.end(); colIterator++) {
+        const catalog::Column *destCol = colIterator->second;
+        if (destCol->index() < m_groupByColumnCount + 1) {
+            continue;
+        }
+        // The index into the per-agg metadata starts as a materialized view column index
+        // but needs to be shifted down for each column that has no agg option
+        // -- that is, -1 for each "group by" AND -1 for the COUNT(*).
+        std::size_t aggIndex = destCol->index() - m_groupByColumnCount - 1;
+        m_aggTypes[aggIndex] = static_cast<ExpressionType>(destCol->aggregatetype());
+        switch(m_aggTypes[aggIndex]) {
+        case EXPRESSION_TYPE_AGGREGATE_SUM:
+        case EXPRESSION_TYPE_AGGREGATE_COUNT:
+        case EXPRESSION_TYPE_AGGREGATE_MIN:
+        case EXPRESSION_TYPE_AGGREGATE_MAX:
+            break; // legal value
+        default: {
+            char message[128];
+            snprintf(message, 128, "Error in materialized view aggregation %d expression type %s",
+                     (int)aggIndex, expressionToString(m_aggTypes[aggIndex]).c_str());
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                          message);
+        }
+        }
+        if (usesComplexAgg) {
+            continue;
+        }
+        // Not used for Complex Aggregation case
+        const catalog::Column *srcCol = destCol->matviewsource();
+        assert(srcCol);
+        m_aggColIndexes[aggIndex] = srcCol->index();
+    }
+
+    if (usesComplexAgg) {
+        VOLT_TRACE("Aggregate Expression: %s\n", expressionsAsText.c_str());
+        ExpressionUtil::loadIndexedExprsFromJson(m_aggExprs, expressionsAsText);
+    }
+    return m_aggTypes.size();
 }
 
-void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple, bool fallible) {
+inline NValue MaterializedViewMetadata::getGroupByValueFromSrcTuple(int colIndex, const TableTuple& tuple)
+{
+    if (m_groupByExprs.size() != 0) {
+        AbstractExpression* gbExpr = m_groupByExprs[colIndex];
+        return gbExpr->eval(&tuple, NULL);
+    } else {
+        int gbColIdx = m_groupByColIndexes[colIndex];
+        return tuple.getNValue(gbColIdx);
+    }
+}
+
+inline NValue MaterializedViewMetadata::getAggInputFromSrcTuple(int aggIndex, const TableTuple& tuple)
+{
+    if (m_aggExprs.size() != 0) {
+        AbstractExpression* aggExpr = m_aggExprs[aggIndex];
+        return aggExpr->eval(&tuple, NULL);
+    } else {
+        int srcColIdx = m_aggColIndexes[aggIndex];
+        return tuple.getNValue(srcColIdx);
+    }
+}
+
+NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple& oldTuple,
+                                                                const NValue &existingValue,
+                                                                const NValue &initialNull,
+                                                                int negate_for_min,
+                                                                int aggIndex)
+{
+    AbstractExpression *aggExpr = NULL;
+    int srcColIdx = -1;
+    if (m_aggExprs.size() != 0) {
+        aggExpr = m_aggExprs[aggIndex];
+    } else {
+        srcColIdx = m_aggColIndexes[aggIndex];
+    }
+    NValue newVal = initialNull;
+    m_indexForMinMax->moveToKey(&m_searchKeyTuple);
+    VOLT_TRACE("Starting to scan tuples using index %s\n", m_indexForMinMax->debug().c_str());
+    TableTuple tuple;
+    while (!(tuple = m_indexForMinMax->nextValueAtKey()).isNullTuple()) {
+        // skip the oldTuple and apply post filter
+        if (tuple.equals(oldTuple) ||
+            (m_filterPredicate && m_filterPredicate->eval(&tuple, NULL).isFalse())) {
+            continue;
+        }
+        VOLT_TRACE("Scanning tuple: %s\n", tuple.debugNoHeader().c_str());
+        NValue current = (aggExpr) ? aggExpr->eval(&tuple, NULL) : tuple.getNValue(srcColIdx);
+        if (current.isNull()) {
+            continue;
+        }
+        if (current.compare(existingValue) == 0) {
+            newVal = current;
+            VOLT_TRACE("Found another tuple with same min / max value, breaking the loop.\n");
+            break;
+        }
+        VOLT_TRACE("\tBefore: current %s, best %s\n", current.debug().c_str(), newVal.debug().c_str());
+        if (newVal.isNull() || (negate_for_min * current.compare(newVal)) > 0) {
+            newVal = current;
+            VOLT_TRACE("\tAfter: new best %s\n", newVal.debug().c_str());
+        }
+    }
+    return newVal;
+}
+
+NValue MaterializedViewMetadata::findMinMaxFallbackValueSequential(const TableTuple& oldTuple,
+                                                                   const NValue &existingValue,
+                                                                   const NValue &initialNull,
+                                                                   int negate_for_min,
+                                                                   int aggIndex)
+{
+    AbstractExpression *aggExpr = NULL;
+    int srcColIdx = -1;
+    if (m_aggExprs.size() != 0) {
+        aggExpr = m_aggExprs[aggIndex];
+    } else {
+        srcColIdx = m_aggColIndexes[aggIndex];
+    }
+    NValue newVal = initialNull;
+    // loop through tuples to find the MIN / MAX
+    bool skippedOne = false;
+    TableTuple tuple(m_srcTable->schema());
+    TableIterator &iterator = m_srcTable->iterator();
+    VOLT_TRACE("Starting iteration on: %s\n", m_srcTable->debug().c_str());
+    while (iterator.next(tuple)) {
+        // apply post filter
+        VOLT_TRACE("Checking tuple: %s\n", tuple.debugNoHeader().c_str());
+        if (m_filterPredicate && m_filterPredicate->eval(&tuple, NULL).isFalse()) {
+            continue;
+        }
+        VOLT_TRACE("passed 1\n");
+        int comparison = 0;
+        for (int idx = 0; idx < m_groupByColumnCount; idx++) {
+            NValue foundKey = getGroupByValueFromSrcTuple(idx, tuple);
+            comparison = m_searchKeyValue[idx].compare(foundKey);
+            if (comparison != 0) {
+                break;
+            }
+        }
+        if (comparison != 0) {
+            continue;
+        }
+        VOLT_TRACE("passed 2\n");
+        NValue current = (aggExpr) ? aggExpr->eval(&tuple, NULL) : tuple.getNValue(srcColIdx);
+        if (current.isNull()) {
+            continue;
+        }
+        if (current.compare(existingValue) == 0) {
+            if (!skippedOne) {
+                VOLT_TRACE("Skip tuple: %s\n", tuple.debugNoHeader().c_str());
+                skippedOne = true;
+                continue;
+            }
+            VOLT_TRACE("Found another tuple with same min / max value, breaking the loop.\n");
+            newVal = current;
+            break;
+        }
+        VOLT_TRACE("\tBefore: current %s, best %s\n", current.debug().c_str(), newVal.debug().c_str());
+        if (newVal.isNull() || (negate_for_min * current.compare(newVal)) > 0) {
+            newVal = current;
+            VOLT_TRACE("\tAfter: new best %s\n", newVal.debug().c_str());
+        }
+    }
+    VOLT_TRACE("\tFinal: new best %s\n", newVal.debug().c_str());
+    return newVal;
+}
+
+void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bool fallible)
+{
     // don't change the view if this tuple doesn't match the predicate
     if (m_filterPredicate
         && (m_filterPredicate->eval(&newTuple, NULL).isFalse())) {
@@ -240,17 +393,7 @@ void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple, bool fal
         // tuple values should be pulled from the existing tuple in
         // that table. This works around a memory ownership issue
         // related to out-of-line strings.
-        NValue value;
-        if (exists) {
-            value = m_existingTuple.getNValue(colindex);
-        } else {
-            if (m_groupbyExprs.size() != 0) {
-                AbstractExpression * expr = m_groupbyExprs.at(colindex);
-                value = expr->eval(&newTuple, NULL);
-            } else {
-                value = newTuple.getNValue(m_groupByColumns[colindex]);
-            }
-        }
+        NValue value = exists ? m_existingTuple.getNValue(colindex) : m_searchKeyValue[colindex];
         m_updatedTuple.setNValue(colindex, value);
     }
 
@@ -259,51 +402,69 @@ void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple, bool fal
                              m_existingTuple.getNValue(colindex).op_increment());
     colindex++;
 
+    int aggOffset = colindex;
     // set values for the other columns
-    for (int i = colindex; i < m_outputColumnCount; i++) {
-        NValue newValue;
-        if (m_aggregationExprs.size() != 0) {
-            AbstractExpression * expr = m_aggregationExprs.at(i-colindex);
-            newValue = expr->eval(&newTuple, NULL);
-        } else {
-            newValue = newTuple.getNValue(m_outputColumnSrcTableIndexes[i]);
-        }
-        NValue existingValue = m_existingTuple.getNValue(i);
-
-        if (m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_SUM) {
-            m_updatedTuple.setNValue(i, newValue.op_add(existingValue));
-        }
-        else if (m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
-            m_updatedTuple.setNValue(i, existingValue.op_increment());
-        }
-        else {
-            char message[128];
-            snprintf(message, 128, "Error in materialized view table update for"
-                    " col %d. Expression type %d", i, m_outputColumnAggTypes[i]);
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          message);
-        }
-    }
-
     // update or insert the row
     if (exists) {
+        for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
+            NValue existingValue = m_existingTuple.getNValue(aggOffset+aggIndex);
+            NValue newValue = getAggInputFromSrcTuple(aggIndex, newTuple);
+            if (newValue.isNull()) {
+                newValue = existingValue;
+            } else {
+                switch(m_aggTypes[aggIndex]) {
+                case EXPRESSION_TYPE_AGGREGATE_SUM:
+                    newValue = existingValue.op_add(newValue);
+                    break;
+                case EXPRESSION_TYPE_AGGREGATE_COUNT:
+                    newValue = existingValue.op_increment();
+                    break;
+                case EXPRESSION_TYPE_AGGREGATE_MIN:
+                    // ignore any new value that is not strictly an improvement
+                    if (newValue.compare(existingValue) >= 0) {
+                        newValue = existingValue;
+                    }
+                    break;
+                case EXPRESSION_TYPE_AGGREGATE_MAX:
+                    // ignore any new value that is not strictly an improvement
+                    if (newValue.compare(existingValue) <= 0) {
+                        newValue = existingValue;
+                    }
+                    break;
+                default:
+                    assert(false); // Should have been caught when the matview was loaded.
+                }
+            }
+            m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
+        }
+
         // Shouldn't need to update group-key-only indexes such as the primary key
         // since their keys shouldn't ever change, but do update other indexes.
         m_target->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
                                                  m_updatableIndexList, fallible);
     }
     else {
+        // A new group row gets its initial agg values copied directly from the first source row.
+        for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
+            NValue newValue = getAggInputFromSrcTuple(aggIndex, newTuple);
+            m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
+        }
         m_target->insertPersistentTuple(m_updatedTuple, fallible);
     }
 }
 
-void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fallible) {
+void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bool fallible)
+{
     // don't change the view if this tuple doesn't match the predicate
     if (m_filterPredicate && (m_filterPredicate->eval(&oldTuple, NULL).isFalse()))
         return;
 
-    // this will assert if the tuple isn't there as param expected is true
-    findExistingTuple(oldTuple, true);
+    if ( ! findExistingTuple(oldTuple)) {
+        std::string name = m_target->name();
+        throwFatalException("MaterializedViewMetadata for table %s went"
+                            " looking for a tuple in the view and"
+                            " expected to find it but didn't", name.c_str());
+    }
 
     // clear the tuple that will be built to insert or overwrite
     memset(m_updatedTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
@@ -312,9 +473,9 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
     //fflush(stdout);
 
     // set up the first column, which is a count
-    NValue count = m_existingTuple.getNValue(m_groupByColumnCount).op_decrement();
+    NValue count = m_existingTuple.getNValue((int)m_groupByColumnCount).op_decrement();
 
-    //printf("  Count is: %d.\n", (int)(m_existingTuple.getSlimValue(m_groupByColumnCount).getBigInt()));
+    //printf("  Count is: %ld.\n", (long)(count.getBigInt()));
     //fflush(stdout);
 
     // check if we should remove the tuple
@@ -337,28 +498,47 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
     m_updatedTuple.setNValue(colindex, count);
     colindex++;
 
+    int aggOffset = colindex;
     // set values for the other columns
-    for (int i = colindex; i < m_outputColumnCount; i++) {
-        NValue oldValue;
-        if (m_aggregationExprs.size() != 0) {
-            AbstractExpression * expr = m_aggregationExprs.at(i-colindex);
-            oldValue = expr->eval(&oldTuple, NULL);
-        } else {
-            oldValue = oldTuple.getNValue(m_outputColumnSrcTableIndexes[i]);
-        }
-        NValue existingValue = m_existingTuple.getNValue(i);
+    for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
+        NValue existingValue = m_existingTuple.getNValue(aggOffset+aggIndex);
+        NValue oldValue = getAggInputFromSrcTuple(aggIndex, oldTuple);
+        NValue newValue = existingValue;
+        if ( ! oldValue.isNull()) {
+            int reversedForMin = 1; // initially assume that agg is not MIN.
+            switch(m_aggTypes[aggIndex]) {
+            case EXPRESSION_TYPE_AGGREGATE_SUM:
+                newValue = existingValue.op_subtract(oldValue);
+                break;
+            case EXPRESSION_TYPE_AGGREGATE_COUNT:
+                newValue = oldValue.isNull() ? existingValue : existingValue.op_decrement();
+                break;
+            case EXPRESSION_TYPE_AGGREGATE_MIN:
+                reversedForMin = -1;
+                // fall through...
+            case EXPRESSION_TYPE_AGGREGATE_MAX:
+                if (oldValue.compare(existingValue) == 0) {
+                    // re-calculate MIN / MAX
+                    newValue = NValue::getNullValue(m_target->schema()->columnType(aggOffset+aggIndex));
 
-        if (m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_SUM) {
-            m_updatedTuple.setNValue(i, existingValue.op_subtract(oldValue));
+                    // indexscan if an index is available, otherwise tablescan
+                    if (m_indexForMinMax) {
+                        newValue = findMinMaxFallbackValueIndexed(oldTuple, existingValue, newValue,
+                                                                  reversedForMin, aggIndex);
+                    } else {
+                        VOLT_TRACE("before findMinMaxFallbackValueSequential\n");
+                        newValue = findMinMaxFallbackValueSequential(oldTuple, existingValue, newValue,
+                                                                     reversedForMin, aggIndex);
+                        VOLT_TRACE("after findMinMaxFallbackValueSequential\n");
+                    }
+                }
+                break;
+            default:
+                assert(false); // Should have been caught when the matview was loaded.
+            }
         }
-        else if (m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
-            m_updatedTuple.setNValue(i, existingValue.op_decrement());
-        }
-        else {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          "Error in materialized view table"
-                                          " update.");
-        }
+        VOLT_TRACE("updating matview tuple column %d\n", (int)(aggOffset+aggIndex));
+        m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
     }
 
     // update the row
@@ -368,34 +548,19 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
                                              m_updatableIndexList, fallible);
 }
 
-bool MaterializedViewMetadata::findExistingTuple(TableTuple &oldTuple, bool expected) {
+bool MaterializedViewMetadata::findExistingTuple(const TableTuple &tuple)
+{
     // find the key for this tuple (which is the group by columns)
-    NValue value;
-    for (int i = 0; i < m_groupByColumnCount; i++) {
-        if (m_groupbyExprs.size() != 0) {
-            AbstractExpression * expr = m_groupbyExprs.at(i);
-            value = expr->eval(&oldTuple,NULL);
-        } else {
-            value = oldTuple.getNValue(m_groupByColumns[i]);
-        }
-        m_searchKey.setNValue(i, value);
+    for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
+        NValue value = getGroupByValueFromSrcTuple(colindex, tuple);
+        m_searchKeyValue[colindex] = value;
+        m_searchKeyTuple.setNValue(colindex, value);
     }
 
     // determine if the row exists (create the empty one if it doesn't)
-    m_index->moveToKey(&m_searchKey);
+    m_index->moveToKey(&m_searchKeyTuple);
     m_existingTuple = m_index->nextValueAtKey();
-    if (m_existingTuple.isNullTuple()) {
-        if (expected) {
-            std::string name = m_target->name();
-            throwFatalException("MaterializedViewMetadata for table %s went"
-                                " looking for a tuple in the view and"
-                                " expected to find it but didn't", name.c_str());
-        }
-        return false;
-    }
-    else {
-        return true;
-    }
+    return ! m_existingTuple.isNullTuple();
 }
 
 } // namespace voltdb

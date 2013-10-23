@@ -238,7 +238,8 @@ public class SnapshotDeleteAgent extends OpsAgent
 
                 if (!pathname.getName().endsWith(".vpt") &&
                     !pathname.getName().endsWith(".digest") &&
-                    !pathname.getName().endsWith(".jar")) {
+                    !pathname.getName().endsWith(".jar") &&
+                    !pathname.getName().endsWith(".hash")) {
                     return false;
                 }
 

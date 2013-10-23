@@ -43,7 +43,6 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.ProjectionPlanNode;
@@ -119,7 +118,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // New inlined projection node for the scan node, contain extra group by columns.
         public ProjectionPlanNode scanInlinedProjectionNode = null;
         // New re-Aggregation plan node on the coordinator to eliminate the duplicated rows.
-        public AggregatePlanNode reAggNode = null;
+        public HashAggregatePlanNode reAggNode = null;
     }
 
     public ArrayList<ParsedColInfo> displayColumns = new ArrayList<ParsedColInfo>();
@@ -164,25 +163,17 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     @Override
     void parse(VoltXMLElement stmtNode) {
         String node;
-
-        if ((node = stmtNode.attributes.get("limit")) != null)
-            limit = Long.parseLong(node);
-        if ((node = stmtNode.attributes.get("offset")) != null)
-            offset = Long.parseLong(node);
-        if ((node = stmtNode.attributes.get("limit_paramid")) != null)
-            limitParameterId = Long.parseLong(node);
-        if ((node = stmtNode.attributes.get("offset_paramid")) != null)
-            offsetParameterId = Long.parseLong(node);
         if ((node = stmtNode.attributes.get("distinct")) != null)
             distinct = Boolean.parseBoolean(node);
 
-        // limit and offset can't have both value and parameter
-        if (limit != -1) assert limitParameterId == -1 : "Parsed value and param. limit.";
-        if (offset != 0) assert offsetParameterId == -1 : "Parsed value and param. offset.";
-
+        VoltXMLElement limitElement = null, offsetElement = null;
         VoltXMLElement displayElement = null, orderbyElement = null, groupbyElement = null;
         for (VoltXMLElement child : stmtNode.children) {
-            if (child.name.equalsIgnoreCase("columns")) {
+            if (child.name.equalsIgnoreCase("limit")) {
+                limitElement = child;
+            } else if (child.name.equalsIgnoreCase("offset")) {
+                offsetElement = child;
+            } else if (child.name.equalsIgnoreCase("columns")) {
                 displayElement = child;
             } else if (child.name.equalsIgnoreCase("ordercolumns")) {
                 orderbyElement = child;
@@ -190,6 +181,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 groupbyElement = child;
             }
         }
+        parseLimitAndOffset(limitElement, offsetElement);
+
         if (aggregationList == null) {
             aggregationList = new ArrayList<AbstractExpression>();
         }
@@ -204,7 +197,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             insertToColumnList(aggResultColumns, groupByColumns);
         }
 
-        if (orderbyElement != null) {
+        if (orderbyElement != null && !guaranteesUniqueRow()) {
             parseOrderColumns(orderbyElement, false);
         }
         // At this point, we have collected all aggregations in the select statement.
@@ -225,16 +218,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         // Prepare for the mv based distributed query fix only if it might be required.
         if (tableList.size() == 1) {
-            if (getSingleTableFilterExpression() == null) {
-                // Do not handle joined query case and where clause case.
-                mvFixInfo.mvTable = tableList.get(0);
-                processMVBasedQueryFix(mvFixInfo, m_db, scanColumns);
-            }
+            // Do not handle joined query case case.
+            mvFixInfo.mvTable = tableList.get(0);
+            processMVBasedQueryFix(mvFixInfo, m_db, scanColumns, joinTree);
         }
     }
 
     private static void processMVBasedQueryFix(MVFixInfo mvFixInfo, Database db,
-            Map<String, ArrayList<SchemaColumn>> scanColumns)
+            Map<String, ArrayList<SchemaColumn>> scanColumns, JoinNode joinTree)
     {
         // Check valid cases first
         String mvTableName = mvFixInfo.mvTable.getTypeName();
@@ -257,8 +248,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (complexGroupbyJson.length() > 0) {
             List<AbstractExpression> mvComplexGroupbyCols = null;
             try {
-                mvComplexGroupbyCols =
-                        AbstractExpression.fromJSONArrayString(complexGroupbyJson, db);
+                mvComplexGroupbyCols = AbstractExpression.fromJSONArrayString(complexGroupbyJson);
             } catch (JSONException e) {
                 e.printStackTrace();
             }
@@ -367,6 +357,52 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             outputColumnIndex++;
         }
         mvFixInfo.reAggNode.setOutputSchema(aggSchema);
+
+        assert(joinTree != null);
+        assert(joinTree.m_whereExpr == null);
+        // Follow HSQL's logic to store the where expression in joinExpr for single table.
+        AbstractExpression where = joinTree.m_joinExpr;
+        if (where != null) {
+            // Collect all TVEs that need to be do re-aggregation in coordinator.
+            List<TupleValueExpression> needReAggTVEs = new ArrayList<TupleValueExpression>();
+            for (int i=numOfGroupByColumns; i < mvColumnArray.size(); i++) {
+                Column mvCol = mvColumnArray.get(i);
+                TupleValueExpression tve = new TupleValueExpression();
+                tve.setColumnIndex(i);
+                tve.setColumnName(mvCol.getName());
+                tve.setTableName(mvTableName);
+                tve.setColumnAlias(mvCol.getName());
+                tve.setValueType(VoltType.get((byte)mvCol.getType()));
+                tve.setValueSize(mvCol.getSize());
+
+                needReAggTVEs.add(tve);
+            }
+            List<AbstractExpression> exprs = ExpressionUtil.uncombine(where);
+            List<AbstractExpression> pushdownExprs = new ArrayList<AbstractExpression>();
+            List<AbstractExpression> aggPostExprs = new ArrayList<AbstractExpression>();
+            // Check where clause.
+            for (AbstractExpression expr: exprs) {
+                ArrayList<AbstractExpression> tves = expr.findBaseTVEs();
+                boolean pushdown = true;
+                for (TupleValueExpression needReAggTVE: needReAggTVEs) {
+                    if (tves.contains(needReAggTVE)) {
+                        pushdown = false;
+                        break;
+                    }
+                }
+                if (pushdown) {
+                    pushdownExprs.add(expr);
+                } else {
+                    aggPostExprs.add(expr);
+                }
+            }
+            AbstractExpression aggPostExpr = ExpressionUtil.combine(aggPostExprs);
+
+            mvFixInfo.reAggNode.setPostPredicate(aggPostExpr);
+            assert(joinTree.m_whereExpr == null);
+            joinTree.m_joinExpr = ExpressionUtil.combine(pushdownExprs);
+        }
+
     }
 
     private void processAvgPushdownOptimization (VoltXMLElement displayElement,
@@ -671,6 +707,49 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
         }
         aggregationList.addAll(optimalAvgAggs);
+    }
+
+    private void parseLimitAndOffset(VoltXMLElement limitNode, VoltXMLElement offsetNode) {
+        String node;
+        if (limitNode != null) {
+            // Parse limit
+            if ((node = limitNode.attributes.get("limit_paramid")) != null)
+                limitParameterId = Long.parseLong(node);
+            else {
+                assert(limitNode.children.size() == 1);
+                VoltXMLElement valueNode = limitNode.children.get(0);
+                String isParam = valueNode.attributes.get("isparam");
+                if ((isParam != null) && (isParam.equalsIgnoreCase("true"))) {
+                    limitParameterId = Long.parseLong(valueNode.attributes.get("id"));
+                } else {
+                    node = limitNode.attributes.get("limit");
+                    assert(node != null);
+                    limit = Long.parseLong(node);
+                }
+            }
+        }
+        if (offsetNode != null) {
+            // Parse offset
+            if ((node = offsetNode.attributes.get("offset_paramid")) != null)
+                offsetParameterId = Long.parseLong(node);
+            else {
+                if (offsetNode.children.size() == 1) {
+                    VoltXMLElement valueNode = offsetNode.children.get(0);
+                    String isParam = valueNode.attributes.get("isparam");
+                    if ((isParam != null) && (isParam.equalsIgnoreCase("true"))) {
+                        offsetParameterId = Long.parseLong(valueNode.attributes.get("id"));
+                    } else {
+                        node = offsetNode.attributes.get("offset");
+                        assert(node != null);
+                        offset = Long.parseLong(node);
+                    }
+                }
+            }
+        }
+
+        // limit and offset can't have both value and parameter
+        if (limit != -1) assert limitParameterId == -1 : "Parsed value and param. limit.";
+        if (offset != 0) assert offsetParameterId == -1 : "Parsed value and param. offset.";
     }
 
     private void parseDisplayColumns(VoltXMLElement columnsNode, boolean isDistributed) {

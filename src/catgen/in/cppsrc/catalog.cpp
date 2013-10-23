@@ -29,6 +29,7 @@
 #include "catalogtype.h"
 #include "cluster.h"
 #include "common/SerializableEEException.h"
+#include "common/MiscUtil.h"
 
 using namespace voltdb;
 using namespace catalog;
@@ -83,7 +84,7 @@ void Catalog::purgeDeletions() {
 void Catalog::execute(const string &stmts) {
     cleanupExecutionBookkeeping();
 
-    vector<string> lines = splitString(stmts, '\n');
+    vector<string> lines = MiscUtil::splitString(stmts, '\n');
     for (int32_t i = 0; i < lines.size(); ++i) {
         executeOne(lines[i]);
     }
@@ -207,7 +208,7 @@ CatalogType *Catalog::itemForPath(const CatalogType *parent, const string &path)
     if (realpath.length() == 0)
         return this;
 
-    vector<string> parts = splitToTwoString(realpath, '/');
+    vector<string> parts = MiscUtil::splitToTwoString(realpath, '/');
 
     // child of root
     if (parts.size() <= 1)
@@ -220,10 +221,10 @@ CatalogType *Catalog::itemForPath(const CatalogType *parent, const string &path)
 }
 
 CatalogType *Catalog::itemForPathPart(const CatalogType *parent, const string &pathPart) const {
-    vector<string> parts = splitToTwoString(pathPart, '[');
+    vector<string> parts = MiscUtil::splitToTwoString(pathPart, '[');
     if (parts.size() <= 1)
         return NULL;
-    parts[1] = splitString(parts[1], ']')[0];
+    parts[1] = MiscUtil::splitString(parts[1], ']')[0];
     return parent->getChild(parts[0], parts[1]);
 }
 
@@ -249,34 +250,6 @@ void Catalog::unregisterGlobally(CatalogType *catObj) {
 
 void Catalog::update() {
     // nothing to do
-}
-
-vector<string> Catalog::splitString(const string &str, char delimiter) {
-    vector<string> vec;
-    size_t begin = 0;
-    while (true) {
-        size_t end = str.find(delimiter, begin);
-        if (end == string::npos) {
-            if (begin != str.size()) {
-                vec.push_back(str.substr(begin));
-            }
-            break;
-        }
-        vec.push_back(str.substr(begin, end - begin));
-        begin = end + 1;
-    }
-    return vec;
-}
-vector<string> Catalog::splitToTwoString(const string &str, char delimiter) {
-    vector<string> vec;
-    size_t end = str.find(delimiter);
-    if (end == string::npos) {
-        vec.push_back(str);
-    } else {
-        vec.push_back(str.substr(0, end));
-        vec.push_back(str.substr(end + 1));
-    }
-    return vec;
 }
 
 /*

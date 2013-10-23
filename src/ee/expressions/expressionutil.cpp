@@ -71,7 +71,7 @@ hashRangeFactory(PlannerDomValue obj) {
         PlannerDomValue rangeStartValue = arrayObject.valueForKey("RANGE_START");
         PlannerDomValue rangeEndValue = arrayObject.valueForKey("RANGE_END");
 
-        ranges[ii] = srange_type(rangeStartValue.asInt64(), rangeEndValue.asInt64());
+        ranges[ii] = srange_type(rangeStartValue.asInt(), rangeEndValue.asInt());
     }
     return new HashRangeExpression(hashColumnValue.asInt(), ranges, static_cast<int>(rangesArray.arrayLen()));
 }

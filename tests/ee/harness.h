@@ -143,10 +143,13 @@ public:
 #define TEST(suite_name, test_name) MAGIC_TEST_MACRO(Test, suite_name, test_name, TestSuite::globalInstance())
 
 /*
- * Define STUPID_UNIT_TWEAK to allow selective test disabling by prepending the
- * TEST* macros with "NO", e.g. NOTEST_F(...).
- * Define STUPID_UNIT_SOLO to disable all tests except for the one prepended
- * with "SOLO", e.g. SOLOTEST_F(...).
+ * Define STUPID_UNIT_TWEAK to enable these special capabilities.
+ * Selectively disable tests by prepending the TEST* macros with "NO", e.g.
+ *      NOTEST_F(...).
+ * Define STUPID_UNIT_SOLO to disable all tests except for the one prepended with "SOLO", e.g.
+ *      SOLOTEST_F(...)
+ * Force a breakpoint when any unit test assertion fails.
+ *      #define STUPIDUNIT_ASSERT_BREAKPOINT
  * IMPORTANT: The build will intentionally fail if STUPIDUNIT_TWEAK is not
  * defined while there are NOTEST* macros in code. Similarly, it will fail if
  * STUPID_UNIT_SOLO is not defined while there are SOLOTEST* macros in code.
@@ -171,9 +174,20 @@ public:
 #define SOLOTEST(suite_name, test_name) MAGIC_TEST_MACRO(Test, suite_name, test_name, TestSuite::globalInstance())
 #endif
 
+// Optionally force a gdb-compatible breakpoint when an assertion triggers.
+#ifdef STUPIDUNIT_ASSERT_BREAKPOINT
+#define STUPIDUNIT_ASSERT_BREAKPOINT_CODE asm volatile("int3;");
+#else
+#define STUPIDUNIT_ASSERT_BREAKPOINT_CODE
+#endif
+
 // Abuse macros to easily define all the EXPECT and ASSERT variants
-#define STUPIDUNIT_MAKE_EXPECT_MACRO(operation, one, two) do { \
-    if (!((one) operation (two))) fail(__FILE__, __LINE__, #one " " #operation " " #two); \
+#define STUPIDUNIT_MAKE_EXPECT_MACRO(operation, one, two) \
+do { \
+    if (!((one) operation (two))) { \
+        STUPIDUNIT_ASSERT_BREAKPOINT_CODE \
+        fail(__FILE__, __LINE__, #one " " #operation " " #two); \
+    } \
 } while (0)
 
 #define EXPECT_EQ(one, two) STUPIDUNIT_MAKE_EXPECT_MACRO(==, one, two)
@@ -183,17 +197,30 @@ public:
 #define EXPECT_GT(one, two) STUPIDUNIT_MAKE_EXPECT_MACRO(>, one, two)
 #define EXPECT_GE(one, two) STUPIDUNIT_MAKE_EXPECT_MACRO(>=, one, two)
 
-#define EXPECT_TRUE(value) do { \
-    if (!(value)) fail(__FILE__, __LINE__, "Expected true; " #value " is false"); \
+#define EXPECT_TRUE(value) \
+do { \
+    if (!(value)) { \
+        STUPIDUNIT_ASSERT_BREAKPOINT_CODE \
+        fail(__FILE__, __LINE__, "Expected true; " #value " is false"); \
+    } \
 } while (0)
-#define EXPECT_FALSE(value) do { \
-    if ((value)) fail(__FILE__, __LINE__, "Expected false; " #value " is true"); \
+#define EXPECT_FALSE(value) \
+do { \
+    if ((value)) {\
+        STUPIDUNIT_ASSERT_BREAKPOINT_CODE \
+        fail(__FILE__, __LINE__, "Expected false; " #value " is true"); \
+    } \
 } while (0)
 
 // The only difference between EXPECT and ASSERT is that ASSERT returns from
 // the test method if the test fails
-#define STUPIDUNIT_MAKE_ASSERT_MACRO(operation, one, two) do { \
-    if (!((one) operation (two))) { fail(__FILE__, __LINE__, #one " " #operation " " #two); return; } \
+#define STUPIDUNIT_MAKE_ASSERT_MACRO(operation, one, two) \
+do { \
+    if (!((one) operation (two))) { \
+        STUPIDUNIT_ASSERT_BREAKPOINT_CODE \
+        fail(__FILE__, __LINE__, #one " " #operation " " #two); \
+        return; \
+    } \
 } while (0)
 
 #define ASSERT_EQ(one, two) STUPIDUNIT_MAKE_ASSERT_MACRO(==, one, two)
@@ -203,11 +230,21 @@ public:
 #define ASSERT_GT(one, two) STUPIDUNIT_MAKE_ASSERT_MACRO(>, one, two)
 #define ASSERT_GE(one, two) STUPIDUNIT_MAKE_ASSERT_MACRO(>=, one, two)
 
-#define ASSERT_TRUE(value) do { \
-    if (!(value)) { fail(__FILE__, __LINE__, "Expected true; " #value " is false"); return; } \
+#define ASSERT_TRUE(value) \
+do { \
+    if (!(value)) { \
+        STUPIDUNIT_ASSERT_BREAKPOINT_CODE \
+        fail(__FILE__, __LINE__, "Expected true; " #value " is false"); \
+        return; \
+    } \
 } while (0)
-#define ASSERT_FALSE(value) do { \
-    if ((value)) { fail(__FILE__, __LINE__, "Expected false; " #value " is true"); return; } \
+#define ASSERT_FALSE(value) \
+do { \
+    if ((value)) { \
+        STUPIDUNIT_ASSERT_BREAKPOINT_CODE \
+        fail(__FILE__, __LINE__, "Expected false; " #value " is true"); \
+        return; \
+    } \
 } while (0)
 
 

@@ -87,7 +87,7 @@
 #define ENGINE_ERRORCODE_ERROR 1
 
 #define MAX_BATCH_COUNT 1000
-#define MAX_PARAM_COUNT 1000 // or whatever
+#define MAX_PARAM_COUNT 1025 // keep in synch with value in CompiledPlan.java
 
 namespace catalog {
 class Catalog;
@@ -145,9 +145,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                         int32_t partitionId,
                         int32_t hostId,
                         std::string hostname,
-                        int64_t tempTableMemoryLimit,
-                        HashinatorType type,
-                        char *hashinatorConfig);
+                        int64_t tempTableMemoryLimit);
         virtual ~VoltDBEngine();
 
         inline int32_t getClusterIndex() const { return m_clusterIndex; }
@@ -338,17 +336,13 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         bool activateTableStream(
                 const CatalogId tableId,
                 const TableStreamType streamType,
+                int64_t undoToken,
                 ReferenceSerializeInput &serializeIn);
 
         /**
          * Serialize tuples to output streams from a table in COW mode.
          * Overload that serializes a stream position array.
-         * Returns:
-         *  0-n: remaining tuple count
-         *  -1: streaming was completed by the previous call
-         *  -2: error, e.g. when no longer in COW mode.
-         * Note that -1 is only returned once after the previous call serialized all
-         * remaining tuples. Further calls are considered errors and will return -2.
+         * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
          */
         int64_t tableStreamSerializeMore(const CatalogId tableId,
                                          const TableStreamType streamType,
@@ -357,12 +351,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /**
          * Serialize tuples to output streams from a table in COW mode.
          * Overload that populates a position vector provided by the caller.
-         * Returns:
-         *  0-n: remaining tuple count
-         *  -1: streaming was completed by the previous call
-         *  -2: error, e.g. when no longer in COW mode.
-         * Note that -1 is only returned once after the previous call serialized all
-         * remaining tuples. Further calls are considered errors and will return -2.
+         * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
          */
         int64_t tableStreamSerializeMore(const CatalogId tableId,
                                          const TableStreamType streamType,
@@ -391,7 +380,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         size_t tableHashCode(int32_t tableId);
 
-        void updateHashinator(HashinatorType type, const char *config);
+        void updateHashinator(HashinatorType type, const char *config, int32_t *configPtr, uint32_t numTokens);
 
         /*
          * Execute an arbitrary task represented by the task id and serialized parameters.

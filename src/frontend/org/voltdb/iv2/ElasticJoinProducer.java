@@ -17,7 +17,11 @@
 
 package org.voltdb.iv2;
 
-import com.google.common.util.concurrent.SettableFuture;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.concurrent.ExecutionException;
+
+import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
@@ -30,9 +34,7 @@ import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.TaskLog;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.concurrent.ExecutionException;
+import com.google.common.util.concurrent.SettableFuture;
 
 public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     // true if the site has received the first fragment task message
@@ -47,6 +49,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
 
     // a snapshot sink used to stream table data from multiple sources
     private final StreamSnapshotSink m_dataSink;
+    private final Mailbox m_streamSnapshotMb;
 
     private class CompletionAction extends JoinCompletionAction {
         @Override
@@ -60,7 +63,8 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     {
         super(partitionId, "Elastic join producer:" + partitionId + " ", taskQueue);
         m_completionAction = new CompletionAction();
-        m_dataSink = new StreamSnapshotSink();
+        m_streamSnapshotMb = VoltDB.instance().getHostMessenger().createMailbox();
+        m_dataSink = new StreamSnapshotSink(m_streamSnapshotMb);
     }
 
     private void doInitiation(RejoinMessage message)
@@ -106,7 +110,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         Pair<Integer, ByteBuffer> tableBlock = m_dataSink.poll(m_snapshotBufferAllocator);
         // poll() could return null if the source indicated end of stream,
         // need to check on that before retry
-        if (tableBlock == null && !m_dataSink.isEOF()) {
+        if (tableBlock == null && !m_dataSink.isEOF() && !m_snapshotCompletionMonitor.isDone()) {
             // The sources are not set up yet, don't block the site,
             // return here and retry later.
             m_taskQueue.offer(this);
@@ -114,10 +118,10 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         }
 
         // Block until all blocks for partitioned tables are streamed over.
-        JOINLOG.info("P" + m_partitionId + " blocking partitioned table transfer starts");
+        JOINLOG.info("P" + m_partitionId + " blocking data transfer starts");
         while (tableBlock != null) {
             if (JOINLOG.isTraceEnabled()) {
-                JOINLOG.trace(m_whoami + "restoring partitioned table " + tableBlock.getFirst() +
+                JOINLOG.trace(m_whoami + "restoring table " + tableBlock.getFirst() +
                               " block of (" + tableBlock.getSecond().position() + "," +
                               tableBlock.getSecond().limit() + ")");
             }
@@ -134,16 +138,20 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         }
 
         // No more data from this data sink, close and remove it from the list
-        assert m_dataSink.isEOF();
+        assert m_dataSink.isEOF() || m_snapshotCompletionMonitor.isDone();
         m_dataSink.close();
 
-        JOINLOG.debug(m_whoami + " partitioned table snapshot transfer is finished");
+        if (m_streamSnapshotMb != null) {
+            VoltDB.instance().getHostMessenger().removeMailbox(m_streamSnapshotMb.getHSId());
+        }
+
+        JOINLOG.debug(m_whoami + " data transfer is finished");
 
         SnapshotCompletionEvent event = null;
         try {
             event = m_snapshotCompletionMonitor.get();
             assert(event != null);
-            JOINLOG.debug("P" + m_partitionId + " noticed partitioned table snapshot completion");
+            JOINLOG.debug("P" + m_partitionId + " noticed data transfer completion");
             m_completionAction.setSnapshotTxnId(event.multipartTxnId);
         } catch (InterruptedException e) {
             // isDone() already returned true, this shouldn't happen
@@ -154,7 +162,11 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         RejoinMessage rm = new RejoinMessage(m_mailbox.getHSId(),
                                              RejoinMessage.Type.SNAPSHOT_FINISHED);
         m_mailbox.send(m_coordinatorHsId, rm);
-        setJoinComplete(siteConnection, event.exportSequenceNumbers);
+        setJoinComplete(
+                siteConnection,
+                event.exportSequenceNumbers,
+                false /* requireExistingSequenceNumbers */
+                );
     }
 
     @Override

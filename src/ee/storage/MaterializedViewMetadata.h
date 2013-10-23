@@ -46,43 +46,60 @@ public:
      * Called when the source table is inserting a tuple. This will update the materialized view
      * destination table to reflect this change.
      */
-    void processTupleInsert(TableTuple &newTuple, bool fallible);
+    void processTupleInsert(const TableTuple &newTuple, bool fallible);
 
     /**
      * Called when the source table is deleting a tuple. This will update the materialized view
      * destination table to reflect this change.
      */
-    void processTupleDelete(TableTuple &oldTuple, bool fallible);
+    void processTupleDelete(const TableTuple &oldTuple, bool fallible);
 
     PersistentTable * targetTable() const { return m_target; }
+    std::string indexForMinMax() const { return m_indexForMinMax == NULL ? "" : m_indexForMinMax->getName(); }
 
     void setTargetTable(PersistentTable * target);
+    void setIndexForMinMax(std::string index);
 private:
 
     void freeBackedTuples();
     void allocateBackedTuples();
 
     /** load a predicate from the catalog structure if it's there */
-    void parsePredicate(catalog::MaterializedViewInfo *mvInfo);
+    static AbstractExpression* parsePredicate(catalog::MaterializedViewInfo *mvInfo);
 
-    void parseComplexGroupby(catalog::MaterializedViewInfo *mvInfo);
-    void parseComplexAggregation(catalog::MaterializedViewInfo *mvInfo);
+    std::size_t parseGroupBy(catalog::MaterializedViewInfo *mvInfo);
+    std::size_t parseAggregation(catalog::MaterializedViewInfo *mvInfo);
+    NValue getGroupByValueFromSrcTuple(int colIndex, const TableTuple& tuple);
+    NValue getAggInputFromSrcTuple(int aggIndex, const TableTuple& tuple);
 
     /**
      * build a search key based on the src table value
      * and use an index to find 0 or 1 rows in the view table
      */
-    bool findExistingTuple(TableTuple &oldTuple, bool expected = false);
+    bool findExistingTuple(const TableTuple &oldTuple);
 
+    NValue findMinMaxFallbackValueIndexed(const TableTuple& oldTuple,
+                                          const NValue &existingValue,
+                                          const NValue &initialNull,
+                                          int negate_for_min,
+                                          int aggIndex);
+
+    NValue findMinMaxFallbackValueSequential(const TableTuple& oldTuple,
+                                             const NValue &existingValue,
+                                             const NValue &initialNull,
+                                             int negate_for_min,
+                                             int aggIndex);
+
+    // the source persistent table
+    PersistentTable *m_srcTable;
     // the materialized view table
     PersistentTable *m_target;
-    // space to hold the search key for the view table
-    TableTuple m_searchKey;
-    // storage to hold the value for the search key
-    char *m_searchKeyBackingStore;
     // the primary index on the view table whose columns
     // are the same as the group by in the view query
     TableIndex *m_index;
+
+    // the index on srcTable which can be used to maintain min/max
+    TableIndex *m_indexForMinMax;
 
     // space to store temp view tuples
     TableTuple m_existingTuple;
@@ -95,21 +112,29 @@ private:
     // part of the aggregation in the materialized view
     AbstractExpression *m_filterPredicate;
 
-    std::vector<AbstractExpression *> m_groupbyExprs;
-    std::vector<AbstractExpression *> m_aggregationExprs;
+    std::vector<AbstractExpression *> m_groupByExprs;
+    std::vector<int32_t> m_groupByColIndexes;
+    // How many columns (or expressions) is the view aggregated on?
+    // This MUST be declared/initialized AFTER m_groupByExprs/m_groupByColIndexes
+    // but BEFORE m_searchKeyValues/m_searchKeyTuple/m_searchKeyBackingStore.
+    std::size_t m_groupByColumnCount;
+    std::vector<NValue> m_searchKeyValue;
+    // space to hold the search key for the view table
+    TableTuple m_searchKeyTuple;
+    // storage to hold the value for the search key
+    char *m_searchKeyBackingStore;
 
-    // how many columns is the view aggregated on
-    int32_t m_groupByColumnCount;
     // which columns in the source table
-    int32_t *m_groupByColumns;
 
-    // how many columns in the materialized view table
-    int32_t m_outputColumnCount;
     // what are the indexes of columns in the src table for
     // the columns in the view table
-    int32_t *m_outputColumnSrcTableIndexes;
+    std::vector<AbstractExpression *> m_aggExprs;
+    std::vector<int32_t> m_aggColIndexes;
     // what are the aggregates for each column in the view table
-    ExpressionType *m_outputColumnAggTypes;
+    std::vector<ExpressionType> m_aggTypes;
+    // How many optional agg columns in the materialized view table?
+    // This MUST be declared/initialized AFTER m_aggExprs/m_aggColIndexes/m_aggTypes.
+    std::size_t m_aggColumnCount;
 
     // vector of target table indexes to update.
     // Ideally, these should be a subset of the target table indexes that depend on the count and/or

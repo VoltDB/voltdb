@@ -145,11 +145,11 @@
                          "ddl": "strings-DDL.sql",
                          "template": "advanced-strings.sql",
                          "normalizer": "normalizer.py"},
+    "advanced-ints": {"schema": "int-schema.py",
+                      "ddl": "int-DDL.sql",
+                      "template": "advanced-ints.sql",
+                      "normalizer": "normalizer.py"},
 # BIGINT OVERFLOW CAUSES FAILURES IN THIS SUITE, USE REGRESSION INPUT
-    "regression-advanced-ints": {"schema": "int-schema.py",
-                                 "ddl": "int-DDL.sql",
-                                 "template": "regression-advanced-ints.sql",
-                                 "normalizer": "normalizer.py"},
     "regression-advanced-ints-cntonly": {"schema": "int-schema.py",
                                          "ddl": "int-DDL.sql",
                                          "template": "regression-advanced-ints-cntonly.sql",
@@ -159,6 +159,13 @@
                      "ddl": "DDL.sql",
                      "template": "index-count1.sql",
                      "normalizer": "normalizer.py"},
+
+# To test index scan: forward scan, reverse scan
+    "index-scan": {"schema": "index-scan-schema.py",
+        "ddl": "index-DDL.sql",
+        "template": "index-scan.sql",
+        "normalizer": "normalizer.py"},
+
 # This suite written to test push-down of aggregates and limits in combination
 # with indexes, projections and order-by.
     "pushdown": {"schema": "pushdown-schema.py",

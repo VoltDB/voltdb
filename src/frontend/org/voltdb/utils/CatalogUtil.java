@@ -86,7 +86,6 @@ import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.CommandLogType.Frequency;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
-import org.voltdb.compiler.deploymentfile.ExportOnServerType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
@@ -105,9 +104,7 @@ import org.voltdb.compilereport.IndexAnnotation;
 import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.compilereport.StatementAnnotation;
 import org.voltdb.compilereport.TableAnnotation;
-import org.voltdb.export.processors.GuestProcessor;
-import org.voltdb.export.processors.RawProcessor;
-import org.voltdb.exportclient.ExportToFileClient;
+import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
@@ -122,9 +119,6 @@ import com.google.common.base.Charsets;
 public abstract class CatalogUtil {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
-
-    // The minimum version of catalog that's compatible with this version of Volt
-    public static final int[] minCompatibleVersion = {3, 6, 1};
 
     public static final String CATALOG_FILENAME = "catalog.txt";
     public static final String CATALOG_BUILDINFO_FILENAME = "buildinfo.txt";
@@ -167,7 +161,7 @@ public abstract class CatalogUtil {
 
         // Check if it's compatible
         if (!isCatalogCompatible(voltVersionString)) {
-            throw new IOException("Catalog compiled with " + voltVersionString + " is not compatible with the current version of VoltDB (" +
+            throw new IOException("Catalog compiled with '" + voltVersionString + "' is not compatible with the current version of VoltDB (" +
                     VoltDB.instance().getVersionString() + ") - " + " please build your application using the current version of VoltDB.");
         }
 
@@ -461,7 +455,7 @@ public abstract class CatalogUtil {
             } else {
                 List<AbstractExpression> indexedExprs = null;
                 try {
-                    indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring, null);
+                    indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring);
                 } catch (JSONException e) {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
@@ -526,31 +520,24 @@ public abstract class CatalogUtil {
      * Check if a catalog compiled with the given version of VoltDB is
      * compatible with the current version of VoltDB.
      *
-     * The rule is that the catalog must be compiled with a version of VoltDB
-     * that's within the range [minCompatibleVersion, currentVersion],
-     * inclusive.
-     *
      * @param catalogVersionStr
      *            The version string of the VoltDB that compiled the catalog.
      * @return true if it's compatible, false otherwise.
      */
+
     public static boolean isCatalogCompatible(String catalogVersionStr)
     {
         if (catalogVersionStr == null || catalogVersionStr.isEmpty()) {
             return false;
         }
 
+        //Check that it is a properly formed verstion string
         int[] catalogVersion = MiscUtils.parseVersionString(catalogVersionStr);
-        int[] currentVersion = MiscUtils.parseVersionString(VoltDB.instance().getVersionString());
-
         if (catalogVersion == null) {
             throw new IllegalArgumentException("Invalid version string " + catalogVersionStr);
         }
 
-        int maxCmpResult = MiscUtils.compareVersions(catalogVersion, currentVersion);
-        int minCmpResult = MiscUtils.compareVersions(catalogVersion, minCompatibleVersion);
-
-        if (minCmpResult == -1 || maxCmpResult == 1) {
+        if (!catalogVersionStr.equals(VoltDB.instance().getVersionString())) {
             return false;
         }
 
@@ -629,6 +616,10 @@ public abstract class CatalogUtil {
         int fsyncInterval = 200;
         int maxTxnsBeforeFsync = Integer.MAX_VALUE;
         boolean enabled = false;
+        // enterprise voltdb defaults to CL enabled if not specified in the XML
+        if (MiscUtils.isPro()) {
+            enabled = true;
+        }
         boolean sync = false;
         int logSizeMb = 1024;
         org.voltdb.catalog.CommandLog config = catalog.getClusters().get("cluster").getLogconfig().get("log");
@@ -761,17 +752,15 @@ public abstract class CatalogUtil {
             // mimic what is done when the catalog is built, which
             // ignores anything else within the export XML stanza
             // when enabled is false
-            ExportOnServerType onServer = export.getOnserver();
-            if (onServer != null && export.isEnabled()) {
-                sb.append(" ONSERVER ");
-                ServerExportEnum exportTo = onServer.getExportto();
-                if (exportTo != null) {
-                    sb.append( "EXPORTTO ").append(exportTo.name());
-                    if (exportTo.name().equalsIgnoreCase("CUSTOM")) {
-                        sb.append(" EXPORTCONNECTORCLASS ").append(onServer.getExportconnectorclass());
+            if (export.isEnabled()) {
+                ServerExportEnum exportTarget = export.getTarget();
+                if (exportTarget != null) {
+                    sb.append( "TARGET ").append(exportTarget.name());
+                    if (exportTarget.name().equalsIgnoreCase("CUSTOM")) {
+                        sb.append(" EXPORTCONNECTORCLASS ").append(export.getExportconnectorclass());
                     }
                 }
-                ExportConfigurationType config = onServer.getConfiguration();
+                ExportConfigurationType config = export.getConfiguration();
                 if (config != null) {
                     List<PropertyType> props = config.getProperty();
                     if( props != null && !props.isEmpty()) {
@@ -969,16 +958,11 @@ public abstract class CatalogUtil {
                 }
             }
             else {
-                // Default partition detection on for IV2
-                if (VoltDB.instance().isIV2Enabled()) {
-                    catCluster.setNetworkpartition(true);
-                    CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
-                    SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
-                    sched.setPrefix(defaultPPDPrefix);
-                }
-                else {
-                    catCluster.setNetworkpartition(false);
-                }
+                // Default partition detection on
+                catCluster.setNetworkpartition(true);
+                CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
+                SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
+                sched.setPrefix(defaultPPDPrefix);
             }
 
             // copy admin mode configuration from xml to catalog
@@ -1071,10 +1055,8 @@ public abstract class CatalogUtil {
         }
 
         boolean adminstate = exportType.isEnabled();
-        String connector = RawProcessor.class.getName();
-        if (exportType.getOnserver() != null) {
-            connector = GuestProcessor.class.getName();
-        }
+        // on-server export always uses the gues processor
+        String connector = "org.voltdb.export.processors.GuestProcessor";
 
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
         org.voltdb.catalog.Connector catconn = db.getConnectors().get("0");
@@ -1089,49 +1071,48 @@ public abstract class CatalogUtil {
         catconn.setLoaderclass(connector);
         catconn.setEnabled(adminstate);
 
-        ExportOnServerType exportOnServer = exportType.getOnserver();
-        if (exportOnServer != null) {
+        String exportClientClassName = null;
 
-            String exportClientClassName = null;
-
-            switch( exportOnServer.getExportto()) {
-            case FILE: exportClientClassName = ExportToFileClient.class.getName(); break;
+        switch(exportType.getTarget()) {
+            case FILE: exportClientClassName = "org.voltdb.exportclient.ExportToFileClient"; break;
             case JDBC: exportClientClassName = "org.voltdb.exportclient.JDBCExportClient"; break;
             //Validate that we can load the class.
             case CUSTOM:
                 try {
-                    CatalogUtil.class.getClassLoader().loadClass(exportOnServer.getExportconnectorclass());
-                    exportClientClassName = exportOnServer.getExportconnectorclass();
-                } catch (ClassNotFoundException ex) {
+                    CatalogUtil.class.getClassLoader().loadClass(exportType.getExportconnectorclass());
+                    exportClientClassName = exportType.getExportconnectorclass();
+                }
+                catch (ClassNotFoundException ex) {
                     hostLog.error(
                             "Custom Export failed to configure, failed to load " +
-                            " export plugin class: " + exportOnServer.getExportconnectorclass() +
+                            " export plugin class: " + exportType.getExportconnectorclass() +
                             " Disabling export.");
-                    exportType.setEnabled(false);
-                    return;
-                }
-                break;
+                exportType.setEnabled(false);
+                return;
             }
+            break;
+        }
 
-            // this is OK as the deployment file XML schema does not allow for
-            // export configuration property names that begin with underscores
-            if (exportClientClassName != null && exportClientClassName.trim().length() > 0) {
-                ConnectorProperty prop = catconn.getConfig().add(GuestProcessor.EXPORT_TO_TYPE);
-                prop.setName(GuestProcessor.EXPORT_TO_TYPE);
-                prop.setValue(exportClientClassName);
-            }
+        // this is OK as the deployment file XML schema does not allow for
+        // export configuration property names that begin with underscores
+        if (exportClientClassName != null && exportClientClassName.trim().length() > 0) {
+            ConnectorProperty prop = catconn.getConfig().add(ExportDataProcessor.EXPORT_TO_TYPE);
+            prop.setName(ExportDataProcessor.EXPORT_TO_TYPE);
+            //Override for tests
+            String dexportClientClassName = System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE, exportClientClassName);
+            prop.setValue(dexportClientClassName);
+        }
 
-            ExportConfigurationType exportConfiguration = exportOnServer.getConfiguration();
-            if (exportConfiguration != null) {
+        ExportConfigurationType exportConfiguration = exportType.getConfiguration();
+        if (exportConfiguration != null) {
 
-                List<PropertyType> configProperties = exportConfiguration.getProperty();
-                if (configProperties != null && ! configProperties.isEmpty()) {
+            List<PropertyType> configProperties = exportConfiguration.getProperty();
+            if (configProperties != null && ! configProperties.isEmpty()) {
 
-                    for( PropertyType configProp: configProperties) {
-                        ConnectorProperty prop = catconn.getConfig().add(configProp.getName());
-                        prop.setName(configProp.getName());
-                        prop.setValue(configProp.getValue());
-                    }
+                for( PropertyType configProp: configProperties) {
+                    ConnectorProperty prop = catconn.getConfig().add(configProp.getName());
+                    prop.setName(configProp.getName());
+                    prop.setValue(configProp.getValue());
                 }
             }
         }
@@ -1648,6 +1629,44 @@ public abstract class CatalogUtil {
         }
     }
 
+    /**
+     * Get all normal tables from the catalog. A normal table is one that's NOT a materialized
+     * view, nor an export table. For the lack of a better name, I call it normal.
+     * @param catalog         Catalog database
+     * @param isReplicated    true to return only replicated tables,
+     *                        false to return all partitioned tables
+     * @return A list of tables
+     */
+    public static List<Table> getNormalTables(Database catalog, boolean isReplicated) {
+        List<Table> tables = new ArrayList<Table>();
+        for (Table table : catalog.getTables()) {
+            if ((table.getIsreplicated() == isReplicated) &&
+                table.getMaterializer() == null &&
+                !CatalogUtil.isTableExportOnly(catalog, table)) {
+                tables.add(table);
+            }
+        }
+        return tables;
+    }
+
+    /**
+     * Iterate through all the tables in the catalog, find a table with an id that matches the
+     * given table id, and return its name.
+     *
+     * @param catalog  Catalog database
+     * @param tableId  table id
+     * @return table name associated with the given table id (null if no association is found)
+     */
+    public static String getTableNameFromId(Database catalog, int tableId) {
+        String tableName = null;
+        for (Table table: catalog.getTables()) {
+            if (table.getRelativeIndex() == tableId) {
+                tableName = table.getTypeName();
+            }
+        }
+        return tableName;
+    }
+
     // Calculate the width of an index:
     // -- if the index is a pure-column index, return number of columns in the index
     // -- if the index is an expression index, return number of expressions used to create the index
@@ -1659,7 +1678,7 @@ public abstract class CatalogUtil {
             indexSize = getSortedCatalogItems(index.getColumns(), "index").size();
         } else {
             try {
-                indexSize = AbstractExpression.fromJSONArrayString(jsonstring, null).size();
+                indexSize = AbstractExpression.fromJSONArrayString(jsonstring).size();
             } catch (JSONException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
@@ -1667,6 +1686,5 @@ public abstract class CatalogUtil {
         }
 
         return indexSize;
-
     }
 }

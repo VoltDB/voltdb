@@ -151,7 +151,7 @@ class JavaRunner(object):
         self.initialize()
         if not os.path.exists(outdir):
             os.makedirs(outdir)
-        utility.run_cmd('javac', '-target', '1.6', '-source', '1.6',
+        utility.run_cmd('javac', '-target', '1.7', '-source', '1.7',
                           '-classpath', self.classpath, '-d', outdir, *srcfiles)
 
 #===============================================================================
@@ -400,6 +400,9 @@ class VerbRunner(object):
             self._run_command(verbspace, *args2, **kwargs)
 
     def call_proc(self, sysproc_name, types, args, check_status = True):
+        if self.client is None:
+            utility.abort('Command is not set up as a client.',
+                          'Add an appropriate admin or client bundle to @VOLT.Command().')
         utility.verbose_info('Call procedure: %s%s' % (sysproc_name, tuple(args)))
         proc = voltdbclient.VoltProcedure(self.client, sysproc_name, types)
         response = proc.call(params = args)

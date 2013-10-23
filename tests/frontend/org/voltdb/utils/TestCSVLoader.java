@@ -43,18 +43,18 @@ import org.voltdb.types.TimestampType;
 
 public class TestCSVLoader extends TestCase {
 
-    private String pathToCatalog;
-    private String pathToDeployment;
-    private ServerThread localServer;
-    private VoltDB.Configuration config;
-    private VoltProjectBuilder builder;
-    private Client client;
+    protected String pathToCatalog;
+    protected String pathToDeployment;
+    protected ServerThread localServer;
+    protected VoltDB.Configuration config;
+    protected VoltProjectBuilder builder;
+    protected Client client;
     protected static final VoltLogger m_log = new VoltLogger("CONSOLE");
 
-    private String userName = System.getProperty("user.name");
-    private String reportDir = String.format("/tmp/%s_csv", userName);
-    private String path_csv = String.format("%s/%s", reportDir, "test.csv");
-    private String dbName = String.format("mydb_%s", userName);
+    protected String userName = System.getProperty("user.name");
+    protected String reportDir = String.format("/tmp/%s_csv", userName);
+    protected String path_csv = String.format("%s/%s", reportDir, "test.csv");
+    protected String dbName = String.format("mydb_%s", userName);
 
     public void prepare() {
         if (!reportDir.endsWith("/"))
@@ -75,103 +75,6 @@ public class TestCSVLoader extends TestCase {
     protected void setUp() throws Exception
     {
         super.setUp();
-    }
-
-
-    public void testSnapshotAndLoad () throws Exception {
-        String my_schema =
-                "create table BLAH (" +
-                        "clm_integer integer default 0 not null, " + // column that is partitioned on
-
-                "clm_tinyint tinyint default 0, " +
-                "clm_smallint smallint default 0, " +
-                "clm_bigint bigint default 0, " +
-
-                "clm_string varchar(10) default null, " +
-                "clm_decimal decimal default null, " +
-                "clm_float float default null"+
-                //"clm_varinary varbinary(10) default null," +
-                //"clm_timestamp timestamp default null " +
-                ");";
-
-        try{
-            pathToCatalog = Configuration.getPathToCatalogForTest("csv.jar");
-            pathToDeployment = Configuration.getPathToCatalogForTest("csv.xml");
-            builder = new VoltProjectBuilder();
-
-            builder.addLiteralSchema(my_schema);
-            builder.addPartitionInfo("BLAH", "clm_integer");
-            //builder.addStmtProcedure("Insert", "INSERT into BLAH values (?, ?, ?, ?, ?, ?, ?);");
-            boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-            assertTrue(success);
-            MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-            config = new VoltDB.Configuration();
-            config.m_pathToCatalog = pathToCatalog;
-            config.m_pathToDeployment = pathToDeployment;
-            localServer = new ServerThread(config);
-            client = null;
-
-            localServer.start();
-            localServer.waitForInitialization();
-
-            client = ClientFactory.createClient();
-            client.createConnection("localhost");
-
-            int expectedLineCnt = 5;
-            client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (1,1,1,11111111,'first',1.10,1.11);" );
-            client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (2,2,2,222222,'second',2.20,2.22);" );
-            client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (3,3,3,333333, 'third' ,3.33, 3.33);" );
-            client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (4,4,4,444444, 'fourth' ,4.40 ,4.44);" );
-            client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (5,5,5,5555555, 'fifth', 5.50, 5.55);" );
-
-            client.callProcedure("@SnapshotSave", String.format("{uripath:\"file:///tmp\",nonce:\"%s\",block:true,format:\"csv\"}", dbName) );
-
-            //clear the table then try to load the csv file
-            client.callProcedure("@AdHoc", "DELETE FROM BLAH;");
-            String []my_options = {
-                    "-f" + "/tmp/" + dbName + "-BLAH-host_0.csv",
-                    //"--procedure=BLAH.insert",
-                    //"--reportdir=" + reportdir,
-                    //"--table=BLAH",
-                    "--maxerrors=50",
-                    //"-user",
-                    "--user=",
-                    "--password=",
-                    "--port=",
-                    "--separator=,",
-                    "--quotechar=\"",
-                    "--escape=\\",
-                    "--skip=0",
-                    //"--strictquotes",
-                    "BLAH"
-            };
-            prepare();
-            CSVLoader.main( my_options );
-            File file = new File( String.format("/tmp/%s-BLAH-host_0.csv", dbName) );
-            file.delete();
-
-            // do the test
-            VoltTable modCount;
-            modCount = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;").getResults()[0];
-            System.out.println("data inserted to table BLAH:\n" + modCount);
-            int rowct = modCount.getRowCount();
-            assertEquals(expectedLineCnt, rowct);
-            //assertEquals(0, invalidlinecnt);
-
-        }
-        finally {
-            if (client != null) client.close();
-            client = null;
-
-            if (localServer != null) {
-                localServer.shutdown();
-                localServer.join();
-            }
-            localServer = null;
-
-            // no clue how helpful this is
-            System.gc();
-        }
     }
 
     public void testCommon() throws Exception
@@ -337,6 +240,108 @@ public class TestCSVLoader extends TestCase {
         };
         int invalidLineCnt = 4;
         int validLineCnt = 7;
+        test_Interface(mySchema, myOptions, myData, invalidLineCnt, validLineCnt);
+    }
+
+    //Test batch option that and gets constraint violations.
+    //has a batch that fully fails and 2 batches that has 50% failure.
+    public void testBatchOptionThatSplitsAndGetsViolations() throws Exception {
+        String mySchema =
+                "create table BLAH ("
+                + "clm_integer integer not null, "
+                + // column that is partitioned on
+                "clm_tinyint tinyint default 0, "
+                + "clm_smallint smallint default 0, "
+                + "clm_bigint bigint default 0, "
+                + "clm_string varchar(20) default null, "
+                + "clm_decimal decimal default null, "
+                + "clm_float float default null, "
+                + "clm_timestamp timestamp default null, "
+                + "PRIMARY KEY(clm_integer) "
+                + "); ";
+        String[] myOptions = {
+            "-f" + path_csv,
+            "--reportdir=" + reportDir,
+            //"--table=BLAH",
+            "--maxerrors=50",
+            //"-user",
+            "--user=",
+            "--password=",
+            "--port=",
+            "--separator=,",
+            "--quotechar=\"",
+            "--escape=\\",
+            "--skip=0",
+            "--limitrows=100",
+            "--batch=2", //Batch size is small so we dont have to generate large dataset.
+            "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String[] myData = {
+            "1 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "2 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "3 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "4 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "1 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "2 ,1,1,11111111,first,1.10,1.11," + currentTime, //Whole batch fails
+            "5 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "6 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "1 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "2 ,1,1,11111111,first,1.10,1.11," + currentTime, //Whole batch fails
+            "7 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "8 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "11 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "1 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "2 ,1,1,11111111,first,1.10,1.11," + currentTime, //Whole batch fails
+            "1 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "12 ,1,1,11111111,first,1.10,1.11," + currentTime
+        };
+        int invalidLineCnt = 7;
+        int validLineCnt = 10;
+        test_Interface(mySchema, myOptions, myData, invalidLineCnt, validLineCnt);
+    }
+
+    //Test batch option that splits and gets constraint violations.
+    public void testBatchOptionThatSplitsAndGetsViolationsAndDataIsSmall() throws Exception {
+        String mySchema =
+                "create table BLAH ("
+                + "clm_integer integer not null, "
+                + // column that is partitioned on
+                "clm_tinyint tinyint default 0, "
+                + "clm_smallint smallint default 0, "
+                + "clm_bigint bigint default 0, "
+                + "clm_string varchar(20) default null, "
+                + "clm_decimal decimal default null, "
+                + "clm_float float default null, "
+                + "clm_timestamp timestamp default null, "
+                + "PRIMARY KEY(clm_integer) "
+                + "); ";
+        String[] myOptions = {
+            "-f" + path_csv,
+            "--reportdir=" + reportDir,
+            //"--table=BLAH",
+            "--maxerrors=50",
+            //"-user",
+            "--user=",
+            "--password=",
+            "--port=",
+            "--separator=,",
+            "--quotechar=\"",
+            "--escape=\\",
+            "--skip=0",
+            "--limitrows=100",
+            "--batch=2", //Batch size is small so we dont have to generate large dataset.
+            "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String[] myData = {
+            "1 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "2 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "2 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "1 ,1,1,11111111,first,1.10,1.11," + currentTime
+        };
+        int invalidLineCnt = 2;
+        int validLineCnt = 2;
         test_Interface(mySchema, myOptions, myData, invalidLineCnt, validLineCnt);
     }
 

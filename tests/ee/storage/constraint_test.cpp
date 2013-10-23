@@ -79,7 +79,8 @@ public:
         m_engine.setBuffers( NULL, 0, NULL, 0, m_exceptionBuffer, 4096);
         m_engine.resetReusedResultOutputBuffer();
         int partitionCount = 1;
-        m_engine.initialize(0, 0, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY, HASHINATOR_LEGACY, (char*)&partitionCount);
+        m_engine.initialize(0, 0, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY);
+        m_engine.updateHashinator( HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
     }
     ~ConstraintTest() {
         delete table;

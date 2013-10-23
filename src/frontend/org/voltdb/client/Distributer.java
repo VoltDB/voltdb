@@ -34,11 +34,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-
-import jsr166y.ThreadLocalRandom;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -106,9 +105,8 @@ class Distributer {
     private final Map<Integer, NodeConnection[]> m_partitionReplicas = new HashMap<Integer, NodeConnection[]>();
     private final Map<Integer, NodeConnection> m_hostIdToConnection = new HashMap<Integer, NodeConnection>();
     private final Map<String, Procedure> m_procedureInfo = new HashMap<String, Procedure>();
-
-    private boolean m_hashinatorInitialized = false;
-
+    //This is the instance of the Hashinator we picked from TOPO used only for client affinity.
+    private TheHashinator m_hashinator = null;
     // timeout for individual procedure calls
     private final long m_procedureCallTimeoutMS;
     private static final long MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
@@ -575,12 +573,6 @@ class Distributer {
                 Thread.sleep(5);
             }
         } while(more);
-
-        synchronized (this) {
-            for (NodeConnection cxn : m_connections ) {
-                assert(cxn.m_callbacks.size() == 0);
-            }
-        }
     }
 
     Distributer() {
@@ -704,17 +696,18 @@ class Distributer {
 
             /*
              * Check if the master for the partition is known. No back pressure check to ensure correct
-             * routing, but backpressure will be managed anyways.
+             * routing, but backpressure will be managed anyways. This is where we guess partition based on client
+             * affinity and known topology (hashinator initialized).
              */
-            if (m_useClientAffinity && m_hashinatorInitialized) {
+            if (m_useClientAffinity && (m_hashinator != null)) {
                 final Procedure procedureInfo = m_procedureInfo.get(invocation.getProcName());
 
                 if (procedureInfo != null) {
                     Integer hashedPartition = MpInitiator.MP_INIT_PID;
                     if (!procedureInfo.multiPart) {
-                        hashedPartition =
-                            invocation.getHashinatedParam(procedureInfo.partitionParameterType,
-                                procedureInfo.partitionParameter);
+                        hashedPartition = m_hashinator.getHashedPartitionForParameter(
+                                procedureInfo.partitionParameterType,
+                                invocation.getPartitionParamValue(procedureInfo.partitionParameter));
                     }
                     /*
                      * If the procedure is read only and single part, load balance across replicas
@@ -724,9 +717,9 @@ class Distributer {
                         if (partitionReplicas != null && partitionReplicas.length > 0) {
                             cxn = partitionReplicas[ThreadLocalRandom.current().nextInt(partitionReplicas.length)];
                             if (cxn.hadBackPressure()) {
-                                //See if there is one without backpressure
+                                //See if there is one without backpressure, make sure it's still connected
                                 for (NodeConnection nc : partitionReplicas) {
-                                    if (!nc.hadBackPressure()) {
+                                    if (!nc.hadBackPressure() && nc.m_isConnected) {
                                         cxn = nc;
                                         break;
                                     }
@@ -745,6 +738,12 @@ class Distributer {
                             backpressure = false;
                         }
                     }
+                }
+                if (cxn != null && !cxn.m_isConnected) {
+                    // Would be nice to log something here
+                    // Client affinity picked a connection that was actually disconnected.  Reset to null
+                    // and let the round-robin choice pick a connection
+                    cxn = null;
                 }
             }
             if (cxn == null) {
@@ -903,11 +902,15 @@ class Distributer {
     private void updateAffinityTopology(VoltTable tables[]) {
         //First table contains the description of partition ids master/slave relationships
         VoltTable vt = tables[0];
+
+        //In future let TOPO return cooked bytes when cooked and we use correct recipie
+        boolean cooked = false;
         if (tables.length == 1) {
             //Just in case the new client connects to the old version of Volt that only returns 1 topology table
             // We're going to get the MPI back in this table, so subtract it out from the number of partitions.
             int numPartitions = vt.getRowCount() - 1;
-            TheHashinator.initialize(LegacyHashinator.class, LegacyHashinator.getConfigureBytes(numPartitions));
+            m_hashinator = TheHashinator.getHashinator(LegacyHashinator.class,
+                    LegacyHashinator.getConfigureBytes(numPartitions), cooked);
         } else {
             //Second table contains the hash function
             boolean advanced = tables[1].advanceRow();
@@ -916,11 +919,10 @@ class Distributer {
                                    "performance will be lower because transactions can't be routed at this client");
                 return;
             }
-            TheHashinator.initialize(
+            m_hashinator = TheHashinator.getHashinator(
                     HashinatorType.valueOf(tables[1].getString("HASHTYPE")).hashinatorClass,
-                    tables[1].getVarbinary("HASHCONFIG"));
+                    tables[1].getVarbinary("HASHCONFIG"), cooked);
         }
-        m_hashinatorInitialized = true;
         m_partitionMasters.clear();
         m_partitionReplicas.clear();
         // The MPI's partition ID is 16383 (MpInitiator.MP_INIT_PID), so we shouldn't inadvertently
@@ -971,5 +973,36 @@ class Distributer {
                 e.printStackTrace();
             }
         }
+    }
+
+    /**
+     * Return if Hashinator is initialed. This is useful only for non standard clients.
+     * This will only only ever return true if client affinity is turned on.
+     *
+     * @return
+     */
+    public boolean isHashinatorInitialized() {
+        return (m_hashinator != null);
+    }
+
+    /**
+     * This is used by clients such as CSVLoader which puts processing into buckets.
+     *
+     * @param typeValue volt Type
+     * @param value the representative value
+     * @return
+     */
+    public long getPartitionForParameter(byte typeValue, Object value) {
+        if (m_hashinator == null) {
+            return -1;
+        }
+        return m_hashinator.getHashedPartitionForParameter(typeValue, value);
+    }
+
+    public HashinatorType getHashinatorType() {
+        if (m_hashinator == null) {
+            return HashinatorType.LEGACY;
+        }
+        return m_hashinator.getConfigurationType();
     }
 }

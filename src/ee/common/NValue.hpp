@@ -385,7 +385,7 @@ class NValue {
     /*
      * Out must have space for 16 bytes
      */
-    void murmurHash3(void *out) const;
+    int32_t murmurHash3() const;
 
     /*
      * callConstant, callUnary, and call are templates for arbitrary NValue member functions that implement
@@ -3334,7 +3334,7 @@ inline NValue NValue::op_divide(const NValue rhs) const {
 /*
  * Out must have storage for 16 bytes
  */
-inline void NValue::murmurHash3(void * out) const {
+inline int32_t NValue::murmurHash3() const {
     const ValueType type = getValueType();
     switch(type) {
     case VALUE_TYPE_TIMESTAMP:
@@ -3343,12 +3343,10 @@ inline void NValue::murmurHash3(void * out) const {
     case VALUE_TYPE_INTEGER:
     case VALUE_TYPE_SMALLINT:
     case VALUE_TYPE_TINYINT:
-        MurmurHash3_x64_128( m_data, 8, 0, out);
-        break;
+        return MurmurHash3_x64_128( m_data, 8, 0);
     case VALUE_TYPE_VARBINARY:
     case VALUE_TYPE_VARCHAR:
-        MurmurHash3_x64_128( getObjectValue(), getObjectLength(), 0, out);
-        break;
+        return MurmurHash3_x64_128( getObjectValue(), getObjectLength(), 0);
     default:
         throwFatalException("Unknown type for murmur hashing %d", type);
         break;

@@ -65,7 +65,7 @@ public abstract class TransactionTask extends SiteTasker
         // Flush us out of the head of the TransactionTaskQueue.  Null check so we're reusable
         // for live rejoin replay
         if (m_queue != null) {
-            m_queue.flush();
+            m_queue.flush(getTxnId());
         }
     }
 }

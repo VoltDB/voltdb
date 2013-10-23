@@ -17,6 +17,10 @@
 
 package org.voltdb.plannodes;
 
+import java.util.List;
+
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
 /**
@@ -26,6 +30,31 @@ import org.voltdb.types.PlanNodeType;
 public class HashAggregatePlanNode extends AggregatePlanNode {
     public HashAggregatePlanNode() {
         super();
+    }
+
+    public HashAggregatePlanNode(HashAggregatePlanNode origin) {
+        super();
+        m_isCoordinatingAggregator = origin.m_isCoordinatingAggregator;
+        if (origin.m_prePredicate != null) {
+            m_prePredicate = (AbstractExpression) origin.m_prePredicate.clone();
+        }
+        if (origin.m_postPredicate != null) {
+            m_postPredicate = (AbstractExpression) origin.m_postPredicate.clone();
+        }
+        for (AbstractExpression expr : origin.m_groupByExpressions) {
+            addGroupByExpression(expr);
+        }
+        List<ExpressionType> aggregateTypes = origin.m_aggregateTypes;
+        List<Integer> aggregateDistinct = origin.m_aggregateDistinct;
+        List<Integer> aggregateOutputColumns = origin.m_aggregateOutputColumns;
+        List<AbstractExpression> aggregateExpressions = origin.m_aggregateExpressions;
+        for (int i = 0; i < origin.getAggregateTypesSize(); i++) {
+            addAggregate(aggregateTypes.get(i),
+                    aggregateDistinct.get(i) == 1 ? true : false,
+                    aggregateOutputColumns.get(i),
+                    aggregateExpressions.get(i));
+        }
+        setOutputSchema(origin.getOutputSchema());
     }
 
     @Override

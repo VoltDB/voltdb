@@ -19,9 +19,12 @@ package org.voltdb.iv2;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google.common.collect.Maps;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
@@ -49,21 +52,25 @@ public class MpProcedureTask extends ProcedureTask
     // Need to store the new masters list so that we can update the list of masters
     // when we requeue this Task to for restart
     final private AtomicReference<List<Long>> m_restartMasters = new AtomicReference<List<Long>>();
+    // Keeps track of the mapping between partition and master HSID, only used for sysproc for now. This could
+    // replace m_restartMasters, but added to minimize impact on the sensitive failure handling code
+    final private AtomicReference<Map<Integer, Long>> m_restartMastersMap = new AtomicReference<Map<Integer, Long>>();
     boolean m_isRestart = false;
     final Iv2InitiateTaskMessage m_msg;
 
     MpProcedureTask(Mailbox mailbox, String procName, TransactionTaskQueue queue,
-                  Iv2InitiateTaskMessage msg, List<Long> pInitiators,
+                  Iv2InitiateTaskMessage msg, List<Long> pInitiators, Map<Integer, Long> partitionMasters,
                   long buddyHSId, boolean isRestart)
     {
         super(mailbox, procName,
-              new MpTransactionState(mailbox, msg, pInitiators,
+              new MpTransactionState(mailbox, msg, pInitiators, partitionMasters,
                                      buddyHSId, isRestart),
               queue);
         m_isRestart = isRestart;
         m_msg = msg;
         m_initiatorHSIds.addAll(pInitiators);
         m_restartMasters.set(new ArrayList<Long>());
+        m_restartMastersMap.set(new HashMap<Integer, Long>());
     }
 
     /**
@@ -71,11 +78,11 @@ public class MpProcedureTask extends ProcedureTask
      * Currently only thread-"safe" by virtue of only calling this on
      * MpProcedureTasks which are not at the head of the MPI's TransactionTaskQueue.
      */
-    public void updateMasters(List<Long> masters)
+    public void updateMasters(List<Long> masters, Map<Integer, Long> partitionMasters)
     {
         m_initiatorHSIds.clear();
         m_initiatorHSIds.addAll(masters);
-        ((MpTransactionState)getTransactionState()).updateMasters(masters);
+        ((MpTransactionState)getTransactionState()).updateMasters(masters, partitionMasters);
     }
 
     /**
@@ -84,10 +91,12 @@ public class MpProcedureTask extends ProcedureTask
      * Transaction to restart it, and only do this sequentially from the
      * repairing thread.
      */
-    public void doRestart(List<Long> masters)
+    public void doRestart(List<Long> masters, Map<Integer, Long> partitionMasters)
     {
         List<Long> copy = new ArrayList<Long>(masters);
         m_restartMasters.set(copy);
+
+        m_restartMastersMap.set(Maps.newHashMap(partitionMasters));
     }
 
     /** Run is invoked by a run-loop to execute this transaction. */
@@ -198,7 +207,7 @@ public class MpProcedureTask extends ProcedureTask
         complete.setOriginalTxnId(m_msg.getOriginalTxnId());
         m_initiator.send(com.google.common.primitives.Longs.toArray(m_initiatorHSIds), complete);
         m_txnState.setDone();
-        m_queue.flush();
+        m_queue.flush(getTxnId());
     }
 
     private void restartTransaction()
@@ -208,7 +217,7 @@ public class MpProcedureTask extends ProcedureTask
         // which will send the necessary CompleteTransactionMessage to restart.
         ((MpTransactionState)m_txnState).restart();
         // Update the masters list with the list provided when restart was triggered
-        updateMasters(m_restartMasters.get());
+        updateMasters(m_restartMasters.get(), m_restartMastersMap.get());
         m_isRestart = true;
         m_queue.restart();
     }

@@ -944,7 +944,7 @@ Apache Cassandra GCInspector.java, MumurHash.java
 // domain. The author hereby disclaims copyright to this source code.
 
 ================================================================================
-Guava 12.0
+Guava 15.0
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one

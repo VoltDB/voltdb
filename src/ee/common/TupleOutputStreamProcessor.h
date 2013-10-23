@@ -66,7 +66,7 @@ public:
      */
     bool writeRow(TupleSerializer &tupleSerializer,
                   TableTuple &tuple,
-                  bool &deleteRow);
+                  bool *deleteRow = NULL);
 
 private:
 

@@ -221,25 +221,6 @@ function export-tofile() {
         --period 1
 }
 
-function export-tosqoop() {
-    echo "Running sqoop export process"
-    #rm -rf $EXPORTDATA
-    #Change these if sqoop or hadoop are installed elsewhere
-    export SQOOP_HOME="/usr/lib/sqoop"
-    export HADOOP_HOME="/usr/lib/hadoop"
-    H_PATH="$HADOOP_HOME/*:$HADOOP_HOME/conf:$HADOOP_HOME/lib/*"
-    S_PATH="$SQOOP_HOME/*:$SQOOP_HOME/lib/*"
-    export CLASSPATH="$CLASSPATH:$H_PATH:$S_PATH"
-    java org.voltdb.hadoop.VoltDBSqoopExportClient \
-       --connect client \
-       --servers localhost \
-       --verbose \
-       --period 3 \
-       --target-dir /tmp/sqoop-export \
-       --nonce ExportData
-}
-
-
 function export-verify() {
     java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj genqa.ExportVerifier \
         4 \

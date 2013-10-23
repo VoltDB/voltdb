@@ -26,11 +26,14 @@ package org.voltdb.regressionsuites;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
@@ -48,8 +51,8 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
             vt = client.callProcedure("@AdHoc",
                     "select * from " + mvTable + " ORDER BY " + orderbyStmt).getResults()[0];
         } catch (Exception e) {
-            fail();
             e.printStackTrace();
+            fail();
         }
 
         if (vt.getRowCount() != 0) {
@@ -74,6 +77,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         mvUpdateR2();
         mvInsertDeleteR3();
         mvUpdateR3();
+        mvUpdateR4();
     }
 
     private void mvInsertDeleteR1() throws IOException, ProcCallException {
@@ -418,7 +422,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         }
     }
 
-    private void verifyMVTestR3 (Client client, Object[][] expected13,
+    private void verifyMVTestR3(Client client, Object[][] expected13,
             Object[][] expected24, String orderbyStmt) {
         String mvTable = "V_R3";
 
@@ -524,6 +528,368 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                     new Object[][] {{"VoltDB"+longStr,2,70},{"IBM"+longStr,3,82}},
                     orderbyStmt);
         }
+    }
+
+    public void testMaterializedViewMinMax() throws IOException, ProcCallException, Exception {
+        System.out.println("Test Min and Max...");
+        Client client = getClient();
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+        final long expectedMinMostTM = dateFormat.parse("2010-06-11 02:00:00.123").getTime()*1000;
+        final long expectedMinTM = dateFormat.parse("2011-06-11 02:00:00.123").getTime()*1000;
+        final long expectedMedTM = dateFormat.parse("2012-06-11 02:00:00.123").getTime()*1000;
+        final long expectedMaxTM = dateFormat.parse("2013-06-11 02:00:00.123").getTime()*1000;
+        long[][] expected;
+        //                               id, wage, dept, tm
+        client.callProcedure("R2.insert", 0, 10,  0, "2013-06-11 02:00:00.123000");
+        client.callProcedure("R2.insert", 1, 10,  1, "2013-06-11 02:00:00.123000");
+        client.callProcedure("R2.insert", 2, 20, -1, "2012-06-11 02:00:00.123000");
+        client.callProcedure("R2.insert", 3, 30,  1, "2011-06-11 02:00:00.123000");
+        client.callProcedure("R2.insert", 4, 20, -1, "2012-06-11 02:00:00.123000");
+        client.callProcedure("R2.insert", 5, 10,  1, "2013-06-11 02:00:00.123000");
+
+        client.callProcedure("R2.insert", 7, 70,  2, "2011-06-11 02:00:00.123000");
+
+        // ABS(DEPT), COUNT (*), MAX(WAGE * 2), MIN(TM)
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,5,60,expectedMinTM},
+                                 {2,1,140,expectedMinTM}};
+        verifyMVTestR2MinMax(client, expected);
+
+        // Drop the min tm and max wage value for group 1
+        client.callProcedure("R2.delete", 3);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,4,40,expectedMedTM},
+                                 {2,1,140,expectedMinTM}};
+        verifyMVTestR2MinMax(client, expected);
+
+        // Drop 1 of 2 min tm and max wage values for group 1 -- expect no change except to the count
+        client.callProcedure("R2.delete", 2);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,3,40,expectedMedTM},
+                                 {2,1,140,expectedMinTM}};
+
+        // Re-establish a min tm and max wage value for group 1
+        client.callProcedure("R2.insert", 6, 30, 1, "2011-06-11 02:00:00.123000");
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,4,60,expectedMinTM},
+                                 {2,1,140,expectedMinTM}};
+        verifyMVTestR2MinMax(client, expected);
+
+        // Re-establish a min tm and max wage value for group 2 via update of the sole base
+        client.callProcedure("R2.update", 7, 77, 2, "2013-06-11 02:00:00.123000", 7);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,4,60,expectedMinTM},
+                                 {2,1,154,expectedMaxTM}};
+        verifyMVTestR2MinMax(client, expected);
+
+        // Re-establish a min tm and max wage value for group 1 via update of the current extreme value
+        client.callProcedure("R2.update", 6, 40, 1, "2010-06-11 02:00:00.123000", 6);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,4,80,expectedMinMostTM},
+                                 {2,1,154,expectedMaxTM}};
+        verifyMVTestR2MinMax(client, expected);
+
+        // Re-establish a min tm and max wage value for groups 1 and 2 via switch of a grouped key
+        client.callProcedure("R2.update", 6, 80, 2, "2010-06-11 02:00:00.123000", 6);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,3,40,expectedMedTM},
+                                 {2,2,160,expectedMinMostTM}};
+        verifyMVTestR2MinMax(client, expected);
+
+        // Demonstrate that null values do not alter mins or maxs.
+        if ( ! isHSQL()) { // hsql backend does not know to filter VoltDB nulls? should it?
+           client.callProcedure("R2.insert", 10, null, 0, null);
+           client.callProcedure("R2.insert", 11, null, 1, null);
+           client.callProcedure("R2.insert", 12, null, 2, null);
+           expected = new long[][] {{0,2,20,expectedMaxTM},
+                                    {1,4,40,expectedMedTM},
+                                    {2,3,160,expectedMinMostTM}};
+           verifyMVTestR2MinMax(client, expected);
+        }
+
+    }
+
+    private void verifyMVTestR2MinMax(Client client, long[][] expected)
+        throws IOException, NoConnectionsException, ProcCallException, ParseException
+    {
+        VoltTable table = client.callProcedure("@AdHoc", "SELECT * FROM V_R2_MIN_MAX ORDER BY DEPT").getResults()[0];
+        System.out.println(table);
+        validateTableOfLongs(table, expected);
+    }
+
+    public void testMaterializedViewFieldMinMax() throws IOException, ProcCallException, Exception
+    {
+        if (isHSQL()) { // hsql backend does not support the FIELD function
+            return;
+        }
+        System.out.println("Test Field Function Min and Max...");
+        Client client = getClient();
+        final long expectedMinMostTM = 2010;
+        final long expectedMinTM = 2011;
+        final long expectedMedTM = 2012;
+        final long expectedMaxTM = 2013;
+        long[][] expected;
+        // JSON FIELDS:
+        //   wage INTEGER
+        //   dept INTEGER
+        //   tm_year INTEGER
+        //   tm_month INTEGER
+        //   tm_day INTEGER
+        //     id, json_data
+        client.callProcedure("R5.insert",
+                0, "{\"wage\":10 , \"dept\":0 , \"tm_year\":2013 , \"tm_month\":6 , \"tm_day\":11 }");
+        client.callProcedure("R5.insert",
+                1, "{\"wage\":10 , \"dept\":1 , \"tm_year\":2013 , \"tm_month\":6 , \"tm_day\":11 }");
+        client.callProcedure("R5.insert",
+                2, "{\"wage\":20 , \"dept\":-1, \"tm_year\":2012 , \"tm_month\":6 , \"tm_day\":11 }");
+        client.callProcedure("R5.insert",
+                3, "{\"wage\":30 , \"dept\":1 , \"tm_year\":2011 , \"tm_month\":6 , \"tm_day\":11 }");
+        client.callProcedure("R5.insert",
+                4, "{\"wage\":20 , \"dept\":-1, \"tm_year\":2012 , \"tm_month\":6 , \"tm_day\":11 }");
+        client.callProcedure("R5.insert",
+                5, "{\"wage\":10 , \"dept\":1 , \"tm_year\":2013 , \"tm_month\":6 , \"tm_day\":11 }");
+
+        client.callProcedure("R5.insert",
+                7, "{\"wage\":70 , \"dept\":2 , \"tm_year\":2011 , \"tm_month\":6 , \"tm_day\":11 }");
+
+        // ABS(DEPT), COUNT (*), MAX(WAGE * 2), MIN(TM)
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,5,60,expectedMinTM},
+                                 {2,1,140,expectedMinTM}};
+        verifyMVTestR5MinMax(client, expected);
+
+        // Drop the min tm and max wage value for group 1
+        client.callProcedure("R5.delete", 3);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,4,40,expectedMedTM},
+                                 {2,1,140,expectedMinTM}};
+        verifyMVTestR5MinMax(client, expected);
+
+        // Drop 1 of 2 min tm and max wage values for group 1 -- expect no change except to the count
+        client.callProcedure("R5.delete", 2);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,3,40,expectedMedTM},
+                                 {2,1,140,expectedMinTM}};
+
+        // Re-establish a min tm and max wage value for group 1
+        client.callProcedure("R5.insert",
+                6, "{\"wage\":30 , \"dept\":1 , \"tm_year\":2011 , \"tm_month\":6 , \"tm_day\":11 }");
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,4,60,expectedMinTM},
+                                 {2,1,140,expectedMinTM}};
+        verifyMVTestR5MinMax(client, expected);
+
+        // Re-establish a min tm and max wage value for group 2 via update of the sole base
+        client.callProcedure("R5.update", 7,
+                "{\"wage\":77 , \"dept\":2 , \"tm_year\":2013 , \"tm_month\":6 , \"tm_day\":11 }", 7);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,4,60,expectedMinTM},
+                                 {2,1,154,expectedMaxTM}};
+        verifyMVTestR5MinMax(client, expected);
+
+        // Re-establish a min tm and max wage value for group 1 via update of the current extreme value
+        client.callProcedure("R5.update", 6,
+                "{\"wage\":40 , \"dept\":1 , \"tm_year\":2010 , \"tm_month\":6 , \"tm_day\":11 }", 6);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,4,80,expectedMinMostTM},
+                                 {2,1,154,expectedMaxTM}};
+        verifyMVTestR5MinMax(client, expected);
+
+        // Re-establish a min tm and max wage value for groups 1 and 2 via switch of a grouped key
+        client.callProcedure("R5.update", 6,
+                "{\"wage\":80 , \"dept\":2 , \"tm_year\":2010 , \"tm_month\":6 , \"tm_day\":11 }", 6);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,3,40,expectedMedTM},
+                                 {2,2,160,expectedMinMostTM}};
+        verifyMVTestR5MinMax(client, expected);
+
+        // Demonstrate that null values do not alter mins or maxs.
+        client.callProcedure("R5.insert", 10, "{\"dept\":0}");
+        client.callProcedure("R5.insert", 11, "{\"dept\":1}");
+        client.callProcedure("R5.insert", 12, "{\"dept\":2}");
+        expected = new long[][] {{0,2,20,expectedMaxTM},
+                                 {1,4,40,expectedMedTM},
+                                 {2,3,160,expectedMinMostTM}};
+        verifyMVTestR5MinMax(client, expected);
+    }
+
+    private void verifyMVTestR5MinMax(Client client, long[][] expected)
+        throws IOException, NoConnectionsException, ProcCallException, ParseException
+    {
+        VoltTable table = client.callProcedure("@AdHoc",
+            "SELECT DEPT, CNT, CAST(MAX_WAGE AS INTEGER)*2, CAST(MIN_TM AS INTEGER) " +
+            "FROM V_R5_MIN_MAX ORDER BY DEPT").getResults()[0];
+        System.out.println(table);
+        validateTableOfLongs(table, expected);
+    }
+
+    public void testColumnWidthLimits() throws IOException, ProcCallException, Exception
+    {
+        if (isHSQL()) { // hsql backend does not support the FIELD function
+            return;
+        }
+        System.out.println("Test mat view VARCHAR limits...");
+        Client client = getClient();
+        // test that the arbitrary length limits imposed on matview columns prevent "disaster".
+        client.callProcedure("R6.insert", 0, 1, "{\"unused\":\"" +
+            "12345678901234567890123456789012345678901234567 50" +
+            "1234567890123456789012345678901234567890123456 100" +
+            "1234567890123456789012345678901234567890123456 150" +
+            "1234567890123456789012345678901234567890123456 200" +
+            "1234567890123456789012345678901234567890123456 250" +
+            "1234567890123456789012345678901234567890123456 300" +
+            "1234567890123456789012345678901234567890123456 350" +
+            "1234567890123456789012345678901234567890123456 400" +
+            "1234567890123456789012345678901234567890123456 450" +
+            "1234567890123456789012345678901234567890123456 500" +
+            "1234567890123456789012345678901234567890123456 550" +
+            "1234567890123456789012345678901234567890123456 600" +
+            "1234567890123456789012345678901234567890123456 650" +
+            "1234567890123456789012345678901234567890123456 700" +
+            "1234567890123456789012345678901234567890123456 750" +
+            "1234567890123456789012345678901234567890123456 800" +
+            "1234567890123456789012345678901234567890123456 850" +
+            "1234567890123456789012345678901234567890123456 900" +
+            "1234567890123456789012345678901234567890123456 950" +
+            "123456789012345678901234567890123456789012345 1000" +
+            "123456789012345678901234567890123456789012345 1050" +
+            "123456789012345678901234567890123456789012345 1100" +
+            "123456789012345678901234567890123456789012345 1150" +
+            "123456789012345678901234567890123456789012345 1200" +
+            "123456789012345678901234567890123456789012345 1250" +
+            "123456789012345678901234567890123456789012345 1300" +
+            "123456789012345678901234567890123456789012345 1350" +
+            "123456789012345678901234567890123456789012345 1400" +
+            "123456789012345678901234567890123456789012345 1450" +
+            "123456789012345678901234567890123456789012345 1500" +
+            "123456789012345678901234567890123456789012345 1550" +
+            "123456789012345678901234567890123456789012345 1600" +
+            "123456789012345678901234567890123456789012345 1650" +
+            "123456789012345678901234567890123456789012345 1700" +
+            "123456789012345678901234567890123456789012345 1750" +
+            "123456789012345678901234567890123456789012345 1800" +
+            "123456789012345678901234567890123456789012345 1850" +
+            "123456789012345678901234567890123456789012345 1900" +
+            "123456789012345678901234567890123456789012345 1950" +
+            "123456789012345678901234567890123456789012345 2000" +
+            "123456789012345678901234567890123456789012345 2050" +
+            "\", \"used\":\"9\"}");
+
+        // No problem for now until MAX_USED needs to be set to the over-long value.
+        client.callProcedure("R6.insert", 1, 1, "{\"unused\":\"1\", \"used\":\"" +
+            "12345678901234567890123456789012345678901234567 50" +
+            "1234567890123456789012345678901234567890123456 100" +
+            "1234567890123456789012345678901234567890123456 150" +
+            "1234567890123456789012345678901234567890123456 200" +
+            "1234567890123456789012345678901234567890123456 250" +
+            "1234567890123456789012345678901234567890123456 300" +
+            "1234567890123456789012345678901234567890123456 350" +
+            "1234567890123456789012345678901234567890123456 400" +
+            "1234567890123456789012345678901234567890123456 450" +
+            "1234567890123456789012345678901234567890123456 500" +
+            "1234567890123456789012345678901234567890123456 550" +
+            "1234567890123456789012345678901234567890123456 600" +
+            "1234567890123456789012345678901234567890123456 650" +
+            "1234567890123456789012345678901234567890123456 700" +
+            "1234567890123456789012345678901234567890123456 750" +
+            "1234567890123456789012345678901234567890123456 800" +
+            "1234567890123456789012345678901234567890123456 850" +
+            "1234567890123456789012345678901234567890123456 900" +
+            "1234567890123456789012345678901234567890123456 950" +
+            "123456789012345678901234567890123456789012345 1000" +
+            "123456789012345678901234567890123456789012345 1050" +
+            "123456789012345678901234567890123456789012345 1100" +
+            "123456789012345678901234567890123456789012345 1150" +
+            "123456789012345678901234567890123456789012345 1200" +
+            "123456789012345678901234567890123456789012345 1250" +
+            "123456789012345678901234567890123456789012345 1300" +
+            "123456789012345678901234567890123456789012345 1350" +
+            "123456789012345678901234567890123456789012345 1400" +
+            "123456789012345678901234567890123456789012345 1450" +
+            "123456789012345678901234567890123456789012345 1500" +
+            "123456789012345678901234567890123456789012345 1550" +
+            "123456789012345678901234567890123456789012345 1600" +
+            "123456789012345678901234567890123456789012345 1650" +
+            "123456789012345678901234567890123456789012345 1700" +
+            "123456789012345678901234567890123456789012345 1750" +
+            "123456789012345678901234567890123456789012345 1800" +
+            "123456789012345678901234567890123456789012345 1850" +
+            "123456789012345678901234567890123456789012345 1900" +
+            "123456789012345678901234567890123456789012345 1950" +
+            "123456789012345678901234567890123456789012345 2000" +
+            "123456789012345678901234567890123456789012345 2050" +
+            "\"}");
+        try {
+            // Problem: MAX_USED needs to fall back to the over-long value
+            // when the short value is removed.
+            client.callProcedure("R6.delete", 0);
+            fail();
+        } catch (Exception exc) {
+            assertTrue(exc.toString().contains("Object exceeds specified size"));
+        }
+    }
+
+    private void mvUpdateR4() throws IOException, ProcCallException {
+        System.out.println("Test R4 update...");
+
+        ClientResponse result;
+        Client client = this.getClient();
+        String insert = "R4.insert";
+        // ID, wage, dept, age, rent
+        client.callProcedure(insert, 1,  10, -1, 21, 5);
+        client.callProcedure(insert, 2,  20,  1, 22, 6);
+        client.callProcedure(insert, 3,  30,  1, 23, 7 );
+        client.callProcedure(insert, 4,  40,  2, 24, 8);
+        client.callProcedure(insert, 5,  50,  2, 25, 9);
+
+        String mvTable = "V2_R4";
+        String orderbyStmt = mvTable+"_G1";
+        // SELECT dept*dept, dept+dept, count(*), SUM(wage) FROM R4 GROUP BY dept*dept, dept+dept
+
+        // Check the current contents in MVs
+        compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, -2, 1, 10}, {1, 2, 2, 50}, {4, 4, 2, 90}}, orderbyStmt);
+
+        // Test update(id, wage, dept, age, rent, oldid)
+        result = client.callProcedure("R4.update", 2, 19, 1, 22, 6, 2);
+        assertEquals(ClientResponse.SUCCESS, result.getStatus());
+        assertEquals(1, result.getResults()[0].asScalarLong());
+        compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, -2, 1, 10}, {1, 2, 2, 49}, {4, 4, 2, 90}}, orderbyStmt);
+
+        result = client.callProcedure("R4.update", 4, 41, -1, 24, 8, 4);
+        assertEquals(ClientResponse.SUCCESS, result.getStatus());
+        assertEquals(1, result.getResults()[0].asScalarLong());
+        compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, -2, 2, 51}, {1, 2, 2, 49}, {4, 4, 1, 50}}, orderbyStmt);
+
+        result = client.callProcedure("R4.update", 5, 55, 1, 25, 9, 5);
+        assertEquals(ClientResponse.SUCCESS, result.getStatus());
+        assertEquals(1, result.getResults()[0].asScalarLong());
+        compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, -2, 2, 51}, {1, 2, 3, 104}}, orderbyStmt);
+
+        // Test ENG-5291 -- that inserting nulls effects only count(*)s but not aggregation columns.
+        client.callProcedure("R4.insert", 6, null, 1, null, null);
+        assertEquals(ClientResponse.SUCCESS, result.getStatus());
+        assertEquals(1, result.getResults()[0].asScalarLong());
+        client.callProcedure("R4.insert", 7, null, 1, null, null);
+        assertEquals(ClientResponse.SUCCESS, result.getStatus());
+        assertEquals(1, result.getResults()[0].asScalarLong());
+        compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, -2, 2, 51}, {1, 2, 5, 104}}, orderbyStmt);
+
+        result = client.callProcedure("@AdHoc","Delete from R4");
+        assertEquals(ClientResponse.SUCCESS, result.getStatus());
+        assertEquals(7, result.getResults()[0].asScalarLong());
+        compareMVcontentsOfLongs(client, mvTable, null, orderbyStmt);
     }
 
     private void loadTableForMVFixSuite() throws Exception {
@@ -738,6 +1104,62 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         }
     }
 
+    public void testPartitionedMVQueriesWhere() throws Exception {
+        System.out.println("Test MV partition agg query where...");
+        VoltTable vt = null;
+        Client client = this.getClient();
+
+        // Load data
+        loadTableForMVFixSuite();
+        String[] tbs = {"V_P1", "V_P1_ABS", "V_P2", "V_R4"};
+        /*
+        * Current expected data:
+        * V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent
+        * 10,   1,     4,     101,       37
+        * 20,   2,     2,     45,        13
+        * 30,   2,     1,     24,        8
+        * 30,   3,     3,     85,        37
+        * */
+        for (String tb: tbs) {
+            vt = client.callProcedure("@AdHoc", "Select V_CNT from "
+                    + tb + " where v_sum_rent = 37 Order by V_CNT;").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{3}, {4}});
+
+            vt = client.callProcedure("@AdHoc", "Select V_CNT from "
+                    + tb + " where V_G1 < 20 Order by V_CNT;").getResults()[0];
+            assertEquals(4, vt.asScalarLong());
+
+            vt = client.callProcedure("@AdHoc", "Select count(*) from "
+                    + tb + " where V_G1 > 10 ;").getResults()[0];
+            assertEquals(3, vt.asScalarLong());
+
+            // Test it with extra meaningless order by.
+            vt = client.callProcedure("@AdHoc", "Select count(*) from "
+                    + tb + " where V_G1 > 10 ORDER BY V_CNT;").getResults()[0];
+            assertEquals(3, vt.asScalarLong());
+
+            // Test AND
+            vt = client.callProcedure("@AdHoc", "Select V_CNT from "
+                    + tb + " where V_G1 > 10 AND v_sum_rent = 37 Order by V_CNT;").getResults()[0];
+            assertEquals(3, vt.asScalarLong());
+
+            // Test OR
+            vt = client.callProcedure("@AdHoc", "Select V_CNT from "
+                    + tb + " where V_G1 > 10 OR v_sum_rent = 37 Order by V_CNT;").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{1}, {2}, {3}, {4}});
+
+            vt = client.callProcedure("@AdHoc", "Select V_CNT from "
+                    + tb + " where V_G1 = 20 OR v_sum_rent = 37 Order by V_CNT;").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{2}, {3}, {4}});
+
+            // Test no push down.
+            vt = client.callProcedure("@AdHoc", "Select V_G1, V_CNT from "
+                    + tb + " where V_G1 = (v_sum_rent - 7) Order by V_CNT;").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{30,3}});
+        }
+
+    }
+
     //
     // Suite builder boilerplate
     //
@@ -747,7 +1169,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
     }
 
     static public junit.framework.Test suite() throws Exception {
-        VoltServerConfig config = null;
+        LocalCluster config = null;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
                 TestPlansGroupByComplexMaterializedViewSuite.class);
         String literalSchema = null;
@@ -778,7 +1200,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         try {
             project0.addLiteralSchema(literalSchema);
         } catch (IOException e) {
-            assertFalse(true);
+            fail();
         }
 
         config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
@@ -788,7 +1210,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         lines = captured.split("\n");
 
         assertTrue(foundLineMatching(lines,
-                ".*V0.*must have non-group by columns aggregated by sum or count.*"));
+                ".*V0.*must have non-group by columns aggregated by sum, count, min or max.*"));
 
         VoltProjectBuilder project1 = new VoltProjectBuilder();
         project1.setCompilerDebugPrintStream(capturing);
@@ -810,7 +1232,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         try {
             project1.addLiteralSchema(literalSchema);
         } catch (IOException e) {
-            assertFalse(true);
+            fail();
         }
 
         config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
@@ -826,7 +1248,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         VoltProjectBuilder project = new VoltProjectBuilder();
         literalSchema =
                 "CREATE TABLE R1 ( " +
-                "id INTEGER DEFAULT '0' NOT NULL, " +
+                "id INTEGER NOT NULL, " +
                 "wage INTEGER, " +
                 "dept INTEGER, " +
                 "PRIMARY KEY (id) );" +
@@ -844,7 +1266,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "AS SELECT ABS(dept), count(*), SUM(wage+id) FROM R1 GROUP BY ABS(dept);" +
 
                 "CREATE TABLE R2 ( " +
-                "id INTEGER DEFAULT '0' NOT NULL, " +
+                "id INTEGER NOT NULL, " +
                 "wage INTEGER, " +
                 "dept INTEGER, " +
                 "tm TIMESTAMP DEFAULT NULL, " +
@@ -853,6 +1275,45 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "CREATE VIEW V_R2 (V_R2_G1, V_R2_G2, V_R2_CNT, V_R2_sum_wage) " +
                 "AS SELECT truncate(month,tm), dept, count(*), SUM(wage) " +
                 "FROM R2 GROUP BY truncate(month,tm), dept;" +
+
+                "CREATE VIEW V_R2_MIN_MAX (DEPT, CNT, MAX_WAGE, MIN_TM) " +
+                "AS SELECT ABS(DEPT), COUNT (*), MAX(WAGE * 2), MIN(TM) " +
+                "FROM R2 GROUP BY ABS(DEPT);" +
+
+                // R5 mv tests are mainly for string handling concerns
+                // -- it's a JSONic variant of R2 and its views -- a test for ENG-5292
+                "CREATE TABLE R5 ( " +
+                "id INTEGER NOT NULL, " +
+                "JSON_DATA VARCHAR(100)," +
+                // JSON FIELDS:
+                //   wage INTEGER
+                //   dept INTEGER
+                //   tm_year INTEGER
+                //   tm_month INTEGER
+                //   tm_day INTEGER
+                "PRIMARY KEY (ID) );" +
+
+                "CREATE VIEW V_R5_MIN_MAX (DEPT, CNT, MAX_WAGE, MIN_TM) " +
+                "AS SELECT ABS(CAST(FIELD(JSON_DATA, 'dept') AS INTEGER)), COUNT(*), " +
+                "MAX(FIELD(JSON_DATA, 'wage')), MIN(FIELD(JSON_DATA, 'tm_year')) " +
+                "FROM R5 " +
+                "GROUP BY  ABS(CAST(FIELD(JSON_DATA, 'dept') AS INTEGER));" +
+
+                // R6 mv tests our arbitrary string limitations
+                "CREATE TABLE R6 ( " +
+                "id INTEGER NOT NULL, " +
+                "grupo INTEGER NOT NULL, " +
+                "JSON_DATA VARCHAR(10000)," +
+                // JSON FIELDS:
+                //   unused - an unused string that pads the base table column just to show we can.
+                //   used  - a string that gets used in a mat view MIN column, triggering the
+                //           size limitation when it gets too large.
+                "PRIMARY KEY (ID) );" +
+
+                "CREATE VIEW V_R6_MIN_MAX (GRUPO, CNT, MAX_USED) " +
+                "AS SELECT grupo, COUNT(*), MAX(FIELD(JSON_DATA, 'used')) " +
+                "FROM R6 " +
+                "GROUP BY grupo;" +
 
                 // R3 mv tests are mainly for memory concerns
                 "CREATE TABLE R3 ( " +
@@ -879,7 +1340,6 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "AS SELECT vlong || '" + longStr + "', " +
                 "count(*), SUM(wage) " +
                 "FROM R3 GROUP BY vlong || '" + longStr + "';" +
-
 
                 "CREATE TABLE P1 ( " +
                 "id INTEGER DEFAULT '0' NOT NULL, " +
@@ -915,8 +1375,8 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 // NO Need to fix mv query
                 "CREATE TABLE R4 ( " +
                 "id INTEGER DEFAULT '0' NOT NULL, " +
-                "wage INTEGER, " +
-                "dept INTEGER, " +
+                "wage BIGINT, " +
+                "dept BIGINT, " +
                 "age INTEGER,  " +
                 "rent INTEGER, " +
                 "PRIMARY KEY (id) );" +
@@ -924,29 +1384,41 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "CREATE VIEW V_R4 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) " +
                 "AS SELECT wage, dept, count(*), sum(age), sum(rent)  FROM R4 " +
                 "GROUP BY wage, dept;" +
-                ""
-                ;
+
+                // This R4 mv tests bigint math result type
+                "CREATE VIEW V2_R4 (V2_R4_G1, V2_R4_G2, V2_R4_CNT, V2_R4_sum_wage) " +
+                "AS SELECT dept*dept, dept+dept, count(*), SUM(wage) " +
+                "FROM R4 GROUP BY dept*dept, dept+dept;" +
+                "";
         try {
             project.addLiteralSchema(literalSchema);
         } catch (IOException e) {
-            assertFalse(true);
+            fail();
         }
 
+        //* Single-server configuration  -- please do not remove or corrupt this structured comment
         config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
+        // End single-server configuration  -- please do not remove or corrupt this structured comment */
 
+        //* HSQL backend server configuration  -- please do not remove or corrupt this structured comment
         config = new LocalCluster("plansgroupby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
+        // End HSQL backend server configuration  -- please do not remove or corrupt this structured comment */
 
-        // Cluster
+        //* Multi-server configuration  -- please do not remove or corrupt this structured comment
         config = new LocalCluster("plansgroupby-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        // Disable hasLocalServer -- with hasLocalServer enabled,
+        // multi-server pro configs mysteriously hang at startup under eclipse.
+        config.setHasLocalServer(false);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
+        // End multi-server configuration  -- please do not remove or corrupt this structured comment */
 
         return builder;
     }

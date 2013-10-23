@@ -41,6 +41,10 @@ import org.voltdb.types.PlanNodeType;
 
 public class TestPlansJoin extends PlannerTestCase {
 
+    public void testJoin() {
+        compile("select R1.a, r1.c, R2.a, r2.c, R3.a, r3.c FROM R1 RIGHT JOIN R2 ON R1.A = R2.A LEFT JOIN R3 ON R1.C = R3.c");
+    }
+
     public void testBasicInnerJoin() {
         // select * with ON clause should return all columns from all tables
         AbstractPlanNode pn = compile("select * FROM R1 JOIN R2 ON R1.C = R2.C");
@@ -868,6 +872,10 @@ public class TestPlansJoin extends PlannerTestCase {
         // Distributed inner  and replicated outer tables -NLJ/IndexScan
         lpn = compileToFragments("select *  FROM R3 LEFT JOIN P2 ON R3.A = P2.A AND P2.A < 0 AND P2.E > 3 WHERE P2.A IS NULL");
         assertEquals(2, lpn.size());
+        for (AbstractPlanNode apn: lpn) {
+            System.out.println(apn.toExplainPlanString());
+        }
+
         n = lpn.get(0).getChild(0).getChild(0);
         assertTrue(n instanceof NestLoopPlanNode);
         assertEquals(JoinType.LEFT, ((NestLoopPlanNode) n).getJoinType());
@@ -880,15 +888,12 @@ public class TestPlansJoin extends PlannerTestCase {
         n = lpn.get(1).getChild(0);
         assertTrue(n instanceof IndexScanPlanNode);
         IndexScanPlanNode in = (IndexScanPlanNode) n;
+        assertEquals(IndexLookupType.LT, in.getLookupType());
 
         assertNotNull(in.getPredicate());
-
         assertEquals(ExpressionType.CONJUNCTION_AND, in.getPredicate().getExpressionType());
-        assertEquals(IndexLookupType.LT, in.getLookupType());
-        assertEquals(ExpressionType.CONJUNCTION_AND, in.getPredicate().getLeft().getExpressionType());
-        assertEquals(ExpressionType.COMPARE_GREATERTHAN, in.getPredicate().getLeft().getLeft().getExpressionType());
-        assertEquals(ExpressionType.OPERATOR_NOT, in.getPredicate().getLeft().getRight().getExpressionType());
-        assertEquals(ExpressionType.COMPARE_LESSTHAN, in.getPredicate().getRight().getExpressionType());
+        assertEquals(ExpressionType.COMPARE_GREATERTHAN, in.getPredicate().getLeft().getExpressionType());
+        assertEquals(ExpressionType.OPERATOR_NOT, in.getPredicate().getRight().getExpressionType());
 
         // Distributed inner  and outer tables -NLIJ/inlined IndexScan
         lpn = compileToFragments("select *  FROM P2 RIGHT JOIN P3 ON P3.A = P2.A AND P2.A < 0 WHERE P2.A IS NULL");
@@ -931,11 +936,6 @@ public class TestPlansJoin extends PlannerTestCase {
        // Self JOIN . Temporary restriction
        failToCompile("select R1.C FROM R1 LEFT OUTER JOIN R2 ON R1.C = R2.C RIGHT JOIN R2 ON R2.C = R1.C",
                      "VoltDB does not support self joins, consider using views instead");
-       // OUTER JOIN with more then two tables. Temporary restriction
-       failToCompile("select R1.C FROM R1 LEFT OUTER JOIN R2 ON R1.C = R2.C RIGHT JOIN R3 ON R3.C = R1.C",
-                     "VoltDB does not support outer joins with more than two tables involved");
-       failToCompile("select R1.C FROM R1 LEFT JOIN R2 ON R1.C = R2.C, R3 WHERE R3.C = R1.C",
-                     "VoltDB does not support outer joins with more than two tables involved");
    }
 
 

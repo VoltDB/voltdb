@@ -125,7 +125,6 @@ public class TestLimitOffsetSuite extends RegressionSuite {
                 .getResults()[0];
         assertEquals(1, result.getRowCount());
         result.advanceRow();
-        assertEquals(0, result.getLong(0));
         result = client.callProcedure("@AdHoc", "SELECT A.PKEY FROM A, B WHERE A.PKEY = B.PKEY LIMIT 2 OFFSET 2;")
                 .getResults()[0];
         assertEquals(2, result.getRowCount());
@@ -164,6 +163,37 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         VoltTable result = client.callProcedure("@AdHoc", "select I from A limit 0").getResults()[0];
 
         assertEquals(0, result.getRowCount());
+    }
+
+    public void testENG5156() throws IOException, ProcCallException {
+        Client client = this.getClient();
+        VoltTable result = null;
+
+        String insertProc = "SCORE.insert";
+        client.callProcedure(insertProc,  1, "b", 1, 1378827221795L, 1, 1);
+        client.callProcedure(insertProc,  2, "b", 2, 1378827221795L, 2, 2);
+
+        result = client.callProcedure("@ExplainProc", "GetTopScores").getResults()[0];
+        // using the "IDX_SCORE_VALUE_USER" index for sort order only.
+        assertTrue(result.toString().contains("IDX_SCORE_VALUE_USER"));
+        assertTrue(result.toString().contains("inline LIMIT with parameter"));
+
+        result = client.callProcedure("GetTopScores", 1378827221793L, 1378827421793L, 1).getResults()[0];
+        validateTableOfLongs(result, new long[][] {{2,2}});
+
+        // Test AdHoc.
+        result = client.callProcedure("@Explain",
+                "SELECT user_id, score_value FROM score " +
+                "WHERE score_date > 1378827221793 AND score_date <= 1378827421793 " +
+                "ORDER BY score_value DESC, user_id DESC LIMIT 1; ").getResults()[0];
+        assertTrue(result.toString().contains("IDX_SCORE_VALUE_USER"));
+        assertTrue(result.toString().contains("inline LIMIT with parameter"));
+
+        result = client.callProcedure("@AdHoc",
+                "SELECT user_id, score_value FROM score " +
+                "WHERE score_date > 1378827221793 AND score_date <= 1378827421793 " +
+                "ORDER BY score_value DESC, user_id DESC LIMIT 1; ").getResults()[0];
+        validateTableOfLongs(result, new long[][] {{2,2}});
     }
 
     static public junit.framework.Test suite() {

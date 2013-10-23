@@ -26,7 +26,6 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
-import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -77,6 +76,7 @@ public class MockVoltDB implements VoltDBInterface
     private SiteTracker m_siteTracker;
     private final Map<MailboxType, List<MailboxNodeContent>> m_mailboxMap =
             new HashMap<MailboxType, List<MailboxNodeContent>>();
+    private boolean m_replicationActive = false;
 
     public MockVoltDB() {
         this(VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT, -1, VoltDB.DEFAULT_DR_PORT);
@@ -148,9 +148,6 @@ public class MockVoltDB implements VoltDBInterface
         return retval;
     }
 
-    private final Hashtable<Long, ExecutionSite> m_localSites =
-            new Hashtable<Long, ExecutionSite>();
-
     public void addSite(long siteId, MailboxType type) {
         m_mailboxMap.get(type).add(new MailboxNodeContent(siteId, null));
         m_siteTracker = new SiteTracker(m_hostId, m_mailboxMap);
@@ -158,9 +155,6 @@ public class MockVoltDB implements VoltDBInterface
 
     public void addSite(long siteId, int partitionId)
     {
-        if (((int)siteId) == 0) {
-            m_localSites.put(siteId, new ExecutionSite(partitionId));
-        }
         MailboxNodeContent mnc = new MailboxNodeContent( siteId, partitionId);
         m_mailboxMap.get(MailboxType.ExecutionSite).add(mnc);
         m_siteTracker = new SiteTracker(m_hostId, m_mailboxMap);
@@ -294,12 +288,6 @@ public class MockVoltDB implements VoltDBInterface
     public HostMessenger getHostMessenger()
     {
         return m_hostMessenger;
-    }
-
-    @Override
-    public Hashtable<Long, ExecutionSite> getLocalSites()
-    {
-        return m_localSites;
     }
 
     public void setStatsAgent(StatsAgent agent)
@@ -473,12 +461,13 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public void setReplicationActive(boolean active)
     {
+        m_replicationActive = active;
     }
 
     @Override
     public boolean getReplicationActive()
     {
-        return false;
+        return m_replicationActive;
     }
 
     @Override
@@ -537,15 +526,6 @@ public class MockVoltDB implements VoltDBInterface
                 return true;
             }
         };
-    }
-
-    @Override
-    public boolean isIV2Enabled() {
-        if (voltconfig == null)
-        {
-            voltconfig = new VoltDB.Configuration();
-        }
-        return voltconfig.m_enableIV2;
     }
 
     @Override

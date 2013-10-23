@@ -67,8 +67,6 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Group;
-import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Procedure;
@@ -129,6 +127,7 @@ public class VoltCompiler {
 
     // generated html text for catalog report
     String m_report = null;
+    String m_reportPath = null;
 
     InMemoryJarfile m_jarOutput = null;
     Catalog m_catalog = null;
@@ -567,11 +566,12 @@ public class VoltCompiler {
 
         // generate the catalog report and write it to disk
         try {
-            m_report = ReportMaker.report(m_catalog);
+            m_report = ReportMaker.report(m_catalog, m_warnings);
             File file = new File("catalog-report.html");
             FileWriter fw = new FileWriter(file);
             fw.write(m_report);
             fw.close();
+            m_reportPath = file.getAbsolutePath();
         } catch (IOException e) {
             e.printStackTrace();
             return null;
@@ -823,7 +823,7 @@ public class VoltCompiler {
                     // if this is a fancy expression-based index...
                     else {
                         try {
-                            List<AbstractExpression> indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, null);
+                            List<AbstractExpression> indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr);
                             for (AbstractExpression expr: indexExpressions) {
                                 if (expr instanceof TupleValueExpression &&
                                         ((TupleValueExpression) expr).getColumnName().equals(c.getName()) ) {
@@ -1491,44 +1491,6 @@ public class VoltCompiler {
         return cls;
     }
 
-    void grantExportToGroup( final String groupName, final Database catdb)
-        throws VoltCompilerException
-    {
-        assert groupName != null && ! groupName.trim().isEmpty() && catdb != null;
-
-        // Catalog Connector
-        // Relying on schema's enforcement of at most 1 connector
-        org.voltdb.catalog.Connector catconn = catdb.getConnectors().getIgnoreCase("0");
-        if (catconn == null) {
-            catconn = catdb.getConnectors().add("0");
-        }
-
-        final Group group = catdb.getGroups().getIgnoreCase(groupName);
-        if (group == null) {
-            throw new VoltCompilerException("Export has a role " + groupName + " that does not exist");
-        }
-
-        GroupRef groupRef = catconn.getAuthgroups().getIgnoreCase(groupName);
-
-        if      (groupRef == null) {
-            groupRef = catconn.getAuthgroups().add(groupName);
-            groupRef.setGroup(group);
-        }
-        else if (groupRef.getGroup() == null) {
-                groupRef.setGroup(group);
-        }
-
-        if (groupRef.getGroup() != group) {
-            throw new VoltCompilerException(
-                    "Mismatched group reference found in export connector auth groups: " +
-                    "it references '" + groupRef.getGroup().getTypeName() +
-                    "(" + System.identityHashCode(groupRef.getGroup()) +") " +
-                    "', when it should reference '" + group.getTypeName() +
-                    "(" + System.identityHashCode(group) +")" +
-                    "' instead");
-        }
-    }
-
     private void compileExport(final ExportType export, final Database catdb)
         throws VoltCompilerException
     {
@@ -1548,20 +1510,6 @@ public class VoltCompiler {
         org.voltdb.catalog.Connector catconn = catdb.getConnectors().getIgnoreCase("0");
         if (catconn == null) {
             catconn = catdb.getConnectors().add("0");
-        }
-
-        // add authorized users and groups
-        final ArrayList<String> groupslist = new ArrayList<String>();
-
-        // @groups
-        if (export.getGroups() != null) {
-            for (String group : export.getGroups().split(",")) {
-                groupslist.add(group);
-            }
-        }
-
-        for (String groupName : groupslist) {
-            grantExportToGroup(groupName, catdb);
         }
 
         // Catalog Connector.ConnectorTableInfo
@@ -1845,6 +1793,9 @@ public class VoltCompiler {
                         "\tfor best performance. For information on VoltDB partitioning, see:\n"+
                         "\thttp://voltdb.com/docs/UsingVoltDB/ChapAppDesign.php\n\n");
             }
+            outputStream.println("------------------------------------------\n");
+            outputStream.println("Full catalog report can be found at file://" + m_reportPath + "\n" +
+                        "\t or can be viewed at \"http://localhost:8080\" when the server is running.\n");
             outputStream.println("------------------------------------------\n");
         }
         if (feedbackStream != null) {

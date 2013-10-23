@@ -39,43 +39,46 @@ TEST_F(ElasticHashinatorTest, TestMinMaxToken)
     ReferenceSerializeOutput output(config.get(), 4 + (12 * 3));
 
     output.writeInt(3);
-    output.writeLong(std::numeric_limits<int64_t>::min());
+    output.writeInt(std::numeric_limits<int32_t>::min());
     output.writeInt(0);
-    output.writeLong(0);
+    output.writeInt(0);
     output.writeInt(1);
-    output.writeLong(std::numeric_limits<int64_t>::max());
+    output.writeInt(std::numeric_limits<int32_t>::max());
     output.writeInt(2);
 
-    boost::scoped_ptr<ElasticHashinator> hashinator(ElasticHashinator::newInstance(config.get()));
-    EXPECT_EQ( 0, hashinator->partitionForToken(std::numeric_limits<int64_t>::min()));
-    EXPECT_EQ( 0, hashinator->partitionForToken(std::numeric_limits<int64_t>::min() + 1));
+    boost::scoped_ptr<ElasticHashinator> hashinator(ElasticHashinator::newInstance(config.get(), NULL, 0));
+    EXPECT_EQ( 0, hashinator->partitionForToken(std::numeric_limits<int32_t>::min()));
+    EXPECT_EQ( 0, hashinator->partitionForToken(std::numeric_limits<int32_t>::min() + 1));
 
     EXPECT_EQ( 1, hashinator->partitionForToken(0));
     EXPECT_EQ( 1, hashinator->partitionForToken(1));
 
-    EXPECT_EQ( 2, hashinator->partitionForToken(std::numeric_limits<int64_t>::max()));
-    EXPECT_EQ( 1, hashinator->partitionForToken(std::numeric_limits<int64_t>::max() - 1));
+    EXPECT_EQ( 2, hashinator->partitionForToken(std::numeric_limits<int32_t>::max()));
+    EXPECT_EQ( 1, hashinator->partitionForToken(std::numeric_limits<int32_t>::max() - 1));
 
     output.initializeWithPosition(config.get(), 4 + (12 * 3), 0);
 
     output.writeInt(3);
-    output.writeLong(std::numeric_limits<int64_t>::min() + 1);
+    //output.writeInt(std::numeric_limits<int32_t>::min() + 1);
+    output.writeInt(std::numeric_limits<int32_t>::min());
     output.writeInt(0);
-    output.writeLong(0);
+    output.writeInt(0);
     output.writeInt(1);
-    output.writeLong(std::numeric_limits<int64_t>::max() - 1);
+    output.writeInt(std::numeric_limits<int32_t>::max() - 1);
     output.writeInt(2);
 
-    hashinator.reset(ElasticHashinator::newInstance(config.get()));
+    hashinator.reset(ElasticHashinator::newInstance(config.get(), NULL, 0));
 
-    EXPECT_EQ( 2, hashinator->partitionForToken(std::numeric_limits<int64_t>::min()));
-    EXPECT_EQ( 0, hashinator->partitionForToken(std::numeric_limits<int64_t>::min() + 1));
+    //This used to test wrapping, but we aren't allowing wrapping anymore (always have a token at Integer.MIN_VALUE)
+    //EXPECT_EQ( 2, hashinator->partitionForToken(std::numeric_limits<int32_t>::min()));
+    EXPECT_EQ( 0, hashinator->partitionForToken(std::numeric_limits<int32_t>::min()));
+    EXPECT_EQ( 0, hashinator->partitionForToken(std::numeric_limits<int32_t>::min() + 1));
 
     EXPECT_EQ( 1, hashinator->partitionForToken(0));
     EXPECT_EQ( 1, hashinator->partitionForToken(1));
 
-    EXPECT_EQ( 2, hashinator->partitionForToken(std::numeric_limits<int64_t>::max()));
-    EXPECT_EQ( 2, hashinator->partitionForToken(std::numeric_limits<int64_t>::max() - 1));
+    EXPECT_EQ( 2, hashinator->partitionForToken(std::numeric_limits<int32_t>::max()));
+    EXPECT_EQ( 2, hashinator->partitionForToken(std::numeric_limits<int32_t>::max() - 1));
 }
 
 int main() {

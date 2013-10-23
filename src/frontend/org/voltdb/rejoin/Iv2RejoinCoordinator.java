@@ -36,11 +36,10 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 
 import org.voltdb.SnapshotSiteProcessor;
-import org.voltdb.catalog.Database;
 
 import org.voltdb.SnapshotFormat;
 
-import org.voltdb.iv2.Cartographer;
+import org.voltdb.catalog.Database;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.messaging.RejoinMessage;
@@ -70,6 +69,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
 
     private static AtomicLong m_sitesRejoinedCount = new AtomicLong(0);
 
+    private Database m_catalog;
     // contains all sites that haven't started rejoin initialization
     private final Queue<Long> m_pendingSites;
     // contains all sites that are waiting to start a snapshot
@@ -154,14 +154,15 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     private String makeSnapshotRequest(Multimap<Long, Long> sourceToDests)
     {
         StreamSnapshotRequestConfig.Stream stream =
-            new StreamSnapshotRequestConfig.Stream(sourceToDests, null, null);
+            new StreamSnapshotRequestConfig.Stream(sourceToDests, null);
         StreamSnapshotRequestConfig config =
-            new StreamSnapshotRequestConfig(null, Arrays.asList(stream), false);
+            new StreamSnapshotRequestConfig(SnapshotUtil.getTablesToSave(m_catalog), Arrays.asList(stream), false);
         return makeSnapshotRequest(config);
     }
 
     @Override
-    public boolean startJoin(Database catalog, Cartographer cartographer, String clSnapshotPath) {
+    public boolean startJoin(Database catalog) {
+        m_catalog = catalog;
         m_startTime = System.currentTimeMillis();
         if (m_liveRejoin) {
             long firstSite;
@@ -187,21 +188,15 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         return true;
     }
 
-    private void onSnapshotStreamFinished(long HSId) {
+    private void initiateNextSite() {
         // make all the decisions under lock.
         Long nextSite = null;
         synchronized (m_lock) {
             if (!m_pendingSites.isEmpty()) {
                 nextSite = m_pendingSites.poll();
                 m_snapshotSites.add(nextSite);
-                REJOINLOG.info("Finished streaming snapshot to site: " +
-                        CoreUtils.hsIdToString(HSId) +
-                        " and initiating snapshot stream to next site: " +
+                REJOINLOG.info("Initiating snapshot stream to next site: " +
                         CoreUtils.hsIdToString(nextSite));
-            }
-            else {
-                REJOINLOG.info("Finished streaming snapshot to site: " +
-                        CoreUtils.hsIdToString(HSId));
             }
         }
         if (nextSite != null) {
@@ -265,7 +260,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         if (data != null) {
             REJOINLOG.debug("Snapshot request: " + data);
             SnapshotUtil.requestSnapshot(0l, "", nonce, !m_liveRejoin, SnapshotFormat.STREAM, data,
-                    m_handler, true);
+                    SnapshotUtil.fatalSnapshotResponseHandler, true);
         }
     }
 
@@ -280,8 +275,10 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         RejoinMessage rm = (RejoinMessage) message;
         Type type = rm.getType();
         if (type == RejoinMessage.Type.SNAPSHOT_FINISHED) {
-            onSnapshotStreamFinished(rm.m_sourceHSId);
+            REJOINLOG.info("Finished streaming snapshot to site: " +
+                           CoreUtils.hsIdToString(rm.m_sourceHSId));
         } else if (type == RejoinMessage.Type.REPLAY_FINISHED) {
+            initiateNextSite();
             onReplayFinished(rm.m_sourceHSId);
         } else if (type == RejoinMessage.Type.INITIATION_RESPONSE) {
             onSiteInitialized(rm.m_sourceHSId, rm.getMasterHSId(), rm.getSnapshotSinkHSId());

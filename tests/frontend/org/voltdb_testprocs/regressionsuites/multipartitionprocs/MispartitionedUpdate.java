@@ -38,8 +38,8 @@ public class MispartitionedUpdate extends VoltProcedure {
     public long run(short partitionValue) {
         // basically, try 1000 different partition keys and assume one of them
         // is partitioned wrong
-        for (int i = 0; i < 1000; i++) {
-            voltQueueSQL(update, partitionValue + i, partitionValue);
+        for (int i = 1; i <= 1000; i++) {
+            voltQueueSQL(update, partitionValue + i, partitionValue + (i - 1) );
             voltExecuteSQL();
         }
         return 0;

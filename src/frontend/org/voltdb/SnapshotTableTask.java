@@ -46,11 +46,6 @@ public class SnapshotTableTask
         m_deleteTuples = deleteTuples;
     }
 
-    public int getTableId()
-    {
-        return m_table.getRelativeIndex();
-    }
-
     @Override
     public String toString()
     {

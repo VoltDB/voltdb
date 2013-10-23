@@ -70,7 +70,8 @@ public:
         m_tuplesDeletedInLastUndo = 0;
         m_engine = new voltdb::VoltDBEngine();
         int partitionCount = 1;
-        m_engine->initialize(1,1, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY, HASHINATOR_LEGACY, (char*)&partitionCount);
+        m_engine->initialize(1,1, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY);
+        m_engine->updateHashinator(HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
 
         m_columnNames.push_back("1");
         m_columnNames.push_back("2");
@@ -413,7 +414,7 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
             TupleOutputStreamProcessor outs( serializationBuffer, serializationBufferSize);
             TupleOutputStream &out = outs.at(0);
             std::vector<int> retPositions;
-            m_table->streamMore(outs, retPositions);
+            m_table->streamMore(outs, TABLE_STREAM_SNAPSHOT, retPositions);
             const int serialized = static_cast<int>(out.position());
             if (out.position() == 0) {
                 break;
@@ -559,7 +560,7 @@ TEST_F(CompactionTest, TestENG897) {
         TupleOutputStreamProcessor outs( serializationBuffer, 2097152);
         TupleOutputStream &out = outs.at(0);
         std::vector<int> retPositions;
-        m_table->streamMore(outs, retPositions);
+        m_table->streamMore(outs, TABLE_STREAM_SNAPSHOT, retPositions);
         if (out.position() == 0) {
             break;
         }
