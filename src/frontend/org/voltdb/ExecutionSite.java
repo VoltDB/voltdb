@@ -1712,5 +1712,5 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     public void setBatch(int batchIndex) {}
 
     @Override
-    public void startProcedure(String procedureName) {}
+    public void setProcedureName(String procedureName) {}
 }

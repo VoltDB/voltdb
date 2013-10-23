@@ -481,11 +481,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
     @Override
     public void setBatch(int batchIndex) {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        // don't need to do anything here
     }
 
     @Override
-    public void startProcedure(String procedureName) {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    public void setProcedureName(String procedureName) {
+        // don't need to do anything here I think?
     }
 }

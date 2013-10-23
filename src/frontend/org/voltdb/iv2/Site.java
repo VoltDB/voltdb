@@ -1135,7 +1135,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void startProcedure(String procedureName) {
-        m_ee.startProcedure(procedureName);
+    public void setProcedureName(String procedureName) {
+        m_ee.setProcedureName(procedureName);
     }
 }

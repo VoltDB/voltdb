@@ -223,7 +223,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
 
     /**
-     * Convenience factory method to replace constructory that includes arrays of stuff.
+     * Convenience factory method to replace constructor that includes arrays of stuff.
      *
      * @param initiatorHSId
      * @param coordinatorHSId
@@ -357,6 +357,14 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
     public boolean isEmptyForRestart() {
         return m_emptyForRestart;
+    }
+
+    public String getProcedureName() {
+        Iv2InitiateTaskMessage initMsg = getInitiateTask();
+        if (initMsg != null) {
+            return initMsg.m_invocation.getProcName();
+        }
+        return null;
     }
 
     /*

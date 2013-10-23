@@ -395,7 +395,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         m_currentBatchIndex = batchIndex;
     }
 
-    public void startProcedure(String procedureName) {
+    public void setProcedureName(String procedureName) {
         m_currentProcedureName = procedureName;
     }
 

@@ -100,7 +100,7 @@ public interface SiteProcedureConnection {
             boolean readOnly) throws EEException;
 
     public void setBatch(int batchIndex);
-    public void startProcedure(String procedureName);
+    public void setProcedureName(String procedureName);
 
     /**
      * Legacy recursable execution interface for MP transaction states.

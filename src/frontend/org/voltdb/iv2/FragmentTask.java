@@ -77,6 +77,14 @@ public class FragmentTask extends TransactionTask
         if (hostLog.isDebugEnabled()) {
             hostLog.debug("STARTING: " + this);
         }
+
+        // if this has a procedure name from the initiaton bundled,
+        // inform the site connection here
+        String procName = m_fragmentMsg.getProcedureName();
+        if (procName != null) {
+            siteConnection.setProcedureName(procName);
+        }
+
         // Set the begin undo token if we haven't already
         // In the future we could record a token per batch
         // and do partial rollback
