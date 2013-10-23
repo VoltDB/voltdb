@@ -57,7 +57,6 @@ ElasticIndexReadContext::handleActivation(TableStreamType streamType)
     }
 
     if (!m_surgeon.hasIndex()) {
-        VOLT_ERROR("There is no index to materialize.");
         return ACTIVATION_FAILED;
     }
 
