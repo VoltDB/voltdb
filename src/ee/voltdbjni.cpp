@@ -258,9 +258,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     jint partitionId,
     jint hostId,
     jbyteArray hostname,
-    jlong tempTableMemory,
-    jint hashinatorType,
-    jbyteArray hashinatorConfig)
+    jlong tempTableMemory)
 {
     VOLT_DEBUG("nativeInitialize() start");
     VoltDBEngine *engine = castToEngine(enginePtr);
@@ -275,7 +273,6 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
         jbyte *hostChars = env->GetByteArrayElements( hostname, NULL);
         std::string hostString(reinterpret_cast<char*>(hostChars), env->GetArrayLength(hostname));
         env->ReleaseByteArrayElements( hostname, hostChars, JNI_ABORT);
-        jbyte *hashinatorConfigData = env->GetByteArrayElements(hashinatorConfig, NULL);
         // initialization is separated from constructor so that constructor
         // never fails.
         VOLT_DEBUG("calling initialize...");
@@ -285,10 +282,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
                                    partitionId,
                                    hostId,
                                    hostString,
-                                   tempTableMemory,
-                                   (HashinatorType)hashinatorType,
-                                   (char*)hashinatorConfigData);
-        env->ReleaseByteArrayElements( hashinatorConfig, hashinatorConfigData, JNI_ABORT);
+                                   tempTableMemory);
         if (success) {
             VOLT_DEBUG("initialize succeeded");
             return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
@@ -725,11 +719,9 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getCRC32C
  * Method:    getMurmur3128
  * Signature: (JII)J
  */
-SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltcore_utils_DBBPool_getMurmur3128__JII
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getMurmur3128__JII
   (JNIEnv *env, jclass clazz, jlong ptr, jint offset, jint length) {
-    int64_t  retval[2];
-    MurmurHash3_x64_128( reinterpret_cast<char*>(ptr) + offset, length, 0, retval);
-    return retval[0];
+    return MurmurHash3_x64_128( reinterpret_cast<char*>(ptr) + offset, length, 0);
 }
 
 /*
@@ -737,7 +729,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltcore_utils_DBBPool_getMurmur3128_
  * Method:    getMurmur3128
  * Signature: (JII)J
  */
-SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltcore_utils_DBBPool_getMurmur3128__J
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getMurmur3128__J
   (JNIEnv *env, jclass clazz, jlong value) {
     return MurmurHash3_x64_128( value );
 }
@@ -1189,7 +1181,7 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeProce
  * Method:    nativeHashinate
  * Signature: (JI)I
  */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashinate(JNIEnv *env, jobject obj, jlong engine_ptr)
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashinate(JNIEnv *env, jobject obj, jlong engine_ptr, jlong configPtr, jint tokenCount)
 {
     VOLT_DEBUG("nativeHashinate in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
@@ -1207,7 +1199,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashi
             hashinator.reset(LegacyHashinator::newInstance(configValue));
             break;
         case HASHINATOR_ELASTIC:
-            hashinator.reset(ElasticHashinator::newInstance(configValue));
+            hashinator.reset(ElasticHashinator::newInstance(configValue, reinterpret_cast<int32_t*>(configPtr), static_cast<uint32_t>(tokenCount)));
             break;
         default:
             return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
@@ -1228,20 +1220,25 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashi
  * Method:    nativeUpdateHashinator
  * Signature: (JI)I
  */
-SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeUpdateHashinator(JNIEnv *env, jobject obj, jlong engine_ptr)
+SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeUpdateHashinator(JNIEnv *env, jobject obj, jlong engine_ptr, jint type, jlong configPtr, jint tokenCount)
 {
     VOLT_DEBUG("nativeUpdateHashinator in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     assert(engine);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     try {
+        HashinatorType hashinatorType = static_cast<HashinatorType>(type);
+        //Fast path processing, just use the config given by pointer
+        if (configPtr != 0) {
+            engine->updateHashinator(hashinatorType, NULL, reinterpret_cast<int32_t*>(configPtr), static_cast<uint32_t>(tokenCount));
+            return;
+        }
         updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
         NValueArray& params = engine->getParameterContainer();
         Pool *stringPool = engine->getStringPool();
         deserializeParameterSet(engine->getParameterBuffer(), engine->getParameterBufferCapacity(), params, engine->getStringPool());
-        HashinatorType hashinatorType = static_cast<HashinatorType>(voltdb::ValuePeeker::peekAsInteger(params[0]));
-        const char *configValue = static_cast<const char*>(voltdb::ValuePeeker::peekObjectValue(params[1]));
-        engine->updateHashinator(hashinatorType, configValue);
+        const char *configValue = static_cast<const char*>(voltdb::ValuePeeker::peekObjectValue(params[0]));
+        engine->updateHashinator(hashinatorType, configValue, reinterpret_cast<int32_t*>(configPtr), static_cast<uint32_t>(tokenCount));
         stringPool->purge();
     } catch (const FatalException &e) {
         topend->crashVoltDB(e);

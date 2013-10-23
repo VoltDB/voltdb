@@ -69,24 +69,24 @@ public class LegacyHashinator extends TheHashinator {
     }
 
     @Override
-    protected Pair<HashinatorType, byte[]> pGetCurrentConfig() {
-        return Pair.of(HashinatorType.LEGACY, m_configBytes);
+    protected HashinatorConfig pGetCurrentConfig() {
+        return new HashinatorConfig(HashinatorType.LEGACY, m_configBytes, 0, 0);
     }
 
     @Override
-    public Map<Long, Integer> pPredecessors(int partition)
+    public Map<Integer, Integer> pPredecessors(int partition)
     {
         throw new RuntimeException("Legacy hashinator doesn't support predecessors");
     }
 
     @Override
-    public Pair<Long, Integer> pPredecessor(int partition, long token)
+    public Pair<Integer, Integer> pPredecessor(int partition, int token)
     {
         throw new RuntimeException("Legacy hashinator doesn't support predecessors");
     }
 
     @Override
-    public Map<Long, Long> pGetRanges(int partition)
+    public Map<Integer, Integer> pGetRanges(int partition)
     {
         throw new RuntimeException("Getting ranges is not supported in the legacy hashinator");
     }

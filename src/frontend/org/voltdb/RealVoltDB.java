@@ -763,7 +763,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 Class<?> elasticServiceClass =
                     MiscUtils.loadProClass("org.voltdb.join.ElasticJoinCoordinator", "Elastic", false);
 
-                if (elasticServiceClass != null && TheHashinator.getCurrentConfig().getFirst() == HashinatorType.ELASTIC) {
+                if (elasticServiceClass != null && TheHashinator.getCurrentConfig().type == HashinatorType.ELASTIC) {
                     Constructor<?> constructor =
                         elasticServiceClass.getConstructor(HostMessenger.class,
                                                            ClientInterface.class,

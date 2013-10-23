@@ -68,8 +68,8 @@ static FORCE_INLINE uint64_t fmix ( uint64_t k )
 
 //-----------------------------------------------------------------------------
 
-void MurmurHash3_x64_128 ( const void * key, const int len,
-                           const uint32_t seed, void * out )
+int32_t MurmurHash3_x64_128 ( const void * key, const int len,
+                           const uint32_t seed )
 {
   const uint8_t * data = (const uint8_t*)key;
   const int nblocks = len / 16;
@@ -143,8 +143,9 @@ void MurmurHash3_x64_128 ( const void * key, const int len,
   h1 += h2;
   h2 += h1;
 
-  ((uint64_t*)out)[0] = h1;
-  ((uint64_t*)out)[1] = h2;
+  //Shift so that we use the higher order bits in case we want to use the lower order ones later
+  //Also use the h1 higher order bits because it provided much better performance in voter, consistent too
+  return static_cast<int32_t>(h1 >> 32);
 }
 }
 //-----------------------------------------------------------------------------

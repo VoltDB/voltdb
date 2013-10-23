@@ -199,7 +199,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config)
+        public void updateHashinator(TheHashinator.HashinatorConfig config)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }

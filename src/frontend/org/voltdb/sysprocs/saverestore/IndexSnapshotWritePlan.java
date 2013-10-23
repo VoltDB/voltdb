@@ -107,15 +107,15 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
         return pidToLocalHSId;
     }
 
-    private static AbstractExpression
-    createPredicateForTable(Table table, IndexSnapshotRequestConfig.PartitionRanges partitionRanges)
+    /**
+     * Create the expression used to build elastic index for a given table.
+     * @param table     The table to build the elastic index on
+     * @param ranges    The hash ranges that the index should include
+     */
+    public static AbstractExpression createIndexExpressionForTable(Table table, Map<Integer, Integer> ranges)
     {
-        if (SNAP_LOG.isTraceEnabled()) {
-            SNAP_LOG.trace("Partition " + partitionRanges.partitionId + " has ranges " +
-                           partitionRanges.ranges);
-        }
         HashRangeExpression predicate = new HashRangeExpression();
-        predicate.setRanges(partitionRanges.ranges);
+        predicate.setRanges(ranges);
         predicate.setHashColumnIndex(table.getPartitioncolumn().getIndex());
 
         return predicate;
@@ -155,7 +155,7 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
                     new SnapshotTableTask(table,
                                           dataTarget,
                                           new SnapshotDataFilter[0],
-                                          createPredicateForTable(table, partitionRange),
+                                          createIndexExpressionForTable(table, partitionRange.ranges),
                                           false);
 
                 placeTask(task, Arrays.asList(localHSId));

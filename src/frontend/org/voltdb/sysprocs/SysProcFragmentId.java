@@ -89,6 +89,13 @@ public class SysProcFragmentId
                 fragId == PF_snapshotSaveQuiesce);
     }
 
+    public static boolean isBalancePartitionsFragment(byte[] planHash) {
+        long fragId = VoltSystemProcedure.hashToFragId(planHash);
+        return (fragId == PF_prepBalancePartitions  ||
+                fragId == PF_balancePartitions ||
+                fragId == PF_balancePartitionsData);
+    }
+
     // @LoadMultipartitionTable
     public static final long PF_distribute = 50;
     public static final long PF_aggregate = 51;

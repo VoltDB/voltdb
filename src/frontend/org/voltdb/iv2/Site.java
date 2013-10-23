@@ -58,6 +58,7 @@ import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStats;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
+import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
@@ -78,6 +79,7 @@ import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
+import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.LogKeys;
 
 import vanilla.java.affinity.impl.PosixJNAAffinity;
@@ -316,7 +318,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config)
+        public void updateHashinator(HashinatorConfig config)
         {
             Site.this.updateHashinator(config);
         }
@@ -426,7 +428,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     ExecutionEngine initializeEE(String serializedCatalog, final long timestamp)
     {
         String hostname = CoreUtils.getHostnameOrAddress();
-        Pair<TheHashinator.HashinatorType, byte[]> hashinatorConfig = TheHashinator.getCurrentConfig();
+        HashinatorConfig hashinatorConfig = TheHashinator.getCurrentConfig();
         ExecutionEngine eeTemp = null;
         try {
             if (m_backend == BackendTarget.NATIVE_EE_JNI) {
@@ -439,8 +441,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         hostname,
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getMaxtemptablesize(),
-                        hashinatorConfig.getFirst(),
-                        hashinatorConfig.getSecond());
+                        hashinatorConfig);
                 eeTemp.loadCatalog( timestamp, serializedCatalog);
             }
             else {
@@ -456,8 +457,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             getSystemsettings().get("systemsettings").getMaxtemptablesize(),
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPort,
-                            hashinatorConfig.getFirst(),
-                            hashinatorConfig.getSecond());
+                            hashinatorConfig);
                 eeTemp.loadCatalog( timestamp, serializedCatalog);
             }
         }
@@ -558,7 +558,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     VoltDB.crashLocalVoltDB("Started a MP transaction during replay before completing " +
                             " open transaction.", false, null);
                 }
-                FragmentTask t = new FragmentTask(m_initiatorMailbox, m, global_replay_mpTxn);
+
+                TransactionTask t;
+                if (m.isSysProcTask()) {
+                    t = new SysprocFragmentTask(m_initiatorMailbox, m, global_replay_mpTxn);
+                } else {
+                    t = new FragmentTask(m_initiatorMailbox, m, global_replay_mpTxn);
+                }
+
                 if (!filter(tibm)) {
                     t.runFromTaskLog(this);
                 }
@@ -594,7 +601,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
     }
 
-    private boolean filter(TransactionInfoBaseMessage tibm)
+    static boolean filter(TransactionInfoBaseMessage tibm)
     {
         // don't log sysproc fragments or iv2 intiiate task messages.
         // this is all jealously; should be refactored to ask tibm
@@ -602,7 +609,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         // horrible introspection. This implementation mimics the
         // original live rejoin code for ExecutionSite...
         if (tibm instanceof FragmentTaskMessage && ((FragmentTaskMessage)tibm).isSysProcTask()) {
-            return true;
+            if (!SysProcFragmentId.isBalancePartitionsFragment(((FragmentTaskMessage) tibm).getPlanHash(0))) {
+                return true;
+            }
         }
         else if (tibm instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage)tibm;
@@ -1102,9 +1111,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_numberOfPartitions = partitionCount;
     }
 
-    private void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config)
+    private void updateHashinator(HashinatorConfig config)
     {
-        m_ee.updateHashinator(config.getFirst(), config.getSecond());
+        m_ee.updateHashinator(config);
     }
 
     /**

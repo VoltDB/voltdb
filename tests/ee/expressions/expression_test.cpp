@@ -229,7 +229,7 @@ class TV  : public AE {
  */
 class HR : public AE {
 public:
-    HR(int hashColumn, int64_t ranges[][2], int numRanges) :
+    HR(int hashColumn, int32_t ranges[][2], int numRanges) :
         AE(EXPRESSION_TYPE_HASH_RANGE, VALUE_TYPE_BIGINT, 8),
         m_hashColumn(hashColumn),
         m_ranges(ranges),
@@ -251,7 +251,7 @@ public:
     }
 
     const int m_hashColumn;
-    const int64_t (*m_ranges)[2];
+    const int32_t (*m_ranges)[2];
     const int m_numRanges;
 };
 
@@ -364,14 +364,14 @@ TEST_F(ExpressionTest, SimpleMultiplication) {
 TEST_F(ExpressionTest, HashRange) {
     queue<AE*> e;
 
-    const int64_t range1Max = -(numeric_limits<int64_t>::max() / 2);
-    const int64_t range1Min = numeric_limits<int64_t>::min() - (range1Max / 2);
-    const int64_t range2Min = 0;
-    const int64_t range2Max = numeric_limits<int64_t>::max() / 2;
-    const int64_t range3Min = range2Max + (range2Max / 2);
-    const int64_t range3Max = range1Min - 1;
+    const int32_t range1Max = -(numeric_limits<int32_t>::max() / 2);
+    const int32_t range1Min = numeric_limits<int32_t>::min() - (range1Max / 2);
+    const int32_t range2Min = 0;
+    const int32_t range2Max = numeric_limits<int32_t>::max() / 2;
+    const int32_t range3Min = range2Max + (range2Max / 2);
+    const int32_t range3Max = numeric_limits<int32_t>::max();
 
-    int64_t ranges[][2] = {
+    int32_t ranges[][2] = {
             { range1Min, range1Max},
             { range2Min, range2Max},
             { range3Min, range3Max}
@@ -414,14 +414,14 @@ TEST_F(ExpressionTest, HashRange) {
 
     for (int ii = 0; ii < 100000; ii++) {
         NValue val = ValueFactory::getIntegerValue(rand());
-        int64_t out[2];
-        val.murmurHash3(out);
+        const int32_t hash = val.murmurHash3();
         t.setNValue(1, val);
         NValue inrange = e1->eval( &t );
-        const int64_t hash = out[0];
-        if ((hash >= range1Min && hash < range1Max) ||
-             (hash >= range2Min && hash < range2Max) ||
-             (hash >= range3Min || hash < range3Max)) {
+        if ((hash >= range1Min && hash <= range1Max) ||
+             (hash >= range2Min && hash <= range2Max) ||
+             (hash >= range3Min && hash <= range3Max)) {
+             //We no longer allow wrapping so this condition isn't true
+             //(hash >= range3Min || hash < range3Max)) {
             ASSERT_TRUE(inrange.isTrue());
         } else {
             ASSERT_FALSE(inrange.isTrue());
