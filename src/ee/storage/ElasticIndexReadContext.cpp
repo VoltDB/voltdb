@@ -175,8 +175,8 @@ bool ElasticIndexReadContext::parseHashRange(
         std::vector<std::string> rangeStrings = MiscUtil::splitToTwoString(predicateStrings.at(0), ':');
         if (rangeStrings.size() == 2) {
             try {
-                rangeOut = ElasticIndexHashRange(boost::lexical_cast<int64_t>(rangeStrings[0]),
-                                                 boost::lexical_cast<int64_t>(rangeStrings[1]));
+                rangeOut = ElasticIndexHashRange(boost::lexical_cast<int32_t>(rangeStrings[0]),
+                                                 boost::lexical_cast<int32_t>(rangeStrings[1]));
                 success = true;
             }
             catch(boost::bad_lexical_cast) {

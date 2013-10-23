@@ -88,16 +88,16 @@ public:
         }
         partitionIds.push(partitionId);
         signatures.push(signature);
-        blocks.push_back(shared_ptr<StreamBlock>(new StreamBlock(block)));
-        data.push_back(shared_ptr<char>(block->rawPtr()));
+        blocks.push_back(boost::shared_ptr<StreamBlock>(new StreamBlock(block)));
+        data.push_back(boost::shared_ptr<char>(block->rawPtr()));
         receivedExportBuffer = true;
     }
 
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length) {}
     queue<int32_t> partitionIds;
     queue<std::string> signatures;
-    deque<shared_ptr<StreamBlock> > blocks;
-    vector<shared_ptr<char> > data;
+    deque<boost::shared_ptr<StreamBlock> > blocks;
+    vector<boost::shared_ptr<char> > data;
     bool receivedExportBuffer;
 
 };
@@ -234,7 +234,7 @@ TEST_F(TupleStreamWrapperTest, DoOneTuple)
 
     // we should only have one tuple in the buffer
     ASSERT_TRUE(m_topend.receivedExportBuffer);
-    shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), MAGIC_TUPLE_SIZE);
 }
@@ -265,7 +265,7 @@ TEST_F(TupleStreamWrapperTest, BasicOps)
 
     // get the first buffer flushed
     ASSERT_TRUE(m_topend.receivedExportBuffer);
-    shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 9));
@@ -301,7 +301,7 @@ TEST_F(TupleStreamWrapperTest, FarFutureFlush)
 
     // get the first buffer flushed
     ASSERT_TRUE(m_topend.receivedExportBuffer);
-    shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 9));
@@ -333,7 +333,7 @@ TEST_F(TupleStreamWrapperTest, Fill) {
     appendTuple(tuples_to_fill, tuples_to_fill + 1);
 
     ASSERT_TRUE(m_topend.receivedExportBuffer);
-    shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * tuples_to_fill));
@@ -366,7 +366,7 @@ TEST_F(TupleStreamWrapperTest, FillSingleTxnAndAppend) {
     appendTuple(1, 2);
 
     ASSERT_TRUE(m_topend.receivedExportBuffer);
-    shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * tuples_to_fill));
@@ -400,7 +400,7 @@ TEST_F(TupleStreamWrapperTest, FillSingleTxnAndFlush) {
 
     // should be able to get 2 buffers, one full and one with one tuple
     ASSERT_TRUE(m_topend.receivedExportBuffer);
-    shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * tuples_to_fill));
@@ -438,7 +438,7 @@ TEST_F(TupleStreamWrapperTest, FillSingleTxnAndCommitWithRollback) {
     // so flush and make sure we got something sane
     m_wrapper->periodicFlush(-1, 1, 2);
     ASSERT_TRUE(m_topend.receivedExportBuffer);
-    shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * tuples_to_fill));
@@ -478,7 +478,7 @@ TEST_F(TupleStreamWrapperTest, RollbackFirstTuple)
 
     // we should only have one tuple in the buffer
     ASSERT_TRUE(m_topend.receivedExportBuffer);
-    shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), MAGIC_TUPLE_SIZE);
@@ -505,7 +505,7 @@ TEST_F(TupleStreamWrapperTest, RollbackMiddleTuple)
     m_wrapper->periodicFlush(-1, 10, 11);
 
     ASSERT_TRUE(m_topend.receivedExportBuffer);
-    shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 10));
@@ -534,7 +534,7 @@ TEST_F(TupleStreamWrapperTest, RollbackWholeBuffer)
     m_wrapper->periodicFlush(-1, 10, 11);
 
     ASSERT_TRUE(m_topend.receivedExportBuffer);
-    shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 10));

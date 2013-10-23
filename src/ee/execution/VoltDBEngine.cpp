@@ -161,9 +161,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          int32_t partitionId,
                          int32_t hostId,
                          string hostname,
-                         int64_t tempTableMemoryLimit,
-                         HashinatorType hashinatorType,
-                         char *hashinatorConfig)
+                         int64_t tempTableMemoryLimit)
 {
     // Be explicit about running in the standard C locale for now.
     locale::global(locale("C"));
@@ -213,18 +211,6 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_isELEnabled,
                                             hostname,
                                             hostId);
-
-    switch (hashinatorType) {
-    case HASHINATOR_LEGACY:
-        m_hashinator.reset(LegacyHashinator::newInstance(hashinatorConfig));
-        break;
-    case HASHINATOR_ELASTIC:
-        m_hashinator.reset(ElasticHashinator::newInstance(hashinatorConfig));
-        break;
-    default:
-        throwFatalException("Unknown hashinator type %d", hashinatorType);
-        break;
-    }
 
     return true;
 }
@@ -1581,13 +1567,13 @@ size_t VoltDBEngine::tableHashCode(int32_t tableId) {
     return table->hashCode();
 }
 
-void VoltDBEngine::updateHashinator(HashinatorType type, const char *config) {
+void VoltDBEngine::updateHashinator(HashinatorType type, const char *config, int32_t *configPtr, uint32_t numTokens) {
     switch (type) {
     case HASHINATOR_LEGACY:
         m_hashinator.reset(LegacyHashinator::newInstance(config));
         break;
     case HASHINATOR_ELASTIC:
-        m_hashinator.reset(ElasticHashinator::newInstance(config));
+        m_hashinator.reset(ElasticHashinator::newInstance(config, configPtr, numTokens));
         break;
     default:
         throwFatalException("Unknown hashinator type %d", type);
@@ -1611,7 +1597,7 @@ void VoltDBEngine::dispatchValidatePartitioningTask(const char *taskParams) {
             hashinator.reset(LegacyHashinator::newInstance(config));
             break;
         case HASHINATOR_ELASTIC:
-            hashinator.reset(ElasticHashinator::newInstance(config));
+            hashinator.reset(ElasticHashinator::newInstance(config, NULL, 0));
             break;
         default:
             throwFatalException("Unknown hashinator type %d", type);

@@ -50,6 +50,7 @@ public class AdHocMayhemThread extends Thread {
 
     public AdHocMayhemThread(Client client, float mpRatio, Semaphore permits) {
         setName("AdHocMayhemThread");
+        setDaemon(true);
 
         this.client = client;
         this.mpRatio = mpRatio;

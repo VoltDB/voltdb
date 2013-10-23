@@ -38,7 +38,7 @@ public class HashRangeExpressionBuilder {
      * @param value1
      * @param value2
      */
-    public HashRangeExpressionBuilder put(Long value1, Long value2) {
+    public HashRangeExpressionBuilder put(Integer value1, Integer value2) {
         m_builder.put(value1, value2);
         return this;
     }
@@ -48,7 +48,7 @@ public class HashRangeExpressionBuilder {
      * @return  hash range expression
      */
     public HashRangeExpression build(Integer hashColumnIndex) {
-        Map<Long, Long> ranges = m_builder.build();
+        Map<Integer, Integer> ranges = m_builder.build();
         HashRangeExpression predicate = new HashRangeExpression();
         predicate.setRanges(ranges);
         predicate.setHashColumnIndex(hashColumnIndex);
@@ -56,5 +56,5 @@ public class HashRangeExpressionBuilder {
     }
 
     /// Builder object that produces immutable maps.
-    private ImmutableSortedMap.Builder<Long, Long> m_builder = new ImmutableSortedMap.Builder<Long, Long>(Ordering.natural());
+    private ImmutableSortedMap.Builder<Integer, Integer> m_builder = new ImmutableSortedMap.Builder<Integer, Integer>(Ordering.natural());
 }
