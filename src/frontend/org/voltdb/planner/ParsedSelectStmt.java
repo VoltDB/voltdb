@@ -220,11 +220,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (stmtCache.size() == 1) {
             // Do not handle joined query case case.
             StmtTableScan mvTableScan = stmtCache.get(0);
+            Set<SchemaColumn> scanColumns = mvTableScan.m_scanColumns;
             Set<SchemaColumn> mvNewScanColumns = new HashSet<SchemaColumn>();
-            // For a COUNT(*)-only scan, size is 0, otherwise it is 1.
-            assert(scanColumns.keySet().size() <= 1);
-            if (scanColumns.keySet().size() == 1) {
-                mvNewScanColumns.addAll(scanColumns.get(0));
+            // For a COUNT(*)-only scan, scanColumns doesn't not exist.
+            if (scanColumns != null) {
+                mvNewScanColumns.addAll(scanColumns);
             }
             processMVBasedQueryFix(mvFixInfo, m_db, mvTableScan, mvNewScanColumns, joinTree);
         }
