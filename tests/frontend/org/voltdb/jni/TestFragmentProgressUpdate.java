@@ -27,6 +27,7 @@ import junit.framework.TestCase;
 
 import org.voltdb.LegacyHashinator;
 import org.voltdb.ParameterSet;
+import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -51,27 +52,31 @@ public class TestFragmentProgressUpdate extends TestCase {
                 0,
                 "",
                 100,
-                HashinatorType.LEGACY,
-                LegacyHashinator.getConfigureBytes(1));
+                new HashinatorConfig(HashinatorType.LEGACY,
+                                     LegacyHashinator.getConfigureBytes(1),
+                                     0,
+                                     0));
         testFragmentProgressUpdate(m_ee);
     }
 
-//    public void testIPCFragmentProgressUpdate() throws Exception {
-//        m_ee = new ExecutionEngineIPC(
-//                CLUSTER_ID,
-//                NODE_ID,
-//                0,
-//                0,
-//                "",
-//                100,
-//                BackendTarget.NATIVE_EE_IPC,
-//                10000,
-//                HashinatorType.LEGACY,
-//                LegacyHashinator.getConfigureBytes(1));
-//        testFragmentProgressUpdate(m_ee);
-//    }
+    /*public void testIPCFragmentProgressUpdate() throws Exception {
+        m_ee = new ExecutionEngineIPC(
+                CLUSTER_ID,
+                NODE_ID,
+                0,
+                0,
+                "",
+                100,
+                BackendTarget.NATIVE_EE_IPC,
+                10000,
+                new HashinatorConfig(HashinatorType.LEGACY,
+                        LegacyHashinator.getConfigureBytes(1),
+                        0,
+                        0));
+        testFragmentProgressUpdate(m_ee);
+    }*/
 
-    public void testFragmentProgressUpdate(ExecutionEngine ee) throws Exception {
+    void testFragmentProgressUpdate(ExecutionEngine ee) throws Exception {
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
         Catalog catalog = builder.createTPCCSchemaCatalog();
         int WAREHOUSE_TABLEID = catalog.getClusters().get("cluster").getDatabases().
@@ -118,7 +123,7 @@ public class TestFragmentProgressUpdate extends TestCase {
         ActivePlanRepository.clear();
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
-                Encoder.base64Decode(selectBottomFrag.getPlannodetree()));
+                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()));
         ParameterSet params = ParameterSet.emptyParameterSet();
 
         m_ee.executePlanFragments(
