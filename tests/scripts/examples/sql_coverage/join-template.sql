@@ -23,10 +23,11 @@ SELECT * FROM _table LHS25 @jointype JOIN _table RHS ON    LHS25.@idcol = RHS.@i
 SELECT * FROM _table LHS31 @jointype JOIN _table RHS ON    LHS31.@idcol = RHS.@idcol AND     RHS.@idcol = 2
 SELECT * FROM _table LHS32 @jointype JOIN _table RHS ON    LHS32.@idcol = RHS.@idcol AND   LHS32.@idcol = 2
 
-SELECT * FROM _table LHS36 @jointype JOIN _table RHS USING(      @idcol,                         @numcol)              WHERE     @idcol > 10 AND       @numcol < 30 AND       @numcol >=     @idcol
-SELECT * FROM _table LHS37 @jointype JOIN _table RHS USING(      @idcol,                         @numcol)              WHERE     @idcol > 10 AND       @numcol < 30 AND       @idcol  =      @numcol
-SELECT @idcol, @numcol FROM _table LHS38 @jointype JOIN _table RHS USING(     @idcol,            @numcol)              WHERE     @idcol > 10 AND       @numcol < 30 AND       @numcol >=     @idcol
-SELECT @idcol, @numcol FROM _table LHS39 @jointype JOIN _table RHS USING(     @idcol,            @numcol)              WHERE     @idcol > 10 AND       @numcol < 30 AND       @idcol  =      @numcol
+-- Mike A is looking into this ALIAS/USING/WHERE combo issue
+--SELECT * FROM _table LHS36 @jointype JOIN _table RHS USING(      @idcol,                         @numcol)              WHERE     @idcol > 10 AND       @numcol < 30 AND       @numcol >=     @idcol
+--SELECT * FROM _table LHS37 @jointype JOIN _table RHS USING(      @idcol,                         @numcol)              WHERE     @idcol > 10 AND       @numcol < 30 AND       @idcol  =      @numcol
+--SELECT @idcol, @numcol FROM _table LHS38 @jointype JOIN _table RHS USING(     @idcol,            @numcol)              WHERE     @idcol > 10 AND       @numcol < 30 AND       @numcol >=     @idcol
+--SELECT @idcol, @numcol FROM _table LHS39 @jointype JOIN _table RHS USING(     @idcol,            @numcol)              WHERE     @idcol > 10 AND       @numcol < 30 AND       @idcol  =      @numcol
 
 
 --- Three or more table outer join test

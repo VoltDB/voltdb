@@ -217,23 +217,24 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             processAvgPushdownOptimization(displayElement, orderbyElement, groupbyElement);
         }
         // Prepare for the mv based distributed query fix only if it might be required.
-        if (tableList.size() == 1) {
+        if (stmtCache.size() == 1) {
             // Do not handle joined query case case.
-            Table mvTable = tableList.get(0);
+            StmtTableScan mvTableScan = stmtCache.get(0);
             Set<SchemaColumn> mvNewScanColumns = new HashSet<SchemaColumn>();
             // For a COUNT(*)-only scan, size is 0, otherwise it is 1.
             assert(scanColumns.keySet().size() <= 1);
             if (scanColumns.keySet().size() == 1) {
                 mvNewScanColumns.addAll(scanColumns.get(0));
             }
-            processMVBasedQueryFix(mvFixInfo, m_db, mvTable, mvNewScanColumns, joinTree);
+            processMVBasedQueryFix(mvFixInfo, m_db, mvTableScan, mvNewScanColumns, joinTree);
         }
     }
 
-    private static void processMVBasedQueryFix(MVFixInfo mvFixInfo, Database db, Table mvTable,
+    private static void processMVBasedQueryFix(MVFixInfo mvFixInfo, Database db, StmtTableScan mvTableScan,
             Set<SchemaColumn> mvNewScanColumns, JoinNode joinTree)
     {
         // Check valid cases first
+        Table mvTable = mvTableScan.m_table;
         String mvTableName = mvTable.getTypeName();
         Table srcTable = mvTable.getMaterializer();
         if (srcTable == null) {
@@ -315,15 +316,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             Column mvCol = mvColumnArray.get(i);
             String colName = mvCol.getName();
 
-            TupleValueExpression tve = new TupleValueExpression();
-            tve.setColumnIndex(i);
-            tve.setColumnName(colName);
-            tve.setTableName(mvTableName);
-            tve.setColumnAlias(colName);
+            TupleValueExpression tve = new TupleValueExpression(mvTableName, mvTableScan.m_tableAlias, colName, colName, i);
             tve.setValueType(VoltType.get((byte)mvCol.getType()));
             tve.setValueSize(mvCol.getSize());
 
-            SchemaColumn scol = new SchemaColumn(mvTableName, null, colName, colName, tve);
+            SchemaColumn scol = new SchemaColumn(mvTableName, mvTableScan.m_tableAlias, colName, colName, tve);
 
             mvDDLGroupbyColumns.add(scol);
             if (!mvNewScanColumns.contains(scol)) {
@@ -368,14 +365,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             List<TupleValueExpression> needReAggTVEs = new ArrayList<TupleValueExpression>();
             for (int i=numOfGroupByColumns; i < mvColumnArray.size(); i++) {
                 Column mvCol = mvColumnArray.get(i);
-                TupleValueExpression tve = new TupleValueExpression();
-                tve.setColumnIndex(i);
-                tve.setColumnName(mvCol.getName());
-                tve.setTableName(mvTableName);
-                tve.setColumnAlias(mvCol.getName());
-                tve.setValueType(VoltType.get((byte)mvCol.getType()));
-                tve.setValueSize(mvCol.getSize());
-
+                TupleValueExpression tve = new TupleValueExpression(mvTableName, mvTableScan.m_tableAlias, mvCol.getName(), mvCol.getName(), i);
                 needReAggTVEs.add(tve);
             }
             List<AbstractExpression> exprs = ExpressionUtil.uncombine(where);
