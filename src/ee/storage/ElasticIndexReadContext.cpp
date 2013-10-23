@@ -199,7 +199,9 @@ void ElasticIndexReadContext::deleteStreamedTuples()
     m_iter->reset();
     TableTuple tuple;
     while (m_iter->next(tuple)) {
-        m_surgeon.deleteTuple(tuple);
+        if (!tuple.isPendingDelete()) {
+            m_surgeon.deleteTuple(tuple);
+        }
     }
 }
 
