@@ -63,7 +63,6 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
-import org.voltdb.export.ExportInternalMessage;
 import org.voltdb.fault.FaultHandler;
 import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault;
@@ -1206,14 +1205,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             if (txnState != null)
             {
             }
-        }
-        else if (message instanceof ExportInternalMessage) {
-            ExportInternalMessage exportm = (ExportInternalMessage) message;
-            ee.exportAction(exportm.m_m.isSync(),
-                                exportm.m_m.getAckOffset(),
-                                0,
-                                exportm.m_m.getPartitionId(),
-                                exportm.m_m.getSignature());
         } else if (message instanceof PotentialSnapshotWorkMessage) {
             m_snapshotter.doSnapshotWork(m_systemProcedureContext);
         }

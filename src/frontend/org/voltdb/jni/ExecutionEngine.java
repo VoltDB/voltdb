@@ -34,12 +34,10 @@ import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
-import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
-import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.LogKeys;
@@ -443,13 +441,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     /**
      * Execute an Export action against the execution engine.
-     * @param syncAction TODO
-     * @param ackTxnId if an ack, the transaction id being acked
-     * @param tableSignature the signature of the table being polled or acked.
-     * @param syncOffset TODO
-     * @return the response ExportMessage
      */
-    public abstract ExportProtoMessage exportAction( boolean syncAction,
+    public abstract void exportAction( boolean syncAction,
             long ackOffset, long seqNo, int partitionId, String tableSignature);
 
     /**

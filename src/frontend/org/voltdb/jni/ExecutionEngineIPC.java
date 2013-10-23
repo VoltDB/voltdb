@@ -35,13 +35,11 @@ import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
-import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.export.ExportManager;
-import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -1181,7 +1179,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public ExportProtoMessage exportAction(boolean syncAction,
+    public void exportAction(boolean syncAction,
             long ackOffset, long seqNo, int partitionId, String mTableSignature) {
         try {
             m_data.clear();
@@ -1204,15 +1202,10 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             results.flip();
             long result_offset = results.getLong();
             if (result_offset < 0) {
-                ExportProtoMessage reply = null;
-                reply = new ExportProtoMessage( 0, partitionId, mTableSignature);
-                reply.error();
-                return reply;
+                System.out.println("exportAction failed!  syncAction: " + syncAction + ", ackTxnId: " +
+                    ackOffset + ", seqNo: " + seqNo + ", partitionId: " + partitionId +
+                    ", tableSignature: " + mTableSignature);
             }
-            else {
-                return null;
-            }
-
         } catch (final IOException e) {
             throw new RuntimeException(e);
         }
