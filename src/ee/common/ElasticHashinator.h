@@ -54,22 +54,28 @@ public:
      * Factory method that constructs an ElasticHashinator from a binary configuration.
      * The format is described in ElasticHashinator.java and basically describes the tokens
      * on the ring.
+     *
+     * Config can be serialized or raw, if it is raw the pointer is stored and the data
+     * can be shared across EEs and with Java.
+     * The raw version consists of an array of integers where even values are tokens and odd values are partitions.
+     *
      */
-    static ElasticHashinator* newInstance(const char *config) {
-        ReferenceSerializeInput countInput(config, 4);
-        int numEntries = countInput.readInt();
-        ReferenceSerializeInput entryInput(&config[sizeof(int32_t)], numEntries * (sizeof(int32_t) * sizeof(int64_t)));
-        TokenMap tokens;
-        for (int ii = 0; ii < numEntries; ii++) {
-            const int64_t token = entryInput.readLong();
-            const int32_t partitionId = entryInput.readInt();
-            if (tokens.exists(token)) {
-                throwFatalException("Duplicate token in ring, %jd with partitions %d and %d",
-                        (intmax_t)token, partitionId, tokens[token]);
+    static ElasticHashinator* newInstance(const char *config, int32_t *configPtr, uint32_t tokenCount) {
+        if (configPtr == NULL) {
+            ReferenceSerializeInput countInput(config, 4);
+            int numEntries = countInput.readInt();
+            ReferenceSerializeInput entryInput(&config[sizeof(int32_t)], numEntries * (sizeof(int32_t) + sizeof(int32_t)));
+            int32_t *tokens = new int32_t[numEntries * 2];
+            for (int ii = 0; ii < numEntries; ii++) {
+                const int32_t token = entryInput.readInt();
+                const int32_t partitionId = entryInput.readInt();
+                tokens[ii * 2] = token;
+                tokens[ii * 2 + 1] = partitionId;
             }
-            tokens[token] = partitionId;
+            return new ElasticHashinator(tokens, numEntries, true);
+        } else {
+            return new ElasticHashinator(configPtr, tokenCount, false);
         }
-        return new ElasticHashinator(tokens);
     }
 
     ~ElasticHashinator() {}
@@ -95,47 +101,38 @@ protected:
      * pick a partition to store the data
      */
     int32_t hashinate(const char *string, int32_t length) const {
-        int64_t out[2];
-        MurmurHash3_x64_128(string, length, 0, out);
-        return partitionForToken(out[0]);
+        int32_t hash = MurmurHash3_x64_128(string, length, 0);
+        return partitionForToken(hash);
     }
 
 private:
-    typedef stx::btree_map<int64_t, int32_t> TokenMap;
-    ElasticHashinator(TokenMap tokenMap) : tokens(tokenMap) {}
 
-    int32_t partitionForToken(int64_t hash) const {
-        /*
-         * C++ doesn't have the NavigableMap equivalent of floor,
-         * so we use upper_bound and step back, except if upper bound
-         * returns tokens.begin()
-         */
-        TokenMap::const_iterator i = tokens.upper_bound(hash);
-        //std::cout << "EE finding partition for token " << token << std::endl;
+    ElasticHashinator(int32_t *tokens, uint32_t tokenCount, bool owned) : tokens(tokens), tokenCount(tokenCount), tokensOwner( owned ? tokens : NULL ) {}
 
-        /*
-         * Hash value is < the smallest token (tokens.begin()) in which
-         * case it actually maps to the last/largest token since conceptually this is a ring.
-         */
-        if (i == tokens.begin()) {
-            return tokens.rbegin().data();
+    const int32_t *tokens;
+    const uint32_t tokenCount;
+    boost::scoped_array<int32_t> tokensOwner;
+
+    int32_t partitionForToken(int32_t hash) const {
+        int32_t min = 0;
+        int32_t max = tokenCount - 1;
+
+        while (min <= max) {
+            assert(min >= 0);
+            assert(max >= 0);
+            uint32_t mid = (min + max) >> 1;
+            int32_t midval = tokens[mid * 2];
+
+            if (midval < hash) {
+                min = mid + 1;
+            } else if (midval > hash) {
+                max = mid - 1;
+            } else {
+                return tokens[mid * 2 + 1];
+            }
         }
-
-        /*
-         * Move the iterator back one, this is upper bound, so to find the floor we have to find the first
-         * value that did not come after the hash value. There are test cases that show if upper_bound
-         * returns tokens.end() that it moves back to tokens.rbegin() on its own.
-         */
-        i--;
-
-        /*
-         * At this point we will have the right value, and bounds should not be an issue
-         * due to the checks for tokens.begin. tokens.end is handled by always moving the iterator back one
-         */
-        return i.data();
+        return tokens[(min - 1) * 2 + 1];
     }
-
-    const TokenMap tokens;
 };
 }
 #endif /* ELASTICHASHINATOR_H_ */

@@ -410,7 +410,8 @@ public class SnapshotSiteProcessor {
             TableStreamer streamer =
                 new TableStreamer(tableId, format.getStreamType(), m_snapshotTableTasks.get(tableId));
             if (!streamer.activate(context, tablePredicates.getValue())) {
-                VoltDB.crashLocalVoltDB("Failed to activate snapshot stream", false, null);
+                VoltDB.crashLocalVoltDB("Failed to activate snapshot stream on table " +
+                                        CatalogUtil.getTableNameFromId(context.getDatabase(), tableId), false, null);
             }
             m_streamers.put(tableId, streamer);
         }

@@ -57,7 +57,6 @@ ElasticIndexReadContext::handleActivation(TableStreamType streamType)
     }
 
     if (!m_surgeon.hasIndex()) {
-        VOLT_ERROR("There is no index to materialize.");
         return ACTIVATION_FAILED;
     }
 
@@ -175,8 +174,8 @@ bool ElasticIndexReadContext::parseHashRange(
         std::vector<std::string> rangeStrings = MiscUtil::splitToTwoString(predicateStrings.at(0), ':');
         if (rangeStrings.size() == 2) {
             try {
-                rangeOut = ElasticIndexHashRange(boost::lexical_cast<int64_t>(rangeStrings[0]),
-                                                 boost::lexical_cast<int64_t>(rangeStrings[1]));
+                rangeOut = ElasticIndexHashRange(boost::lexical_cast<int32_t>(rangeStrings[0]),
+                                                 boost::lexical_cast<int32_t>(rangeStrings[1]));
                 success = true;
             }
             catch(boost::bad_lexical_cast) {
@@ -199,7 +198,9 @@ void ElasticIndexReadContext::deleteStreamedTuples()
     m_iter->reset();
     TableTuple tuple;
     while (m_iter->next(tuple)) {
-        m_surgeon.deleteTuple(tuple);
+        if (!tuple.isPendingDelete()) {
+            m_surgeon.deleteTuple(tuple);
+        }
     }
 }
 
