@@ -301,6 +301,36 @@ public class TestPlansJoin extends PlannerTestCase {
             assertNotSame(-1, tve.getColumnIndex());
         }
 
+        List<AbstractPlanNode> apl;
+        AbstractPlanNode node;
+        SeqScanPlanNode seqScan;
+
+        apl = compileToFragments("select * FROM P1 LABEL JOIN R2 USING(A) WHERE A > 0 and R2.C >= 5");
+        pn = apl.get(1);
+        node = pn.getChild(0);
+        assertTrue(node instanceof NestLoopPlanNode);
+        assertEquals(ExpressionType.COMPARE_EQUAL,
+                     ((NestLoopPlanNode)node).getJoinPredicate().getExpressionType());
+        seqScan = (SeqScanPlanNode)node.getChild(1);
+        assertEquals(ExpressionType.COMPARE_GREATERTHANOREQUALTO, seqScan.getPredicate().getExpressionType());
+        node = node.getChild(0);
+        seqScan = (SeqScanPlanNode)node;
+        assertTrue(node instanceof SeqScanPlanNode);
+        assertEquals(ExpressionType.COMPARE_GREATERTHAN, seqScan.getPredicate().getExpressionType());
+
+        apl = compileToFragments("select * FROM P1 LABEL LEFT JOIN R2 USING(A) WHERE A > 0 and R2.C >= 5");
+        pn = apl.get(1);
+        node = pn.getChild(0);
+        assertTrue(node instanceof NestLoopPlanNode);
+        assertEquals(ExpressionType.COMPARE_EQUAL,
+                     ((NestLoopPlanNode)node).getJoinPredicate().getExpressionType());
+        seqScan = (SeqScanPlanNode)node.getChild(1);
+        assertEquals(ExpressionType.COMPARE_GREATERTHANOREQUALTO, seqScan.getPredicate().getExpressionType());
+        node = node.getChild(0);
+        seqScan = (SeqScanPlanNode)node;
+        assertTrue(node instanceof SeqScanPlanNode);
+        assertEquals(ExpressionType.COMPARE_GREATERTHAN, seqScan.getPredicate().getExpressionType());
+
     }
 
     public void testTransitiveValueEquivalenceConditions() {
