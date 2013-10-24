@@ -509,14 +509,13 @@ class ServerBundle(JavaBundle):
 #===============================================================================
     """
     Bundle class to run org.voltdb.VoltDB process.
-    Supports needing catalog, needing port and live keyword option for rejoin.
+    Supports needing catalog and live keyword option for rejoin.
     All other options are supported as common options.
     """
-    def __init__(self, subcommand, needs_catalog=True, needs_port=True, needs_live=False):
+    def __init__(self, subcommand, needs_catalog=True, needs_live=False):
         JavaBundle.__init__(self, 'org.voltdb.VoltDB')
         self.subcommand = subcommand
         self.needs_catalog = needs_catalog
-        self.needs_port = needs_port
         self.needs_live = needs_live
 
     def initialize(self, verb):
@@ -560,7 +559,7 @@ class ServerBundle(JavaBundle):
             final_args.extend(['deployment', runner.opts.deployment])
         if runner.opts.host:
             final_args.extend(['host', runner.opts.host.host])
-            if self.needs_port and runner.opts.host.port is not None:
+            if runner.opts.host.port is not None:
                 final_args.extend(['port', runner.opts.host.port])
         if runner.opts.license:
             final_args.extend(['license', runner.opts.license])
