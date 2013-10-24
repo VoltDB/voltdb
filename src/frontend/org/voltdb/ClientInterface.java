@@ -1949,18 +1949,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         /*
          * Round trip the invocation to initialize it for command logging
          */
-        FastSerializer fs = new FastSerializer();
-        int serializedSize = 0;
         try {
-            fs.writeObject(task);
-            ByteBuffer source = fs.getBuffer();
-            ByteBuffer copy = ByteBuffer.allocate(source.remaining());
-            serializedSize = copy.capacity();
-            copy.put(source);
-            copy.flip();
-            FastDeserializer fds = new FastDeserializer(copy);
-            task = new StoredProcedureInvocation();
-            task.readExternal(fds);
+            task = MiscUtils.roundTripForCL(task);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
@@ -1969,7 +1959,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         createTransaction(plannedStmtBatch.connectionId, task,
                 plannedStmtBatch.isReadOnly(), isSinglePartition, false,
                 partition,
-                serializedSize, EstTime.currentTimeMillis());
+                task.getSerializedSize(), EstTime.currentTimeMillis());
     }
 
     /*
