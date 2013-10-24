@@ -6,6 +6,7 @@
 
 {@idcol = "ID"}
 {@numcol = "NUM"}
+{@fromtables = "_table"}
 
 -- Repeat queries with forced data value overlaps between tables.
 <join-template.sql>

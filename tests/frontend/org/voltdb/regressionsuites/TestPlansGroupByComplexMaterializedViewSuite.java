@@ -958,7 +958,6 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
             // (1) Select *
             vt = client.callProcedure("@AdHoc", "Select * from " + tb +
                     " ORDER BY V_G1, V_G2").getResults()[0];
-            System.out.println(vt);
             validateTableOfLongs(vt, new long[][]{{ 10, 1, 4, 101, 37},
                     {20, 2, 2, 45, 13}, {30, 2, 1, 24, 8}, {30, 3, 3, 85, 37}});
 
@@ -992,6 +991,16 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
             vt = client.callProcedure("@AdHoc", "Select abs(V_sum_rent - V_sum_age) from " + tb +
                     " ORDER BY V_sum_age").getResults()[0];
             validateTableOfLongs(vt, new long[][]{{16}, {32}, {48}, {64}});
+
+            // (5) select with distict
+            vt = client.callProcedure("@AdHoc", "Select distinct v_cnt from " + tb +
+                    " ORDER BY v_cnt").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[]{ 1, 2, 3, 4});
+
+
+            vt = client.callProcedure("@AdHoc", "Select distinct v_g1 from " + tb +
+                    " ORDER BY v_g1").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[]{ 10, 20, 30});
         }
     }
 
@@ -1160,6 +1169,126 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
 
     }
 
+    public void testPartitionedMVQueriesInnerJoin() throws Exception {
+        System.out.println("Test MV partition agg query inner join...");
+        VoltTable vt = null;
+        Client client = this.getClient();
+
+        // Load data
+        loadTableForMVFixSuite();
+        String sql = "";
+
+        String[] tbs = {"V_P1", "V_P1_ABS", "V_P2"};
+        /*
+        * Current expected data in tables {"V_P1", "V_P1_ABS", "V_P2", "V_R4"}:
+        * V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent
+        * 10,   1,     4,     101,       37
+        * 20,   2,     2,     45,        13
+        * 30,   2,     1,     24,        8
+        * 30,   3,     3,     85,        37
+        * */
+
+        for (String tb: tbs) {
+            // (1) Two tables join.
+            sql = "Select v_p1.v_cnt from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
+                    "order by v_p1.v_cnt;";
+            sql = sql.replace("v_p1", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {1, 1, 2, 3, 3, 4});
+
+
+            sql = "Select v_p1.v_sum_age from v_p1 join v_r4 on v_p1.v_cnt = v_r4.v_cnt " +
+                    "order by v_p1.v_sum_age;";
+            sql = sql.replace("v_p1", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {24, 45, 85, 101});
+
+            // Refer H-SQL bug ticket: ENG-534.
+            if (!isHSQL()) {
+                sql = "Select v_p1.v_sum_age from v_p1 join v_r4 on v_p1.v_cnt = v_r4.v_cnt " +
+                        "where v_p1.v_sum_rent > 15 order by v_p1.v_sum_age;";
+                sql = sql.replace("v_p1", tb);
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+                validateTableOfScalarLongs(vt, new long[] {85, 101});
+
+
+                // Weird join on clause.
+                sql = "Select v_p1.v_cnt from v_p1 join v_r4 on v_p1.v_g2 = v_p1.v_cnt " +
+                        "order by v_p1.v_cnt;";
+                sql = sql.replace("v_p1", tb);
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+                System.out.println(vt);
+                validateTableOfScalarLongs(vt, new long[] {2, 2, 2, 2, 3, 3, 3,3});
+
+                // Join on different column names.
+                sql = "select v_p1.v_cnt from v_r4 inner join v_p1 on v_r4.v_sum_rent = v_p1.v_sum_age";
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+                System.out.println(vt);
+                validateTableOfScalarLongs(vt, new long[] {});
+
+                // test where clause.
+                sql = "Select v_p1.v_sum_age from v_p1 join v_r4 on v_p1.v_cnt = v_r4.v_cnt  " +
+                        "where v_p1.v_sum_rent > 15 order by v_p1.v_sum_age;";
+                sql = sql.replace("v_p1", tb);
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+                validateTableOfScalarLongs(vt, new long[] {85, 101});
+
+
+                sql = "Select v_p1.v_sum_age as c1, v_r4.v_sum_rent as c2 from v_p1 join v_r4 " +
+                        "on v_p1.v_cnt >= v_r4.v_cnt " +
+                        "where v_p1.v_sum_rent > -1 and v_p1.v_g1 > 15 and v_p1.v_cnt <= 2 " +
+                        "order by c1, c2 ";
+                sql = sql.replace("v_p1", tb);
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+                validateTableOfLongs(vt, new long[][] {{24,8}, {45, 8}, {45, 13} });
+
+
+                // Test aggregation.
+                sql = "Select SUM(v_p1.v_sum_age) as c1, MAX(v_r4.v_sum_rent) as c2 from v_p1 join v_r4 " +
+                        "on v_p1.v_cnt >= v_r4.v_cnt " +
+                        "where v_p1.v_sum_rent > -1 and v_p1.v_g1 > 15 and v_p1.v_cnt <= 2 " +
+                        "order by c1, c2 ";
+                sql = sql.replace("v_p1", tb);
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+                validateTableOfLongs(vt, new long[][] {{114,13}});
+
+                sql = "Select v_p1.v_g2 as c0 , SUM(v_p1.v_sum_age) as c1, MAX(v_p1.v_sum_rent) as c2 " +
+                        "from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
+                        "where v_p1.v_cnt < 4 " +
+                        "group by v_p1.v_g2 " +
+                        "order by c0, c1, c2 ";
+                sql = sql.replace("v_p1", tb);
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+                System.out.println(vt);
+                validateTableOfLongs(vt, new long[][] {{2, 93, 13}, {3, 170, 37}});
+
+
+                // (2) Three tables join.
+                sql = "Select v_p1.v_cnt from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
+                        "inner join v0_r4 on v_p1.v_g1 = v0_r4.v_g1 " +
+                        "order by v_p1.v_cnt;";
+                sql = sql.replace("v_p1", tb);
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+                validateTableOfScalarLongs(vt, new long[] {1, 1, 1, 1, 2, 3, 3, 3, 3, 4});
+
+                sql = "Select v_p1.v_sum_age from v_p1 join v_r4 on v_p1.v_cnt = v_r4.v_cnt " +
+                        "inner join v0_r4 on v_p1.v_cnt = v0_r4.v_cnt " +
+                        "order by v_p1.v_sum_age;";
+                sql = sql.replace("v_p1", tb);
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+
+                validateTableOfScalarLongs(vt, new long[] {24, 45, 85, 101});
+
+                sql = "Select v_p1.v_sum_age from v_p1 join v_r4 on v_p1.v_cnt = v_r4.v_cnt " +
+                        "inner join v0_r4 on v_p1.v_cnt = v0_r4.v_cnt " +
+                        "where v_p1.v_sum_rent > 15 order by v_p1.v_sum_age;";
+                sql = sql.replace("v_p1", tb);
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+                validateTableOfScalarLongs(vt, new long[] {85, 101});
+            }
+        }
+    }
+
     //
     // Suite builder boilerplate
     //
@@ -1317,7 +1446,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
 
                 // R3 mv tests are mainly for memory concerns
                 "CREATE TABLE R3 ( " +
-                "id INTEGER DEFAULT '0' NOT NULL, " +
+                "id INTEGER DEFAULT 0 NOT NULL, " +
                 "wage INTEGER, " +
                 "vshort VARCHAR(20)," +
                 "vlong VARCHAR(200)," +
@@ -1342,7 +1471,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "FROM R3 GROUP BY vlong || '" + longStr + "';" +
 
                 "CREATE TABLE P1 ( " +
-                "id INTEGER DEFAULT '0' NOT NULL, " +
+                "id INTEGER DEFAULT 0 NOT NULL, " +
                 "wage INTEGER, " +
                 "dept INTEGER, " +
                 "age INTEGER,  " +
@@ -1360,7 +1489,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
 
                 // NO Need to fix mv query
                 "CREATE TABLE P2 ( " +
-                "id INTEGER DEFAULT '0' NOT NULL, " +
+                "id INTEGER DEFAULT 0 NOT NULL, " +
                 "wage INTEGER, " +
                 "dept INTEGER NOT NULL, " +
                 "age INTEGER,  " +
@@ -1374,7 +1503,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
 
                 // NO Need to fix mv query
                 "CREATE TABLE R4 ( " +
-                "id INTEGER DEFAULT '0' NOT NULL, " +
+                "id INTEGER DEFAULT 0 NOT NULL, " +
                 "wage BIGINT, " +
                 "dept BIGINT, " +
                 "age INTEGER,  " +
@@ -1382,6 +1511,10 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "PRIMARY KEY (id) );" +
 
                 "CREATE VIEW V_R4 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) " +
+                "AS SELECT wage, dept, count(*), sum(age), sum(rent)  FROM R4 " +
+                "GROUP BY wage, dept;" +
+
+                "CREATE VIEW V0_R4 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) " +
                 "AS SELECT wage, dept, count(*), sum(age), sum(rent)  FROM R4 " +
                 "GROUP BY wage, dept;" +
 

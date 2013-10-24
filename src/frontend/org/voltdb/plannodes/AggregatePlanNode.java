@@ -137,8 +137,16 @@ public class AggregatePlanNode extends AbstractPlanNode {
         m_prePredicate = predicate;
     }
 
+    public AbstractExpression getPrePredicate() {
+        return m_prePredicate;
+    }
+
     public void setPostPredicate(AbstractExpression predicate) {
         m_postPredicate = predicate;
+    }
+
+    public AbstractExpression getPostPredicate() {
+        return m_postPredicate;
     }
 
     // for single min() / max(), return the single aggregate expression
