@@ -307,6 +307,12 @@ public class ExportOnServerVerifier {
         return skinny;
     }
 
+    /**
+     * Verifies the fat version of the exported table. By fat it means that it contains many
+     * columns of multiple types
+     *
+     * @throws Exception
+     */
     void verifyFat() throws Exception
     {
 
@@ -451,6 +457,14 @@ public class ExportOnServerVerifier {
         }
     }
 
+    /**
+     * It attempts to read enough client records to match the records read
+     * from the exported file.
+     *
+     * @return true is there are more client to be read, or false if not
+     * @throws IOException
+     * @throws ValidationErr
+     */
     private boolean readEnoughClientRecords() throws IOException, ValidationErr {
         final int maxOverFlow = m_clientIndexes.size() * 1000;
         final int overFlowSize = m_clientOverFlow.size();
@@ -501,11 +515,16 @@ public class ExportOnServerVerifier {
         }
         System.out.println("!_!_! DEBUG !_!_! read " + dcount + " client txid records");
 
+        // read the client records that do not have associated tx (invocations with failed status codes)
         readOrphanedClientRecords();
 
         return haveNotReadAllClientRecords();
     }
 
+    /**
+     * tests whether or not all client records have been read
+     * @return true is there are more client to be read, or false if not
+     */
     private boolean haveNotReadAllClientRecords() {
         int doneCount = 0;
         for (Map.Entry<Integer, Boolean> e: m_clientComplete.entrySet()) {
@@ -514,6 +533,11 @@ public class ExportOnServerVerifier {
         return doneCount == 0 || doneCount != m_clientIndexes.size();
     }
 
+    /**
+     * Read the client records that do not have associated tx (invocations with failed status codes).
+     * Delete the client generated files once they are read
+     * @throws IOException
+     */
     private void readOrphanedClientRecords() throws IOException {
         File baseDH = new File(m_clientPath, "-1");
         if (   !baseDH.exists()
@@ -581,6 +605,12 @@ public class ExportOnServerVerifier {
         return out;
     }
 
+    /**
+     * Verifies the skinny version of the exported table. By skinny it means that it contains the
+     * bare minimum of columns (just enough for the purpose of transaction verification)
+     *
+     * @throws Exception
+     */
     void verifySkinny() throws Exception
     {
 
@@ -796,6 +826,11 @@ public class ExportOnServerVerifier {
         System.out.println("==================================================================\n");
     }
 
+    /**
+     * Adds all the discovered user ssh private keys to jSch session
+     * @param file the user directory which contains the private keys
+     * @throws Exception
+     */
     private void loadAllPrivateKeys(File file) throws Exception {
         if (file.isDirectory()) {
             for (File f : file.listFiles()) {
@@ -938,6 +973,11 @@ public class ExportOnServerVerifier {
         }
     }
 
+    /**
+     * In situations where enough exported records are read without client transaction
+     * matches, this procedure prints for each partition which are its recorded but unmatched
+     * client and exported transaction ids
+     */
     void dumpUnmatchedSituation() {
         File unmatchedDH = new File("unmatched");
         unmatchedDH.mkdir();
@@ -990,15 +1030,25 @@ public class ExportOnServerVerifier {
             } catch (IOException e) {
                 throw new RuntimeException("Failed to dump unmatched for partition " + partid, e);
             }
+
             if (clcnt == 0) {
                 clientFH.delete();
             }
             if (excnt == 0) {
                 exportFH.delete();
             }
+            if (clcnt == 0 && excnt == 0) {
+                partFHs.get(partid).delete();
+            }
         }
     }
 
+    /**
+     * Prints out what its latest exported file listing probe contains.
+     * @param pathsFromAllNodes a list of lists where the first dimension is the node, and the
+     *            second is the list of probed export files found on that node
+     * @param activeFound how many active export files where found id the probe
+     */
     private void printExportFileSituation(List<Pair<ChannelSftp, List<String>>> pathsFromAllNodes, int activeFound) {
         System.out.println("\n================= E X P O R T  F I L E S  S I T U A T I O N ======================");
         System.out.println("On                      " + new Date());
@@ -1038,10 +1088,6 @@ public class ExportOnServerVerifier {
         Arrays.sort(a, comparator);
         Arrays.sort(b, comparator);
         return Arrays.equals(a, b);
-    }
-
-    public boolean onlyLastFileLeft(File [] files) {
-        return files != null && files.length == 1  && files[0].getName().trim().endsWith("-last");
     }
 
     private File[] checkForMoreFiles(File path, File[] files, FileFilter acceptor,
@@ -1313,10 +1359,9 @@ public class ExportOnServerVerifier {
 
     private void markCheckedUpTo()
     {
-        for (int i = 0; i < m_partitions; ++i)
+        for (int partid = 0; partid < m_partitions; ++partid)
         {
-            int partid = i;
-            int mark = m_rowTxnIds.get(i).size();
+            int mark = m_rowTxnIds.get(partid).size();
             m_checkedUpTo.put(partid, mark);
         }
     }
