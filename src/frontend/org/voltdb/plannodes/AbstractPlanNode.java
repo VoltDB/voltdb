@@ -424,9 +424,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         if (idx == m_children.size()) {
             return false;
         }
-        oldChild.removeFromGraph();
-        m_children.add(idx, newChild);
-        newChild.m_parents.add(this);
+        oldChild.m_parents.clear();
+        setAndLinkChild(idx, newChild);
         return true;
     }
 
@@ -540,6 +539,22 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      */
     public Boolean isInline() {
         return m_isInline;
+    }
+
+    /**
+     * Refer to the override implementation on NestLoopIndexJoin node.
+     * @param tableName
+     * @return whether this node has an inlined index scan node or not.
+     */
+    public boolean hasInlinedIndexScanOfTable(String tableName) {
+        for (int i = 0; i < getChildCount(); i++) {
+            AbstractPlanNode child = getChild(i);
+            if (child.hasInlinedIndexScanOfTable(tableName) == true) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
 
