@@ -178,97 +178,6 @@ class CommandVerb(BaseVerb):
                                 % self.__class__.__name__)
 
 #===============================================================================
-class JavaVerb(CommandVerb):
-#===============================================================================
-    """
-    Verb that wraps a function that calls into a Java class. Used by
-    the @VOLT.Java decorator.
-    """
-    def __init__(self, name, function, java_class, **kwargs):
-        CommandVerb.__init__(self, name, function, **kwargs)
-        self.java_class = java_class
-        self.add_options(
-           cli.IntegerOption(None, '--debugport', 'debugport',
-                             'enable remote Java debugging on the specified port'),
-           cli.BooleanOption(None, '--dry-run', 'dryrun', None))
-
-    def go(self, runner):
-        self.run_java(runner, *runner.args)
-
-    def run_java(self, runner, *args):
-        opts_override = self.get_attr('java_opts_override', default = [])
-        if runner.opts.debugport:
-            kw = {'debugport': runner.opts.debugport}
-        else:
-            kw = {}
-        runner.java.execute(self.java_class, opts_override, *args, **kw)
-
-#===============================================================================
-class ServerVerb(JavaVerb):
-#===============================================================================
-    """
-    Verb that wraps a function that calls into a Java class to run a VoltDB
-    server process. Used by the @VOLT.Server decorator.
-    """
-    def __init__(self, name, function, server_subcommand, **kwargs):
-        JavaVerb.__init__(self, name, function, 'org.voltdb.VoltDB', **kwargs)
-        self.server_subcommand = server_subcommand
-        # Add common server-ish options.
-        self.add_options(
-            cli.StringOption('-d', '--deployment', 'deployment',
-                             'the deployment configuration file path',
-                             default = 'deployment.xml'),
-            cli.HostOption('-H', '--host', 'host', 'the host', default = 'localhost'),
-            cli.StringOption('-l', '--license', 'license', 'the license file path'),
-            cli.StringOption(None, '--internalinterface', 'internalinterface', None),
-            cli.StringOption(None, '--internalport', 'internalport', None),
-            cli.StringOption(None, '--zkport', 'zkport', None),
-            cli.StringOption(None, '--replicationport', 'replicationport', None),
-            cli.StringOption(None, '--adminport', 'adminport', None),
-            cli.StringOption(None, '--externalinterface', 'externalinterface', None))
-        self.add_arguments(
-            cli.StringArgument('catalog',
-                               'the application catalog jar file path'))
-        # Add appropriate server-ish Java options.
-        self.merge_java_options('java_opts_override',
-                '-server',
-                '-XX:+HeapDumpOnOutOfMemoryError',
-                '-XX:HeapDumpPath=/tmp',
-                '-XX:-ReduceInitialCardMarks')
-
-    def go(self, runner):
-        final_args = [self.server_subcommand]
-        catalog = runner.opts.catalog
-        if not catalog:
-            catalog = runner.config.get('volt.catalog')
-        if catalog is None:
-            utility.abort('A catalog path is required.')
-        final_args.extend(['catalog', catalog])
-        if runner.opts.deployment:
-            final_args.extend(['deployment', runner.opts.deployment])
-        if runner.opts.host:
-            final_args.extend(['host', runner.opts.host.host])
-            if runner.opts.host.port is not None:
-                final_args.extend(['port', runner.opts.host.port])
-        if runner.opts.license:
-            final_args.extend(['license', runner.opts.license])
-        if runner.opts.internalinterface:
-            final_args.extend(['internalinterface', runner.opts.internalinterface])
-        if runner.opts.internalport:
-            final_args.extend(['internalport', runner.opts.internalport])
-        if runner.opts.zkport:
-            final_args.extend(['zkport', runner.opts.zkport])
-        if runner.opts.replicationport:
-            final_args.extend(['replicationport', runner.opts.replicationport])
-        if runner.opts.adminport:
-            final_args.extend(['adminport', runner.opts.adminport])
-        if runner.opts.externalinterface:
-            final_args.extend(['externalinterface', runner.opts.externalinterface])
-        if runner.args:
-            final_args.extend(runner.args)
-        self.run_java(runner, *final_args)
-
-#===============================================================================
 class HelpVerb(CommandVerb):
 #===============================================================================
     """
@@ -403,33 +312,11 @@ class VerbDecorators(object):
             return wrapper
         return inner_decorator
 
-    def _get_java_decorator(self, verb_class, java_class, *args, **kwargs):
-        # Add extra message to description.
-        extra_help = '(use --help for full usage)'
-        if 'description' in kwargs:
-            kwargs['description'] += ' %s' % extra_help
-        else:
-            kwargs['description'] = extra_help
-        return self._get_decorator(verb_class, java_class, *args, **kwargs)
-
     def Command(self, *args, **kwargs):
         """
         @VOLT.Command decorator for declaring general-purpose commands.
         """
         return self._get_decorator(CommandVerb, *args, **kwargs)
-
-    def Java(self, java_class, *args, **kwargs):
-        """
-        @VOLT.Java decorator for declaring commands that call Java classes.
-        """
-        return self._get_java_decorator(JavaVerb, java_class, *args, **kwargs)
-
-    def Server(self, server_subcommand, *args, **kwargs):
-        """
-        @VOLT.Server decorator for declaring commands that call Java classes to
-        run a VoltDB server process.
-        """
-        return self._get_decorator(ServerVerb, server_subcommand, *args, **kwargs)
 
     def Help(self, *args, **kwargs):
         """
