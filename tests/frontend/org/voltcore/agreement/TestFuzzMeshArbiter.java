@@ -140,21 +140,11 @@ public class TestFuzzMeshArbiter extends TestCase
         while (!getNodesInState(NodeState.START).isEmpty()) {
             Thread.sleep(50);
         }
-        MiniNode victim = getNode(0);
-        victim.shutdown();
-        victim = getNode(1);
-        victim.shutdown();
-        while (getNodesInState(NodeState.RESOLVE).isEmpty()) {
-            Thread.sleep(50);
-        }
-        while (!getNodesInState(NodeState.RESOLVE).isEmpty()) {
-            Thread.sleep(50);
-        }
-        Set<Long> expect = new HashSet<Long>();
-        expect.addAll(m_nodes.keySet());
-        expect.remove(getHSId(0));
-        expect.remove(getHSId(1));
-        assertTrue(checkFullyConnectedGraphs(expect));
+        FuzzTestState state = new FuzzTestState(0L, m_nodes.keySet());
+        state.killNode(0);
+        state.setUpExpectations();
+
+        state.expect();
     }
 
     public void testLinkFail() throws InterruptedException
