@@ -21,6 +21,7 @@
 #include "common/types.h"
 #include "common/PlannerDomValue.h"
 #include "common/FatalException.hpp"
+#include "common/ValueFactory.hpp"
 #include "catalog/catalog.h"
 #include "catalog/columnref.h"
 #include "catalog/column.h"
@@ -388,9 +389,8 @@ void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bo
     // clear the tuple that will be built to insert or overwrite
     memset(m_updatedTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
 
-    int colindex = 0;
     // set up the first n columns, based on group-by columns
-    for (colindex = 0; colindex < m_groupByColumnCount; colindex++) {
+    for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
         // note that if the tuple is in the mv's target table,
         // tuple values should be pulled from the existing tuple in
         // that table. This works around a memory ownership issue
@@ -399,15 +399,14 @@ void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bo
         m_updatedTuple.setNValue(colindex, value);
     }
 
-    // set up the next column, which is a count
-    m_updatedTuple.setNValue(colindex,
-                             m_existingTuple.getNValue(colindex).op_increment());
-    colindex++;
-
-    int aggOffset = colindex;
+    int aggOffset = (int)m_groupByColumnCount + 1;
     // set values for the other columns
     // update or insert the row
     if (exists) {
+        // increment the next column, which is a count(*)
+        m_updatedTuple.setNValue((int)m_groupByColumnCount,
+                                 m_existingTuple.getNValue((int)m_groupByColumnCount).op_increment());
+
         for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
             NValue existingValue = m_existingTuple.getNValue(aggOffset+aggIndex);
             NValue newValue = getAggInputFromSrcTuple(aggIndex, newTuple);
@@ -446,9 +445,21 @@ void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bo
                                                  m_updatableIndexList, fallible);
     }
     else {
-        // A new group row gets its initial agg values copied directly from the first source row.
+        // set the next column, which is a count(*), to 1
+        m_updatedTuple.setNValue((int)m_groupByColumnCount, ValueFactory::getBigIntValue(1));
+
+        // A new group row gets its initial agg values copied directly from the first source row
+        // except for user-defined COUNTs which get set to 0 or 1 depending on whether the
+        // source column value is null.
         for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
             NValue newValue = getAggInputFromSrcTuple(aggIndex, newTuple);
+            if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
+                if (newValue.isNull()) {
+                    newValue = ValueFactory::getBigIntValue(0);
+                } else {
+                    newValue = ValueFactory::getBigIntValue(1);
+                }
+            }
             m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
         }
         m_target->insertPersistentTuple(m_updatedTuple, fallible);
@@ -487,9 +498,8 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
     }
     // assume from here that we're just updating the existing row
 
-    int colindex = 0;
     // set up the first n columns, based on group-by columns
-    for (colindex = 0; colindex < m_groupByColumnCount; colindex++) {
+    for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
         // note that if the tuple is in the mv's target table,
         // tuple values should be pulled from the existing tuple in
         // that table. This works around a memory ownership issue
@@ -497,10 +507,9 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
         m_updatedTuple.setNValue(colindex, m_existingTuple.getNValue(colindex));
     }
 
-    m_updatedTuple.setNValue(colindex, count);
-    colindex++;
+    m_updatedTuple.setNValue((int)m_groupByColumnCount, count);
 
-    int aggOffset = colindex;
+    int aggOffset = (int)m_groupByColumnCount + 1;
     // set values for the other columns
     for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
         NValue existingValue = m_existingTuple.getNValue(aggOffset+aggIndex);
