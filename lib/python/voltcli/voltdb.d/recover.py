@@ -25,7 +25,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-@VOLT.Server('recover',
-    description = 'Start the VoltDB server and recover the previous database state.')
+@VOLT.Command(
+    bundles = VOLT.ServerBundle('recover', False),
+    description = 'Start the VoltDB server and recover the previous database state.'
+)
 def recover(runner):
     runner.go()

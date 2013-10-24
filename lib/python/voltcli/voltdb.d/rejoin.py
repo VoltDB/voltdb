@@ -26,38 +26,8 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 @VOLT.Command(
-    description = 'Rejoin host to the VoltDB cluster.',
-    options = (
-        VOLT.StringOption ('-H', '--host', 'host',
-                           'Host to Join the Cluster'),
-        VOLT.BooleanOption ('-L', '--live', 'live',
-                           'IS this a Live Rejoin?'),
-        VOLT.StringOption(None, '--internalinterface', 'internalinterface', None),
-        VOLT.StringOption(None, '--internalport', 'internalport', None),
-        VOLT.StringOption(None, '--zkport', 'zkport', None),
-        VOLT.StringOption(None, '--replicationport', 'replicationport', None),
-        VOLT.StringOption(None, '--adminport', 'adminport', None),
-        VOLT.StringOption(None, '--externalinterface', 'externalinterface', None),
-    )
+    bundles = VOLT.ServerBundle('rejoin', False, False, True),
+    description = 'Rejoin host to the VoltDB cluster.'
 )
 def rejoin(runner):
-    if runner.opts.host == None: 
-        runner.abort_with_help('Host must be specified in rejoin operation.')
-    if runner.opts.live:
-        runner.args.extend(['live', 'rejoin', 'host', runner.opts.host])
-    else:
-        runner.args.extend(['rejoin', 'host', runner.opts.host])
-    if runner.opts.internalinterface:
-        runner.args.extend(['internalinterface', runner.opts.internalinterface])
-    if runner.opts.internalport:
-        runner.args.extend(['internalport', runner.opts.internalport])
-    if runner.opts.zkport:
-        runner.args.extend(['zkport', runner.opts.zkport])
-    if runner.opts.replicationport:
-        runner.args.extend(['replicationport', runner.opts.replicationport])
-    if runner.opts.adminport:
-        runner.args.extend(['adminport', runner.opts.adminport])
-    if runner.opts.externalinterface:
-        runner.args.extend(['externalinterface', runner.opts.externalinterface])
- 
-    runner.java.execute('org.voltdb.VoltDB', None, *runner.args)
+    runner.go()

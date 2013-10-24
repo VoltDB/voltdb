@@ -57,7 +57,7 @@ usage for a verb, including its options and arguments.
 )
 
 # Internal command names that get added to the VOLT namespace of user scripts.
-internal_commands = ['volt', 'voltadmin']
+internal_commands = ['voltdb', 'voltadmin']
 
 # Written to the README file when the packaged executable is created.
 compatibility_warning = '''\
@@ -492,6 +492,7 @@ class VOLT(object):
         self.ConnectionBundle = ConnectionBundle
         self.ClientBundle     = ClientBundle
         self.AdminBundle      = AdminBundle
+        self.ServerBundle     = ServerBundle
         # As a convenience expose the utility module so that commands don't
         # need to import it.
         self.utility = utility

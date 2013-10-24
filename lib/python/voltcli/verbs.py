@@ -168,8 +168,14 @@ class CommandVerb(BaseVerb):
                 self.bundles[i].stop(self, runner)
 
     def go(self, runner):
-        utility.abort('The default go() method is not implemented by %s.'
-                            % self.__class__.__name__)
+        gofound = False
+        for bundle in self.bundles:
+            if hasattr(bundle, 'go'):
+                bundle.go(self, runner)
+                gofound = True
+        if not gofound:
+            utility.abort('go() method is not implemented by any bundle or %s.'
+                                % self.__class__.__name__)
 
 #===============================================================================
 class JavaVerb(CommandVerb):
@@ -457,6 +463,125 @@ class VerbSpace(object):
         self.verbs       = verbs
         self.verb_names  = self.verbs.keys()
         self.verb_names.sort()
+
+#===============================================================================
+class JavaBundle(object):
+#===============================================================================
+    """
+    Verb that wraps a function that calls into a Java class. Used by
+    the @VOLT.Java decorator.
+    """
+    def __init__(self, java_class):
+        self.java_class = java_class
+
+    def initialize(self, verb):
+        verb.add_options(
+           cli.IntegerOption(None, '--debugport', 'debugport',
+                             'enable remote Java debugging on the specified port'),
+           cli.BooleanOption(None, '--dry-run', 'dryrun', None),
+           cli.StringOption('-l', '--license', 'license', 'the license file path'),
+           cli.StringOption(None, '--internalinterface', 'internalinterface', 'Specifies which network interface to use for internal communication, such as the internal and zookeep- er ports.'),
+           cli.StringOption(None, '--internalport', 'internalport', 'Specifies the internal port number used to communicate between cluster nodes.'),
+           cli.StringOption(None, '--zkport', 'zkport', 'Specifies the zookeeper port number.'),
+           cli.StringOption(None, '--replicationport', 'replicationport', 'Specifies the first of three replication ports used for database replication.'),
+           cli.StringOption(None, '--adminport', 'adminport', 'Specifies the admin port number.'),
+           cli.StringOption(None, '--externalinterface', 'externalinterface', 'Specifies which network interface to use for external ports, such as the admin and client ports.'))
+
+    def start(self, verb, runner):
+        pass
+
+    def go(self, verb, runner):
+        self.run_java(runner, verb, *runner.args)
+
+    def stop(self, verb, runner):
+        pass
+
+    def run_java(self, verb, runner, *args):
+        opts_override = verb.get_attr('java_opts_override', default = [])
+        if runner.opts.debugport:
+            kw = {'debugport': runner.opts.debugport}
+        else:
+            kw = {}
+        runner.java.execute(self.java_class, opts_override, *args, **kw)
+
+#===============================================================================
+class ServerBundle(JavaBundle):
+#===============================================================================
+    """
+    Bundle class to run org.voltdb.VoltDB process.
+    Supports needing catalog, needing port and live keyword option for rejoin.
+    All other options are supported as common options.
+    """
+    def __init__(self, subcommand, needs_catalog=True, needs_port=True, needs_live=False):
+        JavaBundle.__init__(self, 'org.voltdb.VoltDB')
+        self.subcommand = subcommand
+        self.needs_catalog = needs_catalog
+        self.needs_port = needs_port
+        self.needs_live = needs_live
+
+    def initialize(self, verb):
+        JavaBundle.initialize(self, verb)
+        verb.add_options(
+            cli.StringOption('-d', '--deployment', 'deployment',
+                             'the deployment configuration file path',
+                             default = None),
+            cli.HostOption('-H', '--host', 'host', 'the host', default = 'localhost'))
+        if self.needs_live:
+           verb.add_options(cli.BooleanOption('-L', '--live', 'live', 'IS this a Live Rejoin?'))
+        if self.needs_catalog:
+            verb.add_arguments(cli.PathArgument('catalog',
+                              'the application catalog jar file path'))
+
+    def start(self, verb, runner):
+        # Add appropriate server-ish Java options.
+        verb.merge_java_options('java_opts_override',
+                '-server',
+                '-XX:+HeapDumpOnOutOfMemoryError',
+                '-XX:HeapDumpPath=/tmp',
+                '-XX:-ReduceInitialCardMarks')
+
+    def go(self, verb, runner):
+        if self.needs_live:
+            if runner.opts.live:
+                final_args = ['live', self.subcommand]
+            else:
+                final_args = [self.subcommand]
+        else: 
+            final_args = [self.subcommand]
+        if self.needs_catalog:
+            catalog = runner.opts.catalog
+            if not catalog:
+                catalog = runner.config.get('volt.catalog')
+            if catalog is None:
+                utility.abort('A catalog path is required.')
+            final_args.extend(['catalog', catalog])
+
+        if runner.opts.deployment:
+            final_args.extend(['deployment', runner.opts.deployment])
+        if runner.opts.host:
+            final_args.extend(['host', runner.opts.host.host])
+            if self.needs_port and runner.opts.host.port is not None:
+                final_args.extend(['port', runner.opts.host.port])
+        if runner.opts.license:
+            final_args.extend(['license', runner.opts.license])
+        if runner.opts.internalinterface:
+            final_args.extend(['internalinterface', runner.opts.internalinterface])
+        if runner.opts.internalport:
+            final_args.extend(['internalport', runner.opts.internalport])
+        if runner.opts.zkport:
+            final_args.extend(['zkport', runner.opts.zkport])
+        if runner.opts.replicationport:
+            final_args.extend(['replicationport', runner.opts.replicationport])
+        if runner.opts.adminport:
+            final_args.extend(['adminport', runner.opts.adminport])
+        if runner.opts.externalinterface:
+            final_args.extend(['externalinterface', runner.opts.externalinterface])
+        if runner.args:
+            final_args.extend(runner.args)
+        self.run_java(verb, runner, *final_args)
+
+    def stop(self, verb, runner):
+        pass
 
 #===============================================================================
 class ConnectionBundle(object):

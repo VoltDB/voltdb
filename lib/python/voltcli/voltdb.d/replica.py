@@ -25,7 +25,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-@VOLT.Server('replica',
-             description = 'Start the VoltDB replica of the database.')
+@VOLT.Command(
+    bundles = VOLT.ServerBundle('replica'),
+    description = 'Start the VoltDB replica of the database.'
+)
 def replica(runner):
     runner.go()
