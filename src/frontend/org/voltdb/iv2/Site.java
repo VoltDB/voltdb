@@ -1075,8 +1075,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void setPerPartitionTxnIds(long[] perPartitionTxnIds) {
-        boolean foundMultipartTxnId = false;
+    public void setPerPartitionTxnIds(long[] perPartitionTxnIds, boolean skipMultiPart) {
+        boolean foundMultipartTxnId = skipMultiPart;
         boolean foundSinglepartTxnId = false;
         for (long txnId : perPartitionTxnIds) {
             if (TxnEgo.getPartitionId(txnId) == m_partitionId) {

@@ -21,6 +21,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutionException;
 
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
@@ -28,6 +31,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.RejoinMessage;
@@ -50,6 +54,9 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     // a snapshot sink used to stream table data from multiple sources
     private final StreamSnapshotSink m_dataSink;
     private final Mailbox m_streamSnapshotMb;
+    private Long m_partitionTxnId;
+    private Stat m_partitionTxnIdStat = new Stat();
+    private long m_partitionTxnIds[];
 
     private class CompletionAction extends JoinCompletionAction {
         @Override
@@ -67,9 +74,99 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         m_dataSink = new StreamSnapshotSink(m_streamSnapshotMb);
     }
 
+    /*
+     * Inherit the per partition txnid from the long since gone
+     * partition that existed in the past
+     */
+    private void fetchPerPartitionTxnId() {
+        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+        byte partitionTxnIdsBytes[] = null;
+        try {
+            partitionTxnIdsBytes = zk.getData(VoltZK.perPartitionTxnIds, false, m_partitionTxnIdStat);
+        } catch (KeeperException.NoNodeException e){return;}//Can be no node if the cluster was never restored
+        catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Error retrieving per partition txn ids", true, e);
+        }
+        ByteBuffer buf = ByteBuffer.wrap(partitionTxnIdsBytes);
+
+        int count = buf.getInt();
+        m_partitionTxnIds = new long[count];
+        for (int ii = 0; ii < count; ii++) {
+            long txnId = buf.getLong();
+            m_partitionTxnIds[ii] = txnId;
+            int partitionId = TxnEgo.getPartitionId(txnId);
+            if (partitionId == m_partitionId) {
+                m_partitionTxnId = txnId;
+                return;
+            }
+        }
+        if (m_partitionTxnId == null) {
+            m_partitionTxnIds = null;
+            m_partitionTxnIdStat = null;
+        }
+        System.out.println("Fetched " + count + " txnids and mine is " + m_partitionTxnId);
+    }
+
+    /*
+     * Set the txnid on the site, clean up the ZK state by racing to remove self
+     */
+    private void applyAndCleanupPerPartitionTxnId(SiteProcedureConnection connection) {
+        //If there was no ID nothing to do
+        if (m_partitionTxnId == null) return;
+        connection.setPerPartitionTxnIds(m_partitionTxnIds, true);
+        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+        do {
+            ByteBuffer txnIdsBuf = ByteBuffer.allocate(4 + (8 * (m_partitionTxnIds.length - 1)));
+            txnIdsBuf.putInt(m_partitionTxnIds.length - 1);
+
+            //Construct the new set of Ids without self, check to make sure it hasn't already been done
+            boolean foundSelf = false;
+            for (int ii = 0; ii < m_partitionTxnIds.length; ii++) {
+                //Skip self and also not that self was present
+                if (m_partitionTxnIds[ii] == m_partitionTxnId) {
+                    foundSelf = true;
+                    continue;
+                }
+                txnIdsBuf.putLong(m_partitionTxnIds[ii]);
+            }
+
+            //Some other replica already did the update, work is done so bail out
+            if (!foundSelf) {
+                m_partitionTxnIds = null;
+                m_partitionTxnIdStat = null;
+                return;
+            }
+
+            //Race to do the update
+            try {
+                zk.setData(VoltZK.perPartitionTxnIds, txnIdsBuf.array(), m_partitionTxnIdStat.getVersion());
+                m_partitionTxnIds = null;
+                m_partitionTxnIdStat = null;
+                System.out.println("Updated per partition txnids for " + m_partitionTxnId);
+                return;
+            } catch (KeeperException.BadVersionException e) {
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Error updating per partition txn ids", true, e);
+            }
+
+            //Lost the race, get the new version and try and apply it again
+            try {
+                ByteBuffer update = ByteBuffer.wrap(zk.getData(VoltZK.perPartitionTxnIds, false, m_partitionTxnIdStat));
+                int count = update.getInt();
+                m_partitionTxnIds = new long[count];
+                for (int ii = 0; ii < count; ii++) {
+                    m_partitionTxnIds[ii] = update.getLong();
+                }
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Error retrieving per partition txn ids", true, e);
+            }
+        } while (true);
+    }
+
     private void doInitiation(RejoinMessage message)
     {
         m_coordinatorHsId = message.m_sourceHSId;
+        fetchPerPartitionTxnId();
         String snapshotNonce = message.getSnapshotNonce();
         SnapshotCompletionAction interest =
                 new SnapshotCompletionAction(snapshotNonce, m_snapshotCompletionMonitor);
@@ -146,6 +243,8 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         }
 
         JOINLOG.debug(m_whoami + " data transfer is finished");
+
+        applyAndCleanupPerPartitionTxnId(siteConnection);
 
         SnapshotCompletionEvent event = null;
         try {
