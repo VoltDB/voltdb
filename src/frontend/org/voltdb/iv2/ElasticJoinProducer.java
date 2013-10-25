@@ -95,9 +95,10 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
             long txnId = buf.getLong();
             m_partitionTxnIds[ii] = txnId;
             int partitionId = TxnEgo.getPartitionId(txnId);
+            System.out.println("Saw partition id " + partitionId + " mine is " + m_partitionId);
             if (partitionId == m_partitionId) {
                 m_partitionTxnId = txnId;
-                return;
+                continue;
             }
         }
         if (m_partitionTxnId == null) {
