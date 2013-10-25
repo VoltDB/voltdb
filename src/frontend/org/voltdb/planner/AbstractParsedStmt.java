@@ -314,8 +314,6 @@ public abstract class AbstractParsedStmt {
      * @return
      */
     private TupleValueExpression parseColumnRefExpression(VoltXMLElement exprNode) {
-        String alias = exprNode.attributes.get("alias");
-        String tableName = exprNode.attributes.get("table");
         // When the column lacks required detail,
         // use the more detailed column that got attached to it as a columnref child.
         // This is the convention specific to the case of a column referenced in JOIN ... USING ...
@@ -328,12 +326,17 @@ public abstract class AbstractParsedStmt {
                 }
             }
         }
-        String columnName = exprNode.attributes.get("column");
 
+        String tableName = exprNode.attributes.get("table");
+        String tableAlias = exprNode.attributes.get("tablealias");
+        boolean hasChildren = childExprs != null && !childExprs.isEmpty();
         if (tableName == null) {
-            // Try to get table name from the first nested columnref expression if any
-            if (childExprs != null && !childExprs.isEmpty()) {
+            // This is the case of a column from USING expression -
+            // table and tablealias attributes are not set
+            // Try to get table name/alias from the first nested columnref expression if any
+            if (hasChildren == true) {
                 tableName = childExprs.get(0).getTableName();
+                tableAlias = childExprs.get(0).getTableAlias();
             }
             // One last try
             if (tableName == null) {
@@ -341,13 +344,30 @@ public abstract class AbstractParsedStmt {
                 tableName = m_DDLIndexedTable.getTypeName();
             }
         }
+
         assert(tableName != null);
-        String tableAlias = exprNode.attributes.get("tablealias");
+
         if (tableAlias == null) {
-            tableAlias = tableName;
+            if (hasChildren) {
+                // pick the first outer table
+                for (TupleValueExpression childTVE : childExprs) {
+                    tableAlias = childTVE.getTableAlias();
+                    // The table is already in the cache, all we need is its index into the cache
+                    assert(tableAliasIndexMap.containsKey(childTVE.getTableAlias()));
+                    int tableIdx = tableAliasIndexMap.get(childTVE.getTableAlias());
+                    StmtTableScan childTable = stmtCache.get(tableIdx);
+                    if (childTable.m_isInner == false) {
+                        break;
+                    }
+                }
+            } else {
+                tableAlias = tableName;
+            }
         }
 
-        TupleValueExpression expr = new TupleValueExpression(tableName, tableAlias, columnName, alias);
+        String columnName = exprNode.attributes.get("column");
+        String columnAlias = exprNode.attributes.get("alias");
+        TupleValueExpression expr = new TupleValueExpression(tableName, tableAlias, columnName, columnAlias);
         if (childExprs != null && !childExprs.isEmpty()) {
             expr.setChildExpressions(childExprs);
         }
@@ -623,6 +643,20 @@ public abstract class AbstractParsedStmt {
 
             JoinNode joinNode = new JoinNode(nodeId + 1, joinType, joinTree, leafNode);
             joinTree = joinNode;
+
+            // Set the inner/outer indicators for the table cache
+            StmtTableScan currentTable = stmtCache.get(aliasIdx);
+            if (joinType == JoinType.RIGHT) {
+                currentTable.m_isInner = false;
+            }
+            // The first node
+            assert(joinTree.m_leftNode != null);
+            if (joinTree.m_leftNode.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) {
+                if (joinType == JoinType.LEFT) {
+                    StmtTableScan firstTable = stmtCache.get(joinTree.m_leftNode.m_tableAliasIndex);
+                    firstTable.m_isInner = false;
+                }
+            }
        }
     }
 

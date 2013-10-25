@@ -309,9 +309,7 @@ public class TestPlansJoin extends PlannerTestCase {
         AbstractPlanNode node;
         SeqScanPlanNode seqScan;
 
-        apl = compileToFragments("select * FROM P1 JOIN R2 USING(A) WHERE P1.C > 0 and R2.C >= 5");
-        // Mike A is looking into the issue with this variant
-        //apl = compileToFragments("select * FROM P1 LABELED JOIN R2 USING(A) WHERE A > 0 and R2.C >= 5");
+        apl = compileToFragments("select * FROM P1 LABEL LEFT JOIN R2 USING(A) WHERE A > 0 and R2.C >= 5");
         pn = apl.get(1);
         node = pn.getChild(0);
         assertTrue(node instanceof NestLoopPlanNode);
@@ -323,6 +321,7 @@ public class TestPlansJoin extends PlannerTestCase {
         seqScan = (SeqScanPlanNode)node;
         assertTrue(node instanceof SeqScanPlanNode);
         assertEquals(ExpressionType.COMPARE_GREATERTHAN, seqScan.getPredicate().getExpressionType());
+
     }
 
     public void testTransitiveValueEquivalenceConditions() {

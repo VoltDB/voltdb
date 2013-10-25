@@ -34,5 +34,6 @@ public class StmtTableScan {
     public String m_tableAlias = null;
     // Store a table-hashed list of the columns actually used by this statement.
     public HashSet<SchemaColumn> m_scanColumns = null ;
-
+    // True if this table is an inner table in a join, false otherwise
+    public boolean m_isInner = true;
 }
