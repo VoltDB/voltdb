@@ -228,9 +228,10 @@ public class TestPlansJoin extends PlannerTestCase {
         assertEquals(ExpressionType.CONJUNCTION_AND, p.getExpressionType());
         assertEquals(ExpressionType.COMPARE_EQUAL, p.getLeft().getExpressionType());
         assertEquals(ExpressionType.COMPARE_EQUAL, p.getRight().getExpressionType());
-        n = n.getChild(0);
+        n = n.getChild(1);
         assertTrue(n instanceof AbstractScanPlanNode);
         scan = (AbstractScanPlanNode) n;
+        assertTrue(scan.getPredicate() != null);
         assertEquals(ExpressionType.COMPARE_GREATERTHAN, scan.getPredicate().getExpressionType());
 
         pn = compile("select * FROM R1 JOIN R2 ON R1.A = R2.A JOIN R3 ON R1.C = R3.C WHERE R1.A > 0");
@@ -304,6 +305,7 @@ public class TestPlansJoin extends PlannerTestCase {
         List<AbstractPlanNode> apl;
         AbstractPlanNode node;
         SeqScanPlanNode seqScan;
+        NestLoopPlanNode nlj;
 
         apl = compileToFragments("select * FROM P1 LABEL JOIN R2 USING(A) WHERE A > 0 and R2.C >= 5");
         pn = apl.get(1);
@@ -311,24 +313,34 @@ public class TestPlansJoin extends PlannerTestCase {
         assertTrue(node instanceof NestLoopPlanNode);
         assertEquals(ExpressionType.COMPARE_EQUAL,
                      ((NestLoopPlanNode)node).getJoinPredicate().getExpressionType());
-        seqScan = (SeqScanPlanNode)node.getChild(1);
-        assertEquals(ExpressionType.COMPARE_GREATERTHANOREQUALTO, seqScan.getPredicate().getExpressionType());
-        node = node.getChild(0);
-        seqScan = (SeqScanPlanNode)node;
+        assertTrue(node.getChild(0) instanceof SeqScanPlanNode);
+        seqScan = (SeqScanPlanNode)node.getChild(0);
+        assertTrue(seqScan.getPredicate() == null);
+        node = node.getChild(1);
         assertTrue(node instanceof SeqScanPlanNode);
-        assertEquals(ExpressionType.COMPARE_GREATERTHAN, seqScan.getPredicate().getExpressionType());
+        seqScan = (SeqScanPlanNode)node;
+        assertEquals(ExpressionType.CONJUNCTION_AND, seqScan.getPredicate().getExpressionType());
 
-        apl = compileToFragments("select * FROM P1 LABEL LEFT JOIN R2 USING(A) WHERE A > 0 and R2.C >= 5");
+        apl = compileToFragments("select * FROM P1 LABEL LEFT JOIN R2 USING(A) WHERE A > 0");
         pn = apl.get(1);
         node = pn.getChild(0);
         assertTrue(node instanceof NestLoopPlanNode);
-        assertEquals(ExpressionType.COMPARE_EQUAL,
-                     ((NestLoopPlanNode)node).getJoinPredicate().getExpressionType());
-        seqScan = (SeqScanPlanNode)node.getChild(1);
-        assertEquals(ExpressionType.COMPARE_GREATERTHANOREQUALTO, seqScan.getPredicate().getExpressionType());
-        node = node.getChild(0);
-        seqScan = (SeqScanPlanNode)node;
-        assertTrue(node instanceof SeqScanPlanNode);
+        nlj = (NestLoopPlanNode) node;
+        assertTrue(JoinType.LEFT == nlj.getJoinType());
+        assertEquals(ExpressionType.COMPARE_EQUAL, nlj.getJoinPredicate().getExpressionType());
+        seqScan = (SeqScanPlanNode)node.getChild(0);
+        assertTrue(seqScan.getPredicate() != null);
+        assertEquals(ExpressionType.COMPARE_GREATERTHAN, seqScan.getPredicate().getExpressionType());
+
+        apl = compileToFragments("select * FROM R2 LABEL RIGHT JOIN P1 USING(A) WHERE A > 0");
+        pn = apl.get(1);
+        node = pn.getChild(0);
+        assertTrue(node instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) node;
+        assertTrue(JoinType.LEFT == nlj.getJoinType());
+        assertEquals(ExpressionType.COMPARE_EQUAL, nlj.getJoinPredicate().getExpressionType());
+        seqScan = (SeqScanPlanNode)node.getChild(0);
+        assertTrue(seqScan.getPredicate() != null);
         assertEquals(ExpressionType.COMPARE_GREATERTHAN, seqScan.getPredicate().getExpressionType());
 
     }

@@ -178,7 +178,7 @@ public abstract class AbstractParsedStmt {
         }
         for (VoltXMLElement node : root.children) {
             if (node.name.equalsIgnoreCase("tablescan")) {
-                parseTable(node);
+                parseTable(node, true);
             } else if (node.name.equalsIgnoreCase("tablescans")) {
                 parseTables(node);
             }
@@ -312,7 +312,7 @@ public abstract class AbstractParsedStmt {
      * @return
      */
     private TupleValueExpression parseColumnRefExpression(VoltXMLElement exprNode) {
-        // When the column lacks required detail,
+        // When the column lacks required detail (column from USING expression),
         // use the more detailed column that got attached to it as a columnref child.
         // This is the convention specific to the case of a column referenced in JOIN ... USING ...
         List<TupleValueExpression> childExprs = null;
@@ -325,43 +325,37 @@ public abstract class AbstractParsedStmt {
             }
         }
 
-        String tableName = exprNode.attributes.get("table");
-        String tableAlias = exprNode.attributes.get("tablealias");
-        boolean hasChildren = childExprs != null && !childExprs.isEmpty();
-        if (tableName == null) {
-            // This is the case of a column from USING expression -
-            // table and tablealias attributes are not set
-            // Try to get table name/alias from the first nested columnref expression if any
-            if (hasChildren == true) {
-                tableName = childExprs.get(0).getTableName();
-                tableAlias = childExprs.get(0).getTableAlias();
-            }
-            // One last try
+        String tableName = null;
+        String tableAlias = null;
+        // Is column is part of the USING expression?
+        boolean isNotUsingColumn = childExprs == null || childExprs.isEmpty();
+        if (isNotUsingColumn) {
+            tableName = exprNode.attributes.get("table");
+            tableAlias = exprNode.attributes.get("tablealias");
             if (tableName == null) {
                 assert(m_DDLIndexedTable != null);
                 tableName = m_DDLIndexedTable.getTypeName();
             }
-        }
-
-        assert(tableName != null);
-
-        if (tableAlias == null) {
-            if (hasChildren) {
-                // pick the first outer table
-                for (TupleValueExpression childTVE : childExprs) {
-                    tableAlias = childTVE.getTableAlias();
-                    // The table is already in the cache, all we need is its index into the cache
-                    assert(tableAliasIndexMap.containsKey(childTVE.getTableAlias()));
-                    int tableIdx = tableAliasIndexMap.get(childTVE.getTableAlias());
-                    StmtTableScan childTable = stmtCache.get(tableIdx);
-                    if (childTable.m_isInner == false) {
-                        break;
-                    }
-                }
-            } else {
+            if (tableAlias == null) {
                 tableAlias = tableName;
             }
-        }
+        } else {
+            // This is the case of a column from USING expression -
+            // Get table name/alias from the first nested outer table TVE
+            for (TupleValueExpression childTVE : childExprs) {
+               tableName = childTVE.getTableName();
+               tableAlias = childTVE.getTableAlias();
+               // The table is already in the cache, all we need is its index into the cache
+               assert(tableAliasIndexMap.containsKey(childTVE.getTableAlias()));
+               int tableIdx = tableAliasIndexMap.get(childTVE.getTableAlias());
+               StmtTableScan childTable = stmtCache.get(tableIdx);
+               if (childTable.m_isInner == false) {
+                   break;
+               }
+           }
+       }
+
+        assert(tableName != null);
 
         String columnName = exprNode.attributes.get("column");
         String columnAlias = exprNode.attributes.get("alias");
@@ -598,10 +592,30 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
+    * @param currentTableNode
+    * @param prevTableNode
+    */
+    private void parseTables(VoltXMLElement currentTableNode, VoltXMLElement prevTableNode) {
+        // In order to identify inner and outer tables in a join we need both of them since
+        // the join type attribute is always at the second table from the join
+        if (prevTableNode != null) {
+            JoinType joinType = JoinType.get(currentTableNode.attributes.get("jointype"));
+            assert(joinType != JoinType.INVALID);
+
+            if (joinTree == null) {
+                boolean isPrevTableInner = !(joinType == JoinType.LEFT);
+                parseTable(prevTableNode, isPrevTableInner);
+            }
+            boolean isCurrentTableInner = !(joinType == JoinType.RIGHT);
+            parseTable(currentTableNode, isCurrentTableInner);
+        }
+    }
+
+    /**
     *
     * @param tableNode
     */
-    private void parseTable(VoltXMLElement tableNode) {
+    private void parseTable(VoltXMLElement tableNode, boolean isInnerTable) {
         String tableName = tableNode.attributes.get("table");
         assert(tableName != null);
 
@@ -611,13 +625,16 @@ public abstract class AbstractParsedStmt {
         }
         // add table to the query cache
         int aliasIdx = addTableToStmtCache(tableName, tableAlias);
-
-        AbstractExpression joinExpr = parseJoinCondition(tableNode);
-        AbstractExpression whereExpr = parseWhereCondition(tableNode);
+        // Update the inner indicator on the cache
+        StmtTableScan tableCache = stmtCache.get(aliasIdx);
+        tableCache.m_isInner = isInnerTable;
 
         Table table = getTableFromDB(tableName);
         tableList.add(table);
 
+        // Now that inner/outer table indicator is set we can parse the expressions
+        AbstractExpression joinExpr = parseJoinCondition(tableNode);
+        AbstractExpression whereExpr = parseWhereCondition(tableNode);
         // @TODO ENG_3038 This method of building join trees works for joins without
         // sub-queries
 
@@ -632,7 +649,6 @@ public abstract class AbstractParsedStmt {
         } else {
             // Build the tree by attaching the next table always to the right
             // The node's join type is determined by the type of its right node
-
             JoinType joinType = JoinType.get(tableNode.attributes.get("jointype"));
             assert(joinType != JoinType.INVALID);
             if (joinType == JoinType.FULL) {
@@ -641,20 +657,6 @@ public abstract class AbstractParsedStmt {
 
             JoinNode joinNode = new JoinNode(nodeId + 1, joinType, joinTree, leafNode);
             joinTree = joinNode;
-
-            // Set the inner/outer indicators for the table cache
-            StmtTableScan currentTable = stmtCache.get(aliasIdx);
-            if (joinType == JoinType.RIGHT) {
-                currentTable.m_isInner = false;
-            }
-            // The first node
-            assert(joinTree.m_leftNode != null);
-            if (joinTree.m_leftNode.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) {
-                if (joinType == JoinType.LEFT) {
-                    StmtTableScan firstTable = stmtCache.get(joinTree.m_leftNode.m_tableAliasIndex);
-                    firstTable.m_isInner = false;
-                }
-            }
        }
     }
 
@@ -665,6 +667,9 @@ public abstract class AbstractParsedStmt {
     private void parseTables(VoltXMLElement tablesNode) {
         Set<String> visited = new HashSet<String>();
 
+        VoltXMLElement prevNode = null;
+        // Assuming only 'tablescan' elements are there
+        boolean singleTableSelect = (tablesNode.children.size() == 1);
         for (VoltXMLElement node : tablesNode.children) {
             if (node.name.equalsIgnoreCase("tablescan")) {
 
@@ -678,8 +683,13 @@ public abstract class AbstractParsedStmt {
                 if( visited.contains(visitedTable)) {
                     throw new PlanningErrorException("Not unique table/alias: " + visitedTable);
                 }
-
-                parseTable(node);
+                if (singleTableSelect) {
+                    // Single table select. The table is INNER
+                    parseTable(node, true);
+                } else {
+                    parseTables(node, prevNode);
+                    prevNode = node;
+                }
                 visited.add(visitedTable);
             }
         }
