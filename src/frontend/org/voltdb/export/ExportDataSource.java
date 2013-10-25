@@ -90,6 +90,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final Semaphore m_bufferPushPermits = new Semaphore(16);
 
     private final int m_nullArrayLength;
+    private long m_polledBlockSize = 0;
 
     /**
      * Create a new data source.
@@ -522,7 +523,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return m_es.submit(new Callable<Long>() {
                 @Override
                 public Long call() throws Exception {
-                    return m_committedBuffers.sizeInBytes();
+                    return m_committedBuffers.sizeInBytes() + m_polledBlockSize;
                 }
             }).get();
         } catch (Throwable t) {
@@ -719,7 +720,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
                 return;
             }
-
             //Assemble a list of blocks to delete so that they can be deleted
             //outside of the m_committedBuffers critical section
             ArrayList<StreamBlock> blocksToDelete = new ArrayList<StreamBlock>();
@@ -759,6 +759,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             } else {
                 //Otherwise return the block with the USO for the end of the block
                 //since the entire remainder of the block is being sent.
+                m_polledBlockSize = first_unpolled_block.totalUso();
                 fut.set(
                         new AckingContainer(first_unpolled_block.unreleasedBufferV2(),
                                 first_unpolled_block.uso() + first_unpolled_block.totalUso()));
@@ -861,5 +862,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         Preconditions.checkNotNull(toBeRunOnMastership, "mastership runnable is null");
 
         m_onMastership = toBeRunOnMastership;
+    }
+
+    public void resetInFlightSize() {
+        m_polledBlockSize = 0;
     }
 }
