@@ -157,10 +157,15 @@
                                          "normalizer": "not-a-normalizer.py"},
 
 # ADVANCED MATERIALIZED VIEW TESTING, INCLUDING COMPLEX GROUP BY AND AGGREGATIONS.
-"advanced-matview": {"schema": "matview-advanced-schema.py",
-    "ddl": "matview-DDL.sql",
-    "template": "advanced-matview.sql",
-    "normalizer": "normalizer.py"},
+    "advanced-matview-nonjoin": {"schema": "matview-advanced-nonjoin-schema.py",
+                                 "ddl": "matview-DDL.sql",
+                                 "template": "advanced-matview-nonjoin.sql",
+                                 "normalizer": "normalizer.py"},
+
+    "advanced-matview-join": {"schema": "matview-advanced-join-schema.py",
+                              "ddl": "matview-DDL.sql",
+                              "template": "advanced-matview-join.sql",
+                              "normalizer": "normalizer.py"},
 
 # To test index count
     "index-count1": {"schema": "index-count1-schema.py",

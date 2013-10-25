@@ -417,16 +417,13 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         int idx = 0;
         for (AbstractPlanNode child : m_children) {
             if (child.equals(oldChild)) {
-                break;
+                oldChild.m_parents.clear();
+                setAndLinkChild(idx, newChild);
+                return true;
             }
             ++idx;
         }
-        if (idx == m_children.size()) {
-            return false;
-        }
-        oldChild.m_parents.clear();
-        setAndLinkChild(idx, newChild);
-        return true;
+        return false;
     }
 
 

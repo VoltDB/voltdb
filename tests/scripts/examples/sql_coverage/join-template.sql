@@ -1,7 +1,7 @@
 -- DML, generate random data first.
 --INSERT
 -- test basic INSERT
-INSERT INTO @fromtables VALUES (@insertvals)
+INSERT INTO @dmltable VALUES (@insertvals)
 
 SELECT * FROM @fromtables LHS11 ,              @fromtables RHS WHERE                                 LHS11._variable[@columntype] = RHS._variable[@comparabletype]
 SELECT * FROM @fromtables LHS12 ,              @fromtables RHS WHERE LHS12.@idcol = RHS.@idcol

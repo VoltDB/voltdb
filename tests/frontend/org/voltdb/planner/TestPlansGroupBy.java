@@ -370,14 +370,32 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkHasComplexAgg(pns);
     }
 
-    private void checkMVFix_reAgg(
+    private void checkMVNoFix_NoAgg(
             String sql,
-            int numGroupbyOfReaggNode, int numAggsOfReaggNode) {
-
-        checkMVReaggreateFeature(sql, true,
+            boolean distinctPushdown) {
+        // the first '-1' indicates that there is no top aggregation node.
+        checkMVReaggreateFeature(sql, false,
                 -1, -1,
-                numGroupbyOfReaggNode, numAggsOfReaggNode,
-                false, true, false);
+                -1, -1,
+                distinctPushdown, true, false);
+    }
+
+    public void testNoFix_MVBasedQuery() {
+        // Normal select queries
+        checkMVNoFix_NoAgg("SELECT * FROM V_P1_TEST1", false);
+
+        checkMVNoFix_NoAgg("SELECT V_SUM_C1 FROM V_P1_TEST1 ORDER BY V_A1", false);
+
+        checkMVNoFix_NoAgg("SELECT V_SUM_C1 FROM V_P1_TEST1 LIMIT 1", false);
+
+        checkMVNoFix_NoAgg("SELECT DISTINCT V_SUM_C1 FROM V_P1_TEST1", true);
+
+        // Distributed group by query
+        checkMVReaggreateFeature("SELECT V_SUM_C1 FROM V_P1_TEST1 GROUP by V_SUM_C1",
+                false, 1, 0, -1, -1, false, false, true);
+
+        checkMVReaggreateFeature("SELECT V_SUM_C1, sum(V_CNT) FROM V_P1_TEST1 " +
+                "GROUP by V_SUM_C1", false, 1, 1, -1, -1, false, false, true);
     }
 
     public void testMVBasedQuery_NoAggQuery() {
@@ -399,46 +417,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
             checkMVFix_reAgg("SELECT v_sum_c1 FROM " + tb + " limit 1", 2, 1);
             checkMVFix_reAgg("SELECT v_sum_c1 FROM " + tb + " order by v_sum_c1 limit 1", 2, 1);
             // test distinct down.
-            checkMVReaggreateFeature("SELECT distinct v_sum_c1 FROM " + tb + " limit 1", true,
-                    -1, -1, 2, 1, false, true, false);
+            checkMVFix_reAgg("SELECT distinct v_sum_c1 FROM " + tb + " limit 1", 2, 1);
         }
-    }
-
-    private void checkMVFix_TopAgg_ReAgg(
-            String sql,
-            int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
-            int numGroupbyOfReaggNode, int numAggsOfReaggNode) {
-
-        checkMVReaggreateFeature(sql, true,
-                numGroupbyOfTopAggNode, numAggsOfTopAggNode,
-                numGroupbyOfReaggNode, numAggsOfReaggNode,
-                false, false, false);
-    }
-
-    public void testMVBasedQuery_EdgeCases() {
-        // No aggregation will be pushed down.
-        checkMVFix_TopAgg_ReAgg("SELECT count(*) FROM V_P1", 0, 1, 2, 0);
-        checkMVFix_TopAgg_ReAgg("SELECT SUM(v_a1) FROM V_P1", 0, 1, 2, 0);
-        checkMVFix_TopAgg_ReAgg("SELECT count(v_a1) FROM V_P1", 0, 1, 2, 0);
-        checkMVFix_TopAgg_ReAgg("SELECT max(v_a1) FROM V_P1", 0, 1, 2, 0);
-
-        // No disctinct will be pushed down.
-        // ENG-5364.
-        // In future,  a little efficient way is to push down distinct for part of group by columns only.
-        checkMVFix_reAgg("SELECT distinct v_a1 FROM V_P1", 2, 0);
-        checkMVFix_reAgg("SELECT distinct v_cnt FROM V_P1", 2, 1);
-    }
-
-    private void checkMVFix_TopAgg_ReAgg(
-            String sql,
-            int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
-            int numGroupbyOfReaggNode, int numAggsOfReaggNode,
-            boolean projectionNode) {
-
-        checkMVReaggreateFeature(sql, true,
-                numGroupbyOfTopAggNode, numAggsOfTopAggNode,
-                numGroupbyOfReaggNode, numAggsOfReaggNode,
-                false, projectionNode, false);
     }
 
     public void testMVBasedQuery_AggQuery() {
@@ -454,77 +434,63 @@ public class TestPlansGroupBy extends PlannerTestCase {
                     " GROUP by V_SUM_C1", 1, 0, 2, 1);
 
             // because we have order by.
-            checkMVFix_TopAgg_ReAgg("SELECT V_SUM_C1 FROM " + tb +
-                    " GROUP by V_SUM_C1 ORDER BY V_SUM_C1", 1, 0, 2, 1, true);
+            checkMVFix_TopAgg_ReAgg_with_TopProjection("SELECT V_SUM_C1 FROM " + tb +
+                    " GROUP by V_SUM_C1 ORDER BY V_SUM_C1", 1, 0, 2, 1);
 
-            checkMVFix_TopAgg_ReAgg("SELECT V_SUM_C1 FROM " + tb + " GROUP by V_SUM_C1 " +
-                    "ORDER BY V_SUM_C1 LIMIT 5", 1, 0, 2, 1, true);
+            checkMVFix_TopAgg_ReAgg_with_TopProjection("SELECT V_SUM_C1 FROM " + tb + " GROUP by V_SUM_C1 " +
+                    "ORDER BY V_SUM_C1 LIMIT 5", 1, 0, 2, 1);
 
             checkMVFix_TopAgg_ReAgg("SELECT V_SUM_C1 FROM " + tb +
                     " GROUP by V_SUM_C1 LIMIT 5", 1, 0, 2, 1);
 
-            checkMVFix_TopAgg_ReAgg("SELECT distinct V_SUM_C1 FROM " + tb +
-                    " GROUP by V_SUM_C1 LIMIT 5", 1, 0, 2, 1, true);
+            checkMVFix_TopAgg_ReAgg_with_TopProjection("SELECT distinct V_SUM_C1 FROM " + tb +
+                    " GROUP by V_SUM_C1 LIMIT 5", 1, 0, 2, 1);
 
             // Test set (2):
             checkMVFix_TopAgg_ReAgg("SELECT V_SUM_C1, sum(V_CNT) FROM " + tb +
                     " GROUP by V_SUM_C1", 1, 1, 2, 2);
 
-            checkMVFix_TopAgg_ReAgg("SELECT V_SUM_C1, sum(V_CNT) FROM " + tb +
-                    " GROUP by V_SUM_C1 ORDER BY V_SUM_C1", 1, 1, 2, 2, true);
+            checkMVFix_TopAgg_ReAgg_with_TopProjection("SELECT V_SUM_C1, sum(V_CNT) FROM " + tb +
+                    " GROUP by V_SUM_C1 ORDER BY V_SUM_C1", 1, 1, 2, 2);
 
-            checkMVFix_TopAgg_ReAgg("SELECT V_SUM_C1, sum(V_CNT) FROM " + tb +
-                    " GROUP by V_SUM_C1 ORDER BY V_SUM_C1 limit 2", 1, 1, 2, 2, true);
+            checkMVFix_TopAgg_ReAgg_with_TopProjection("SELECT V_SUM_C1, sum(V_CNT) FROM " + tb +
+                    " GROUP by V_SUM_C1 ORDER BY V_SUM_C1 limit 2", 1, 1, 2, 2);
 
             // Distinct: No aggregation push down.
-            checkMVFix_TopAgg_ReAgg("SELECT V_SUM_C1, sum(distinct V_CNT) " +
-                    "FROM " + tb + " GROUP by V_SUM_C1 ORDER BY V_SUM_C1", 1, 1, 2, 2, true);
+            checkMVFix_TopAgg_ReAgg_with_TopProjection("SELECT V_SUM_C1, sum(distinct V_CNT) " +
+                    "FROM " + tb + " GROUP by V_SUM_C1 ORDER BY V_SUM_C1", 1, 1, 2, 2);
 
             // Test set (3)
             checkMVFix_TopAgg_ReAgg("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
                     " GROUP BY V_A1,V_B1, V_SUM_C1", 3, 1, 2, 2);
 
-            checkMVFix_TopAgg_ReAgg("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
-                    " GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1,V_B1, V_SUM_C1", 3, 1, 2, 2, true);
+            checkMVFix_TopAgg_ReAgg_with_TopProjection("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
+                    " GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1,V_B1, V_SUM_C1", 3, 1, 2, 2);
 
-            checkMVFix_TopAgg_ReAgg("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
-                    " GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1,V_B1, V_SUM_C1 LIMIT 5", 3, 1, 2, 2, true);
+            checkMVFix_TopAgg_ReAgg_with_TopProjection("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
+                    " GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1,V_B1, V_SUM_C1 LIMIT 5", 3, 1, 2, 2);
 
-            checkMVFix_TopAgg_ReAgg("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
-                    " GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1, V_SUM_C1 LIMIT 5", 3, 1, 2, 2, true);
+            checkMVFix_TopAgg_ReAgg_with_TopProjection("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
+                    " GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1, V_SUM_C1 LIMIT 5", 3, 1, 2, 2);
 
             // Distinct: No aggregation push down.
-            checkMVFix_TopAgg_ReAgg("SELECT V_A1,V_B1, V_SUM_C1, sum( distinct V_SUM_D1) FROM " +
-                    tb + " GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1, V_SUM_C1 LIMIT 5", 3, 1, 2, 2, true);
+            checkMVFix_TopAgg_ReAgg_with_TopProjection("SELECT V_A1,V_B1, V_SUM_C1, sum( distinct V_SUM_D1) FROM " +
+                    tb + " GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1, V_SUM_C1 LIMIT 5", 3, 1, 2, 2);
         }
     }
 
-    private void checkMVNoFix_NoAgg(
-            String sql,
-            boolean distinctPushdown) {
-        // the first '-1' indicates that there is no top aggregation node.
-        checkMVReaggreateFeature(sql, false,
-                -1, -1,
-                -1, -1,
-                distinctPushdown, true, false);
-    }
+    public void testMVBasedQuery_EdgeCases() {
+        // No aggregation will be pushed down.
+        checkMVFix_TopAgg_ReAgg("SELECT count(*) FROM V_P1", 0, 1, 2, 0);
+        checkMVFix_TopAgg_ReAgg("SELECT SUM(v_a1) FROM V_P1", 0, 1, 2, 0);
+        checkMVFix_TopAgg_ReAgg("SELECT count(v_a1) FROM V_P1", 0, 1, 2, 0);
+        checkMVFix_TopAgg_ReAgg("SELECT max(v_a1) FROM V_P1", 0, 1, 2, 0);
 
-    public void testMVBasedQuery_NoFix() {
-        // Normal select queries
-        checkMVNoFix_NoAgg("SELECT * FROM V_P1_TEST1", false);
-
-        checkMVNoFix_NoAgg("SELECT V_SUM_C1 FROM V_P1_TEST1 ORDER BY V_A1", false);
-
-        checkMVNoFix_NoAgg("SELECT V_SUM_C1 FROM V_P1_TEST1 LIMIT 1", false);
-
-        checkMVNoFix_NoAgg("SELECT DISTINCT V_SUM_C1 FROM V_P1_TEST1", true);
-
-        // Distributed group by query
-        checkMVReaggreateFeature("SELECT V_SUM_C1 FROM V_P1_TEST1 GROUP by V_SUM_C1",
-                false, 1, 0, -1, -1, false, false, true);
-
-        checkMVReaggreateFeature("SELECT V_SUM_C1, sum(V_CNT) FROM V_P1_TEST1 " +
-                "GROUP by V_SUM_C1", false, 1, 1, -1, -1, false, false, true);
+        // No disctinct will be pushed down.
+        // ENG-5364.
+        // In future,  a little efficient way is to push down distinct for part of group by columns only.
+        checkMVFix_reAgg("SELECT distinct v_a1 FROM V_P1", 2, 0);
+        checkMVFix_reAgg("SELECT distinct v_cnt FROM V_P1", 2, 1);
     }
 
     private void checkMVFixWithWhere(String sql, String aggFilter, String scanFilter) {
@@ -593,7 +559,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
         //      CREATE VIEW V_P1 (V_A1, V_B1, V_CNT, V_SUM_C1, V_SUM_D1)
         //      AS SELECT A1, B1, COUNT(*), SUM(C1), COUNT(D1)
         //      FROM P1  GROUP BY A1, B1;
-
         // Test
         checkMVFixWithWhere("SELECT * FROM V_P1 where v_cnt = 1", "v_cnt = 1", null);
         checkMVFixWithWhere("SELECT * FROM V_P1 where v_a1 = 9", null, "v_a1 = 9");
@@ -635,7 +600,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 System.out.println(apn.toExplainPlanString());
             }
             // No join node under receive node.
-            checkMVReaggreateFeature(true, numGroupbyOfTopAggNode, numAggsOfTopAggNode,
+            checkMVReaggregateFeature(true, numGroupbyOfTopAggNode, numAggsOfTopAggNode,
                     numGroupbyOfReaggNode, numAggsOfReaggNode, false, false, false);
 
             checkMVFixWithWhere(aggFilters, scanFilters);
@@ -779,6 +744,39 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkMVFixWithJoin(sql, 2, 1, 2, 3, "(v_sum_c1 < 3) and (v_cnt > 1)", "v_a1 > 2");
     }
 
+    private void checkMVFix_reAgg(
+            String sql,
+            int numGroupbyOfReaggNode, int numAggsOfReaggNode) {
+
+        checkMVReaggreateFeature(sql, true,
+                -1, -1,
+                numGroupbyOfReaggNode, numAggsOfReaggNode,
+                false, true, false);
+    }
+
+    private void checkMVFix_TopAgg_ReAgg(
+            String sql,
+            int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
+            int numGroupbyOfReaggNode, int numAggsOfReaggNode) {
+
+        checkMVReaggreateFeature(sql, true,
+                numGroupbyOfTopAggNode, numAggsOfTopAggNode,
+                numGroupbyOfReaggNode, numAggsOfReaggNode,
+                false, false, false);
+    }
+
+    private void checkMVFix_TopAgg_ReAgg_with_TopProjection(
+            String sql,
+            int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
+            int numGroupbyOfReaggNode, int numAggsOfReaggNode) {
+
+        checkMVReaggreateFeature(sql, true,
+                numGroupbyOfTopAggNode, numAggsOfTopAggNode,
+                numGroupbyOfReaggNode, numAggsOfReaggNode,
+                false, true, false);
+    }
+
+
     // topNode, reAggNode
     private void checkMVReaggreateFeature(
             String sql, boolean needFix,
@@ -790,13 +788,13 @@ public class TestPlansGroupBy extends PlannerTestCase {
         for (AbstractPlanNode apn: pns) {
             System.out.println(apn.toExplainPlanString());
         }
-        checkMVReaggreateFeature(needFix, numGroupbyOfTopAggNode, numAggsOfTopAggNode,
+        checkMVReaggregateFeature(needFix, numGroupbyOfTopAggNode, numAggsOfTopAggNode,
                 numGroupbyOfReaggNode, numAggsOfReaggNode,
                 distinctPushdown, projectionNode, aggPushdown);
     }
 
     // topNode, reAggNode
-    private void checkMVReaggreateFeature(
+    private void checkMVReaggregateFeature(
             boolean needFix,
             int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
             int numGroupbyOfReaggNode, int numAggsOfReaggNode,

@@ -539,7 +539,7 @@ public class PlanAssembler {
             if (m_parsedSelect.mayNeedAvgPushdown()) {
                 m_parsedSelect.switchOptimalSuiteForAvgPushdown();
             }
-            if (m_parsedSelect.mvFixInfo.needed() && m_parsedSelect.mvFixInfo.isJoin()
+            if (m_parsedSelect.tableList.size() > 1 && m_parsedSelect.mvFixInfo.needed()
                     && subSelectRoot.hasInlinedIndexScanOfTable(m_parsedSelect.mvFixInfo.getMVTableName())) {
                 // MV partitioned joined query needs reAggregation work on coordinator.
                 // Index scan on MV table can not be supported.
@@ -1215,53 +1215,51 @@ public class PlanAssembler {
         reAggNode.clearParents();
 
         AbstractPlanNode receiveNode = root;
+        AbstractPlanNode reAggParent = null;
         // Find receive plan node and insert the constructed re-aggregation plan node.
         if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
-            reAggNode.addAndLinkChild(root);
             root = reAggNode;
         } else {
             List<AbstractPlanNode> recList = root.findAllNodesOfType(PlanNodeType.RECEIVE);
             assert(recList.size() == 1);
             receiveNode = recList.get(0);
 
-            AbstractPlanNode parent = receiveNode.getParent(0);
-            boolean result = parent.replaceChild(receiveNode, reAggNode);
+            reAggParent = receiveNode.getParent(0);
+            boolean result = reAggParent.replaceChild(receiveNode, reAggNode);
             assert(result);
-
-            reAggNode.addAndLinkChild(receiveNode);
         }
+        reAggNode.addAndLinkChild(receiveNode);
 
         // If it is joined query, replace the node under receive node with materialized view scan node.
-        AbstractScanPlanNode mvScanNode = null;
         assert(receiveNode instanceof ReceivePlanNode);
         AbstractPlanNode sendNode = receiveNode.getChild(0);
         assert(sendNode instanceof SendPlanNode);
         AbstractPlanNode sendNodeChild = sendNode.getChild(0);
 
-        if (mvFixInfo.isJoin()) {
+
+        HashAggregatePlanNode reAggNodeForReplace = null;
+        if (m_parsedSelect.tableList.size() > 1) {
+            reAggNodeForReplace = reAggNode;
+        }
+        boolean find = mvFixInfo.processScanNodeWithReAggNode(sendNode, reAggNodeForReplace);
+        assert(find);
+
+        if (m_parsedSelect.tableList.size() > 1) {
             AbstractPlanNode joinNode = sendNodeChild;
             // No agg, limit pushed down at this point.
             assert(joinNode instanceof AbstractJoinPlanNode);
 
-            AbstractPlanNode reAggParent = null;
             // Fix the node after Re-aggregation node.
-            if (root != reAggNode) {
-                reAggParent = reAggNode.getParent(0);
-            }
             joinNode.clearParents();
             reAggNode.clearParents();
 
-            // Get the MV scan node and
-            boolean replaced = mvFixInfo.replaceScanNodeWithReAggNode(joinNode, reAggNode);
-            assert(replaced);
-            mvScanNode = mvFixInfo.m_scanNode;
-            assert(mvScanNode != null);
-            mvScanNode.clearParents();
-            mvScanNode.clearChildren();
+
+            assert(mvFixInfo.m_scanNode != null);
+            mvFixInfo.m_scanNode.clearParents();
 
             // replace joinNode with MV scan node on each partition.
             sendNode.clearChildren();
-            sendNode.addAndLinkChild(mvScanNode);
+            sendNode.addAndLinkChild(mvFixInfo.m_scanNode);
 
             // If reAggNode has parent node before we put it under join node,
             // its parent will be the parent of the new join node. Update the root node.
@@ -1272,13 +1270,7 @@ public class PlanAssembler {
             } else {
                 root = joinNode;
             }
-        } else {
-            // Set up the scan plan node's scan columns. Add in-line projection node for scan node.
-            List<AbstractScanPlanNode> scanList = sendNodeChild.getScanNodeList();
-            mvScanNode = scanList.get(0);
-            assert(mvScanNode.getTargetTableName().equals(mvFixInfo.getMVTableName()));
         }
-        mvScanNode.addInlinePlanNode(mvFixInfo.getScanInlinedProjectionNode());
 
         return root;
     }

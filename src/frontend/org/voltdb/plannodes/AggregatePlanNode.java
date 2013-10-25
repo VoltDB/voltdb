@@ -137,10 +137,6 @@ public class AggregatePlanNode extends AbstractPlanNode {
         m_prePredicate = predicate;
     }
 
-    public AbstractExpression getPrePredicate() {
-        return m_prePredicate;
-    }
-
     public void setPostPredicate(AbstractExpression predicate) {
         m_postPredicate = predicate;
     }

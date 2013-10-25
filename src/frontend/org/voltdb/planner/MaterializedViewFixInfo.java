@@ -61,8 +61,6 @@ public class MaterializedViewFixInfo {
     // number of group-by s.
     private int m_numOfGroupByColumns;
 
-    private boolean m_isJoin = false;
-
     // Scan Node for join query.
     AbstractScanPlanNode m_scanNode = null;
 
@@ -74,21 +72,9 @@ public class MaterializedViewFixInfo {
         m_needed = need;
     }
 
-    public boolean isJoin () {
-        return m_isJoin;
-    }
-
-    public void setIsJoin (boolean join) {
-        m_isJoin = join;
-    }
-
     public String getMVTableName () {
         assert(m_mvTable != null);
         return m_mvTable.getTypeName();
-    }
-
-    public ProjectionPlanNode getScanInlinedProjectionNode () {
-        return m_scanInlinedProjectionNode;
     }
 
     public HashAggregatePlanNode getReAggregationPlanNode () {
@@ -159,25 +145,31 @@ public class MaterializedViewFixInfo {
     }
 
     /**
-     * Grasp the scan node on MV table from the join node.
+     * Find the scan node on MV table, replace it with reAggNode for join query.
      * This scan node can not be in-lined, so it should be as a child of a join node.
-     * @param joinNode
+     * @param node
      */
-    public boolean replaceScanNodeWithReAggNode(AbstractPlanNode joinNode, AbstractPlanNode reAggNode) {
+    public boolean processScanNodeWithReAggNode(AbstractPlanNode node, AbstractPlanNode reAggNode) {
         // MV table scan node can not be in in-lined nodes.
-        for (int i = 0; i < joinNode.getChildCount(); i++) {
-            AbstractPlanNode child = joinNode.getChild(i);
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AbstractPlanNode child = node.getChild(i);
 
             if (child instanceof AbstractScanPlanNode) {
                 AbstractScanPlanNode scanNode = (AbstractScanPlanNode) child;
                 if (!scanNode.getTargetTableName().equals(getMVTableName())) {
                     continue;
                 }
-                joinNode.setAndLinkChild(i, reAggNode);
+                if (reAggNode != null) {
+                    // Join query case.
+                    node.setAndLinkChild(i, reAggNode);
+                }
+                // Process scan node.
+                // Set up the scan plan node's scan columns. Add in-line projection node for scan node.
+                scanNode.addInlinePlanNode(m_scanInlinedProjectionNode);
                 m_scanNode = scanNode;
                 return true;
             } else {
-                boolean replaced = replaceScanNodeWithReAggNode(child, reAggNode);
+                boolean replaced = processScanNodeWithReAggNode(child, reAggNode);
                 if (replaced) {
                     return true;
                 }

@@ -254,10 +254,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      * Prepare for the mv based distributed query fix only if it might be required.
      */
     private void prepareMVBasedQueryFix() {
-        if (tableList.size() > 1) {
-            mvFixInfo.setIsJoin(true);
-        }
-
         // Handle joined query case case.
         // MV partitioned table without partition column can only join with replicated tables.
         // For all tables in this query, the # of tables that need to be fixed should not exceed one.
