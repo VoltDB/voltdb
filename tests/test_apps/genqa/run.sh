@@ -62,7 +62,7 @@ function catalog() {
     # stop if compilation fails
     rm -rf $EXPORTDATA
     mkdir $EXPORTDATA
-    rm -rf $CLIENTLOG
+    rm -fR $CLIENTLOG
     mkdir $CLIENTLOG
     if [ $? != 0 ]; then exit; fi
 }
@@ -73,15 +73,6 @@ function server() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE host $HOST
-}
-
-# run the voltdb server locally
-function server-legacy() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment_legacy.xml \
         license $LICENSE host $HOST
 }
 
@@ -112,7 +103,7 @@ function server2() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create catalog $APPNAME.jar deployment deployment_multinode.xml \
-        license $LICENSE host $HOST:3021 internalport 3022 adminport 21215 port 21216 zkport 2182 enableiv2
+        license $LICENSE host $HOST:3021 internalport 3022 adminport 21215 port 21216 zkport 2182
 }
 
 function server3() {
@@ -120,7 +111,7 @@ function server3() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create catalog $APPNAME.jar deployment deployment_multinode.xml \
-        license $LICENSE host $HOST:3021 internalport 3023 adminport 21213 port 21214 zkport 2183 enableiv2
+        license $LICENSE host $HOST:3021 internalport 3023 adminport 21213 port 21214 zkport 2183
 }
 
 
@@ -206,26 +197,6 @@ function jdbc-benchmark() {
         --procedure=JiggleSinglePartition \
         --poolsize=100000 \
         --wait=0
-}
-
-function export-tofile() {
-    rm -rf $EXPORTDATA/*
-    mkdir $EXPORTDATA
-    java -Dlog4j.configuration=file:${PWD}/../../log4j-allconsole.xml \
-         -classpath obj:$CLASSPATH:obj org.voltdb.exportclient.ExportToFileClient \
-        --connect client \
-        --servers localhost \
-        --type csv \
-        --outdir ./$EXPORTDATA \
-        --nonce export \
-        --period 1
-}
-
-function export-verify() {
-    java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj genqa.ExportVerifier \
-        4 \
-        $EXPORTDATA \
-        $CLIENTLOG
 }
 
 function export-on-server-verify() {
