@@ -1087,7 +1087,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 foundSinglepartTxnId = true;
                 m_initiatorMailbox.setMaxLastSeenTxnId(txnId);
             }
-            if (TxnEgo.getPartitionId(txnId) == MpInitiator.MP_INIT_PID) {
+            if (!skipMultiPart && TxnEgo.getPartitionId(txnId) == MpInitiator.MP_INIT_PID) {
                 if (foundMultipartTxnId) {
                     VoltDB.crashLocalVoltDB(
                             "Found multiple transactions ids during restore for a multipart txnid", false, null);
