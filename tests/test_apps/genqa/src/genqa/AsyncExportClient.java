@@ -44,8 +44,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -63,9 +65,9 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.exampleutils.AppHelper;
+import org.voltdb.iv2.TxnEgo;
 
 public class AsyncExportClient
 {
@@ -78,10 +80,11 @@ public class AsyncExportClient
     {
         String m_nonce;
         String m_txnLogPath;
-        FileOutputStream m_curFOS = null;
-        OutputStreamWriter m_outs = null;
         AtomicLong m_count = new AtomicLong(0);
-        private File m_curFile;
+
+        private Map<Integer,File> m_curFiles = new TreeMap<>();
+        private Map<Integer,File> m_baseDirs = new TreeMap<>();
+        private Map<Integer,OutputStreamWriter> m_osws = new TreeMap<>();
 
         public TxnIdWriter(String nonce, String txnLogPath)
         {
@@ -91,42 +94,64 @@ public class AsyncExportClient
             File logPath = new File(m_txnLogPath);
             if (!logPath.exists()) {
                 if (!logPath.mkdir()) {
-                    System.err.println("Problem creating log directory");
+                    System.err.println("Problem creating log directory " + logPath);
                 }
             }
         }
 
-        public void createNewFile() throws IOException
-        {
-            close();
+        public void createNewFile(int partId) throws IOException {
+            File dh = m_baseDirs.get(partId);
+            if (dh == null) {
+                dh = new File(m_txnLogPath, Integer.toString(partId));
+                if (!dh.mkdir()) {
+                    System.err.println("Problem createing log directory " + dh);
+                }
+                m_baseDirs.put(partId, dh);
+            }
+            long count = m_count.get();
+            count = count - count % CLIENT_TXNID_FILE_SIZE;
+            File logFH = new File(dh, "active-" + count + "-" + m_nonce + "-txns");
+            OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(logFH));
 
-            m_curFile = new File(m_txnLogPath, "active-" + m_count + "-" + m_nonce + "-txns");
-            m_curFOS = new FileOutputStream(m_curFile);
-            m_outs = new OutputStreamWriter(m_curFOS);
+            m_curFiles.put(partId,logFH);
+            m_osws.put(partId,osw);
         }
 
-        public void write(String txnId) throws IOException
-        {
-            if ((m_count.get() % CLIENT_TXNID_FILE_SIZE) == 0)
-            {
-                createNewFile();
+        public void write(int partId, String rec) throws IOException {
+
+            if ((m_count.get() % CLIENT_TXNID_FILE_SIZE) == 0) {
+                close(false);
             }
-            m_outs.write(txnId);
+            OutputStreamWriter osw = m_osws.get(partId);
+            if (osw == null) {
+                createNewFile(partId);
+                osw = m_osws.get(partId);
+            }
+            osw.write(rec);
             m_count.incrementAndGet();
         }
-        public void close() throws IOException
+
+        public void close(boolean isLast) throws IOException
         {
-            if (m_curFOS != null)
-            {
-                m_outs.close();
-                m_curFOS.flush();
-                m_curFOS.close();
-                File renamed = new File(
-                        m_txnLogPath,
-                        m_curFile.getName().substring("active-".length())
-                        );
-                m_curFile.renameTo(renamed);
+            for (Map.Entry<Integer,OutputStreamWriter> e: m_osws.entrySet()) {
+
+                int partId = e.getKey();
+                OutputStreamWriter osw = e.getValue();
+
+                if (osw != null) {
+                    osw.close();
+                    File logFH = m_curFiles.get(partId);
+                    File renamed = new File(
+                            m_baseDirs.get(partId),
+                            logFH.getName().substring("active-".length()) + (isLast ? "-last" : "")
+                            );
+                    logFH.renameTo(renamed);
+
+                    e.setValue(null);
+                }
+                m_curFiles.put(partId, null);
             }
+
         }
     }
 
@@ -151,7 +176,7 @@ public class AsyncExportClient
                 final String trace = String.format("%d:%d:%d\n", m_rowid, txid, now);
                 try
                 {
-                    m_writer.write(trace);
+                    m_writer.write(TxnEgo.getPartitionId(txid),trace);
                 }
                 catch (IOException e)
                 {
@@ -164,7 +189,7 @@ public class AsyncExportClient
                 final String trace = String.format("%d:-1:%d\n", m_rowid, now);
                 try
                 {
-                    m_writer.write(trace);
+                    m_writer.write(-1,trace);
                 }
                 catch (IOException e)
                 {
@@ -347,7 +372,7 @@ public class AsyncExportClient
             clientRef.get().drain();
 
             Thread.sleep(10000);
-            writer.close();
+            writer.close(true);
 
             // Now print application results:
 
