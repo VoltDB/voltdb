@@ -154,6 +154,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
      */
     private void runForBlockingDataTransfer(SiteProcedureConnection siteConnection)
     {
+        applyPerPartitionTxnId(siteConnection);
         Pair<Integer, ByteBuffer> tableBlock = m_dataSink.poll(m_snapshotBufferAllocator);
         // poll() could return null if the source indicated end of stream,
         // need to check on that before retry
@@ -214,7 +215,6 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
                 event.exportSequenceNumbers,
                 false /* requireExistingSequenceNumbers */
                 );
-        applyPerPartitionTxnId(siteConnection);
     }
 
     @Override

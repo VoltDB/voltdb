@@ -34,7 +34,7 @@ import org.voltdb.utils.CatalogUtil;
 public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
 {
     public static Class<?> PROCEDURES[] =
-        new Class<?>[] { MatView.class, SaveRestoreSelect.class};
+        new Class<?>[] { MatView.class, SaveRestoreSelect.class, GetTxnId.class};
 
     public static String partitioning[][] =
         new String[][] {{"PARTITION_TESTER", "PT_ID"},
