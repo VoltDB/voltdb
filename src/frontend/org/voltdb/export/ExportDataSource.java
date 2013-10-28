@@ -91,6 +91,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private final int m_nullArrayLength;
     private long m_polledBlockSize = 0;
+    private boolean m_shutdown = false;
 
     /**
      * Create a new data source.
@@ -615,28 +616,40 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         } catch (InterruptedException e) {
             Throwables.propagate(e);
         }
-        m_es.execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    pushExportBufferImpl(uso, bufferPtr, buffer, sync, endOfStream);
-                } catch (Exception e) {
-                    exportLog.error("Error pushing export buffer", e);
-                } catch (Error e) {
-                    VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, e);
-                } finally {
-                    m_bufferPushPermits.release();
+        if (!m_shutdown) {
+            m_es.execute(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        if (m_shutdown) {
+                            return;
+                        }
+                        pushExportBufferImpl(uso, bufferPtr, buffer, sync, endOfStream);
+                    } catch (Exception e) {
+                        exportLog.error("Error pushing export buffer", e);
+                    } catch (Error e) {
+                        VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, e);
+                    } finally {
+                        m_bufferPushPermits.release();
+                    }
                 }
-            }
-        });
+            });
+        }
     }
 
     public ListenableFuture<?> closeAndDelete() {
+        if (m_shutdown) {
+            return null;
+        }
         return m_es.submit(new Callable<Object>() {
             @Override
             public Object call() throws Exception {
                 try {
+                    if (m_shutdown) {
+                        return null;
+                    }
                     m_committedBuffers.closeAndDelete();
+                    m_shutdown = true;
                     return null;
                 } finally {
                     m_es.shutdown();
@@ -650,10 +663,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ListenableFuture<?> truncateExportToTxnId(final long txnId) {
+        if (m_shutdown) {
+            return null;
+        }
         return m_es.submit(new Runnable() {
             @Override
             public void run() {
                 try {
+                    if (m_shutdown) {
+                        return;
+                    }
                     m_committedBuffers.truncateToTxnId(txnId, m_nullArrayLength);
                     if (m_committedBuffers.isEmpty() && m_endOfStream) {
                         if (m_pollFuture != null) {
@@ -672,11 +691,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ListenableFuture<?> close() {
+        if (m_shutdown) {
+            return null;
+        }
         return m_es.submit(new Runnable() {
             @Override
             public void run() {
                 try {
+                    if (m_shutdown) {
+                        return;
+                    }
                     m_committedBuffers.close();
+                    m_shutdown = true;
                 } catch (IOException e) {
                     exportLog.error(e);
                 } finally {
@@ -687,10 +713,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ListenableFuture<BBContainer> poll() {
+        if (m_shutdown) {
+            return null;
+        }
         final SettableFuture<BBContainer> fut = SettableFuture.create();
         m_es.submit(new Runnable() {
             @Override
             public void run() {
+                if (m_shutdown) {
+                    return;
+                }
                 /*
                  * The poll is blocking through the future, shouldn't
                  * call poll a second time until a response has been given
@@ -812,10 +844,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void ack(final long uso) {
+        if (m_shutdown) {
+            return;
+        }
         m_es.execute(new Runnable() {
             @Override
             public void run() {
                 try {
+                    if (m_shutdown) {
+                        return;
+                    }
                     ackImpl(uso);
                 } catch (Exception e) {
                     exportLog.error("Error acking export buffer", e);
