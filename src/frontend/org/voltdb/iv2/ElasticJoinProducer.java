@@ -21,6 +21,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutionException;
 
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
@@ -28,6 +31,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.RejoinMessage;
@@ -65,6 +69,49 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         m_completionAction = new CompletionAction();
         m_streamSnapshotMb = VoltDB.instance().getHostMessenger().createMailbox();
         m_dataSink = new StreamSnapshotSink(m_streamSnapshotMb);
+    }
+
+    /*
+     * Inherit the per partition txnid from the long since gone
+     * partition that existed in the past
+     */
+    private long[] fetchPerPartitionTxnId() {
+        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+        byte partitionTxnIdsBytes[] = null;
+        try {
+            partitionTxnIdsBytes = zk.getData(VoltZK.perPartitionTxnIds, false, null);
+        } catch (KeeperException.NoNodeException e){return null;}//Can be no node if the cluster was never restored
+        catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Error retrieving per partition txn ids", true, e);
+        }
+        ByteBuffer buf = ByteBuffer.wrap(partitionTxnIdsBytes);
+
+        int count = buf.getInt();
+        Long partitionTxnId = null;
+        long partitionTxnIds[] = new long[count];
+        for (int ii = 0; ii < count; ii++) {
+            long txnId = buf.getLong();
+            partitionTxnIds[ii] = txnId;
+            int partitionId = TxnEgo.getPartitionId(txnId);
+            if (partitionId == m_partitionId) {
+                partitionTxnId = txnId;
+                continue;
+            }
+        }
+        if (partitionTxnId != null) {
+            return partitionTxnIds;
+        }
+        return null;
+    }
+
+    /*
+     * Fetch and set the per partition txnid if necessary
+     */
+    private void applyPerPartitionTxnId(SiteProcedureConnection connection) {
+        //If there was no ID nothing to do
+        long partitionTxnIds[] = fetchPerPartitionTxnId();
+        if (partitionTxnIds == null) return;
+        connection.setPerPartitionTxnIds(partitionTxnIds, true);
     }
 
     private void doInitiation(RejoinMessage message)
@@ -107,6 +154,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
      */
     private void runForBlockingDataTransfer(SiteProcedureConnection siteConnection)
     {
+        applyPerPartitionTxnId(siteConnection);
         Pair<Integer, ByteBuffer> tableBlock = m_dataSink.poll(m_snapshotBufferAllocator);
         // poll() could return null if the source indicated end of stream,
         // need to check on that before retry
