@@ -397,9 +397,9 @@ public class ElasticHashinator extends TheHashinator {
     public String toString()
     {
         StringBuilder sb = new StringBuilder();
-        sb.append(" Token               ").append("   Partition\n");
+        sb.append(" Token       ").append("   Partition\n");
         for (Map.Entry<Integer, Integer> entry : m_tokensMap.get().entrySet()) {
-            sb.append(String.format("[%20d => %8d]\n", entry.getKey(), entry.getValue()));
+            sb.append(String.format("[%11d => %9d]\n", entry.getKey(), entry.getValue()));
         }
         return sb.toString();
     }
