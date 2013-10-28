@@ -20,9 +20,7 @@
 {@dmltable = "_basetables"}
 {@fromtables = "_table"}
 
-{@jointype = " INNER "}
--- Replace the join type with the next line when ENG-5178 is fixed.
--- {@jointype = "_jointype"}
+{@jointype = "_jointype"}
 
 INSERT INTO @dmltable VALUES (_id, _value[int16], _value[int16], _value[int16], _value[int16])
 INSERT INTO @dmltable VALUES (_id, 1010, 1010, 1010, 1010)
