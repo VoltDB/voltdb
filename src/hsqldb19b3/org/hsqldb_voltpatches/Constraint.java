@@ -113,6 +113,7 @@ public final class Constraint implements SchemaObject {
     public static final int FOREIGN_KEY    = 0,
                             MAIN           = 1,
                             UNIQUE         = 2,
+                            ASSUMEUNIQUE   = 100, // For VoltDB
                             CHECK          = 3,
                             PRIMARY_KEY    = 4,
                             TEMP           = 5;

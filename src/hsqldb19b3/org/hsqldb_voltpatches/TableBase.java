@@ -403,9 +403,10 @@ public class TableBase {
     }
 
     // A VoltDB extension to support indexed expressions
-    public final Index createAndAddExprIndexStructure(HsqlName name, int[] cols, Expression[] indexExprs, boolean unique, boolean constraint) {
+    public final Index createAndAddVoltIndexStructure(HsqlName name, int[] cols,
+            Expression[] indexExprs, boolean unique, boolean constraint, boolean assumeUnique) {
 
-        Index newExprIndex = createExprIndexStructure(name, cols, indexExprs, unique, constraint);
+        Index newExprIndex = createVoltIndexStructure(name, cols, indexExprs, unique, constraint, assumeUnique);
         addIndex(newExprIndex);
         return newExprIndex;
     } /* createAndAddExprIndexStructure */
@@ -438,7 +439,8 @@ public class TableBase {
     }
 
     // A VoltDB extension to support indexed expressions
-    final Index createExprIndexStructure(HsqlName name, int[] columns, Expression[] expressions, boolean unique, boolean constraint) {
+    final Index createVoltIndexStructure(HsqlName name, int[] columns, Expression[] expressions,
+            boolean unique, boolean constraint, boolean assumeUnique) {
         // TODO: DEFinitely implement for indexExprs
         if (primaryKeyCols == null) {
             //VOLTDB changed ... throw Error.runtimeError(ErrorCode.U_S0500, "createIndex");
@@ -455,7 +457,7 @@ public class TableBase {
         }
 
         long id = database.persistentStoreCollection.getNextId();
-        Index newExprIndex = new IndexAVL(name, id, this, cols, types, expressions, unique, constraint);
+        Index newExprIndex = new IndexAVL(name, id, this, cols, types, expressions, unique, constraint, assumeUnique);
 
         return newExprIndex;
     } /* createExprIndexStructure */
@@ -520,19 +522,6 @@ public class TableBase {
 
         return newIndex;
     }
-
-    /**
-     *  Create new memory-resident index with indexed expressions. For MEMORY and TEXT tables.
-     *  A VoltDB extension to support indexed expressions.
-     * @param indexExprs
-     */
-    public final Index createExprIndex(PersistentStore store, HsqlName name, int[] cols,
-                                       Expression[] indexExprs, boolean unique, boolean constraint) {
-
-        Index newExprIndex = createAndAddExprIndexStructure(name, cols, indexExprs, unique, constraint);
-
-        return newExprIndex;
-    } /* createExprIndex */
 
     public void clearAllData(Session session) {
 

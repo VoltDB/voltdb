@@ -1061,9 +1061,9 @@ public class Table extends TableBase implements SchemaObject {
 
             // A VoltDB extension -- Don't consider non-column expression indexes for this purpose
             Expression[] exprArr = idx.getExpressions();
-            if (exprArr != null) {
-                idx = tn.createExprIndexStructure(idx.getName(), colarr, adjustExprs(exprArr, colIndex, adjust),
-                                                  idx.isUnique(), idx.isConstraint());
+            if (exprArr != null || idx.isAssumeUnique()) {
+                idx = tn.createVoltIndexStructure(idx.getName(), colarr, adjustExprs(exprArr, colIndex, adjust),
+                                                  idx.isUnique(), idx.isConstraint(), idx.isAssumeUnique());
                 tn.addIndex(idx);
                 continue;
             }

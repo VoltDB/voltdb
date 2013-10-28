@@ -520,18 +520,17 @@ public class TableWorks {
      * @param indexExprs Expression[]
      * @param name HsqlName
      * @param unique boolean
+     * @param assumeunique boolean
      * @return new index
      */
-    Index addExprIndex(int[] cols, Expression[] indexExprs, HsqlName name, boolean unique) {
+    Index addVoltIndex(int[] cols, Expression[] indexExprs, HsqlName name, boolean unique, boolean assumeUnique) {
 
         Index newExprIndex;
 
         if (table.isEmpty(session) || table.isIndexingMutable()) {
-            PersistentStore store = session.sessionData.getRowStore(table);
-
-            newExprIndex = table.createExprIndex(store, name, cols, indexExprs, unique, false);
+            newExprIndex = table.createAndAddVoltIndexStructure(name, cols, indexExprs, unique, false, assumeUnique);
         } else {
-            newExprIndex = table.createExprIndexStructure(name, cols, indexExprs, unique, false);
+            newExprIndex = table.createVoltIndexStructure(name, cols, indexExprs, unique, false, assumeUnique);
 
             Table tn = table.moveDefinition(session, table.tableType, null,
                                             null, newExprIndex, -1, 0, emptySet,
@@ -587,7 +586,12 @@ public class TableWorks {
      * @param name HsqlName
      */
     void addUniqueConstraint(int[] cols, HsqlName name) {
+        // Changed for VoltDB.
+        addAssumeUniqueConstraint(cols, name, false);
+    }
 
+
+    public void addAssumeUniqueConstraint(int[] cols, HsqlName name, boolean assumeUnique) {
         database.schemaManager.checkSchemaObjectNotExists(name);
 
         if (table.getUniqueConstraintForColumns(cols) != null) {
@@ -598,8 +602,16 @@ public class TableWorks {
         HsqlName indexname = database.nameManager.newAutoName("IDX",
             name.name, table.getSchemaName(), table.getName(),
             SchemaObject.INDEX);
-        Index index = table.createIndexStructure(indexname, cols, null, null,
-            true, true, false);
+        Index index = null;
+
+        if (assumeUnique) {
+            // For VoltDB.
+            index = table.createVoltIndexStructure(indexname, cols, null, true, true, assumeUnique);
+        } else {
+            index = table.createIndexStructure(indexname, cols, null, null,
+                    true, true, false);
+        }
+
         Constraint constraint = new Constraint(name, table, index,
                                                Constraint.UNIQUE);
         Table tn = table.moveDefinition(session, table.tableType, null,
@@ -622,8 +634,9 @@ public class TableWorks {
      * @param cols
      * @param indexExprs
      * @param name HsqlName
+     * @param assumeunique boolean
      */
-    public void addUniqueExprConstraint(int[] cols, Expression[] indexExprs, HsqlName name) {
+    public void addUniqueExprConstraint(int[] cols, Expression[] indexExprs, HsqlName name, boolean assumeUnique) {
         database.schemaManager.checkSchemaObjectNotExists(name);
 
         if (table.getUniqueConstraintForExprs(indexExprs) != null) {
@@ -634,7 +647,7 @@ public class TableWorks {
         HsqlName indexname = database.nameManager.newAutoName("IDX",
             name.name, table.getSchemaName(), table.getName(),
             SchemaObject.INDEX);
-        Index exprIndex = table.createExprIndexStructure(indexname, cols, indexExprs, true, true);
+        Index exprIndex = table.createVoltIndexStructure(indexname, cols, indexExprs, true, true, assumeUnique);
         Constraint constraint = new Constraint(name, table, exprIndex, Constraint.UNIQUE);
         Table tn = table.moveDefinition(session, table.tableType, null,
                                         constraint, exprIndex, -1, 0, emptySet, emptySet);

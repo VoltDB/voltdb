@@ -1270,6 +1270,8 @@ public class DDLCompiler {
 
         String name = node.attributes.get("name");
         boolean unique = Boolean.parseBoolean(node.attributes.get("unique"));
+        boolean assumeUnique = Boolean.parseBoolean(node.attributes.get("assumeunique"));
+
         AbstractParsedStmt dummy = new ParsedSelectStmt(null, db);
         dummy.setTable(table);
 
@@ -1380,6 +1382,10 @@ public class DDLCompiler {
         }
 
         index.setUnique(unique);
+        if (assumeUnique) {
+            index.setUnique(true);
+        }
+        index.setAssumeunique(assumeUnique);
 
         // check if an existing index duplicates another index (if so, drop it)
         // note that this is an exact dup... uniqueness, counting-ness and type

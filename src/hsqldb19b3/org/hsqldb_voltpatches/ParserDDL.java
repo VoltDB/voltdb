@@ -183,6 +183,11 @@ public class ParserDDL extends ParserRoutine {
                 return compileCreateCharacterSet();
 
             // index
+            case Tokens.ASSUMEUNIQUE :
+                read();
+                checkIsThis(Tokens.INDEX);
+                return compileCreateIndex(true, true);
+
             case Tokens.UNIQUE :
                 read();
                 checkIsThis(Tokens.INDEX);
@@ -584,7 +589,7 @@ public class ParserDDL extends ParserRoutine {
 
                     database.schemaManager.checkSchemaObjectNotExists(cname);
                 }
-
+                boolean assumeUnique = false; // For VoltDB
                 switch (token.tokenType) {
 
                     case Tokens.FOREIGN :
@@ -594,9 +599,12 @@ public class ParserDDL extends ParserRoutine {
 
                         return;
 
+                    case Tokens.ASSUMEUNIQUE :
+                        assumeUnique = true;
+
                     case Tokens.UNIQUE :
                         read();
-                        processAlterTableAddUniqueConstraint(t, cname);
+                        processAlterTableAddUniqueConstraint(t, cname, assumeUnique);
 
                         return;
 
@@ -1266,9 +1274,12 @@ public class ParserDDL extends ParserRoutine {
 
         for (int i = 1; i < tempConstraints.size(); i++) {
             c = (Constraint) tempConstraints.get(i);
-
+            boolean assumeUnique = false;  // For VoltDB
             switch (c.constType) {
-
+                case Constraint.ASSUMEUNIQUE : {
+                    assumeUnique = true;
+                    // No break, fall through.
+                }
                 case Constraint.UNIQUE : {
                     c.setColumnsIndexes(table);
 
@@ -1288,9 +1299,10 @@ public class ParserDDL extends ParserRoutine {
                             table.getName(), SchemaObject.INDEX);
 
                     Index index = null;
-                    if (c.indexExprs != null) {
+                    if (c.indexExprs != null || assumeUnique) {
                         // Special case handling for VoltDB indexed expressions
-                        index = table.createAndAddExprIndexStructure(indexName, c.core.mainCols, c.indexExprs, true, true);
+                        index = table.createAndAddVoltIndexStructure(indexName, c.core.mainCols,
+                                c.indexExprs, true, true, assumeUnique);
                     } else {
                         index = table.createAndAddIndexStructure(indexName,
                             c.core.mainCols, null, null, true, true, false);
@@ -1305,6 +1317,7 @@ public class ParserDDL extends ParserRoutine {
 
                     break;
                 }
+
                 case Constraint.FOREIGN_KEY : {
                     addForeignKey(session, table, c, constraintList);
 
@@ -2952,7 +2965,13 @@ public class ParserDDL extends ParserRoutine {
         return table.getColumnIndexes(set);
     }
 
+
     StatementSchema compileCreateIndex(boolean unique) {
+        return compileCreateIndex(unique, false);
+    }
+
+    // A VoltDB extension to user unique index without uniqueness guarantee on partition table.
+    StatementSchema compileCreateIndex(boolean unique, boolean assumeUnique) {
 
         Table    table;
         HsqlName indexHsqlName;
@@ -2986,7 +3005,7 @@ public class ParserDDL extends ParserRoutine {
         if (set == null) {
             // A VoltDB extension to support indexed expressions.
             // Not just indexing columns.
-            // The meaning of set and indexColumns shifts here to be 
+            // The meaning of set and indexColumns shifts here to be
             // the set of unique base columns for the indexed expressions.
             set = getBaseColumnNames(indexExprs);
         } else {
@@ -2998,7 +3017,7 @@ public class ParserDDL extends ParserRoutine {
 
         String   sql          = getLastPart();
         Object[] args         = new Object[] {
-            table, indexColumns, indexHsqlName, Boolean.valueOf(unique), indexExprs
+            table, indexColumns, indexHsqlName, Boolean.valueOf(unique), indexExprs, assumeUnique
         };
 
         return new StatementSchema(sql, StatementTypes.CREATE_INDEX, args,
@@ -3420,7 +3439,7 @@ public class ParserDDL extends ParserRoutine {
         database.schemaManager.renameSchemaObject(table.getName(), name);
     }
 
-    void processAlterTableAddUniqueConstraint(Table table, HsqlName name) {
+    void processAlterTableAddUniqueConstraint(Table table, HsqlName name, boolean assumeUnique) {
 
         if (name == null) {
             name = database.nameManager.newAutoName("CT",
@@ -3440,12 +3459,16 @@ public class ParserDDL extends ParserRoutine {
         if ((indexExprs != null) && (cols == null)) {
             // A VoltDB extension to support indexed expressions.
             // Not just indexing columns.
-            // The meaning of cols shifts here to be 
+            // The meaning of cols shifts here to be
             // the set of unique base columns for the indexed expressions.
             set = getBaseColumnNames(indexExprs);
             cols = getColumnList(set, table);
-            tableWorks.addUniqueExprConstraint(cols, indexExprs.toArray(new Expression[indexExprs.size()]), name);
+            tableWorks.addUniqueExprConstraint(cols, indexExprs.toArray(new Expression[indexExprs.size()]), name, assumeUnique);
 
+            return;
+        }
+        if (assumeUnique) {
+            tableWorks.addUniqueExprConstraint(null, null, name, assumeUnique);
             return;
         }
 

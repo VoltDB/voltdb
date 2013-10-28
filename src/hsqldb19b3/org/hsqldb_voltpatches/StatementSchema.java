@@ -949,12 +949,14 @@ public class StatementSchema extends Statement {
                 boolean  unique;
                 // A VoltDB extension to support indexed expressions
                 List<Expression> indexExprs;
+                boolean  assumeUnique;
 
                 table        = (Table) arguments[0];
                 indexColumns = (int[]) arguments[1];
                 name         = (HsqlName) arguments[2];
                 unique       = ((Boolean) arguments[3]).booleanValue();
                 indexExprs   = (List<Expression>)arguments[4];
+                assumeUnique   = ((Boolean) arguments[5]).booleanValue();
 
                 try {
                     /*
@@ -974,8 +976,13 @@ public class StatementSchema extends Statement {
 
                     if (indexExprs != null) {
                         // A VoltDB extension to support indexed expressions
-                        tableWorks.addExprIndex(indexColumns, indexExprs.toArray(new Expression[indexExprs.size()]), name, unique);
-
+                        tableWorks.addVoltIndex(indexColumns,
+                                indexExprs.toArray(new Expression[indexExprs.size()]), name, unique, assumeUnique);
+                        break;
+                    }
+                    if (assumeUnique) {
+                        // A VoltDB extension
+                        tableWorks.addVoltIndex(indexColumns, null, name, unique, assumeUnique);
                         break;
                     }
 

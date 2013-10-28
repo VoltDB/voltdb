@@ -285,4 +285,10 @@ public interface Index extends SchemaObject {
      * @return the list of expressions, or null if indexing only plain column value(s).
      */
     public Expression[] getExpressions();
+
+    /**
+     * VoltDB added method to allow unique index on partition table without partition key included.
+     * @return true if user wants unique index without uniqueness guarantee on partition table without partition key included.
+     */
+    public boolean isAssumeUnique();
 }
