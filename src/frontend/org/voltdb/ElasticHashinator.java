@@ -231,21 +231,20 @@ public class ElasticHashinator extends TheHashinator {
     }
 
     /**
-     * Add the given token to the ring and generate the new hashinator. The current hashinator is not changed.
-     * @param token        The new token
-     * @param partition    The partition associated with the new token
+     * Add the given tokens to the ring and generate the new hashinator. The current hashinator is not changed.
+     * @param tokensToAdd    Tokens to add as a map of tokens to partitions
      * @return The new hashinator
      */
-    public ElasticHashinator addToken(int token, int partition)
+    public ElasticHashinator addTokens(Map<Integer, Integer> tokensToAdd)
     {
         ImmutableSortedMap.Builder<Integer, Integer> b = ImmutableSortedMap.naturalOrder();
         for (Map.Entry<Integer, Integer> e : m_tokensMap.get().entrySet()) {
-            if (e.getKey().intValue() == token) {
+            if (tokensToAdd.containsKey(e.getKey())) {
                 continue;
             }
             b.put(e.getKey(), e.getValue());
         }
-        b.put(token, partition);
+        b.putAll(tokensToAdd);
         return new ElasticHashinator(b.build());
     }
 
