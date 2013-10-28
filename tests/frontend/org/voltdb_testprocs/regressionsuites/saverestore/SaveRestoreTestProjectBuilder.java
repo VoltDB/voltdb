@@ -34,7 +34,9 @@ import org.voltdb.utils.CatalogUtil;
 public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
 {
     public static Class<?> PROCEDURES[] =
-        new Class<?>[] { MatView.class, SaveRestoreSelect.class};
+        new Class<?>[] { MatView.class, SaveRestoreSelect.class, GetTxnId.class};
+    public static Class<?> PROCEDURES_NOPARTITIONING[] =
+            new Class<?>[] { MatView.class, SaveRestoreSelect.class};
 
     public static String partitioning[][] =
         new String[][] {{"PARTITION_TESTER", "PT_ID"},
@@ -48,6 +50,11 @@ public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
     public void addDefaultProcedures()
     {
         addProcedures(PROCEDURES);
+    }
+
+    public void addDefaultProceduresNoPartitioning()
+    {
+        addProcedures(PROCEDURES_NOPARTITIONING);
     }
 
     public void addDefaultPartitioning()
@@ -84,7 +91,7 @@ public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
      * Has no partitioned tables.
      */
     public void addAllDefaultsNoPartitioning() {
-        addDefaultProcedures();
+        addDefaultProceduresNoPartitioning();
         addDefaultSchema();
     }
 
