@@ -399,11 +399,11 @@ class ServerBundle(JavaBundle):
     Supports needing catalog and live keyword option for rejoin.
     All other options are supported as common options.
     """
-    def __init__(self, subcommand, needs_catalog=True, needs_live=False):
+    def __init__(self, subcommand, needs_catalog=True, supports_live=False):
         JavaBundle.__init__(self, 'org.voltdb.VoltDB')
         self.subcommand = subcommand
         self.needs_catalog = needs_catalog
-        self.needs_live = needs_live
+        self.supports_live = supports_live
 
     def initialize(self, verb):
         JavaBundle.initialize(self, verb)
@@ -412,8 +412,8 @@ class ServerBundle(JavaBundle):
                              'the deployment configuration file path',
                              default = None),
             cli.HostOption('-H', '--host', 'host', 'the host', default = 'localhost'))
-        if self.needs_live:
-           verb.add_options(cli.BooleanOption('-L', '--live', 'live', 'IS this a Live Rejoin?'))
+        if self.supports_live:
+           verb.add_options(cli.BooleanOption('-L', '--live', 'live', 'perform a live rejoin'))
         if self.needs_catalog:
             verb.add_arguments(cli.PathArgument('catalog',
                               'the application catalog jar file path'))
@@ -427,7 +427,7 @@ class ServerBundle(JavaBundle):
                 '-XX:-ReduceInitialCardMarks')
 
     def go(self, verb, runner):
-        if self.needs_live:
+        if self.supports_live:
             if runner.opts.live:
                 final_args = ['live', self.subcommand]
             else:
