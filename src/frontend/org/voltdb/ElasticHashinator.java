@@ -25,15 +25,16 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
+import com.google.common.collect.MapDifference;
+import com.google.common.collect.Maps;
+import com.google.common.collect.SortedMapDifference;
 import org.apache.cassandra_voltpatches.MurmurHash3;
 import org.voltcore.utils.Pair;
 
-import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSortedMap;
-import com.google.common.collect.Maps;
 import com.google.common.collect.UnmodifiableIterator;
 import org.voltdb.utils.CompressionService;
 
@@ -566,5 +567,44 @@ public class ElasticHashinator extends TheHashinator {
     @Override
     public void finalize() {
         unsafe.freeMemory(m_tokens);
+    }
+
+    /**
+     * Checks if the current hashinator and the given one are equal to each other. One hashinator may have more
+     * tokens than the other, but as long as all possible tokens hash to the same partitions,
+     * they are considered equal.
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        ElasticHashinator that = (ElasticHashinator) o;
+
+        if (m_signature.get().equals(that.m_signature.get())) return true;
+
+        SortedMapDifference<Integer,Integer> diff = Maps.difference(m_tokensMap.get(), that.m_tokensMap.get());
+        if (!diff.entriesDiffering().isEmpty()) {
+            System.err.println("Differ: " + diff.entriesDiffering().toString());
+            return false;
+        }
+
+        for (Map.Entry<Integer, Integer> e : diff.entriesOnlyOnLeft().entrySet()) {
+            if (that.partitionForToken(e.getKey()) != e.getValue()) {
+                System.err.println(e.getValue() + " not the same as " + that.partitionForToken(e.getKey()) +
+                                   " for token " + e.getKey());
+                return false;
+            }
+        }
+
+        for (Map.Entry<Integer, Integer> e : diff.entriesOnlyOnRight().entrySet()) {
+            if (partitionForToken(e.getKey()) != e.getValue()) {
+                System.err.println(e.getValue() + " not the same as " + partitionForToken(e.getKey()) +
+                                   " for token " + e.getKey());
+                return false;
+            }
+        }
+
+        return true;
     }
 }
