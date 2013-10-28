@@ -502,17 +502,9 @@ public class StatementQuery extends StatementDMQL {
     protected void resolveUsingColumns(VoltXMLElement columns, RangeVariable[] rvs) throws HSQLParseException {
         // Only one OUTER join for a whole select is supported so far
         for (VoltXMLElement columnElmt : columns.children) {
-            boolean innerJoin = true;
             String table = null;
             if (columnElmt.attributes.get("table") == null) {
                 for (RangeVariable rv : rvs) {
-                    if (rv.isLeftJoin || rv.isRightJoin) {
-                        if (innerJoin == false) {
-                            throw new HSQLParseException("VoltDB does not support outer joins with more than two tables involved");
-                        }
-                        innerJoin = false;
-                    }
-
                     if (!rv.getTable().columnList.containsKey(columnElmt.attributes.get("column"))) {
                         // The column is not from this table. Skip it
                         continue;
