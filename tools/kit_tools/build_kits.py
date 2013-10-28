@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import os, sys, shutil, datetime
-from fabric.api import run, cd, local, get, settings, lcd, put, shell_env
+from fabric.api import run, cd, local, get, settings, lcd, put
 from fabric_ssh_config import getSSHInfoForHost
 
 username='test'
@@ -151,7 +151,6 @@ if (len(sys.argv) > 3 or (len(sys.argv) == 2 and sys.argv[1] == "-h")):
     print "   build-kit.py"
     print "   build-kit.py git-tag"
     print "   build-kit.py voltdb-git-SHA pro-git-SHA"
-    exit()
 
 proTreeish = "master"
 voltdbTreeish = "master"
@@ -196,25 +195,21 @@ with settings(user=username,host_string=volt5f[1],disable_known_hosts=True,key_f
         releaseDir = os.getenv('HOME') + "/releases/" + voltdbTreeish
     makeReleaseDir(releaseDir)
     print "VERSION: " + versionVolt5f
-    with shell_env(JAVA_HOME="/usr/lib/jvm/java-1.6.0"):
-        buildCommunity()
-        copyCommunityFilesToReleaseDir(releaseDir, versionVolt5f, "LINUX")
-        buildPro()
-        copyEnterpriseFilesToReleaseDir(releaseDir, versionVolt5f, "LINUX")
-        makeTrialLicense()
-        copyTrialLicenseToReleaseDir(releaseDir)
+    buildCommunity()
+    copyCommunityFilesToReleaseDir(releaseDir, versionVolt5f, "LINUX")
+    buildPro()
+    copyEnterpriseFilesToReleaseDir(releaseDir, versionVolt5f, "LINUX")
+    makeTrialLicense()
+    copyTrialLicenseToReleaseDir(releaseDir)
 
 # build kits on the mini
 with settings(user=username,host_string=voltmini[1],disable_known_hosts=True,key_filename=voltmini[0]):
     versionMac = checkoutCode(voltdbTreeish, proTreeish)
     assert versionVolt5f == versionMac
-    with settings(capture=True):
-        java_home = run('/usr/libexec/java_home -v 1.6')
-    with shell_env(JAVA_HOME=java_home):
-        buildCommunity()
-        copyCommunityFilesToReleaseDir(releaseDir, versionMac, "MAC")
-        buildPro()
-        copyEnterpriseFilesToReleaseDir(releaseDir, versionMac, "MAC")
+    buildCommunity()
+    copyCommunityFilesToReleaseDir(releaseDir, versionMac, "MAC")
+    buildPro()
+    copyEnterpriseFilesToReleaseDir(releaseDir, versionMac, "MAC")
 
 # build debian kit
 with settings(user=username,host_string=volt12c[1],disable_known_hosts=True,key_filename=volt12c[0]):
