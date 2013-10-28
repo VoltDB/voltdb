@@ -65,7 +65,6 @@ tail = "tar.gz"
 # http://volt0/kits/candidate/LINUX-voltdb-ent-2.8.1.tar.gz
 root = "http://volt0/kits/branch/"
 testname = os.path.basename(os.path.abspath(__file__)).replace(".py", "")
-#logDir = destDir + getpass.getuser() + "_" + testname + "_log/"
 elem2Test = {'helloworld':'./run.sh', 'voltcache':'./run.sh', 'voltkv':'./run.sh', 'voter':'./run.sh'}
 defaultHost = "localhost"
 defaultPort = 21212
@@ -388,10 +387,12 @@ def startTest(testSuiteList):
         keyStrSet = None
         if suiteName in elem2Test.keys():
             # Could be an overkill
+            #currDir = os.path.join(logDir, suiteName + "_logs")
             os.chdir(path)
             currDir = os.getcwd()
             service = elem2Test[suiteName]
-            print ">>> Test: %s\n   Current Directory: '%s'" % (suiteName, currDir)
+            print ">>> Test: %s" % suiteName
+            print "   Current Directory: '%s'" % currDir
             logFileS = os.path.join(logDir, suiteName + "_server")
             logFileC = os.path.join(logDir,suiteName + "_client")
             print "   Log File for VoltDB Server: '%s'" % logFileS
@@ -492,7 +493,7 @@ if __name__ == "__main__":
                       help="Report file location")
     parser.add_option("-b","--branch", dest="branch", default="master",
                       help="Branch name to test")
-    parser.add_option("-o","--output", dest="destDir", default=os.getcwd(),
+    parser.add_option("-o","--output", dest="destDir", default='/tmp',
                       help="Output Directory")
 
 
@@ -501,8 +502,7 @@ if __name__ == "__main__":
     parser.set_defaults(suite="all")
     (options, args) = parser.parse_args()
     destDir = options.destDir
-    logDir = os.path.join(destDir,getpass.getuser() + "_" + testname + '_log')
-
+    logDir = os.path.join(os.getcwd(), getpass.getuser() + "_" + testname + '_log')
     workDir = os.path.join(destDir,getpass.getuser() + "_" + testname)
 
     if not os.path.exists(logDir):
