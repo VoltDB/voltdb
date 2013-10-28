@@ -69,7 +69,7 @@ SELECT _variable[#grouped], COUNT(*) AS FOO FROM @fromtables GROUP BY __[#groupe
 -- test GROUP BY ORDER BY COUNT(*) with optional LIMIT/OFFSET
 SELECT _variable[#grouped], COUNT(*) AS FOO FROM @fromtables GROUP BY __[#grouped] ORDER BY 2, 1 _optionallimitoffset
 -- test INNER JOIN (we'll do more two-table join fun separately, this just checks syntax)
-SELECT * FROM _table LHS INNER JOIN _table RHS ON LHS.@idcol = RHS.@idcol
+SELECT * FROM @fromtables LHS INNER JOIN @fromtables RHS ON LHS.@idcol = RHS.@idcol
 -- TODO: If the intent is to support a schema with multiple id-partitioned tables,
 -- this statement is looking for trouble -- might want to migrate it to its own template/suite.
-SELECT * FROM _table LHS INNER JOIN _table RHS ON LHS._variable[@columntype] = RHS._variable[@comparabletype]
+SELECT * FROM @fromtables LHS INNER JOIN @fromtables RHS ON LHS._variable[@columntype] = RHS._variable[@comparabletype]

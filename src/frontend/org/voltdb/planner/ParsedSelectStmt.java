@@ -29,13 +29,8 @@ import java.util.Set;
 
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.hsqldb_voltpatches.VoltXMLElement;
-import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Column;
-import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
@@ -43,12 +38,9 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.NodeSchema;
-import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
-import org.voltdb.utils.CatalogUtil;
 
 public class ParsedSelectStmt extends AbstractParsedStmt {
 
@@ -105,22 +97,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
-    /**
-     * This class contain all the information that Materialized view partitioned query need to be fixed.
-     *
-     */
-
-    public static class MVFixInfo {
-        // Does this mv partitioned based query needs to be fixed.
-        public boolean needed = false;
-        // materialized view table
-        public Table mvTable = null;
-        // New inlined projection node for the scan node, contain extra group by columns.
-        public ProjectionPlanNode scanInlinedProjectionNode = null;
-        // New re-Aggregation plan node on the coordinator to eliminate the duplicated rows.
-        public HashAggregatePlanNode reAggNode = null;
-    }
-
     public ArrayList<ParsedColInfo> displayColumns = new ArrayList<ParsedColInfo>();
     public ArrayList<ParsedColInfo> orderColumns = new ArrayList<ParsedColInfo>();
     public AbstractExpression having = null;
@@ -149,7 +125,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private boolean hasAggregateExpression = false;
     private boolean hasAverage = false;
 
-    public MVFixInfo mvFixInfo = new MVFixInfo();
+    public MaterializedViewFixInfo mvFixInfo = new MaterializedViewFixInfo();
 
     /**
     * Class constructor
@@ -216,193 +192,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (mayNeedAvgPushdown()) {
             processAvgPushdownOptimization(displayElement, orderbyElement, groupbyElement);
         }
-        // Prepare for the mv based distributed query fix only if it might be required.
-        if (tableList.size() == 1) {
-            // Do not handle joined query case case.
-            mvFixInfo.mvTable = tableList.get(0);
-            processMVBasedQueryFix(mvFixInfo, m_db, scanColumns, joinTree);
-        }
-    }
 
-    private static void processMVBasedQueryFix(MVFixInfo mvFixInfo, Database db,
-            Map<String, ArrayList<SchemaColumn>> scanColumns, JoinNode joinTree)
-    {
-        // Check valid cases first
-        String mvTableName = mvFixInfo.mvTable.getTypeName();
-        Table srcTable = mvFixInfo.mvTable.getMaterializer();
-        if (srcTable == null) {
-            return;
-        }
-        Column partitionCol = srcTable.getPartitioncolumn();
-        if (partitionCol == null) {
-            return;
-        }
-
-        String partitionColName = partitionCol.getName();
-        MaterializedViewInfo mvInfo = srcTable.getViews().get(mvTableName);
-
-        // Justify whether partition column is in group by column list or not
-        boolean partitionColInGroupbyCols = false;
-        int numOfGroupByColumns;
-        String complexGroupbyJson = mvInfo.getGroupbyexpressionsjson();
-        if (complexGroupbyJson.length() > 0) {
-            List<AbstractExpression> mvComplexGroupbyCols = null;
-            try {
-                mvComplexGroupbyCols = AbstractExpression.fromJSONArrayString(complexGroupbyJson);
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-            numOfGroupByColumns = mvComplexGroupbyCols.size();
-
-            for (AbstractExpression expr: mvComplexGroupbyCols) {
-                if (expr instanceof TupleValueExpression) {
-                    TupleValueExpression tve = (TupleValueExpression) expr;
-                    if (tve.getColumnName().equals(partitionColName)) {
-                        partitionColInGroupbyCols = true;
-                        break;
-                    }
-                }
-            }
-        } else {
-            CatalogMap<ColumnRef> mvSimpleGroupbyCols = mvInfo.getGroupbycols();
-            numOfGroupByColumns = mvSimpleGroupbyCols.size();
-
-            for (ColumnRef colRef: mvSimpleGroupbyCols) {
-                if (colRef.getColumn().getName().equals(partitionColName)) {
-                    partitionColInGroupbyCols = true;
-                    break;
-                }
-            }
-        }
-        if (partitionColInGroupbyCols) {
-            // Group by columns contain partition column from source table.
-            // Then, query on mv table will have duplicates from each partition.
-            // There is no need to fix this case, so just return.
-            return;
-        }
-
-        // Start to do real processing now.
-        mvFixInfo.needed = true;
-
-        Set<SchemaColumn> mvNewScanColumns = new HashSet<SchemaColumn>();
-        Set<SchemaColumn> mvDDLGroupbyColumns = new HashSet<SchemaColumn>();
-        Map<String, ExpressionType> mvColumnAggType = new HashMap<String, ExpressionType>();
-
-        List<Column> mvColumnArray =
-                CatalogUtil.getSortedCatalogItems(mvFixInfo.mvTable.getColumns(), "index");
-        for (Column mvCol: mvColumnArray) {
-            ExpressionType reAggType = ExpressionType.get(mvCol.getAggregatetype());
-            if (reAggType == ExpressionType.AGGREGATE_COUNT_STAR ||
-                    reAggType == ExpressionType.AGGREGATE_COUNT) {
-                reAggType = ExpressionType.AGGREGATE_SUM;
-            }
-            mvColumnAggType.put(mvCol.getName(), reAggType);
-        }
-        NodeSchema inlineProjSchema = new NodeSchema();
-        // COUNT(*) size is 0, otherwise it is 1.
-        assert(scanColumns.keySet().size() <= 1);
-        if (scanColumns.keySet().size() == 1) {
-            mvNewScanColumns.addAll(scanColumns.get(mvTableName));
-        }
-        // construct new projection columns for scan plan node.
-        for (SchemaColumn scol: mvNewScanColumns) {
-            inlineProjSchema.addColumn(scol);
-        }
-
-        assert(numOfGroupByColumns > 0);
-        for (int i = 0; i < numOfGroupByColumns; i++) {
-            Column mvCol = mvColumnArray.get(i);
-
-            TupleValueExpression tve = new TupleValueExpression();
-            tve.setColumnIndex(i);
-            tve.setColumnName(mvCol.getName());
-            tve.setTableName(mvTableName);
-            tve.setColumnAlias(mvCol.getName());
-            tve.setValueType(VoltType.get((byte)mvCol.getType()));
-            tve.setValueSize(mvCol.getSize());
-
-            SchemaColumn scol = new SchemaColumn( mvTableName,
-                    mvCol.getName(),mvCol.getName(), tve);
-
-            mvDDLGroupbyColumns.add(scol);
-            if (!mvNewScanColumns.contains(scol)) {
-                mvNewScanColumns.add(scol);
-                // construct new projection columns for scan plan node.
-                inlineProjSchema.addColumn(scol);
-            }
-        }
-
-        mvFixInfo.scanInlinedProjectionNode = new ProjectionPlanNode();
-        mvFixInfo.scanInlinedProjectionNode.setOutputSchema(inlineProjSchema);
-
-        // Construct the reAggregation plan node's aggSchema
-        mvFixInfo.reAggNode = new HashAggregatePlanNode();
-        int outputColumnIndex = 0;
-        NodeSchema aggSchema = new NodeSchema();
-
-        // Construct reAggregation node's aggregation and group by list.
-        for (SchemaColumn scol: mvNewScanColumns) {
-            if (mvDDLGroupbyColumns.contains(scol)) {
-                // Add group by expression.
-                mvFixInfo.reAggNode.addGroupByExpression(scol.getExpression());
-            } else {
-                ExpressionType reAggType = mvColumnAggType.get(scol.getColumnName());
-                assert(reAggType != null);
-                AbstractExpression agg_input_expr = scol.getExpression();
-                assert(agg_input_expr instanceof TupleValueExpression);
-                // Add aggregation information.
-                mvFixInfo.reAggNode.addAggregate(reAggType, false, outputColumnIndex, agg_input_expr);
-            }
-            aggSchema.addColumn(scol);
-            outputColumnIndex++;
-        }
-        mvFixInfo.reAggNode.setOutputSchema(aggSchema);
-
-        assert(joinTree != null);
-        assert(joinTree.m_whereExpr == null);
-        // Follow HSQL's logic to store the where expression in joinExpr for single table.
-        AbstractExpression where = joinTree.m_joinExpr;
-        if (where != null) {
-            // Collect all TVEs that need to be do re-aggregation in coordinator.
-            List<TupleValueExpression> needReAggTVEs = new ArrayList<TupleValueExpression>();
-            for (int i=numOfGroupByColumns; i < mvColumnArray.size(); i++) {
-                Column mvCol = mvColumnArray.get(i);
-                TupleValueExpression tve = new TupleValueExpression();
-                tve.setColumnIndex(i);
-                tve.setColumnName(mvCol.getName());
-                tve.setTableName(mvTableName);
-                tve.setColumnAlias(mvCol.getName());
-                tve.setValueType(VoltType.get((byte)mvCol.getType()));
-                tve.setValueSize(mvCol.getSize());
-
-                needReAggTVEs.add(tve);
-            }
-            List<AbstractExpression> exprs = ExpressionUtil.uncombine(where);
-            List<AbstractExpression> pushdownExprs = new ArrayList<AbstractExpression>();
-            List<AbstractExpression> aggPostExprs = new ArrayList<AbstractExpression>();
-            // Check where clause.
-            for (AbstractExpression expr: exprs) {
-                ArrayList<AbstractExpression> tves = expr.findBaseTVEs();
-                boolean pushdown = true;
-                for (TupleValueExpression needReAggTVE: needReAggTVEs) {
-                    if (tves.contains(needReAggTVE)) {
-                        pushdown = false;
-                        break;
-                    }
-                }
-                if (pushdown) {
-                    pushdownExprs.add(expr);
-                } else {
-                    aggPostExprs.add(expr);
-                }
-            }
-            AbstractExpression aggPostExpr = ExpressionUtil.combine(aggPostExprs);
-
-            mvFixInfo.reAggNode.setPostPredicate(aggPostExpr);
-            assert(joinTree.m_whereExpr == null);
-            joinTree.m_joinExpr = ExpressionUtil.combine(pushdownExprs);
-        }
-
+        prepareMVBasedQueryFix();
     }
 
     private void processAvgPushdownOptimization (VoltXMLElement displayElement,
@@ -457,6 +248,28 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         orderColumns = avgPushdownOrderColumns;
         projectSchema = avgPushdownNewAggSchema;
         hasComplexAgg = true;
+    }
+
+    /**
+     * Prepare for the mv based distributed query fix only if it might be required.
+     */
+    private void prepareMVBasedQueryFix() {
+        // Handle joined query case case.
+        // MV partitioned table without partition column can only join with replicated tables.
+        // For all tables in this query, the # of tables that need to be fixed should not exceed one.
+        for (Table mvTable: tableList) {
+            Set<SchemaColumn> mvNewScanColumns = new HashSet<SchemaColumn>();
+            List <SchemaColumn> columns = scanColumns.get(mvTable.getTypeName());
+            // For a COUNT(*)-only scan, key size is 0, not contained.
+            // For a joined query without selected columns from table TB, TB is not contained as well.
+            if (columns != null) {
+                mvNewScanColumns.addAll(columns);
+            }
+            if (mvFixInfo.checkFixNeeded(mvTable)) {
+                mvFixInfo.processMVBasedQueryFix(mvNewScanColumns, joinTree);
+                break;
+            }
+        }
     }
 
     private boolean needComplexAggregation () {
