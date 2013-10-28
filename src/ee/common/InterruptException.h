@@ -23,6 +23,10 @@
 namespace voltdb {
 class ReferenceSerializeOutput;
 
+/**
+ * Thrown when it has been decided that a query is taking too
+ * long and needs to stop.
+ */
 class InterruptException : public SerializableEEException {
 public:
 

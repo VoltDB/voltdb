@@ -1699,7 +1699,7 @@ void VoltDBEngine::reportProgessToTopend() {
                                         tableName,
                                         tableSize,
                                         m_tuplesProcessedInBatch + m_tuplesProcessedInFragment)){
-        VOLT_INFO("Interrupt query.");
+        VOLT_DEBUG("Interrupt query.");
         throw InterruptException("Query interrupted.");
     }
 }

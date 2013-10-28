@@ -19,6 +19,10 @@ package org.voltdb.exceptions;
 
 import java.nio.ByteBuffer;
 
+/**
+ * Thrown when it has been decided that a query is taking too
+ * long and needs to stop.
+ */
 public class InterruptException extends SerializableException {
     public static final long serialVersionUID = 0L;
 

@@ -115,6 +115,7 @@ public class ProcedureRunner {
     protected final PureJavaCrc32C m_inputCRC = new PureJavaCrc32C();
 
     // running procedure info
+    //  - track the current call to voltExecuteSQL for logging progress
     protected int m_batchIndex;
 
     // Used to get around the "abstract" for StmtProcedures.
@@ -876,7 +877,8 @@ public class ProcedureRunner {
            status = ClientResponse.GRACEFUL_FAILURE;
            msg.append("SQL ERROR\n");
        }
-       // Interrupt exception will be thrown when @Cancel uniqueId is called.
+       // Interrupt exception will be thrown when the procedure is killed by a user
+       // or by a timeout in the middle of executing.
        else if (e.getClass() == org.voltdb.exceptions.InterruptException.class) {
            status = ClientResponse.GRACEFUL_FAILURE;
            msg.append("Transaction Interrupted\n");

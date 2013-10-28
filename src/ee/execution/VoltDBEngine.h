@@ -165,6 +165,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         // Execution Functions
         // -------------------------------------------------
+
+        /**
+         * Execute a list of plan fragments, with the params yet-to-be deserialized.
+         */
         int executePlanFragments(int32_t numFragments,
                                  int64_t planfragmentIds[],
                                  int64_t intputDependencyIds[],
@@ -174,6 +178,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                  int64_t uniqueId,
                                  int64_t undoToken);
 
+        /**
+         * Execute a single plan fragment.
+         */
         int executePlanFragment(int64_t planfragmentId,
                                 int64_t inputDependencyId,
                                 const NValueArray &params,
@@ -207,6 +214,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // If using this somewhere new, consider if you're being lazy.
         ExecutorContext *getExecutorContext();
 
+        // Executors can call this to note a certain number of tuples have been
+        // scanned or processed.index
         inline void noteTuplesProcessedForProgressMonitoring(int tuplesProcessed);
 
         // -------------------------------------------------
@@ -450,6 +459,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void printReport();
 
+        /**
+         * Call into the topend with informaiton about how executing a plan fragment is going.
+         */
         void reportProgessToTopend();
 
         /**
