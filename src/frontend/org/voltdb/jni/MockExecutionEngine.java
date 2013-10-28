@@ -25,12 +25,8 @@ import java.util.Random;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
-import org.voltdb.ParameterSet;
-import org.voltdb.StatsSelector;
-import org.voltdb.TableStreamType;
+import org.voltdb.*;
 import org.voltdb.TheHashinator.HashinatorType;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.export.ExportProtoMessage;
@@ -210,12 +206,12 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public int hashinate(Object value, HashinatorType type, byte config[]) {
+    public int hashinate(Object value, TheHashinator.HashinatorConfig config) {
         return 0;
     }
 
     @Override
-    public void updateHashinator(HashinatorType type, byte[] config)
+    public void updateHashinator(TheHashinator.HashinatorConfig config)
     {
 
     }

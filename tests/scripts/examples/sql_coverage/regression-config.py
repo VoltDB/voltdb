@@ -122,10 +122,11 @@
                         "template": "basic-timestamp.sql",
                         "normalizer": "normalizer.py"},
 # BIGINT OVERFLOW CAUSES FAILURES IN THIS SUITE, USE REGRESSION INPUT
-    "regression-basic-matview": {"schema": "matview-schema.py",
-                                 "ddl": "int-DDL.sql",
+    "regression-basic-matview": {"schema": "matview-basic-schema.py",
+                                 "ddl": "matview-DDL.sql",
                                  "template": "regression-basic-matview.sql",
                                  "normalizer": "normalizer.py"},
+
 # THESE ALL SUCCEED, USE TEMPLATE INPUT
     "advanced": {"schema": "schema.py",
                  "ddl": "DDL.sql",
@@ -154,11 +155,30 @@
                                          "ddl": "int-DDL.sql",
                                          "template": "regression-advanced-ints-cntonly.sql",
                                          "normalizer": "not-a-normalizer.py"},
+
+# ADVANCED MATERIALIZED VIEW TESTING, INCLUDING COMPLEX GROUP BY AND AGGREGATIONS.
+    "advanced-matview-nonjoin": {"schema": "matview-advanced-nonjoin-schema.py",
+                                 "ddl": "matview-DDL.sql",
+                                 "template": "advanced-matview-nonjoin.sql",
+                                 "normalizer": "normalizer.py"},
+
+    "advanced-matview-join": {"schema": "matview-advanced-join-schema.py",
+                              "ddl": "matview-DDL.sql",
+                              "template": "advanced-matview-join.sql",
+                              "normalizer": "normalizer.py"},
+
 # To test index count
     "index-count1": {"schema": "index-count1-schema.py",
                      "ddl": "DDL.sql",
                      "template": "index-count1.sql",
                      "normalizer": "normalizer.py"},
+
+# To test index scan: forward scan, reverse scan
+    "index-scan": {"schema": "index-scan-schema.py",
+        "ddl": "index-DDL.sql",
+        "template": "index-scan.sql",
+        "normalizer": "normalizer.py"},
+
 # This suite written to test push-down of aggregates and limits in combination
 # with indexes, projections and order-by.
     "pushdown": {"schema": "pushdown-schema.py",

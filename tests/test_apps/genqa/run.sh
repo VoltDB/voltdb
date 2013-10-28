@@ -62,7 +62,7 @@ function catalog() {
     # stop if compilation fails
     rm -rf $EXPORTDATA
     mkdir $EXPORTDATA
-    rm -rf $CLIENTLOG
+    rm -fR $CLIENTLOG
     mkdir $CLIENTLOG
     if [ $? != 0 ]; then exit; fi
 }
@@ -200,26 +200,6 @@ function jdbc-benchmark() {
         --procedure=JiggleSinglePartition \
         --poolsize=100000 \
         --wait=0
-}
-
-function export-tofile() {
-    rm -rf $EXPORTDATA/*
-    mkdir $EXPORTDATA
-    java -Dlog4j.configuration=file:${PWD}/../../log4j-allconsole.xml \
-         -classpath obj:$CLASSPATH:obj org.voltdb.exportclient.ExportToFileClient \
-        --connect client \
-        --servers localhost \
-        --type csv \
-        --outdir ./$EXPORTDATA \
-        --nonce export \
-        --period 1
-}
-
-function export-verify() {
-    java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj genqa.ExportVerifier \
-        4 \
-        $EXPORTDATA \
-        $CLIENTLOG
 }
 
 function export-on-server-verify() {

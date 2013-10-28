@@ -23,26 +23,28 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 {
-    "P_MATVIEW": {
-        "columns": (("ID", FastSerializer.VOLTTYPE_INTEGER),
-                    ("BIG", FastSerializer.VOLTTYPE_BIGINT),
-                    ("NUM", FastSerializer.VOLTTYPE_BIGINT),
-                    ("TINYCOUNT", FastSerializer.VOLTTYPE_BIGINT),
-                    ("SMALLCOUNT", FastSerializer.VOLTTYPE_BIGINT),
-                    ("BIGCOUNT", FastSerializer.VOLTTYPE_BIGINT),
-                    ("TINYSUM", FastSerializer.VOLTTYPE_BIGINT),
-                    ("SMALLSUM", FastSerializer.VOLTTYPE_BIGINT),
-        ),
+    "P_SCAN": {
+        "columns": (
+                    ("A", FastSerializer.VOLTTYPE_INTEGER),
+                    ("B", FastSerializer.VOLTTYPE_INTEGER),
+                    ("C", FastSerializer.VOLTTYPE_INTEGER),
+                    ("D", FastSerializer.VOLTTYPE_INTEGER),
+                    ("E", FastSerializer.VOLTTYPE_INTEGER),
+                    ("F", FastSerializer.VOLTTYPE_INTEGER)
+                    ),
+        "partitions": ("B",),
+        "indexes": ("A", )
     },
-    "R_MATVIEW": {
-        "columns": (("ID", FastSerializer.VOLTTYPE_INTEGER),
-                    ("BIG", FastSerializer.VOLTTYPE_BIGINT),
-                    ("NUM", FastSerializer.VOLTTYPE_BIGINT),
-                    ("TINYCOUNT", FastSerializer.VOLTTYPE_BIGINT),
-                    ("SMALLCOUNT", FastSerializer.VOLTTYPE_BIGINT),
-                    ("BIGCOUNT", FastSerializer.VOLTTYPE_BIGINT),
-                    ("TINYSUM", FastSerializer.VOLTTYPE_BIGINT),
-                    ("SMALLSUM", FastSerializer.VOLTTYPE_BIGINT),
-        ),
-    },
+    "R_SCAN": {
+        "columns": (
+                    ("A", FastSerializer.VOLTTYPE_INTEGER),
+                    ("B", FastSerializer.VOLTTYPE_INTEGER),
+                    ("C", FastSerializer.VOLTTYPE_INTEGER),
+                    ("D", FastSerializer.VOLTTYPE_INTEGER),
+                    ("E", FastSerializer.VOLTTYPE_INTEGER),
+                    ("F", FastSerializer.VOLTTYPE_INTEGER)
+                    ),
+        "partitions": (),
+        "indexes": ("A",)
+    }
 }

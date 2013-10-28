@@ -29,7 +29,7 @@ class ElasticIndexIterator;
 class PersistentTable;
 
 /// Hash value type.
-typedef int64_t ElasticHash;
+typedef int32_t ElasticHash;
 
 /**
  * Data for the elastic index key.
@@ -198,11 +198,6 @@ public:
     ElasticIndexHashRange(const ElasticIndexHashRange &other);
 
     /**
-     * Return true if the range wraps around.
-     */
-    bool wrapsAround() const;
-
-    /**
      * From hash accessor.
      */
     ElasticHash getLowerBound() const;
@@ -247,14 +242,11 @@ public:
 
 private:
 
-    bool wrap();
-
     ElasticIndex &m_index;
     const TupleSchema &m_schema;
     ElasticIndexHashRange m_range;
     ElasticIndex::iterator m_iter;
     ElasticIndex::iterator m_end;
-    bool m_lastIteration;
 };
 
 
@@ -462,7 +454,7 @@ inline ElasticIndexHashRange::ElasticIndexHashRange(ElasticHash from, ElasticHas
  */
 inline ElasticIndexHashRange::ElasticIndexHashRange() :
     // min->min covers all possible values, min->max would not.
-    m_from(std::numeric_limits<int64_t>::min()), m_to(std::numeric_limits<int64_t>::min())
+    m_from(std::numeric_limits<int32_t>::min()), m_to(std::numeric_limits<int32_t>::max())
 {}
 
 /**
@@ -471,14 +463,6 @@ inline ElasticIndexHashRange::ElasticIndexHashRange() :
 inline ElasticIndexHashRange::ElasticIndexHashRange(const ElasticIndexHashRange &other) :
     m_from(other.m_from), m_to(other.m_to)
 {}
-
-/**
- * Return true if the range wraps around.
- */
-inline bool ElasticIndexHashRange::wrapsAround() const
-{
-    return m_from >= m_to;
-}
 
 /**
  * From hash accessor.

@@ -28,15 +28,13 @@ typedef unsigned __int64 uint64_t;
 
 //-----------------------------------------------------------------------------
 
-void MurmurHash3_x64_128 ( const void * key, int len, uint32_t seed, void * out );
+int32_t MurmurHash3_x64_128 ( const void * key, int len, uint32_t seed );
 
-inline int64_t MurmurHash3_x64_128 ( int64_t value, uint32_t seed) {
-    int64_t out[2];
-    MurmurHash3_x64_128( &value, 8, seed, out);
-    return out[0];
+inline int32_t MurmurHash3_x64_128 ( int64_t value, uint32_t seed) {
+    return MurmurHash3_x64_128( &value, 8, seed);
 }
 
-inline int64_t MurmurHash3_x64_128 ( int64_t value) {
+inline int32_t MurmurHash3_x64_128 ( int64_t value) {
     return MurmurHash3_x64_128(value, 0);
 }
 

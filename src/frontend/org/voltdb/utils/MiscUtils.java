@@ -38,6 +38,7 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ReplicationRole;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
@@ -711,5 +712,26 @@ public class MiscUtils {
                 return Lists.newArrayList();
             }
         });
+    }
+
+    /**
+     * Serialize and then deserialize an invocation so that it has serializedParams set for command logging if the
+     * invocation is sent to a local site.
+     * @return The round-tripped version of the invocation
+     * @throws IOException
+     */
+    public static StoredProcedureInvocation roundTripForCL(StoredProcedureInvocation invocation) throws IOException
+    {
+        if (invocation.getSerializedParams() == null) {
+            ByteBuffer buf = ByteBuffer.allocate(invocation.getSerializedSize());
+            invocation.flattenToBuffer(buf);
+            buf.flip();
+
+            StoredProcedureInvocation rti = new StoredProcedureInvocation();
+            rti.initFromBuffer(buf);
+            return rti;
+        } else {
+            return invocation;
+        }
     }
 }

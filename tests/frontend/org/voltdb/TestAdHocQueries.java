@@ -32,6 +32,7 @@ import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.AfterClass;
 import org.junit.Test;
+import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -155,7 +156,6 @@ public class TestAdHocQueries extends AdHocQueryTester {
             assertEquals( 23, results[3].getLong(0));
             assertEquals( 3, results[3].getLong(1));
 
-
             results = m_client.callProcedure("executeSQLSP", 24, "select * from parted1 order by partval").getResults();
 
             if (TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY) {
@@ -166,6 +166,8 @@ public class TestAdHocQueries extends AdHocQueryTester {
                     assertEquals( 4, results[ii].getLong(1));
                 }
             } else {
+                //These constants break when partitioning changes
+                //Recently 23, 24, and 25, started hashing to the same place /facepalm
                 for (int ii = 0; ii < 4; ii++) {
                     //The third statement does an exact equality match
                     if (ii == 2) {
@@ -175,13 +177,16 @@ public class TestAdHocQueries extends AdHocQueryTester {
                         assertEquals( 4, results[ii].getLong(1));
                         continue;
                     }
-                    assertEquals( 2, results[ii].getRowCount());
+                    assertEquals( 3, results[ii].getRowCount());
                     assertTrue(results[ii].advanceRow());
                     assertEquals(23, results[ii].getLong(0));
                     assertEquals( 3, results[ii].getLong(1));
                     assertTrue(results[ii].advanceRow());
                     assertEquals(24, results[ii].getLong(0));
                     assertEquals( 4, results[ii].getLong(1));
+                    assertTrue(results[ii].advanceRow());
+                    assertEquals(25, results[ii].getLong(0));
+                    assertEquals( 5, results[ii].getLong(1));
                 }
             }
         }
@@ -219,49 +224,74 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
             VoltTable modCount;
 
+            //Hashes to partition 0
+            int hashableA;
+            //Hashes to partition 1
+            int hashableB;
+            //Hashes to partition 0
+            int hashableC;
+            //Hashes to partition 1
+            int hashableD;
+            if (TheHashinator.getConfiguredHashinatorType() == HashinatorType.LEGACY) {
+                hashableA = 4;
+                hashableB = 1;
+                hashableC = 2;
+                hashableD = 3;
+            } else {
+                hashableA = 8;
+                hashableB = 2;
+                hashableC = 1;
+                hashableD = 4;
+            }
+
+            //If things break you can use this to find what hashes where and fix the constants
+//            for (int ii = 0; ii < 10; ii++) {
+//                System.out.println("Partition " + TheHashinator.getPartitionForParameter(VoltType.INTEGER.getValue(), ii) + " param " + ii);
+//            }
+
             // Unlike TestAdHocPlans, TestAdHocQueries runs the queries against actual (minimal) data.
             // Load that, here.
-            modCount = m_client.callProcedure("@AdHoc", "INSERT INTO PARTED1 VALUES (0, 0);").getResults()[0];
+            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED1 VALUES (%d, %d);", hashableA, hashableA)).getResults()[0];
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
 
-            modCount = m_client.callProcedure("@AdHoc", "INSERT INTO PARTED1 VALUES (1, 1);").getResults()[0];
+            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED1 VALUES (%d, %d);", hashableB, hashableB)).getResults()[0];
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
 
-            modCount = m_client.callProcedure("@AdHoc", "INSERT INTO PARTED2 VALUES (0, 0);").getResults()[0];
+            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED2 VALUES (%d, %d);", hashableA, hashableA)).getResults()[0];
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
 
-            modCount = m_client.callProcedure("@AdHoc", "INSERT INTO PARTED2 VALUES (2, 2);").getResults()[0];
+            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED2 VALUES (%d, %d);", hashableC, hashableC)).getResults()[0];
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
 
-            modCount = m_client.callProcedure("@AdHoc", "INSERT INTO PARTED3 VALUES (0, 0);").getResults()[0];
+            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED3 VALUES (%d, %d);", hashableA, hashableA)).getResults()[0];
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
 
-            modCount = m_client.callProcedure("@AdHoc", "INSERT INTO PARTED3 VALUES (3, 3);").getResults()[0];
+            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED3 VALUES (%d, %d);", hashableD, hashableD)).getResults()[0];
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
 
-            modCount = m_client.callProcedure("@AdHoc", "INSERT INTO REPPED1 VALUES (0, 0);").getResults()[0];
+            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO REPPED1 VALUES (%d, %d);", hashableA, hashableA)).getResults()[0];
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
 
-            modCount = m_client.callProcedure("@AdHoc", "INSERT INTO REPPED1 VALUES (1, 1);").getResults()[0];
+            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO REPPED1 VALUES (%d, %d);", hashableB, hashableB)).getResults()[0];
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
 
-            modCount = m_client.callProcedure("@AdHoc", "INSERT INTO REPPED2 VALUES (0, 0);").getResults()[0];
+            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO REPPED2 VALUES (%d, %d);", hashableA, hashableA)).getResults()[0];
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
 
-            modCount = m_client.callProcedure("@AdHoc", "INSERT INTO REPPED2 VALUES (2, 2);").getResults()[0];
+            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO REPPED2 VALUES (%d, %d);", hashableC, hashableC)).getResults()[0];
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
 
-            runAllAdHocSPtests();
+            runAllAdHocSPtests(hashableA, hashableB, hashableC, hashableD);
         }
         finally {
             if (m_client != null) m_client.close();
@@ -326,15 +356,15 @@ public class TestAdHocQueries extends AdHocQueryTester {
             System.out.println(result.toString());
 
             // test single-partition stuff
-            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH;", 0).getResults()[0];
+            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH;", TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY ? 0 : 2).getResults()[0];
+            System.out.println(result.toString());
             assertEquals(0, result.getRowCount());
+            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH;", TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY ? 1 : 0).getResults()[0];
             System.out.println(result.toString());
-            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH;", 1).getResults()[0];
             assertEquals(1, result.getRowCount());
-            System.out.println(result.toString());
 
             try {
-                env.m_client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (0, 0, 0);", 1);
+                env.m_client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (0, 0, 0);", TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY ? 1 : 2);
                 fail("Badly partitioned insert failed to throw expected exception");
             }
             catch (Exception e) {}
