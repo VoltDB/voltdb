@@ -26,13 +26,11 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 
 import org.voltdb.BackendTarget;
-
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-
-import org.voltdb.VoltTable;
 import org.voltdb_testprocs.regressionsuites.basecase.LoadP1;
 import org.voltdb_testprocs.regressionsuites.basecase.LoadP1_MP;
 import org.voltdb_testprocs.regressionsuites.basecase.LoadP1_SP;
@@ -134,7 +132,7 @@ public class TestUndoSuite extends RegressionSuite {
         try {
             project.addLiteralSchema(
                     "CREATE TABLE p1(key INTEGER NOT NULL, b1 INTEGER NOT NULL, " +
-                    "b2 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1));"
+                    "b2 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1, key));"
             );
             project.addPartitionInfo("p1", "key");
 

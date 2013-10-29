@@ -1494,7 +1494,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "dept INTEGER NOT NULL, " +
                 "age INTEGER,  " +
                 "rent INTEGER, " +
-                "PRIMARY KEY (id) );" +
+                "PRIMARY KEY (id, dept) );" +
                 "PARTITION TABLE P2 ON COLUMN dept;" +
 
                 "CREATE VIEW V_P2 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) " +

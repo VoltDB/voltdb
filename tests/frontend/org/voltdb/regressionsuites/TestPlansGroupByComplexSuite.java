@@ -76,32 +76,36 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         long[][] expected;
 
         for (String tb: tbs) {
-            // Test pass-through columns, group by primary key
-            cr = client.callProcedure("@AdHoc", "SELECT dept, count(wage) from " + tb +
-                    " GROUP BY id ORDER BY dept DESC");
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            vt = cr.getResults()[0];
-            expected = new long[][] {{2,1}, {2,1}, {1,1}, {1,1}, {1,1} };
-            System.out.println(vt.toString());
-            validateTableOfLongs(vt, expected);
+            // Test group by PRIMARY KEY
+            // P2 AND P3 have different primary keys.
+            if (tb.equals("R1") || tb.equals("P1")) {
+                // Test pass-through columns, group by primary key
+                cr = client.callProcedure("@AdHoc", "SELECT dept, count(wage) from " + tb +
+                        " GROUP BY id ORDER BY dept DESC");
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+                vt = cr.getResults()[0];
+                expected = new long[][] {{2,1}, {2,1}, {1,1}, {1,1}, {1,1} };
+                System.out.println(vt.toString());
+                validateTableOfLongs(vt, expected);
 
-            // Test duplicates, operator expression, group by primary key
-            cr = client.callProcedure("@AdHoc", "SELECT id, id, dept, dept+5 from " + tb +
-                    " GROUP BY id ORDER BY id");
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            vt = cr.getResults()[0];
-            expected = new long[][] {{1,1,1,6}, {2,2,1,6}, {3,3,1,6}, {4,4,2,7}, {5,5,2,7} };
-            System.out.println(vt.toString());
-            validateTableOfLongs(vt, expected);
+                // Test duplicates, operator expression, group by primary key
+                cr = client.callProcedure("@AdHoc", "SELECT id, id, dept, dept+5 from " + tb +
+                        " GROUP BY id ORDER BY id");
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+                vt = cr.getResults()[0];
+                expected = new long[][] {{1,1,1,6}, {2,2,1,6}, {3,3,1,6}, {4,4,2,7}, {5,5,2,7} };
+                System.out.println(vt.toString());
+                validateTableOfLongs(vt, expected);
 
-            // Test function expression with group by primary key
-            cr = client.callProcedure("@AdHoc", "SELECT id, id + 1, sum(wage)/2, abs(dept-3) from " + tb +
-                    " GROUP BY id ORDER BY id");
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            vt = cr.getResults()[0];
-            expected = new long[][] {{1,2,5,2}, {2,3,10,2}, {3,4,15,2}, {4,5,20,1}, {5,6,25,1} };
-            System.out.println(vt.toString());
-            validateTableOfLongs(vt, expected);
+                // Test function expression with group by primary key
+                cr = client.callProcedure("@AdHoc", "SELECT id, id + 1, sum(wage)/2, abs(dept-3) from " + tb +
+                        " GROUP BY id ORDER BY id");
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+                vt = cr.getResults()[0];
+                expected = new long[][] {{1,2,5,2}, {2,3,10,2}, {3,4,15,2}, {4,5,20,1}, {5,6,25,1} };
+                System.out.println(vt.toString());
+                validateTableOfLongs(vt, expected);
+            }
 
             // Test order by expression column which is not in display columns
             cr = client.callProcedure("@AdHoc", "SELECT COUNT(*) as tag, sum(wage) from " + tb +
@@ -954,6 +958,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
                 "DEPT INTEGER, " +
                 "TM TIMESTAMP DEFAULT NULL, " +
                 "PRIMARY KEY (ID) );" +
+
                 "CREATE TABLE P1 ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
                 "WAGE INTEGER NOT NULL, " +
@@ -967,7 +972,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
                 "WAGE INTEGER NOT NULL, " +
                 "DEPT INTEGER NOT NULL, " +
                 "TM TIMESTAMP DEFAULT NULL, " +
-                "PRIMARY KEY (ID) );" +
+                "PRIMARY KEY (ID, DEPT) );" +
                 "PARTITION TABLE P2 ON COLUMN DEPT;" +
 
                 "CREATE TABLE P3 ( " +
@@ -975,7 +980,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
                 "WAGE INTEGER NOT NULL, " +
                 "DEPT INTEGER NOT NULL, " +
                 "TM TIMESTAMP DEFAULT NULL, " +
-                "PRIMARY KEY (ID) );" +
+                "PRIMARY KEY (ID, WAGE) );" +
                 "PARTITION TABLE P3 ON COLUMN WAGE;"
                 ;
         try {

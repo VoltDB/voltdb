@@ -20,10 +20,9 @@ CREATE TABLE data_reports (
   time TIMESTAMP NOT NULL,
   value FLOAT DEFAULT '0' NOT NULL,
   field VARCHAR(10) DEFAULT 'value' NOT NULL,
-  CONSTRAINT IDX_reportData_PK PRIMARY KEY (reportID,metricID,time,field)
+  CONSTRAINT IDX_reportData_PK PRIMARY KEY (reportID,metricID,time,field, appID)
 );
 PARTITION TABLE data_reports ON COLUMN appID;
-
 
 create table R (
   a bigint ,
