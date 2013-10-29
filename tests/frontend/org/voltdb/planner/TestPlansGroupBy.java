@@ -589,8 +589,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
     private void checkMVFixWithJoin_noOrder (String sql, int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
             int numGroupbyOfReaggNode, int numAggsOfReaggNode, String[] aggFilters, String[] scanFilters) {
 
-        //String[] joinType = {"inner join", "left join", "right join"};
-        String[] joinType = {"inner join"};
+        String[] joinType = {"inner join", "left join", "right join"};
 
         for (int i = 0; i < joinType.length; i++) {
             String newsql = sql.replace("@joinType", joinType[i]);
@@ -611,19 +610,15 @@ public class TestPlansGroupBy extends PlannerTestCase {
         String sql = "";
 
         // Test agg query on join.
-//        sql = "select v_cnt from v_p1 left join v_r1 on v_p1.v_cnt = v_r1.v_cnt " +
-//                "where v_p1.v_cnt > 1 and v_p1.v_a1 > 2 and v_p1.v_sum_c1 < 3 and v_r1.v_b1 < 4 ";
-//        checkMVFixWithJoin_reAgg(sql, 2, 2, "(v_cnt > 1) and (v_sum_c1 < 3)", "v_a1 > 2");
-
-//        sql = "select v_p1.v_a1 from v_p1 right join v_r1 on v_p1.v_a1 = v_r1.v_a1";
-//        checkMVFixWithJoin_reAgg(sql, 2, 0, null, null);
+        sql = "select v_a1 from v_p1 left join v_r1 on v_p1.v_a1 = v_r1.v_a1 AND v_p1.v_cnt = 2 ";
+        checkMVFixWithJoin_reAgg(sql, 2, 1, "v_cnt = 2", null);
     }
 
     /**
      * No tested for Outer join, no 'using' unclear column reference tested.
      * Non-aggregation queries.
      */
-    public void testMVBasedQuery_InnerJoin_NoAgg() {
+    public void testMVBasedQuery_Join_NoAgg() {
         String sql = "";
 
         // Two tables joins.
@@ -675,7 +670,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
      * No tested for Outer join, no 'using' unclear column reference tested.
      * Aggregation queries.
      */
-    public void testMVBasedQuery_InnerJoin_Agg() {
+    public void testMVBasedQuery_Join_Agg() {
         String sql = "";
 
         // Two tables joins.
@@ -742,6 +737,16 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 "where v_p1.v_cnt > 1 and v_p1.v_a1 > 2 and v_p1.v_sum_c1 < 3 and v_r1.v_b1 < 4 " +
                 "group by v_p1.v_cnt, v_p1.v_b1 ";
         checkMVFixWithJoin(sql, 2, 1, 2, 3, "(v_sum_c1 < 3) and (v_cnt > 1)", "v_a1 > 2");
+    }
+
+    public void testENG5385() {
+        String sql = "";
+
+        sql = "select v_a1 from v_p1 left join v_r1 on v_p1.v_a1 = v_r1.v_a1 AND v_p1.v_cnt = 2 ";
+        checkMVFixWithJoin_reAgg(sql, 2, 1, "v_cnt = 2", null);
+
+        // When ENG-5385 is fixed, use the next line to check its plan.
+//        checkMVFixWithJoin_reAgg(sql, 2, 1, null, null);
     }
 
     private void checkMVFix_reAgg(
