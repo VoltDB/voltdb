@@ -760,10 +760,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     clSnapshotPath = m_catalogContext.cluster.getLogconfig().get("log").getInternalsnapshotpath();
                 }
 
-                Class<?> elasticServiceClass =
-                    MiscUtils.loadProClass("org.voltdb.join.ElasticJoinCoordinator", "Elastic", false);
+                if (m_config.m_isEnterprise && TheHashinator.getCurrentConfig().type == HashinatorType.ELASTIC) {
+                    Class<?> elasticServiceClass = MiscUtils.loadProClass("org.voltdb.join.ElasticJoinCoordinator",
+                                                                          "Elastic join", false);
 
-                if (elasticServiceClass != null && TheHashinator.getCurrentConfig().type == HashinatorType.ELASTIC) {
+                    if (elasticServiceClass == null) {
+                        VoltDB.crashLocalVoltDB("Missing the ElasticJoinCoordinator class file in the enterprise " +
+                                                "edition", false, null);
+                    }
+
                     Constructor<?> constructor =
                         elasticServiceClass.getConstructor(HostMessenger.class,
                                                            ClientInterface.class,
