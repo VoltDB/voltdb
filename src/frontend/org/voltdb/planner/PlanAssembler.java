@@ -501,8 +501,7 @@ public class PlanAssembler {
         }
         AbstractPlanNode root = subSelectRoot;
 
-        boolean mvFixInfoCoordinatorNeeded = true;
-        boolean mvFixInfoEdgeCaseOuterJoin = false;
+        boolean mvFixNeedsProjection = false;
         /*
          * If the access plan for the table in the join order was for a
          * distributed table scan there must be a send/receive pair at the top
@@ -513,6 +512,9 @@ public class PlanAssembler {
          * inner side of a NestLoop join.
          */
         if (m_partitioning.requiresTwoFragments()) {
+            boolean mvFixInfoCoordinatorNeeded = true;
+            boolean mvFixInfoEdgeCaseOuterJoin = false;
+
             ArrayList<AbstractPlanNode> receivers = root.findAllNodesOfType(PlanNodeType.RECEIVE);
             if (receivers.size() == 1) {
                 // The subplan SHOULD be good to go, but just make sure that it doesn't
@@ -567,6 +569,17 @@ public class PlanAssembler {
                     return getNextSelectPlan();
                 }
             }
+
+            root = handleAggregationOperators(root);
+
+            // Process the re-aggregate plan node and insert it into the plan.
+            if (m_parsedSelect.mvFixInfo.needed() && mvFixInfoCoordinatorNeeded) {
+                AbstractPlanNode tmpRoot = root;
+                root = handleMVBasedMultiPartQuery(root, mvFixInfoEdgeCaseOuterJoin);
+                if (root != tmpRoot) {
+                    mvFixNeedsProjection = true;
+                }
+            }
         } else {
             /*
              * There is no receive node and root is a single partition plan.
@@ -575,19 +588,7 @@ public class PlanAssembler {
             // If there is no receive plan node and no distributed plan has been generated,
             // the fix set for MV is not needed.
             m_parsedSelect.mvFixInfo.setNeeded(false);
-        }
-
-
-        root = handleAggregationOperators(root);
-
-        // Process the re-aggregate plan node and insert it into the plan.
-        boolean mvFixNeedsProjection = false;
-        if (m_parsedSelect.mvFixInfo.needed() && mvFixInfoCoordinatorNeeded) {
-            AbstractPlanNode tmpRoot = root;
-            root = handleMVBasedMultiPartQuery(root, mvFixInfoEdgeCaseOuterJoin);
-            if (root != tmpRoot) {
-                mvFixNeedsProjection = true;
-            }
+            root = handleAggregationOperators(root);
         }
 
         if (m_parsedSelect.hasComplexAgg()) {
