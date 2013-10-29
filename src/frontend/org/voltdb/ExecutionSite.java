@@ -1699,7 +1699,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     }
 
     @Override
-    public void setPerPartitionTxnIds(long[] perPartitionTxnIds) {
+    public void setPerPartitionTxnIds(long[] perPartitionTxnIds, boolean skipMultipart) {
         //A noop pre-IV2
     }
 
