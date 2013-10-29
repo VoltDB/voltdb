@@ -64,9 +64,6 @@ public class MaterializedViewFixInfo {
     // Scan Node for join query.
     AbstractScanPlanNode m_scanNode = null;
 
-    // Edge outer join case that needs to be treated as single table.
-    boolean m_edgeCaseOuterJoin = false;
-
     public boolean needed () {
         return m_needed;
     }

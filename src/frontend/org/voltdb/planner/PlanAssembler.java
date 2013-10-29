@@ -533,22 +533,25 @@ public class PlanAssembler {
             }
             else {
                 root = subAssembler.addSendReceivePair(root);
+                // Root is a receive node here.
+                assert(root instanceof ReceivePlanNode);
+
+                if (m_parsedSelect.mayNeedAvgPushdown()) {
+                    m_parsedSelect.switchOptimalSuiteForAvgPushdown();
+                }
+                if (m_parsedSelect.tableList.size() > 1 && m_parsedSelect.mvFixInfo.needed()
+                        && subSelectRoot.hasInlinedIndexScanOfTable(m_parsedSelect.mvFixInfo.getMVTableName())) {
+                    // MV partitioned joined query needs reAggregation work on coordinator.
+                    // Index scan on MV table can not be supported.
+                    // So, in-lined index scan of Nested loop index join can not be possible.
+                    return getNextSelectPlan();
+                }
             }
         }
-
         boolean mvFixInfoCoordinatorNeeded = true;
-        if (root instanceof ReceivePlanNode) {
-            if (m_parsedSelect.mayNeedAvgPushdown()) {
-                m_parsedSelect.switchOptimalSuiteForAvgPushdown();
-            }
-            if (m_parsedSelect.tableList.size() > 1 && m_parsedSelect.mvFixInfo.needed()
-                    && subSelectRoot.hasInlinedIndexScanOfTable(m_parsedSelect.mvFixInfo.getMVTableName())) {
-                // MV partitioned joined query needs reAggregation work on coordinator.
-                // Index scan on MV table can not be supported.
-                // So, in-lined index scan of Nested loop index join can not be possible.
-                return getNextSelectPlan();
-            }
-        } else {
+        boolean mvFixInfoEdgeCaseOuterJoin = false;
+
+        if (root instanceof ReceivePlanNode == false) {
             // Edge cases: left outer join with replicated table.
             if (m_parsedSelect.mvFixInfo.needed()) {
                 List<AbstractPlanNode> recList = root.findAllNodesOfType(PlanNodeType.RECEIVE);
@@ -557,8 +560,7 @@ public class PlanAssembler {
 
                     AbstractPlanNode receiveNode = recList.get(0);
                     if (receiveNode.getParent(0) instanceof NestLoopPlanNode) {
-                        if (m_parsedSelect.tableList.size() > 1 &&
-                                subSelectRoot.hasInlinedIndexScanOfTable(m_parsedSelect.mvFixInfo.getMVTableName())) {
+                        if (subSelectRoot.hasInlinedIndexScanOfTable(m_parsedSelect.mvFixInfo.getMVTableName())) {
                             return getNextSelectPlan();
                         }
                         List<AbstractPlanNode> nljs = receiveNode.findAllNodesOfType(PlanNodeType.NESTLOOP);
@@ -567,9 +569,9 @@ public class PlanAssembler {
                         // outer join edge case does not have any join plan node under receive node.
                         // This is like a single table case.
                         if (nljs.size() + nlijs.size() == 0) {
-                            m_parsedSelect.mvFixInfo.m_edgeCaseOuterJoin = true;
+                            mvFixInfoEdgeCaseOuterJoin = true;
                         }
-                        root = handleMVBasedMultiPartQuery(root);
+                        root = handleMVBasedMultiPartQuery(root, mvFixInfoEdgeCaseOuterJoin);
                     }
                 } else {
                     // If there is no receive plan node and no distributed plan has been generated,
@@ -585,7 +587,7 @@ public class PlanAssembler {
         boolean mvFixNeedsProjection = false;
         if (m_parsedSelect.mvFixInfo.needed() && mvFixInfoCoordinatorNeeded) {
             AbstractPlanNode tmpRoot = root;
-            root = handleMVBasedMultiPartQuery(root);
+            root = handleMVBasedMultiPartQuery(root, mvFixInfoEdgeCaseOuterJoin);
             if (root != tmpRoot) {
                 mvFixNeedsProjection = true;
             }
@@ -1225,7 +1227,7 @@ public class PlanAssembler {
     }
 
 
-    AbstractPlanNode handleMVBasedMultiPartQuery (AbstractPlanNode root) {
+    AbstractPlanNode handleMVBasedMultiPartQuery (AbstractPlanNode root, boolean edgeCaseOuterJoin) {
         MaterializedViewFixInfo mvFixInfo = m_parsedSelect.mvFixInfo;
 
         HashAggregatePlanNode reAggNode = new HashAggregatePlanNode(mvFixInfo.getReAggregationPlanNode());
@@ -1254,14 +1256,14 @@ public class PlanAssembler {
         AbstractPlanNode sendNodeChild = sendNode.getChild(0);
 
         HashAggregatePlanNode reAggNodeForReplace = null;
-        if (m_parsedSelect.tableList.size() > 1 && !mvFixInfo.m_edgeCaseOuterJoin) {
+        if (m_parsedSelect.tableList.size() > 1 && !edgeCaseOuterJoin) {
             reAggNodeForReplace = reAggNode;
         }
         boolean find = mvFixInfo.processScanNodeWithReAggNode(sendNode, reAggNodeForReplace);
         assert(find);
 
         // If it is normal joined query, replace the node under receive node with materialized view scan node.
-        if (m_parsedSelect.tableList.size() > 1 && !mvFixInfo.m_edgeCaseOuterJoin) {
+        if (m_parsedSelect.tableList.size() > 1 && !edgeCaseOuterJoin) {
             AbstractPlanNode joinNode = sendNodeChild;
             // No agg, limit pushed down at this point.
             assert(joinNode instanceof AbstractJoinPlanNode);
