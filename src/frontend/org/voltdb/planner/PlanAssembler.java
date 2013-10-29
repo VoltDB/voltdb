@@ -501,6 +501,8 @@ public class PlanAssembler {
         }
         AbstractPlanNode root = subSelectRoot;
 
+        boolean mvFixInfoCoordinatorNeeded = true;
+        boolean mvFixInfoEdgeCaseOuterJoin = false;
         /*
          * If the access plan for the table in the join order was for a
          * distributed table scan there must be a send/receive pair at the top
@@ -525,13 +527,31 @@ public class PlanAssembler {
                                 "an inner partitioned table is too complex and is not supported.");
                     }
                 }
-            }
-            else if (receivers.size() > 0) {
+
+                // Edge cases: left outer join with replicated table.
+                if (m_parsedSelect.mvFixInfo.needed()) {
+                    mvFixInfoCoordinatorNeeded = false;
+                    AbstractPlanNode receiveNode = receivers.get(0);
+                    if (receiveNode.getParent(0) instanceof NestLoopPlanNode) {
+                        if (subSelectRoot.hasInlinedIndexScanOfTable(m_parsedSelect.mvFixInfo.getMVTableName())) {
+                            return getNextSelectPlan();
+                        }
+                        List<AbstractPlanNode> nljs = receiveNode.findAllNodesOfType(PlanNodeType.NESTLOOP);
+                        List<AbstractPlanNode> nlijs = receiveNode.findAllNodesOfType(PlanNodeType.NESTLOOPINDEX);
+
+                        // outer join edge case does not have any join plan node under receive node.
+                        // This is like a single table case.
+                        if (nljs.size() + nlijs.size() == 0) {
+                            mvFixInfoEdgeCaseOuterJoin = true;
+                        }
+                        root = handleMVBasedMultiPartQuery(root, mvFixInfoEdgeCaseOuterJoin);
+                    }
+                }
+            } else if (receivers.size() > 0) {
                 throw new PlanningErrorException(
                         "This special case join between an outer replicated table and " +
                         "an inner partitioned table is too complex and is not supported.");
-            }
-            else {
+            } else {
                 root = subAssembler.addSendReceivePair(root);
                 // Root is a receive node here.
                 assert(root instanceof ReceivePlanNode);
@@ -547,39 +567,16 @@ public class PlanAssembler {
                     return getNextSelectPlan();
                 }
             }
+        } else {
+            /*
+             * There is no receive node and root is a single partition plan.
+             */
+
+            // If there is no receive plan node and no distributed plan has been generated,
+            // the fix set for MV is not needed.
+            m_parsedSelect.mvFixInfo.setNeeded(false);
         }
-        boolean mvFixInfoCoordinatorNeeded = true;
-        boolean mvFixInfoEdgeCaseOuterJoin = false;
 
-        if (root instanceof ReceivePlanNode == false) {
-            // Edge cases: left outer join with replicated table.
-            if (m_parsedSelect.mvFixInfo.needed()) {
-                List<AbstractPlanNode> recList = root.findAllNodesOfType(PlanNodeType.RECEIVE);
-                if (recList.size() == 1) {
-                    mvFixInfoCoordinatorNeeded = false;
-
-                    AbstractPlanNode receiveNode = recList.get(0);
-                    if (receiveNode.getParent(0) instanceof NestLoopPlanNode) {
-                        if (subSelectRoot.hasInlinedIndexScanOfTable(m_parsedSelect.mvFixInfo.getMVTableName())) {
-                            return getNextSelectPlan();
-                        }
-                        List<AbstractPlanNode> nljs = receiveNode.findAllNodesOfType(PlanNodeType.NESTLOOP);
-                        List<AbstractPlanNode> nlijs = receiveNode.findAllNodesOfType(PlanNodeType.NESTLOOPINDEX);
-
-                        // outer join edge case does not have any join plan node under receive node.
-                        // This is like a single table case.
-                        if (nljs.size() + nlijs.size() == 0) {
-                            mvFixInfoEdgeCaseOuterJoin = true;
-                        }
-                        root = handleMVBasedMultiPartQuery(root, mvFixInfoEdgeCaseOuterJoin);
-                    }
-                } else {
-                    // If there is no receive plan node and no distributed plan has been generated,
-                    // the fix set is not needed.
-                    m_parsedSelect.mvFixInfo.setNeeded(false);
-                }
-            }
-        }
 
         root = handleAggregationOperators(root);
 
