@@ -56,6 +56,12 @@ function catalog() {
         src/txnIdSelfCheck/ddl.sql src/txnIdSelfCheck/ddl-annex.sql
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
+
+    # primary no-export catalog
+    $VOLTDB compile --classpath obj -o $APPNAME-noexport.jar src/txnIdSelfCheck/ddl-noexport.sql
+    # stop if compilation fails
+    if [ $? != 0 ]; then exit; fi
+
 }
 
 # run the voltdb server locally
