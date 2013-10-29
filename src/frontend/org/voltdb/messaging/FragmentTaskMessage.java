@@ -35,6 +35,8 @@ import org.voltdb.common.Constants;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
+import com.google.common.base.Charsets;
+
 /**
  * Message from a stored procedure coordinator to an execution site
  * which is participating in the transaction. This message specifies
@@ -126,6 +128,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     Iv2InitiateTaskMessage m_initiateTask;
     ByteBuffer m_initiateTaskBuffer;
 
+    // context for long running fragment status log messages
+    byte[] m_procedureName = null;
     int m_currentBatchIndex = 0;
 
     public int getCurrentBatchIndex() {
@@ -183,6 +187,16 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             m_initiateTaskBuffer = ftask.m_initiateTaskBuffer.duplicate();
         }
         assert(selfCheck());
+    }
+
+    public void setProcedureName(String procedureName) {
+        Iv2InitiateTaskMessage it = getInitiateTask();
+        if (it != null) {
+            assert(it.getStoredProcedureName().equals(procedureName));
+        }
+        else {
+            m_procedureName = procedureName.getBytes(Charsets.UTF_8);
+        }
     }
 
     public void setBatch(int batchIndex) {
@@ -364,7 +378,12 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         if (initMsg != null) {
             return initMsg.m_invocation.getProcName();
         }
-        return null;
+        else if (m_procedureName != null) {
+            return new String(m_procedureName, Charsets.UTF_8);
+        }
+        else {
+            return null;
+        }
     }
 
     /*
@@ -486,6 +505,12 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         // Fragment ID block (20 bytes per sha1-hash)
         msgsize += 20 * m_items.size();
+
+        // short + str for proc name
+        msgsize += 2;
+        if (m_procedureName != null) {
+            msgsize += m_procedureName.length;
+        }
 
         // int for which batch (4)
         msgsize += 4;
@@ -611,7 +636,17 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             }
         }
 
-        // two ints for context within batches
+        // write procedure name
+        if (m_procedureName == null) {
+            buf.putShort((short) -1);
+        }
+        else {
+            assert(m_procedureName.length <= Short.MAX_VALUE);
+            buf.putShort((short) m_procedureName.length);
+            buf.put(m_procedureName);
+        }
+
+        // ints for batch context
         buf.putInt(m_currentBatchIndex);
 
         if (m_initiateTaskBuffer != null) {
@@ -702,6 +737,16 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                     }
                 }
             }
+        }
+
+        // read procedure name if there
+        short procNameLen = buf.getShort();
+        if (procNameLen >= 0) {
+            m_procedureName = new byte[procNameLen];
+            buf.get(m_procedureName);
+        }
+        else {
+            m_procedureName = null;
         }
 
         // ints for batch context

@@ -205,6 +205,9 @@ public class ProcedureRunner {
         // reset batch context info
         m_batchIndex = -1;
 
+        // set procedure name in the site/ee
+        m_site.setProcedureName(m_procedureName);
+
         // use local var to avoid warnings about reassigning method argument
         Object[] paramList = paramListIn;
 
@@ -352,6 +355,8 @@ public class ProcedureRunner {
             m_cachedSingleStmt.params = null;
             m_cachedSingleStmt.expectation = null;
             m_seenFinalBatch = false;
+
+            m_site.setProcedureName(null);
         }
 
         return retval;
@@ -1055,7 +1060,7 @@ public class ProcedureRunner {
        // holds query results
        final VoltTable[] m_results;
 
-       BatchState(int batchSize, TransactionState txnState, long siteId, boolean finalTask) {
+       BatchState(int batchSize, TransactionState txnState, long siteId, boolean finalTask, String procedureName) {
            m_batchSize = batchSize;
            m_txnState = txnState;
 
@@ -1071,6 +1076,7 @@ public class ProcedureRunner {
                                                  m_txnState.isReadOnly(),
                                                  false,
                                                  txnState.isForReplay());
+           m_localTask.setProcedureName(procedureName);
 
            // the data and message for all sites in the transaction
            m_distributedTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
@@ -1080,6 +1086,7 @@ public class ProcedureRunner {
                                                        m_txnState.isReadOnly(),
                                                        finalTask,
                                                        txnState.isForReplay());
+           m_distributedTask.setProcedureName(procedureName);
        }
 
        /*
@@ -1132,7 +1139,11 @@ public class ProcedureRunner {
     */
    VoltTable[] executeSlowHomogeneousBatch(final List<QueuedSQL> batch, final boolean finalTask) {
 
-       BatchState state = new BatchState(batch.size(), m_txnState, m_site.getCorrespondingSiteId(), finalTask);
+       BatchState state = new BatchState(batch.size(),
+                                         m_txnState,
+                                         m_site.getCorrespondingSiteId(),
+                                         finalTask,
+                                         m_procedureName);
 
        // iterate over all sql in the batch, filling out the above data structures
        for (int i = 0; i < batch.size(); ++i) {

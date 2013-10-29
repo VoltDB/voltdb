@@ -35,7 +35,6 @@ import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
-import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -94,6 +93,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     int m_currentBatchIndex = 0;
     private boolean m_readOnly;
     private long m_startTime;
+    private long m_lastMsgTime;
     private long m_logDuration = 1000;
 
     /** information about EE calls back to JAVA. For test.*/
@@ -328,22 +328,27 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         m_lastTuplesAccessed = tuplesFound;
 
         long currentTime = System.currentTimeMillis();
-        long duration = currentTime - m_startTime;
+        if (m_startTime == 0) {
+            m_startTime = m_lastMsgTime = currentTime;
+        }
 
-        if(duration > m_logDuration) {
+        if (currentTime > (m_logDuration + m_lastMsgTime)) {
             VoltLogger log = new VoltLogger("CONSOLE");
-            String msg = String.format("Procedure %s is taking a long time to execute -- %.2f seconds spent accessing " +
+            String msg = String.format("Procedure %s is taking a long time to execute -- at least %.1f seconds spent accessing " +
                     "%d tuples. Current plan fragment %s in call %d to voltExecuteSQL on site %s.",
                     m_currentProcedureName,
-                    duration / 1000.0,
+                    (currentTime - m_startTime) / 1000.0,
                     tuplesFound,
                     planNodeName,
                     m_currentBatchIndex,
                     CoreUtils.hsIdToString(m_siteId));
             log.info(msg);
-            m_logDuration = (m_logDuration < 30000) ? 2*m_logDuration : 30000;
+            m_logDuration = (m_logDuration < 30000) ? (2 * m_logDuration) : 30000;
+            m_lastMsgTime = currentTime;
         }
+
         // Return true if we want to interrupt ee. Otherwise return false
+        // for now, always continue
         return false;
     }
 
@@ -413,11 +418,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         try {
             // For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
             m_readOnly = (undoQuantumToken == Long.MAX_VALUE) ? true : false;
-            // update context
 
+            // reset context for progress updates
+            m_startTime = 0;
+            m_logDuration = 1000;
 
-            // Consider put the following line in EEJNI.coreExecutePlanFrag... before where the native method is called?
-            m_startTime = System.currentTimeMillis();
             VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
                     parameterSets, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
             m_plannerStats.updateEECacheStats(m_eeCacheSize, numFragmentIds - m_cacheMisses,
@@ -429,7 +434,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             // will still be used to estimate the cache size, but it's hard to count cache hits
             // during an exception, so we don't count cache misses either to get the right ratio.
             m_cacheMisses = 0;
-            m_logDuration = 0;
         }
     }
 
