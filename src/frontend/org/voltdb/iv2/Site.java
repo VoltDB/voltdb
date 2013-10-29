@@ -1080,8 +1080,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void setPerPartitionTxnIds(long[] perPartitionTxnIds) {
-        boolean foundMultipartTxnId = false;
+    public void setPerPartitionTxnIds(long[] perPartitionTxnIds, boolean skipMultiPart) {
+        boolean foundMultipartTxnId = skipMultiPart;
         boolean foundSinglepartTxnId = false;
         for (long txnId : perPartitionTxnIds) {
             if (TxnEgo.getPartitionId(txnId) == m_partitionId) {
@@ -1092,7 +1092,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 foundSinglepartTxnId = true;
                 m_initiatorMailbox.setMaxLastSeenTxnId(txnId);
             }
-            if (TxnEgo.getPartitionId(txnId) == MpInitiator.MP_INIT_PID) {
+            if (!skipMultiPart && TxnEgo.getPartitionId(txnId) == MpInitiator.MP_INIT_PID) {
                 if (foundMultipartTxnId) {
                     VoltDB.crashLocalVoltDB(
                             "Found multiple transactions ids during restore for a multipart txnid", false, null);

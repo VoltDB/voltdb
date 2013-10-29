@@ -466,7 +466,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public void setPerPartitionTxnIds(long[] perPartitionTxnIds) {
+    public void setPerPartitionTxnIds(long[] perPartitionTxnIds, boolean skipMultipart) {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
