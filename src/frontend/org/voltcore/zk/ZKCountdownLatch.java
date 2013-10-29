@@ -63,7 +63,10 @@ public class ZKCountdownLatch
         while (true) {
             ZKUtil.FutureWatcher fw = new ZKUtil.FutureWatcher();
             int count = ByteBuffer.wrap(m_zk.getData(m_path, fw, null)).getInt();
-            if (count > 0) fw.get();
+            if (count > 0) {
+                fw.get();
+                continue;
+            }
             countedDown = true;
             return;
         }
