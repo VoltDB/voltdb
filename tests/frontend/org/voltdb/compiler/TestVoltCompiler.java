@@ -1745,6 +1745,134 @@ public class TestVoltCompiler extends TestCase {
         compileForDDLTest(getPathForSchema(s), false);
     }
 
+    public void testAssumeUnique()
+    {
+        final String s =
+                "create table t(id integer not null, num integer not null);\n" +
+                "create unique index idx_t_unique on t(id,num);\n" +
+                "create index idx_t on t(num);";
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        Database d = c.m_catalog.getClusters().get("cluster").getDatabases().get("database");
+        assertTrue(d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_unique").getUnique());
+        assertFalse(d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t").getUnique());
+        // also validate that simple column indexes don't trigger the generalized expression index handling
+        String noExpressionFound = "";
+        assertEquals(noExpressionFound, d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_unique").getExpressionsjson());
+        assertEquals(noExpressionFound, d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t").getExpressionsjson());
+    }
+
+    private void checkValidUnique(String ddl, String errorMsg) {
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
+        final String schemaPath = schemaFile.getPath();
+
+        final String simpleProject =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database name='database'>" +
+            "<schemas>" +
+            "<schema path='" + schemaPath + "' />" +
+            "</schemas>" +
+            "<procedures/>" +
+            "</database>" +
+            "</project>";
+
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+        final String projectPath = projectFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+
+        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        boolean expectSuccess = errorMsg == null ? true : false;
+        assertEquals(expectSuccess, success);
+        if (!expectSuccess) {
+            assertTrue(isFeedbackPresent(errorMsg, compiler.m_errors));
+        }
+    }
+
+    public void testUniqueIndexGiveException() {
+        // ensure the test cleans up
+        String msgP = "does not include the partitioning column";
+        String msgR = "use UNIQUE instead of ASSUMEUNIQUE";
+
+        // A unique index on the non-primary key for replicated table gets no warning.
+        String schema0 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "CREATE UNIQUE INDEX user_index0 ON t0 (name) ;";
+        checkValidUnique(schema0, null);
+        checkValidUnique(schema0.replace("UNIQUE", "ASSUMEUNIQUE"), msgR);
+
+        // A unique index on the partitioning key ( no primary key) gets no warning.
+        String schema1 = "create table t0 (id bigint not null, name varchar(32) not null, age integer);\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index1 ON t0 (id) ;";
+        checkValidUnique(schema1, null);
+        checkValidUnique(schema1.replace("UNIQUE", "ASSUMEUNIQUE"), msgR);
+
+        // A unique index on the partitioning key ( also primary key) gets no warning.
+        String schema2 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index2 ON t0 (id) ;";
+        checkValidUnique(schema2, null);
+        checkValidUnique(schema2.replace("UNIQUE", "ASSUMEUNIQUE"), msgR);
+
+        // A unique compound index on the partitioning key and another column gets no warning.
+        String schema3 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index3 ON t0 (id, age) ;";
+        checkValidUnique(schema3, null);
+        checkValidUnique(schema3.replace("UNIQUE", "ASSUMEUNIQUE"), msgR);
+
+        // A unique index on the partitioning key and an expression like abs(age) gets no warning.
+        String schema4 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index4 ON t0 (id, abs(age)) ;";
+        checkValidUnique(schema4, null);
+        checkValidUnique(schema4.replace("UNIQUE", "ASSUMEUNIQUE"), msgR);
+
+
+        // ****** Partition Table
+        // A unique index on the partitioning key ( non-primary key) gets one warning.
+        String schema6 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN name;\n" +
+                "CREATE UNIQUE INDEX user_index6 ON t0 (name) ;";
+        checkValidUnique(schema6, msgP);
+
+        // A unique index on the partitioning key ( no primary key) gets one warning.
+        String schema7 = "create table t0 (id bigint not null, name varchar(32) not null, age integer);\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index7 ON t0 (name) ;";
+        checkValidUnique(schema7, msgP);
+
+        // A unique index on the non-partitioning key gets one warning.
+        String schema8 = "create table t0 (id bigint not null, name varchar(32), age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index8 ON t0 (name) ;";
+        checkValidUnique(schema8, msgP);
+
+        // A unique index on an unrelated expression like abs(age) gets a warning.
+        String schema9 = "create table t0 (id bigint not null, name varchar(32), age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index9 ON t0 (abs(age)) ;";
+        checkValidUnique(schema9, msgP);
+
+
+        // A unique index on an expression of the partitioning key like substr(1, 2, name) gets two warnings.
+        String schema10 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN name;\n" +
+                "CREATE UNIQUE INDEX user_index10 ON t0 (substr(name, 1, 2 )) ;";
+        checkValidUnique(schema10, msgP);
+
+        // A unique index on the non-partitioning key, non-partitioned column gets two warnings.
+        String schema12 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN name;\n" +
+                "CREATE UNIQUE INDEX user_index12 ON t0 (age) ;";
+        checkValidUnique(schema12, msgP);
+
+        // ****** Replicate Table
+
+    }
+
+
     public void testPartitionOnBadType() {
         final String simpleSchema =
             "create table books (cash float default 0.0 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));";

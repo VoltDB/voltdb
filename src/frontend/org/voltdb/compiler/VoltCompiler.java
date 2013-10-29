@@ -762,8 +762,8 @@ public class VoltCompiler {
         final CatalogMap<Table> tables = db.getTables();
         for (Table table: tables) {
             String tableName = table.getTypeName();
-            if (voltDdlTracker.m_partitionMap.containsKey(tableName)) {
-                String colName = voltDdlTracker.m_partitionMap.get(tableName);
+            if (voltDdlTracker.m_partitionMap.containsKey(tableName.toLowerCase())) {
+                String colName = voltDdlTracker.m_partitionMap.get(tableName.toLowerCase());
                 // A null column name indicates a replicated table. Ignore it here
                 // because it defaults to replicated in the catalog.
                 if (colName != null) {
@@ -899,6 +899,9 @@ public class VoltCompiler {
                         "and can cause constraint violations when repartitioning the data. " +
                         "Try appending partitioning column %s to the index %s, or use the USER_UNIQUE keyword instead.",
                         indexName, tableName, c.getName(), c.getName(), indexName);
+                throw new VoltCompilerException(exceptionMsg);
+            } else if (contain && index.getAssumeunique()) {
+                String exceptionMsg = String.format("Please use UNIQUE instead of ASSUMEUNIQUE");
                 throw new VoltCompilerException(exceptionMsg);
             }
         }
