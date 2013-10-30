@@ -669,6 +669,7 @@ DISTRIBUTION
     <sequential>
         <mkdir dir="${dist.dir}@{distlabel}/bin" />
         <mkdir dir="${dist.dir}@{distlabel}/lib" />
+        <mkdir dir="${dist.dir}@{distlabel}/tools" />
         <mkdir dir="${raw.dist.dir}/voltdb-@{distlabel}-${dist.version}" />
         <copy todir="${dist.dir}@{distlabel}">
             <fileset dir="${base.dir}">
@@ -678,10 +679,6 @@ DISTRIBUTION
         <copy todir="${dist.dir}@{distlabel}/bin">
             <fileset dir="${base.dir}/bin">
                 <include name="voltadmin" />
-            </fileset>
-        </copy>
-        <copy todir="${dist.dir}@{distlabel}/tools">
-            <fileset dir="${base.dir}/tools">
             </fileset>
         </copy>
         <copy todir="${dist.dir}@{distlabel}/lib">
