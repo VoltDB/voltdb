@@ -992,6 +992,7 @@ public class ParserDDL extends ParserRoutine {
                 case Tokens.PRIMARY :
                 case Tokens.FOREIGN :
                 case Tokens.UNIQUE :
+                case Tokens.ASSUMEUNIQUE : // For VoltDB.
                 case Tokens.CHECK :
                     if (!startPart) {
                         throw unexpectedToken();
@@ -2667,7 +2668,7 @@ public class ParserDDL extends ParserRoutine {
                 readNewDependentSchemaObjectName(schemaObject.getName(),
                                                  SchemaObject.CONSTRAINT);
         }
-
+        boolean assumeUnique = false; // For VoltDB
         switch (token.tokenType) {
 
             case Tokens.PRIMARY : {
@@ -2700,12 +2701,18 @@ public class ParserDDL extends ParserRoutine {
 
                 break;
             }
+            case Tokens.ASSUMEUNIQUE : {
+                assumeUnique = true; // For VoltDB
+                // fall through
+            }
             case Tokens.UNIQUE : {
                 if (schemaObject.getName().type != SchemaObject.TABLE) {
                     throw this.unexpectedTokenRequire(Tokens.T_CHECK);
                 }
 
                 read();
+
+                int uniqueType = assumeUnique ? Constraint.ASSUMEUNIQUE : Constraint.UNIQUE;
 
                 // A VoltDB extension to "readColumnNames(false)" to support indexed expressions.
                 List<Expression> indexExprs = XreadExpressions(null);
@@ -2721,14 +2728,13 @@ public class ParserDDL extends ParserRoutine {
                     // A VoltDB extension to support indexed expressions.
                     // Not all expressions are simple columns.
                     set = getBaseColumnNames(indexExprs);
-                    Constraint exprc = new Constraint(constName, set, indexExprs.toArray(new Expression[indexExprs.size()]));
+                    Constraint exprc = new Constraint(constName, set, indexExprs.toArray(new Expression[indexExprs.size()]), uniqueType);
                     constraintList.add(exprc);
-
                     break;
 				}
 
                 Constraint c = new Constraint(constName, set,
-                                              Constraint.UNIQUE);
+                        uniqueType);
 
                 constraintList.add(c);
 
@@ -2792,7 +2798,7 @@ public class ParserDDL extends ParserRoutine {
                 constName = readNewDependentSchemaObjectName(table.getName(),
                         SchemaObject.CONSTRAINT);
             }
-
+            boolean assumeUnqiue = false;
             switch (token.tokenType) {
 
                 case Tokens.PRIMARY : {
@@ -2824,6 +2830,10 @@ public class ParserDDL extends ParserRoutine {
 
                     break;
                 }
+                case Tokens.ASSUMEUNIQUE : {
+                    assumeUnqiue = true; // For VoltDB
+                    // Fall through
+                }
                 case Tokens.UNIQUE : {
                     read();
 
@@ -2836,9 +2846,11 @@ public class ParserDDL extends ParserRoutine {
                                 table.getSchemaName(), table.getName(),
                                 SchemaObject.CONSTRAINT);
                     }
+                    // For VoltDB to support AssumeUnique
+                    int uniqueType = assumeUnqiue ? Constraint.ASSUMEUNIQUE : Constraint.UNIQUE;
 
                     Constraint c = new Constraint(constName, set,
-                                                  Constraint.UNIQUE);
+                            uniqueType);
 
                     constraintList.add(c);
 

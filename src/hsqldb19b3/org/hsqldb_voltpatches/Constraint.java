@@ -218,9 +218,10 @@ public final class Constraint implements SchemaObject {
         mainColSet = mainCols;
     }
 
-    // A VoltDB extension to support indexed expressions
-    public Constraint(HsqlName name, OrderedHashSet baseCols, Expression[] exprs) {
-        this(name, baseCols, Constraint.UNIQUE);
+    // A VoltDB extension to support indexed expressions or AssumeUnique.
+    public Constraint(HsqlName name, OrderedHashSet baseCols, Expression[] exprs, int type) {
+        this(name, baseCols, type);
+
         indexExprs = exprs;
     }
 
@@ -1042,6 +1043,7 @@ public final class Constraint implements SchemaObject {
         switch (constType) {
             case FOREIGN_KEY: return "FOREIGN_KEY";
             case MAIN: return "MAIN";
+            case ASSUMEUNIQUE: return "ASSUMEUNIQUE";
             case UNIQUE: return "UNIQUE";
             case CHECK: return isNotNull ? "NOT_NULL" : "CHECK";
             case PRIMARY_KEY: return "PRIMARY_KEY";
