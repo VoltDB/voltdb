@@ -530,8 +530,6 @@ public class StatementQuery extends StatementDMQL {
                 if (tableAlias != null) {
                     columnElmt.attributes.put("tablealias", tableAlias);
                 }
-                // Recurse one level down to resolve aggregation, order by, group by expressions
-                resolveUsingColumns(columnElmt.children, rvs);
             }
         }
     }
