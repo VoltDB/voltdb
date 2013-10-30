@@ -131,6 +131,7 @@ public class TestPushDownLimit extends PlannerTestCase {
         }
     }
 
+    private final boolean ENG5399fixed = false; 
     private void checkPushedDownLimit(AbstractPlanNode p, boolean downIntoScan, boolean downIntoJoin, boolean isLeftJoin) {
 
         if (downIntoScan) {
@@ -143,7 +144,7 @@ public class TestPushDownLimit extends PlannerTestCase {
             assertTrue(p.getInlinePlanNode(PlanNodeType.LIMIT) != null);
         }
 
-        if (isLeftJoin) {
+        if (ENG5399fixed && isLeftJoin) {
             assertTrue(p instanceof AbstractJoinPlanNode);
             assertTrue(((AbstractJoinPlanNode)p).getJoinType() == JoinType.LEFT);
             assertTrue(p.getInlinePlanNode(PlanNodeType.LIMIT) != null);
