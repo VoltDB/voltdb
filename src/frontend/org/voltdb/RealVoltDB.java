@@ -1110,23 +1110,28 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
             } catch (KeeperException.NodeExistsException e) {
                 byte deploymentBytesTemp[] = getDeploymentBytesFromZk(zk);
-                if (deploymentBytesTemp == null) {
-                    hostLog.error("Deployment file could not be found locally or remotely at: " + m_config.m_pathToDeployment);
-                    VoltDB.crashLocalVoltDB("No such deployment file: "
-                            + m_config.m_pathToDeployment, false, null);
-                }
-                PureJavaCrc32 crc = new PureJavaCrc32();
-                crc.update(deploymentBytes);
-                final long checksumHere = crc.getValue();
-                crc.reset();
-                crc.update(deploymentBytesTemp);
-                if (checksumHere != crc.getValue()) {
-                    hostLog.info("Deployment configuration was pulled from ZK, and the checksum did not match " +
-                    "the locally supplied file");
+                if (deploymentBytesTemp != null) {
+                    if (deploymentBytes != null) {
+                        PureJavaCrc32 crc = new PureJavaCrc32();
+                        crc.update(deploymentBytes);
+                        final long checksumHere = crc.getValue();
+                        crc.reset();
+                        crc.update(deploymentBytesTemp);
+                        if (checksumHere != crc.getValue()) {
+                            hostLog.info("Deployment configuration was pulled from ZK, and the checksum did not match "
+                                    + "the locally supplied file");
+                            deploymentBytes = null;
+                        } else {
+                            hostLog.info("Deployment configuration pulled from ZK");
+                        }
+                    } else {
+                        //Use remote deployment obtained.
+                        deploymentBytes = deploymentBytesTemp;
+                    }
                 } else {
-                    hostLog.info("Deployment configuration pulled from ZK");
+                    hostLog.error("Deployment file could not be loaded remotely, expected to be there: " + m_config.m_pathToDeployment);
+                    deploymentBytes = null;
                 }
-                deploymentBytes = deploymentBytesTemp;
             }
             if (deploymentBytes == null) {
                 hostLog.error("Deployment file could not be found locally or remotely at: " + m_config.m_pathToDeployment);
