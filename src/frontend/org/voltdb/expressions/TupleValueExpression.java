@@ -52,8 +52,6 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     private boolean m_hasAggregate = false;
 
-    private List<TupleValueExpression> m_childrenTVE = null;
-
     /**
      * Create a new TupleValueExpression
      * @param tableName  The name of the table where this column originated,
@@ -112,12 +110,6 @@ public class TupleValueExpression extends AbstractValueExpression {
         clone.m_tableAlias = m_tableAlias;
         clone.m_columnName = m_columnName;
         clone.m_columnAlias = m_columnAlias;
-        if (m_childrenTVE != null) {
-            clone.m_childrenTVE = new ArrayList<TupleValueExpression>();
-            for (TupleValueExpression childTVE : m_childrenTVE) {
-                clone.m_childrenTVE.add((TupleValueExpression) childTVE.clone());
-            }
-        }
         return clone;
     }
 
@@ -203,10 +195,6 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     public void setTableIndex(int idx) {
         m_tableIdx = idx;
-    }
-
-    public void setChildExpressions(List<TupleValueExpression> childrenTVE) {
-        m_childrenTVE = childrenTVE;
     }
 
     @Override
@@ -299,11 +287,6 @@ public class TupleValueExpression extends AbstractValueExpression {
         // TODO(XIN): getIgnoreCase takes 2% of Planner CPU, Optimize it later
         Table table = db.getTables().getIgnoreCase(m_tableName);
         resolveForTable(table);
-        if (m_childrenTVE != null) {
-            for (TupleValueExpression childTVE : m_childrenTVE) {
-                childTVE.resolveForDB(db);
-            }
-        }
     }
 
     @Override
@@ -326,17 +309,7 @@ public class TupleValueExpression extends AbstractValueExpression {
      * expressions.
      */
     public int resolveColumnIndexesUsingSchema(NodeSchema inputSchema) {
-        int index = inputSchema.getIndexOfTve(this);
-        if (index == -1 && m_childrenTVE != null) {
-            // Try to resolve column index using nested TVE
-            for (TupleValueExpression childTVE : m_childrenTVE) {
-                index = inputSchema.getIndexOfTve(childTVE);
-                if (index != -1) {
-                    break;
-                }
-            }
-        }
-        return index;
+        return inputSchema.getIndexOfTve(this);
     }
 
     // Even though this function applies generally to expressions and tables and not just to TVEs as such,

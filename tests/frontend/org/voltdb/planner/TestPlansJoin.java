@@ -336,7 +336,13 @@ public class TestPlansJoin extends PlannerTestCase {
         assertTrue(seqScan.getPredicate() != null);
         assertEquals(ExpressionType.COMPARE_GREATERTHAN, seqScan.getPredicate().getExpressionType());
 
-        apl = compileToFragments("select * FROM R2 LABEL RIGHT JOIN P1 USING(A) WHERE A > 0");
+        apl = compileToFragments("select A FROM R2 LABEL RIGHT JOIN P1 AP1 USING(A) WHERE A > 0");
+        pn = apl.get(0);
+        ns = pn.getOutputSchema();
+        assertEquals(1, ns.size());
+        SchemaColumn sc = ns.getColumns().get(0);
+        assertEquals("AP1", sc.getTableAlias());
+        assertEquals("P1", sc.getTableName());
         pn = apl.get(1);
         node = pn.getChild(0);
         assertTrue(node instanceof NestLoopPlanNode);
@@ -346,6 +352,11 @@ public class TestPlansJoin extends PlannerTestCase {
         seqScan = (SeqScanPlanNode)node.getChild(0);
         assertTrue(seqScan.getPredicate() != null);
         assertEquals(ExpressionType.COMPARE_GREATERTHAN, seqScan.getPredicate().getExpressionType());
+        ns = seqScan.getOutputSchema();
+        assertEquals(1, ns.size());
+        sc = ns.getColumns().get(0);
+        assertEquals("AP1", sc.getTableAlias());
+        assertEquals("P1", sc.getTableName());
 
     }
 
