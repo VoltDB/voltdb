@@ -253,7 +253,7 @@ public class InitiatorMailbox implements Mailbox
         logRxMessage(message);
         boolean canDeliver = m_scheduler.sequenceForReplay(message);
         if (message instanceof DumpMessage) {
-            hostLog.warn("Received DumpMessage at " + m_hsId);
+            hostLog.warn("Received DumpMessage at " + CoreUtils.hsIdToString(m_hsId));
         }
         if (message instanceof Iv2RepairLogRequestMessage) {
             handleLogRequest(message);
