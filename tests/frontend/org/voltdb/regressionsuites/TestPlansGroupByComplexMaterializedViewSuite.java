@@ -1491,7 +1491,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "CREATE TABLE P2 ( " +
                 "id INTEGER DEFAULT 0 NOT NULL, " +
                 "wage INTEGER, " +
-                "dept INTEGER NOT NULL, " +
+                "dept INTEGER NOT NULL assumeunique, " +
                 "age INTEGER,  " +
                 "rent INTEGER, " +
                 "PRIMARY KEY (id, dept) );" +

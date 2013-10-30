@@ -23,6 +23,8 @@ CREATE TABLE data_reports (
   CONSTRAINT IDX_reportData_PK PRIMARY KEY (reportID,metricID,time,field, appID)
 );
 PARTITION TABLE data_reports ON COLUMN appID;
+CREATE INDEX assumeunqiue_PK_index on data_reports (reportID,metricID,time,field);
+
 
 create table R (
   a bigint ,

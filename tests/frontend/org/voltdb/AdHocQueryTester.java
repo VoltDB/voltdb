@@ -57,7 +57,7 @@ public abstract class AdHocQueryTester extends TestCase {
 
                 "create table PARTED3 (" +
                 "PARTVAL bigint not null, " +
-                "NONPART bigint not null," +
+                "NONPART bigint not null ASSUMEUNIQUE," +
                 "PRIMARY KEY(NONPART, PARTVAL));" +
 
                 "create table REPPED1 (" +

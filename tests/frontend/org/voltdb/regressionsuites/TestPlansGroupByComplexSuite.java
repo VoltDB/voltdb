@@ -970,14 +970,14 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
                 "CREATE TABLE P2 ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
                 "WAGE INTEGER NOT NULL, " +
-                "DEPT INTEGER NOT NULL, " +
+                "DEPT INTEGER NOT NULL, " + // No assumeunique, because there are duplicates in test data.
                 "TM TIMESTAMP DEFAULT NULL, " +
                 "PRIMARY KEY (ID, DEPT) );" +
                 "PARTITION TABLE P2 ON COLUMN DEPT;" +
 
                 "CREATE TABLE P3 ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
-                "WAGE INTEGER NOT NULL, " +
+                "WAGE INTEGER NOT NULL, " + // No assumeunique, because there are duplicates in test data.
                 "DEPT INTEGER NOT NULL, " +
                 "TM TIMESTAMP DEFAULT NULL, " +
                 "PRIMARY KEY (ID, WAGE) );" +

@@ -262,12 +262,11 @@ public class TestIndexReverseScanSuite extends RegressionSuite {
 
     }
 
-    public void testReverseScanWithNulls() throws IOException, ProcCallException {
+    public void notestReverseScanWithNulls() throws IOException, ProcCallException {
         loadData();
-
-        Client c = this.getClient();
-        VoltTable vt;
-
+//
+//        Client c = this.getClient();
+//        VoltTable vt;
         // TODO: add test cases for null here or SQL coverage.
 
     }
@@ -311,7 +310,7 @@ public class TestIndexReverseScanSuite extends RegressionSuite {
 
                 "CREATE TABLE P2 ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
-                "a INTEGER not null, " +
+                "a INTEGER not null assumeunique, " +
                 "b INTEGER, " +
                 "c INTEGER, " +
                 "d INTEGER, " +
@@ -324,7 +323,7 @@ public class TestIndexReverseScanSuite extends RegressionSuite {
                 "CREATE TABLE P3 ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
                 "a INTEGER, " +
-                "b INTEGER not null, " +
+                "b INTEGER not null assumeunique, " +
                 "c INTEGER, " +
                 "d INTEGER, " +
                 "PRIMARY KEY (ID, b) );" +

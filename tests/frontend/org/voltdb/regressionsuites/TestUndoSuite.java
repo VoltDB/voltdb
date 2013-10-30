@@ -131,10 +131,10 @@ public class TestUndoSuite extends RegressionSuite {
         project.addStmtProcedure("CountP1", "select count(*) from p1;");
         try {
             project.addLiteralSchema(
-                    "CREATE TABLE p1(key INTEGER NOT NULL, b1 INTEGER NOT NULL, " +
-                    "b2 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1, key));"
+                    "CREATE TABLE p1(key INTEGER NOT NULL, b1 INTEGER NOT NULL ASSUMEUNIQUE, " +
+                    "b2 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1, key)); " +
+                    "PARTITION TABLE P1 ON COLUMN key;"
             );
-            project.addPartitionInfo("p1", "key");
 
             // a replicated table (should not generate procedures).
             project.addLiteralSchema(
