@@ -15,8 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef TIMEOUTEXCEPTION_H_
-#define TIMEOUTEXCEPTION_H_
+#ifndef INTERRUPTEXCEPTION_H_
+#define INTERRUPTEXCEPTION_H_
 
 #include "common/SerializableEEException.h"
 
