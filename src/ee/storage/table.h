@@ -389,7 +389,7 @@ protected:
         if (m_tuplesPinnedByUndo != 0) {
             return false;
         }
-        return allocatedTupleCount() - activeTupleCount() > (m_tuplesPerBlock * 3) && loadFactor() < .95;
+        return allocatedTupleCount() - activeTupleCount() > (m_tuplesPerBlock * 3) && loadFactor() < .50;
     }
 
     void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema);

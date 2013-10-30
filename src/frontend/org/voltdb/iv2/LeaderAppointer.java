@@ -46,10 +46,8 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKUtil;
-import org.voltdb.Promotable;
-import org.voltdb.SnapshotFormat;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltZK;
+import org.voltdb.*;
+import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -626,6 +624,7 @@ public class LeaderAppointer implements Promotable
 
         for (String partitionDir : partitionDirs) {
             int pid = LeaderElector.getPartitionFromElectionDir(partitionDir);
+
             String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
             try {
                 // The data of the partition dir indicates whether the partition has finished
@@ -639,6 +638,11 @@ public class LeaderAppointer implements Promotable
 
                 List<String> replicas = m_zk.getChildren(dir, null, null);
                 if (!isInitializing && replicas.isEmpty()) {
+                    //These partitions can fail, just cleanup and remove the partition from the system
+                    if (partitionNotOnHashRing(pid)) {
+                        removeAndCleanupPartition(pid);
+                        continue;
+                    }
                     tmLog.fatal("K-Safety violation: No replicas found for partition: " + pid);
                     retval = false;
                 }
@@ -648,6 +652,33 @@ public class LeaderAppointer implements Promotable
             }
         }
         return retval;
+    }
+
+    private void removeAndCleanupPartition(int pid) {
+        tmLog.info("Removing and cleanup up partition info for partition " + pid);
+        BabySitter sitter = m_partitionWatchers.remove(pid);
+        if (sitter != null) {
+            sitter.shutdown();
+        }
+        m_callbacks.remove(pid);
+        try {
+            try {
+                m_zk.delete(ZKUtil.joinZKPath(VoltZK.iv2masters, String.valueOf(pid)), -1);
+            } catch (KeeperException.NoNodeException e) {}
+            try {
+                m_zk.delete(ZKUtil.joinZKPath(VoltZK.iv2appointees, String.valueOf(pid)), -1);
+            } catch (KeeperException.NoNodeException e) {}
+            try {
+                m_zk.delete(ZKUtil.joinZKPath(VoltZK.leaders_initiators, "partition_" + String.valueOf(pid)), -1);
+            } catch (KeeperException.NoNodeException e) {}
+        } catch (Exception e) {
+            tmLog.error("Error removing partition info", e);
+        }
+    }
+
+    private boolean partitionNotOnHashRing(int pid) {
+        if (TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY) return false;
+        return TheHashinator.getRanges(pid).isEmpty();
     }
 
     /**
