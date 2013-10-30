@@ -10,11 +10,13 @@
 {@comparablevalue = "_numericvalue"}
 {@dmlcolumnpredicate = "_variable[numeric] _cmp _value[int16]"}
 {@dmltable = "_table"}
+{@fromtables = "_table B, _table"}
 {@idcol = "ID"}
 -- reducing the random values to int16 until overflow detection works
 --{@insertvals = "_id, _value[string], _value[int32], _value[float]"}
 {@insertvals = "_id, _value[string], _value[int16], _value[float]"}
 {@numcol = "NUM"}
+{@onefun = "ABS"}
 {@optionalfn = "_numfun"}
 {@updatecolumn = "NUM"}
 {@updatesource = "ID"}
