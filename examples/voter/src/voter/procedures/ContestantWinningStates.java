@@ -37,9 +37,6 @@ import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class ContestantWinningStates extends VoltProcedure
 {
     public final SQLStmt resultStmt = new SQLStmt(
