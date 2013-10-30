@@ -885,6 +885,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
+    /**
+     * Convenience method to submit wrapped Runnables to executor.
+     *
+     * @param runner Runnable task.
+     * @return ListenableFuture
+     */
     private ListenableFuture<?> runExportDataSourceRunner(Runnable runner) {
         if (m_shutdown) {
             return null;
@@ -899,7 +905,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return null;
     }
 
-    class ExportDataSourceRunnable implements Runnable {
+    //Wrapper Runnable.
+    final class ExportDataSourceRunnable implements Runnable {
 
         private final Runnable m_runner;
 
