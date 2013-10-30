@@ -131,7 +131,7 @@ public class TestPushDownLimit extends PlannerTestCase {
         }
     }
 
-    private final boolean ENG5399fixed = false; 
+    private final boolean ENG5399fixed = false;
     private void checkPushedDownLimit(AbstractPlanNode p, boolean downIntoScan, boolean downIntoJoin, boolean isLeftJoin) {
 
         if (downIntoScan) {
