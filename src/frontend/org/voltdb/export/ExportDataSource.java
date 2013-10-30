@@ -92,7 +92,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private final int m_nullArrayLength;
     private long m_polledBlockSize = 0;
-    private boolean m_shutdown = false;
 
     /**
      * Create a new data source.
@@ -639,7 +638,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             public Object call() throws Exception {
                 try {
                     m_committedBuffers.closeAndDelete();
-                    m_shutdown = true;
                     return null;
                 } finally {
                     m_es.shutdown();
@@ -680,7 +678,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             public void run() {
                 try {
                     m_committedBuffers.close();
-                    m_shutdown = true;
                 } catch (IOException e) {
                     exportLog.error(e);
                 } finally {
@@ -873,15 +870,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private void executeExportDataSourceRunner(Runnable runner) {
-        if (m_shutdown) {
+        if (m_es.isShutdown()) {
             return;
         }
         try {
             m_es.execute(new ExportDataSourceRunnable(runner));
         } catch (RejectedExecutionException rej) {
-            if (m_es.isShutdown()) {
-                m_shutdown = true;
-            }
         }
     }
 
@@ -892,15 +886,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * @return ListenableFuture
      */
     private ListenableFuture<?> runExportDataSourceRunner(Runnable runner) {
-        if (m_shutdown) {
+        if (m_es.isShutdown()) {
             return null;
         }
         try {
             return m_es.submit((Runnable) new ExportDataSourceRunnable(runner));
         } catch (RejectedExecutionException rej) {
-            if (m_es.isShutdown()) {
-                m_shutdown = true;
-            }
         }
         return null;
     }
@@ -916,12 +907,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         @Override
         public void run() {
-            if (m_shutdown) {
+            if (m_es.isShutdown()) {
                 return;
             }
-            if (m_runner != null) {
-                m_runner.run();
-            }
+            m_runner.run();
         }
     }
 }
