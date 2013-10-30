@@ -1758,7 +1758,7 @@ public class TestVoltCompiler extends TestCase {
 
         // Similar to SCHEMA0, but use a different way to define unique column.
         String schema5 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  " +
-        		"primary key (id), UNIQUE (name) );\n";
+                "primary key (id), UNIQUE (name) );\n";
         checkValidUnique(schema5, null);
         checkValidUnique(schema5.replace("UNIQUE", "ASSUMEUNIQUE"), msgR);
 
@@ -1776,14 +1776,14 @@ public class TestVoltCompiler extends TestCase {
 
         // A unique compound index on the partitioning key and another column gets no warning.
         String schema3 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  " +
-        		"UNIQUE (id, age), primary key (id));\n" +
+                "UNIQUE (id, age), primary key (id));\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n";
         checkValidUnique(schema3, null);
         checkValidUnique(schema3.replace("UNIQUE", "ASSUMEUNIQUE"), null);
 
         // A unique index on the partitioning key and an expression like abs(age) gets no warning.
         String schema4 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  " +
-        		"primary key (id), UNIQUE (id, abs(age)) );\n" +
+                "primary key (id), UNIQUE (id, abs(age)) );\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n";
         checkValidUnique(schema4, null);
         checkValidUnique(schema4.replace("UNIQUE", "ASSUMEUNIQUE"), null);
@@ -1817,7 +1817,7 @@ public class TestVoltCompiler extends TestCase {
 
         // A unique index on an expression of the partitioning key like substr(1, 2, name) gets two warnings.
         String schema10 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  " +
-        		"primary key (id), UNIQUE (substr(name, 1, 2 )) );\n" +
+                "primary key (id), UNIQUE (substr(name, 1, 2 )) );\n" +
                 "PARTITION TABLE t0 ON COLUMN name;\n";
         checkValidUnique(schema10, msgP);
         checkValidUnique(schema10.replace("UNIQUE", "ASSUMEUNIQUE"), msgP);
