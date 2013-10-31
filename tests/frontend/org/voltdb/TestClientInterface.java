@@ -42,6 +42,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -622,5 +624,43 @@ public class TestClientInterface {
 
         // the hashinator should've been updated in either case
         assertEquals(newHashinatorVersion, TheHashinator.getCurrentVersionedConfig().getFirst().longValue());
+    }
+
+    @Test
+    public void testGetPartitionKeys() throws IOException {
+        ByteBuffer msg = createMsg("@GetPartitionKeys", 99);
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNotNull(resp);
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
+
+        msg = createMsg("@GetPartitionKeys");
+        resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNotNull(resp);
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
+
+        msg = createMsg("@GetPartitionKeys", 99, 99);
+        resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNotNull(resp);
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
+
+        msg = createMsg("@GetPartitionKeys", 6);
+        resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNotNull(resp);
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
+
+        msg = createMsg("@GetPartitionKeys", 5);
+        resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNotNull(resp);
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        VoltTable vt = resp.getResults()[0];
+        assertEquals(3, vt.getRowCount());
+        assertEquals(VoltType.INTEGER, vt.getColumnType(1));
+
+        Set<Integer> partitions = new HashSet<Integer>(Arrays.asList( 0, 1, 2));
+        while (vt.advanceRow()) {
+            int partition = TheHashinator.getPartitionForParameter(VoltType.INTEGER.getValue(), vt.getLong(1));
+            assertTrue(partitions.remove(partition));
+        }
+        assertTrue(partitions.isEmpty());
     }
 }

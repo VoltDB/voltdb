@@ -628,4 +628,9 @@ public class ElasticHashinator extends TheHashinator {
     {
         return (int) ((((long) token - Integer.MIN_VALUE) / interval) * interval + Integer.MIN_VALUE);
     }
+
+    @Override
+    protected Set<Integer> pGetPartitions() {
+        return new HashSet<Integer>(m_tokensMap.get().values());
+    }
 }

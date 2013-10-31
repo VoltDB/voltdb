@@ -1697,8 +1697,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         // ping just responds as fast as possible to show the connection is alive
         // nb: ping is not a real procedure, so this is checked before other "sysprocs"
-        if (task.procName.equals("@Ping")) {
-            return new ClientResponseImpl(ClientResponseImpl.SUCCESS, new VoltTable[0], "", task.clientHandle);
+        if (task.procName.startsWith("@")) {
+            if (task.procName.equals("@Ping")) {
+                return new ClientResponseImpl(ClientResponseImpl.SUCCESS, new VoltTable[0], "", task.clientHandle);
+            }
+            if (task.procName.equals("@GetPartitionKeys")) {
+                return dispatchGetPartitionKeys(task);
+            }
         }
 
         // Deserialize the client's request and map to a catalog stored procedure
@@ -1878,6 +1883,47 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     task.clientHandle);
         }
         return null;
+    }
+
+    private ClientResponseImpl dispatchGetPartitionKeys(StoredProcedureInvocation task) {
+        Object params[] = task.getParams().toArray();
+        String typeString = "the type of partition key to return and can be one of " +
+                            "INTEGER(5), STRING(9), or VARBINARY(25)";
+        if (params.length != 1) {
+            return new ClientResponseImpl(
+                    ClientResponse.GRACEFUL_FAILURE,
+                    new VoltTable[0],
+                    "GetPartitionKeys must have one integer parameter specifying " + typeString,
+                    task.clientHandle);
+        }
+        if (!(params[0] instanceof Number)) {
+            return new ClientResponseImpl(
+                    ClientResponse.GRACEFUL_FAILURE,
+                    new VoltTable[0],
+                    "GetPartitionKeys must have one integer parameter specifying " + typeString +
+                    " provided type was " + params[0].getClass().getName(),
+                    task.clientHandle);
+        }
+        VoltType voltType = null;
+        byte typeValue = ((Number)params[0]).byteValue();
+        try {
+            voltType = VoltType.get(typeValue);
+        } catch (AssertionError e) {
+            return new ClientResponseImpl(
+                    ClientResponse.GRACEFUL_FAILURE,
+                    new VoltTable[0],
+                    "Type " + typeValue + " is not a supported type of partition key, " + typeString,
+                    task.clientHandle);
+        }
+        VoltTable partitionKeys = TheHashinator.getPartitionKeys(voltType);
+        if (partitionKeys == null) {
+            return new ClientResponseImpl(
+                    ClientResponse.GRACEFUL_FAILURE,
+                    new VoltTable[0],
+                    "Type " + typeValue + " is not a supported type of partition key, " + typeString,
+                    task.clientHandle);
+        }
+        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[] { partitionKeys }, null, task.clientHandle);
     }
 
     void createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch)
