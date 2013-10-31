@@ -1095,7 +1095,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             byte deploymentBytes[] = null;
 
             try {
-                org.voltcore.utils.CoreUtils.urlToBytes(m_config.m_pathToDeployment);
+                deploymentBytes = org.voltcore.utils.CoreUtils.urlToBytes(m_config.m_pathToDeployment);
             } catch (Exception ex) {
                 //Let us get bytes from ZK
                 hostLog.info("Deployment file could not be found locally at: " + m_config.m_pathToDeployment);
