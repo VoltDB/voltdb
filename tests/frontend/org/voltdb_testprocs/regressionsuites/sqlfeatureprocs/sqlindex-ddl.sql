@@ -16,7 +16,7 @@ CREATE TABLE TU2 (
 );
 partition table TU2 on column UNAME;
 create unique index idx_U2_TREE on TU2 (UNAME,POINTS);
-create assumeunique index idx2_U2_TREE ON TU2 (UNAME, POINTS + 10);
+create unique index idx2_U2_TREE ON TU2 (UNAME, POINTS + 10);
 create unique index idx3_U2_TREE ON TU2 (POINTS * 2, UNAME);
 create assumeunique index idx4_U2_TREE ON TU2 (ABS(POINTS), CHAR_LENGTH(UNAME));
 

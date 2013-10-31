@@ -310,7 +310,7 @@ public class TestIndexReverseScanSuite extends RegressionSuite {
 
                 "CREATE TABLE P2 ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
-                "a INTEGER not null assumeunique, " +
+                "a INTEGER not null unique, " +
                 "b INTEGER, " +
                 "c INTEGER, " +
                 "d INTEGER, " +
@@ -323,7 +323,7 @@ public class TestIndexReverseScanSuite extends RegressionSuite {
                 "CREATE TABLE P3 ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
                 "a INTEGER, " +
-                "b INTEGER not null assumeunique, " +
+                "b INTEGER not null unique, " +
                 "c INTEGER, " +
                 "d INTEGER, " +
                 "PRIMARY KEY (ID, b) );" +
