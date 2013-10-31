@@ -114,7 +114,7 @@ public class HTTPClientInterface {
             if (m_connections == null) {
                 int port = VoltDB.instance().getConfig().m_port;
                 int adminPort = VoltDB.instance().getConfig().m_adminPort;
-                String externalInterface = VoltDB.instance().getConfig();
+                String externalInterface = VoltDB.instance().getConfig().m_externalInterface;
                 if (externalInterface == null || externalInterface.isEmpty()) {
                     externalInterface = "localhost";
                 }
