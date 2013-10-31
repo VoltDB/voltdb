@@ -348,7 +348,7 @@ TEST_F(CompactionTest, BasicCompaction) {
     ASSERT_TRUE(pkeysFoundAfterDelete == pkeysNotDeleted);
     //    std::cout << "Have " << m_table->m_data.size() << " blocks left " << m_table->allocatedTupleCount() << ", " << m_table->activeTupleCount() << std::endl;
 #ifdef MEMCHECK
-    ASSERT_EQ( m_table->m_data.size(), 500);
+    ASSERT_EQ( m_table->m_data.size(), 333);
 #else
     ASSERT_EQ( m_table->m_data.size(), 12);
 #endif
