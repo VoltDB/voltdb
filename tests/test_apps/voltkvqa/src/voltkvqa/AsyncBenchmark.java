@@ -459,6 +459,8 @@ public class AsyncBenchmark {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
+
+        System.exit(1);
     }
     /**
      * Prints the results of the voting simulation and statistics
