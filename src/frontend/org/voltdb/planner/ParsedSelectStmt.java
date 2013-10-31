@@ -265,15 +265,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (columns != null) {
                 mvNewScanColumns.addAll(columns);
             }
-            if (mvFixInfo.checkFixNeeded(mvTable)) {
-                mvFixInfo.processMVBasedQueryFix(mvNewScanColumns, joinTree);
+            if (mvFixInfo.processMVBasedQueryFix(mvTable, mvNewScanColumns, this)) {
                 break;
             }
         }
     }
 
     private boolean needComplexAggregation () {
-        if (!hasAggregateExpression && !isGrouped()) {
+        if (!hasAggregateExpression() && !isGrouped()) {
             hasComplexAgg = false;
             return false;
         }

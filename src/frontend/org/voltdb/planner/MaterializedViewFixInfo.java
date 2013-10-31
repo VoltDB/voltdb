@@ -32,8 +32,10 @@ import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
@@ -86,7 +88,7 @@ public class MaterializedViewFixInfo {
      * Set the need flag to true, only if it needs to be fixed.
      * @return
      */
-    public boolean checkFixNeeded(Table table) {
+    public boolean processMVBasedQueryFix(Table table, Set<SchemaColumn> scanColumns, ParsedSelectStmt stmt) {
         // Check valid cases first
         String mvTableName = table.getTypeName();
         Table srcTable = table.getMaterializer();
@@ -102,7 +104,6 @@ public class MaterializedViewFixInfo {
         MaterializedViewInfo mvInfo = srcTable.getViews().get(mvTableName);
 
         // Justify whether partition column is in group by column list or not
-
         String complexGroupbyJson = mvInfo.getGroupbyexpressionsjson();
         if (complexGroupbyJson.length() > 0) {
             List<AbstractExpression> mvComplexGroupbyCols = null;
@@ -138,11 +139,200 @@ public class MaterializedViewFixInfo {
             }
         }
         assert(m_numOfGroupByColumns > 0);
-
         m_mvTable = table;
+
+        Set<TupleValueExpression> mvDDLGroupbyTVEs = new HashSet<TupleValueExpression>();
+        List<Column> mvColumnArray =
+                CatalogUtil.getSortedCatalogItems(table.getColumns(), "index");
+
+
+        // Start to do real materialized view processing to fix the duplicates problem.
+        // (1) construct new projection columns for scan plan node.
+        Set<SchemaColumn> mvDDLGroupbyColumns = new HashSet<SchemaColumn>();
+        NodeSchema inlineProjSchema = new NodeSchema();
+        for (SchemaColumn scol: scanColumns) {
+            inlineProjSchema.addColumn(scol);
+        }
+
+        for (int i = 0; i < m_numOfGroupByColumns; i++) {
+            Column mvCol = mvColumnArray.get(i);
+            String colName = mvCol.getName();
+
+            TupleValueExpression tve = new TupleValueExpression();
+            tve.setColumnIndex(i);
+            tve.setColumnName(colName);
+            tve.setTableName(mvTableName);
+            tve.setColumnAlias(colName);
+            tve.setValueType(VoltType.get((byte)mvCol.getType()));
+            tve.setValueSize(mvCol.getSize());
+
+            mvDDLGroupbyTVEs.add(tve);
+
+            SchemaColumn scol = new SchemaColumn(mvTableName, colName, colName, tve);
+
+            mvDDLGroupbyColumns.add(scol);
+            if (!scanColumns.contains(scol)) {
+                scanColumns.add(scol);
+                // construct new projection columns for scan plan node.
+                inlineProjSchema.addColumn(scol);
+            }
+        }
+
+        Map<String, ExpressionType> mvColumnAggType = new HashMap<String, ExpressionType>();
+
+        // Record the re-aggregation type for each scan columns.
+        Map<String, ExpressionType> mvColumnReAggType = new HashMap<String, ExpressionType>();
+        for (int i = m_numOfGroupByColumns; i < mvColumnArray.size(); i++) {
+            Column mvCol = mvColumnArray.get(i);
+            ExpressionType reAggType = ExpressionType.get(mvCol.getAggregatetype());
+            mvColumnAggType.put(mvCol.getName(), reAggType);
+
+            if (reAggType == ExpressionType.AGGREGATE_COUNT_STAR ||
+                    reAggType == ExpressionType.AGGREGATE_COUNT) {
+                reAggType = ExpressionType.AGGREGATE_SUM;
+            }
+            mvColumnReAggType.put(mvCol.getName(), reAggType);
+        }
+
+        m_scanInlinedProjectionNode = new ProjectionPlanNode();
+        m_scanInlinedProjectionNode.setOutputSchema(inlineProjSchema);
+
+        // (2) Construct the reAggregation Node.
+
+        // Construct the reAggregation plan node's aggSchema
+        m_reAggNode = new HashAggregatePlanNode();
+        int outputColumnIndex = 0;
+        // inlineProjSchema contains the group by columns, while aggSchema may do not.
+        NodeSchema aggSchema = new NodeSchema();
+
+        // Construct reAggregation node's aggregation and group by list.
+        for (SchemaColumn scol: scanColumns) {
+            if (mvDDLGroupbyColumns.contains(scol)) {
+                // Add group by expression.
+                m_reAggNode.addGroupByExpression(scol.getExpression());
+            } else {
+                ExpressionType reAggType = mvColumnReAggType.get(scol.getColumnName());
+                assert(reAggType != null);
+                AbstractExpression agg_input_expr = scol.getExpression();
+                assert(agg_input_expr instanceof TupleValueExpression);
+                // Add aggregation information.
+                m_reAggNode.addAggregate(reAggType, false, outputColumnIndex, agg_input_expr);
+            }
+            aggSchema.addColumn(scol);
+            outputColumnIndex++;
+        }
+        m_reAggNode.setOutputSchema(aggSchema);
+
+
+        // Collect all TVEs that need to be do re-aggregation in coordinator.
+        List<TupleValueExpression> needReAggTVEs = new ArrayList<TupleValueExpression>();
+        List<AbstractExpression> aggPostExprs = new ArrayList<AbstractExpression>();
+
+        for (int i=m_numOfGroupByColumns; i < mvColumnArray.size(); i++) {
+            Column mvCol = mvColumnArray.get(i);
+            TupleValueExpression tve = new TupleValueExpression();
+            tve.setColumnIndex(i);
+            tve.setColumnName(mvCol.getName());
+            tve.setTableName(getMVTableName());
+            tve.setColumnAlias(mvCol.getName());
+            tve.setValueType(VoltType.get((byte)mvCol.getType()));
+            tve.setValueSize(mvCol.getSize());
+
+            needReAggTVEs.add(tve);
+        }
+
+        collectReAggNodePostExpressions(stmt.joinTree, needReAggTVEs, aggPostExprs);
+
+        AbstractExpression aggPostExpr = ExpressionUtil.combine(aggPostExprs);
+        // Add post filters for the reAggregation node.
+        m_reAggNode.setPostPredicate(aggPostExpr);
+
+
+        // ENG-5386
+        if (aggPostExpr == null && edgeCaseQueryNoFixNeeded(stmt, mvDDLGroupbyTVEs, mvColumnAggType)) {
+            return false;
+        }
+
         m_needed = true;
         return true;
     }
+
+    // ENG-5386: do not fix some cases in order to get better performance.
+    private boolean edgeCaseQueryNoFixNeeded(ParsedSelectStmt stmt, Set<TupleValueExpression> mvDDLGroupbyTVEs,
+            Map<String, ExpressionType> mvColumnAggType) {
+
+        if (stmt.hasComplexGroupby()) {
+            return false;
+        }
+
+        if (stmt.tableList.size() == 1) {
+            // Condition (1): Group by columns must be part of or all from MV DDL group by TVEs.
+            for (ParsedColInfo gcol: stmt.groupByColumns()) {
+                assert(gcol.expression instanceof TupleValueExpression);
+                TupleValueExpression tve = (TupleValueExpression) gcol.expression;
+                if (!mvDDLGroupbyTVEs.contains(tve)) {
+                    return false;
+                }
+            }
+
+            // Condition (2): Aggregation must be:
+            /**
+             * SUM(sum_column), MIN(min_column), MAX(max_column)
+             */
+            for (ParsedColInfo dcol: stmt.displayColumns()) {
+                if (stmt.groupByColumns().contains(dcol)) {
+                    continue;
+                }
+                if (dcol.expression instanceof AggregateExpression == false) {
+                    return false;
+                }
+                AggregateExpression aggExpr = (AggregateExpression) dcol.expression;
+                if (aggExpr.getLeft() instanceof TupleValueExpression == false) {
+                    return false;
+                }
+                ExpressionType type = aggExpr.getExpressionType();
+                TupleValueExpression tve = (TupleValueExpression) aggExpr.getLeft();
+                String columnName = tve.getColumnName();
+
+                if (type != ExpressionType.AGGREGATE_SUM && type != ExpressionType.AGGREGATE_MIN
+                        && type != ExpressionType.AGGREGATE_MAX) {
+                    return false;
+                }
+
+                if (mvColumnAggType.get(columnName) != type ) {
+                    return false;
+                }
+            }
+        } else {
+            // For join query.
+            JoinNode joinTree = stmt.joinTree;
+            // join query has to be uniquely match.
+
+            return false;
+        }
+
+
+        // Edge case query can be optimized with correct answer without MV reAggregation fix.
+        return true;
+    }
+
+    private void collectJoinExpressions(JoinNode joinTree,
+            List<TupleValueExpression> needReAggTVEs, List<AbstractExpression> joinTVEs) {
+        if (joinTree.m_leftNode != null) {
+            collectReAggNodePostExpressions(joinTree.m_leftNode, needReAggTVEs, joinTVEs);
+        }
+        if (joinTree.m_rightNode != null) {
+            collectReAggNodePostExpressions(joinTree.m_rightNode, needReAggTVEs, joinTVEs);
+        }
+        if (joinTree.m_table != null) {
+            joinTree.m_joinExpr = processFilters(joinTree.m_joinExpr, needReAggTVEs, joinTVEs);
+
+            // For outer join filters. Inner join or single table query will have whereExpr be null.
+            joinTree.m_whereExpr = processFilters(joinTree.m_whereExpr, needReAggTVEs, joinTVEs);
+        }
+    }
+
+
 
     /**
      * Find the scan node on MV table, replace it with reAggNode for join query.
@@ -176,80 +366,6 @@ public class MaterializedViewFixInfo {
             }
         }
         return false;
-    }
-
-    private void processInlineProjectionsAndReAggNode(Set<SchemaColumn> scanColumns, List<Column> mvColumnArray) {
-        assert(m_needed);
-        String mvTableName = m_mvTable.getTypeName();
-
-        // (1) construct new projection columns for scan plan node.
-        Set<SchemaColumn> mvDDLGroupbyColumns = new HashSet<SchemaColumn>();
-        NodeSchema inlineProjSchema = new NodeSchema();
-        for (SchemaColumn scol: scanColumns) {
-            inlineProjSchema.addColumn(scol);
-        }
-
-        for (int i = 0; i < m_numOfGroupByColumns; i++) {
-            Column mvCol = mvColumnArray.get(i);
-            String colName = mvCol.getName();
-
-            TupleValueExpression tve = new TupleValueExpression();
-            tve.setColumnIndex(i);
-            tve.setColumnName(colName);
-            tve.setTableName(mvTableName);
-            tve.setColumnAlias(colName);
-            tve.setValueType(VoltType.get((byte)mvCol.getType()));
-            tve.setValueSize(mvCol.getSize());
-
-            SchemaColumn scol = new SchemaColumn(mvTableName, colName, colName, tve);
-
-            mvDDLGroupbyColumns.add(scol);
-            if (!scanColumns.contains(scol)) {
-                scanColumns.add(scol);
-                // construct new projection columns for scan plan node.
-                inlineProjSchema.addColumn(scol);
-            }
-        }
-        m_scanInlinedProjectionNode = new ProjectionPlanNode();
-        m_scanInlinedProjectionNode.setOutputSchema(inlineProjSchema);
-
-        // (2) Construct the reAggregation Node.
-        // Record the re-aggregation type for each scan columns.
-        Map<String, ExpressionType> mvColumnAggType = new HashMap<String, ExpressionType>();
-        for (int i = m_numOfGroupByColumns; i < mvColumnArray.size(); i++) {
-            Column mvCol = mvColumnArray.get(i);
-            ExpressionType reAggType = ExpressionType.get(mvCol.getAggregatetype());
-            if (reAggType == ExpressionType.AGGREGATE_COUNT_STAR ||
-                    reAggType == ExpressionType.AGGREGATE_COUNT) {
-                reAggType = ExpressionType.AGGREGATE_SUM;
-            }
-            mvColumnAggType.put(mvCol.getName(), reAggType);
-        }
-
-        // Construct the reAggregation plan node's aggSchema
-        m_reAggNode = new HashAggregatePlanNode();
-        int outputColumnIndex = 0;
-        // inlineProjSchema contains the group by columns, while aggSchema may do not.
-        NodeSchema aggSchema = new NodeSchema();
-
-        // Construct reAggregation node's aggregation and group by list.
-        for (SchemaColumn scol: scanColumns) {
-            if (mvDDLGroupbyColumns.contains(scol)) {
-                // Add group by expression.
-                m_reAggNode.addGroupByExpression(scol.getExpression());
-            } else {
-                ExpressionType reAggType = mvColumnAggType.get(scol.getColumnName());
-                assert(reAggType != null);
-                AbstractExpression agg_input_expr = scol.getExpression();
-                assert(agg_input_expr instanceof TupleValueExpression);
-                // Add aggregation information.
-                m_reAggNode.addAggregate(reAggType, false, outputColumnIndex, agg_input_expr);
-            }
-            aggSchema.addColumn(scol);
-            outputColumnIndex++;
-        }
-        m_reAggNode.setOutputSchema(aggSchema);
-
     }
 
     private boolean fromMVTableOnly(List<AbstractExpression> tves) {
@@ -313,40 +429,5 @@ public class MaterializedViewFixInfo {
             return remaningFilters;
         }
         return null;
-    }
-
-    /**
-     * Start to do real materialized view processing to fix the duplicates problem.
-     * @param scanColumns
-     * @param joinTree
-     */
-    public void processMVBasedQueryFix(Set<SchemaColumn> scanColumns, JoinNode joinTree) {
-        List<Column> mvColumnArray =
-                CatalogUtil.getSortedCatalogItems(m_mvTable.getColumns(), "index");
-
-        processInlineProjectionsAndReAggNode(scanColumns, mvColumnArray);
-
-        // Collect all TVEs that need to be do re-aggregation in coordinator.
-        List<TupleValueExpression> needReAggTVEs = new ArrayList<TupleValueExpression>();
-        List<AbstractExpression> aggPostExprs = new ArrayList<AbstractExpression>();
-
-        for (int i=m_numOfGroupByColumns; i < mvColumnArray.size(); i++) {
-            Column mvCol = mvColumnArray.get(i);
-            TupleValueExpression tve = new TupleValueExpression();
-            tve.setColumnIndex(i);
-            tve.setColumnName(mvCol.getName());
-            tve.setTableName(getMVTableName());
-            tve.setColumnAlias(mvCol.getName());
-            tve.setValueType(VoltType.get((byte)mvCol.getType()));
-            tve.setValueSize(mvCol.getSize());
-
-            needReAggTVEs.add(tve);
-        }
-
-        collectReAggNodePostExpressions(joinTree, needReAggTVEs, aggPostExprs);
-
-        AbstractExpression aggPostExpr = ExpressionUtil.combine(aggPostExprs);
-        // Add post filters for the reAggregation node.
-        m_reAggNode.setPostPredicate(aggPostExpr);
     }
 }
