@@ -1191,10 +1191,7 @@ class NValue {
             retval.getTimestamp() = whole.ToInt(); break;
         }
         case VALUE_TYPE_VARCHAR: {
-            std::string str (reinterpret_cast<const char*>(getObjectValue()));
-            // trim both end whitespaces
-            str.erase(str.begin(), std::find_if(str.begin(), str.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
-            str.erase(std::find_if(str.rbegin(), str.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), str.end());
+            const char* str = reinterpret_cast<const char*>(getObjectValue());
             retval.getTimestamp() = parseTimestampString(str);
             break;
         }
@@ -1205,121 +1202,161 @@ class NValue {
         return retval;
     }
 
-    int64_t parseTimestampString(std::string &str) const {
+    static void throwTimestampFormatError(const std::string& str)
+    {
+        char message[4096];
+        // No space separator for between the date and time
+        snprintf(message, 4096, "Attempted to cast %s to type %s failed. Supported format: YYYY-MM-DD HH:MM:SS.XXXXXX",
+                 str.c_str(), valueToString(VALUE_TYPE_TIMESTAMP).c_str());
+        throw SQLException(SQLException::dynamic_sql_error, message);
+    }
+
+    static int64_t parseTimestampString(const char* str)
+    {
         // tm structure
         std::tm date_time;
-        int sep_pos = static_cast<int>(str.find(' '));
         // date_str
-        std::string date_str = str.substr(0, sep_pos);
+        std::string date_str = str;
         date_str.erase(date_str.begin(), std::find_if(date_str.begin(), date_str.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
-        date_str.erase(std::find_if(date_str.rbegin(), date_str.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), date_str.end());
+        std::size_t sep_pos = date_str.find(' ');
+        if (sep_pos != 10) {
+            throwTimestampFormatError(str);
+        }
+
         // time_str
-        std::string time_str = str.substr(sep_pos + 1);
+        std::string time_str = date_str.substr(sep_pos + 1);
         time_str.erase(time_str.begin(), std::find_if(time_str.begin(), time_str.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
         time_str.erase(std::find_if(time_str.rbegin(), time_str.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), time_str.end());
-        // date and time spec strings
-        std::string date_spec_str = "YMD";
-        std::string time_spec_str = "HMSm";
-        char * pch;
-        long micro = 0;
-
-        char message[4096];
-        snprintf(message, 4096, "Attempted to cast %s to type %s failed. Supported format: YYYY-MM-DD HH:MM:SS.XXXXXX",
-                    str.c_str(), valueToString(VALUE_TYPE_TIMESTAMP).c_str());
-
-        // start to tokenize date_str: YYYY-MM-DD
-        for ( int i = 0; i < date_spec_str.length(); i++) {
-            pch = std::strtok((i == 0 ? const_cast<char*>(date_str.c_str()) : NULL), "-");
-            if (pch != NULL) {
-                switch (date_spec_str.at(i)) {
-                    case 'Y':
-                    {
-                        int year = atoi(pch);
-                        if (year > 9999 || year < 0) {
-                            throw SQLException(SQLException::dynamic_sql_error, message);
-                        }
-                        date_time.tm_year = year - 1900;
-                        break;
-                    }
-                    case 'M':
-                    {
-                        int month = atoi(pch);
-                        if (month > 12 || month < 1) {
-                            throw SQLException(SQLException::dynamic_sql_error, message);
-                        }
-                        date_time.tm_mon = atoi(pch) - 1;
-                        break;
-                    }
-                    case 'D':
-                    {
-                        int day = atoi(pch);
-                        // TODO: for now we only check the most common case
-                        if (day > 31 || day < 1) {
-                            throw SQLException(SQLException::dynamic_sql_error, message);
-                        }
-                        date_time.tm_mday = atoi(pch);
-                        break;
-                    }
-                    default: throw SQLException(SQLException::dynamic_sql_error, message);
-                } //switch
-            } else {
-                throw SQLException(SQLException::dynamic_sql_error, message);
-            }
+        if (time_str.length() != 15) {
+            throwTimestampFormatError(str);
         }
 
-        // start to tokenize time_str: HH:MM:SS.mmmmmm
-        for ( int i = 0; i < time_spec_str.length(); i++) {
-            pch = std::strtok((i == 0 ? const_cast<char*>(time_str.c_str()) : NULL), ":.");
-            if (pch != NULL) {
-                switch (time_spec_str.at(i)) {
-                    case 'H':
-                    {
-                        int hour = atoi(pch);
-                        if (hour > 23 || hour < 0) {
-                            throw SQLException(SQLException::dynamic_sql_error, message);
-                        }
-                        date_time.tm_hour = atoi(pch);
-                        break;
-                    }
-                    case 'M':
-                    {
-                        int min = atoi(pch);
-                        if (min > 59 || min < 0) {
-                            throw SQLException(SQLException::dynamic_sql_error, message);
-                        }
-                        date_time.tm_min = atoi(pch);
-                        break;
-                    }
-                    case 'S':
-                    {
-                        int sec = atoi(pch);
-                        if (sec > 59 || sec < 0) {
-                            throw SQLException(SQLException::dynamic_sql_error, message);
-                        }
-                        date_time.tm_sec = atoi(pch);
-                        break;
-                    }
-                    case 'm':
-                    {
-                        if (sizeof(pch) > 6) {
-                            pch[6] = '\0';
-                        }
-                        if (sizeof(pch) < 6) {
-                            for (int i = sizeof(pch); i < 6; i++) {
-                                pch[i] = '0';
-                            }
-                            pch[6] = '\0';
-                        }
-                        micro = atoi(pch);
-                        break;
-                    }
-                    default: throw SQLException(SQLException::dynamic_sql_error, message);
-                } //switch
-            } else {
-                throw SQLException(SQLException::dynamic_sql_error, message);
-            }
+
+        std::string number_string;
+        const char * pch;
+
+        if (date_str.at(4) != '-' || date_str.at(7) != '-') {
+            throwTimestampFormatError(str);
         }
-        return std::mktime(&date_time) * 1000000 + micro;
+
+        number_string = date_str.substr(0,4);
+        pch = number_string.c_str();
+        int year = atoi(pch);
+        if (year > 9999 || year < 1000) {
+            throwTimestampFormatError(str);
+        } //
+        date_time.tm_year = year - 1900;
+
+        number_string = date_str.substr(5,2);
+        pch = number_string.c_str();
+        int month;
+        if (pch[0] == '0') {
+            month = 0;
+        } else if (pch[0] == '1') {
+            month = 10;
+        } else {
+            throwTimestampFormatError(str);
+        }
+        if (pch[1] > '9' || pch[1] < '0') {
+            throwTimestampFormatError(str);
+        }
+        month += pch[1] - '0';
+        if (month > 12 || month < 1) {
+            throwTimestampFormatError(str);
+        }
+        date_time.tm_mon = month - 1;
+
+        number_string = date_str.substr(8,2);
+        pch = number_string.c_str();
+        int day;
+        if (pch[0] == '0') {
+            day = 0;
+        } else if (pch[0] == '1') {
+            day = 10;
+        } else if (pch[0] == '2') {
+            day = 20;
+        } else if (pch[0] == '3') {
+            day = 30;
+        } else {
+            throwTimestampFormatError(str);
+        }
+        if (pch[1] > '9' || pch[1] < '0') {
+            throwTimestampFormatError(str);
+        }
+        day += pch[1] - '0';
+        if (day > 31 || day < 1) {
+            throwTimestampFormatError(str);
+        }
+        date_time.tm_mday = day;
+
+        // tokenize time_str: HH:MM:SS.mmmmmm
+        if (time_str.at(2) != ':' || time_str.at(5) != ':' || time_str.at(8) != '.') {
+            throwTimestampFormatError(str);
+        }
+
+        number_string = time_str.substr(0,2);
+        pch = number_string.c_str();
+        int hour;
+        if (pch[0] == '0') {
+            hour = 0;
+        } else if (pch[0] == '1') {
+            hour = 10;
+        } else if (pch[0] == '2') {
+            hour = 20;
+        } else {
+            throwTimestampFormatError(str);
+        }
+        if (pch[1] > '9' || pch[1] < '0') {
+            throwTimestampFormatError(str);
+        }
+        hour += pch[1] - '0';
+        if (hour > 23 || hour < 0) {
+            throwTimestampFormatError(str);
+        }
+        date_time.tm_hour = hour;
+
+        number_string = time_str.substr(3,2);
+        pch = number_string.c_str();
+        int minute;
+        if (pch[0] > '5' || pch[0] < '0') {
+            throwTimestampFormatError(str);
+        }
+        minute = 10*(pch[0] - '0');
+        if (pch[1] > '9' || pch[1] < '0') {
+            throwTimestampFormatError(str);
+        }
+        minute += pch[1] - '0';
+        if (minute > 59 || minute < 0) {
+            throwTimestampFormatError(str);
+        }
+        date_time.tm_min = minute;
+
+        number_string = time_str.substr(6,2);
+        pch = number_string.c_str();
+        int second;
+        if (pch[0] > '5' || pch[0] < '0') {
+            throwTimestampFormatError(str);
+        }
+        second = 10*(pch[0] - '0');
+        if (pch[1] > '9' || pch[1] < '0') {
+            throwTimestampFormatError(str);
+        }
+        second += pch[1] - '0';
+        if (second > 59 || second < 0) {
+            throwTimestampFormatError(str);
+        }
+        date_time.tm_sec = second;
+
+        // hack a '1' in the place if the decimal and use atoi to get a value that
+        // MUST be between 1 and 2 million if all 6 digits of micros were included.
+        number_string = time_str.substr(8,7);
+        number_string.at(0) = '1';
+        pch = number_string.c_str();
+        int micro = atoi(pch);
+        if (micro >= 2000000 || micro < 1000000) {
+            throwTimestampFormatError(str);
+        }
+        return std::mktime(&date_time) * 1000000 + micro - 1000000;
     }
 
     template <typename T>
@@ -1526,17 +1563,32 @@ class NValue {
             return retval;
         }
         case VALUE_TYPE_TIMESTAMP: {
-            std::time_t stdtime ( getTimestamp() / 1000000 );
-            long micro = getTimestamp() % 1000000;
-            char mbstr[20];    // Format: "YYYY-MM-DD HH:MM:SS."- 20 digits
-            std::strftime(mbstr, 20, "%Y-%m-%d %H:%M:%S.", std::localtime(&stdtime));
-            value << mbstr << micro;
-            // append rest ending 0s: total 26 digits
-            if (value.str().size() < 26) {
-                for (int i = 0; i < 26 - value.str().size(); i++) {
-                    value << "0";
-                }
+            int64_t timestampForSeconds = getTimestamp();
+            long micro = timestampForSeconds % 1000000;
+            if (timestampForSeconds < 0 && micro < 0) {
+                // deal with negative micros (for dates before 1970)
+                // by borrowing 1 whole second from the formatted date/time
+                // and converting it to 1000000 micros
+                timestampForSeconds -= 1000000;
+                micro += 1000000;
             }
+            std::time_t stdtime ( timestampForSeconds / 1000000 );
+            char mbstr[21];    // Format: "YYYY-MM-DD HH:MM:SS."- 20 characters + terminator
+            std::size_t wrote =
+                std::strftime(mbstr, sizeof(mbstr), "%Y-%m-%d %H:%M:%S.", std::localtime(&stdtime));
+            if (wrote != 20) { // Exactly 20 characters of standard format required
+                throwCastSQLException(type, VALUE_TYPE_VARCHAR);
+            }
+            std::stringstream micros_six_digits;
+            // pad the micros number 0, 1, 2 ... 999999 with a generous number of initial 0s,
+            // then take the last 6 digits to get micros in the proper format and scale:
+            // 000000, 000001, 000002 ... 999999
+            std::stringstream micro_stream;
+            micro_stream << "00000" << micro;
+            std::string micro_digits = micro_stream.str();
+            // Now the value looks like 000000, 000001, 000002 ... 0000010 ... 00000100 ... 00000999999
+            std::size_t extra_zeroes = micro_digits.size() - 6;
+            value << mbstr << micro_digits.substr(extra_zeroes);
             break;
         }
         default:
