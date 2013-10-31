@@ -1050,6 +1050,10 @@ public:
             if (serialized == 0) {
                 break;
             }
+
+            // Trying to clear an index that's not drained will fail, but should be side-effect free
+            clearIndex(testRange, false);
+
             int ii = 12; // skip partition id, row count, and first tuple size
             while (ii < (serialized - 4)) {
                 int value = ntohl(*reinterpret_cast<int32_t*>(&m_serializationBuffer[ii]));
