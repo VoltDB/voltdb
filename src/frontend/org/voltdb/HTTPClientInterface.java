@@ -114,7 +114,11 @@ public class HTTPClientInterface {
             if (m_connections == null) {
                 int port = VoltDB.instance().getConfig().m_port;
                 int adminPort = VoltDB.instance().getConfig().m_adminPort;
-                m_connections = new AuthenticatedConnectionCache(10, "localhost", port, adminPort);
+                String externalInterface = VoltDB.instance().getConfig();
+                if (externalInterface == null || externalInterface.isEmpty()) {
+                    externalInterface = "localhost";
+                }
+                m_connections = new AuthenticatedConnectionCache(10, externalInterface, port, adminPort);
             }
 
             String username = request.getParameter("User");
