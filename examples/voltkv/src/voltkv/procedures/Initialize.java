@@ -24,11 +24,6 @@ package voltkv.procedures;
 
 import org.voltdb.*;
 
-@ProcInfo
-(
-  singlePartition = false
-)
-
 public class Initialize extends VoltProcedure
 {
     // Delete everything

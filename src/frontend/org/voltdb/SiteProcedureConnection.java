@@ -162,7 +162,7 @@ public interface SiteProcedureConnection {
 
     // Snapshot services provided by the site
     public Future<?> doSnapshotWork();
-    public void setPerPartitionTxnIds(long[] perPartitionTxnIds);
+    public void setPerPartitionTxnIds(long[] perPartitionTxnIds, boolean skipMultiPart);
 
     public long[] validatePartitioning(long tableIds[], int hashinatorType, byte hashinatorConfig[]);
 }

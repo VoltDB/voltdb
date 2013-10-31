@@ -35,10 +35,6 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "votes.phone_number:0",
-    singlePartition = true
-)
 public class Vote extends VoltProcedure {
 
     // potential return codes

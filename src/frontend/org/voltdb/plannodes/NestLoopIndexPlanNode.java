@@ -244,6 +244,17 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
     }
 
     @Override
+    public boolean hasInlinedIndexScanOfTable(String tableName) {
+        IndexScanPlanNode index_scan = (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assert(index_scan != null);
+        if (index_scan.getTargetTableName().equals(tableName)) {
+            return true;
+        } else {
+            return getChild(0).hasInlinedIndexScanOfTable(tableName);
+        }
+    }
+
+    @Override
     public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
 
         // Add the cost of the inlined index scan to the cost of processing the input tuples.

@@ -1,6 +1,43 @@
--- DML, generate random data first.
---INSERT
--- test basic INSERT
+<grammar.sql>
+
+{_basetables |= "P2"}
+{_basetables |= "R2"}
+{_basetables |= "R2V"}
+
+{@aftermath = " _math _value[int:1,3]"}
+{@agg = "_numagg"}
+{@columnpredicate = "_variable[@comparabletype] _cmp _value[int16]"}
+{@columntype = "int"}
+{@comparableconstant = "42"}
+{@comparabletype = "numeric"}
+{@comparablevalue = "_numericvalue"}
+{@dmlcolumnpredicate = "_variable[int] _cmp _value[int]"}
+
+{@insertvals = "_id, 9, 9, 9, 9"}
+{@idcol = "V_G1"}
+{@numcol = "V_SUM_AGE"}
+
+{@dmltable = "_basetables"}
+{@fromtables = "_table"}
+
+{@jointype = "_jointype"}
+
+INSERT INTO @dmltable VALUES (_id, _value[int16], _value[int16], _value[int16], _value[int16])
+INSERT INTO @dmltable VALUES (_id, 1010, 1010, 1010, 1010)
+INSERT INTO @dmltable VALUES (_id, 1020, 1020, 1020, 1020)
+
+INSERT INTO @dmltable VALUES (_id, -1010, 1010, 1010, 1010)
+INSERT INTO @dmltable VALUES (_id, -1020, 1020, 1020, 1020)
+
+
+--- Hsql bug: ENG-5362.
+<basic-select.sql>
+--- Remove the select template, the hsql problem may be reproduced.
+
+--- Start to use the template file When ENG-5385 is fixed. The template includes two more join query templates for on clause. 
+-- <join-template.sql>
+
+--- Remove all the the query templates when ENG-5385 is fixed.
 INSERT INTO @dmltable VALUES (@insertvals)
 
 SELECT * FROM @fromtables LHS11 ,              @fromtables RHS WHERE                                 LHS11._variable[@columntype] = RHS._variable[@comparabletype]
@@ -12,13 +49,8 @@ SELECT * FROM @fromtables LHS16 ,              @fromtables RHS WHERE LHS16.@idco
 
 SELECT * FROM @fromtables LHS21 @jointype JOIN @fromtables RHS ON                                    LHS21._variable[@columntype] = RHS._variable[@comparabletype]
 SELECT * FROM @fromtables LHS22 @jointype JOIN @fromtables RHS ON    LHS22.@idcol = RHS.@idcol
--- These STILL need softening
--- SELECT * FROM @fromtables LHS23 @jointype JOIN @fromtables RHS ON    LHS23.@idcol = RHS.@idcol AND     RHS._variable[numeric] = 2
--- SELECT * FROM @fromtables LHS24 @jointype JOIN @fromtables RHS ON    LHS24.@idcol = RHS.@idcol AND   LHS24._variable[numeric] = 2
-   SELECT * FROM @fromtables LHS23 @jointype JOIN @fromtables RHS ON    LHS23.@idcol = RHS.@idcol AND     RHS.@numcol = 2
-   SELECT * FROM @fromtables LHS24 @jointype JOIN @fromtables RHS ON    LHS24.@idcol = RHS.@idcol AND   LHS24.@numcol = 2
-SELECT * FROM @fromtables LHS25 @jointype JOIN @fromtables RHS ON    LHS25.@idcol = RHS.@idcol WHERE LHS25._variable[@columntype] < 45 AND LHS25._variable[@columntype] = RHS._variable[@comparabletype]
 
+SELECT * FROM @fromtables LHS25 @jointype JOIN @fromtables RHS ON    LHS25.@idcol = RHS.@idcol WHERE LHS25._variable[@columntype] < 45 AND LHS25._variable[@columntype] = RHS._variable[@comparabletype]
 -- Still triggers wrong answer from mis-partitioning?
 SELECT * FROM @fromtables LHS31 @jointype JOIN @fromtables RHS ON    LHS31.@idcol = RHS.@idcol AND     RHS.@idcol = 2
 SELECT * FROM @fromtables LHS32 @jointype JOIN @fromtables RHS ON    LHS32.@idcol = RHS.@idcol AND   LHS32.@idcol = 2
@@ -28,6 +60,9 @@ SELECT * FROM @fromtables LHS37 @jointype JOIN @fromtables RHS USING(      @idco
 SELECT @idcol, @numcol FROM @fromtables LHS38 @jointype JOIN @fromtables RHS USING(     @idcol,            @numcol)              WHERE     @idcol > 10 AND       @numcol < 30 AND       @numcol >=     @idcol
 SELECT @idcol, @numcol FROM @fromtables LHS39 @jointype JOIN @fromtables RHS USING(     @idcol,            @numcol)              WHERE     @idcol > 10 AND       @numcol < 30 AND       @idcol  =      @numcol
 
+
 --- Three or more table outer join test
-SELECT *               FROM @fromtables LHS40 @jointype JOIN @fromtables MHS ON  LHS40.@idcol = MHS.@idcol  @jointype JOIN @fromtables RHS ON LHS40.@numcol = RHS.@numcol
-SELECT @idcol, @numcol FROM @fromtables LHS41 @jointype JOIN @fromtables MHS ON  LHS41.@idcol = MHS.@idcol  @jointype JOIN @fromtables RHS ON LHS41.@numcol = RHS.@numcol
+SELECT * FROM @fromtables LHS40 @jointype JOIN @fromtables MHS ON  LHS40.@idcol = MHS.@idcol  @jointype JOIN @fromtables RHS ON LHS40.@numcol = RHS.@numcol
+SELECT @idcol, @numcol FROM @fromtables LHS40 @jointype JOIN @fromtables MHS ON  LHS40.@idcol = MHS.@idcol  @jointype JOIN @fromtables RHS ON LHS40.@numcol = RHS.@numcol
+
+

@@ -161,7 +161,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     TableIterator iterator0 = outer_table->iterator();
     int tuple_ctr = 0;
     int tuple_skipped = 0;
-    while (iterator0.next(outer_tuple) && (limit == -1 || tuple_ctr < limit)) {
+    while ((limit == -1 || tuple_ctr < limit) && iterator0.next(outer_tuple)) {
 
         // did this loop body find at least one match for this tuple?
         bool match = false;
@@ -176,7 +176,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
             joined.setNValues(0, outer_tuple, 0, outer_cols);
 
             TableIterator iterator1 = inner_table->iterator();
-            while (iterator1.next(inner_tuple)) {
+            while ((limit == -1 || tuple_ctr < limit) && iterator1.next(inner_tuple)) {
                 // Apply join filter to produce matches for each outer that has them,
                 // then pad unmatched outers, then filter them all
                 if (joinPredicate == NULL || joinPredicate->eval(&outer_tuple, &inner_tuple).isTrue()) {
@@ -199,7 +199,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         //
         // Left Outer Join
         //
-        if (join_type == JOIN_TYPE_LEFT && !match) {
+        if ((limit == -1 || tuple_ctr < limit) && join_type == JOIN_TYPE_LEFT && !match) {
             // Still needs to pass the filter
             if (wherePredicate == NULL || wherePredicate->eval(&outer_tuple, &null_tuple).isTrue()) {
                 // Check if we have to skip this tuple because of offset

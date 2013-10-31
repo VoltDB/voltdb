@@ -505,7 +505,6 @@ public class StatementQuery extends StatementDMQL {
             if (columnElmt.attributes.get("table") == null) {
                 columnElmt.attributes.put("using", "true");
                 for (RangeVariable rv : rvs) {
-
                     if (!rv.getTable().columnList.containsKey(columnElmt.attributes.get("column"))) {
                         // The column is not from this table. Skip it
                         continue;

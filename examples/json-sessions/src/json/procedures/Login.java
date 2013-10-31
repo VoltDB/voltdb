@@ -28,10 +28,6 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "user_session_table.username:0",
-    singlePartition = true
-)
 public class Login extends VoltProcedure {
 
     // potential return codes
