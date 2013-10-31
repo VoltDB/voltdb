@@ -52,12 +52,15 @@ public class PushdownLimits extends MicroOptimization {
         //     and inline the LimitPlanNode in to the AbstractScanPlanNode
 
         ArrayList<AbstractPlanNode> children = new ArrayList<AbstractPlanNode>();
-        for (int i = 0; i < plan.getChildCount(); i++) {
-            AbstractPlanNode child = plan.getChild(i);
-            AbstractPlanNode replacement = recursivelyApply(child);
-            if (replacement != child) {
-                plan.replaceChild(child, replacement);
-            }
+        for (int i = 0; i < plan.getChildCount(); i++)
+            children.add(plan.getChild(i));
+        plan.clearChildren();
+
+        for (AbstractPlanNode child : children) {
+            // TODO this will break when children feed multiple parents
+            child = recursivelyApply(child);
+            child.clearParents();
+            plan.addAndLinkChild(child);
         }
 
         if ( ! (plan instanceof LimitPlanNode)) {
@@ -80,19 +83,19 @@ public class PushdownLimits extends MicroOptimization {
         }
 
         // push down through Projection
-        // Replace plan/limit . child/projection . leaf/whatever
-        // with child/projection . recursivelyApply(plan/limit . leaf/whatever)
+        // Replace the chain plan/limit . child/projection . leaf/whatever
+        // with recursivelyApply(child/projection . plan/limit . leaf/whatever)
+        // == child/projection . recursivelyApply(plan/limit . leaf/whatever)
         if (child instanceof ProjectionPlanNode) {
-            assert(child.getChildCount() == 1);
+            assert (child.getChildCount() == 1);
             AbstractPlanNode leaf = child.getChild(0);
             leaf.clearParents();
             plan.clearChildren();
             plan.addAndLinkChild(leaf);
             child.clearChildren();
             child.clearParents();
-            // limit may push further down
-            child.addAndLinkChild(recursivelyApply(plan));
-            return child;
+            child.addAndLinkChild(plan);
+            return recursivelyApply(child);
         }
 
         // push into JOINs
