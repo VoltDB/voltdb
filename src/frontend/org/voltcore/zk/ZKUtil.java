@@ -240,6 +240,10 @@ public class ZKUtil {
     }
 
     public static ZKUtil.StringCallback asyncMkdirs( ZooKeeper zk, String dirDN) {
+        return asyncMkdirs( zk, dirDN, null);
+    }
+
+    public static ZKUtil.StringCallback asyncMkdirs( ZooKeeper zk, String dirDN, byte payload[]) {
         Preconditions.checkArgument(
                 dirDN != null &&
                 ! dirDN.trim().isEmpty() &&
@@ -250,12 +254,14 @@ public class ZKUtil {
         StringBuilder dsb = new StringBuilder(128);
         ZKUtil.StringCallback lastCallback = null;
         try {
-            for (String dirPortion: dirDN.substring(1).split("/")) {
+            String dirPortions[] = dirDN.substring(1).split("/");
+            for (int ii = 0; ii < dirPortions.length; ii++) {
+                String dirPortion = dirPortions[ii];
                 lastCallback = new ZKUtil.StringCallback();
                 dsb.append('/').append(dirPortion);
                 zk.create(
                         dsb.toString(),
-                        null,
+                        ii == dirPortions.length - 1 ? payload : null,
                         Ids.OPEN_ACL_UNSAFE,
                         CreateMode.PERSISTENT,
                         lastCallback,
