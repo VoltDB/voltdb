@@ -767,25 +767,21 @@ public class VoltCompiler {
                 // A null column name indicates a replicated table. Ignore it here
                 // because it defaults to replicated in the catalog.
                 if (colName != null) {
-                    final Table t = tables.getIgnoreCase(tableName);
-                    if (t == null) {
-                        msg += "PARTITION has unknown TABLE '" + tableName + "'";
-                        throw new VoltCompilerException(msg);
-                    }
-                    final Column c = t.getColumns().getIgnoreCase(colName);
+                    assert(tables.getIgnoreCase(tableName) != null);
+                    final Column partitionCol = table.getColumns().getIgnoreCase(colName);
                     // make sure the column exists
-                    if (c == null) {
+                    if (partitionCol == null) {
                         msg += "PARTITION has unknown COLUMN '" + colName + "'";
                         throw new VoltCompilerException(msg);
                     }
                     // make sure the column is marked not-nullable
-                    if (c.getNullable() == true) {
+                    if (partitionCol.getNullable() == true) {
                         msg += "Partition column '" + tableName + "." + colName + "' is nullable. " +
                             "Partition columns must be constrained \"NOT NULL\".";
                         throw new VoltCompilerException(msg);
                     }
                     // verify that the partition column is a supported type
-                    VoltType pcolType = VoltType.get((byte) c.getType());
+                    VoltType pcolType = VoltType.get((byte) partitionCol.getType());
                     switch (pcolType) {
                         case TINYINT:
                         case SMALLINT:
@@ -800,19 +796,31 @@ public class VoltCompiler {
                             throw new VoltCompilerException(msg);
                     }
 
-                    t.setPartitioncolumn(c);
-                    t.setIsreplicated(false);
+                    table.setPartitioncolumn(partitionCol);
+                    table.setIsreplicated(false);
 
                     // Check valid indexes, whether they contain the partition column or not.
-                    checkValidIndexes(t,c);
+                    for (Index index: table.getIndexes()) {
+                        checkValidPartitionTableIndex(index, partitionCol, tableName);
+                    }
+                    // Set the partitioning of destination tables of associated views.
+                    // If a view's source table is replicated, then a full scan of the
+                    // associated view is single-sited. If the source is partitioned,
+                    // a full scan of the view must be distributed, unless it is filtered
+                    // by the original table's partitioning key, which, to be filtered,
+                    // must also be a GROUP BY key.
+                    final CatalogMap<MaterializedViewInfo> views = table.getViews();
+                    for (final MaterializedViewInfo mvi : views) {
+                        mvi.getDest().setIsreplicated(false);
+                        setGroupedTablePartitionColumn(mvi, partitionCol);
+                    }
                 }
             } else {
                 // Replicated tables case.
-                Table t = table;
-
-                for (Index index: t.getIndexes()) {
+                for (Index index: table.getIndexes()) {
                     if (index.getAssumeunique()) {
-                        String exceptionMsg = String.format("Please use UNIQUE instead of ASSUMEUNIQUE");
+                        String exceptionMsg = String.format(
+                                "ASSUMEUNIQUE is not valid for replicated tables. Please use UNIQUE instead");
                         throw new VoltCompilerException(exceptionMsg);
                     }
                 }
@@ -846,76 +854,63 @@ public class VoltCompiler {
         addExtraClasses();
     }
 
-    private void checkValidIndexes(Table t, Column c) throws VoltCompilerException {
-        for (Index index: t.getIndexes())
-        {
-            // skip checking for non-unique indexes and user intended index.
-            if (!index.getUnique() || index.getAssumeunique()) {
-                continue;
-            }
+    private void checkValidPartitionTableIndex(Index index, Column partitionCol, String tableName)
+            throws VoltCompilerException {
+        // skip checking for non-unique indexes.
+        if (!index.getUnique()) {
+            return;
+        }
 
-            boolean contain = false;
-            String jsonExpr = index.getExpressionsjson();
-            // if this is a pure-column index...
-            if (jsonExpr.isEmpty()) {
-                for (ColumnRef cref : index.getColumns()) {
-                    Column col = cref.getColumn();
-                    // unique index contains partitioned column
-                    if (col.equals(c)) {
+        boolean contain = false;
+        String jsonExpr = index.getExpressionsjson();
+        // if this is a pure-column index...
+        if (jsonExpr.isEmpty()) {
+            for (ColumnRef cref : index.getColumns()) {
+                Column col = cref.getColumn();
+                // unique index contains partitioned column
+                if (col.equals(partitionCol)) {
+                    contain = true;
+                    break;
+                }
+            }
+        }
+        // if this is a fancy expression-based index...
+        else {
+            try {
+                List<AbstractExpression> indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr);
+                for (AbstractExpression expr: indexExpressions) {
+                    if (expr instanceof TupleValueExpression &&
+                            ((TupleValueExpression) expr).getColumnName().equals(partitionCol.getName()) ) {
                         contain = true;
                         break;
                     }
                 }
-            }
-            // if this is a fancy expression-based index...
-            else {
-                try {
-                    List<AbstractExpression> indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr);
-                    for (AbstractExpression expr: indexExpressions) {
-                        if (expr instanceof TupleValueExpression &&
-                                ((TupleValueExpression) expr).getColumnName().equals(c.getName()) ) {
-                            contain = true;
-                            break;
-                        }
-                    }
-                } catch (JSONException e) {
-                    e.printStackTrace(); // danger will robinson
-                    assert(false);
-                }
-            }
-
-            if (!contain) {
-                // Throw compiler exception.
-                String indexName = index.getTypeName();
-                if (indexName.startsWith("SYS_IDX_PK_") || indexName.startsWith("SYS_IDX_SYS_PK_") ||
-                        indexName.startsWith("MATVIEW_PK_INDEX") ) {
-                    indexName = "PRIMARY KEY index";
-                } else {
-                    indexName = "unique index " + indexName;
-                }
-                String tableName = t.getTypeName();
-                String exceptionMsg = String.format("A %s on the partitioned table %s does not " +
-                        "include the partitioning column %s. This does not guarantee uniqueness across the database " +
-                        "and can cause constraint violations when repartitioning the data. " +
-                        "Try appending partitioning column %s to the index %s, or use the USER_UNIQUE keyword instead.",
-                        indexName, tableName, c.getName(), c.getName(), indexName);
-                throw new VoltCompilerException(exceptionMsg);
-            } else if (contain && index.getAssumeunique()) {
-                String exceptionMsg = String.format("Please use UNIQUE instead of ASSUMEUNIQUE");
-                throw new VoltCompilerException(exceptionMsg);
+            } catch (JSONException e) {
+                e.printStackTrace(); // danger will robinson
+                assert(false);
             }
         }
 
-        // Set the partitioning of destination tables of associated views.
-        // If a view's source table is replicated, then a full scan of the
-        // associated view is single-sited. If the source is partitioned,
-        // a full scan of the view must be distributed, unless it is filtered
-        // by the original table's partitioning key, which, to be filtered,
-        // must also be a GROUP BY key.
-        final CatalogMap<MaterializedViewInfo> views = t.getViews();
-        for (final MaterializedViewInfo mvi : views) {
-            mvi.getDest().setIsreplicated(false);
-            setGroupedTablePartitionColumn(mvi, c);
+        if (contain && index.getAssumeunique()) {
+            String exceptionMsg = String.format("ASSUMEUNIQUE is too conservative, use UNIQUE instead.");
+            throw new VoltCompilerException(exceptionMsg);
+        } else if (!contain && !index.getAssumeunique()) {
+            // Throw compiler exception.
+            String indexName = index.getTypeName();
+            String keyword = "";
+            if (indexName.startsWith("SYS_IDX_PK_") || indexName.startsWith("SYS_IDX_SYS_PK_") ) {
+                indexName = "PRIMARY KEY";
+                keyword = "PRIMARY KEY";
+            } else {
+                indexName = "UNIQUE INDEX " + indexName;
+                keyword = "UNIQUE";
+            }
+
+            String exceptionMsg = String.format("Invalid use of %s. " +
+                    "%s indexes on partitioned table %s must include the partitioning column %s.  " +
+                    "Add the partitioning column %s to the %s or remove the %s keyword.",
+                    indexName, keyword, tableName, partitionCol.getName(), partitionCol.getName(), indexName, keyword);
+            throw new VoltCompilerException(exceptionMsg);
         }
 
     }

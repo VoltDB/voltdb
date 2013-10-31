@@ -612,8 +612,9 @@ public class TableWorks {
                     true, true, false);
         }
 
+        // For VoltDB
         Constraint constraint = new Constraint(name, table, index,
-                                               Constraint.UNIQUE);
+                                               Constraint.UNIQUE, assumeUnique);
         Table tn = table.moveDefinition(session, table.tableType, null,
                                         constraint, index, -1, 0, emptySet,
                                         emptySet);
@@ -648,7 +649,7 @@ public class TableWorks {
             name.name, table.getSchemaName(), table.getName(),
             SchemaObject.INDEX);
         Index exprIndex = table.createVoltIndexStructure(indexname, cols, indexExprs, true, true, assumeUnique);
-        Constraint constraint = new Constraint(name, table, exprIndex, Constraint.UNIQUE);
+        Constraint constraint = new Constraint(name, table, exprIndex, Constraint.UNIQUE, assumeUnique);
         Table tn = table.moveDefinition(session, table.tableType, null,
                                         constraint, exprIndex, -1, 0, emptySet, emptySet);
         tn.moveData(session, table, -1, 0);

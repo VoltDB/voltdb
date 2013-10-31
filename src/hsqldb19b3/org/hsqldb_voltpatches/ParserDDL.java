@@ -1275,12 +1275,7 @@ public class ParserDDL extends ParserRoutine {
 
         for (int i = 1; i < tempConstraints.size(); i++) {
             c = (Constraint) tempConstraints.get(i);
-            boolean assumeUnique = false;  // For VoltDB
             switch (c.constType) {
-                case Constraint.ASSUMEUNIQUE : {
-                    assumeUnique = true;
-                    // No break, fall through.
-                }
                 case Constraint.UNIQUE : {
                     c.setColumnsIndexes(table);
 
@@ -1300,17 +1295,18 @@ public class ParserDDL extends ParserRoutine {
                             table.getName(), SchemaObject.INDEX);
 
                     Index index = null;
-                    if (c.indexExprs != null || assumeUnique) {
+                    if (c.indexExprs != null || c.assumeUnique) {
                         // Special case handling for VoltDB indexed expressions
                         index = table.createAndAddVoltIndexStructure(indexName, c.core.mainCols,
-                                c.indexExprs, true, true, assumeUnique);
+                                c.indexExprs, true, true, c.assumeUnique);
                     } else {
                         index = table.createAndAddIndexStructure(indexName,
                             c.core.mainCols, null, null, true, true, false);
                     }
 
+                    // For VoltDB to support AssumeUnique
                     Constraint newconstraint = new Constraint(c.getName(),
-                        table, index, Constraint.UNIQUE);
+                        table, index, Constraint.UNIQUE, c.assumeUnique);
 
                     table.addConstraint(newconstraint);
                     session.database.schemaManager.addSchemaObject(
@@ -2712,8 +2708,6 @@ public class ParserDDL extends ParserRoutine {
 
                 read();
 
-                int uniqueType = assumeUnique ? Constraint.ASSUMEUNIQUE : Constraint.UNIQUE;
-
                 // A VoltDB extension to "readColumnNames(false)" to support indexed expressions.
                 List<Expression> indexExprs = XreadExpressions(null);
                 OrderedHashSet set = getSimpleColumnNames(indexExprs);
@@ -2728,13 +2722,14 @@ public class ParserDDL extends ParserRoutine {
                     // A VoltDB extension to support indexed expressions.
                     // Not all expressions are simple columns.
                     set = getBaseColumnNames(indexExprs);
-                    Constraint exprc = new Constraint(constName, set, indexExprs.toArray(new Expression[indexExprs.size()]), uniqueType);
+                    Constraint exprc = new Constraint(constName, set,
+                            indexExprs.toArray(new Expression[indexExprs.size()]), Constraint.UNIQUE, assumeUnique);
                     constraintList.add(exprc);
                     break;
 				}
 
                 Constraint c = new Constraint(constName, set,
-                        uniqueType);
+                        Constraint.UNIQUE, assumeUnique);
 
                 constraintList.add(c);
 
@@ -2847,10 +2842,8 @@ public class ParserDDL extends ParserRoutine {
                                 SchemaObject.CONSTRAINT);
                     }
                     // For VoltDB to support AssumeUnique
-                    int uniqueType = assumeUnqiue ? Constraint.ASSUMEUNIQUE : Constraint.UNIQUE;
-
                     Constraint c = new Constraint(constName, set,
-                            uniqueType);
+                            Constraint.UNIQUE, assumeUnqiue);
 
                     constraintList.add(c);
 
