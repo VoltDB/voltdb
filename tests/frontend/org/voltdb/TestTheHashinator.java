@@ -23,6 +23,7 @@
 
 package org.voltdb;
 
+import static junit.framework.Assert.assertNull;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -182,6 +183,34 @@ public class TestTheHashinator {
         return Multimaps.invertFrom(Multimaps.forMap(m), HashMultimap.<Integer, Integer>create());
     }
 
+    @Test
+    public void testGetPartitionKeys() throws Exception {
+        int partitionCount = 50;
+        Set<Integer> allPartitions = new HashSet<Integer>();
+        for (int ii = 0; ii < 50; ii++) {
+            allPartitions.add(ii);
+        }
+        VoltType types[] = new VoltType[] { VoltType.INTEGER, VoltType.STRING, VoltType.VARBINARY };
+
+        final byte configBytes[] = TheHashinator.getConfigureBytes(partitionCount);
+        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), configBytes);
+        for (VoltType type : types) {
+            Set<Integer> partitionsReached = new HashSet<Integer>(allPartitions);
+            assertNull(TheHashinator.getPartitionKeys(VoltType.BIGINT));
+            VoltTable vt = TheHashinator.getPartitionKeys(type);
+            assertNotNull(vt);
+            assertEquals(partitionCount, vt.getRowCount());
+
+            while (vt.advanceRow()) {
+                int expectedPartition = (int)vt.getLong(0);
+                Object key = vt.get(1, type);
+                assertEquals(expectedPartition, TheHashinator.getPartitionForParameter(type.getValue(), key));
+                partitionsReached.remove(expectedPartition);
+            }
+            assertTrue(partitionsReached.isEmpty());
+        }
+
+    }
     /*
      * This test validates that not all values hash to 0. Most of the other
      * tests will pass even if everything hashes to a single partition.
