@@ -1748,7 +1748,7 @@ public class TestVoltCompiler extends TestCase {
     public void testColumnUniqueGiveException()
     {
         String msgP = "must include the partitioning column";
-        String msgPR= "ASSUMEUNIQUE is too conservative, use UNIQUE instead";
+        String msgPR= "ASSUMEUNIQUE is not required if the index includes the partitioning column. Use UNIQUE instead";
         String msgR = "ASSUMEUNIQUE is not valid for replicated tables. Please use UNIQUE instead";
         String schema = "";
 
@@ -1865,7 +1865,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testUniqueIndexGiveException() {
         String msgP = "must include the partitioning column";
-        String msgPR= "ASSUMEUNIQUE is too conservative, use UNIQUE instead";
+        String msgPR= "ASSUMEUNIQUE is not required if the index includes the partitioning column. Use UNIQUE instead";
         String msgR = "ASSUMEUNIQUE is not valid for replicated tables. Please use UNIQUE instead";
         String schema = "";
 

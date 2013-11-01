@@ -309,8 +309,8 @@ public class TestIndexReverseScanSuite extends RegressionSuite {
                 "create index P1_TREE_2 on P1 (b, c);" +
 
                 "CREATE TABLE P2 ( " +
-                "ID INTEGER DEFAULT '0' NOT NULL, " +
-                "a INTEGER not null unique, " +
+                "ID INTEGER DEFAULT '0' NOT NULL ASSUMEUNIQUE, " +
+                "a INTEGER not null, " +
                 "b INTEGER, " +
                 "c INTEGER, " +
                 "d INTEGER, " +

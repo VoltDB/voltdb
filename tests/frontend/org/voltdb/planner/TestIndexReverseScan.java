@@ -93,7 +93,7 @@ public class TestIndexReverseScan extends PlannerTestCase {
                 "AND time >= '2013-09-29 00:00:00' AND time <= '2013-10-07 00:00:00' " +
                 "ORDER BY time DESC LIMIT 150";
 
-        checkReverseScan("ASSUMEUNQIUE_PK_INDEX", IndexLookupType.LTE, 3, 3, 2, SortDirectionType.DESC);
+        checkReverseScan("ASSUMEUNIQUE_PK_INDEX", IndexLookupType.LTE, 3, 3, 2, SortDirectionType.DESC);
     }
 
     public void testNonOptimizable()

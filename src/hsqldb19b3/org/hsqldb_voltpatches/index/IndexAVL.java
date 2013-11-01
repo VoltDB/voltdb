@@ -1692,9 +1692,7 @@ public class IndexAVL implements Index {
                 indexedExprs.children.add(xml);
             }
         }
-        if (isAssumeUnique) {
-            index.attributes.put("assumeunique", isAssumeUnique() ? "true" : "false");
-        }
+        index.attributes.put("assumeunique", isAssumeUnique() ? "true" : "false");
 
         index.attributes.put("columns", getColumnNameList());
         index.attributes.put("unique", isUnique() ? "true" : "false");

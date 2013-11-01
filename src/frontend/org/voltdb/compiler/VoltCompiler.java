@@ -892,7 +892,8 @@ public class VoltCompiler {
         }
 
         if (contain && index.getAssumeunique()) {
-            String exceptionMsg = String.format("ASSUMEUNIQUE is too conservative, use UNIQUE instead.");
+            String exceptionMsg = String.format("ASSUMEUNIQUE is not required " +
+            "if the index includes the partitioning column. Use UNIQUE instead.");
             throw new VoltCompilerException(exceptionMsg);
         } else if (!contain && !index.getAssumeunique()) {
             // Throw compiler exception.

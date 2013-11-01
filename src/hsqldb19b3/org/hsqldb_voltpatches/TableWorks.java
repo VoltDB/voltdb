@@ -606,7 +606,7 @@ public class TableWorks {
 
         if (assumeUnique) {
             // For VoltDB.
-            index = table.createVoltIndexStructure(indexname, cols, null, true, true, assumeUnique);
+            index = table.createVoltIndexStructure(indexname, cols, null, true, true, true);
         } else {
             index = table.createIndexStructure(indexname, cols, null, null,
                     true, true, false);
