@@ -1189,6 +1189,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         * */
 
         for (String tb: tbs) {
+            System.out.println("Testing inner join with partitioned view: " + tb);
             // (1) Two tables join.
             sql = "Select v_p1.v_cnt from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
                     "order by v_p1.v_cnt;";
