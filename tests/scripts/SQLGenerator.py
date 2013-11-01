@@ -34,6 +34,7 @@ from optparse import OptionParser # for use in standalone test mode
 
 COUNT = 2                       # number of random values to generate by default
 IS_VOLT = False
+ALLOW_SELF_JOIN = True
 
 def field_name_generator():
     i = 0
@@ -324,17 +325,17 @@ class BaseGenerator:
     def next_param(self):
         for value in self.values:
             if self.prior_generator:
-                if self.prior_generator.__has_reserved(value):
+                if self.prior_generator.has_reserved(value):
                     continue # To avoid self-join and other kinds of redundancy, don't reuse values.
             self.reserved_value = value
             yield value
 
-    def __has_reserved(self, name):
+    def has_reserved(self, name):
         if name == self.reserved_value:
             return True
         if not self.prior_generator:
             return False
-        return self.prior_generator.__has_reserved(name)
+        return self.prior_generator.has_reserved(name)
 
 
 class TableGenerator(BaseGenerator):
@@ -352,6 +353,11 @@ class TableGenerator(BaseGenerator):
         self.prior_generator = prior_generators.get("table")
         prior_generators["table"] = self # new table generator at the head of the chain
         return prior_generators
+
+    def has_reserved(self, name):
+        if ALLOW_SELF_JOIN:
+            return False
+        return super().has_reserved(name)
 
 
 class ColumnGenerator(BaseGenerator):

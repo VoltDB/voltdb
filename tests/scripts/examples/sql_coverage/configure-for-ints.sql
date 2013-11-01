@@ -15,6 +15,7 @@
 -- reducing the random values to int16 until overflow detection works
 --{@insertvals = "_id, _value[byte], _value[int32], _value[int64]"}
 {@insertvals = "_id, _value[byte], _value[int16], _value[int16]"}
+{@onefun = "ABS"}
 {@optionalfn = "_numfun"}
 {@updatecolumn = "BIG"}
 {@updatesource = "ID"}

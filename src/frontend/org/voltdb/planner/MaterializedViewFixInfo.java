@@ -56,7 +56,7 @@ public class MaterializedViewFixInfo {
     // Does this mv partitioned based query needs to be fixed.
     private boolean m_needed = false;
     // materialized view table
-    private Table m_mvTable = null;
+    private StmtTableScan m_mvTableScan = null;
 
     // number of group-by s.
     private int m_numOfGroupByColumns;
@@ -64,20 +64,25 @@ public class MaterializedViewFixInfo {
     // Scan Node for join query.
     AbstractScanPlanNode m_scanNode = null;
 
-    public boolean needed () {
+    public boolean needed() {
         return m_needed;
     }
 
-    public void setNeeded (boolean need) {
+    public void setNeeded(boolean need) {
         m_needed = need;
     }
 
-    public String getMVTableName () {
-        assert(m_mvTable != null);
-        return m_mvTable.getTypeName();
+    public String getMVTableName() {
+        assert(m_mvTableScan != null);
+        return m_mvTableScan.m_table.getTypeName();
     }
 
-    public HashAggregatePlanNode getReAggregationPlanNode () {
+    public String getMVTableAlias() {
+        assert(m_mvTableScan != null);
+        return m_mvTableScan.m_tableAlias;
+    }
+
+    public HashAggregatePlanNode getReAggregationPlanNode() {
         return m_reAggNode;
     }
 
@@ -86,8 +91,9 @@ public class MaterializedViewFixInfo {
      * Set the need flag to true, only if it needs to be fixed.
      * @return
      */
-    public boolean checkFixNeeded(Table table) {
+    public boolean checkFixNeeded(StmtTableScan mvTableScan) {
         // Check valid cases first
+        Table table = mvTableScan.m_table;
         String mvTableName = table.getTypeName();
         Table srcTable = table.getMaterializer();
         if (srcTable == null) {
@@ -139,7 +145,7 @@ public class MaterializedViewFixInfo {
         }
         assert(m_numOfGroupByColumns > 0);
 
-        m_mvTable = table;
+        m_mvTableScan = mvTableScan;
         m_needed = true;
         return true;
     }
@@ -180,7 +186,8 @@ public class MaterializedViewFixInfo {
 
     private void processInlineProjectionsAndReAggNode(Set<SchemaColumn> scanColumns, List<Column> mvColumnArray) {
         assert(m_needed);
-        String mvTableName = m_mvTable.getTypeName();
+        String mvTableName = getMVTableName();
+        String mvTableAlias = getMVTableAlias();
 
         // (1) construct new projection columns for scan plan node.
         Set<SchemaColumn> mvDDLGroupbyColumns = new HashSet<SchemaColumn>();
@@ -193,15 +200,11 @@ public class MaterializedViewFixInfo {
             Column mvCol = mvColumnArray.get(i);
             String colName = mvCol.getName();
 
-            TupleValueExpression tve = new TupleValueExpression();
-            tve.setColumnIndex(i);
-            tve.setColumnName(colName);
-            tve.setTableName(mvTableName);
-            tve.setColumnAlias(colName);
+            TupleValueExpression tve = new TupleValueExpression(mvTableName, mvTableAlias, colName, colName, i);
             tve.setValueType(VoltType.get((byte)mvCol.getType()));
             tve.setValueSize(mvCol.getSize());
 
-            SchemaColumn scol = new SchemaColumn(mvTableName, colName, colName, tve);
+            SchemaColumn scol = new SchemaColumn(mvTableName, mvTableAlias, colName, colName, tve);
 
             mvDDLGroupbyColumns.add(scol);
             if (!scanColumns.contains(scol)) {
@@ -253,7 +256,7 @@ public class MaterializedViewFixInfo {
     }
 
     private boolean fromMVTableOnly(List<AbstractExpression> tves) {
-        String mvTableName = m_mvTable.getTypeName();
+        String mvTableName = m_mvTableScan.m_table.getTypeName();
         for (AbstractExpression tve: tves) {
             assert(tve instanceof TupleValueExpression);
             String tveTableName = ((TupleValueExpression)tve).getTableName();
@@ -267,12 +270,12 @@ public class MaterializedViewFixInfo {
     private void collectReAggNodePostExpressions(JoinNode joinTree,
             List<TupleValueExpression> needReAggTVEs, List<AbstractExpression> aggPostExprs) {
         if (joinTree.m_leftNode != null) {
+            assert (joinTree.m_rightNode != null);
             collectReAggNodePostExpressions(joinTree.m_leftNode, needReAggTVEs, aggPostExprs);
-        }
-        if (joinTree.m_rightNode != null) {
             collectReAggNodePostExpressions(joinTree.m_rightNode, needReAggTVEs, aggPostExprs);
         }
-        if (joinTree.m_table != null) {
+        else {
+            assert(joinTree.m_tableAliasIndex != -1);
             joinTree.m_joinExpr = processFilters(joinTree.m_joinExpr, needReAggTVEs, aggPostExprs);
 
             // For outer join filters. Inner join or single table query will have whereExpr be null.
@@ -322,7 +325,7 @@ public class MaterializedViewFixInfo {
      */
     public void processMVBasedQueryFix(Set<SchemaColumn> scanColumns, JoinNode joinTree) {
         List<Column> mvColumnArray =
-                CatalogUtil.getSortedCatalogItems(m_mvTable.getColumns(), "index");
+                CatalogUtil.getSortedCatalogItems(m_mvTableScan.m_table.getColumns(), "index");
 
         processInlineProjectionsAndReAggNode(scanColumns, mvColumnArray);
 
@@ -332,11 +335,8 @@ public class MaterializedViewFixInfo {
 
         for (int i=m_numOfGroupByColumns; i < mvColumnArray.size(); i++) {
             Column mvCol = mvColumnArray.get(i);
-            TupleValueExpression tve = new TupleValueExpression();
-            tve.setColumnIndex(i);
-            tve.setColumnName(mvCol.getName());
-            tve.setTableName(getMVTableName());
-            tve.setColumnAlias(mvCol.getName());
+            String colName = mvCol.getName();
+            TupleValueExpression tve = new TupleValueExpression(getMVTableName(), getMVTableAlias(), colName, colName);
             tve.setValueType(VoltType.get((byte)mvCol.getType()));
             tve.setValueSize(mvCol.getSize());
 

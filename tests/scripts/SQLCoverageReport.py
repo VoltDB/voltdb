@@ -142,7 +142,12 @@ def print_section(name, mismatches, output_dir):
     for i in mismatches:
         safe_print(i["SQL"])
         detail_page = generate_detail(name, i, output_dir)
-
+        jniStatus = i["jni"]["Status"]
+        if jniStatus < 0:
+            jniStatus = "Error: " + `jniStatus`
+        hsqlStatus = i["hsql"]["Status"]
+        if hsqlStatus < 0:
+            hsqlStatus = "Error: " + `hsqlStatus`
         result += """
 <tr>
 <td>%s</td>
@@ -152,8 +157,8 @@ def print_section(name, mismatches, output_dir):
 </tr>""" % (i["id"],
             detail_page,
             cgi.escape(i["SQL"]),
-            i["jni"]["Status"],
-            i["hsqldb"]["Status"])
+            jniStatus,
+            hsqlStatus)
 
     result += """
 </table>
