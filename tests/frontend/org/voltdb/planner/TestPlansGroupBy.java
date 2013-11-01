@@ -26,6 +26,7 @@ package org.voltdb.planner;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
@@ -413,23 +414,23 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkMVNoFix_NoAgg("SELECT V_A1, MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_A1", 1, 1, false, false, true);
         checkMVNoFix_NoAgg("SELECT V_A1,V_B1, MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_A1, V_B1", 2, 1, false, false, true);
 
-//        // (3) Join Query
-//        String sql = "";
-//
-//        // Voter example query in 'Results' stored procedure.
-//        sql = "   SELECT a.contestant_name   AS contestant_name"
-//                + "        , a.contestant_number AS contestant_number"
-//                + "        , SUM(b.num_votes)    AS total_votes"
-//                + "     FROM v_votes_by_contestant_number_state AS b"
-//                + "        , contestants AS a"
-//                + "    WHERE a.contestant_number = b.contestant_number"
-//                + " GROUP BY a.contestant_name"
-//                + "        , a.contestant_number"
-//                + " ORDER BY total_votes DESC"
-//                + "        , contestant_number ASC"
-//                + "        , contestant_name ASC;";
-//
-//        checkMVNoFix_NoAgg(sql, 2, 1, false, false, true);
+        // (3) Join Query
+        String sql = "";
+
+        // Voter example query in 'Results' stored procedure.
+        sql = "   SELECT a.contestant_name   AS contestant_name"
+                + "        , a.contestant_number AS contestant_number"
+                + "        , SUM(b.num_votes)    AS total_votes"
+                + "     FROM v_votes_by_contestant_number_state AS b"
+                + "        , contestants AS a"
+                + "    WHERE a.contestant_number = b.contestant_number"
+                + " GROUP BY a.contestant_name"
+                + "        , a.contestant_number"
+                + " ORDER BY total_votes DESC"
+                + "        , contestant_number ASC"
+                + "        , contestant_name ASC;";
+
+        checkMVNoFix_NoAgg(sql, 2, 1, false, true, true);
 //
 //        sql = "select v_p1.v_b1, v_p1.v_cnt, sum(v_a1) from v_p1 @joinType v_r1 using(v_a1) " +
 //                "group by v_p1.v_b1, v_p1.v_cnt;";
@@ -929,8 +930,12 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 assertTrue(p instanceof AggregatePlanNode);
                 p = p.getChild(0);
             }
-
-            assertTrue(p instanceof AbstractScanPlanNode);
+            if (needFix) {
+                assertTrue(p instanceof AbstractScanPlanNode);
+            } else {
+                assertTrue(p instanceof AbstractScanPlanNode ||
+                        p instanceof AbstractJoinPlanNode);
+            }
         }
     }
 }
