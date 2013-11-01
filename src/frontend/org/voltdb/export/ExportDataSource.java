@@ -57,6 +57,7 @@ import com.google.common.io.Files;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.SettableFuture;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  *  Allows an ExportDataProcessor to access underlying table queues
@@ -90,6 +91,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final Semaphore m_bufferPushPermits = new Semaphore(16);
 
     private final int m_nullArrayLength;
+    private long m_polledBlockSize = 0;
 
     /**
      * Create a new data source.
@@ -405,7 +407,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * Obtain next block of data from source
      */
     public ListenableFuture<?> exportAction(final ExportInternalMessage m) {
-        return m_es.submit(new Runnable() {
+        return runExportDataSourceRunner(new Runnable() {
                 @Override
                 public void run() {
                     try {
@@ -522,7 +524,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return m_es.submit(new Callable<Long>() {
                 @Override
                 public Long call() throws Exception {
-                    return m_committedBuffers.sizeInBytes();
+                    return m_committedBuffers.sizeInBytes() + m_polledBlockSize;
                 }
             }).get();
         } catch (Throwable t) {
@@ -614,7 +616,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         } catch (InterruptedException e) {
             Throwables.propagate(e);
         }
-        m_es.execute(new Runnable() {
+        executeExportDataSourceRunner((new Runnable() {
             @Override
             public void run() {
                 try {
@@ -627,7 +629,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     m_bufferPushPermits.release();
                 }
             }
-        });
+        }));
     }
 
     public ListenableFuture<?> closeAndDelete() {
@@ -649,7 +651,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ListenableFuture<?> truncateExportToTxnId(final long txnId) {
-        return m_es.submit(new Runnable() {
+        return runExportDataSourceRunner((new Runnable() {
             @Override
             public void run() {
                 try {
@@ -667,11 +669,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     VoltDB.crashLocalVoltDB("Error while trying to truncate export to txnid " + txnId, true, e);
                 }
             }
-        });
+        }));
     }
 
     public ListenableFuture<?> close() {
-        return m_es.submit(new Runnable() {
+        return runExportDataSourceRunner((new Runnable() {
             @Override
             public void run() {
                 try {
@@ -682,12 +684,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     m_es.shutdown();
                 }
             }
-        });
+        }));
     }
 
     public ListenableFuture<BBContainer> poll() {
         final SettableFuture<BBContainer> fut = SettableFuture.create();
-        m_es.submit(new Runnable() {
+        runExportDataSourceRunner(new Runnable() {
             @Override
             public void run() {
                 /*
@@ -719,7 +721,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
                 return;
             }
-
             //Assemble a list of blocks to delete so that they can be deleted
             //outside of the m_committedBuffers critical section
             ArrayList<StreamBlock> blocksToDelete = new ArrayList<StreamBlock>();
@@ -759,6 +760,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             } else {
                 //Otherwise return the block with the USO for the end of the block
                 //since the entire remainder of the block is being sent.
+                m_polledBlockSize = first_unpolled_block.totalUso();
                 fut.set(
                         new AckingContainer(first_unpolled_block.unreleasedBufferV2(),
                                 first_unpolled_block.uso() + first_unpolled_block.totalUso()));
@@ -811,7 +813,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void ack(final long uso) {
-        m_es.execute(new Runnable() {
+        executeExportDataSourceRunner(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -850,7 +852,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void acceptMastership() {
         Preconditions.checkNotNull(m_onMastership, "mastership runnable is not yet set");
 
-        m_es.execute(m_onMastership);
+        executeExportDataSourceRunner(m_onMastership);
     }
 
     /**
@@ -861,5 +863,54 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         Preconditions.checkNotNull(toBeRunOnMastership, "mastership runnable is null");
 
         m_onMastership = toBeRunOnMastership;
+    }
+
+    public void resetInFlightSize() {
+        m_polledBlockSize = 0;
+    }
+
+    private void executeExportDataSourceRunner(Runnable runner) {
+        if (m_es.isShutdown()) {
+            return;
+        }
+        try {
+            m_es.execute(new ExportDataSourceRunnable(runner));
+        } catch (RejectedExecutionException rej) {
+        }
+    }
+
+    /**
+     * Convenience method to submit wrapped Runnables to executor.
+     *
+     * @param runner Runnable task.
+     * @return ListenableFuture
+     */
+    private ListenableFuture<?> runExportDataSourceRunner(Runnable runner) {
+        if (m_es.isShutdown()) {
+            return null;
+        }
+        try {
+            return m_es.submit((Runnable) new ExportDataSourceRunnable(runner));
+        } catch (RejectedExecutionException rej) {
+        }
+        return null;
+    }
+
+    //Wrapper Runnable.
+    final class ExportDataSourceRunnable implements Runnable {
+
+        private final Runnable m_runner;
+
+        public ExportDataSourceRunnable(Runnable runner) {
+            m_runner = runner;
+        }
+
+        @Override
+        public void run() {
+            if (m_es.isShutdown()) {
+                return;
+            }
+            m_runner.run();
+        }
     }
 }
