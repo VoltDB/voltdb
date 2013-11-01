@@ -23,26 +23,28 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 {
-    "P_MATVIEW": {
-        "columns": (("ID", FastSerializer.VOLTTYPE_INTEGER),
-                    ("BIG", FastSerializer.VOLTTYPE_BIGINT),
-                    ("NUM", FastSerializer.VOLTTYPE_BIGINT),
-                    ("TINYCOUNT", FastSerializer.VOLTTYPE_BIGINT),
-                    ("SMALLCOUNT", FastSerializer.VOLTTYPE_BIGINT),
-                    ("BIGCOUNT", FastSerializer.VOLTTYPE_BIGINT),
-                    ("TINYSUM", FastSerializer.VOLTTYPE_BIGINT),
-                    ("SMALLSUM", FastSerializer.VOLTTYPE_BIGINT),
+    "V_P2": {
+        "columns": (("V_G1", FastSerializer.VOLTTYPE_INTEGER),
+                    ("V_G2", FastSerializer.VOLTTYPE_INTEGER),
+                    ("V_CNT", FastSerializer.VOLTTYPE_INTEGER),
+                    ("V_SUM_AGE", FastSerializer.VOLTTYPE_INTEGER),
+                    ("V_SUM_RENT", FastSerializer.VOLTTYPE_INTEGER),
         ),
     },
-    "R_MATVIEW": {
-        "columns": (("ID", FastSerializer.VOLTTYPE_INTEGER),
-                    ("BIG", FastSerializer.VOLTTYPE_BIGINT),
-                    ("NUM", FastSerializer.VOLTTYPE_BIGINT),
-                    ("TINYCOUNT", FastSerializer.VOLTTYPE_BIGINT),
-                    ("SMALLCOUNT", FastSerializer.VOLTTYPE_BIGINT),
-                    ("BIGCOUNT", FastSerializer.VOLTTYPE_BIGINT),
-                    ("TINYSUM", FastSerializer.VOLTTYPE_BIGINT),
-                    ("SMALLSUM", FastSerializer.VOLTTYPE_BIGINT),
+    "V_R2_ABS": {
+        "columns": (("V_G1", FastSerializer.VOLTTYPE_INTEGER),
+                    ("V_G2", FastSerializer.VOLTTYPE_INTEGER),
+                    ("V_CNT", FastSerializer.VOLTTYPE_INTEGER),
+                    ("V_SUM_AGE", FastSerializer.VOLTTYPE_INTEGER),
+                    ("V_SUM_RENT", FastSerializer.VOLTTYPE_INTEGER),
         ),
+    },
+    "V_R2": {
+        "columns": (("V_G1", FastSerializer.VOLTTYPE_INTEGER),
+                    ("V_G2", FastSerializer.VOLTTYPE_INTEGER),
+                    ("V_CNT", FastSerializer.VOLTTYPE_INTEGER),
+                    ("V_SUM_AGE", FastSerializer.VOLTTYPE_INTEGER),
+                    ("V_SUM_RENT", FastSerializer.VOLTTYPE_INTEGER),
+                    ),
     },
 }

@@ -34,7 +34,7 @@
 
 package voter;
 
-import java.sql.CallableStatement;
+import java.sql.PreparedStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -254,7 +254,7 @@ public class JDBCBenchmark {
                 badVoteCountVotes.get(), failedVotes.get());
 
         // 2. Voting results
-        final CallableStatement resultsCS = client
+        final PreparedStatement resultsCS = client
                 .prepareCall("{call Results}");
         ResultSet result = resultsCS.executeQuery();
         String winner = "";
@@ -330,7 +330,7 @@ public class JDBCBenchmark {
 
                 // synchronously call the "Vote" procedure
                 try {
-                    final CallableStatement voteCS = client
+                    final PreparedStatement voteCS = client
                             .prepareCall("{call Vote(?,?,?)}");
                     voteCS.setLong(1, call.phoneNumber);
                     voteCS.setInt(2, call.contestantNumber);
@@ -346,7 +346,7 @@ public class JDBCBenchmark {
                 // synchronously call the "Vote" procedure
                 try {
 
-                    final CallableStatement voteCS = client
+                    final PreparedStatement voteCS = client
                             .prepareCall("{call Vote(?,?,?)}");
                     voteCS.setLong(1, call.phoneNumber);
                     voteCS.setInt(2, call.contestantNumber);
@@ -385,7 +385,7 @@ public class JDBCBenchmark {
         // initialize using synchronous call
         // Initialize the application
         System.out.println("\nPopulating Static Tables\n");
-        final CallableStatement initializeCS = client
+        final PreparedStatement initializeCS = client
                 .prepareCall("{call Initialize(?,?)}");
         initializeCS.setInt(1, config.contestants);
         initializeCS.setString(2, CONTESTANT_NAMES_CSV);

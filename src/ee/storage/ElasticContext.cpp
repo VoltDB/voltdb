@@ -69,14 +69,16 @@ ElasticContext::handleActivation(TableStreamType streamType)
 
     // Clear the index?
     if (streamType == TABLE_STREAM_ELASTIC_INDEX_CLEAR) {
-        if (!m_surgeon.isIndexEmpty()) {
-            VOLT_ERROR("Elastic index clear is not allowed while an index is "
-                       "present that has not been completely consumed.");
-            return ACTIVATION_FAILED;
+        if (m_surgeon.hasIndex()) {
+            if (!m_surgeon.isIndexEmpty()) {
+                VOLT_ERROR("Elastic index clear is not allowed while an index is "
+                           "present that has not been completely consumed.");
+                return ACTIVATION_FAILED;
+            }
+            m_surgeon.dropIndex();
+            m_scanner.reset();
+            m_indexActive = false;
         }
-        m_surgeon.dropIndex();
-        m_scanner.reset();
-        m_indexActive = false;
         return ACTIVATION_SUCCEEDED;
     }
 

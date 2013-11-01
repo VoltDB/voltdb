@@ -160,7 +160,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
     }
 
-    public void setScanColumns(ArrayList<SchemaColumn> scanColumns)
+    public void setScanColumns(List<SchemaColumn> scanColumns)
     {
         if (scanColumns != null)
         {

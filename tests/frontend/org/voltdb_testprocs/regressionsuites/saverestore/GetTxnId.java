@@ -21,36 +21,21 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-// Put stored procedure
-//
-//   Puts the given Key-Value pair
-
-
-package voltkv.procedures;
+package org.voltdb_testprocs.regressionsuites.saverestore;
 
 import org.voltdb.*;
 
-public class Put extends VoltProcedure
-{
-    // Checks if key exists
-    public final SQLStmt checkStmt = new SQLStmt("SELECT key FROM store WHERE key = ?;");
+@ProcInfo (
+    partitionInfo = "PARTITION_TESTER.PT_ID: 0",
+    singlePartition = true
+)
+public class GetTxnId extends VoltProcedure {
 
-    // Updates a key/value pair
-    public final SQLStmt updateStmt = new SQLStmt("UPDATE store SET value = ? WHERE key = ?;");
+    public final SQLStmt insertPartitioned =
+        new SQLStmt("INSERT INTO PARTITION_TESTER VALUES (?, ?, ?, ?);");
 
-    // Inserts a key/value pair
-    public final SQLStmt insertStmt = new SQLStmt("INSERT INTO store (key, value) VALUES (?, ?);");
-
-    public VoltTable[] run(String key, byte[] value)
-    {
-        // Check whether the pair exists
-        voltQueueSQL(checkStmt, key);
-
-        // Insert new or update existing key depending on result
-        if (voltExecuteSQL()[0].getRowCount() == 0)
-            voltQueueSQL(insertStmt, key, value);
-        else
-            voltQueueSQL(updateStmt, value, key);
-        return voltExecuteSQL(true);
+    public VoltTable[] run(int partitioning) {
+        this.setAppStatusString(Long.toString(this.getVoltPrivateRealTransactionIdDontUseMe()));
+        return null;
     }
 }
