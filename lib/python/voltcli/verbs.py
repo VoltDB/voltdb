@@ -363,15 +363,13 @@ class JavaBundle(object):
 
     def initialize(self, verb):
         verb.add_options(
-           cli.IntegerOption(None, '--debugport', 'debugport',
-                             'enable remote Java debugging on the specified port'),
            cli.BooleanOption(None, '--dry-run', 'dryrun', None),
            cli.StringOption('-l', '--license', 'license', 'the license file path'),
-           cli.StringOption(None, '--internalinterface', 'internalinterface', 'Specifies which network interface to use for internal communication, such as the internal and zookeep- er ports.'),
-           cli.StringOption(None, '--internalport', 'internalport', 'Specifies the internal port number used to communicate between cluster nodes.'),
-           cli.StringOption(None, '--zkport', 'zkport', 'Specifies the zookeeper port number.'),
-           cli.StringOption(None, '--replicationport', 'replicationport', 'Specifies the first of three replication ports used for database replication.'),
-           cli.StringOption(None, '--adminport', 'adminport', 'Specifies the admin port number.'),
+           cli.StringOption(None, '--internalinterface', 'internalinterface', 'Specifies which network interface to use for internal communication, such as the internal and zookeeper ports.'),
+           cli.StringOption(None, '--internalport', 'internalport', 'Specifies the internal port number used to communicate between cluster nodes. Default 3021'),
+           cli.StringOption(None, '--zkport', 'zkport', 'Specifies the zookeeper port number. Default 2181'),
+           cli.StringOption(None, '--replicationport', 'replicationport', 'Specifies the first of three replication ports used for database replication. Default 5555'),
+           cli.StringOption(None, '--adminport', 'adminport', 'Specifies the admin port number. Default 21211'),
            cli.StringOption(None, '--externalinterface', 'externalinterface', 'Specifies which network interface to use for external ports, such as the admin and client ports.'))
 
     def start(self, verb, runner):
@@ -385,10 +383,7 @@ class JavaBundle(object):
 
     def run_java(self, verb, runner, *args):
         opts_override = verb.get_attr('java_opts_override', default = [])
-        if runner.opts.debugport:
-            kw = {'debugport': runner.opts.debugport}
-        else:
-            kw = {}
+        kw = {}
         runner.java.execute(self.java_class, opts_override, *args, **kw)
 
 #===============================================================================
