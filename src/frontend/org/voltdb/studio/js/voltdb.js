@@ -243,7 +243,7 @@ var IVoltDB = (function(){
                           , '@UpdateApplicationCatalog': { '2' : ['varchar', 'varchar'] }
                           , '@UpdateLogging': { '1' : ['xml'] }
                           , '@ValidatePartitioning': { '2': ['int', 'varbinary']}
-                          , '@GetPartitionKeys': { '1': ['int']}
+                          , '@GetPartitionKeys': { '1': ['varchar']}
                         };
         return this;
     }
@@ -313,7 +313,7 @@ var IVoltDB = (function(){
                                                   , '@UpdateLogging': { '1' : ['Configuration (xml)', 'Returns Table[]'] }
                                                   , '@Promote': { '0' : ['Returns bit'] }
                                                   , '@ValidatePartitioning': { '2' : ['HashinatorType (int)', 'Config (varbinary)', 'Returns Table[]'] }
-                                                  , '@GetPartitionKeys': { '1' : ['VoltType (int)', 'Returns Table[]'] }
+                                                  , '@GetPartitionKeys': { '1' : ['VoltType (varchar)', 'Returns Table[]'] }
                                                   };
 
                 /*

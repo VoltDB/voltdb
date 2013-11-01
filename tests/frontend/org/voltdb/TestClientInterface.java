@@ -628,27 +628,44 @@ public class TestClientInterface {
 
     @Test
     public void testGetPartitionKeys() throws IOException {
-        ByteBuffer msg = createMsg("@GetPartitionKeys", 99);
+        //Unsupported type
+        ByteBuffer msg = createMsg("@GetPartitionKeys", "BIGINT");
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNotNull(resp);
         assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
 
+        //Null param
+        msg = createMsg("@GetPartitionKeys", new Object[] { null });
+        resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNotNull(resp);
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
+
+        //Empty string param
+        msg = createMsg("@GetPartitionKeys", "");
+        resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNotNull(resp);
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
+
+        //Junk string
+        msg = createMsg("@GetPartitionKeys", "ryanlikestheyankees");
+        resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNotNull(resp);
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
+
+        //No param
         msg = createMsg("@GetPartitionKeys");
         resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNotNull(resp);
         assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
 
-        msg = createMsg("@GetPartitionKeys", 99, 99);
+        //Extra param
+        msg = createMsg("@GetPartitionKeys", "INTEGER", 99);
         resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNotNull(resp);
         assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
 
-        msg = createMsg("@GetPartitionKeys", 6);
-        resp = m_ci.handleRead(msg, m_handler, m_cxn);
-        assertNotNull(resp);
-        assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
-
-        msg = createMsg("@GetPartitionKeys", 5);
+        //Correct param with no case sensitivity
+        msg = createMsg("@GetPartitionKeys", "InTeGeR");
         resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNotNull(resp);
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());

@@ -1888,31 +1888,32 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private ClientResponseImpl dispatchGetPartitionKeys(StoredProcedureInvocation task) {
         Object params[] = task.getParams().toArray();
         String typeString = "the type of partition key to return and can be one of " +
-                            "INTEGER(5), STRING(9), or VARBINARY(25)";
-        if (params.length != 1) {
+                            "INTEGER, STRING or VARCHAR (equivalent), or VARBINARY";
+        if (params.length != 1 || params[0] == null) {
             return new ClientResponseImpl(
                     ClientResponse.GRACEFUL_FAILURE,
                     new VoltTable[0],
-                    "GetPartitionKeys must have one integer parameter specifying " + typeString,
+                    "GetPartitionKeys must have one string parameter specifying " + typeString,
                     task.clientHandle);
         }
-        if (!(params[0] instanceof Number)) {
+        if (!(params[0] instanceof String)) {
             return new ClientResponseImpl(
                     ClientResponse.GRACEFUL_FAILURE,
                     new VoltTable[0],
-                    "GetPartitionKeys must have one integer parameter specifying " + typeString +
+                    "GetPartitionKeys must have one string parameter specifying " + typeString +
                     " provided type was " + params[0].getClass().getName(),
                     task.clientHandle);
         }
         VoltType voltType = null;
-        byte typeValue = ((Number)params[0]).byteValue();
-        try {
-            voltType = VoltType.get(typeValue);
-        } catch (AssertionError e) {
+        String typeStr = ((String)params[0]).trim().toUpperCase();
+        if (typeStr.equals("INTEGER")) voltType = VoltType.INTEGER;
+        else if (typeStr.equals("STRING") || typeStr.equals("VARCHAR")) voltType = VoltType.STRING;
+        else if (typeStr.equals("VARBINARY")) voltType = VoltType.VARBINARY;
+        else {
             return new ClientResponseImpl(
                     ClientResponse.GRACEFUL_FAILURE,
                     new VoltTable[0],
-                    "Type " + typeValue + " is not a supported type of partition key, " + typeString,
+                    "Type " + typeStr + " is not a supported type of partition key, " + typeString,
                     task.clientHandle);
         }
         VoltTable partitionKeys = TheHashinator.getPartitionKeys(voltType);
@@ -1920,7 +1921,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return new ClientResponseImpl(
                     ClientResponse.GRACEFUL_FAILURE,
                     new VoltTable[0],
-                    "Type " + typeValue + " is not a supported type of partition key, " + typeString,
+                    "Type " + typeStr + " is not a supported type of partition key, " + typeString,
                     task.clientHandle);
         }
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[] { partitionKeys }, null, task.clientHandle);
