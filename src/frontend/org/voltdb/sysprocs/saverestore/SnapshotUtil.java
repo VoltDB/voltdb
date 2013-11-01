@@ -1211,6 +1211,7 @@ public class SnapshotUtil {
     }
 
     public static boolean didSnapshotRequestSucceed(VoltTable results[]) {
+        if (results.length < 1) return false;
         final VoltTable result = results[0];
         result.resetRowPosition();
         if (result.getColumnCount() == 1) {
