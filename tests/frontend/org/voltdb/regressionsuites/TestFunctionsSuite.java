@@ -62,13 +62,13 @@ public class TestFunctionsSuite extends RegressionSuite {
         Client client = getClient();
         ClientResponse cr = null;
         /*
-                "CREATE TABLE P1 ( " +
-                "ID INTEGER DEFAULT '0' NOT NULL, " +
-                "DESC VARCHAR(300), " +
-                "NUM INTEGER, " +
-                "RATIO FLOAT, " +
-                "PAST TIMESTAMP DEFAULT NULL, " +
-                "PRIMARY KEY (ID) ); " +
+        CREATE TABLE P1 (
+                ID INTEGER DEFAULT '0' NOT NULL,
+                DESC VARCHAR(300),
+                NUM INTEGER,
+                RATIO FLOAT,
+                PAST TIMESTAMP DEFAULT NULL,
+                PRIMARY KEY (ID) );
         */
 
         client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (0, 'wEoiXIuJwSIKBujWv', -405636, 1.38145922788945552107e-01, NULL)");
@@ -94,19 +94,19 @@ public class TestFunctionsSuite extends RegressionSuite {
         ClientResponse cr = null;
         VoltTable result = null;
         /*
-                "CREATE TABLE P1 ( " +
-                "ID INTEGER DEFAULT '0' NOT NULL, " +
-                "DESC VARCHAR(300), " +
-                "NUM INTEGER, " +
-                "RATIO FLOAT, " +
-                "PAST TIMESTAMP DEFAULT NULL, " +
-                "PRIMARY KEY (ID) ); " +
+        CREATE TABLE P1 (
+                ID INTEGER DEFAULT '0' NOT NULL,
+                DESC VARCHAR(300),
+                NUM INTEGER,
+                RATIO FLOAT,
+                PAST TIMESTAMP DEFAULT NULL,
+                PRIMARY KEY (ID) );
                 // Test generalized indexes on a string function and combos.
-                "CREATE INDEX P1_SUBSTRING_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2) ); " +
-                "CREATE INDEX P1_SUBSTRING_WITH_COL_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2), DESC ); " +
-                "CREATE INDEX P1_NUM_EXPR_WITH_STRING_COL ON P1 ( DESC, ABS(ID) ); " +
-                "CREATE INDEX P1_MIXED_TYPE_EXPRS1 ON P1 ( ABS(ID+2), SUBSTRING(DESC FROM 1 FOR 2) ); " +
-                "CREATE INDEX P1_MIXED_TYPE_EXPRS2 ON P1 ( SUBSTRING(DESC FROM 1 FOR 2), ABS(ID+2) ); " +
+        CREATE INDEX P1_SUBSTRING_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2) );
+        CREATE INDEX P1_SUBSTRING_WITH_COL_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2), DESC );
+        CREATE INDEX P1_NUM_EXPR_WITH_STRING_COL ON P1 ( DESC, ABS(ID) );
+        CREATE INDEX P1_MIXED_TYPE_EXPRS1 ON P1 ( ABS(ID+2), SUBSTRING(DESC FROM 1 FOR 2) );
+        CREATE INDEX P1_MIXED_TYPE_EXPRS2 ON P1 ( SUBSTRING(DESC FROM 1 FOR 2), ABS(ID+2) );
         */
 
         // Do some rudimentary indexed queries -- the real challenge to string expression indexes is defining and loading/maintaining them.
@@ -168,30 +168,30 @@ public class TestFunctionsSuite extends RegressionSuite {
         ClientResponse cr = null;
         VoltTable result = null;
         /*
-                "CREATE TABLE P1 ( " +
-                "ID INTEGER DEFAULT '0' NOT NULL, " +
-                "DESC VARCHAR(300), " +
-                "NUM INTEGER, " +
-                "RATIO FLOAT, " +
-                "PAST TIMESTAMP DEFAULT NULL, " +
-                "PRIMARY KEY (ID) ); " +
-                // Test generalized index on a function of a non-indexed column.
-                "CREATE INDEX P1_ABS_NUM ON P1 ( ABS(NUM) ); " +
-                // Test generalized index on an expression of multiple columns.
-                "CREATE INDEX P1_ABS_ID_PLUS_NUM ON P1 ( ABS(ID) + NUM ); " +
-                // Test generalized index on a string function.
-                // "CREATE INDEX P1_SUBSTRING_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2) ); " +
-                "CREATE TABLE R1 ( " +
-                "ID INTEGER DEFAULT '0' NOT NULL, " +
-                "DESC VARCHAR(300), " +
-                "NUM INTEGER, " +
-                "RATIO FLOAT, " +
-                "PAST TIMESTAMP DEFAULT NULL, " +
-                "PRIMARY KEY (ID) ); " +
-                // Test unique generalized index on a function of an already indexed column.
-                "CREATE UNIQUE INDEX R1_ABS_ID ON R1 ( ABS(ID) ); " +
-                // Test generalized expression index with a constant argument.
-                "CREATE INDEX R1_ABS_ID_SCALED ON R1 ( ID / 3 ); " +
+        CREATE TABLE P1 (
+                ID INTEGER DEFAULT '0' NOT NULL,
+                DESC VARCHAR(300),
+                NUM INTEGER,
+                RATIO FLOAT,
+                PAST TIMESTAMP DEFAULT NULL,
+                PRIMARY KEY (ID) );
+        // Test generalized index on a function of a non-indexed column.
+        CREATE INDEX P1_ABS_NUM ON P1 ( ABS(NUM) );
+        // Test generalized index on an expression of multiple columns.
+        CREATE INDEX P1_ABS_ID_PLUS_NUM ON P1 ( ABS(ID) + NUM );
+        // Test generalized index on a string function.
+        // CREATE INDEX P1_SUBSTRING_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2) );
+        CREATE TABLE R1 (
+                ID INTEGER DEFAULT '0' NOT NULL,
+                DESC VARCHAR(300),
+                NUM INTEGER,
+                RATIO FLOAT,
+                PAST TIMESTAMP DEFAULT NULL,
+                PRIMARY KEY (ID) );
+        // Test unique generalized index on a function of an already indexed column.
+        CREATE UNIQUE INDEX R1_ABS_ID ON R1 ( ABS(ID) );
+        // Test generalized expression index with a constant argument.
+        CREATE INDEX R1_ABS_ID_SCALED ON R1 ( ID / 3 );
         */
 
         cr = client.callProcedure("@AdHoc", "select ID from R1 where ABS(ID) = 9 and DESC > 'XYZ' order by ID");
@@ -687,10 +687,65 @@ public class TestFunctionsSuite extends RegressionSuite {
 
     }
 
-    public void testExtract() throws Exception
+    public void testTimestampConversions() throws Exception
     {
-        System.out.println("STARTING testExtract");
         Client client = getClient();
+        ClientResponse cr = null;
+        VoltTable r = null;
+        long result;
+        int columnIndex = 0;
+
+        // Giving up on hsql testing until timestamp precision behavior can be normalized.
+        if ( ! isHSQL()) {
+            System.out.println("STARTING test CAST between string and timestamp.");
+            /*
+            CREATE TABLE R2 (
+                    ID INTEGER DEFAULT '0' NOT NULL,
+                    DESC VARCHAR(300),
+                    NUM INTEGER,
+                    RATIO FLOAT,
+                    PAST TIMESTAMP DEFAULT NULL,
+                    PRIMARY KEY (ID) );
+            */
+            String strTime;
+            // Normal test case 2001-9-9 01:46:40.789000
+            cr = client.callProcedure("R2.insert", 1, "2001-09-09 01:46:40.789000", 10, 1.1, new Timestamp(1000000000789L));
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            strTime = "2001-10-30 21:46:40.000789";
+            cr = client.callProcedure("R2.insert", 2, strTime, 12, 1.1, strTime);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            strTime = "1601-01-01 00:00:00.000789";
+            cr = client.callProcedure("R2.insert", 3, strTime, 13, 1.1, strTime);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            strTime = "2013-12-31 23:59:59.999999";
+            cr = client.callProcedure("R2.insert", 4, strTime, 14, 1.1, strTime);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+            cr = client.callProcedure("VERIFY_TIMESTAMP_STRING_EQ");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            r = cr.getResults()[0];
+            if (r.getRowCount() != 0) {
+                System.out.println("VERIFY_TIMESTAMP_STRING_EQ failed on " + r.getRowCount() + " rows:");
+                System.out.println(r.toString());
+                fail("VERIFY_TIMESTAMP_STRING_EQ failed on " + r.getRowCount() + " rows");
+            }
+
+            cr = client.callProcedure("VERIFY_STRING_TIMESTAMP_EQ");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            r = cr.getResults()[0];
+            if (r.getRowCount() != 0) {
+                System.out.println("VERIFY_STRING_TIMESTAMP_EQ failed on " + r.getRowCount() + " rows:");
+                System.out.println(r.toString());
+                fail("VERIFY_TIMESTAMP_STRING_EQ failed on " + r.getRowCount() + " rows");
+            }
+
+            cr = client.callProcedure("DUMP_TIMESTAMP_STRING_PATHS");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            r = cr.getResults()[0];
+            System.out.println(r);
+        }
+
+        System.out.println("STARTING test Extract");
         /*
         CREATE TABLE P1 (
                 ID INTEGER DEFAULT '0' NOT NULL,
@@ -701,11 +756,6 @@ public class TestFunctionsSuite extends RegressionSuite {
                 PRIMARY KEY (ID)
                 );
         */
-        ClientResponse cr = null;
-        VoltTable r = null;
-        long result;
-        int columnIndex = 0;
-
         // Test Null timestamp
 //        cr = client.callProcedure("P1.insert", 0, "X0", 10, 1.1, null);
 //        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -2347,6 +2397,19 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("EXTRACT_TIMESTAMP", "select EXTRACT(YEAR FROM PAST), EXTRACT(MONTH FROM PAST), EXTRACT(DAY FROM PAST), " +
                 "EXTRACT(DAY_OF_WEEK FROM PAST), EXTRACT(DAY_OF_YEAR FROM PAST), EXTRACT(QUARTER FROM PAST), EXTRACT(HOUR FROM PAST), " +
                 "EXTRACT(MINUTE FROM PAST), EXTRACT(SECOND FROM PAST) from P1 where ID = ?");
+
+
+        project.addStmtProcedure("VERIFY_TIMESTAMP_STRING_EQ",
+                "select PAST, CAST(DESC AS TIMESTAMP), DESC, CAST(PAST AS VARCHAR) from R2 " +
+                "where PAST <> CAST(DESC AS TIMESTAMP)");
+
+        project.addStmtProcedure("VERIFY_STRING_TIMESTAMP_EQ",
+                "select PAST, CAST(DESC AS TIMESTAMP), DESC, CAST(PAST AS VARCHAR) from R2 " +
+                "where DESC <> CAST(PAST AS VARCHAR)");
+
+        project.addStmtProcedure("DUMP_TIMESTAMP_STRING_PATHS",
+                "select PAST, CAST(DESC AS TIMESTAMP), DESC, CAST(PAST AS VARCHAR) from R2");
+
 
 
         project.addStmtProcedure("DISPLAY_VARCHAR", "select CAST(INTEGERNUM AS VARCHAR), CAST(TINYNUM AS VARCHAR), CAST(SMALLNUM AS VARCHAR), CAST(BIGNUM AS VARCHAR), CAST(FLOATNUM AS VARCHAR), CAST(DECIMALNUM AS VARCHAR) from NUMBER_TYPES order by INTEGERNUM");

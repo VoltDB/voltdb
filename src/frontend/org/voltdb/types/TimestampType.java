@@ -128,9 +128,19 @@ public class TimestampType implements JSONString, Comparable<TimestampType> {
     @Override
     public String toString() {
         SimpleDateFormat sdf = new SimpleDateFormat(VoltDB.ODBC_DATE_FORMAT_STRING);
-        String format = sdf.format(m_date);
+        Date dateToMillis = m_date;
+        short usecs = m_usecs;
+        if (usecs < 0) {
+            // Negative usecs can occur for dates before 1970.
+            // To be expressed as positive decimals, they must "borrow" a milli from the date
+            // and convert it to 1000 micros.
+            dateToMillis.setTime(dateToMillis.getTime()-1);
+            usecs += 1000;
+        }
+        assert(usecs >= 0);
+        String format = sdf.format(dateToMillis);
         // zero-pad so 1 or 2 digit usecs get appended correctly
-        return format + String.format("%03d", m_usecs);
+        return format + String.format("%03d", usecs);
     }
 
     /**
