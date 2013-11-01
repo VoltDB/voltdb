@@ -129,7 +129,7 @@ public class IndexAVL implements Index {
     private final int[]     pkCols;
     private final Type[]    pkTypes;
     private final boolean   isUnique;    // DDL uniqueness
-    private boolean   isAssumeUnique;  // A VoltDB extension to allow unique index on partitioned table without partition column included.
+    private boolean         isAssumeUnique;  // A VoltDB extension to allow unique index on partitioned table without partition column included.
     private final boolean   useRowId;
     private final boolean   isConstraint;
     private final boolean   isForward;
@@ -285,11 +285,9 @@ public class IndexAVL implements Index {
      * @param unique is this a unique index
      * @param constraint does this index belonging to a constraint
      */
-    public IndexAVL(HsqlName name, long id, TableBase table, int[] cols, Type[] colTypes,
-            Expression[] expressions, boolean unique, boolean constraint, boolean assumeUnique) {
+    public IndexAVL(HsqlName name, long id, TableBase table, int[] cols, Type[] colTypes, Expression[] expressions, boolean unique, boolean constraint) {
         this(name, id, table, cols, null, null, colTypes, false, unique, constraint, false);
         this.exprs = expressions;
-        this.isAssumeUnique = assumeUnique;
     }
 
     // SchemaObject implementation
@@ -1712,6 +1710,12 @@ public class IndexAVL implements Index {
     @Override
     public boolean isAssumeUnique() {
         return isAssumeUnique;
+    }
+
+    @Override
+    public Index setAssumeUnique(boolean assumeUnique) {
+        this.isAssumeUnique = assumeUnique;
+        return this;
     }
 
 }

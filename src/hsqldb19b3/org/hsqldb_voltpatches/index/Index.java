@@ -291,4 +291,6 @@ public interface Index extends SchemaObject {
      * @return true if user wants unique index without uniqueness guarantee on partition table without partition key included.
      */
     public boolean isAssumeUnique();
+
+    public Index setAssumeUnique(boolean assumeUnique);
 }

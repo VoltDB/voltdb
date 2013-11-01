@@ -134,7 +134,7 @@ public final class Constraint implements SchemaObject {
     OrderedHashSet refColSet;
     // Is this for temp constraints only? What's a temp constraint?
     Expression[] indexExprs; // A VoltDB extension to support indexed expressions
-    boolean assumeUnique; // For VoltDB
+    boolean assumeUnique = false; // For VoltDB
 
     //
     final public static Constraint[] emptyArray = new Constraint[]{};
@@ -150,7 +150,6 @@ public final class Constraint implements SchemaObject {
         core.mainTable = t;
         core.mainIndex = index;
         core.mainCols  = index.getColumns();
-        assumeUnique   = false;
     }
 
     /**
@@ -161,7 +160,6 @@ public final class Constraint implements SchemaObject {
         this.name = name;
         constType = MAIN;
         core      = fkconstraint.core;
-        assumeUnique = false;
     }
 
     Constraint duplicate() {
@@ -210,7 +208,6 @@ public final class Constraint implements SchemaObject {
         core.deleteAction  = deleteAction;
         core.updateAction  = updateAction;
         core.matchType     = matchType;
-        assumeUnique       = false;
     }
 
     public Constraint(HsqlName name, OrderedHashSet mainCols, int type) {
@@ -219,31 +216,12 @@ public final class Constraint implements SchemaObject {
         this.name  = name;
         constType  = type;
         mainColSet = mainCols;
-        assumeUnique = false;
     }
 
-    // For VoltDB to support AssumeUnique
-    public Constraint(HsqlName name, Table t, Index index, int type, boolean isAssumeUnique) {
-        this(name, t, index, type);
-        assumeUnique   = isAssumeUnique;
-    }
-
-    // For VoltDB to support AssumeUnique
-    public Constraint(HsqlName name, OrderedHashSet mainCols, int type, boolean isAssumeUnique) {
-
-        core       = new ConstraintCore();
-        this.name  = name;
-        constType  = type;
-        mainColSet = mainCols;
-        assumeUnique = isAssumeUnique;
-    }
-
-    // A VoltDB extension to support indexed expressions or AssumeUnique.
-    public Constraint(HsqlName name, OrderedHashSet baseCols, Expression[] exprs, int type, boolean isAssumeUnique) {
-        this(name, baseCols, type);
-
+    // A VoltDB extension to support indexed expressions
+    public Constraint(HsqlName name, OrderedHashSet baseCols, Expression[] exprs) {
+        this(name, baseCols, Constraint.UNIQUE);
         indexExprs = exprs;
-        assumeUnique = isAssumeUnique;
     }
 
     void setColumnsIndexes(Table table) {
@@ -360,6 +338,7 @@ public final class Constraint implements SchemaObject {
                 if (indexExprs != null) {
                     return getExprList(sb);
                 }
+                sb.append(Tokens.T_ASSUMEUNIQUE);
 
                 int[] col = getMainColumns();
 
@@ -1122,6 +1101,11 @@ public final class Constraint implements SchemaObject {
             sep = ", ";
         }
         return sb.toString();
+    }
+
+    public Constraint setAssumeUnique(boolean assumeUnique) {
+        this.assumeUnique = assumeUnique;
+        return this;
     }
 
 }
