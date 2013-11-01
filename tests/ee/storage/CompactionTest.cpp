@@ -296,7 +296,7 @@ TEST_F(CompactionTest, BasicCompaction) {
     stx::btree_set<int32_t> pkeysNotDeleted;
     std::vector<int32_t> pkeysToDelete;
     for (int ii = 0; ii < tupleCount; ii ++) {
-        if (ii % 3 == 0 || ii % 3 == 1) {
+        if (ii % 2 == 0) {
             pkeysToDelete.push_back(ii);
         } else {
             pkeysNotDeleted.insert(ii);
@@ -350,7 +350,7 @@ TEST_F(CompactionTest, BasicCompaction) {
 #ifdef MEMCHECK
     ASSERT_EQ( m_table->m_data.size(), 500);
 #else
-    ASSERT_EQ( m_table->m_data.size(), 12);
+    ASSERT_EQ( m_table->m_data.size(), 13);
 #endif
 
     for (stx::btree_set<int32_t>::iterator ii = pkeysNotDeleted.begin(); ii != pkeysNotDeleted.end(); ii++) {
