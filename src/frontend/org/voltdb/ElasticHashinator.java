@@ -27,6 +27,7 @@ import java.util.TreeMap;
 
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Maps;
+import com.google.common.collect.SortedMapDifference;
 import org.apache.cassandra_voltpatches.MurmurHash3;
 import org.voltcore.utils.Pair;
 
@@ -589,7 +590,29 @@ public class ElasticHashinator extends TheHashinator {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        return m_tokensMap.get().equals(((ElasticHashinator) o).getTokens());
+
+        ElasticHashinator that = (ElasticHashinator) o;
+
+        if (m_signature.get().equals(that.m_signature.get())) return true;
+
+        SortedMapDifference<Integer,Integer> diff = Maps.difference(m_tokensMap.get(), that.m_tokensMap.get());
+        if (!diff.entriesDiffering().isEmpty()) return false;
+
+        // Tolerate tokens that are not on the bucket boundaries. As long as these tokens hash to the same partitions
+        // as they are in the other hashinator, it's fine.
+        for (Map.Entry<Integer, Integer> leftEntry : diff.entriesOnlyOnLeft().entrySet()) {
+            if (that.partitionForToken(leftEntry.getKey()) != leftEntry.getValue()) {
+                return false;
+            }
+        }
+
+        for (Map.Entry<Integer, Integer> rightEntry : diff.entriesOnlyOnRight().entrySet()) {
+            if (partitionForToken(rightEntry.getKey()) != rightEntry.getValue()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
