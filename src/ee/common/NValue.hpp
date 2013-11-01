@@ -1249,7 +1249,7 @@ class NValue {
 
         number_string = date_str.substr(5,2);
         pch = number_string.c_str();
-        int month;
+        int month = 0;
         if (pch[0] == '0') {
             month = 0;
         } else if (pch[0] == '1') {
@@ -1268,7 +1268,7 @@ class NValue {
 
         number_string = date_str.substr(8,2);
         pch = number_string.c_str();
-        int day;
+        int day = 0;
         if (pch[0] == '0') {
             day = 0;
         } else if (pch[0] == '1') {
@@ -1296,7 +1296,7 @@ class NValue {
 
         number_string = time_str.substr(0,2);
         pch = number_string.c_str();
-        int hour;
+        int hour = 0;
         if (pch[0] == '0') {
             hour = 0;
         } else if (pch[0] == '1') {
