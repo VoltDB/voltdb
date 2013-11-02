@@ -131,7 +131,7 @@ typedef std::vector<T_HashRange> T_HashRangeVector;
  */
 class CopyOnWriteTest : public Test {
 public:
-    CopyOnWriteTest() {
+    CopyOnWriteTest() : m_table(NULL) {
         m_tuplesInserted = 0;
         m_tuplesUpdated = 0;
         m_tuplesDeleted = 0;
@@ -207,7 +207,9 @@ public:
 
     ~CopyOnWriteTest() {
         delete m_engine;
-        delete m_table;
+        if (m_table != NULL) {
+            delete m_table;
+        }
     }
 
     void iterate() {
