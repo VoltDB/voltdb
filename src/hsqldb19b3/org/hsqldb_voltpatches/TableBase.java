@@ -391,6 +391,20 @@ public class TableBase {
 
     public final Index createAndAddIndexStructure(HsqlName name,
             int[] columns, boolean[] descending, boolean[] nullsLast,
+            boolean unique, boolean constraint, boolean forward) {
+
+        Index newindex = createIndexStructure(name, columns, descending,
+                                              nullsLast, unique, constraint,
+                                              forward, false);
+
+        addIndex(newindex);
+
+        return newindex;
+    }
+
+    // A VoltDB extension to support assumeUnique
+    public final Index createAndAddIndexStructure(HsqlName name,
+            int[] columns, boolean[] descending, boolean[] nullsLast,
             boolean unique, boolean constraint, boolean forward, boolean assumeUnique) {
 
         Index newindex = createIndexStructure(name, columns, descending,

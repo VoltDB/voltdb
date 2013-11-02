@@ -1326,7 +1326,7 @@ public class QuerySpecification extends QueryExpression {
         if (sortAndSlice.hasOrder()) {
             orderIndex = resultTable.createAndAddIndexStructure(null,
                     sortAndSlice.sortOrder, sortAndSlice.sortDescending,
-                    sortAndSlice.sortNullsLast, false, false, false, false);
+                    sortAndSlice.sortNullsLast, false, false, false);
         }
 
         if (isDistinctSelect || isFullOrder) {
@@ -1335,7 +1335,7 @@ public class QuerySpecification extends QueryExpression {
             ArrayUtil.fillSequence(fullCols);
 
             fullIndex = resultTable.createAndAddIndexStructure(null, fullCols,
-                    null, null, false, false, false, false);
+                    null, null, false, false, false);
             resultTable.fullIndex = fullIndex;
         }
 
@@ -1347,7 +1347,7 @@ public class QuerySpecification extends QueryExpression {
             }
 
             groupIndex = resultTable.createAndAddIndexStructure(null,
-                    groupCols, null, null, false, false, false, false);
+                    groupCols, null, null, false, false, false);
         } else if (isAggregated) {
             groupIndex = mainIndex;
         }

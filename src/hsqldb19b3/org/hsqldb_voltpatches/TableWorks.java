@@ -343,7 +343,7 @@ public class TableWorks {
 
                     index = table.createAndAddIndexStructure(indexName,
                             c.getRefColumns(), null, null, false, true,
-                            isForward, false);
+                            isForward);
                     c.core.uniqueName = uniqueConstraint.getName();
                     c.core.mainName = database.nameManager.newAutoName("REF",
                             c.core.refName.name, table.getSchemaName(),

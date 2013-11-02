@@ -194,7 +194,7 @@ public class ParserDDL extends ParserRoutine {
                 return compileCreateIndex(true, assumeUnique);
 
             case Tokens.INDEX :
-                return compileCreateIndex(false, assumeUnique);
+                return compileCreateIndex(false, false);
 
             case Tokens.FUNCTION :
             case Tokens.PROCEDURE :
@@ -1389,7 +1389,7 @@ public class ParserDDL extends ParserRoutine {
         HsqlName refIndexName = session.database.nameManager.newAutoName("IDX",
             table.getSchemaName(), table.getName(), SchemaObject.INDEX);
         Index index = table.createAndAddIndexStructure(refIndexName,
-            c.core.refCols, null, null, false, true, isForward, false);
+            c.core.refCols, null, null, false, true, isForward);
         HsqlName mainName = session.database.nameManager.newAutoName("REF",
             c.getName().name, table.getSchemaName(), table.getName(),
             SchemaObject.INDEX);

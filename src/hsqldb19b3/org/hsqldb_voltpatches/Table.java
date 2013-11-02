@@ -1863,7 +1863,7 @@ public class Table extends TableBase implements SchemaObject {
 
         try {
             Index index = createAndAddIndexStructure(indexName, columns, null,
-                null, false, false, false, false);
+                null, false, false, false);
 
             return index;
         } catch (Throwable t) {

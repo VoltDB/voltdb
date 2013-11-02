@@ -31,6 +31,7 @@
 
 package org.hsqldb_voltpatches;
 
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.index.Index;
@@ -649,7 +650,7 @@ public class QueryExpression {
         if (sortAndSlice.hasOrder()) {
             orderIndex = resultTable.createAndAddIndexStructure(null,
                     sortAndSlice.sortOrder, sortAndSlice.sortDescending,
-                    sortAndSlice.sortNullsLast, false, false, false, false);
+                    sortAndSlice.sortNullsLast, false, false, false);
         }
 
         int[] fullCols = new int[columnCount];
@@ -657,7 +658,7 @@ public class QueryExpression {
         ArrayUtil.fillSequence(fullCols);
 
         fullIndex = resultTable.createAndAddIndexStructure(null, fullCols,
-                null, null, false, false, false, false);
+                null, null, false, false, false);
         resultTable.fullIndex = fullIndex;
     }
 

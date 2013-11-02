@@ -1551,7 +1551,7 @@ public class DDLCompiler {
             for (Index destIndex : destTable.getIndexes()) {
                 if (destIndex.getUnique() || destIndex.getAssumeunique()) {
                     String msg = "A UNIQUE or ASSUMEUNIQUE index is not allowed on a materialized view. " +
-                            "Remove the qualifier \"UNIQUE\" from the index " + destIndex.getTypeName() +
+                            "Remove the qualifier from the index " + destIndex.getTypeName() +
                             "defined on the materialized view \"" + viewName + "\".";
                     throw m_compiler.new VoltCompilerException(msg);
                 }

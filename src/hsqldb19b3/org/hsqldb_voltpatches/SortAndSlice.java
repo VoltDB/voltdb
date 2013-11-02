@@ -138,7 +138,7 @@ public final class SortAndSlice {
 
         try {
             index = table.createAndAddIndexStructure(null, sortOrder,
-                    sortDescending, sortNullsLast, false, false, false, false);
+                    sortDescending, sortNullsLast, false, false, false);
         } catch (Throwable t) {
             throw Error.runtimeError(ErrorCode.U_S0500, "SortAndSlice");
         }
