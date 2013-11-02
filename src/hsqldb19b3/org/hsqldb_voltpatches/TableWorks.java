@@ -294,7 +294,7 @@ public class TableWorks {
 
                     // create an autonamed index
                     index = table.createAndAddIndexStructure(indexName,
-                            c.getMainColumns(), null, null, true, true, false);
+                            c.getMainColumns(), null, null, true, true, false).setAssumeUnique(c.assumeUnique);
                     c.core.mainTable = table;
                     c.core.mainIndex = index;
 
