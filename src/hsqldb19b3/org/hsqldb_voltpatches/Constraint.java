@@ -338,7 +338,6 @@ public final class Constraint implements SchemaObject {
                 if (indexExprs != null) {
                     return getExprList(sb);
                 }
-                sb.append(Tokens.T_ASSUMEUNIQUE);
 
                 int[] col = getMainColumns();
 

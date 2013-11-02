@@ -180,7 +180,7 @@ public class TableWorks {
         HsqlName indexName = database.nameManager.newAutoName("IDX",
             table.getSchemaName(), table.getName(), SchemaObject.INDEX);
         Index refIndex = table.createIndexStructure(indexName, c.core.refCols,
-            null, null, false, true, isForward, false);
+            null, null, false, true, isForward);
         HsqlName mainName = database.nameManager.newAutoName("REF",
             c.getName().name, table.getSchemaName(), table.getName(),
             SchemaObject.INDEX);
@@ -294,7 +294,7 @@ public class TableWorks {
 
                     // create an autonamed index
                     index = table.createAndAddIndexStructure(indexName,
-                            c.getMainColumns(), null, null, true, true, false, c.assumeUnique);  // For VoltDB
+                            c.getMainColumns(), null, null, true, true, false);
                     c.core.mainTable = table;
                     c.core.mainIndex = index;
 
@@ -480,7 +480,7 @@ public class TableWorks {
      * @param unique boolean
      * @return new index
      */
-    Index addIndex(int[] col, HsqlName name, boolean unique, boolean assumeUnique) {
+    Index addIndex(int[] col, HsqlName name, boolean unique) {
 
         Index newindex;
 
@@ -488,10 +488,10 @@ public class TableWorks {
             PersistentStore store = session.sessionData.getRowStore(table);
 
             newindex = table.createIndex(store, name, col, null, null, unique,
-                                         false, false, assumeUnique);
+                                         false, false);
         } else {
             newindex = table.createIndexStructure(name, col, null, null,
-                                                  unique, false, false, assumeUnique);
+                                                  unique, false, false);
 
             Table tn = table.moveDefinition(session, table.tableType, null,
                                             null, newindex, -1, 0, emptySet,
@@ -522,16 +522,16 @@ public class TableWorks {
      * @param unique boolean
      * @return new index
      */
-    Index addExprIndex(int[] cols, Expression[] indexExprs, HsqlName name, boolean unique, boolean assumeUnique) {
+    Index addExprIndex(int[] cols, Expression[] indexExprs, HsqlName name, boolean unique) {
 
         Index newExprIndex;
 
         if (table.isEmpty(session) || table.isIndexingMutable()) {
             PersistentStore store = session.sessionData.getRowStore(table);
 
-            newExprIndex = table.createExprIndex(store, name, cols, indexExprs, unique, false, assumeUnique);
+            newExprIndex = table.createExprIndex(store, name, cols, indexExprs, unique, false);
         } else {
-            newExprIndex = table.createExprIndexStructure(name, cols, indexExprs, unique, false, assumeUnique);
+            newExprIndex = table.createExprIndexStructure(name, cols, indexExprs, unique, false);
 
             Table tn = table.moveDefinition(session, table.tableType, null,
                                             null, newExprIndex, -1, 0, emptySet,
@@ -599,7 +599,7 @@ public class TableWorks {
             name.name, table.getSchemaName(), table.getName(),
             SchemaObject.INDEX);
         Index index = table.createIndexStructure(indexname, cols, null, null,
-            true, true, false, assumeUnique);
+            true, true, false);
         Constraint constraint = new Constraint(name, table, index,
                                                Constraint.UNIQUE).setAssumeUnique(assumeUnique);
         Table tn = table.moveDefinition(session, table.tableType, null,
@@ -634,7 +634,7 @@ public class TableWorks {
         HsqlName indexname = database.nameManager.newAutoName("IDX",
             name.name, table.getSchemaName(), table.getName(),
             SchemaObject.INDEX);
-        Index exprIndex = table.createExprIndexStructure(indexname, cols, indexExprs, true, true, assumeUnique);
+        Index exprIndex = table.createExprIndexStructure(indexname, cols, indexExprs, true, true);
         Constraint constraint = new Constraint(name, table, exprIndex, Constraint.UNIQUE).setAssumeUnique(assumeUnique);
         Table tn = table.moveDefinition(session, table.tableType, null,
                                         constraint, exprIndex, -1, 0, emptySet, emptySet);

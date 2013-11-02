@@ -976,12 +976,12 @@ public class StatementSchema extends Statement {
 
                     if (indexExprs != null) {
                         // A VoltDB extension to support indexed expressions
-                        tableWorks.addExprIndex(indexColumns, indexExprs.toArray(new Expression[indexExprs.size()]), name, unique, assumeUnique);
+                        tableWorks.addExprIndex(indexColumns, indexExprs.toArray(new Expression[indexExprs.size()]), name, unique).setAssumeUnique(assumeUnique);
 
                         break;
                     }
 
-                    tableWorks.addIndex(indexColumns, name, unique, assumeUnique);
+                    tableWorks.addIndex(indexColumns, name, unique).setAssumeUnique(assumeUnique);
 
                     break;
                 } catch (HsqlException e) {

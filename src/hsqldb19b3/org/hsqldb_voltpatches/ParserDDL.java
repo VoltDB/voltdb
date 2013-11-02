@@ -1298,10 +1298,10 @@ public class ParserDDL extends ParserRoutine {
                     Index index = null;
                     if (c.indexExprs != null) {
                         // Special case handling for VoltDB indexed expressions
-                        index = table.createAndAddExprIndexStructure(indexName, c.core.mainCols, c.indexExprs, true, true, c.assumeUnique);
+                        index = table.createAndAddExprIndexStructure(indexName, c.core.mainCols, c.indexExprs, true, true).setAssumeUnique(c.assumeUnique);
                     } else {
                         index = table.createAndAddIndexStructure(indexName,
-                            c.core.mainCols, null, null, true, true, false, c.assumeUnique);
+                            c.core.mainCols, null, null, true, true, false).setAssumeUnique(c.assumeUnique);
                     }
 
                     Constraint newconstraint = new Constraint(c.getName(),

@@ -395,21 +395,7 @@ public class TableBase {
 
         Index newindex = createIndexStructure(name, columns, descending,
                                               nullsLast, unique, constraint,
-                                              forward, false);
-
-        addIndex(newindex);
-
-        return newindex;
-    }
-
-    // A VoltDB extension to support assumeUnique
-    public final Index createAndAddIndexStructure(HsqlName name,
-            int[] columns, boolean[] descending, boolean[] nullsLast,
-            boolean unique, boolean constraint, boolean forward, boolean assumeUnique) {
-
-        Index newindex = createIndexStructure(name, columns, descending,
-                                              nullsLast, unique, constraint,
-                                              forward, assumeUnique);
+                                              forward);
 
         addIndex(newindex);
 
@@ -417,10 +403,9 @@ public class TableBase {
     }
 
     // A VoltDB extension to support indexed expressions
-    public final Index createAndAddExprIndexStructure(HsqlName name, int[] cols, Expression[] indexExprs,
-            boolean unique, boolean constraint, boolean assumeUnique) {
+    public final Index createAndAddExprIndexStructure(HsqlName name, int[] cols, Expression[] indexExprs, boolean unique, boolean constraint) {
 
-        Index newExprIndex = createExprIndexStructure(name, cols, indexExprs, unique, constraint, assumeUnique);
+        Index newExprIndex = createExprIndexStructure(name, cols, indexExprs, unique, constraint);
         addIndex(newExprIndex);
         return newExprIndex;
     } /* createAndAddExprIndexStructure */
@@ -428,7 +413,7 @@ public class TableBase {
     final Index createIndexStructure(HsqlName name, int[] columns,
                                      boolean[] descending,
                                      boolean[] nullsLast, boolean unique,
-                                     boolean constraint, boolean forward, boolean assumeUnique) {
+                                     boolean constraint, boolean forward) {
 
         if (primaryKeyCols == null) {
             //VOLTDB changed ... throw Error.runtimeError(ErrorCode.U_S0500, "createIndex");
@@ -447,14 +432,13 @@ public class TableBase {
         long id = database.persistentStoreCollection.getNextId();
         Index newIndex = new IndexAVL(name, id, this, cols, descending,
                                       nullsLast, types, false, unique,
-                                      constraint, forward).setAssumeUnique(assumeUnique);
+                                      constraint, forward);
 
         return newIndex;
     }
 
     // A VoltDB extension to support indexed expressions
-    final Index createExprIndexStructure(HsqlName name, int[] columns, Expression[] expressions,
-            boolean unique, boolean constraint, boolean assumeUnique) {
+    final Index createExprIndexStructure(HsqlName name, int[] columns, Expression[] expressions, boolean unique, boolean constraint) {
         // TODO: DEFinitely implement for indexExprs
         if (primaryKeyCols == null) {
             //VOLTDB changed ... throw Error.runtimeError(ErrorCode.U_S0500, "createIndex");
@@ -471,8 +455,7 @@ public class TableBase {
         }
 
         long id = database.persistentStoreCollection.getNextId();
-        Index newExprIndex = new IndexAVL(name, id, this, cols,
-                types, expressions, unique, constraint).setAssumeUnique(assumeUnique);
+        Index newExprIndex = new IndexAVL(name, id, this, cols, types, expressions, unique, constraint);
 
         return newExprIndex;
     } /* createExprIndexStructure */
@@ -530,10 +513,10 @@ public class TableBase {
     public final Index createIndex(PersistentStore store, HsqlName name,
                                    int[] columns, boolean[] descending,
                                    boolean[] nullsLast, boolean unique,
-                                   boolean constraint, boolean forward, boolean assumeUnique) {
+                                   boolean constraint, boolean forward) {
 
         Index newIndex = createAndAddIndexStructure(name, columns, descending,
-            nullsLast, unique, constraint, forward, assumeUnique);
+            nullsLast, unique, constraint, forward);
 
         return newIndex;
     }
@@ -544,9 +527,9 @@ public class TableBase {
      * @param indexExprs
      */
     public final Index createExprIndex(PersistentStore store, HsqlName name, int[] cols,
-                                       Expression[] indexExprs, boolean unique, boolean constraint, boolean assumeUnique) {
+                                       Expression[] indexExprs, boolean unique, boolean constraint) {
 
-        Index newExprIndex = createAndAddExprIndexStructure(name, cols, indexExprs, unique, constraint, assumeUnique);
+        Index newExprIndex = createAndAddExprIndexStructure(name, cols, indexExprs, unique, constraint);
 
         return newExprIndex;
     } /* createExprIndex */
