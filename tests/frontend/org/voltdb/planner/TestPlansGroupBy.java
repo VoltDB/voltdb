@@ -391,6 +391,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testNoFix_MVBasedQuery() {
+        String sql = "";
+
         // (1) Table V_P1_NO_FIX_NEEDED:
 
         // Normal select queries
@@ -414,9 +416,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkMVNoFix_NoAgg("SELECT V_A1, MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_A1", 1, 1, false, false, true);
         checkMVNoFix_NoAgg("SELECT V_A1,V_B1, MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_A1, V_B1", 2, 1, false, false, true);
 
-        // (3) Join Query
-        String sql = "";
 
+        // (3) Join Query
         // Voter example query in 'Results' stored procedure.
         sql = "   SELECT a.contestant_name   AS contestant_name"
                 + "        , a.contestant_number AS contestant_number"
@@ -429,12 +430,19 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 + " ORDER BY total_votes DESC"
                 + "        , contestant_number ASC"
                 + "        , contestant_name ASC;";
-
         checkMVNoFix_NoAgg(sql, 2, 1, false, true, true);
-//
-//        sql = "select v_p1.v_b1, v_p1.v_cnt, sum(v_a1) from v_p1 @joinType v_r1 using(v_a1) " +
-//                "group by v_p1.v_b1, v_p1.v_cnt;";
-//        checkMVFixWithJoin(sql, 2, 1, 2, 1, null, null);
+
+
+        sql = "select sum(v_cnt) from v_p1 INNER JOIN v_r1 using(v_a1)";
+        checkMVNoFix_NoAgg(sql, 0, 1, false, false, true);
+
+        sql = "select v_p1.v_b1, sum(v_p1.v_sum_d1) from v_p1 INNER JOIN v_r1 on v_p1.v_a1 > v_r1.v_a1 " +
+                "group by v_p1.v_b1;";
+        checkMVNoFix_NoAgg(sql, 1, 1, false, false, true);
+
+        sql = "select MAX(v_r1.v_a1) from v_p1 INNER JOIN v_r1 on v_p1.v_a1 = v_r1.v_a1 " +
+                "INNER JOIN r1v on v_p1.v_a1 = r1v.v_a1 ";
+        checkMVNoFix_NoAgg(sql, 0, 1, false, false, true);
     }
 
     public void testMVBasedQuery_EdgeCases() {
@@ -752,7 +760,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
 
         // Three tables joins.
-        sql = "select MAX(v_r1.v_a1) from v_p1 @joinType v_r1 on v_p1.v_a1 = v_r1.v_a1 " +
+        sql = "select MAX(v_p1.v_a1) from v_p1 @joinType v_r1 on v_p1.v_a1 = v_r1.v_a1 " +
                 "@joinType r1v on v_p1.v_a1 = r1v.v_a1 ";
         checkMVFixWithJoin(sql, 0, 1, 2, 0, null, null);
 

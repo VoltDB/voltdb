@@ -60,11 +60,11 @@ public class MaterializedViewFixInfo {
     // materialized view table
     private Table m_mvTable = null;
 
-    // number of group-by s.
-    private int m_numOfGroupByColumns;
-
     // Scan Node for join query.
     AbstractScanPlanNode m_scanNode = null;
+
+    // ENG-5386: Edge case query.
+    private boolean m_edgeCaseQueryNoFixNeeded = true;
 
     public boolean needed () {
         return m_needed;
@@ -103,6 +103,7 @@ public class MaterializedViewFixInfo {
         String partitionColName = partitionCol.getName();
         MaterializedViewInfo mvInfo = srcTable.getViews().get(mvTableName);
 
+        int numOfGroupByColumns;
         // Justify whether partition column is in group by column list or not
         String complexGroupbyJson = mvInfo.getGroupbyexpressionsjson();
         if (complexGroupbyJson.length() > 0) {
@@ -112,7 +113,7 @@ public class MaterializedViewFixInfo {
             } catch (JSONException e) {
                 e.printStackTrace();
             }
-            m_numOfGroupByColumns = mvComplexGroupbyCols.size();
+            numOfGroupByColumns = mvComplexGroupbyCols.size();
 
             for (AbstractExpression expr: mvComplexGroupbyCols) {
                 if (expr instanceof TupleValueExpression) {
@@ -127,7 +128,7 @@ public class MaterializedViewFixInfo {
             }
         } else {
             CatalogMap<ColumnRef> mvSimpleGroupbyCols = mvInfo.getGroupbycols();
-            m_numOfGroupByColumns = mvSimpleGroupbyCols.size();
+            numOfGroupByColumns = mvSimpleGroupbyCols.size();
 
             for (ColumnRef colRef: mvSimpleGroupbyCols) {
                 if (colRef.getColumn().getName().equals(partitionColName)) {
@@ -138,12 +139,12 @@ public class MaterializedViewFixInfo {
                 }
             }
         }
-        assert(m_numOfGroupByColumns > 0);
+        assert(numOfGroupByColumns > 0);
         m_mvTable = table;
 
         Set<TupleValueExpression> mvDDLGroupbyTVEs = new HashSet<TupleValueExpression>();
         List<Column> mvColumnArray =
-                CatalogUtil.getSortedCatalogItems(table.getColumns(), "index");
+                CatalogUtil.getSortedCatalogItems(m_mvTable.getColumns(), "index");
 
 
         // Start to do real materialized view processing to fix the duplicates problem.
@@ -154,7 +155,7 @@ public class MaterializedViewFixInfo {
             inlineProjSchema.addColumn(scol);
         }
 
-        for (int i = 0; i < m_numOfGroupByColumns; i++) {
+        for (int i = 0; i < numOfGroupByColumns; i++) {
             Column mvCol = mvColumnArray.get(i);
             String colName = mvCol.getName();
 
@@ -181,7 +182,7 @@ public class MaterializedViewFixInfo {
 
         // Record the re-aggregation type for each scan columns.
         Map<String, ExpressionType> mvColumnReAggType = new HashMap<String, ExpressionType>();
-        for (int i = m_numOfGroupByColumns; i < mvColumnArray.size(); i++) {
+        for (int i = numOfGroupByColumns; i < mvColumnArray.size(); i++) {
             Column mvCol = mvColumnArray.get(i);
             ExpressionType reAggType = ExpressionType.get(mvCol.getAggregatetype());
 
@@ -226,7 +227,7 @@ public class MaterializedViewFixInfo {
         List<TupleValueExpression> needReAggTVEs = new ArrayList<TupleValueExpression>();
         List<AbstractExpression> aggPostExprs = new ArrayList<AbstractExpression>();
 
-        for (int i=m_numOfGroupByColumns; i < mvColumnArray.size(); i++) {
+        for (int i=numOfGroupByColumns; i < mvColumnArray.size(); i++) {
             Column mvCol = mvColumnArray.get(i);
             TupleValueExpression tve = new TupleValueExpression();
             tve.setColumnIndex(i);
@@ -255,17 +256,11 @@ public class MaterializedViewFixInfo {
         return true;
     }
 
-    private boolean m_edgeCaseQueryNoFixNeeded = true;
-
     // ENG-5386: do not fix some cases in order to get better performance.
     private boolean edgeCaseQueryNoFixNeeded(ParsedSelectStmt stmt, Set<TupleValueExpression> mvDDLGroupbyTVEs,
             Map<String, ExpressionType> mvColumnAggType) {
 
         if (stmt.hasComplexGroupby()) {
-            return false;
-        }
-
-        if (stmt.tableList.size() > 2) {
             return false;
         }
 
@@ -405,7 +400,6 @@ public class MaterializedViewFixInfo {
                     }
                 } else {
                     // Filter references from two tables or more.
-                    // m_edgeCaseQueryNoFixNeeded
                     for (TupleValueExpression needReAggTVE: needReAggTVEs) {
                         if (tves.contains(needReAggTVE)) {
                             m_edgeCaseQueryNoFixNeeded = false;
