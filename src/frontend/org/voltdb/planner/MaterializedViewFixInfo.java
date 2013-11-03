@@ -293,11 +293,12 @@ public class MaterializedViewFixInfo {
             TupleValueExpression tve = (TupleValueExpression) aggExpr.getLeft();
             String columnName = tve.getColumnName();
 
+            if (type != ExpressionType.AGGREGATE_SUM && type != ExpressionType.AGGREGATE_MIN
+                    && type != ExpressionType.AGGREGATE_MAX) {
+                return false;
+            }
+
             if (tve.getTableName().equals(getMVTableName())) {
-                if (type != ExpressionType.AGGREGATE_SUM && type != ExpressionType.AGGREGATE_MIN
-                        && type != ExpressionType.AGGREGATE_MAX) {
-                    return false;
-                }
                 if (mvColumnAggType.get(columnName) != type ) {
                     return false;
                 }
