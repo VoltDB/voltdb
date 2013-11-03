@@ -52,6 +52,11 @@ class ElasticIndexKey
     ElasticIndexKey(ElasticHash hash, char *ptr);
 
     /**
+     * Full constructor that takes the casted pointer value directly.
+     */
+    ElasticIndexKey(ElasticHash hash, uintptr_t ptrVal);
+
+    /**
      * Copy constructor.
      */
     ElasticIndexKey(const ElasticIndexKey &other);
@@ -79,7 +84,7 @@ class ElasticIndexKey
   private:
 
     ElasticHash m_hash;
-    char *m_ptr;
+    uintptr_t m_ptrVal;
 };
 
 /**
@@ -255,15 +260,23 @@ private:
  */
 inline ElasticIndexKey::ElasticIndexKey() :
     m_hash(0),
-    m_ptr(NULL)
+    m_ptrVal(0)
 {}
 
 /**
  * Full constructor.
  */
 inline ElasticIndexKey::ElasticIndexKey(ElasticHash hash, char *ptr) :
+    m_hash(hash)
+{
+    // Cast pointer to unsigned integer so that it can be used in comparison
+    // safely. Directly comparing less than of two pointers is undefined in C++.
+    m_ptrVal = reinterpret_cast<uintptr_t>(ptr);
+}
+
+inline ElasticIndexKey::ElasticIndexKey(ElasticHash hash, uintptr_t ptrVal) :
     m_hash(hash),
-    m_ptr(ptr)
+    m_ptrVal(ptrVal)
 {}
 
 /**
@@ -271,7 +284,7 @@ inline ElasticIndexKey::ElasticIndexKey(ElasticHash hash, char *ptr) :
  */
 inline ElasticIndexKey::ElasticIndexKey(const ElasticIndexKey &other) :
     m_hash(other.m_hash),
-    m_ptr(other.m_ptr)
+    m_ptrVal(other.m_ptrVal)
 {}
 
 /**
@@ -280,7 +293,7 @@ inline ElasticIndexKey::ElasticIndexKey(const ElasticIndexKey &other) :
 inline const ElasticIndexKey &ElasticIndexKey::operator=(const ElasticIndexKey &other)
 {
     m_hash = other.m_hash;
-    m_ptr = other.m_ptr;
+    m_ptrVal = other.m_ptrVal;
     return *this;
 }
 
@@ -289,7 +302,7 @@ inline const ElasticIndexKey &ElasticIndexKey::operator=(const ElasticIndexKey &
  */
 inline bool ElasticIndexKey::operator==(const ElasticIndexKey &other) const
 {
-    return m_hash == other.m_hash && m_ptr == other.m_ptr;
+    return m_hash == other.m_hash && m_ptrVal == other.m_ptrVal;
 }
 
 /**
@@ -305,7 +318,7 @@ inline ElasticHash ElasticIndexKey::getHash() const
  */
 inline char *ElasticIndexKey::getTupleAddress() const
 {
-    return m_ptr;
+    return reinterpret_cast<char *>(m_ptrVal);
 }
 
 /**
@@ -314,7 +327,7 @@ inline char *ElasticIndexKey::getTupleAddress() const
 inline bool ElasticIndexComparator::operator()(
        const ElasticIndexKey &a, const ElasticIndexKey &b) const
 {
-    return (a.m_hash < b.m_hash || (a.m_hash == b.m_hash && a.m_ptr < b.m_ptr));
+    return (a.m_hash < b.m_hash || (a.m_hash == b.m_hash && a.m_ptrVal < b.m_ptrVal));
 }
 
 /**
@@ -398,7 +411,7 @@ inline ElasticIndex::iterator ElasticIndex::createIterator()
  */
 inline ElasticIndex::iterator ElasticIndex::createLowerBoundIterator(ElasticHash lowerBound)
 {
-    return lower_bound(ElasticIndexKey(lowerBound, NULL));
+    return lower_bound(ElasticIndexKey(lowerBound, (uintptr_t) 0));
 }
 
 /**
@@ -406,7 +419,7 @@ inline ElasticIndex::iterator ElasticIndex::createLowerBoundIterator(ElasticHash
  */
 inline ElasticIndex::iterator ElasticIndex::createUpperBoundIterator(ElasticHash upperBound)
 {
-    return upper_bound(ElasticIndexKey(upperBound, NULL));
+    return upper_bound(ElasticIndexKey(upperBound, std::numeric_limits<uintptr_t>::max()));
 }
 
 /**
@@ -422,7 +435,7 @@ inline ElasticIndex::const_iterator ElasticIndex::createIterator() const
  */
 inline ElasticIndex::const_iterator ElasticIndex::createLowerBoundIterator(ElasticHash lowerBound) const
 {
-    return lower_bound(ElasticIndexKey(lowerBound, NULL));
+    return lower_bound(ElasticIndexKey(lowerBound, (uintptr_t) 0));
 }
 
 /**
@@ -430,7 +443,7 @@ inline ElasticIndex::const_iterator ElasticIndex::createLowerBoundIterator(Elast
  */
 inline ElasticIndex::const_iterator ElasticIndex::createUpperBoundIterator(ElasticHash upperBound) const
 {
-    return upper_bound(ElasticIndexKey(upperBound, NULL));
+    return upper_bound(ElasticIndexKey(upperBound, std::numeric_limits<uintptr_t>::max()));
 }
 
 /**
@@ -438,7 +451,7 @@ inline ElasticIndex::const_iterator ElasticIndex::createUpperBoundIterator(Elast
  */
 inline std::ostream &operator<<(std::ostream &os, const ElasticIndexKey &key)
 {
-    os << std::hex << key.m_hash << ':' << reinterpret_cast<long>(key.m_ptr);
+    os << std::hex << key.m_hash << ':' << key.m_ptrVal;
     return os;
 }
 
