@@ -76,6 +76,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         long[][] expected;
 
         for (String tb: tbs) {
+            // Test group by PRIMARY KEY
             // Test pass-through columns, group by primary key
             cr = client.callProcedure("@AdHoc", "SELECT dept, count(wage) from " + tb +
                     " GROUP BY id ORDER BY dept DESC");
@@ -949,13 +950,14 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
         final String literalSchema =
                 "CREATE TABLE R1 ( " +
-                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
                 "WAGE INTEGER, " +
                 "DEPT INTEGER, " +
                 "TM TIMESTAMP DEFAULT NULL, " +
                 "PRIMARY KEY (ID) );" +
+
                 "CREATE TABLE P1 ( " +
-                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
                 "WAGE INTEGER NOT NULL, " +
                 "DEPT INTEGER NOT NULL, " +
                 "TM TIMESTAMP DEFAULT NULL, " +
@@ -963,19 +965,19 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
                 "PARTITION TABLE P1 ON COLUMN ID;" +
 
                 "CREATE TABLE P2 ( " +
-                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "ID INTEGER DEFAULT 0 NOT NULL ASSUMEUNIQUE, " +
                 "WAGE INTEGER NOT NULL, " +
                 "DEPT INTEGER NOT NULL, " +
                 "TM TIMESTAMP DEFAULT NULL, " +
-                "PRIMARY KEY (ID) );" +
+                "PRIMARY KEY (ID, DEPT) );" +
                 "PARTITION TABLE P2 ON COLUMN DEPT;" +
 
                 "CREATE TABLE P3 ( " +
-                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "ID INTEGER DEFAULT 0 NOT NULL ASSUMEUNIQUE, " +
                 "WAGE INTEGER NOT NULL, " +
                 "DEPT INTEGER NOT NULL, " +
                 "TM TIMESTAMP DEFAULT NULL, " +
-                "PRIMARY KEY (ID) );" +
+                "PRIMARY KEY (ID, WAGE) );" +
                 "PARTITION TABLE P3 ON COLUMN WAGE;"
                 ;
         try {
