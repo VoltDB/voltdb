@@ -343,6 +343,7 @@ public class Tokens {
     static final String        T_TRUNCATE          = "TRUNCATE";
     static final String        T_UESCAPE           = "UESCAPE";
     static final String        T_UNION             = "UNION";
+    static final String        T_ASSUMEUNIQUE      = "ASSUMEUNIQUE";     // For VoltDB
     public static final String T_UNIQUE            = "UNIQUE";
     static final String        T_UNKNOWN           = "UNKNOWN";
     static final String        T_UNNEST            = "UNNEST";
@@ -1082,6 +1083,7 @@ public class Tokens {
     public static final int UNDO                             = 295;
     public static final int UNION                            = 296;
     public static final int UNIQUE                           = 297;
+    public static final int ASSUMEUNIQUE                     = 1303;    // For VoltDB
     public static final int UNKNOWN                          = 298;
     public static final int UNNEST                           = 299;
     public static final int UNTIL                            = 300;
@@ -1851,6 +1853,7 @@ public class Tokens {
         reservedKeys.put(Tokens.T_UNDO, UNDO);
         reservedKeys.put(Tokens.T_UNION, UNION);
         reservedKeys.put(Tokens.T_UNIQUE, UNIQUE);
+        reservedKeys.put(Tokens.T_ASSUMEUNIQUE, ASSUMEUNIQUE);    // For VoltDB
         reservedKeys.put(Tokens.T_UNKNOWN, UNKNOWN);
         reservedKeys.put(Tokens.T_UNNEST, UNNEST);
         reservedKeys.put(Tokens.T_UNTIL, UNTIL);
@@ -2185,6 +2188,7 @@ public class Tokens {
             OUTER, PRIMARY, REFERENCES, RIGHT, SELECT, SET, SOME, STDDEV_POP,
             STDDEV_SAMP, SUM, TABLE, THEN, TO, TRAILING, TRIGGER, UNION,
             UNIQUE, USING, VALUES, VAR_POP, VAR_SAMP, WHEN, WHERE, WITH,
+            ASSUMEUNIQUE, // For VoltDB
         };
 
         for (int i = 0; i < keyword.length; i++) {

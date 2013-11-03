@@ -203,8 +203,7 @@ public class TestSqlUpdateSuite extends RegressionSuite {
             new MultiConfigSuiteBuilder(TestSqlUpdateSuite.class);
 
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(Insert.class.getResource("fixed-sql-ddl.sql"));
-        project.addPartitionInfo("P1", "ID");
+        project.addSchema(Insert.class.getResource("sql-update-ddl.sql"));
         project.addProcedures(PROCEDURES);
 
         config = new LocalCluster("sqlupdate-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);

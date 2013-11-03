@@ -84,8 +84,7 @@ public class TestGiantDeleteSuite extends RegressionSuite {
             new MultiConfigSuiteBuilder(TestGiantDeleteSuite.class);
 
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(Insert.class.getResource("fixed-sql-ddl.sql"));
-        project.addPartitionInfo("ASSET", "OBJECT_DETAIL_ID");
+        project.addSchema(Insert.class.getResource("giant-delete-ddl.sql"));
         project.addProcedures(PROCEDURES);
         project.addStmtProcedure("Delete", "DELETE FROM ASSET WHERE ASSET_ID > -1;");
 
