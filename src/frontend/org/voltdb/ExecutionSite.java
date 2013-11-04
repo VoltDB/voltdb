@@ -1707,4 +1707,10 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     public long[] validatePartitioning(long[] tableIds, int hashinatorType, byte[] hashinatorConfig) {
         throw new UnsupportedOperationException();
     }
+
+    @Override
+    public void setBatch(int batchIndex) {}
+
+    @Override
+    public void setProcedureName(String procedureName) {}
 }

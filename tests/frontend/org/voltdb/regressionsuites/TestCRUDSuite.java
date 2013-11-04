@@ -227,9 +227,9 @@ public class TestCRUDSuite extends RegressionSuite {
             // a partitioned table that should not generate procedures (pkey not partition key)
             project.addLiteralSchema(
                     "CREATE TABLE p3(a1 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL); " +
-                    "CREATE UNIQUE INDEX p3_tree_idx ON p3(a1);"
+                    "CREATE ASSUMEUNIQUE INDEX p3_tree_idx ON p3(a1); " +
+                    "PARTITION TABLE P3 ON COLUMN a2;"
             );
-            project.addPartitionInfo("p3", "a2");
 
             // a replicated table (should not generate procedures).
             project.addLiteralSchema(

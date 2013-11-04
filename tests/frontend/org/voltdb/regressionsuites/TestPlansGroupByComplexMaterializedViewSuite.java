@@ -1189,6 +1189,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         * */
 
         for (String tb: tbs) {
+            System.out.println("Testing inner join with partitioned view: " + tb);
             // (1) Two tables join.
             sql = "Select v_p1.v_cnt from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
                     "order by v_p1.v_cnt;";
@@ -1489,12 +1490,12 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
 
                 // NO Need to fix mv query
                 "CREATE TABLE P2 ( " +
-                "id INTEGER DEFAULT 0 NOT NULL, " +
+                "id INTEGER DEFAULT 0 NOT NULL ASSUMEUNIQUE, " +
                 "wage INTEGER, " +
                 "dept INTEGER NOT NULL, " +
                 "age INTEGER,  " +
                 "rent INTEGER, " +
-                "PRIMARY KEY (id) );" +
+                "PRIMARY KEY (dept, id) );" +
                 "PARTITION TABLE P2 ON COLUMN dept;" +
 
                 "CREATE VIEW V_P2 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) " +

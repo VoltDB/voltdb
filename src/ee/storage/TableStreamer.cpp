@@ -59,16 +59,11 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                                    const std::vector<std::string> &predicateStrings)
 {
     bool failed = false;
-
-    // Rebuild the stream list with just the streams that deserve to persist.
-    StreamList savedStreams(m_streams);
-    m_streams.clear();
     bool found = false;
-    BOOST_FOREACH(StreamPtr &streamPtr, savedStreams) {
+    BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
         assert(streamPtr != NULL);
         switch (streamPtr->m_context->handleReactivation(streamType)) {
             case TableStreamerContext::ACTIVATION_SUCCEEDED:
-                m_streams.push_back(streamPtr);
                 streamPtr->m_context->updatePredicates(predicateStrings);
                 found = true;
                 break;
@@ -76,8 +71,6 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                 failed = true;
                 break;
             case TableStreamerContext::ACTIVATION_UNSUPPORTED:
-                // Don't get rid of streams that serve a different type of stream.
-                m_streams.push_back(streamPtr);
                 break;
         }
     }

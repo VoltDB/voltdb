@@ -361,6 +361,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         VOLT_DEBUG("Initial Expression:\n%s", initial_expression->debug(true).c_str());
     }
 
+    Table* targetTable = m_targetTable;
+    m_engine->setLastAccessedTable(targetTable);
     //
     // An index scan has three parts:
     //  (1) Lookup tuples using the search key
@@ -397,6 +399,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                 m_index->moveToEnd(false);
             } else {
                 while (!(m_tuple = m_index->nextValue()).isNullTuple()) {
+                    m_engine->noteTuplesProcessedForProgressMonitoring(1);
                     if (initial_expression != NULL && initial_expression->eval(&m_tuple, NULL).isFalse()) {
                         // just passed the first failed entry, so move 2 backward
                         m_index->moveToBeforePriorEntry();
@@ -434,6 +437,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             !(m_tuple = m_index->nextValue()).isNullTuple()))) {
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", m_tuple.debug("tablename").c_str());
 
+        m_engine->noteTuplesProcessedForProgressMonitoring(1);
         //
         // First check whether the end_expression is now false
         //
