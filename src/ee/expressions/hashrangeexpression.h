@@ -59,6 +59,10 @@ public:
         }
         const int32_t hash = tuple1->getNValue(this->value_idx).murmurHash3();
 
+        return binarySearch(hash);
+    }
+
+    voltdb::NValue binarySearch(const int32_t hash) const {
         //The binary search blows up on only one range
         if (num_ranges == 1) {
             if (hash >= ranges[0].first && hash <= ranges[0].second) return NValue::getTrue();

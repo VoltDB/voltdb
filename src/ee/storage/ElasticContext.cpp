@@ -20,6 +20,7 @@
 #include "storage/persistenttable.h"
 #include "common/TupleOutputStreamProcessor.h"
 #include "common/FixUnusedAssertHack.h"
+#include "expressions/hashrangeexpression.h"
 
 namespace voltdb {
 
@@ -55,11 +56,11 @@ ElasticContext::handleActivation(TableStreamType streamType)
 
     // Create the index?
     if (streamType == TABLE_STREAM_ELASTIC_INDEX) {
-        // Don't allow activation if there's an existing index.
+        // Allow activation if there is an index, we will check when the predicates
+        // are updated to make sure the existing index satisfies the request
         if (m_surgeon.hasIndex()) {
-            VOLT_ERROR("Elastic context activation is not allowed while an index is "
-                       "present that has not been completely consumed.");
-            return ACTIVATION_FAILED;
+            VOLT_INFO("Activating elastic index build for index that already exists.");
+            return ACTIVATION_SUCCEEDED;
         }
         m_surgeon.createIndex();
         m_scanner.reset(new ElasticScanner(getTable(), m_surgeon.getData()));
@@ -75,6 +76,9 @@ ElasticContext::handleActivation(TableStreamType streamType)
                            "present that has not been completely consumed.");
                 return ACTIVATION_FAILED;
             }
+            //Clear the predicates so when we are activated again we won't
+            //compare against the old predicate
+            m_predicates.clear();
             m_surgeon.dropIndex();
             m_scanner.reset();
             m_indexActive = false;
@@ -116,8 +120,8 @@ int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStrea
         return TABLE_STREAM_SERIALIZATION_ERROR;
     }
     if (m_surgeon.isIndexingComplete()) {
-        VOLT_ERROR("Elastic streaming was called after indexing had already completed.");
-        return TABLE_STREAM_SERIALIZATION_ERROR;
+        VOLT_INFO("Indexing was already complete.");
+        return 0;
     }
 
     // Populate index with current tuples.
@@ -199,6 +203,37 @@ void ElasticContext::notifyTupleMovement(TBPtr sourceBlock,
             assert(added);
         }
     }
+}
+
+/**
+ * Parse and save predicates.
+ */
+void ElasticContext::updatePredicates(const std::vector<std::string> &predicateStrings) {
+    //If there is already a predicate and thus presumably an index, make sure the request is a subset of what exists
+    //That should always be the case, but wrong answers will follow if we are wrong
+    if (m_predicates.size() > 0 && dynamic_cast<HashRangeExpression*>(&m_predicates[0]) != NULL && predicateStrings.size() > 0) {
+        PlannerDomRoot domRoot(predicateStrings[0].c_str());
+        if (!domRoot.isNull()) {
+            PlannerDomValue predicateObject = domRoot.rootObject();
+            HashRangeExpression *expression = dynamic_cast<HashRangeExpression*>(&m_predicates[0]);
+            if (predicateObject.hasKey("predicateExpression")) {
+                PlannerDomValue predicateExpression = predicateObject.valueForKey("predicateExpression");
+                PlannerDomValue rangesArray = predicateExpression.valueForKey("RANGES");
+                for (int ii = 0; ii < rangesArray.arrayLen(); ii++) {
+                    PlannerDomValue arrayObject = rangesArray.valueAtIndex(ii);
+                    PlannerDomValue rangeStartValue = arrayObject.valueForKey("RANGE_START");
+                    PlannerDomValue rangeEndValue = arrayObject.valueForKey("RANGE_END");
+                    if (expression->binarySearch(rangeStartValue.asInt()).isFalse()) {
+                        throwFatalException("ElasticContext activate failed because a context already existed with conflicting ranges, conflicting range start is %d", rangeStartValue.asInt());
+                    }
+                    if (expression->binarySearch(rangeEndValue.asInt()).isFalse()) {
+                        throwFatalException("ElasticContext activate failed because a context already existed with conflicting ranges, conflicting range end is %d", rangeStartValue.asInt());
+                    }
+                }
+            }
+        }
+    }
+    TableStreamerContext::updatePredicates(predicateStrings);
 }
 
 } // namespace voltdb
