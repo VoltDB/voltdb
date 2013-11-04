@@ -26,10 +26,10 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.client.ProcCallException;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestSPBasecaseSuite extends RegressionSuite {
@@ -127,7 +127,7 @@ public class TestSPBasecaseSuite extends RegressionSuite {
             // a partitioned table that should not generate procedures (pkey not partition key)
             project.addLiteralSchema(
                     "CREATE TABLE p3(a1 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL); " +
-                    "CREATE UNIQUE INDEX p3_tree_idx ON p3(a1);"
+                    "CREATE ASSUMEUNIQUE INDEX p3_tree_idx ON p3(a1);"
             );
             project.addPartitionInfo("p3", "a2");
 

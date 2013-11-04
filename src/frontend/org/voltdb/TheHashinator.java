@@ -17,15 +17,17 @@
 
 package org.voltdb;
 
-import com.google.common.base.Charsets;
+import com.google.common.base.*;
+
 import java.lang.reflect.Constructor;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
-import com.google.common.base.Throwables;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -150,6 +152,7 @@ public abstract class TheHashinator {
     abstract public Map<Integer, Integer> pGetRanges(int partition);
     public abstract HashinatorType getConfigurationType();
     abstract public int pHashToPartition(VoltType type, Object obj);
+    abstract protected Set<Integer> pGetPartitions();
 
     /**
      * Returns the configuration signature
@@ -519,5 +522,64 @@ public abstract class TheHashinator {
         Long version = currentHashinator.getFirst();
         byte[] bytes = currentHashinator.getSecond().getCookedBytes();
         return Pair.of(version, bytes);
+    }
+
+    public static final String CNAME_PARTITION_KEY = "PARTITION_KEY";
+
+    private Supplier<VoltTable> getSupplierForType(final VoltType type) {
+        return new Supplier() {
+            @Override
+            public Object get() {
+                VoltTable vt = new VoltTable(new VoltTable.ColumnInfo[] {
+                        new VoltTable.ColumnInfo(
+                                VoltSystemProcedure.CNAME_PARTITION_ID,
+                                VoltSystemProcedure.CTYPE_ID),
+                        new VoltTable.ColumnInfo(CNAME_PARTITION_KEY, type)});
+                Set<Integer> partitions = TheHashinator.this.pGetPartitions();
+
+                for (int ii = 0; ii < 500000; ii++) {
+                    if (partitions.isEmpty()) break;
+                    Object value = null;
+                    if (type == VoltType.INTEGER) value = ii;
+                    if (type == VoltType.STRING) value = String.valueOf(ii);
+                    if (type == VoltType.VARBINARY) {
+                        ByteBuffer buf = ByteBuffer.allocate(4);
+                        buf.putInt(ii);
+                        value = buf.array();
+                    }
+                    int partition = TheHashinator.this.getHashedPartitionForParameter(type.getValue(), value);
+                    if (partitions.remove(partition)) {
+                        vt.addRow(partition, value);
+                    }
+                }
+                return vt;
+            }
+        };
+    }
+    private final Supplier<VoltTable> m_integerPartitionKeys = Suppliers.memoize(getSupplierForType(VoltType.INTEGER));
+    private final Supplier<VoltTable> m_stringPartitionKeys = Suppliers.memoize(getSupplierForType(VoltType.STRING));
+    private final Supplier<VoltTable> m_varbinaryPartitionKeys = Suppliers.memoize(getSupplierForType(VoltType.VARBINARY));
+
+    /**
+     * Get a VoltTable containing the partition keys for each partition that can be found.
+     * May be missing some partitions during elastic rebalance when the partitions don't own
+     * enough of the ring to be probed
+     *
+     * If the type is not supported returns null
+     * @param type
+     * @return
+     */
+    public static VoltTable getPartitionKeys(VoltType type) {
+        TheHashinator hashinator = instance.get().getSecond();
+        switch (type) {
+            case INTEGER:
+                return hashinator.m_integerPartitionKeys.get();
+            case STRING:
+                return hashinator.m_stringPartitionKeys.get();
+            case VARBINARY:
+                return hashinator.m_varbinaryPartitionKeys.get();
+            default:
+                return null;
+        }
     }
 }

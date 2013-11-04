@@ -32,7 +32,7 @@ Congratulations! You've created your first VoltDB database.
 
 INPUT AND OUTPUT
 ================
-You use standard SQL queries to read and write from a VoltDB database. The VoltDB interactive prompt, sqlcmd, lets you type queries directly. Type "sqlcmd" at the shell prompt to enter interactive mode, then type in the following two queries to input and return data from the database:
+You use standard SQL queries to read and write from a VoltDB database. The VoltDB interactive prompt, sqlcmd, lets you type queries directly. Start a new terminal session and type "sqlcmd" at the shell prompt to enter interactive mode, then type in the following two queries to input and return data from the database:
 
 	sqlcmd
 	INSERT INTO helloworld VALUES ('Hello','World','English');
@@ -54,7 +54,7 @@ Since we are changing the partitioning, we need to stop and restart the database
 	voltdb compile -o helloworld.jar hw1.sql
 	voltdb create catalog helloworld.jar license ~/license.xml
 
-Note that the partitioning is automatic and transparent to simple queries. For example, you can access the database by repeating your earlier queries:
+Note that the partitioning is automatic and transparent to simple queries. For example, you can access the database by repeating your earlier queries in a new terminal session:
 
 	sqlcmd
 	INSERT INTO helloworld VALUES ('Hello','World','English');
@@ -73,7 +73,7 @@ In the simplest case, a single query, you can define the stored procedure in the
 	CREATE PROCEDURE Insert AS 
 	    INSERT INTO helloworld 
             COLUMNS (Dialect, Hello, World) VALUES (?,?,?);
-	CREATE PROCEDURES Select AS
+	CREATE PROCEDURE Select AS
 	    SELECT Hello, World FROM Helloworld
 	    WHERE Dialect=?;
 

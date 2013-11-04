@@ -1489,12 +1489,12 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
 
                 // NO Need to fix mv query
                 "CREATE TABLE P2 ( " +
-                "id INTEGER DEFAULT 0 NOT NULL, " +
+                "id INTEGER DEFAULT 0 NOT NULL ASSUMEUNIQUE, " +
                 "wage INTEGER, " +
                 "dept INTEGER NOT NULL, " +
                 "age INTEGER,  " +
                 "rent INTEGER, " +
-                "PRIMARY KEY (id) );" +
+                "PRIMARY KEY (dept, id) );" +
                 "PARTITION TABLE P2 ON COLUMN dept;" +
 
                 "CREATE VIEW V_P2 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) " +

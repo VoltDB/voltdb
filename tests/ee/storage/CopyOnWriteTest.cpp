@@ -131,7 +131,7 @@ typedef std::vector<T_HashRange> T_HashRangeVector;
  */
 class CopyOnWriteTest : public Test {
 public:
-    CopyOnWriteTest() {
+    CopyOnWriteTest() : m_table(NULL) {
         m_tuplesInserted = 0;
         m_tuplesUpdated = 0;
         m_tuplesDeleted = 0;
@@ -207,7 +207,9 @@ public:
 
     ~CopyOnWriteTest() {
         delete m_engine;
-        delete m_table;
+        if (m_table != NULL) {
+            delete m_table;
+        }
     }
 
     void iterate() {
@@ -757,7 +759,7 @@ public:
             if (directKey) {
                 // Direct key tests synthesize keys with NULL tuple addresses.
                 int32_t hash = MurmurHash3_x64_128(tuple.address()+1, sizeof(int32_t), 0);
-                ElasticIndexKey key(hash, NULL);
+                ElasticIndexKey key(hash, (char *) NULL);
                 isIndexed = index->exists(key);
             }
             else {
@@ -1050,11 +1052,15 @@ public:
             if (serialized == 0) {
                 break;
             }
+
+            // Trying to clear an index that's not drained will fail, but should be side-effect free
+            clearIndex(testRange, false);
+
             int ii = 12; // skip partition id, row count, and first tuple size
             while (ii < (serialized - 4)) {
                 int value = ntohl(*reinterpret_cast<int32_t*>(&m_serializationBuffer[ii]));
                 int32_t hash = MurmurHash3_x64_128(&value, sizeof(value), 0);
-                ElasticIndexKey key(hash, NULL);
+                ElasticIndexKey key(hash, (char *) NULL);
                 bool inserted = index.add(key);
                 ASSERT_TRUE(inserted);
                 totalInserted++;
@@ -1933,6 +1939,19 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
 
         itest++;
     }
+}
+
+TEST_F(CopyOnWriteTest, ElasticIndexLowerUpperBounds) {
+    ElasticIndex index;
+    ElasticIndexKey key1(1, (char *)&index);
+    bool inserted = index.add(key1);
+    ASSERT_TRUE(inserted);
+    ElasticIndexKey key2(3, (char *)&index);
+    inserted = index.add(key2);
+    ASSERT_TRUE(inserted);
+
+    ASSERT_TRUE(key1 == *index.createLowerBoundIterator(1));
+    ASSERT_TRUE(index.createUpperBoundIterator(3) == index.end());
 }
 
 int main() {

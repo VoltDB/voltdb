@@ -76,6 +76,7 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.SiteMailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.catalog.Catalog;
@@ -2130,6 +2131,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_commandLog.init(m_catalogContext, txnId, m_cartographer.getPartitionCount(),
                               m_config.m_commandLogBinding,
                               perPartitionTxnIds);
+            try {
+                ZKCountdownLatch latch =
+                        new ZKCountdownLatch(m_messenger.getZK(),
+                                VoltZK.commandlog_init_barrier, m_messenger.getLiveHostIds().size());
+                latch.countDown(true);
+                latch.await();
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Failed to init and wait on command log init barrier", true, e);
+            }
         }
 
         /*
