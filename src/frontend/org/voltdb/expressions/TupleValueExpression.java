@@ -17,9 +17,6 @@
 
 package org.voltdb.expressions;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
