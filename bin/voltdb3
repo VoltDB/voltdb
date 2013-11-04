@@ -182,6 +182,7 @@ if \ls -1 $VOLTDB_LIB/extension 2> /dev/null | egrep -q '\.jar$'; then
   done
 fi
 
+echo "voltdb3 is Legacy CLI, Please use voltdb instead."
 # run it
 # note: currently heapdump path in log collector is hardcoded to /tmp
 #       if commandline option gets changed, there should be corresponding modification in log collector
