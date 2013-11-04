@@ -6,7 +6,7 @@ CREATE TABLE partitioned
 , cid   tinyint            NOT NULL
 , rid   bigint             NOT NULL
 , value varbinary(1048576) NOT NULL
-, CONSTRAINT PK_txnid PRIMARY KEY
+, CONSTRAINT PK_txnid ASSUMEUNIQUE
   (
     txnid
   )
