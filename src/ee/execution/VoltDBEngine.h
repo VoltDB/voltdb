@@ -460,7 +460,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void printReport();
 
         /**
-         * Call into the topend with informaiton about how executing a plan fragment is going.
+         * Call into the topend with information about how executing a plan fragment is going.
          */
         void reportProgessToTopend();
 
@@ -581,7 +581,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /** size of reused_result_buffer. */
         int m_reusedResultCapacity;
 
-        // arrays to hold fragmentsid and dep ids from java
+        // arrays to hold fragment ids and dep ids from java
         // n.b. these are 8k each, should be boost shared arrays?
         int64_t m_batchFragmentIdsContainer[MAX_BATCH_COUNT];
         int64_t m_batchDepIdsContainer[MAX_BATCH_COUNT];

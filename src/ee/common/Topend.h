@@ -41,7 +41,7 @@ class Topend {
     // Return true if the Topend wants the EE to stop processing the current fragment
     // or false if it should continue.
     virtual bool fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
-                std::string targetTableName, int64_t targetTableSize, int64_t tuplesFound) = 0;
+                std::string targetTableName, int64_t targetTableSize, int64_t tuplesProcessed) = 0;
 
     virtual std::string planForFragmentId(int64_t fragmentId) = 0;
 

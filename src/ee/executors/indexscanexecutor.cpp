@@ -361,7 +361,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         VOLT_DEBUG("Initial Expression:\n%s", initial_expression->debug(true).c_str());
     }
 
-    Table* targetTable = reinterpret_cast<Table*> (m_targetTable);
+    Table* targetTable = m_targetTable;
     m_engine->setLastAccessedTable(targetTable);
     //
     // An index scan has three parts:

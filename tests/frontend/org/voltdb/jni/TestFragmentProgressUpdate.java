@@ -109,14 +109,12 @@ public class TestFragmentProgressUpdate extends TestCase {
         CatalogMap<Procedure> procedures = cluster.getDatabases().get("database").getProcedures();
         Procedure selectProc = procedures.getIgnoreCase("SelectAll");
         Statement selectStmt = selectProc.getStatements().getIgnoreCase("warehouse");
-        PlanFragment selectTopFrag = null;
         PlanFragment selectBottomFrag = null;
 
         int i = 0;
         // this kinda assumes the right order
         for (PlanFragment f : selectStmt.getFragments()) {
-            if (i == 0) selectTopFrag = f;
-            else selectBottomFrag = f;
+            if (i != 0) selectBottomFrag = f;
             i++;
         }
         // populate plan cache

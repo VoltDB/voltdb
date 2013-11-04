@@ -52,9 +52,9 @@ bool IPCTopend::fragmentProgressUpdate(int32_t batchIndex,
         std::string planNodeName,
         std::string lastAccessedTable,
         int64_t lastAccessedTableSize,
-        int64_t tuplesFound) {
+        int64_t tuplesProcessed) {
     return m_vdbipc->fragmentProgressUpdate(batchIndex, planNodeName, lastAccessedTable, lastAccessedTableSize,
-            tuplesFound);
+            tuplesProcessed);
 }
 
 std::string IPCTopend::planForFragmentId(int64_t fragmentId) {

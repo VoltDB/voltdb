@@ -182,6 +182,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_items = ftask.m_items;
         m_initiateTask = ftask.m_initiateTask;
         m_emptyForRestart = ftask.m_emptyForRestart;
+        m_procedureName = ftask.m_procedureName;
         m_currentBatchIndex = ftask.m_currentBatchIndex;
         if (ftask.m_initiateTaskBuffer != null) {
             m_initiateTaskBuffer = ftask.m_initiateTaskBuffer.duplicate();
@@ -468,7 +469,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
      * Fragment ID block (1 per item):
      *     fragment ID: long: 8 * nitems
      *
-     * Porcedure name: byte: length of the name string.
+     * Procedure name: byte: length of the name string.
      *
      * voltExecuteIndex: short: 2
      *

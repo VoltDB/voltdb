@@ -758,9 +758,9 @@ bool VoltDBIPC::fragmentProgressUpdate(int32_t batchIndex,
         std::string planNodeName,
         std::string targetTableName,
         int64_t targetTableSize,
-        int64_t tuplesFound) {
+        int64_t tuplesProcessed) {
     char message[sizeof(int8_t) + sizeof(int32_t) + sizeof(planNodeName) + sizeof(targetTableName) +
-                 sizeof(targetTableSize) + sizeof(tuplesFound)];
+                 sizeof(targetTableSize) + sizeof(tuplesProcessed)];
     message[0] = static_cast<int8_t>(kErrorCode_progressUpdate);
     *reinterpret_cast<int32_t*>(&message[1]) = htonl(batchIndex);
 
@@ -778,7 +778,7 @@ bool VoltDBIPC::fragmentProgressUpdate(int32_t batchIndex,
     *reinterpret_cast<int64_t*>(&message[offset]) = htonll(targetTableSize);
     offset += 8;
 
-    *reinterpret_cast<int64_t*>(&message[offset]) = htonll(tuplesFound);
+    *reinterpret_cast<int64_t*>(&message[offset]) = htonll(tuplesProcessed);
 
     int32_t length;
     ssize_t bytes = read(m_fd, &length, sizeof(int32_t));

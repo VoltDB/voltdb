@@ -78,7 +78,7 @@ public class FragmentTask extends TransactionTask
             hostLog.debug("STARTING: " + this);
         }
 
-        // if this has a procedure name from the initiaton bundled,
+        // if this has a procedure name from the initiation bundled,
         // inform the site connection here
         String procName = m_fragmentMsg.getProcedureName();
         if (procName != null) {

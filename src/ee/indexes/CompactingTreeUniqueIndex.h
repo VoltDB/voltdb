@@ -207,7 +207,6 @@ class CompactingTreeUniqueIndex : public TableIndex
     {
         TableTuple retval = m_match;
         m_match.move(NULL);
-
         return retval;
     }
 

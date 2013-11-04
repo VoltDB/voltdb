@@ -35,7 +35,6 @@ import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
-import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
@@ -469,7 +468,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         }
 
         /**
-         * Read and deserialize a int from the wire.
+         * Read and deserialize an int from the wire.
          */
         public int readInt() throws IOException {
             final ByteBuffer intBytes = ByteBuffer.allocate(4);
@@ -488,7 +487,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         }
 
         /**
-         * Read and deserialize a int from the wire.
+         * Read and deserialize a short from the wire.
          */
         public short readShort() throws IOException {
             final ByteBuffer shortBytes = ByteBuffer.allocate(2);

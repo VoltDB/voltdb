@@ -52,6 +52,8 @@ import org.voltdb.utils.VoltTableUtil;
  */
 public abstract class ExecutionEngine implements FastDeserializer.DeserializationMonitor {
 
+    static VoltLogger log = new VoltLogger("HOST");
+
     public static enum TaskType {
         VALIDATE_PARTITIONING(0);
 
@@ -78,7 +80,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Partition ID */
     protected final int m_partitionId;
 
-    /** Host ID */
+    /** Site ID */
     protected final long m_siteId;
 
     /** Statistics collector (provided later) */
@@ -322,10 +324,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                           String planNodeName,
                                           String lastAccessedTable,
                                           long lastAccessedTableSize,
-                                          long tuplesFound)
+                                          long tuplesProcessed)
     {
         ++m_callsFromEE;
-        m_lastTuplesAccessed = tuplesFound;
+        m_lastTuplesAccessed = tuplesProcessed;
 
         long currentTime = System.currentTimeMillis();
         if (m_startTime == 0) {
@@ -333,12 +335,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
 
         if (currentTime > (m_logDuration + m_lastMsgTime)) {
-            VoltLogger log = new VoltLogger("CONSOLE");
             String msg = String.format("Procedure %s is taking a long time to execute -- at least %.1f seconds spent accessing " +
                     "%d tuples. Current plan fragment %s in call %d to voltExecuteSQL on site %s.",
                     m_currentProcedureName,
                     (currentTime - m_startTime) / 1000.0,
-                    tuplesFound,
+                    tuplesProcessed,
                     planNodeName,
                     m_currentBatchIndex,
                     CoreUtils.hsIdToString(m_siteId));

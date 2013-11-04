@@ -35,7 +35,7 @@ public:
             std::string planNodeName,
             std::string lastAccessedTable,
             int64_t lastAccessedTableSize,
-            int64_t tuplesFound);
+            int64_t tuplesProcessed);
     std::string planForFragmentId(int64_t fragmentId);
     void crashVoltDB(FatalException e);
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
