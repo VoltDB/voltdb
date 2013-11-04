@@ -542,7 +542,8 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
         jlong spHandle,
         jlong lastCommittedSpHandle,
         jlong uniqueId,
-        jlong undoToken) {
+        jlong undoToken)
+{
     //VOLT_DEBUG("nativeExecutePlanFragments() start");
 
     // setup
@@ -552,55 +553,40 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
     try {
         updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
         engine->resetReusedResultOutputBuffer();
-        engine->setUndoToken(undoToken);
         static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-        Pool *stringPool = engine->getStringPool();
 
         // fragment info
-        int batch_size = num_fragments;
-        assert (batch_size <= MAX_BATCH_COUNT);
-        jlong* fragment_ids_buffer = engine->getBatchFragmentIdsContainer();
-        env->GetLongArrayRegion(plan_fragment_ids, 0, batch_size, fragment_ids_buffer);
+        assert (num_fragments <= MAX_BATCH_COUNT);
+        jlong* fragmentIdsBuffer = engine->getBatchFragmentIdsContainer();
+        env->GetLongArrayRegion(plan_fragment_ids, 0, num_fragments, fragmentIdsBuffer);
+
+        // if there are dep ids, read them into the buffer after the fragments
+        jlong* depIdsBuffer = NULL;
+        if (input_dep_ids) {
+            depIdsBuffer = engine->getBatchDepIdsContainer();
+            env->GetLongArrayRegion(input_dep_ids, 0, num_fragments, depIdsBuffer);
+        }
 
         // all fragments' parameters are in this buffer
         ReferenceSerializeInput serialize_in(engine->getParameterBuffer(), engine->getParameterBufferCapacity());
-        NValueArray &params = engine->getParameterContainer();
 
-        // count failures
-        int failures = 0;
+        int failures = engine->executePlanFragments(num_fragments,
+                                                    fragmentIdsBuffer,
+                                                    input_dep_ids ? depIdsBuffer : NULL,
+                                                    serialize_in,
+                                                    spHandle,
+                                                    lastCommittedSpHandle,
+                                                    uniqueId,
+                                                    undoToken);
 
-        for (int i = 0; i < batch_size; ++i) {
-            int cnt = serialize_in.readShort();
-            if (cnt < 0) {
-                throwFatalException("parameter count is negative: %d", cnt);
-            }
-            assert (cnt < MAX_PARAM_COUNT);
-            deserializeParameterSetCommon(cnt, serialize_in, params, stringPool);
-
-            engine->setUsedParamcnt(cnt);
-
-            int64_t input_dep_id = -1;
-            if (input_dep_ids) {
-                env->GetLongArrayRegion(input_dep_ids, i, 1, (jlong*) &input_dep_id);
-            }
-
-            // success is 0 and error is 1.
-            if (engine->executeQuery(fragment_ids_buffer[i], 1, static_cast<int32_t>(input_dep_id),
-                                     params, spHandle, lastCommittedSpHandle, uniqueId, i == 0,
-                                     i == (batch_size - 1)))
-            {
-                ++failures;
-            }
-        }
-
-        // cleanup
-        stringPool->purge();
-
-        if (failures > 0)
+        if (failures > 0) {
             return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
-        else
+        }
+        else {
             return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
-    } catch (const FatalException &e) {
+        }
+    }
+    catch (const FatalException &e) {
         topend->crashVoltDB(e);
     }
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;

@@ -478,4 +478,14 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public long[] validatePartitioning(long[] tableIds, int hashinatorType, byte[] hashinatorConfig) {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
+
+    @Override
+    public void setBatch(int batchIndex) {
+        // don't need to do anything here
+    }
+
+    @Override
+    public void setProcedureName(String procedureName) {
+        // don't need to do anything here I think?
+    }
 }

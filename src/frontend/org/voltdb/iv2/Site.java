@@ -1017,9 +1017,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     @Override
     public VoltTable[] executePlanFragments(int numFragmentIds,
-            long[] planFragmentIds, long[] inputDepIds,
-            Object[] parameterSets, long spHandle, long uniqueId, boolean readOnly)
-            throws EEException {
+                                            long[] planFragmentIds,
+                                            long[] inputDepIds,
+                                            Object[] parameterSets,
+                                            long spHandle,
+                                            long uniqueId,
+                                            boolean readOnly)
+            throws EEException
+    {
         return m_ee.executePlanFragments(
                 numFragmentIds,
                 planFragmentIds,
@@ -1131,5 +1136,15 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             mispartitionedRows[ii] = resultBuffer.getLong();
         }
         return mispartitionedRows;
+    }
+
+    @Override
+    public void setBatch(int batchIndex) {
+        m_ee.setBatch(batchIndex);
+    }
+
+    @Override
+    public void setProcedureName(String procedureName) {
+        m_ee.setProcedureName(procedureName);
     }
 }

@@ -1,14 +1,14 @@
 -- partitioned table
 CREATE TABLE partitioned
 (
-  txnid bigint             NOT NULL
+  txnid bigint             NOT NULL ASSUMEUNIQUE
 , ts    bigint             NOT NULL
 , cid   tinyint            NOT NULL
 , rid   bigint             NOT NULL
 , value varbinary(1048576) NOT NULL
-, CONSTRAINT PK_txnid ASSUMEUNIQUE
+, CONSTRAINT PK_txnid PRIMARY KEY
   (
-    txnid
+    cid, txnid
   )
 , UNIQUE ( cid, rid )
 );

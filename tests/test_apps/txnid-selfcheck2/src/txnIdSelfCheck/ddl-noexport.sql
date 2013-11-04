@@ -1,7 +1,7 @@
 -- partitioned table
 CREATE TABLE partitioned
 (
-  txnid      bigint             NOT NULL
+  txnid      bigint             NOT NULL ASSUMEUNIQUE
 , prevtxnid  bigint             NOT NULL
 , ts         bigint             NOT NULL
 , cid        tinyint            NOT NULL
@@ -11,9 +11,9 @@ CREATE TABLE partitioned
 , adhocinc   bigint             NOT NULL
 , adhocjmp   bigint             NOT NULL
 , value      varbinary(1048576) NOT NULL
-, CONSTRAINT PK_id_p ASSUMEUNIQUE
+, CONSTRAINT PK_id_p PRIMARY KEY
   (
-    txnid
+    cid, txnid
   )
 , UNIQUE ( cid, rid )
 );
