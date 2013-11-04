@@ -11,7 +11,7 @@ CREATE TABLE partitioned
 , adhocinc   bigint             NOT NULL
 , adhocjmp   bigint             NOT NULL
 , value      varbinary(1048576) NOT NULL
-, CONSTRAINT PK_id_p PRIMARY KEY
+, CONSTRAINT PK_id_p ASSUMEUNIQUE
   (
     txnid
   )

@@ -23,6 +23,7 @@
 
 package org.voltdb;
 
+import static junit.framework.Assert.assertNull;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -38,6 +39,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.TreeMap;
 
 import com.google.common.collect.*;
 import org.junit.Before;
@@ -181,6 +183,34 @@ public class TestTheHashinator {
         return Multimaps.invertFrom(Multimaps.forMap(m), HashMultimap.<Integer, Integer>create());
     }
 
+    @Test
+    public void testGetPartitionKeys() throws Exception {
+        int partitionCount = 50;
+        Set<Integer> allPartitions = new HashSet<Integer>();
+        for (int ii = 0; ii < 50; ii++) {
+            allPartitions.add(ii);
+        }
+        VoltType types[] = new VoltType[] { VoltType.INTEGER, VoltType.STRING, VoltType.VARBINARY };
+
+        final byte configBytes[] = TheHashinator.getConfigureBytes(partitionCount);
+        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), configBytes);
+        for (VoltType type : types) {
+            Set<Integer> partitionsReached = new HashSet<Integer>(allPartitions);
+            assertNull(TheHashinator.getPartitionKeys(VoltType.BIGINT));
+            VoltTable vt = TheHashinator.getPartitionKeys(type);
+            assertNotNull(vt);
+            assertEquals(partitionCount, vt.getRowCount());
+
+            while (vt.advanceRow()) {
+                int expectedPartition = (int)vt.getLong(0);
+                Object key = vt.get(1, type);
+                assertEquals(expectedPartition, TheHashinator.getPartitionForParameter(type.getValue(), key));
+                partitionsReached.remove(expectedPartition);
+            }
+            assertTrue(partitionsReached.isEmpty());
+        }
+
+    }
     /*
      * This test validates that not all values hash to 0. Most of the other
      * tests will pass even if everything hashes to a single partition.
@@ -337,7 +367,7 @@ public class TestTheHashinator {
             // this will produce negative values, which is desired here.
             final long valueToHash = r.nextLong();
             final int javahash = TheHashinator.getPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(),
-                    valueToHash);
+                                                                        valueToHash);
             final int eehash = ee.hashinate(valueToHash, TheHashinator.getCurrentConfig());
             if (eehash != javahash) {
                 System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
@@ -371,7 +401,7 @@ public class TestTheHashinator {
 
             int eehash = ee.hashinate(valueToHash, TheHashinator.getCurrentConfig());
             int javahash = TheHashinator.getPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(),
-                    valueToHash);
+                                                                  valueToHash);
             if (eehash != javahash) {
                 System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
                 partitionCount++;
@@ -767,5 +797,45 @@ public class TestTheHashinator {
         byte[] b2 = h2.getCookedBytes();
         assertTrue(Arrays.equals(b1, b2));
         assertEquals(h1.getTokens(), h2.getTokens());
+    }
+
+    @Test
+    public void testAddTokens()
+    {
+        if (hashinatorType == HashinatorType.LEGACY) return;
+
+        ElasticHashinator dut = new ElasticHashinator(ElasticHashinator.getConfigureBytes(1, 4), false);
+        ImmutableSortedMap<Integer, Integer> tokens = dut.getTokens();
+
+        // Add two tokens that don't fall on the bucket boundary, then add one that falls on the boundary.
+        // The intermediate tokens should be "moved" forward, so that it doesn't end up having two intermediate
+        // tokens at the end.
+        dut = addTokenAndCheck(dut, tokens, tokens.firstKey() + 20, 1, true);
+        dut = addTokenAndCheck(dut, tokens, tokens.firstKey() + 10, 1, true);
+        dut = addTokenAndCheck(dut, tokens, tokens.firstKey(),      1, false);
+    }
+
+    private ElasticHashinator addTokenAndCheck(ElasticHashinator dut,
+                                               ImmutableSortedMap<Integer, Integer> initialTokens,
+                                               int token, int partition, boolean hasIntermediateToken)
+    {
+        TreeMap<Integer, Integer> tokensToAdd = Maps.newTreeMap();
+        tokensToAdd.put(token, partition);
+        dut = dut.addTokens(tokensToAdd);
+        SortedMapDifference<Integer, Integer> diff = Maps.difference(initialTokens, dut.getTokens());
+        assertTrue(diff.entriesOnlyOnLeft().isEmpty());
+
+        if (hasIntermediateToken) {
+            assertTrue(diff.entriesDiffering().isEmpty());
+            assertEquals(partition, diff.entriesOnlyOnRight().size());
+            assertEquals(token, diff.entriesOnlyOnRight().firstKey().intValue());
+        } else {
+            assertTrue(diff.entriesOnlyOnRight().isEmpty());
+            assertEquals(1, diff.entriesDiffering().size());
+            assertEquals(initialTokens.firstKey(), diff.entriesDiffering().firstKey());
+            assertEquals(partition, diff.entriesDiffering().get(initialTokens.firstKey()).rightValue().intValue());
+        }
+
+        return dut;
     }
 }

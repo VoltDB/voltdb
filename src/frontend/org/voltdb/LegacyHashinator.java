@@ -18,7 +18,9 @@ package org.voltdb;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
@@ -135,5 +137,14 @@ public class LegacyHashinator extends TheHashinator {
         }
 
         return pHashinateBytes(valueToBytes(obj));
+    }
+
+    @Override
+    protected Set<Integer> pGetPartitions() {
+        Set<Integer> set = new HashSet<Integer>();
+        for (int ii = 0; ii < catalogPartitionCount; ii++) {
+            set.add(ii);
+        }
+        return set;
     }
 }

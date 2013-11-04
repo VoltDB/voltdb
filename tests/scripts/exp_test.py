@@ -212,34 +212,31 @@ def setTestSuite(dname, suite):
                             testSuiteList[subdirname] = path
     return testSuiteList
 
-# Not used yet.
-# It would be necessary if we wanted to run certain queries before
 def stopPS(ps):
+    print ps.returncode
+    if ps.returncode != None:
+        print "Process %d exited early with return code %d" % (ps.pid, ps.returncode)
     print "Going to kill this process: '%d'" % ps.pid
-    killer = subprocess.Popen("kill -9 %d" % (ps.pid), shell = True)
-    killer.communicate()
-    if killer.returncode != 0:
-#        print >> sys.stderr, "Failed to kill the server process %d" % (server.pid)
-        print "Failed to kill the server process %d" % (ps.pid)
+    ps.kill()
 
 # To return a voltDB client
-def getClient():
+def getQueryClient():
     host = defaultHost
     port = defaultPort
     client = None
-    for i in xrange(10):
+    for i in xrange(25):
         try:
             client = VoltQueryClient(host, port)
             client.set_quiet(True)
             client.set_timeout(5.0) # 5 seconds
-            break
+            return client
         except socket.error:
             time.sleep(1)
 
     if client == None:
-        print >> sys.stderr, "Unable to connect/create client"
+        print >> sys.stderr, "Unable to connect python client to server"
         sys.stderr.flush()
-        exit(1)
+        return None
 
     return client
 
@@ -252,7 +249,9 @@ def startService(service, logS, logC):
     cmd = service + " > " + logS + " 2>&1"
     service_ps = subprocess.Popen(cmd, shell=True)
     time.sleep(2)
-    client = getClient()
+    client = getQueryClient()
+    if not client:
+        return None
     cmd = service + " client > " + logC + " 2>&1"
     ret = call(cmd, shell=True)
     print "returning results from service execution: '%s'" % ret
@@ -271,7 +270,12 @@ def execThisService(service, logS, logC):
     print "   Server - Exec CMD: '%s'" % cmd
     service_ps = subprocess.Popen(cmd, shell=True)
     time.sleep(2)
-    client = getClient()
+    client = getQueryClient()
+    if not client:
+        print "    Couldn't connect to server. Killing and giving up"
+        #TODO - write something in log
+        stopPS(service_ps)
+        return
     cmd = service + " client > " + logC + " 2>&1"
     print "   Client - Exec CMD: '%s'" % cmd
     ret = call(cmd, shell=True)
@@ -398,6 +402,7 @@ def startTest(testSuiteList):
             print "   Log File for VoltDB Server: '%s'" % logFileS
             print "   Log File for VoltDB Client: '%s'" % logFileC
             execThisService(service, logFileS, logFileC)
+
             if(suiteName == "helloworld"):
                 (result, msg) = assertHelloWorld(suiteName, logFileC)
             elif(suiteName == "voter"):

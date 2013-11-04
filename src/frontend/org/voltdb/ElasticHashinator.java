@@ -25,15 +25,16 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
+import com.google.common.collect.ImmutableSortedSet;
+import com.google.common.collect.Maps;
+import com.google.common.collect.SortedMapDifference;
 import org.apache.cassandra_voltpatches.MurmurHash3;
 import org.voltcore.utils.Pair;
 
-import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSortedMap;
-import com.google.common.collect.Maps;
 import com.google.common.collect.UnmodifiableIterator;
 import org.voltdb.utils.CompressionService;
 
@@ -231,22 +232,38 @@ public class ElasticHashinator extends TheHashinator {
     }
 
     /**
-     * Add the given token to the ring and generate the new hashinator. The current hashinator is not changed.
-     * @param token        The new token
-     * @param partition    The partition associated with the new token
+     * Add the given tokens to the ring and generate the new hashinator. The current hashinator is not changed.
+     * @param tokensToAdd    Tokens to add as a map of tokens to partitions
      * @return The new hashinator
      */
-    public ElasticHashinator addToken(int token, int partition)
+    public ElasticHashinator addTokens(NavigableMap<Integer, Integer> tokensToAdd)
     {
-        ImmutableSortedMap.Builder<Integer, Integer> b = ImmutableSortedMap.naturalOrder();
+        // figure out the interval
+        long interval = deriveTokenInterval(m_tokensMap.get().keySet());
+
+        Map<Integer, Integer> tokens = Maps.newTreeMap();
         for (Map.Entry<Integer, Integer> e : m_tokensMap.get().entrySet()) {
-            if (e.getKey().intValue() == token) {
+            if (tokensToAdd.containsKey(e.getKey())) {
                 continue;
             }
-            b.put(e.getKey(), e.getValue());
+
+            // see if we are moving an intermediate token forward
+            if (isIntermediateToken(e.getKey(), interval)) {
+                Map.Entry<Integer, Integer> floorEntry = tokensToAdd.floorEntry(e.getKey());
+                // If the two tokens belong to the same partition and bucket, we are moving the one on the ring
+                // forward, so remove it from the ring
+                if (floorEntry != null &&
+                    floorEntry.getValue().equals(e.getValue()) &&
+                    containingBucket(floorEntry.getKey(), interval) == containingBucket(e.getKey(), interval)) {
+                    continue;
+                }
+            }
+
+            tokens.put(e.getKey(), e.getValue());
         }
-        b.put(token, partition);
-        return new ElasticHashinator(b.build());
+        tokens.putAll(tokensToAdd);
+
+        return new ElasticHashinator(ImmutableSortedMap.copyOf(tokens));
     }
 
     @Override
@@ -398,9 +415,9 @@ public class ElasticHashinator extends TheHashinator {
     public String toString()
     {
         StringBuilder sb = new StringBuilder();
-        sb.append(" Token               ").append("   Partition\n");
+        sb.append(" Token       ").append("   Partition\n");
         for (Map.Entry<Integer, Integer> entry : m_tokensMap.get().entrySet()) {
-            sb.append(String.format("[%20d => %8d]\n", entry.getKey(), entry.getValue()));
+            sb.append(String.format("[%11d => %9d]\n", entry.getKey(), entry.getValue()));
         }
         return sb.toString();
     }
@@ -567,5 +584,76 @@ public class ElasticHashinator extends TheHashinator {
     @Override
     public void finalize() {
         unsafe.freeMemory(m_tokens);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        ElasticHashinator that = (ElasticHashinator) o;
+
+        if (m_signature.get().equals(that.m_signature.get())) return true;
+
+        SortedMapDifference<Integer,Integer> diff = Maps.difference(m_tokensMap.get(), that.m_tokensMap.get());
+        if (!diff.entriesDiffering().isEmpty()) return false;
+
+        // Tolerate tokens that are not on the bucket boundaries. As long as these tokens hash to the same partitions
+        // as they are in the other hashinator, it's fine.
+        for (Map.Entry<Integer, Integer> leftEntry : diff.entriesOnlyOnLeft().entrySet()) {
+            if (that.partitionForToken(leftEntry.getKey()) != leftEntry.getValue()) {
+                return false;
+            }
+        }
+
+        for (Map.Entry<Integer, Integer> rightEntry : diff.entriesOnlyOnRight().entrySet()) {
+            if (partitionForToken(rightEntry.getKey()) != rightEntry.getValue()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Figure out the token interval from the first 3 ranges, assuming that there is at most one token that doesn't
+     * fall onto the bucket boundary at any given time. The largest range will be the hashinator's bucket size.
+     * @return The bucket size, or token interval if you prefer.
+     */
+    private static long deriveTokenInterval(ImmutableSortedSet<Integer> tokens)
+    {
+        long interval = 0;
+        int count = 4;
+        int prevToken = Integer.MIN_VALUE;
+        UnmodifiableIterator<Integer> tokenIter = tokens.iterator();
+        while (tokenIter.hasNext() && count-- > 0) {
+            int nextToken = tokenIter.next();
+            interval = Math.max(interval, nextToken - prevToken);
+            prevToken = nextToken;
+        }
+        return interval;
+    }
+
+    /**
+     * Check if the token doesn't fall onto a bucket boundary given the token interval.
+     * @return true if the token doesn't fall onto any bucket boundary.
+     */
+    private static boolean isIntermediateToken(int token, long interval)
+    {
+        return (((long) token - Integer.MIN_VALUE)) % interval != 0;
+    }
+
+    /**
+     * Calculate the boundary of the bucket that countain the given token given the token interval.
+     * @return The token of the bucket boundary.
+     */
+    private static int containingBucket(int token, long interval)
+    {
+        return (int) ((((long) token - Integer.MIN_VALUE) / interval) * interval + Integer.MIN_VALUE);
+    }
+
+    @Override
+    protected Set<Integer> pGetPartitions() {
+        return new HashSet<Integer>(m_tokensMap.get().values());
     }
 }

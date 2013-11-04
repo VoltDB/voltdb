@@ -1225,6 +1225,9 @@ public class DDLCompiler {
         if (idx1.getUnique() != idx2.getUnique()) {
             return false;
         }
+        if (idx1.getAssumeunique() != idx2.getAssumeunique()) {
+            return false;
+        }
 
         // same column count?
         if (idx1.getColumns().size() != idx2.getColumns().size()) {
@@ -1270,6 +1273,8 @@ public class DDLCompiler {
 
         String name = node.attributes.get("name");
         boolean unique = Boolean.parseBoolean(node.attributes.get("unique"));
+        boolean assumeUnique = Boolean.parseBoolean(node.attributes.get("assumeunique"));
+
         AbstractParsedStmt dummy = new ParsedSelectStmt(null, db);
         dummy.setTable(table);
 
@@ -1380,6 +1385,10 @@ public class DDLCompiler {
         }
 
         index.setUnique(unique);
+        if (assumeUnique) {
+            index.setUnique(true);
+        }
+        index.setAssumeunique(assumeUnique);
 
         // check if an existing index duplicates another index (if so, drop it)
         // note that this is an exact dup... uniqueness, counting-ness and type
@@ -1444,6 +1453,7 @@ public class DDLCompiler {
         String name = node.attributes.get("name");
         String typeName = node.attributes.get("constrainttype");
         ConstraintType type = ConstraintType.valueOf(typeName);
+
         if (type == ConstraintType.CHECK) {
             String msg = "VoltDB does not enforce check constraints. ";
             msg += "Constraint on table " + table.getTypeName() + " will be ignored.";
@@ -1484,6 +1494,8 @@ public class DDLCompiler {
 
         Index catalog_index = indexMap.get(indexName);
 
+        // TODO(xin): It seems that indexes have already been set up well, the next whole block is redundant.
+        // Remove them?
         if (catalog_index != null) {
             // if the constraint name contains index type hints, exercise them (giant hack)
             String constraintNameNoCase = name.toLowerCase();
@@ -1494,6 +1506,9 @@ public class DDLCompiler {
 
             catalog_const.setIndex(catalog_index);
             catalog_index.setUnique(true);
+
+            boolean assumeUnique = Boolean.parseBoolean(node.attributes.get("assumeunique"));
+            catalog_index.setAssumeunique(assumeUnique);
         }
         catalog_const.setType(type.getValue());
     }
@@ -1534,9 +1549,9 @@ public class DDLCompiler {
             // Allow only non-unique indexes other than the primary key index.
             // The primary key index is yet to be defined (below).
             for (Index destIndex : destTable.getIndexes()) {
-                if (destIndex.getUnique()) {
-                    String msg = "A UNIQUE index is not allowed on a materialized view. " +
-                            "Remove the qualifier \"UNIQUE\" from the index " + destIndex.getTypeName() +
+                if (destIndex.getUnique() || destIndex.getAssumeunique()) {
+                    String msg = "A UNIQUE or ASSUMEUNIQUE index is not allowed on a materialized view. " +
+                            "Remove the qualifier from the index " + destIndex.getTypeName() +
                             "defined on the materialized view \"" + viewName + "\".";
                     throw m_compiler.new VoltCompilerException(msg);
                 }

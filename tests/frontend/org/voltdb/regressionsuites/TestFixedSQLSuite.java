@@ -1284,12 +1284,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(Insert.class.getResource("fixed-sql-ddl.sql"));
-        project.addPartitionInfo("P1", "ID");
-        project.addPartitionInfo("P2", "ID");
-        project.addPartitionInfo("ENG1850", "cid");
-        project.addPartitionInfo("ASSET", "ASSET_ID");
-        project.addPartitionInfo("OBJECT_DETAIL", "OBJECT_DETAIL_ID");
-        project.addPartitionInfo("STRINGPART", "NAME");
         project.addProcedures(PROCEDURES);
 
         //TODO: Now that this fails to compile with an overflow error, it should be migrated to a

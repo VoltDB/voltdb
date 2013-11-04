@@ -149,6 +149,7 @@ public class ParserDDL extends ParserRoutine {
             return compileCreateTable(tableType);
         }
 
+        boolean assumeUnique = false;
         switch (token.tokenType) {
 
             // other objects
@@ -183,14 +184,17 @@ public class ParserDDL extends ParserRoutine {
                 return compileCreateCharacterSet();
 
             // index
+            case Tokens.ASSUMEUNIQUE :
+                assumeUnique = true;
+                // fall through
             case Tokens.UNIQUE :
                 read();
                 checkIsThis(Tokens.INDEX);
 
-                return compileCreateIndex(true);
+                return compileCreateIndex(true, assumeUnique);
 
             case Tokens.INDEX :
-                return compileCreateIndex(false);
+                return compileCreateIndex(false, false);
 
             case Tokens.FUNCTION :
             case Tokens.PROCEDURE :
@@ -584,7 +588,7 @@ public class ParserDDL extends ParserRoutine {
 
                     database.schemaManager.checkSchemaObjectNotExists(cname);
                 }
-
+                boolean assumeUnique = false; // For VoltDB
                 switch (token.tokenType) {
 
                     case Tokens.FOREIGN :
@@ -594,9 +598,12 @@ public class ParserDDL extends ParserRoutine {
 
                         return;
 
+                    case Tokens.ASSUMEUNIQUE :
+                        assumeUnique = true;
+                        // fall through
                     case Tokens.UNIQUE :
                         read();
-                        processAlterTableAddUniqueConstraint(t, cname);
+                        processAlterTableAddUniqueConstraint(t, cname, assumeUnique);
 
                         return;
 
@@ -983,6 +990,7 @@ public class ParserDDL extends ParserRoutine {
                 case Tokens.CONSTRAINT :
                 case Tokens.PRIMARY :
                 case Tokens.FOREIGN :
+                case Tokens.ASSUMEUNIQUE : // For VoltDB.
                 case Tokens.UNIQUE :
                 case Tokens.CHECK :
                     if (!startPart) {
@@ -1290,14 +1298,14 @@ public class ParserDDL extends ParserRoutine {
                     Index index = null;
                     if (c.indexExprs != null) {
                         // Special case handling for VoltDB indexed expressions
-                        index = table.createAndAddExprIndexStructure(indexName, c.core.mainCols, c.indexExprs, true, true);
+                        index = table.createAndAddExprIndexStructure(indexName, c.core.mainCols, c.indexExprs, true, true).setAssumeUnique(c.assumeUnique);
                     } else {
                         index = table.createAndAddIndexStructure(indexName,
-                            c.core.mainCols, null, null, true, true, false);
+                            c.core.mainCols, null, null, true, true, false).setAssumeUnique(c.assumeUnique);
                     }
 
                     Constraint newconstraint = new Constraint(c.getName(),
-                        table, index, Constraint.UNIQUE);
+                        table, index, Constraint.UNIQUE).setAssumeUnique(c.assumeUnique);
 
                     table.addConstraint(newconstraint);
                     session.database.schemaManager.addSchemaObject(
@@ -2654,7 +2662,7 @@ public class ParserDDL extends ParserRoutine {
                 readNewDependentSchemaObjectName(schemaObject.getName(),
                                                  SchemaObject.CONSTRAINT);
         }
-
+        boolean assumeUnique = false; // For VoltDB
         switch (token.tokenType) {
 
             case Tokens.PRIMARY : {
@@ -2687,6 +2695,9 @@ public class ParserDDL extends ParserRoutine {
 
                 break;
             }
+            case Tokens.ASSUMEUNIQUE :
+                assumeUnique = true;
+                // fall through.
             case Tokens.UNIQUE : {
                 if (schemaObject.getName().type != SchemaObject.TABLE) {
                     throw this.unexpectedTokenRequire(Tokens.T_CHECK);
@@ -2708,14 +2719,14 @@ public class ParserDDL extends ParserRoutine {
                     // A VoltDB extension to support indexed expressions.
                     // Not all expressions are simple columns.
                     set = getBaseColumnNames(indexExprs);
-                    Constraint exprc = new Constraint(constName, set, indexExprs.toArray(new Expression[indexExprs.size()]));
+                    Constraint exprc = new Constraint(constName, set, indexExprs.toArray(new Expression[indexExprs.size()])).setAssumeUnique(assumeUnique);
                     constraintList.add(exprc);
 
                     break;
 				}
 
                 Constraint c = new Constraint(constName, set,
-                                              Constraint.UNIQUE);
+                                              Constraint.UNIQUE).setAssumeUnique(assumeUnique);
 
                 constraintList.add(c);
 
@@ -2779,7 +2790,7 @@ public class ParserDDL extends ParserRoutine {
                 constName = readNewDependentSchemaObjectName(table.getName(),
                         SchemaObject.CONSTRAINT);
             }
-
+            boolean assumeUnique = false; // For VoltDB
             switch (token.tokenType) {
 
                 case Tokens.PRIMARY : {
@@ -2811,6 +2822,9 @@ public class ParserDDL extends ParserRoutine {
 
                     break;
                 }
+                case Tokens.ASSUMEUNIQUE :
+                    assumeUnique = true;
+                    // fall through.
                 case Tokens.UNIQUE : {
                     read();
 
@@ -2825,7 +2839,7 @@ public class ParserDDL extends ParserRoutine {
                     }
 
                     Constraint c = new Constraint(constName, set,
-                                                  Constraint.UNIQUE);
+                                                  Constraint.UNIQUE).setAssumeUnique(assumeUnique);
 
                     constraintList.add(c);
 
@@ -2952,7 +2966,7 @@ public class ParserDDL extends ParserRoutine {
         return table.getColumnIndexes(set);
     }
 
-    StatementSchema compileCreateIndex(boolean unique) {
+    StatementSchema compileCreateIndex(boolean unique, boolean assumeUnique) {
 
         Table    table;
         HsqlName indexHsqlName;
@@ -2986,7 +3000,7 @@ public class ParserDDL extends ParserRoutine {
         if (set == null) {
             // A VoltDB extension to support indexed expressions.
             // Not just indexing columns.
-            // The meaning of set and indexColumns shifts here to be 
+            // The meaning of set and indexColumns shifts here to be
             // the set of unique base columns for the indexed expressions.
             set = getBaseColumnNames(indexExprs);
         } else {
@@ -2998,7 +3012,7 @@ public class ParserDDL extends ParserRoutine {
 
         String   sql          = getLastPart();
         Object[] args         = new Object[] {
-            table, indexColumns, indexHsqlName, Boolean.valueOf(unique), indexExprs
+            table, indexColumns, indexHsqlName, Boolean.valueOf(unique), indexExprs, Boolean.valueOf(assumeUnique)
         };
 
         return new StatementSchema(sql, StatementTypes.CREATE_INDEX, args,
@@ -3420,7 +3434,7 @@ public class ParserDDL extends ParserRoutine {
         database.schemaManager.renameSchemaObject(table.getName(), name);
     }
 
-    void processAlterTableAddUniqueConstraint(Table table, HsqlName name) {
+    void processAlterTableAddUniqueConstraint(Table table, HsqlName name, boolean assumeUnique) {
 
         if (name == null) {
             name = database.nameManager.newAutoName("CT",
@@ -3440,16 +3454,16 @@ public class ParserDDL extends ParserRoutine {
         if ((indexExprs != null) && (cols == null)) {
             // A VoltDB extension to support indexed expressions.
             // Not just indexing columns.
-            // The meaning of cols shifts here to be 
+            // The meaning of cols shifts here to be
             // the set of unique base columns for the indexed expressions.
             set = getBaseColumnNames(indexExprs);
             cols = getColumnList(set, table);
-            tableWorks.addUniqueExprConstraint(cols, indexExprs.toArray(new Expression[indexExprs.size()]), name);
+            tableWorks.addUniqueExprConstraint(cols, indexExprs.toArray(new Expression[indexExprs.size()]), name, assumeUnique);
 
             return;
         }
 
-        tableWorks.addUniqueConstraint(cols, name);
+        tableWorks.addUniqueConstraint(cols, name, assumeUnique);
     }
 
     Statement compileAlterTableAddUniqueConstraint(Table table,
