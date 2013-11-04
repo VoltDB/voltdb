@@ -100,6 +100,18 @@ public interface SiteProcedureConnection {
             boolean readOnly) throws EEException;
 
     /**
+     * Let the EE know which batch of sql is running so it can include this
+     * information in any slow query progress log messages.
+     */
+    public void setBatch(int batchIndex);
+
+    /**
+     * Let the EE know what the name of the currently executing procedure is
+     * so it can include this information in any slow query progress log messages.
+     */
+    public void setProcedureName(String procedureName);
+
+    /**
      * Legacy recursable execution interface for MP transaction states.
      */
     public Map<Integer, List<VoltTable>> recursableRun(TransactionState currentTxnState);

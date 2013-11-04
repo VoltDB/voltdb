@@ -35,6 +35,14 @@ class Topend {
   public:
     virtual int loadNextDependency(
         int32_t dependencyId, voltdb::Pool *pool, Table* destination) = 0;
+
+    // Update the topend on query progress and give the topend a chance to tell the
+    // query to stop.
+    // Return true if the Topend wants the EE to stop processing the current fragment
+    // or false if it should continue.
+    virtual bool fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
+                std::string targetTableName, int64_t targetTableSize, int64_t tuplesProcessed) = 0;
+
     virtual std::string planForFragmentId(int64_t fragmentId) = 0;
 
     virtual void crashVoltDB(voltdb::FatalException e) = 0;

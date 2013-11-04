@@ -30,6 +30,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.exceptions.InterruptException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -47,14 +48,14 @@ public class FragmentTask extends TransactionTask
 
     // This constructor is used during live rejoin log replay.
     FragmentTask(Mailbox mailbox,
-            FragmentTaskMessage message,
-            ParticipantTransactionState txnState)
+                 FragmentTaskMessage message,
+                 ParticipantTransactionState txnState)
     {
         this(mailbox,
-            txnState,
-            null,
-            message,
-            null);
+             txnState,
+             null,
+             message,
+             null);
     }
 
     // This constructor is used during normal operation.
@@ -76,6 +77,14 @@ public class FragmentTask extends TransactionTask
         if (hostLog.isDebugEnabled()) {
             hostLog.debug("STARTING: " + this);
         }
+
+        // if this has a procedure name from the initiation bundled,
+        // inform the site connection here
+        String procName = m_fragmentMsg.getProcedureName();
+        if (procName != null) {
+            siteConnection.setProcedureName(procName);
+        }
+
         // Set the begin undo token if we haven't already
         // In the future we could record a token per batch
         // and do partial rollback
@@ -213,6 +222,9 @@ public class FragmentTask extends TransactionTask
                     fragmentId = ActivePlanRepository.getFragmentIdForPlanHash(planHash);
                 }
 
+                // set up the batch context for the fragment set
+                siteConnection.setBatch(m_fragmentMsg.getCurrentBatchIndex());
+
                 dependency = siteConnection.executePlanFragments(
                         1,
                         new long[] { fragmentId },
@@ -233,6 +245,11 @@ public class FragmentTask extends TransactionTask
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 break;
             } catch (final SQLException e) {
+                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
+                currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                break;
+            }
+            catch (final InterruptException e) {
                 hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 break;
