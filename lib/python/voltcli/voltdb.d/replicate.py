@@ -29,5 +29,5 @@
     bundles = VOLT.ServerBundle('replica'),
     description = 'Start the VoltDB replica of the database.'
 )
-def replica(runner):
+def replicate(runner):
     runner.go()
