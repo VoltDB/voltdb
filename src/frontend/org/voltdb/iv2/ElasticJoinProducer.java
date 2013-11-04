@@ -240,6 +240,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     @Override
     public TaskLog constructTaskLog(String voltroot)
     {
+        m_taskLog = initializeTaskLog(voltroot, m_partitionId);
         return this;
     }
 
@@ -275,29 +276,30 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
             }
             m_receivedFirstFragment = true;
         }
+        m_taskLog.logTask(message);
     }
 
     @Override
     public TransactionInfoBaseMessage getNextMessage() throws IOException
     {
-        return null;
+        return m_taskLog.getNextMessage();
     }
 
     @Override
     public void setEarliestTxnId(long txnId)
     {
-
+        m_taskLog.setEarliestTxnId(txnId);
     }
 
     @Override
     public boolean isEmpty() throws IOException
     {
-        return true;
+        return m_taskLog.isEmpty();
     }
 
     @Override
     public void close() throws IOException
     {
-
+        m_taskLog.close();
     }
 }
