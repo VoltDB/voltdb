@@ -181,13 +181,10 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
                             "the next time the condition occurs to avoid log spam");
                 }
                 if (badPendingBytes) {
-                    networkLog.error("Admission control error, negative outstanding transaction byte count (" +
-                            m_pendingTxnBytes + "). " +
-                            "This is error is not fatal, but it does indicate that admission control " +
-                            "is not correctly tracking transaction resource usage. This message will not repeat " +
-                            "the next time the condition occurs to avoid log spam");
-                    Exception e = new Exception("Stack Trace Exception");
-                    networkLog.error("Figure out where we are", e);
+                    networkLog.info(
+                            "Backpressure reports a negative outstanding transaction byte count (" +
+                            m_pendingTxnBytes +
+                            "). No action required.");
                 }
             }
 
