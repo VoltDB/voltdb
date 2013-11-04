@@ -17,7 +17,6 @@
 
 package org.voltdb.iv2;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -30,12 +29,9 @@ import com.google.common.collect.Maps;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
-import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
-import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltDB;
@@ -47,7 +43,6 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
-import org.voltdb.rejoin.TaskLog;
 
 public class MpScheduler extends Scheduler
 {
@@ -151,44 +146,7 @@ public class MpScheduler extends Scheduler
 
 
         final List<Long> replicaCopy = new ArrayList<Long>(replicas);
-
-        // Must run the repair while pausing the site task queue;
-        // Otherwise, a new MP might immediately be blocked in a
-        // confused world of semi-repair. So just do the repair
-        // work on the site thread....
-        SiteTasker repairTask = new SiteTasker() {
-            @Override
-            public void run(SiteProcedureConnection connection) {
-                try {
-                    String whoami = "MP leader repair " +
-                        CoreUtils.hsIdToString(m_mailbox.getHSId()) + " ";
-                    InitiatorMailbox initiatorMailbox =
-                        (InitiatorMailbox)m_mailbox;
-                    RepairAlgo algo = new MpPromoteAlgo(replicas,
-                            initiatorMailbox, whoami);
-                    initiatorMailbox.setRepairAlgo(algo);
-                    Pair<Boolean, Long> result = algo.start().get();
-                    boolean success = result.getFirst();
-                    if (success) {
-                        tmLog.info(whoami + "finished repair.");
-                    }
-                    else {
-                        tmLog.info(whoami + "interrupted during repair.  Retrying.");
-                    }
-                }
-                catch (InterruptedException ie) {}
-                catch (Exception e) {
-                    VoltDB.crashLocalVoltDB("Terminally failed MPI repair.", true, e);
-                }
-            }
-
-            @Override
-            public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
-            throws IOException
-            {
-                throw new RuntimeException("Rejoin while repairing the MPI should be impossible.");
-            }
-        };
+        MpRepairTask repairTask = new MpRepairTask((InitiatorMailbox)m_mailbox, replicas);
         m_pendingTasks.repair(repairTask, replicaCopy, partitionMasters);
     }
 
