@@ -363,14 +363,14 @@ class JavaBundle(object):
 
     def initialize(self, verb):
         verb.add_options(
-           cli.BooleanOption(None, '--dry-run', 'dryrun', None),
-           cli.StringOption('-l', '--license', 'license', 'the license file path'),
-           cli.StringOption(None, '--internalinterface', 'internalinterface', 'Specifies which network interface to use for internal communication, such as the internal and zookeeper ports.'),
-           cli.StringOption(None, '--internalport', 'internalport', 'Specifies the internal port number used to communicate between cluster nodes. Default 3021'),
-           cli.StringOption(None, '--zkport', 'zkport', 'Specifies the zookeeper port number. Default 2181'),
-           cli.StringOption(None, '--replicationport', 'replicationport', 'Specifies the first of three replication ports used for database replication. Default 5555'),
-           cli.StringOption(None, '--adminport', 'adminport', 'Specifies the admin port number. Default 21211'),
-           cli.StringOption(None, '--externalinterface', 'externalinterface', 'Specifies which network interface to use for external ports, such as the admin and client ports.'))
+           cli.StringOption('-l', '--license', 'license', 'specify the location of the license file'),
+           cli.StringOption(None, '--client', 'clientport', 'specify the client port number'),
+           cli.StringOption(None, '--internal', 'internalport', 'specify the internal port number used to communicate between cluster nodes'),
+           cli.StringOption(None, '--zookeeper', 'zkport', 'specify the zookeeper port number'),
+           cli.StringOption(None, '--replication', 'replicationport', 'specify the replication port number'),
+           cli.StringOption(None, '--admin', 'adminport', 'specify the admin port number'),
+           cli.StringOption(None, '--internalinterface', 'internalinterface', 'specify the network interface to use for internal communication, such as the internal and zookeeper ports'),
+           cli.StringOption(None, '--externalinterface', 'externalinterface', 'specify the network interface to use for external ports, such as the admin and client ports'))
 
     def start(self, verb, runner):
         pass
@@ -394,19 +394,23 @@ class ServerBundle(JavaBundle):
     Supports needing catalog and live keyword option for rejoin.
     All other options are supported as common options.
     """
-    def __init__(self, subcommand, needs_catalog=True, supports_live=False):
+    def __init__(self, subcommand, needs_catalog=True, supports_live=False, default_host=True):
         JavaBundle.__init__(self, 'org.voltdb.VoltDB')
         self.subcommand = subcommand
         self.needs_catalog = needs_catalog
         self.supports_live = supports_live
+        self.default_host = default_host
 
     def initialize(self, verb):
         JavaBundle.initialize(self, verb)
         verb.add_options(
             cli.StringOption('-d', '--deployment', 'deployment',
-                             'the deployment configuration file path',
-                             default = None),
-            cli.HostOption('-H', '--host', 'host', 'the host', default = 'localhost'))
+                             'specify the location of the deployment file',
+                             default = None))
+        if self.default_host:
+            verb.add_options(cli.StringOption('-H', '--host', 'host', 'host:port', default = 'localhost'))
+        else:
+            verb.add_options(cli.StringOption('-H', '--host', 'host', 'host:port'))
         if self.supports_live:
            verb.add_options(cli.BooleanOption('-L', '--live', 'live', 'perform a live rejoin'))
         if self.needs_catalog:
@@ -422,6 +426,9 @@ class ServerBundle(JavaBundle):
                 '-XX:-ReduceInitialCardMarks')
 
     def go(self, verb, runner):
+        if self.needs_catalog:
+            if runner.opts.replica:
+                self.subcommand = 'replica'
         if self.supports_live:
             if runner.opts.live:
                 final_args = ['live', self.subcommand]
@@ -440,9 +447,11 @@ class ServerBundle(JavaBundle):
         if runner.opts.deployment:
             final_args.extend(['deployment', runner.opts.deployment])
         if runner.opts.host:
-            final_args.extend(['host', runner.opts.host.host])
-            if runner.opts.host.port is not None:
-                final_args.extend(['port', runner.opts.host.port])
+            final_args.extend(['host', runner.opts.host])
+        else:
+            utility.abort('host is required.')
+        if runner.opts.clientport:
+            final_args.extend(['port', runner.opts.clientport])
         if runner.opts.license:
             final_args.extend(['license', runner.opts.license])
         if runner.opts.internalinterface:
@@ -451,10 +460,6 @@ class ServerBundle(JavaBundle):
             final_args.extend(['internalport', runner.opts.internalport])
         if runner.opts.zkport:
             final_args.extend(['zkport', runner.opts.zkport])
-        if runner.opts.replicationport:
-            final_args.extend(['replicationport', runner.opts.replicationport])
-        if runner.opts.adminport:
-            final_args.extend(['adminport', runner.opts.adminport])
         if runner.opts.externalinterface:
             final_args.extend(['externalinterface', runner.opts.externalinterface])
         if runner.args:

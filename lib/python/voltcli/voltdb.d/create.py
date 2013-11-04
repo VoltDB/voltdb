@@ -27,6 +27,10 @@
 
 @VOLT.Command(
     bundles = VOLT.ServerBundle('create'),
+    options = (
+        # Hidden option to restore the hashinator in addition to the tables.
+        VOLT.BooleanOption('-r', '--replica', 'replica', 'start replica cluster', default = False),
+    ),
     description = 'Start the VoltDB server and create the database.'
 )
 def create(runner):
