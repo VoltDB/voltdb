@@ -748,7 +748,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         String retval = super.toString() + "\n";
 
         retval += "LIMIT " + String.valueOf(limit) + "\n";
-        retval += "OFFSET " + String.valueOf(limit) + "\n";
+        retval += "OFFSET " + String.valueOf(offset) + "\n";
 
         retval += "DISPLAY COLUMNS:\n";
         for (ParsedColInfo col : displayColumns) {
