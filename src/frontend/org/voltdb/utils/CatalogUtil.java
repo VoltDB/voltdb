@@ -567,7 +567,7 @@ public abstract class CatalogUtil {
      * @param catalog Catalog to be updated.
      * @param deployment Parsed representation of the deployment.xml file.
      * @param crashOnFailedValidation
-     * @param printLog Whether or not to print the cluster configuration.
+     * @param dummy if the catalog is dummy and we are verifying only deployment xml.
      * @return CRC of the deployment contents (>0) or -1 on failure.
      */
     public static long compileDeploymentAndGetCRC(Catalog catalog,
@@ -1049,6 +1049,7 @@ public abstract class CatalogUtil {
      * Set deployment time settings for export
      * @param catalog The catalog to be updated.
      * @param exportsType A reference to the <exports> element of the deployment.xml file.
+     * @param dummy The catalog is real or dummy real catalog is only validated with export info.
      */
     private static void setExportInfo(Catalog catalog, ExportType exportType, boolean dummy) {
         if (exportType == null || dummy) {
