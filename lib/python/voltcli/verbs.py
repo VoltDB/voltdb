@@ -412,7 +412,7 @@ class ServerBundle(JavaBundle):
         else:
             verb.add_options(cli.StringOption('-H', '--host', 'host', 'host:port'))
         if self.supports_live:
-           verb.add_options(cli.BooleanOption('-L', '--live', 'live', 'perform a live rejoin'))
+           verb.add_options(cli.BooleanOption('-b', '--block', 'block', 'perform a blocking rejoin'))
         if self.needs_catalog:
             verb.add_arguments(cli.PathArgument('catalog',
                               'the application catalog jar file path'))
@@ -430,10 +430,10 @@ class ServerBundle(JavaBundle):
             if runner.opts.replica:
                 self.subcommand = 'replica'
         if self.supports_live:
-            if runner.opts.live:
-                final_args = ['live', self.subcommand]
-            else:
+            if runner.opts.block:
                 final_args = [self.subcommand]
+            else:
+                final_args = ['live', self.subcommand]
         else: 
             final_args = [self.subcommand]
         if self.needs_catalog:
