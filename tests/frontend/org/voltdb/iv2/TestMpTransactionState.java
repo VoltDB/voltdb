@@ -34,8 +34,8 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Map;
 
 import junit.framework.TestCase;
@@ -58,7 +58,7 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.utils.VoltTableUtil;
 
-public class Iv2TestMpTransactionState extends TestCase
+public class TestMpTransactionState extends TestCase
 {
     static class MpTestPlan
     {
@@ -183,12 +183,14 @@ public class Iv2TestMpTransactionState extends TestCase
     }
 
     List<Long> allHsids;
+    Map<Integer, Long> partMasters;
     long buddyHSId;
 
     @Override
     protected void setUp()
     {
         allHsids = new ArrayList<Long>();
+        partMasters = new HashMap<Integer, Long>();
     }
 
     private long[] configureHSIds(int count)
@@ -198,6 +200,7 @@ public class Iv2TestMpTransactionState extends TestCase
         for (long i = 0; i < count; i++)
         {
             allHsids.add(i);
+            partMasters.put(index, i);
             non_local[index] = i;
             ++index;
         }
@@ -233,7 +236,7 @@ public class Iv2TestMpTransactionState extends TestCase
         SiteProcedureConnection siteConnection = mock(SiteProcedureConnection.class);
 
         MpTransactionState dut =
-            new MpTransactionState(mailbox, taskmsg, allHsids, null, buddyHSId, false);
+            new MpTransactionState(mailbox, taskmsg, allHsids, partMasters, buddyHSId, false);
 
         // emulate ProcedureRunner's use for a single local fragment
         dut.setupProcedureResume(true, plan.depsToResume);
@@ -289,7 +292,7 @@ public class Iv2TestMpTransactionState extends TestCase
         SiteProcedureConnection siteConnection = mock(SiteProcedureConnection.class);
 
         MpTransactionState dut =
-            new MpTransactionState(mailbox, taskmsg, allHsids, null, buddyHSId, false);
+            new MpTransactionState(mailbox, taskmsg, allHsids, partMasters, buddyHSId, false);
 
         // emulate ProcedureRunner's use for a single local fragment
         dut.setupProcedureResume(true, plan.depsToResume);
@@ -342,7 +345,7 @@ public class Iv2TestMpTransactionState extends TestCase
         SiteProcedureConnection siteConnection = mock(SiteProcedureConnection.class);
 
         MpTransactionState dut =
-            new MpTransactionState(mailbox, taskmsg, allHsids, null, buddyHSId, false);
+            new MpTransactionState(mailbox, taskmsg, allHsids, partMasters, buddyHSId, false);
 
         // emulate ProcedureRunner's use for a single local fragment
         dut.setupProcedureResume(true, plan.depsToResume);
@@ -397,7 +400,7 @@ public class Iv2TestMpTransactionState extends TestCase
         SiteProcedureConnection siteConnection = mock(SiteProcedureConnection.class);
 
         MpTransactionState dut =
-            new MpTransactionState(mailbox, taskmsg, allHsids, null, buddyHSId, false);
+            new MpTransactionState(mailbox, taskmsg, allHsids, partMasters, buddyHSId, false);
 
         // emulate ProcedureRunner's use for a single local fragment
         dut.setupProcedureResume(true, plan.depsToResume);
@@ -457,7 +460,7 @@ public class Iv2TestMpTransactionState extends TestCase
         SiteProcedureConnection siteConnection = mock(SiteProcedureConnection.class);
 
         MpTransactionState dut =
-            new MpTransactionState(mailbox, taskmsg, allHsids, null, buddyHSId, false);
+            new MpTransactionState(mailbox, taskmsg, allHsids, partMasters, buddyHSId, false);
 
         // emulate ProcedureRunner's use for a single local fragment
         dut.setupProcedureResume(true, plan.depsToResume);
@@ -510,7 +513,7 @@ public class Iv2TestMpTransactionState extends TestCase
         Mailbox mailbox = mock(Mailbox.class);
 
         MpTransactionState dut =
-            new MpTransactionState(mailbox, taskmsg, allHsids, null, buddyHSId, false);
+            new MpTransactionState(mailbox, taskmsg, allHsids, partMasters, buddyHSId, false);
 
         // create local work and verify the created localwork has the
         // expected truncation point.
@@ -562,7 +565,7 @@ public class Iv2TestMpTransactionState extends TestCase
         SiteProcedureConnection siteConnection = mock(SiteProcedureConnection.class);
 
         MpTransactionState dut =
-                new MpTransactionState(mailbox, taskmsg, allHsids, null, buddyHSId, false);
+                new MpTransactionState(mailbox, taskmsg, allHsids, partMasters, buddyHSId, false);
 
         // emulate ProcedureRunner's use for a single local fragment
         dut.setupProcedureResume(true, plan.depsToResume);
