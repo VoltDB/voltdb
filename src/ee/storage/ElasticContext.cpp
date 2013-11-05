@@ -21,6 +21,7 @@
 #include "common/TupleOutputStreamProcessor.h"
 #include "common/FixUnusedAssertHack.h"
 #include "logging/LogManager.h"
+#include <cassert>
 
 namespace voltdb {
 
@@ -178,8 +179,7 @@ bool ElasticContext::notifyTupleDelete(TableTuple &tuple)
 {
     if (m_indexActive) {
         if (m_surgeon.indexHas(tuple)) {
-            bool removed = m_surgeon.indexRemove(tuple);
-            assert(removed);
+            m_surgeon.indexRemove(tuple);
         }
     }
     return true;
@@ -197,12 +197,10 @@ void ElasticContext::notifyTupleMovement(TBPtr sourceBlock,
         StreamPredicateList &predicates = getPredicates();
         assert(predicates.size() > 0);
         if (m_surgeon.indexHas(sourceTuple)) {
-            bool removed = m_surgeon.indexRemove(sourceTuple);
-            assert(removed);
+            m_surgeon.indexRemove(sourceTuple);
         }
-        if (getPredicates()[0].eval(&targetTuple).isTrue()) {
-            bool added = m_surgeon.indexAdd(targetTuple);
-            assert(added);
+        if (predicates[0].eval(&targetTuple).isTrue()) {
+            m_surgeon.indexAdd(targetTuple);
         }
     }
 }
