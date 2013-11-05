@@ -1122,6 +1122,16 @@ public abstract class CatalogUtil {
         if (!adminstate) {
             hostLog.info("Export configuration is present and is " +
                "configured to be disabled. Export will be disabled.");
+        } else {
+            hostLog.info("On-Server Export is configured and enabled with type=" + exportType.getTarget());
+            if (exportConfiguration != null && exportConfiguration.getProperty() != null) {
+                hostLog.info("On-Server Export configuration properties are: ");
+                for (PropertyType configProp : exportConfiguration.getProperty()) {
+                    if (!configProp.getName().equalsIgnoreCase("password")) {
+                        hostLog.info("Export Configuration Property NAME=" + configProp.getName() + " VALUE=" + configProp.getValue());
+                    }
+                }
+            }
         }
     }
 
