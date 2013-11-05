@@ -64,7 +64,7 @@ public class MaterializedViewFixInfo {
     AbstractScanPlanNode m_scanNode = null;
 
     // ENG-5386: Edge case query.
-    private boolean m_edgeCaseQueryNoFixNeeded = true;
+    boolean m_edgeCaseQueryNoFixNeeded = true;
 
     public boolean needed () {
         return m_needed;
@@ -89,6 +89,7 @@ public class MaterializedViewFixInfo {
      * @return
      */
     public boolean processMVBasedQueryFix(Table table, Set<SchemaColumn> scanColumns, ParsedSelectStmt stmt) {
+
         // Check valid cases first
         String mvTableName = table.getTypeName();
         Table srcTable = table.getMaterializer();
@@ -142,10 +143,13 @@ public class MaterializedViewFixInfo {
         assert(numOfGroupByColumns > 0);
         m_mvTable = table;
 
-        Set<TupleValueExpression> mvDDLGroupbyTVEs = new HashSet<TupleValueExpression>();
+        if (stmt.hasComplexGroupby()) {
+            m_edgeCaseQueryNoFixNeeded = false;
+        }
+
+        Set<String> mvDDLGroupbyColumnNames = new HashSet<String>();
         List<Column> mvColumnArray =
                 CatalogUtil.getSortedCatalogItems(m_mvTable.getColumns(), "index");
-
 
         // Start to do real materialized view processing to fix the duplicates problem.
         // (1) construct new projection columns for scan plan node.
@@ -167,7 +171,7 @@ public class MaterializedViewFixInfo {
             tve.setValueType(VoltType.get((byte)mvCol.getType()));
             tve.setValueSize(mvCol.getSize());
 
-            mvDDLGroupbyTVEs.add(tve);
+            mvDDLGroupbyColumnNames.add(colName);
 
             SchemaColumn scol = new SchemaColumn(mvTableName, colName, colName, tve);
 
@@ -248,7 +252,8 @@ public class MaterializedViewFixInfo {
 
 
         // ENG-5386
-        if (edgeCaseQueryNoFixNeeded(stmt, mvDDLGroupbyTVEs, mvColumnReAggType)) {
+        if (m_edgeCaseQueryNoFixNeeded &&
+                edgeCaseQueryNoFixNeeded(stmt, mvDDLGroupbyColumnNames, mvColumnReAggType)) {
             return false;
         }
 
@@ -257,22 +262,14 @@ public class MaterializedViewFixInfo {
     }
 
     // ENG-5386: do not fix some cases in order to get better performance.
-    private boolean edgeCaseQueryNoFixNeeded(ParsedSelectStmt stmt, Set<TupleValueExpression> mvDDLGroupbyTVEs,
+    private boolean edgeCaseQueryNoFixNeeded(ParsedSelectStmt stmt, Set<String> mvDDLGroupbyColumnNames,
             Map<String, ExpressionType> mvColumnAggType) {
-
-        if (stmt.hasComplexGroupby()) {
-            return false;
-        }
-
-        if (m_edgeCaseQueryNoFixNeeded == false) {
-            return false;
-        }
 
         // Condition (1): Group by columns must be part of or all from MV DDL group by TVEs.
         for (ParsedColInfo gcol: stmt.groupByColumns()) {
             assert(gcol.expression instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression) gcol.expression;
-            if (tve.getTableName().equals(getMVTableName()) && !mvDDLGroupbyTVEs.contains(tve)) {
+            if (tve.getTableName().equals(getMVTableName()) && !mvDDLGroupbyColumnNames.contains(tve.getColumnName())) {
                 return false;
             }
         }
@@ -360,15 +357,13 @@ public class MaterializedViewFixInfo {
         }
     }
 
-    private boolean fromSingleTableOnly(List<AbstractExpression> tves) {
-        String tableName = null;
+
+    private boolean fromMVTableOnly(List<AbstractExpression> tves) {
+        String mvTableName = m_mvTable.getTypeName();
         for (AbstractExpression tve: tves) {
             assert(tve instanceof TupleValueExpression);
             String tveTableName = ((TupleValueExpression)tve).getTableName();
-            if (tableName == null) {
-                tableName = tveTableName;
-            }
-            if (!tableName.equals(tveTableName)) {
+            if (!mvTableName.equals(tveTableName)) {
                 return false;
             }
         }
@@ -377,47 +372,39 @@ public class MaterializedViewFixInfo {
 
     private AbstractExpression processFilters (AbstractExpression filters,
             List<TupleValueExpression> needReAggTVEs, List<AbstractExpression> aggPostExprs) {
-        if (filters != null) {
-            // Collect all TVEs that need to be do re-aggregation in coordinator.
-            List<AbstractExpression> remaningExprs = new ArrayList<AbstractExpression>();
-            // Check where clause.
-            List<AbstractExpression> exprs = ExpressionUtil.uncombine(filters);
+        if (filters == null) {
+            return null;
+        }
 
-            for (AbstractExpression expr: exprs) {
-                ArrayList<AbstractExpression> tves = expr.findBaseTVEs();
+        // Collect all TVEs that need to be do re-aggregation in coordinator.
+        List<AbstractExpression> remaningExprs = new ArrayList<AbstractExpression>();
+        // Check where clause.
+        List<AbstractExpression> exprs = ExpressionUtil.uncombine(filters);
 
-                boolean canPushdown = true;
-                // If the expression is built on a join expression referencing two tables,
-                // There is no need to process it to extract post filters for ReAggregation node.
-                if (fromSingleTableOnly(tves)) {
-                    if (tves.size() > 0 && ((TupleValueExpression)tves.get(0)).getTableName().equals(getMVTableName()) ) {
-                        for (TupleValueExpression needReAggTVE: needReAggTVEs) {
-                            if (tves.contains(needReAggTVE)) {
-                                canPushdown = false;
-                                m_edgeCaseQueryNoFixNeeded = false;
-                                break;
-                            }
-                        }
+        for (AbstractExpression expr: exprs) {
+            ArrayList<AbstractExpression> tves = expr.findBaseTVEs();
+
+            boolean canPushdown = true;
+
+            for (TupleValueExpression needReAggTVE: needReAggTVEs) {
+                if (tves.contains(needReAggTVE)) {
+                    m_edgeCaseQueryNoFixNeeded = false;
+
+                    if (fromMVTableOnly(tves)) {
+                        canPushdown = false;
                     }
-                } else {
-                    // Filter references from two tables or more.
-                    for (TupleValueExpression needReAggTVE: needReAggTVEs) {
-                        if (tves.contains(needReAggTVE)) {
-                            m_edgeCaseQueryNoFixNeeded = false;
-                            break;
-                        }
-                    }
-                }
-                if (canPushdown) {
-                    remaningExprs.add(expr);
-                } else {
-                    aggPostExprs.add(expr);
+
+                    break;
                 }
             }
-            AbstractExpression remaningFilters = ExpressionUtil.combine(remaningExprs);
-            // Update new filters for the scanNode.
-            return remaningFilters;
+            if (canPushdown) {
+                remaningExprs.add(expr);
+            } else {
+                aggPostExprs.add(expr);
+            }
         }
-        return null;
+        AbstractExpression remaningFilters = ExpressionUtil.combine(remaningExprs);
+        // Update new filters for the scanNode.
+        return remaningFilters;
     }
 }

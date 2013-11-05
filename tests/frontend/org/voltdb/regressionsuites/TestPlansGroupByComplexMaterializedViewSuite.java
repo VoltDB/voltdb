@@ -1384,7 +1384,13 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                     "left join v_r4 on V_P1_ENG5386.v_g1 < v_r4.v_g1 GROUP BY V_P1_ENG5386.v_g1 ORDER BY 1;";
             sql = sql.replace("V_P1_ENG5386", tb);
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-            validateTableOfLongs(vt, new long[][] {{10,303,37,12,21}, {20,90,37,7,22}, {30,109,Long.MIN_VALUE,14,24}});
+            System.out.println(vt);
+            long voltNullLong = Long.MIN_VALUE;
+            if (isHSQL()) {
+                voltNullLong = 0l;
+            }
+            validateTableOfLongs(vt, new long[][] {{10,303,37,12,21}, {20,90,37,7,22}, {30,109,voltNullLong,14,24}});
+
         }
 
     }
