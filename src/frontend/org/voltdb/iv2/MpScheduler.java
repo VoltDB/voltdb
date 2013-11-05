@@ -144,10 +144,8 @@ public class MpScheduler extends Scheduler
             }
         }
 
-
-        final List<Long> replicaCopy = new ArrayList<Long>(replicas);
         MpRepairTask repairTask = new MpRepairTask((InitiatorMailbox)m_mailbox, replicas);
-        m_pendingTasks.repair(repairTask, replicaCopy, partitionMasters);
+        m_pendingTasks.repair(repairTask, replicas, partitionMasters);
     }
 
     /**
