@@ -44,6 +44,9 @@ public class VoltZK {
 
     public static final String buildstring = "/db/buildstring";
     public static final String catalogbytes = "/db/catalogbytes";
+    //This node doesn't mean as much as it used to, it is accurate at startup
+    //but isn't updated after elastic join. We use the cartographer for most things
+    //now
     public static final String topology = "/db/topology";
     public static final String replicationconfig = "/db/replicationconfig";
     public static final String deploymentBytes = "/db/deploymentBytes";
