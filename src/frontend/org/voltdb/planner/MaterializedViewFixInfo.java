@@ -64,7 +64,7 @@ public class MaterializedViewFixInfo {
     AbstractScanPlanNode m_scanNode = null;
 
     // ENG-5386: Edge case query.
-    boolean m_edgeCaseQueryNoFixNeeded = true;
+    private boolean m_edgeCaseQueryNoFixNeeded = true;
 
     public boolean needed () {
         return m_needed;
@@ -83,12 +83,17 @@ public class MaterializedViewFixInfo {
         return m_reAggNode;
     }
 
+    public void setEdgeCaseQueryNoFixNeeded (boolean edgeCase) {
+        m_edgeCaseQueryNoFixNeeded = edgeCase;
+    }
+
     /**
      * Check whether the table need to be fixed or not.
      * Set the need flag to true, only if it needs to be fixed.
      * @return
      */
-    public boolean processMVBasedQueryFix(Table table, Set<SchemaColumn> scanColumns, ParsedSelectStmt stmt) {
+    public boolean processMVBasedQueryFix(Table table, Set<SchemaColumn> scanColumns, JoinNode joinTree,
+            List<ParsedColInfo> displayColumns, List<ParsedColInfo> groupByColumns) {
 
         // Check valid cases first
         String mvTableName = table.getTypeName();
@@ -142,10 +147,6 @@ public class MaterializedViewFixInfo {
         }
         assert(numOfGroupByColumns > 0);
         m_mvTable = table;
-
-        if (stmt.hasComplexGroupby()) {
-            m_edgeCaseQueryNoFixNeeded = false;
-        }
 
         Set<String> mvDDLGroupbyColumnNames = new HashSet<String>();
         List<Column> mvColumnArray =
@@ -244,7 +245,7 @@ public class MaterializedViewFixInfo {
             needReAggTVEs.add(tve);
         }
 
-        collectReAggNodePostExpressions(stmt.joinTree, needReAggTVEs, aggPostExprs);
+        collectReAggNodePostExpressions(joinTree, needReAggTVEs, aggPostExprs);
 
         AbstractExpression aggPostExpr = ExpressionUtil.combine(aggPostExprs);
         // Add post filters for the reAggregation node.
@@ -253,7 +254,7 @@ public class MaterializedViewFixInfo {
 
         // ENG-5386
         if (m_edgeCaseQueryNoFixNeeded &&
-                edgeCaseQueryNoFixNeeded(stmt, mvDDLGroupbyColumnNames, mvColumnReAggType)) {
+                edgeCaseQueryNoFixNeeded(mvDDLGroupbyColumnNames, mvColumnReAggType, displayColumns, groupByColumns)) {
             return false;
         }
 
@@ -262,11 +263,11 @@ public class MaterializedViewFixInfo {
     }
 
     // ENG-5386: do not fix some cases in order to get better performance.
-    private boolean edgeCaseQueryNoFixNeeded(ParsedSelectStmt stmt, Set<String> mvDDLGroupbyColumnNames,
-            Map<String, ExpressionType> mvColumnAggType) {
+    private boolean edgeCaseQueryNoFixNeeded(Set<String> mvDDLGroupbyColumnNames,
+            Map<String, ExpressionType> mvColumnAggType, List<ParsedColInfo> displayColumns, List<ParsedColInfo> groupByColumns) {
 
         // Condition (1): Group by columns must be part of or all from MV DDL group by TVEs.
-        for (ParsedColInfo gcol: stmt.groupByColumns()) {
+        for (ParsedColInfo gcol: groupByColumns) {
             assert(gcol.expression instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression) gcol.expression;
             if (tve.getTableName().equals(getMVTableName()) && !mvDDLGroupbyColumnNames.contains(tve.getColumnName())) {
@@ -275,8 +276,8 @@ public class MaterializedViewFixInfo {
         }
 
         // Condition (2): Aggregation must be:
-        for (ParsedColInfo dcol: stmt.displayColumns()) {
-            if (stmt.groupByColumns().contains(dcol)) {
+        for (ParsedColInfo dcol: displayColumns) {
+            if (groupByColumns.contains(dcol)) {
                 continue;
             }
             if (dcol.expression instanceof AggregateExpression == false) {
