@@ -1114,6 +1114,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 byte deploymentBytesTemp[] = getDeploymentBytesFromZk(zk);
                 if (deploymentBytesTemp != null) {
                     //Check crc if its a supplied deployment on command line.
+                    //We will ignore the supplied or default deployment anyways.
                     if (deploymentBytes != null && !m_config.m_deploymentDefault) {
                         PureJavaCrc32 crc = new PureJavaCrc32();
                         crc.update(deploymentBytes);
