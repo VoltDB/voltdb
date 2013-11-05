@@ -408,9 +408,9 @@ class ServerBundle(JavaBundle):
                              'specify the location of the deployment file',
                              default = None))
         if self.default_host:
-            verb.add_options(cli.StringOption('-H', '--host', 'host', 'host:port', default = 'localhost'))
+            verb.add_options(cli.StringOption('-H', '--host', 'host', 'HOST[:PORT] (default HOST=localhost, PORT=3021)', default = 'localhost:3021'))
         else:
-            verb.add_options(cli.StringOption('-H', '--host', 'host', 'host:port'))
+            verb.add_options(cli.StringOption('-H', '--host', 'host', 'HOST[:PORT] host must be specified (default HOST=localhost, PORT=3021)'))
         if self.supports_live:
            verb.add_options(cli.BooleanOption('-b', '--block', 'block', 'perform a blocking rejoin'))
         if self.needs_catalog:
