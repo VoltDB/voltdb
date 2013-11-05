@@ -1094,7 +1094,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
          */
         try {
             ZooKeeper zk = m_messenger.getZK();
-            byte deploymentBytes[] = org.voltcore.utils.CoreUtils.urlToBytes(m_config.m_pathToDeployment);
+            byte deploymentBytes[] = null;
 
             try {
                 deploymentBytes = org.voltcore.utils.CoreUtils.urlToBytes(m_config.m_pathToDeployment);
