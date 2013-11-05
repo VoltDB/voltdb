@@ -306,6 +306,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             if (config.m_pathToDeployment == null) {
                 try {
                     config.m_pathToDeployment = setupDefaultDeployment();
+                    config.m_deploymentDefault = true;
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Failed to write default deployment.", false, null);
                 }
@@ -1078,6 +1079,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         GCInspector.instance.start(m_periodicPriorityWorkThread);
     }
 
+    //Get deployment bytes from ZooKeeper.
+    byte[] getDeploymentBytesFromZk(ZooKeeper zk) {
+        try {
+            return zk.getData(VoltZK.deploymentBytes, false, null);
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
     int readDeploymentAndCreateStarterCatalogContext() {
         /*
          * Debate with the cluster what the deployment file should be
@@ -1087,33 +1097,50 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             byte deploymentBytes[] = org.voltcore.utils.CoreUtils.urlToBytes(m_config.m_pathToDeployment);
 
             try {
-                if (deploymentBytes != null) {
-                    zk.create(VoltZK.deploymentBytes, deploymentBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-                    hostLog.info("URL of deployment info: " + m_config.m_pathToDeployment);
-                } else {
-                    throw new KeeperException.NodeExistsException();
-                }
-            } catch (KeeperException.NodeExistsException e) {
-                byte deploymentBytesTemp[] = zk.getData(VoltZK.deploymentBytes, false, null);
-                if (deploymentBytesTemp == null) {
-                    throw new RuntimeException(
-                            "Deployment file could not be found locally or remotely at "
-                            + m_config.m_pathToDeployment);
-                }
-                PureJavaCrc32 crc = new PureJavaCrc32();
-                crc.update(deploymentBytes);
-                final long checksumHere = crc.getValue();
-                crc.reset();
-                crc.update(deploymentBytesTemp);
-                if (checksumHere != crc.getValue()) {
-                    hostLog.info("Deployment configuration was pulled from ZK, and the checksum did not match " +
-                    "the locally supplied file");
-                } else {
-                    hostLog.info("Deployment configuration pulled from ZK");
-                }
-                deploymentBytes = deploymentBytesTemp;
+                deploymentBytes = org.voltcore.utils.CoreUtils.urlToBytes(m_config.m_pathToDeployment);
+            } catch (Exception ex) {
+                //Let us get bytes from ZK
+                hostLog.info("Deployment file could not be found locally at: " + m_config.m_pathToDeployment);
             }
 
+            try {
+                if (deploymentBytes != null) {
+                    zk.create(VoltZK.deploymentBytes, deploymentBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                    hostLog.info("URL of deployment: " + m_config.m_pathToDeployment);
+                } else {
+                    deploymentBytes = getDeploymentBytesFromZk(zk);
+                }
+            } catch (KeeperException.NodeExistsException e) {
+                byte deploymentBytesTemp[] = getDeploymentBytesFromZk(zk);
+                if (deploymentBytesTemp != null) {
+                    //Check crc if its a supplied deployment on command line.
+                    if (deploymentBytes != null && !m_config.m_deploymentDefault) {
+                        PureJavaCrc32 crc = new PureJavaCrc32();
+                        crc.update(deploymentBytes);
+                        final long checksumHere = crc.getValue();
+                        crc.reset();
+                        crc.update(deploymentBytesTemp);
+                        if (checksumHere != crc.getValue()) {
+                            hostLog.info("Deployment configuration was pulled from ZK, and the checksum did not match "
+                                    + "the locally supplied file");
+                            deploymentBytes = null;
+                        } else {
+                            hostLog.info("Deployment configuration pulled from ZK");
+                        }
+                    } else {
+                        //Use remote deployment obtained.
+                        deploymentBytes = deploymentBytesTemp;
+                    }
+                } else {
+                    hostLog.error("Deployment file could not be loaded remotely, expected to be there: " + m_config.m_pathToDeployment);
+                    deploymentBytes = null;
+                }
+            }
+            if (deploymentBytes == null) {
+                hostLog.error("Deployment file could not be found locally or remotely at: " + m_config.m_pathToDeployment);
+                VoltDB.crashLocalVoltDB("No such deployment file: "
+                        + m_config.m_pathToDeployment, false, null);
+            }
             m_deployment = CatalogUtil.getDeployment(new ByteArrayInputStream(deploymentBytes));
             // wasn't a valid xml deployment file
             if (m_deployment == null) {

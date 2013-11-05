@@ -120,6 +120,7 @@ public class VoltDB {
 
         /** name of the deployment file */
         public String m_pathToDeployment = null;
+        public boolean m_deploymentDefault = false;
 
         /** name of the license file, for commercial editions */
         public String m_pathToLicense = "license.xml";
