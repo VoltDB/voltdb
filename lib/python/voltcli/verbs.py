@@ -412,7 +412,7 @@ class ServerBundle(JavaBundle):
         else:
             verb.add_options(cli.StringOption('-H', '--host', 'host', 'HOST[:PORT] host must be specified (default HOST=localhost, PORT=3021)'))
         if self.supports_live:
-           verb.add_options(cli.BooleanOption('-b', '--block', 'block', 'perform a blocking rejoin'))
+           verb.add_options(cli.BooleanOption('-b', '--blocking', 'block', 'perform a blocking rejoin'))
         if self.needs_catalog:
             verb.add_arguments(cli.PathArgument('catalog',
                               'the application catalog jar file path'))
