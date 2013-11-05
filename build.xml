@@ -507,7 +507,6 @@ DISTRIBUTION
             <include name="doc/tutorials/**" />
             <include name="examples/**"/>
             <include name="lib/python/**"/>
-            <include name="tools/demo/**"/>
             <exclude name="**/*.pyc" />
         </fileset>
     </copy>
@@ -537,7 +536,6 @@ DISTRIBUTION
     <chmod perm="ugo+rx">
         <fileset dir="${dist.dir}" defaultexcludes="yes">
             <include name="bin/*"/>
-            <include name="tools/demo/launch"/>
             <include name="tools/volt"/>
             <include name="examples/**/run.sh"/>
             <include name="doc/tutorials/**/run.sh"/>
@@ -594,7 +592,6 @@ DISTRIBUTION
     <!-- make shell scripts executable -->
     <chmod perm="ugo+rx">
         <fileset dir="${dist.dir}-client-java/" defaultexcludes="yes">
-            <include name="tools/demo/launch"/>
             <include name="doc/tutorials/auction/run.sh"/>
             <include name="doc/tutorials/helloworld/run.sh"/>
             <include name="examples/voltcache/run.sh"/>
