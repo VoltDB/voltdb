@@ -208,7 +208,7 @@ public class TestVoltDB extends TestCase {
 
         // this should fail because group "bar" does not exist
         assertTrue("Deployment file shouldn't have been able to validate",
-                CatalogUtil.compileDeploymentAndGetCRC(catalog,project.getPathToDeployment(), true) < 0);
+                CatalogUtil.compileDeploymentAndGetCRC(catalog, project.getPathToDeployment(), true, true) < 0);
     }
 
     /**
@@ -245,7 +245,7 @@ public class TestVoltDB extends TestCase {
         catalog.execute(serializedCatalog);
 
         assertTrue("Deployment file should have been able to validate",
-                CatalogUtil.compileDeploymentAndGetCRC(catalog,project.getPathToDeployment(), true) >= 0);
+                CatalogUtil.compileDeploymentAndGetCRC(catalog, project.getPathToDeployment(), true, true) >= 0);
     }
 
 }

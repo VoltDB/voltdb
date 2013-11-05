@@ -544,20 +544,22 @@ public abstract class CatalogUtil {
         return true;
     }
 
-    public static long compileDeploymentAndGetCRC(Catalog catalog, String deploymentURL, boolean crashOnFailedValidation) {
+    public static long compileDeploymentAndGetCRC(Catalog catalog, String deploymentURL,
+            boolean crashOnFailedValidation, boolean dummy) {
         DeploymentType deployment = CatalogUtil.parseDeployment(deploymentURL);
         if (deployment == null) {
             return -1;
         }
-        return compileDeploymentAndGetCRC(catalog, deployment, crashOnFailedValidation);
+        return compileDeploymentAndGetCRC(catalog, deployment, crashOnFailedValidation, dummy);
     }
 
-    public static long compileDeploymentStringAndGetCRC(Catalog catalog, String deploymentString, boolean crashOnFailedValidation) {
+    public static long compileDeploymentStringAndGetCRC(Catalog catalog, String deploymentString,
+            boolean crashOnFailedValidation, boolean dummy) {
         DeploymentType deployment = CatalogUtil.parseDeploymentFromString(deploymentString);
         if (deployment == null) {
             return -1;
         }
-        return compileDeploymentAndGetCRC(catalog, deployment, crashOnFailedValidation);
+        return compileDeploymentAndGetCRC(catalog, deployment, crashOnFailedValidation, dummy);
     }
 
     /**
@@ -570,8 +572,7 @@ public abstract class CatalogUtil {
      */
     public static long compileDeploymentAndGetCRC(Catalog catalog,
                                                   DeploymentType deployment,
-                                                  boolean crashOnFailedValidation)
-    {
+            boolean crashOnFailedValidation, boolean dummy)    {
 
         if (!validateDeployment(catalog, deployment)) {
             return -1;
@@ -602,7 +603,7 @@ public abstract class CatalogUtil {
         // set the HTTPD info
         setHTTPDInfo(catalog, deployment.getHttpd());
 
-        setExportInfo( catalog, deployment.getExport());
+        setExportInfo(catalog, deployment.getExport(), dummy);
 
         setCommandLogInfo( catalog, deployment.getCommandlog());
 
@@ -1049,14 +1050,12 @@ public abstract class CatalogUtil {
      * @param catalog The catalog to be updated.
      * @param exportsType A reference to the <exports> element of the deployment.xml file.
      */
-    private static void setExportInfo(Catalog catalog, ExportType exportType) {
-        if (exportType == null) {
+    private static void setExportInfo(Catalog catalog, ExportType exportType, boolean dummy) {
+        if (exportType == null || dummy) {
             return;
         }
 
         boolean adminstate = exportType.isEnabled();
-        // on-server export always uses the gues processor
-        String connector = "org.voltdb.export.processors.GuestProcessor";
 
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
         org.voltdb.catalog.Connector catconn = db.getConnectors().get("0");
@@ -1068,6 +1067,8 @@ public abstract class CatalogUtil {
             return;
         }
 
+        // on-server export always uses the gues processor
+        String connector = "org.voltdb.export.processors.GuestProcessor";
         catconn.setLoaderclass(connector);
         catconn.setEnabled(adminstate);
 
