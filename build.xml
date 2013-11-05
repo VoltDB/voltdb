@@ -1387,7 +1387,6 @@ TEST CASES
                 <!-- Standard junit fileset -->
                 <include name='org/hsqldb_voltpatches/**/Test*.class'/>
                 <include name='org/voltdb/**/Test*.class'/>
-                <include name='org/voltdb/utils/**/*Test.class'/>
                 <!-- Exclude many tests not directly related to sql functionality -->
                 <exclude name="**/*$*.class"/>
                 <exclude name='org/voltdb/client/TestClientFeatures.class'/>
@@ -1509,9 +1508,6 @@ TEST CASES
                 <include name='org/voltcore/**/Test*.class' />
                 <include name='org/voltdb/**/Test*.class'/>
                 <include name='org/voltdb/network/**/Test*.class'/>
-                <include name='org/voltdb/messaging/**/*Test.class'/>
-                <include name='org/voltdb/network/**/*Test.class'/>
-                <include name='org/voltdb/utils/**/*Test.class'/>
                 <exclude name="**/*$*.class"/>
                 <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
