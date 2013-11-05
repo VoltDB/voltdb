@@ -603,7 +603,9 @@ public abstract class CatalogUtil {
         // set the HTTPD info
         setHTTPDInfo(catalog, deployment.getHttpd());
 
-        setExportInfo(catalog, deployment.getExport(), dummy);
+        if (!dummy) {
+            setExportInfo(catalog, deployment.getExport());
+        }
 
         setCommandLogInfo( catalog, deployment.getCommandlog());
 
@@ -1049,10 +1051,9 @@ public abstract class CatalogUtil {
      * Set deployment time settings for export
      * @param catalog The catalog to be updated.
      * @param exportsType A reference to the <exports> element of the deployment.xml file.
-     * @param dummy The catalog is real or dummy real catalog is only validated with export info.
      */
-    private static void setExportInfo(Catalog catalog, ExportType exportType, boolean dummy) {
-        if (exportType == null || dummy) {
+    private static void setExportInfo(Catalog catalog, ExportType exportType) {
+        if (exportType == null) {
             return;
         }
 
