@@ -22,9 +22,6 @@ import java.util.Map;
 
 import org.json_voltpatches.JSONObject;
 import org.voltcore.network.Connection;
-import org.voltcore.utils.Pair;
-
-import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
@@ -382,6 +379,9 @@ public class StatsAgent extends OpsAgent
         case MANAGEMENT:
             stats = collectManagementStats(interval);
             break;
+        case REBALANCE:
+            stats = collectRebalanceStats(interval);
+            break;
         default:
             // Should have been successfully groomed in collectStatsImpl().  Log something
             // for our information but let the null check below return harmlessly
@@ -611,6 +611,19 @@ public class StatsAgent extends OpsAgent
         return stats;
     }
 
+    private VoltTable[] collectRebalanceStats(boolean interval)
+    {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable mStats = getStatsAggregate(StatsSelector.REBALANCE, interval, now);
+        if (mStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = mStats;
+        }
+        return stats;
+    }
+
     public synchronized void registerStatsSource(StatsSelector selector, long siteId, StatsSource source) {
         assert selector != null;
         assert source != null;
@@ -648,6 +661,7 @@ public class StatsAgent extends OpsAgent
             final Long now,
             VoltTable prevResults)
     {
+
         assert selector != null;
         final HashMap<Long, ArrayList<StatsSource>> siteIdToStatsSources = registeredStatsSources.get(selector);
 

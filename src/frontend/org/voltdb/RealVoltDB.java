@@ -104,6 +104,7 @@ import org.voltdb.iv2.LeaderAppointer;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SpInitiator;
 import org.voltdb.iv2.TxnEgo;
+import org.voltdb.join.BalancePartitionsStatistics;
 import org.voltdb.join.ElasticJoinService;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
@@ -558,6 +559,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             getStatsAgent().registerStatsSource(StatsSelector.LIVECLIENTS, 0, m_liveClientsStats);
             m_latencyStats = new LatencyStats(m_myHostId);
 
+            BalancePartitionsStatistics rebalanceStats = new BalancePartitionsStatistics();
+            getStatsAgent().registerStatsSource(StatsSelector.REBALANCE, 0, rebalanceStats);
+
             /*
              * Initialize the command log on rejoin and join before configuring the IV2
              * initiators.  This will prevent them from receiving transactions
@@ -774,12 +778,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         elasticServiceClass.getConstructor(HostMessenger.class,
                                                            ClientInterface.class,
                                                            Cartographer.class,
+                                                           BalancePartitionsStatistics.class,
                                                            String.class,
                                                            int.class);
                     m_elasticJoinService =
                         (ElasticJoinService) constructor.newInstance(m_messenger,
                                                                      m_clientInterfaces.get(0),
                                                                      m_cartographer,
+                                                                     rebalanceStats,
                                                                      clSnapshotPath,
                                                                      m_deployment.getCluster().getKfactor());
                 }
