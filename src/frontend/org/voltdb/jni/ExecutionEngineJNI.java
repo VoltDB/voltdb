@@ -508,7 +508,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         long retval = nativeExportAction(pointer,
                                          syncAction, ackTxnId, seqNo, getStringBytes(tableSignature));
         if (retval < 0) {
-            LOG.error("exportAction failed!  syncAction: " + syncAction + ", ackTxnId: " +
+            LOG.info("exportAction failed.  syncAction: " + syncAction + ", ackTxnId: " +
                     ackTxnId + ", seqNo: " + seqNo + ", partitionId: " + partitionId +
                     ", tableSignature: " + tableSignature);
         }
