@@ -57,7 +57,7 @@ usage for a verb, including its options and arguments.
 )
 
 # Internal command names that get added to the VOLT namespace of user scripts.
-internal_commands = ['volt', 'voltadmin']
+internal_commands = ['voltdb', 'voltadmin']
 
 # Written to the README file when the packaged executable is created.
 compatibility_warning = '''\
@@ -128,13 +128,6 @@ class JavaRunner(object):
         java_args = [environment.java]
         java_opts = utility.merge_java_options(environment.java_opts, java_opts_override)
         java_args.extend(java_opts)
-        debug_port = kwargs.get('debugport', None)
-        if debug_port:
-            java_args.extend((
-                '-Xdebug',
-                '-Xnoagent',
-                '-Djava.compiler=NONE',
-                '-Xrunjdwp:transport=dt_socket,address=%d,server=y,suspend=y' % debug_port))
         java_args.append('-Dlog4j.configuration=file://%s' % os.environ['LOG4J_CONFIG_PATH'])
         java_args.append('-Djava.library.path="%s"' % os.environ['VOLTDB_VOLTDB'])
         java_args.extend(('-classpath', classpath))
@@ -492,6 +485,7 @@ class VOLT(object):
         self.ConnectionBundle = ConnectionBundle
         self.ClientBundle     = ClientBundle
         self.AdminBundle      = AdminBundle
+        self.ServerBundle     = ServerBundle
         # As a convenience expose the utility module so that commands don't
         # need to import it.
         self.utility = utility
