@@ -567,12 +567,13 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
 
     int32_t numFrags = ntohl(queryCommand->numFragmentIds);
 
-    if (0)
+    if (0) {
         std::cout << "querypfs:"
                   << " spHandle=" << ntohll(queryCommand->spHandle)
                   << " lastCommittedSphandle=" << ntohll(queryCommand->lastCommittedSpHandle)
                   << " undoToken=" << ntohll(queryCommand->undoToken)
                   << " numFragIds=" << numFrags << std::endl;
+    }
 
     // data has binary packed fragmentIds first
     int64_t *fragmentIds = (int64_t*) (&(queryCommand->data));

@@ -22,6 +22,7 @@
 #include "boost/date_time/posix_time/conversion.hpp"
 #include <ctime>
 #include "common/SQLException.h"
+#include "common/executorcontext.hpp"
 
 static const boost::posix_time::ptime EPOCH(boost::gregorian::date(1970,1,1));
 static const int64_t GREGORIAN_EPOCH = -12212553600000000;  // 1583-01-01 00:00:00
@@ -363,6 +364,13 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MICROSECOND>() const {
     }
     int64_t epoch_micros = getTimestamp();
     return getTimestampValue(epoch_micros);
+}
+
+template<> inline NValue NValue::callConstant<FUNC_CURRENT_TIMESTAMP>() {
+
+    ExecutorContext * contest = voltdb::ExecutorContext::getExecutorContext();
+    std::cout << "CURRENT transaction id: " << contest->currentTxnTimestamp() << std::endl;
+    return getTimestampValue(contest->currentTxnTimestamp() * 1000);
 }
 
 }

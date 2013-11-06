@@ -541,7 +541,6 @@ public class FunctionSQL extends Expression {
                 name            = Tokens.T_CURRENT_TIMESTAMP;
                 parseList       = optionalIntegerParamList;
                 isValueFunction = true;
-                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_LOCALTIME :
@@ -1582,14 +1581,18 @@ public class FunctionSQL extends Expression {
                 break;
             }
             case FUNC_CURRENT_TIMESTAMP : {
-                int precision = DateTimeType.defaultTimestampFractionPrecision;
+//                int precision = DateTimeType.defaultTimestampFractionPrecision;
+//
+//                if (nodes[0] != null) {
+//                    precision = ((Integer) nodes[0].valueData).intValue();
+//                }
+//
+//                dataType = DateTimeType.getDateTimeType(
+//                    Types.SQL_TIMESTAMP_WITH_TIME_ZONE, precision);
 
-                if (nodes[0] != null) {
-                    precision = ((Integer) nodes[0].valueData).intValue();
-                }
+                // For VoltDB
 
-                dataType = DateTimeType.getDateTimeType(
-                    Types.SQL_TIMESTAMP_WITH_TIME_ZONE, precision);
+                dataType = Type.SQL_TIMESTAMP;
 
                 break;
             }
