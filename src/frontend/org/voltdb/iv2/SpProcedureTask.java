@@ -80,7 +80,10 @@ public class SpProcedureTask extends ProcedureTask
     public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
     throws IOException
     {
-        taskLog.logTask(m_txnState.getNotice());
+        if (!m_txnState.isReadOnly()) {
+            taskLog.logTask(m_txnState.getNotice());
+        }
+
         SpTransactionState txnState = (SpTransactionState)m_txnState;
         final InitiateResponseMessage response =
             new InitiateResponseMessage(txnState.m_initiationMsg);
