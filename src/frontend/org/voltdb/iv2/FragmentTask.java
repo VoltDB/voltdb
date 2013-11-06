@@ -117,7 +117,10 @@ public class FragmentTask extends TransactionTask
     public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
     throws IOException
     {
-        taskLog.logTask(m_fragmentMsg);
+        if (!m_txnState.isReadOnly()) {
+            taskLog.logTask(m_fragmentMsg);
+        }
+
         final FragmentResponseMessage response =
             new FragmentResponseMessage(m_fragmentMsg, m_initiator.getHSId());
         response.m_sourceHSId = m_initiator.getHSId();
