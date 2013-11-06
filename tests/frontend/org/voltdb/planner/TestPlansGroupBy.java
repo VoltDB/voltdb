@@ -26,6 +26,7 @@ package org.voltdb.planner;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
@@ -380,22 +381,87 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 distinctPushdown, true, false);
     }
 
+    private void checkMVNoFix_NoAgg(
+            String sql, int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
+            boolean distinctPushdown, boolean projectionNode, boolean aggPushdown) {
+
+        checkMVReaggreateFeature(sql, false, numGroupbyOfTopAggNode, numAggsOfTopAggNode, -1, -1,
+                distinctPushdown, projectionNode, aggPushdown);
+
+    }
+
     public void testNoFix_MVBasedQuery() {
+        String sql = "";
+
+        // (1) Table V_P1_NO_FIX_NEEDED:
+
         // Normal select queries
-        checkMVNoFix_NoAgg("SELECT * FROM V_P1_TEST1", false);
-
-        checkMVNoFix_NoAgg("SELECT V_SUM_C1 FROM V_P1_TEST1 ORDER BY V_A1", false);
-
-        checkMVNoFix_NoAgg("SELECT V_SUM_C1 FROM V_P1_TEST1 LIMIT 1", false);
-
-        checkMVNoFix_NoAgg("SELECT DISTINCT V_SUM_C1 FROM V_P1_TEST1", true);
+        checkMVNoFix_NoAgg("SELECT * FROM V_P1_NO_FIX_NEEDED", false);
+        checkMVNoFix_NoAgg("SELECT V_SUM_C1 FROM V_P1_NO_FIX_NEEDED ORDER BY V_A1", false);
+        checkMVNoFix_NoAgg("SELECT V_SUM_C1 FROM V_P1_NO_FIX_NEEDED LIMIT 1", false);
+        checkMVNoFix_NoAgg("SELECT DISTINCT V_SUM_C1 FROM V_P1_NO_FIX_NEEDED", true);
 
         // Distributed group by query
-        checkMVReaggreateFeature("SELECT V_SUM_C1 FROM V_P1_TEST1 GROUP by V_SUM_C1",
-                false, 1, 0, -1, -1, false, false, true);
+        checkMVNoFix_NoAgg("SELECT V_SUM_C1 FROM V_P1_NO_FIX_NEEDED GROUP by V_SUM_C1",
+                1, 0, false, false, true);
+        checkMVNoFix_NoAgg("SELECT V_SUM_C1, sum(V_CNT) FROM V_P1_NO_FIX_NEEDED " +
+                "GROUP by V_SUM_C1", 1, 1, false, false, true);
 
-        checkMVReaggreateFeature("SELECT V_SUM_C1, sum(V_CNT) FROM V_P1_TEST1 " +
-                "GROUP by V_SUM_C1", false, 1, 1, -1, -1, false, false, true);
+        // (2) Table V_P1 and V_P1_NEW:
+        checkMVNoFix_NoAgg("SELECT SUM(V_SUM_C1) FROM V_P1", 0, 1, false, false, true);
+        checkMVNoFix_NoAgg("SELECT MIN(V_MIN_C1) FROM V_P1_NEW", 0, 1, false, false, true);
+        checkMVNoFix_NoAgg("SELECT MAX(V_MAX_D1) FROM V_P1_NEW", 0, 1, false, false, true);
+
+        checkMVNoFix_NoAgg("SELECT MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_A1", 1, 1, false, true, true);
+        checkMVNoFix_NoAgg("SELECT V_A1, MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_A1", 1, 1, false, false, true);
+        checkMVNoFix_NoAgg("SELECT V_A1,V_B1, MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_A1, V_B1", 2, 1, false, false, true);
+
+
+        // (3) Join Query
+        // Voter example query in 'Results' stored procedure.
+        sql = "   SELECT a.contestant_name   AS contestant_name"
+                + "        , a.contestant_number AS contestant_number"
+                + "        , SUM(b.num_votes)    AS total_votes"
+                + "     FROM v_votes_by_contestant_number_state AS b"
+                + "        , contestants AS a"
+                + "    WHERE a.contestant_number = b.contestant_number"
+                + " GROUP BY a.contestant_name"
+                + "        , a.contestant_number"
+                + " ORDER BY total_votes DESC"
+                + "        , contestant_number ASC"
+                + "        , contestant_name ASC;";
+        checkMVNoFix_NoAgg(sql, 2, 1, false, true, true);
+
+
+        sql = "select sum(v_cnt) from v_p1 INNER JOIN v_r1 using(v_a1)";
+        checkMVNoFix_NoAgg(sql, 0, 1, false, false, true);
+
+        sql = "select v_p1.v_b1, sum(v_p1.v_sum_d1) from v_p1 INNER JOIN v_r1 on v_p1.v_a1 > v_r1.v_a1 " +
+                "group by v_p1.v_b1;";
+        checkMVNoFix_NoAgg(sql, 1, 1, false, false, true);
+
+        sql = "select MAX(v_r1.v_a1) from v_p1 INNER JOIN v_r1 on v_p1.v_a1 = v_r1.v_a1 " +
+                "INNER JOIN r1v on v_p1.v_a1 = r1v.v_a1 ";
+        checkMVNoFix_NoAgg(sql, 0, 1, false, false, true);
+    }
+
+    public void testMVBasedQuery_EdgeCases() {
+        // No aggregation will be pushed down.
+        checkMVFix_TopAgg_ReAgg("SELECT count(*) FROM V_P1", 0, 1, 2, 0);
+        checkMVFix_TopAgg_ReAgg("SELECT SUM(v_a1) FROM V_P1", 0, 1, 2, 0);
+        checkMVFix_TopAgg_ReAgg("SELECT count(v_a1) FROM V_P1", 0, 1, 2, 0);
+        checkMVFix_TopAgg_ReAgg("SELECT max(v_a1) FROM V_P1", 0, 1, 2, 0);
+
+        // ENG-5386 opposite cases.
+        checkMVFix_TopAgg_ReAgg("SELECT SUM(V_SUM_C1+1) FROM V_P1", 0, 1, 2, 1);
+        checkMVFix_TopAgg_ReAgg("SELECT SUM(V_SUM_C1) FROM V_P1 WHERE V_SUM_C1 > 3", 0, 1, 2, 1);
+        checkMVFix_TopAgg_ReAgg("SELECT V_SUM_C1, MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_SUM_C1", 1, 1, 2, 2);
+
+        // No disctinct will be pushed down.
+        // ENG-5364.
+        // In future,  a little efficient way is to push down distinct for part of group by columns only.
+        checkMVFix_reAgg("SELECT distinct v_a1 FROM V_P1", 2, 0);
+        checkMVFix_reAgg("SELECT distinct v_cnt FROM V_P1", 2, 1);
     }
 
     public void testMVBasedQuery_NoAggQuery() {
@@ -477,20 +543,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
             checkMVFix_TopAgg_ReAgg_with_TopProjection("SELECT V_A1,V_B1, V_SUM_C1, sum( distinct V_SUM_D1) FROM " +
                     tb + " GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1, V_SUM_C1 LIMIT 5", 3, 1, 2, 2);
         }
-    }
-
-    public void testMVBasedQuery_EdgeCases() {
-        // No aggregation will be pushed down.
-        checkMVFix_TopAgg_ReAgg("SELECT count(*) FROM V_P1", 0, 1, 2, 0);
-        checkMVFix_TopAgg_ReAgg("SELECT SUM(v_a1) FROM V_P1", 0, 1, 2, 0);
-        checkMVFix_TopAgg_ReAgg("SELECT count(v_a1) FROM V_P1", 0, 1, 2, 0);
-        checkMVFix_TopAgg_ReAgg("SELECT max(v_a1) FROM V_P1", 0, 1, 2, 0);
-
-        // No disctinct will be pushed down.
-        // ENG-5364.
-        // In future,  a little efficient way is to push down distinct for part of group by columns only.
-        checkMVFix_reAgg("SELECT distinct v_a1 FROM V_P1", 2, 0);
-        checkMVFix_reAgg("SELECT distinct v_cnt FROM V_P1", 2, 1);
     }
 
     private void checkMVFixWithWhere(String sql, String aggFilter, String scanFilter) {
@@ -708,7 +760,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
 
         // Three tables joins.
-        sql = "select MAX(v_r1.v_a1) from v_p1 @joinType v_r1 on v_p1.v_a1 = v_r1.v_a1 " +
+        sql = "select MAX(v_p1.v_a1) from v_p1 @joinType v_r1 on v_p1.v_a1 = v_r1.v_a1 " +
                 "@joinType r1v on v_p1.v_a1 = r1v.v_a1 ";
         checkMVFixWithJoin(sql, 0, 1, 2, 0, null, null);
 
@@ -886,8 +938,12 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 assertTrue(p instanceof AggregatePlanNode);
                 p = p.getChild(0);
             }
-
-            assertTrue(p instanceof AbstractScanPlanNode);
+            if (needFix) {
+                assertTrue(p instanceof AbstractScanPlanNode);
+            } else {
+                assertTrue(p instanceof AbstractScanPlanNode ||
+                        p instanceof AbstractJoinPlanNode);
+            }
         }
     }
 }

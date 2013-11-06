@@ -405,11 +405,7 @@ public class Inits {
         @Override
         public void run() {
 
-            boolean logEnabled = false;
-            if ((m_deployment.getCommandlog() != null) &&
-                    (m_deployment.getCommandlog().isEnabled())) {
-                logEnabled = true;
-            }
+            boolean logEnabled = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log").getEnabled();
 
             if (logEnabled) {
                 if (m_config.m_isEnterprise) {
