@@ -567,12 +567,12 @@ public abstract class CatalogUtil {
      * @param catalog Catalog to be updated.
      * @param deployment Parsed representation of the deployment.xml file.
      * @param crashOnFailedValidation
-     * @param dummy if the catalog is dummy and we are verifying only deployment xml.
+     * @param isPlaceHolderCatalog if the catalog is isPlaceHolderCatalog and we are verifying only deployment xml.
      * @return CRC of the deployment contents (>0) or -1 on failure.
      */
     public static long compileDeploymentAndGetCRC(Catalog catalog,
                                                   DeploymentType deployment,
-            boolean crashOnFailedValidation, boolean dummy)    {
+            boolean crashOnFailedValidation, boolean isPlaceHolderCatalog)    {
 
         if (!validateDeployment(catalog, deployment)) {
             return -1;
@@ -603,7 +603,7 @@ public abstract class CatalogUtil {
         // set the HTTPD info
         setHTTPDInfo(catalog, deployment.getHttpd());
 
-        if (!dummy) {
+        if (!isPlaceHolderCatalog) {
             setExportInfo(catalog, deployment.getExport());
         }
 
@@ -1069,7 +1069,7 @@ public abstract class CatalogUtil {
             return;
         }
 
-        // on-server export always uses the gues processor
+        // on-server export always uses the guest processor
         String connector = "org.voltdb.export.processors.GuestProcessor";
         catconn.setLoaderclass(connector);
         catconn.setEnabled(adminstate);
@@ -1124,9 +1124,9 @@ public abstract class CatalogUtil {
             hostLog.info("Export configuration is present and is " +
                "configured to be disabled. Export will be disabled.");
         } else {
-            hostLog.info("On-Server Export is configured and enabled with type=" + exportType.getTarget());
+            hostLog.info("Export is configured and enabled with type=" + exportType.getTarget());
             if (exportConfiguration != null && exportConfiguration.getProperty() != null) {
-                hostLog.info("On-Server Export configuration properties are: ");
+                hostLog.info("Export configuration properties are: ");
                 for (PropertyType configProp : exportConfiguration.getProperty()) {
                     if (!configProp.getName().equalsIgnoreCase("password")) {
                         hostLog.info("Export Configuration Property NAME=" + configProp.getName() + " VALUE=" + configProp.getValue());
