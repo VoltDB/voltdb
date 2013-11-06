@@ -545,21 +545,21 @@ public abstract class CatalogUtil {
     }
 
     public static long compileDeploymentAndGetCRC(Catalog catalog, String deploymentURL,
-            boolean crashOnFailedValidation, boolean dummy) {
+            boolean crashOnFailedValidation, boolean isPlaceHolderCatalog) {
         DeploymentType deployment = CatalogUtil.parseDeployment(deploymentURL);
         if (deployment == null) {
             return -1;
         }
-        return compileDeploymentAndGetCRC(catalog, deployment, crashOnFailedValidation, dummy);
+        return compileDeploymentAndGetCRC(catalog, deployment, crashOnFailedValidation, isPlaceHolderCatalog);
     }
 
     public static long compileDeploymentStringAndGetCRC(Catalog catalog, String deploymentString,
-            boolean crashOnFailedValidation, boolean dummy) {
+            boolean crashOnFailedValidation, boolean isPlaceHolderCatalog) {
         DeploymentType deployment = CatalogUtil.parseDeploymentFromString(deploymentString);
         if (deployment == null) {
             return -1;
         }
-        return compileDeploymentAndGetCRC(catalog, deployment, crashOnFailedValidation, dummy);
+        return compileDeploymentAndGetCRC(catalog, deployment, crashOnFailedValidation, isPlaceHolderCatalog);
     }
 
     /**
