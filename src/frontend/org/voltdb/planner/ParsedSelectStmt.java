@@ -254,6 +254,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      * Prepare for the mv based distributed query fix only if it might be required.
      */
     private void prepareMVBasedQueryFix() {
+
+        // ENG-5386: Edge cases query returning correct answers with aggregation push down does not need reAggregation work.
+        if (hasComplexGroupby) {
+            mvFixInfo.setEdgeCaseQueryNoFixNeeded(false);
+        }
+
         // Handle joined query case case.
         // MV partitioned table without partition column can only join with replicated tables.
         // For all tables in this query, the # of tables that need to be fixed should not exceed one.
@@ -265,15 +271,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (columns != null) {
                 mvNewScanColumns.addAll(columns);
             }
-            if (mvFixInfo.checkFixNeeded(mvTable)) {
-                mvFixInfo.processMVBasedQueryFix(mvNewScanColumns, joinTree);
+            if (mvFixInfo.processMVBasedQueryFix(mvTable, mvNewScanColumns, joinTree, displayColumns(), groupByColumns())) {
+
                 break;
             }
         }
     }
 
     private boolean needComplexAggregation () {
-        if (!hasAggregateExpression && !isGrouped()) {
+        if (!hasAggregateExpression() && !isGrouped()) {
             hasComplexAgg = false;
             return false;
         }
