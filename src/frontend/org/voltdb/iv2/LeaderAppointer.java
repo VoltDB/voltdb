@@ -556,8 +556,6 @@ public class LeaderAppointer implements Promotable
                         "This survivor set is continuing execution.");
             }
         }
-        System.out.println("Previous hosts " + previousHosts);
-        System.out.println("Current hosts" + currentHosts);
 
         // A strict, viable minority is always a partition.
         if (currentHosts.size() * 2 < previousHosts.size()) {
