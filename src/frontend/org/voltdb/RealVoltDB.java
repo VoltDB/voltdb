@@ -1100,7 +1100,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 deploymentBytes = org.voltcore.utils.CoreUtils.urlToBytes(m_config.m_pathToDeployment);
             } catch (Exception ex) {
                 //Let us get bytes from ZK
-                hostLog.info("Deployment file could not be found locally at: " + m_config.m_pathToDeployment);
             }
 
             try {
@@ -1122,23 +1121,24 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         crc.reset();
                         crc.update(deploymentBytesTemp);
                         if (checksumHere != crc.getValue()) {
-                            hostLog.info("Deployment configuration was pulled from ZK, and the checksum did not match "
-                                    + "the locally supplied file");
+                            hostLog.warn("The locally provided deployment configuration did not match the "
+                                    + "configuration information found in the cluster.");
                             deploymentBytes = null;
                         } else {
-                            hostLog.info("Deployment configuration pulled from ZK");
+                            hostLog.info("Deployment configuration pulled from other cluster node.");
                         }
                     } else {
                         //Use remote deployment obtained.
                         deploymentBytes = deploymentBytesTemp;
                     }
                 } else {
-                    hostLog.error("Deployment file could not be loaded remotely, expected to be there: " + m_config.m_pathToDeployment);
+                    hostLog.error("Deployment file could not be loaded locally or remotely, "
+                            + "local supplied path: " + m_config.m_pathToDeployment);
                     deploymentBytes = null;
                 }
             }
             if (deploymentBytes == null) {
-                hostLog.error("Deployment file could not be found locally or remotely at: " + m_config.m_pathToDeployment);
+                hostLog.error("Deployment could not be obtained from cluster node or locally");
                 VoltDB.crashLocalVoltDB("No such deployment file: "
                         + m_config.m_pathToDeployment, false, null);
             }
