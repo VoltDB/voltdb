@@ -632,6 +632,8 @@ public class LeaderAppointer implements Promotable
 
         for (String partitionDir : partitionDirs) {
             int pid = LeaderElector.getPartitionFromElectionDir(partitionDir);
+            if (pid == MpInitiator.MP_INIT_PID) continue;
+
             String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
             try {
                 // The data of the partition dir indicates whether the partition has finished
@@ -657,8 +659,10 @@ public class LeaderAppointer implements Promotable
                     //Record host ids for all partitions that are on the ring
                     //so they are considered for partition detection
                     for (String replica : replicas) {
-                        String split[] = replica.split("/");
-                        hostsOnRing.add(Integer.valueOf(split[split.length - 1].split("_")[1]));
+                        final String split[] = replica.split("/");
+                        final long hsId = Long.valueOf(split[split.length - 1].split("_")[0]);
+                        final int hostId = CoreUtils.getHostIdFromHSId(hsId);
+                        hostsOnRing.add(hostId);
                     }
                 }
             }
