@@ -20,6 +20,8 @@
 #include "storage/persistenttable.h"
 #include "common/TupleOutputStreamProcessor.h"
 #include "common/FixUnusedAssertHack.h"
+#include "logging/LogManager.h"
+#include <cassert>
 
 namespace voltdb {
 
@@ -51,14 +53,16 @@ ElasticContext::handleActivation(TableStreamType streamType)
     if (streamType == TABLE_STREAM_ELASTIC_INDEX) {
         // Can't activate an indexing stream during a snapshot.
         if (m_surgeon.hasStreamType(TABLE_STREAM_SNAPSHOT)) {
-            VOLT_ERROR("Elastic context activation is not allowed while a snapshot is in progress.");
+            LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR,
+                "Elastic context activation is not allowed while a snapshot is in progress.");
             return ACTIVATION_FAILED;
         }
 
         // Don't allow activation if there's an existing index.
         if (m_surgeon.hasIndex()) {
-            VOLT_ERROR("Elastic context activation is not allowed while an index is "
-                       "present that has not been completely consumed.");
+            LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR,
+                "Elastic context activation is not allowed while an index is "
+                "present that has not been completely consumed.");
             return ACTIVATION_FAILED;
         }
         m_surgeon.createIndex();
@@ -71,8 +75,9 @@ ElasticContext::handleActivation(TableStreamType streamType)
     if (streamType == TABLE_STREAM_ELASTIC_INDEX_CLEAR) {
         if (m_surgeon.hasIndex()) {
             if (!m_surgeon.isIndexEmpty()) {
-                VOLT_ERROR("Elastic index clear is not allowed while an index is "
-                           "present that has not been completely consumed.");
+                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR,
+                    "Elastic index clear is not allowed while an index is "
+                    "present that has not been completely consumed.");
                 return ACTIVATION_FAILED;
             }
             m_surgeon.dropIndex();
@@ -112,11 +117,13 @@ int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStrea
                                          std::vector<int> &retPositions)
 {
     if (!m_surgeon.hasIndex()) {
-        VOLT_ERROR("Elastic streaming was invoked without proper activation.");
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR,
+            "Elastic streaming was invoked without proper activation.");
         return TABLE_STREAM_SERIALIZATION_ERROR;
     }
     if (m_surgeon.isIndexingComplete()) {
-        VOLT_ERROR("Elastic streaming was called after indexing had already completed.");
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR,
+            "Elastic streaming was called after indexing had already completed.");
         return TABLE_STREAM_SERIALIZATION_ERROR;
     }
 
@@ -172,8 +179,7 @@ bool ElasticContext::notifyTupleDelete(TableTuple &tuple)
 {
     if (m_indexActive) {
         if (m_surgeon.indexHas(tuple)) {
-            bool removed = m_surgeon.indexRemove(tuple);
-            assert(removed);
+            m_surgeon.indexRemove(tuple);
         }
     }
     return true;
@@ -191,12 +197,10 @@ void ElasticContext::notifyTupleMovement(TBPtr sourceBlock,
         StreamPredicateList &predicates = getPredicates();
         assert(predicates.size() > 0);
         if (m_surgeon.indexHas(sourceTuple)) {
-            bool removed = m_surgeon.indexRemove(sourceTuple);
-            assert(removed);
+            m_surgeon.indexRemove(sourceTuple);
         }
-        if (getPredicates()[0].eval(&targetTuple).isTrue()) {
-            bool added = m_surgeon.indexAdd(targetTuple);
-            assert(added);
+        if (predicates[0].eval(&targetTuple).isTrue()) {
+            m_surgeon.indexAdd(targetTuple);
         }
     }
 }
