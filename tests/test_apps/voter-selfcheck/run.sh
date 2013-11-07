@@ -58,8 +58,7 @@ function server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE host $HOST
+    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
 
@@ -68,8 +67,7 @@ function secure-server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment-secure.xml \
-        license $LICENSE host $HOST
+    $VOLTDB create -d deployment-secure.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
 function masked-server() {
@@ -77,8 +75,7 @@ function masked-server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment-masked.xml \
-        license $LICENSE host $HOST
+    $VOLTDB create -d deployment-masked.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
 

@@ -101,9 +101,12 @@ public class CompleteTransactionTask extends TransactionTask
             // future: offer to siteConnection.IBS for replay.
             doCommonSPICompleteActions();
         }
-        // We need to log the restarting message to the task log so we'll replay the whole
-        // stream faithfully
-        taskLog.logTask(m_completeMsg);
+
+        if (!m_txnState.isReadOnly()) {
+            // We need to log the restarting message to the task log so we'll replay the whole
+            // stream faithfully
+            taskLog.logTask(m_completeMsg);
+        }
     }
 
     @Override

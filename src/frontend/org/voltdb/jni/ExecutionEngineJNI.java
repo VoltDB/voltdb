@@ -29,13 +29,11 @@ import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
-import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
-import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FastSerializer.BufferGrowCallback;
@@ -502,19 +500,18 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * data is returned in the usual results buffer, length preceded as usual.
      */
     @Override
-    public ExportProtoMessage exportAction(boolean syncAction,
+    public void exportAction(boolean syncAction,
             long ackTxnId, long seqNo, int partitionId, String tableSignature)
     {
         //Clear is destructive, do it before the native call
         deserializer.clear();
-        ExportProtoMessage result = null;
         long retval = nativeExportAction(pointer,
                                          syncAction, ackTxnId, seqNo, getStringBytes(tableSignature));
         if (retval < 0) {
-            result = new ExportProtoMessage( 0, partitionId, tableSignature);
-            result.error();
+            LOG.info("exportAction failed.  syncAction: " + syncAction + ", ackTxnId: " +
+                    ackTxnId + ", seqNo: " + seqNo + ", partitionId: " + partitionId +
+                    ", tableSignature: " + tableSignature);
         }
-        return result;
     }
 
     @Override

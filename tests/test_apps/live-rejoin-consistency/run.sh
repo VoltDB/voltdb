@@ -64,8 +64,7 @@ function server() {
     # run the server
 LOG4J_CONFIG_PATH=$PWD/log4j.xml
 export LOG4J_CONFIG_PATH
-    $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE host $HOST
+    $VOLTDB create -d deployment.xml -l $LICENSE -H localhost $APPNAME.jar
 }
 
 # run the client that drives the example

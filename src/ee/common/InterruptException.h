@@ -15,8 +15,28 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.export;
+#ifndef INTERRUPTEXCEPTION_H_
+#define INTERRUPTEXCEPTION_H_
 
-public interface ExportStateBlock {
-    public void event(ExportProtoMessage message);
+#include "common/SerializableEEException.h"
+
+namespace voltdb {
+class ReferenceSerializeOutput;
+
+/**
+ * Thrown when it has been decided that a query is taking too
+ * long and needs to stop.
+ */
+class InterruptException : public SerializableEEException {
+public:
+
+    InterruptException(std::string message);
+    virtual ~InterruptException() {}
+
+protected:
+    void p_serialize(ReferenceSerializeOutput *output) const;
+private:
+};
 }
+
+#endif /* INTERRUPTEXCEPTION_H_ */

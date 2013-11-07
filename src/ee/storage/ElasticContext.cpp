@@ -48,14 +48,14 @@ ElasticContext::~ElasticContext()
 TableStreamerContext::ActivationReturnCode
 ElasticContext::handleActivation(TableStreamType streamType)
 {
-    // Can't activate an indexing stream during a snapshot.
-    if (m_surgeon.hasStreamType(TABLE_STREAM_SNAPSHOT)) {
-        VOLT_ERROR("Elastic context activation is not allowed while a snapshot is in progress.");
-        return ACTIVATION_FAILED;
-    }
-
     // Create the index?
     if (streamType == TABLE_STREAM_ELASTIC_INDEX) {
+        // Can't activate an indexing stream during a snapshot.
+        if (m_surgeon.hasStreamType(TABLE_STREAM_SNAPSHOT)) {
+            VOLT_ERROR("Elastic context activation is not allowed while a snapshot is in progress.");
+            return ACTIVATION_FAILED;
+        }
+
         // Allow activation if there is an index, we will check when the predicates
         // are updated to make sure the existing index satisfies the request
         if (m_surgeon.hasIndex()) {

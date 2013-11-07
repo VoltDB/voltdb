@@ -180,6 +180,7 @@ public class TestVoltMessageSerialization extends TestCase {
         FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, 99, true, true, false);
         ft.addFragment(new byte[20], 12, ByteBuffer.allocate(0));
         ft.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_PARTITION);
+        ft.setBatch(75);
 
         FragmentTaskMessage ft2 = (FragmentTaskMessage) checkVoltMessage(ft);
 
@@ -194,6 +195,7 @@ public class TestVoltMessageSerialization extends TestCase {
 
         assertEquals(ft.isFinalTask(), ft2.isFinalTask());
         assertEquals(ft.isSysProcTask(), ft2.isSysProcTask());
+        assertEquals(ft.getCurrentBatchIndex(), ft2.getCurrentBatchIndex());
     }
 
     public void testFragmentTaskWithTwoFrags() throws IOException {
@@ -270,7 +272,6 @@ public class TestVoltMessageSerialization extends TestCase {
         assertTrue(ft.getInitiateTask() != null);
         assertTrue(ft.m_initiateTaskBuffer != null);
         assertTrue(ft.m_initiateTaskBuffer.remaining() > 0);
-
 
         FragmentTaskMessage ft2 = (FragmentTaskMessage) checkVoltMessage(ft);
 
