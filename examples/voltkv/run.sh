@@ -99,13 +99,13 @@ function async-benchmark() {
         voltkv.AsyncBenchmark \
         --displayinterval=5 \
         --duration=120 \
-        --servers=volt3b \
-        --poolsize=5000000 \
+        --servers=localhost \
+        --poolsize=100000 \
         --preload=true \
-        --getputratio=0.50 \
+        --getputratio=0.90 \
         --keysize=32 \
-        --minvaluesize=1000 \
-        --maxvaluesize=1000 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
         --entropy=127 \
         --usecompression=false
 #        --latencyreport=true \
