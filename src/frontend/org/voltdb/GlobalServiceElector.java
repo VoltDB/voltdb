@@ -94,7 +94,7 @@ class GlobalServiceElector implements LeaderNoticeHandler
     }
 
     @Override
-    public void noticedTopologyChange() {
+    public void noticedTopologyChange(boolean added, boolean removed) {
         if (ExportManager.instance() != null) {
             ExportManager.instance().notifyOfClusterTopologyChange();
         }
