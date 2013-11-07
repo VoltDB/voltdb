@@ -21,6 +21,7 @@
 #include "common/TupleOutputStreamProcessor.h"
 #include "storage/ElasticIndexReadContext.h"
 #include "storage/persistenttable.h"
+#include "logging/LogManager.h"
 
 namespace voltdb
 {
@@ -61,7 +62,7 @@ ElasticIndexReadContext::handleActivation(TableStreamType streamType)
     }
 
     if (!m_surgeon.isIndexingComplete()) {
-        VOLT_ERROR("Index generation has not completed.");
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, "Index generation has not completed.");
         return ACTIVATION_FAILED;
     }
 
@@ -102,13 +103,15 @@ int64_t ElasticIndexReadContext::handleStreamMore(
 
     // Check that activation happened.
     if (m_iter == NULL) {
-        VOLT_ERROR("Attempted to begin serialization without activating the context.");
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR,
+            "Attempted to begin serialization without activating the context.");
         remaining = TABLE_STREAM_SERIALIZATION_ERROR;
     }
 
     // Need to initialize the output stream list.
     else if (outputStreams.size() != 1) {
-        VOLT_ERROR("serializeMore() expects exactly one output stream.");
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR,
+            "serializeMore() expects exactly one output stream.");
         remaining = TABLE_STREAM_SERIALIZATION_ERROR;
     }
 
@@ -167,8 +170,11 @@ bool ElasticIndexReadContext::parseHashRange(
 {
     bool success = false;
     if (predicateStrings.size() != 1) {
-        VOLT_ERROR("Too many ElasticIndexReadContext predicates (>1): %ld",
-                   predicateStrings.size());
+        char errMsg[1024 * 16];
+        snprintf(errMsg, 1024 * 16,
+                 "Too many ElasticIndexReadContext predicates (>1): %ld",
+                 predicateStrings.size());
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
     }
     else {
         std::vector<std::string> rangeStrings = MiscUtil::splitToTwoString(predicateStrings.at(0), ':');
@@ -179,8 +185,11 @@ bool ElasticIndexReadContext::parseHashRange(
                 success = true;
             }
             catch(boost::bad_lexical_cast) {
-                VOLT_ERROR("Unable to parse ElasticIndexReadContext predicate \"%s\".",
-                           predicateStrings.at(0).c_str());
+                char errMsg[1024 * 16];
+                snprintf(errMsg, 1024 * 16,
+                         "Unable to parse ElasticIndexReadContext predicate \"%s\".",
+                         predicateStrings.at(0).c_str());
+                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
             }
         }
     }
