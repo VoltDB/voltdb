@@ -20,11 +20,15 @@ else
     VOLTDB_VOLTDB="`pwd`/../../../voltdb"
 fi
 
-CLASSPATH=$({ \
+KCLASSPATH=$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
+
+MYSQLJAR=`pwd`/mysql-connector-java-5.1.23-bin.jar
+CLASSPATH="$KCLASSPATH:$MYSQLJAR"
+echo $CLASSPATH
 VOLTDB="$VOLTDB_BIN/voltdb"
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
@@ -38,6 +42,7 @@ CLIENTLOG="clientlog"
 function clean() {
     rm -rf obj debugoutput $APPNAME.jar $APPNAME2.jar voltdbroot voltdbroot
     rm -f $VOLTDB_LIB/extension/customexport.jar
+    rm -f $VOLTDB_LIB/extension/mysql-connector-java-5.1.23-bin.jar
 }
 
 # compile the source code for procedures and the client
@@ -73,6 +78,15 @@ function server() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+}
+
+# run the voltdb server locally with mysql connector
+function server-mysql() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    cp mysql-connector-java-5.1.23-bin.jar $VOLTDB_LIB/extension/mysql-connector-java-5.1.23-bin.jar
+    # run the server
+    $VOLTDB create -d deployment_mysql.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
 # run the voltdb server locally
