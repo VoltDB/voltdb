@@ -75,6 +75,10 @@ static inline int64_t epoch_microseconds_from_components(unsigned short int year
 
 namespace voltdb {
 
+static const long COUNTER_BITS = 9;
+static const long PARTITIONID_BITS = 14;
+static const int64_t VOLT_EPOCH = epoch_microseconds_from_components(2008);
+
 /** implement the timestamp YEAR extract function **/
 template<> inline NValue NValue::callUnary<FUNC_EXTRACT_YEAR>() const {
     if (isNull()) {
@@ -370,7 +374,8 @@ template<> inline NValue NValue::callConstant<FUNC_CURRENT_TIMESTAMP>() {
 
     ExecutorContext * contest = voltdb::ExecutorContext::getExecutorContext();
     std::cout << "CURRENT transaction id: " << contest->currentTxnTimestamp() << std::endl;
-    return getTimestampValue(contest->currentTxnTimestamp() * 1000);
+    int64_t currentTimeMillis = contest->currentUniqueId() >> (COUNTER_BITS + PARTITIONID_BITS);
+    return getTimestampValue(currentTimeMillis * 1000 + VOLT_EPOCH);
 }
 
 }

@@ -212,12 +212,8 @@ using namespace functionexpression;
 
 AbstractExpression*
 ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpression*>* arguments) {
-    assert(arguments);
     AbstractExpression* ret = 0;
-    size_t nArgs = arguments->size();
-    switch(nArgs) {
-    case 0:
-        //Uncomment this to support the first constant function, e.g. PI().
+    if (!arguments) {
         switch(functionId) {
         case FUNC_CURRENT_TIMESTAMP:
             ret = new ConstantFunctionExpression<FUNC_CURRENT_TIMESTAMP>();
@@ -225,9 +221,11 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         default:
             return NULL;
         }
-        delete arguments;
-        break;
-    case 1:
+        return ret;
+    }
+
+    size_t nArgs = arguments->size();
+    if (nArgs == 1) {
         switch(functionId) {
         case FUNC_ABS:
             ret = new UnaryFunctionExpression<FUNC_ABS>((*arguments)[0]);
@@ -342,8 +340,7 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             return NULL;
         }
         delete arguments;
-        break;
-    default:
+    } else {
         // GeneralFunctions defer deleting the arguments container until through with it.
         switch(functionId) {
         case FUNC_CONCAT:
