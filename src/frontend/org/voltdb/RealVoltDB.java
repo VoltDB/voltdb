@@ -224,7 +224,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     int m_hostIdWithStartupCatalog;
     String m_pathToStartupCatalog;
 
-    // Synchronize initialize and (.
+    // Synchronize initialize and shutdown
     private final Object m_startAndStopLock = new Object();
 
     // Synchronize updates of catalog contexts across the multiple sites on this host.
