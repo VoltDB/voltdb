@@ -396,7 +396,7 @@ public class MpTransactionState extends TransactionState
      * For @BalancePartitions, get the master HSID for the given partition so that the MPI can plan who to send data
      * to whom.
      */
-    public long getMasterHSId(int partition)
+    public Long getMasterHSId(int partition)
     {
         Preconditions.checkArgument(m_masterHSIds.values().containsAll(m_useHSIds) &&
                                     m_useHSIds.containsAll(m_masterHSIds.values()));

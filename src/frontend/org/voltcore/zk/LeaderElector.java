@@ -27,6 +27,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google.common.collect.Sets;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
@@ -298,15 +299,19 @@ public class LeaderElector {
         Set<String> children = ImmutableSet.copyOf(zk.getChildren(dir, childWatcher));
 
         boolean topologyChange = false;
+        boolean removed = false;
+        boolean added = false;
         if (knownChildren != null) {
             if (!knownChildren.equals(children)) {
+                removed = !Sets.difference(knownChildren, children).isEmpty();
+                added = !Sets.difference(children, knownChildren).isEmpty();
                 topologyChange = true;
             }
         }
         knownChildren = children;
 
         if (topologyChange && cb != null) {
-            cb.noticedTopologyChange();
+            cb.noticedTopologyChange(added, removed);
         }
     }
 

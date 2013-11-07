@@ -20,7 +20,6 @@ package org.voltdb.export;
 import java.util.Properties;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.network.InputHandler;
 
 /**
  * Interface ExportManager imposes on processors.
@@ -55,26 +54,9 @@ public interface ExportDataProcessor  {
     public void queueWork(Runnable r);
 
     /**
-     * A client has connected. Create an InputHandler for it.
-     * @param service The service requested.
-     * @param isAdminPort Whether or not the client is connecting on the admin port
-     * @returns InputHandler or null if unable to create an input handler for the service.
-     */
-    public InputHandler createInputHandler(String service, boolean isAdminPort);
-
-    /**
      * The system is terminating. Cleanup and exit the processor.
      */
     public void shutdown();
-
-    /**
-     * Allow connectors to claim responsibility for a service
-     * @param service  Service, see wire protocol login message.
-     * @return  true if connector implements the service.
-     */
-    boolean isConnectorForService(String service);
-
-    void bootClient();
 
     /**
      * Pass processor specific processor configuration properties

@@ -90,6 +90,11 @@ public:
     virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
                                      TableTuple &sourceTuple, TableTuple &targetTuple);
 
+    /**
+     * Validate the predicate update is compatible with the existing predicates
+     */
+    virtual void updatePredicates(const std::vector<std::string> &predicateStrings);
+
 private:
 
     /**
