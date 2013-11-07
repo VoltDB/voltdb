@@ -618,8 +618,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return null;
             }
 
-            AuthSystem.AuthUser user = context.authSystem.getUser(username);
-
             /*
              * Create an input handler.
              */
@@ -631,60 +629,31 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             m_isAdmin);
             }
             else {
-                String strUser = "ANONYMOUS";
-                if ((username != null) && (username.length() > 0)) strUser = username;
-
-                // If no processor can handle this service, null is returned.
-                String connectorClassName = ExportManager.instance().getConnectorForService(service);
-                if (connectorClassName == null) {
-                    //Send negative response
-                    responseBuffer.put(EXPORT_DISABLED_REJECTION).flip();
-                    socket.write(responseBuffer);
-                    socket.close();
-                    authLog.warn("Rejected user " + strUser +
-                                 " attempting to use disabled or unconfigured service " +
-                                 service + ".");
-                    return null;
-                }
-                if (!user.authorizeConnector(connectorClassName)) {
-                    //Send negative response
-                    responseBuffer.put(AUTHENTICATION_FAILURE).flip();
-                    socket.write(responseBuffer);
-                    socket.close();
-                    authLog.warn("Failure to authorize user " + strUser + " for service " + service + ".");
-                    return null;
-                }
-
-                handler = ExportManager.instance().createInputHandler(service, m_isAdmin);
-            }
-
-            if (handler != null) {
-                byte buildString[] = VoltDB.instance().getBuildString().getBytes("UTF-8");
-                responseBuffer = ByteBuffer.allocate(34 + buildString.length);
-                responseBuffer.putInt(30 + buildString.length);//message length
-                responseBuffer.put((byte)0);//version
-
-                //Send positive response
-                responseBuffer.put((byte)0);
-                responseBuffer.putInt(VoltDB.instance().getHostMessenger().getHostId());
-                responseBuffer.putLong(handler.connectionId());
-                responseBuffer.putLong(VoltDB.instance().getHostMessenger().getInstanceId().getTimestamp());
-                responseBuffer.putInt(VoltDB.instance().getHostMessenger().getInstanceId().getCoord());
-                responseBuffer.putInt(buildString.length);
-                responseBuffer.put(buildString).flip();
-                socket.write(responseBuffer);
-
-            }
-            else {
-                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                             "): user " + username + " failed authentication.");
-                // Send negative response
-                responseBuffer.put(AUTHENTICATION_FAILURE).flip();
+                //Send negative response
+                responseBuffer.put(EXPORT_DISABLED_REJECTION).flip();
                 socket.write(responseBuffer);
                 socket.close();
+                authLog.warn("Rejected user " + username +
+                        " attempting to use disabled or unconfigured service " +
+                        service + ".");
+                authLog.warn("VoltDB Export services are no longer available through clients.");
                 return null;
-
             }
+
+            byte buildString[] = VoltDB.instance().getBuildString().getBytes("UTF-8");
+            responseBuffer = ByteBuffer.allocate(34 + buildString.length);
+            responseBuffer.putInt(30 + buildString.length);//message length
+            responseBuffer.put((byte)0);//version
+
+            //Send positive response
+            responseBuffer.put((byte)0);
+            responseBuffer.putInt(VoltDB.instance().getHostMessenger().getHostId());
+            responseBuffer.putLong(handler.connectionId());
+            responseBuffer.putLong(VoltDB.instance().getHostMessenger().getInstanceId().getTimestamp());
+            responseBuffer.putInt(VoltDB.instance().getHostMessenger().getInstanceId().getCoord());
+            responseBuffer.putInt(buildString.length);
+            responseBuffer.put(buildString).flip();
+            socket.write(responseBuffer);
             return handler;
         }
     }
