@@ -63,7 +63,7 @@ ElasticContext::handleActivation(TableStreamType streamType)
         // are updated to make sure the existing index satisfies the request
         if (m_surgeon.hasIndex()) {
             LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO,
-                "Activating elastic index build for index that already exists."); 
+                "Activating elastic index build for index that already exists.");
             return ACTIVATION_SUCCEEDED;
         }
         m_surgeon.createIndex();
