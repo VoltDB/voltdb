@@ -76,9 +76,9 @@ static inline int64_t epoch_microseconds_from_components(unsigned short int year
 namespace voltdb {
 
 // REFER JAVA class: UniqueIdGenerator.
-// bit sizes for each of the fields in the 64-bit id
-// note, these add up to 63 bits to make dealing with
-// signed / unsigned conversions easier.
+// 23 bits are used for COUNTER_BITS and PARTITIONID_BITS.
+// The left 41 bits (64 - 23) are used for TIMESTAMP.
+
 static const long COUNTER_BITS = 9;
 static const long PARTITIONID_BITS = 14;
 static const int64_t VOLT_EPOCH = epoch_microseconds_from_components(2008);

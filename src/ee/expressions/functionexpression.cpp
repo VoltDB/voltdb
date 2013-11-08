@@ -213,7 +213,7 @@ using namespace functionexpression;
 AbstractExpression*
 ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpression*>* arguments) {
     AbstractExpression* ret = 0;
-    if (!arguments || arguments->size() == 0) {
+    if (!arguments) {
         switch(functionId) {
         case FUNC_CURRENT_TIMESTAMP:
             ret = new ConstantFunctionExpression<FUNC_CURRENT_TIMESTAMP>();
@@ -221,13 +221,11 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         default:
             break;
         }
-        if (arguments) {
-            delete arguments;
-        }
         return ret;
     }
 
     size_t nArgs = arguments->size();
+    assert(nArgs != 0);
     if (nArgs == 1) {
         switch(functionId) {
         case FUNC_ABS:
