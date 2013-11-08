@@ -38,6 +38,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
+import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -832,23 +833,54 @@ public class PlanAssembler {
             // some supported default value
             if (expr == null) {
                 // if it's not nullable or defaulted we have a problem
-                if (column.getNullable() == false && column.getDefaulttype() == 0)
-                {
+                if (column.getNullable() == false && column.getDefaulttype() == 0) {
                     throw new PlanningErrorException("Column " + column.getName()
                             + " has no default and is not nullable.");
                 }
-                ConstantValueExpression const_expr =
-                    new ConstantValueExpression();
-                expr = const_expr;
-                if (column.getDefaulttype() != 0)
-                {
-                    const_expr.setValue(column.getDefaultvalue());
-                    const_expr.refineValueType(VoltType.get((byte) column.getDefaulttype()), column.getSize());
+
+
+                boolean isConstantValue = true;
+                if (column.getDefaulttype() == VoltType.TIMESTAMP.getValue()) {
+
+                    boolean isFunctionFormat = true;
+                    String timeValue = column.getDefaultvalue();
+                    try {
+                        Long.parseLong(timeValue);
+                        isFunctionFormat = false;
+                    } catch (NumberFormatException  e) {}
+                    if (isFunctionFormat) {
+                        try {
+                            java.sql.Timestamp.valueOf(timeValue);
+                            isFunctionFormat = false;
+                        } catch (IllegalArgumentException e) {}
+                    }
+
+                    if (isFunctionFormat) {
+                        String name = timeValue.split(":")[0];
+                        int id = Integer.parseInt(timeValue.split(":")[1]);
+
+                        FunctionExpression funcExpr = new FunctionExpression();
+                        funcExpr.setAttributes(name, name , id);
+
+                        funcExpr.setValueType(VoltType.TIMESTAMP);
+                        funcExpr.setValueSize(VoltType.TIMESTAMP.getMaxLengthInBytes());
+
+                        expr = funcExpr;
+                        isConstantValue = false;
+                    }
                 }
-                else
-                {
-                    const_expr.setValue(null);
-                    const_expr.refineValueType(VoltType.get((byte) column.getType()), column.getSize());
+                if (isConstantValue) {
+                    // Not Default sql function.
+                    ConstantValueExpression const_expr = new ConstantValueExpression();
+                    expr = const_expr;
+                    if (column.getDefaulttype() != 0) {
+                        const_expr.setValue(column.getDefaultvalue());
+                        const_expr.refineValueType(VoltType.get((byte) column.getDefaulttype()), column.getSize());
+                    }
+                    else {
+                        const_expr.setValue(null);
+                        const_expr.refineValueType(VoltType.get((byte) column.getType()), column.getSize());
+                    }
                 }
             }
 
