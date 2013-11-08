@@ -63,6 +63,7 @@ import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.ReverseDNSPolicy;
 import org.voltcore.network.VoltNetworkPool;
+import org.voltcore.network.VoltPort;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
@@ -2175,9 +2176,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final void checkForDeadConnections(final long now) {
         final ArrayList<Connection> connectionsToRemove = new ArrayList<Connection>();
         for (final ClientInterfaceHandleManager cihm : m_cihm.values()) {
-            final int delta = cihm.connection.writeStream().calculatePendingWriteDelta(now);
-            if (delta > 4000) {
-                connectionsToRemove.add(cihm.connection);
+            // Internal connections don't implement calculatePendingWriteDelta(), so check for real connection first
+            if (VoltPort.class.equals(cihm.connection.getClass())) {
+                final int delta = cihm.connection.writeStream().calculatePendingWriteDelta(now);
+                if (delta > 4000) {
+                    connectionsToRemove.add(cihm.connection);
+                }
             }
         }
 
