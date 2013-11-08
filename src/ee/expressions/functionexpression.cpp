@@ -213,7 +213,7 @@ using namespace functionexpression;
 AbstractExpression*
 ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpression*>* arguments) {
     AbstractExpression* ret = 0;
-    if (!arguments) {
+    if (!arguments || arguments->size() == 0) {
         switch(functionId) {
         case FUNC_CURRENT_TIMESTAMP:
             ret = new ConstantFunctionExpression<FUNC_CURRENT_TIMESTAMP>();

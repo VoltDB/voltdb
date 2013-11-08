@@ -26,6 +26,7 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -685,6 +686,45 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
         assertTrue(caught);
 
+    }
+
+    public void testCurrentTimestamp() throws Exception
+    {
+        System.out.println("STARTING testCurrentTimestamp");
+        /**
+         *      "CREATE TABLE R_TIME ( " +
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
+                "C1 INTEGER DEFAULT 2 NOT NULL, " +
+                "T1 TIMESTAMP DEFAULT NULL, " +
+                "T2 TIMESTAMP DEFAULT NOW, " +
+                "T3 TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "PRIMARY KEY (ID) ); " +
+         */
+        Client client = getClient();
+        ClientResponse cr = null;
+        VoltTable vt = null;
+        Date time = null;
+        long epsonMicros = 500;
+
+        // Test Default value with functions.
+        cr = client.callProcedure("@AdHoc", "Insert into R_TIME (ID) VALUES(1);");
+        time = new Date();
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = client.callProcedure("@AdHoc", "SELECT C1, T1, T2, T3 FROM R_TIME WHERE ID = 1;").getResults()[0];
+        assertTrue(vt.advanceRow());
+
+        assertEquals(2, vt.getLong(0));
+        // Test NULL
+
+        assertTrue(time.getTime()*1000 - vt.getTimestampAsLong(2) > epsonMicros);
+        assertEquals(vt.getTimestampAsLong(2), vt.getTimestampAsLong(3));
+
+        vt = client.callProcedure("@AdHoc", "SELECT NOW, CURRENT_TIMESTAMP FROM R_TIME;").getResults()[0];
+        time = new Date();
+        assertTrue(vt.advanceRow());
+
+        assertTrue(time.getTime()*1000 - vt.getTimestampAsLong(0) > epsonMicros);
+        assertEquals(vt.getTimestampAsLong(0), vt.getTimestampAsLong(1));
     }
 
     public void testExtract() throws Exception
@@ -2034,7 +2074,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
         final String literalSchema =
                 "CREATE TABLE P1 ( " +
-                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
                 "DESC VARCHAR(300), " +
                 "NUM INTEGER, " +
                 "RATIO FLOAT, " +
@@ -2057,7 +2097,7 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "CREATE INDEX P1_MIXED_TYPE_EXPRS2 ON P1 ( SUBSTRING(DESC FROM 1 FOR 2), ABS(ID+2) ); " +
 
                 "CREATE TABLE R1 ( " +
-                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
                 "DESC VARCHAR(300), " +
                 "NUM INTEGER, " +
                 "RATIO FLOAT, " +
@@ -2071,7 +2111,7 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "CREATE INDEX R1_ABS_ID_SCALED ON R1 ( ID / 3 ); " +
 
                 "CREATE TABLE R2 ( " +
-                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
                 "DESC VARCHAR(300), " +
                 "NUM INTEGER, " +
                 "RATIO FLOAT, " +
@@ -2080,13 +2120,21 @@ public class TestFunctionsSuite extends RegressionSuite {
 
                 //Another table that has all numeric types, for testing numeric column functions.
                 "CREATE TABLE NUMBER_TYPES ( " +
-                "INTEGERNUM INTEGER DEFAULT '0' NOT NULL, " +
+                "INTEGERNUM INTEGER DEFAULT 0 NOT NULL, " +
                 "TINYNUM TINYINT, " +
                 "SMALLNUM SMALLINT, " +
                 "BIGNUM BIGINT, " +
                 "FLOATNUM FLOAT, " +
                 "DECIMALNUM DECIMAL, " +
                 "PRIMARY KEY (INTEGERNUM) );" +
+
+                "CREATE TABLE R_TIME ( " +
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
+                "C1 INTEGER DEFAULT 2 NOT NULL, " +
+                "T1 TIMESTAMP DEFAULT NULL, " +
+                "T2 TIMESTAMP DEFAULT NOW, " +
+                "T3 TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "PRIMARY KEY (ID) ); " +
 
                 "";
         try {

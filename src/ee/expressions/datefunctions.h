@@ -371,9 +371,7 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MICROSECOND>() const {
 }
 
 template<> inline NValue NValue::callConstant<FUNC_CURRENT_TIMESTAMP>() {
-
     ExecutorContext * contest = voltdb::ExecutorContext::getExecutorContext();
-    std::cout << "CURRENT transaction id: " << contest->currentTxnTimestamp() << std::endl;
     int64_t currentTimeMillis = contest->currentUniqueId() >> (COUNTER_BITS + PARTITIONID_BITS);
     return getTimestampValue(currentTimeMillis * 1000 + VOLT_EPOCH);
 }
