@@ -117,7 +117,8 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
 
     @Override
     public void queueTask(Runnable r) {
-        throw new UnsupportedOperationException();
+        // Called when node failure happens
+        r.run();
     }
 
     @Override

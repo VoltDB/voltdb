@@ -1119,15 +1119,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             JSONObject jsObj = new JSONObject(new String(message.m_payload, "UTF-8"));
             final int partitionId = jsObj.getInt(Cartographer.JSON_PARTITION_ID);
             final long initiatorHSId = jsObj.getLong(Cartographer.JSON_INITIATOR_HSID);
-            for (final Connection c : m_connections.keySet()) {
-                c.queueTask(new Runnable() {
-                    @Override
-                    public void run() {
-                        failOverConnection(partitionId, initiatorHSId, c);
-                    }
-                });
+            for (final ClientInterfaceHandleManager cihm : m_cihm.values()) {
+                try {
+                    cihm.connection.queueTask(new Runnable() {
+                        @Override
+                        public void run() {
+                            failOverConnection(partitionId, initiatorHSId, cihm.connection);
+                        }
+                    });
+                } catch (UnsupportedOperationException ignore) {
+                    // In case some internal connections don't implement queueTask()
+                    failOverConnection(partitionId, initiatorHSId, cihm.connection);
+                }
             }
-            failOverConnection(partitionId, initiatorHSId, m_snapshotDaemonAdapter);
         } catch (Exception e) {
             hostLog.warn("Error handling partition fail over at ClientInterface, continuing anyways", e);
         }
@@ -2444,7 +2448,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         @Override
         public void queueTask(Runnable r) {
-            throw new UnsupportedOperationException();
+            // Called when node failure happens
+            r.run();
         }
     }
 
