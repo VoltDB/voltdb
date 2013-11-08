@@ -704,7 +704,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         ClientResponse cr = null;
         VoltTable vt = null;
         Date time = null;
-        long epsonMicros = 500;
+        long epsilonMicros = 100 * 1000;
 
         // Test Default value with functions.
         cr = client.callProcedure("@AdHoc", "Insert into R_TIME (ID) VALUES(1);");
@@ -716,14 +716,16 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(2, vt.getLong(0));
         // Test NULL
 
-        assertTrue(time.getTime()*1000 - vt.getTimestampAsLong(2) > epsonMicros);
+        assertTrue(time.getTime()*1000 - vt.getTimestampAsLong(2) >= 0);
+        assertTrue(time.getTime()*1000 - vt.getTimestampAsLong(2) < epsilonMicros);
         assertEquals(vt.getTimestampAsLong(2), vt.getTimestampAsLong(3));
 
         vt = client.callProcedure("@AdHoc", "SELECT NOW, CURRENT_TIMESTAMP FROM R_TIME;").getResults()[0];
         time = new Date();
         assertTrue(vt.advanceRow());
 
-        assertTrue(time.getTime()*1000 - vt.getTimestampAsLong(0) > epsonMicros);
+        assertTrue(time.getTime()*1000 - vt.getTimestampAsLong(0) >= 0);
+        assertTrue(time.getTime()*1000 - vt.getTimestampAsLong(0) < epsilonMicros);
         assertEquals(vt.getTimestampAsLong(0), vt.getTimestampAsLong(1));
     }
 

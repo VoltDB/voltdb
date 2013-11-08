@@ -75,6 +75,10 @@ static inline int64_t epoch_microseconds_from_components(unsigned short int year
 
 namespace voltdb {
 
+// REFER JAVA class: UniqueIdGenerator.
+// bit sizes for each of the fields in the 64-bit id
+// note, these add up to 63 bits to make dealing with
+// signed / unsigned conversions easier.
 static const long COUNTER_BITS = 9;
 static const long PARTITIONID_BITS = 14;
 static const int64_t VOLT_EPOCH = epoch_microseconds_from_components(2008);
@@ -371,8 +375,8 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MICROSECOND>() const {
 }
 
 template<> inline NValue NValue::callConstant<FUNC_CURRENT_TIMESTAMP>() {
-    ExecutorContext * contest = voltdb::ExecutorContext::getExecutorContext();
-    int64_t currentTimeMillis = contest->currentUniqueId() >> (COUNTER_BITS + PARTITIONID_BITS);
+    ExecutorContext * context = voltdb::ExecutorContext::getExecutorContext();
+    int64_t currentTimeMillis = context->currentUniqueId() >> (COUNTER_BITS + PARTITIONID_BITS);
     return getTimestampValue(currentTimeMillis * 1000 + VOLT_EPOCH);
 }
 

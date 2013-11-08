@@ -842,9 +842,9 @@ public class PlanAssembler {
                     boolean isFunctionFormat = true;
                     String timeValue = column.getDefaultvalue();
                     try {
-                        new java.sql.Timestamp(Long.parseLong(timeValue));
+                        Long.parseLong(timeValue);
                         isFunctionFormat = false;
-                    } catch (IllegalArgumentException e) {}
+                    } catch (NumberFormatException  e) {}
                     if (isFunctionFormat) {
                         try {
                             java.sql.Timestamp.valueOf(timeValue);

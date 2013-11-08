@@ -219,7 +219,10 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             ret = new ConstantFunctionExpression<FUNC_CURRENT_TIMESTAMP>();
             break;
         default:
-            return NULL;
+            break;
+        }
+        if (arguments) {
+            delete arguments;
         }
         return ret;
     }

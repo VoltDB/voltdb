@@ -1149,13 +1149,6 @@ public class DDLCompiler {
             }
         }
         if (defaulttype != null) {
-            if (!defaulttype.equals(typename)) {
-                // Warining.
-                String msg = String.format("Default type %s is inconsitent with column %s Type %s in Table %s.",
-                        defaulttype, name, typename, table.getTypeName());
-                m_compiler.addWarn(msg);
-            }
-
             // fyi: Historically, VoltType class initialization errors get reported on this line (?).
             defaulttype = Integer.toString(VoltType.typeFromString(defaulttype).getValue());
         }
