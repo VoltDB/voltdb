@@ -145,9 +145,9 @@ def print_section(name, mismatches, output_dir):
         jniStatus = i["jni"]["Status"]
         if jniStatus < 0:
             jniStatus = "Error: " + `jniStatus`
-        hsqlStatus = i["hsql"]["Status"]
-        if hsqlStatus < 0:
-            hsqlStatus = "Error: " + `hsqlStatus`
+        hsqldbStatus = i["hsqldb"]["Status"]
+        if hsqldbStatus < 0:
+            hsqldbStatus = "Error: " + `hsqldbStatus`
         result += """
 <tr>
 <td>%s</td>
@@ -158,7 +158,7 @@ def print_section(name, mismatches, output_dir):
             detail_page,
             cgi.escape(i["SQL"]),
             jniStatus,
-            hsqlStatus)
+            hsqldbStatus)
 
     result += """
 </table>

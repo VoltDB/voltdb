@@ -494,8 +494,8 @@ public class StatementQuery extends StatementDMQL {
      * Columns from USING expression are unqualified. In case of INNER join, it doesn't matter
      * we can pick the first table which contains the input column. In case of OUTER joins, we must
      * the OUTER table - if it's a null-able column the outer join must return them.
-     * @param columnName
-     * @return table name this column belongs to
+     * @param columns list of columns to resolve
+     * @return rvs list of range variables
      */
     protected void resolveUsingColumns(List<VoltXMLElement> columns, RangeVariable[] rvs) throws HSQLParseException {
         // Only one OUTER join for a whole select is supported so far

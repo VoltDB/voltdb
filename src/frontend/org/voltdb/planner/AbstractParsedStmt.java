@@ -602,20 +602,6 @@ public abstract class AbstractParsedStmt {
 
             JoinNode joinNode = new JoinNode(nodeId + 1, joinType, joinTree, leafNode);
             joinTree = joinNode;
-
-            // Set the inner/outer indicators for the table cache
-            StmtTableScan currentTable = stmtCache.get(aliasIdx);
-            if (joinType == JoinType.RIGHT) {
-                currentTable.m_isInner = false;
-            }
-            // The first node
-            assert(joinTree.m_leftNode != null);
-            if (joinTree.m_leftNode.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) {
-                if (joinType == JoinType.LEFT) {
-                    StmtTableScan firstTable = stmtCache.get(joinTree.m_leftNode.m_tableAliasIndex);
-                    firstTable.m_isInner = false;
-                }
-            }
        }
     }
 
