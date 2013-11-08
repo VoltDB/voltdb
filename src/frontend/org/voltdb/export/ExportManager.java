@@ -34,7 +34,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.network.InputHandler;
 import org.voltcore.utils.COWSortedMap;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
@@ -176,26 +175,24 @@ public class ExportManager
                     newProcessor.setProcessorConfig(m_processorConfig);
                     newProcessor.readyForData();
 
-                    if (!m_loaderClass.equals("org.voltdb.export.processors.RawProcessor")) {
-                        if (nextGeneration.isDiskBased()) {
-                                        /*
-                                         * Changes in partition count can make the load balancing strategy not capture
-                                         * all partitions for data that was from a previously larger cluster.
-                                         * For those use a naive leader election strategy that is implemented
-                                         * by export generation.
-                                         */
-                            nextGeneration.kickOffLeaderElection();
-                        } else {
-                                        /*
-                                         * This strategy is the one that piggy backs on
-                                         * regular partition mastership distribution to determine
-                                         * who will process export data for different partitions.
-                                         * We stashed away all the ones we have mastership of
-                                         * in m_masterOfPartitions
-                                         */
-                            for( Integer partitionId: m_masterOfPartitions) {
-                                nextGeneration.acceptMastershipTask(partitionId);
-                            }
+                    if (nextGeneration.isDiskBased()) {
+                        /*
+                         * Changes in partition count can make the load balancing strategy not capture
+                         * all partitions for data that was from a previously larger cluster.
+                         * For those use a naive leader election strategy that is implemented
+                         * by export generation.
+                         */
+                        nextGeneration.kickOffLeaderElection();
+                    } else {
+                        /*
+                         * This strategy is the one that piggy backs on
+                         * regular partition mastership distribution to determine
+                         * who will process export data for different partitions.
+                         * We stashed away all the ones we have mastership of
+                         * in m_masterOfPartitions
+                         */
+                        for( Integer partitionId: m_masterOfPartitions) {
+                            nextGeneration.acceptMastershipTask(partitionId);
                         }
                     }
                 }
@@ -255,7 +252,9 @@ public class ExportManager
      * @param partitionId
      */
     synchronized public void acceptMastership(int partitionId) {
-        if (m_loaderClass == null || m_loaderClass.equals("org.voltdb.export.processors.RawProcessor")) return;
+        if (m_loaderClass == null) {
+            return;
+        }
         Preconditions.checkArgument(
                 m_masterOfPartitions.add(partitionId),
                 "can't acquire mastership twice for partition id: " + partitionId
@@ -396,8 +395,7 @@ public class ExportManager
                  * and we are using server side export we need to kick off a leader election
                  * to choose which server is going to export each partition
                  */
-                if (nextGeneration.isDiskBased() &&
-                        !m_loaderClass.equals("org.voltdb.export.processors.RawProcessor")) {
+                if (nextGeneration.isDiskBased()) {
                     nextGeneration.kickOffLeaderElection();
                 }
             } else {
@@ -405,26 +403,24 @@ public class ExportManager
                  * When it isn't startup, it is necessary to kick things off with the mastership
                  * settings that already exist
                  */
-                if (!m_loaderClass.equals("org.voltdb.export.processors.RawProcessor")) {
-                    if (nextGeneration.isDiskBased()) {
-                        /*
-                         * Changes in partition count can make the load balancing strategy not capture
-                         * all partitions for data that was from a previously larger cluster.
-                         * For those use a naive leader election strategy that is implemented
-                         * by export generation.
-                         */
-                        nextGeneration.kickOffLeaderElection();
-                    } else {
-                        /*
-                         * This strategy is the one that piggy backs on
-                         * regular partition mastership distribution to determine
-                         * who will process export data for different partitions.
-                         * We stashed away all the ones we have mastership of
-                         * in m_masterOfPartitions
-                         */
-                        for( Integer partitionId: m_masterOfPartitions) {
-                            nextGeneration.acceptMastershipTask(partitionId);
-                        }
+                if (nextGeneration.isDiskBased()) {
+                    /*
+                     * Changes in partition count can make the load balancing strategy not capture
+                     * all partitions for data that was from a previously larger cluster.
+                     * For those use a naive leader election strategy that is implemented
+                     * by export generation.
+                     */
+                    nextGeneration.kickOffLeaderElection();
+                } else {
+                    /*
+                     * This strategy is the one that piggy backs on
+                     * regular partition mastership distribution to determine
+                     * who will process export data for different partitions.
+                     * We stashed away all the ones we have mastership of
+                     * in m_masterOfPartitions
+                     */
+                    for( Integer partitionId: m_masterOfPartitions) {
+                        nextGeneration.acceptMastershipTask(partitionId);
                     }
                 }
             }
@@ -464,19 +460,6 @@ public class ExportManager
                         " this will have to be cleaned up manually.");
             }
         }
-    }
-
-    public void notifyOfClusterTopologyChange() {
-        exportLog.info("Attempting to boot export client due to rejoin or other cluster topology change");
-        if (m_loaderClass == null) {
-            return;
-        }
-        ExportDataProcessor proc = m_processor.get();
-        while (proc == null) {
-            Thread.yield();
-            proc = m_processor.get();
-        }
-        proc.bootClient();
     }
 
     private void updateProcessorConfig(final Connector conn) {
@@ -539,33 +522,6 @@ public class ExportManager
         }
         m_generations.clear();
         m_loaderClass = null;
-    }
-
-    /**
-     * Factory for input handlers
-     * @return InputHandler for new client connection
-     */
-    public InputHandler createInputHandler(String service, boolean isAdminPort)
-    {
-        ExportDataProcessor proc = m_processor.get();
-        if (proc != null) {
-            return proc.createInputHandler(service, isAdminPort);
-        }
-        return null;
-    }
-
-
-    /**
-     * Map service strings to connector class names
-     * @param service
-     * @return classname responsible for service
-     */
-    public String getConnectorForService(String service) {
-        ExportDataProcessor proc = m_processor.get();
-        if (proc != null && proc.isConnectorForService(service)) {
-            return proc.getClass().getCanonicalName();
-        }
-        return null;
     }
 
     public static long getQueuedExportBytes(int partitionId, String signature) {

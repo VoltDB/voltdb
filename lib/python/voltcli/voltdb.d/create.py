@@ -25,7 +25,13 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-@VOLT.Server('rejoin',
-             description = 'Rejoin host to the VoltDB cluster.')
-def rejoin(runner):
+@VOLT.Command(
+    bundles = VOLT.ServerBundle('create'),
+    options = (
+        # Hidden option to restore the hashinator in addition to the tables.
+        VOLT.BooleanOption('-r', '--replica', 'replica', 'start replica cluster', default = False),
+    ),
+    description = 'Start the VoltDB server and create the database.'
+)
+def create(runner):
     runner.go()

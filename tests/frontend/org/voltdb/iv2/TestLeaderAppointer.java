@@ -46,6 +46,7 @@ import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKTestBase;
 import org.voltcore.zk.ZKUtil;
 
+import org.voltdb.TheHashinator;
 import org.voltdb.compiler.ClusterConfig;
 
 import org.voltdb.VoltDB;
@@ -106,6 +107,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         VoltZK.createPersistentZKNodes(m_zk);
 
         m_config = new ClusterConfig(hostCount, sitesPerHost, replicationFactor);
+        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(m_config.getPartitionCount()));
         m_hostIds = new ArrayList<Integer>();
         for (int i = 0; i < hostCount; i++) {
             m_hostIds.add(i);
@@ -492,11 +494,36 @@ public class TestLeaderAppointer extends ZKTestBase {
         }
         assertEquals(4L, (long)m_cache.pointInTimeCache().get(2));
 
-        // Now deleting the only replica for partition 2 should crash
+
+        // Now deleting the only replica for partition 2 shouldn't crash because it isn't on the ring
+        // for elastic, but for legacy it should crash immediately
         VoltDB.wasCrashCalled = false;
         deleteReplica(2, m_cache.pointInTimeCache().get(2));
-        while (!VoltDB.wasCrashCalled) {
+
+        if (TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY) {
+            while (!VoltDB.wasCrashCalled) {
+                Thread.yield();
+            }
+            return;
+        }
+
+        //For elastic hashinator do more testing
+        Thread.sleep(1000);
+        assertFalse(VoltDB.wasCrashCalled);
+
+        // Now, add a replica for partition 2, should be promoted
+        m_newAppointee.set(false);
+        addReplica(2, 4L);
+        while (!m_newAppointee.get()) {
             Thread.sleep(0);
+        }
+        assertEquals(4L, (long)m_cache.pointInTimeCache().get(2));
+
+        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(4));
+        //Deleting it now should cause a crash, now that the partition is on the ring
+        deleteReplica(2, m_cache.pointInTimeCache().get(2));
+        while (!VoltDB.wasCrashCalled) {
+            Thread.yield();
         }
     }
 }

@@ -120,6 +120,7 @@ public class VoltDB {
 
         /** name of the deployment file */
         public String m_pathToDeployment = null;
+        public boolean m_deploymentDefault = false;
 
         /** name of the license file, for commercial editions */
         public String m_pathToLicense = "license.xml";
@@ -397,8 +398,6 @@ public class VoltDB {
                 } else if (arg.equalsIgnoreCase("ipcport")) {
                     String portStr = args[++i];
                     m_ipcPort = Integer.valueOf(portStr);
-                } else if (arg.equals("enableiv2")) {
-                    // noop because IV2 is always on now
                 } else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     usage();
@@ -503,15 +502,15 @@ public class VoltDB {
             // GettingStarted.pdf).
             String message = "";
             if (org.voltdb.utils.MiscUtils.isPro()) {
-                message = "Usage: voltdb create catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
-                        + "       voltdb replica catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml> \n"
-                        + "       voltdb recover [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
-                        + "       voltdb [live] rejoin host <hostname>\n"
-                        + "       voltdb add host <hostname>\n";
+                message = "Usage: voltdb3 create catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
+                        + "       voltdb3 replica catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml> \n"
+                        + "       voltdb3 recover [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
+                        + "       voltdb3 [live] rejoin host <hostname>\n"
+                        + "       voltdb3 add host <hostname>\n";
             } else {
-                message = "Usage: voltdb create  catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>]\n"
-                        + "       voltdb recover [host <hostname>] [deployment <deployment.xml>]\n"
-                        + "       voltdb rejoin host <hostname>\n";
+                message = "Usage: voltdb3 create  catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>]\n"
+                        + "       voltdb3 recover [host <hostname>] [deployment <deployment.xml>]\n"
+                        + "       voltdb3 rejoin host <hostname>\n";
             }
             message += "       voltdb collect [<option> ...] <path-to-voltdbroot> (run voltdb collect -h for more details)\n";
             message += "       voltdb compile [<option> ...] [<ddl-file> ...]  (run voltdb compile -h for more details)\n";

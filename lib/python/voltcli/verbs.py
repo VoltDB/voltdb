@@ -168,81 +168,14 @@ class CommandVerb(BaseVerb):
                 self.bundles[i].stop(self, runner)
 
     def go(self, runner):
-        utility.abort('The default go() method is not implemented by %s.'
-                            % self.__class__.__name__)
-
-#===============================================================================
-class JavaVerb(CommandVerb):
-#===============================================================================
-    """
-    Verb that wraps a function that calls into a Java class. Used by
-    the @VOLT.Java decorator.
-    """
-    def __init__(self, name, function, java_class, **kwargs):
-        CommandVerb.__init__(self, name, function, **kwargs)
-        self.java_class = java_class
-        self.add_options(
-           cli.IntegerOption(None, '--debugport', 'debugport',
-                             'enable remote Java debugging on the specified port'),
-           cli.BooleanOption(None, '--dry-run', 'dryrun', None))
-
-    def go(self, runner):
-        self.run_java(runner, *runner.args)
-
-    def run_java(self, runner, *args):
-        opts_override = self.get_attr('java_opts_override', default = [])
-        if runner.opts.debugport:
-            kw = {'debugport': runner.opts.debugport}
-        else:
-            kw = {}
-        runner.java.execute(self.java_class, opts_override, *args, **kw)
-
-#===============================================================================
-class ServerVerb(JavaVerb):
-#===============================================================================
-    """
-    Verb that wraps a function that calls into a Java class to run a VoltDB
-    server process. Used by the @VOLT.Server decorator.
-    """
-    def __init__(self, name, function, server_subcommand, **kwargs):
-        JavaVerb.__init__(self, name, function, 'org.voltdb.VoltDB', **kwargs)
-        self.server_subcommand = server_subcommand
-        # Add common server-ish options.
-        self.add_options(
-            cli.StringOption('-d', '--deployment', 'deployment',
-                             'the deployment configuration file path',
-                             default = 'deployment.xml'),
-            cli.HostOption('-H', '--host', 'host', 'the host', default = 'localhost'),
-            cli.StringOption('-l', '--license', 'license', 'the license file path'))
-        self.add_arguments(
-            cli.StringArgument('catalog',
-                               'the application catalog jar file path'))
-        # Add appropriate server-ish Java options.
-        self.merge_java_options('java_opts_override',
-                '-server',
-                '-XX:+HeapDumpOnOutOfMemoryError',
-                '-XX:HeapDumpPath=/tmp',
-                '-XX:-ReduceInitialCardMarks')
-
-    def go(self, runner):
-        final_args = [self.server_subcommand]
-        catalog = runner.opts.catalog
-        if not catalog:
-            catalog = runner.config.get('volt.catalog')
-        if catalog is None:
-            utility.abort('A catalog path is required.')
-        final_args.extend(['catalog', catalog])
-        if runner.opts.deployment:
-            final_args.extend(['deployment', runner.opts.deployment])
-        if runner.opts.host:
-            final_args.extend(['host', runner.opts.host.host])
-            if runner.opts.host.port is not None:
-                final_args.extend(['port', runner.opts.host.port])
-        if runner.opts.license:
-            final_args.extend(['license', runner.opts.license])
-        if runner.args:
-            final_args.extend(runner.args)
-        self.run_java(runner, *final_args)
+        gofound = False
+        for bundle in self.bundles:
+            if hasattr(bundle, 'go'):
+                bundle.go(self, runner)
+                gofound = True
+        if not gofound:
+            utility.abort('go() method is not implemented by any bundle or %s.'
+                                % self.__class__.__name__)
 
 #===============================================================================
 class HelpVerb(CommandVerb):
@@ -379,33 +312,11 @@ class VerbDecorators(object):
             return wrapper
         return inner_decorator
 
-    def _get_java_decorator(self, verb_class, java_class, *args, **kwargs):
-        # Add extra message to description.
-        extra_help = '(use --help for full usage)'
-        if 'description' in kwargs:
-            kwargs['description'] += ' %s' % extra_help
-        else:
-            kwargs['description'] = extra_help
-        return self._get_decorator(verb_class, java_class, *args, **kwargs)
-
     def Command(self, *args, **kwargs):
         """
         @VOLT.Command decorator for declaring general-purpose commands.
         """
         return self._get_decorator(CommandVerb, *args, **kwargs)
-
-    def Java(self, java_class, *args, **kwargs):
-        """
-        @VOLT.Java decorator for declaring commands that call Java classes.
-        """
-        return self._get_java_decorator(JavaVerb, java_class, *args, **kwargs)
-
-    def Server(self, server_subcommand, *args, **kwargs):
-        """
-        @VOLT.Server decorator for declaring commands that call Java classes to
-        run a VoltDB server process.
-        """
-        return self._get_decorator(ServerVerb, server_subcommand, *args, **kwargs)
 
     def Help(self, *args, **kwargs):
         """
@@ -439,6 +350,124 @@ class VerbSpace(object):
         self.verbs       = verbs
         self.verb_names  = self.verbs.keys()
         self.verb_names.sort()
+
+#===============================================================================
+class JavaBundle(object):
+#===============================================================================
+    """
+    Verb that wraps a function that calls into a Java class. Used by
+    the @VOLT.Java decorator.
+    """
+    def __init__(self, java_class):
+        self.java_class = java_class
+
+    def initialize(self, verb):
+        verb.add_options(
+           cli.StringOption('-l', '--license', 'license', 'specify the location of the license file'),
+           cli.StringOption(None, '--client', 'clientport', 'specify the client port number'),
+           cli.StringOption(None, '--internal', 'internalport', 'specify the internal port number used to communicate between cluster nodes'),
+           cli.StringOption(None, '--zookeeper', 'zkport', 'specify the zookeeper port number'),
+           cli.StringOption(None, '--replication', 'replicationport', 'specify the replication port number'),
+           cli.StringOption(None, '--admin', 'adminport', 'specify the admin port number'),
+           cli.StringOption(None, '--internalinterface', 'internalinterface', 'specify the network interface to use for internal communication, such as the internal and zookeeper ports'),
+           cli.StringOption(None, '--externalinterface', 'externalinterface', 'specify the network interface to use for external ports, such as the admin and client ports'))
+
+    def start(self, verb, runner):
+        pass
+
+    def go(self, verb, runner):
+        self.run_java(runner, verb, *runner.args)
+
+    def stop(self, verb, runner):
+        pass
+
+    def run_java(self, verb, runner, *args):
+        opts_override = verb.get_attr('java_opts_override', default = [])
+        kw = {}
+        runner.java.execute(self.java_class, opts_override, *args, **kw)
+
+#===============================================================================
+class ServerBundle(JavaBundle):
+#===============================================================================
+    """
+    Bundle class to run org.voltdb.VoltDB process.
+    Supports needing catalog and live keyword option for rejoin.
+    All other options are supported as common options.
+    """
+    def __init__(self, subcommand, needs_catalog=True, supports_live=False, default_host=True):
+        JavaBundle.__init__(self, 'org.voltdb.VoltDB')
+        self.subcommand = subcommand
+        self.needs_catalog = needs_catalog
+        self.supports_live = supports_live
+        self.default_host = default_host
+
+    def initialize(self, verb):
+        JavaBundle.initialize(self, verb)
+        verb.add_options(
+            cli.StringOption('-d', '--deployment', 'deployment',
+                             'specify the location of the deployment file',
+                             default = None))
+        if self.default_host:
+            verb.add_options(cli.StringOption('-H', '--host', 'host', 'HOST[:PORT] (default HOST=localhost, PORT=3021)', default = 'localhost:3021'))
+        else:
+            verb.add_options(cli.StringOption('-H', '--host', 'host', 'HOST[:PORT] host must be specified (default HOST=localhost, PORT=3021)'))
+        if self.supports_live:
+           verb.add_options(cli.BooleanOption('-b', '--blocking', 'block', 'perform a blocking rejoin'))
+        if self.needs_catalog:
+            verb.add_arguments(cli.PathArgument('catalog',
+                              'the application catalog jar file path'))
+
+    def start(self, verb, runner):
+        # Add appropriate server-ish Java options.
+        verb.merge_java_options('java_opts_override',
+                '-server',
+                '-XX:+HeapDumpOnOutOfMemoryError',
+                '-XX:HeapDumpPath=/tmp',
+                '-XX:-ReduceInitialCardMarks')
+
+    def go(self, verb, runner):
+        if self.needs_catalog:
+            if runner.opts.replica:
+                self.subcommand = 'replica'
+        if self.supports_live:
+            if runner.opts.block:
+                final_args = [self.subcommand]
+            else:
+                final_args = ['live', self.subcommand]
+        else: 
+            final_args = [self.subcommand]
+        if self.needs_catalog:
+            catalog = runner.opts.catalog
+            if not catalog:
+                catalog = runner.config.get('volt.catalog')
+            if catalog is None:
+                utility.abort('A catalog path is required.')
+            final_args.extend(['catalog', catalog])
+
+        if runner.opts.deployment:
+            final_args.extend(['deployment', runner.opts.deployment])
+        if runner.opts.host:
+            final_args.extend(['host', runner.opts.host])
+        else:
+            utility.abort('host is required.')
+        if runner.opts.clientport:
+            final_args.extend(['port', runner.opts.clientport])
+        if runner.opts.license:
+            final_args.extend(['license', runner.opts.license])
+        if runner.opts.internalinterface:
+            final_args.extend(['internalinterface', runner.opts.internalinterface])
+        if runner.opts.internalport:
+            final_args.extend(['internalport', runner.opts.internalport])
+        if runner.opts.zkport:
+            final_args.extend(['zkport', runner.opts.zkport])
+        if runner.opts.externalinterface:
+            final_args.extend(['externalinterface', runner.opts.externalinterface])
+        if runner.args:
+            final_args.extend(runner.args)
+        self.run_java(verb, runner, *final_args)
+
+    def stop(self, verb, runner):
+        pass
 
 #===============================================================================
 class ConnectionBundle(object):

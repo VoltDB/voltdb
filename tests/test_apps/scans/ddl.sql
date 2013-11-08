@@ -8,8 +8,7 @@ PARTITION TABLE narrow_p ON COLUMN p;
 CREATE TABLE narrow_index_p
 (
   p integer not null,
-  val bigint NOT NULL,
-  primary key (val)
+  val bigint NOT NULL ASSUMEUNIQUE
 );
 PARTITION TABLE narrow_index_p ON COLUMN p;
 
