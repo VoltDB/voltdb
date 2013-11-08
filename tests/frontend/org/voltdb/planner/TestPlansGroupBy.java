@@ -730,6 +730,12 @@ public class TestPlansGroupBy extends PlannerTestCase {
         sql = "select sum(v_a1) from v_p1 @joinType v_r1 using(v_a1)";
         checkMVFixWithJoin(sql, 0, 1, 2, 0, null, null);
 
+        sql = "select sum(v_p1.v_a1) from v_p1 @joinType v_r1 on v_p1.v_a1 = v_r1.v_a1";
+        checkMVFixWithJoin(sql, 0, 1, 2, 0, null, null);
+
+        sql = "select sum(v_r1.v_a1) from v_p1 @joinType v_r1 on v_p1.v_a1 = v_r1.v_a1";
+        checkMVFixWithJoin(sql, 0, 1, 2, 0, null, null);
+
         sql = "select v_p1.v_b1, sum(v_a1) from v_p1 @joinType v_r1 using(v_a1) group by v_p1.v_b1;";
         checkMVFixWithJoin(sql, 1, 1, 2, 0, null, null);
 
