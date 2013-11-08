@@ -1197,6 +1197,42 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
             validateTableOfScalarLongs(vt, new long[] {1, 1, 2, 3, 3, 4});
 
+            sql = "Select SUM(v_p1.v_g1) from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
+                    "order by 1;";
+            sql = sql.replace("v_p1", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {150});
+
+            sql = "Select SUM(v_r4.v_g1) from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
+                    "order by 1;";
+            sql = sql.replace("v_p1", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {150});
+
+            sql = "Select MIN(v_p1.v_g1) from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
+                    "order by 1;";
+            sql = sql.replace("v_p1", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {10});
+
+            sql = "Select MIN(v_r4.v_g1) from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
+                    "order by 1;";
+            sql = sql.replace("v_p1", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {10});
+
+            sql = "Select MAX(v_p1.v_g1) from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
+                    "order by 1;";
+            sql = sql.replace("v_p1", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {30});
+
+            sql = "Select MAX(v_r4.v_g1) from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
+                    "order by 1;";
+            sql = sql.replace("v_p1", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {30});
+
 
             sql = "Select v_p1.v_sum_age from v_p1 join v_r4 on v_p1.v_cnt = v_r4.v_cnt " +
                     "order by v_p1.v_sum_age;";
