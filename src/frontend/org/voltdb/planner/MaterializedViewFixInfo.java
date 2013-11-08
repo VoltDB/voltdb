@@ -300,6 +300,11 @@ public class MaterializedViewFixInfo {
                 if (mvColumnAggType.get(columnName) != type ) {
                     return false;
                 }
+            } else {
+                // The other join table.
+                if (type == ExpressionType.AGGREGATE_SUM) {
+                    return false;
+                }
             }
         }
 
