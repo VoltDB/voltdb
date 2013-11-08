@@ -15,7 +15,11 @@
 
 
 {@insertvals = "_id, _value[string], _value[string], _value[float]"}
+-- There are no unary string-to-string functions supported yet.
+{@onefun = ""}
+--{@onefun = "LOWER"}
 {@optionalfn = "_stringfun"}
+
 {@updatecolumn = "DESC"}
 {@updatesource = "DESC_INLINE"}
 {@updatevalue = "_value[string]"}

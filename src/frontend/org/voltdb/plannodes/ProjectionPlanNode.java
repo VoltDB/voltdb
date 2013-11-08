@@ -95,7 +95,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         // and update their indexes against the table schema
         for (TupleValueExpression tve : output_tves)
         {
-            int index = inputSchema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(inputSchema);
             tve.setColumnIndex(index);
         }
         // DON'T RE-SORT HERE
@@ -124,6 +124,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
             {
                 NodeSchema input_schema = m_children.get(0).getOutputSchema();
                 SchemaColumn agg_col = input_schema.find(col.getTableName(),
+                                                         col.getTableAlias(),
                                                          col.getColumnName(),
                                                          col.getColumnAlias());
                 if (agg_col == null)

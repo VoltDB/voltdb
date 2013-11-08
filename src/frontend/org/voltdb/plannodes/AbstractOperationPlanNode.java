@@ -120,14 +120,12 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
             m_hasSignificantOutputSchema = false;
             // This TVE is magic and repeats unfortunately like this
             // throughout the planner.  Consolidate at some point --izzy
-            TupleValueExpression tve = new TupleValueExpression();
+            TupleValueExpression tve = new TupleValueExpression(
+                    "VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "modified_tuples", "modified_tuples", 0);
             tve.setValueType(VoltType.BIGINT);
             tve.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
-            tve.setColumnIndex(0);
-            tve.setTableName("VOLT_TEMP_TABLE");
-            tve.setColumnName("modified_tuples");
-            tve.setColumnAlias("modified_tuples");
             SchemaColumn col = new SchemaColumn("VOLT_TEMP_TABLE",
+                                                "VOLT_TEMP_TABLE",
                                                 "modified_tuples",
                                                 "modified_tuples",
                                                 tve);

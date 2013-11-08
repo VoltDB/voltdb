@@ -536,18 +536,6 @@ public class TestAdHocQueries extends AdHocQueryTester {
             catch (ProcCallException pcex) {
                 assertTrue(pcex.getMessage().indexOf("not support subqueries") > 0);
             }
-            adHocQuery = "SELECT FIRST1.EMPNUM, SECOND2.EMPNUM \n" +
-                    "          FROM STAFF FIRST1, STAFF SECOND2 \n" +
-                    "          WHERE FIRST1.CITY = SECOND2.CITY \n" +
-                    "          AND FIRST1.EMPNUM < SECOND2.EMPNUM;";
-            try {
-                env.m_client.callProcedure("@AdHoc", adHocQuery);
-                fail("did not fail on selfjoin");
-            }
-            catch (ProcCallException pcex) {
-                System.out.println("DEBUG what?" + pcex.getMessage());
-                assertTrue(pcex.getMessage().indexOf("not support self joins") > 0);
-            }
             adHocQuery = "SELECT PNAME \n" +
                     "         FROM PROJ \n" +
                     "         WHERE 'Tampa' NOT BETWEEN CITY AND 'Vienna' \n" +
