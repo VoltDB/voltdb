@@ -557,9 +557,8 @@ inline void NValue::streamTimestamp(std::stringstream& value) const
     long micro = epoch_micros % 1000000;
     if (epoch_micros < 0 && micro < 0) {
         // deal with negative micros (for dates before 1970)
-        // by borrowing 1 whole second from the formatted date/time
+        // by taking back the 1 whole second that was rounded down from the formatted date/time
         // and converting it to 1000000 micros
-        epoch_micros -= 1000000;
         micro += 1000000;
     }
     char mbstr[27];    // Format: "YYYY-MM-DD HH:MM:SS."- 20 characters + terminator
@@ -583,6 +582,7 @@ inline int64_t NValue::parseTimestampString(const char* str)
 {
     // date_str
     std::string date_str = str;
+    // This is the std:string API for "ltrim".
     date_str.erase(date_str.begin(), std::find_if(date_str.begin(), date_str.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
     std::size_t sep_pos = date_str.find(' ');
     if (sep_pos != 10) {
@@ -591,6 +591,7 @@ inline int64_t NValue::parseTimestampString(const char* str)
 
     // time_str
     std::string time_str = date_str.substr(sep_pos + 1);
+    // This is the std:string API for "ltrim" and "rtrim"
     time_str.erase(time_str.begin(), std::find_if(time_str.begin(), time_str.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
     time_str.erase(std::find_if(time_str.rbegin(), time_str.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), time_str.end());
     if (time_str.length() != 15) {
