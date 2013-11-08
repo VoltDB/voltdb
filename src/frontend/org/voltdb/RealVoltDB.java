@@ -1118,14 +1118,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         if (checksumHere != crc.getValue()) {
                             hostLog.warn("The locally provided deployment configuration did not match the "
                                     + "configuration information found in the cluster.");
-                            deploymentBytes = null;
                         } else {
                             hostLog.info("Deployment configuration pulled from other cluster node.");
                         }
-                    } else {
-                        //Use remote deployment obtained.
-                        deploymentBytes = deploymentBytesTemp;
                     }
+                    //Use remote deployment obtained.
+                    deploymentBytes = deploymentBytesTemp;
                 } else {
                     hostLog.error("Deployment file could not be loaded locally or remotely, "
                             + "local supplied path: " + m_config.m_pathToDeployment);
