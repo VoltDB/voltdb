@@ -2177,7 +2177,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         final ArrayList<Connection> connectionsToRemove = new ArrayList<Connection>();
         for (final ClientInterfaceHandleManager cihm : m_cihm.values()) {
             // Internal connections don't implement calculatePendingWriteDelta(), so check for real connection first
-            if (VoltPort.class.equals(cihm.connection.getClass())) {
+            if (VoltPort.class == cihm.connection.getClass()) {
                 final int delta = cihm.connection.writeStream().calculatePendingWriteDelta(now);
                 if (delta > 4000) {
                     connectionsToRemove.add(cihm.connection);
