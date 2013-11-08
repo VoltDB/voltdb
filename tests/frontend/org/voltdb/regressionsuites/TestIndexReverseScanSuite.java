@@ -256,23 +256,18 @@ public class TestIndexReverseScanSuite extends RegressionSuite {
 
             // (4.4) >= , <=
 
-            // Should use sql coverage test cases.
             // There are too many permutations.
+            // Refer SQL coverage test: index-scan.
         }
 
     }
 
-    //  public void testReverseScanTwoColumnsIndex() throws IOException, ProcCallException {
-    //  }
-    //
-    //  public void testReverseScanThreeColumnsIndex() throws IOException, ProcCallException {
-    //  }
-
-    public void testReverseScanWithNulls() throws IOException, ProcCallException {
+    public void notestReverseScanWithNulls() throws IOException, ProcCallException {
         loadData();
-
-        Client c = this.getClient();
-        VoltTable vt;
+//
+//        Client c = this.getClient();
+//        VoltTable vt;
+        // TODO: add test cases for null here or SQL coverage.
 
     }
 
@@ -314,12 +309,12 @@ public class TestIndexReverseScanSuite extends RegressionSuite {
                 "create index P1_TREE_2 on P1 (b, c);" +
 
                 "CREATE TABLE P2 ( " +
-                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "ID INTEGER DEFAULT '0' NOT NULL ASSUMEUNIQUE, " +
                 "a INTEGER not null, " +
                 "b INTEGER, " +
                 "c INTEGER, " +
                 "d INTEGER, " +
-                "PRIMARY KEY (ID) );" +
+                "PRIMARY KEY (ID, a) );" +
                 "PARTITION TABLE P2 ON COLUMN a;" +
 
                 "create index P2_TREE_1 on P2 (a);" +
@@ -328,10 +323,10 @@ public class TestIndexReverseScanSuite extends RegressionSuite {
                 "CREATE TABLE P3 ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
                 "a INTEGER, " +
-                "b INTEGER not null, " +
+                "b INTEGER not null unique, " +
                 "c INTEGER, " +
                 "d INTEGER, " +
-                "PRIMARY KEY (ID) );" +
+                "PRIMARY KEY (ID, b) );" +
                 "PARTITION TABLE P3 ON COLUMN b;" +
 
                 "create index P3_TREE_1 on P3 (a);" +

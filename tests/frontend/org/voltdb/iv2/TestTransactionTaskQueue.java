@@ -38,7 +38,7 @@ import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
-public class Iv2TestTransactionTaskQueue extends TestCase
+public class TestTransactionTaskQueue extends TestCase
 {
 
     private static SiteTaskerQueue getSiteTaskerQueue() {

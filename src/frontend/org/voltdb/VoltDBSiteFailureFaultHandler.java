@@ -21,7 +21,6 @@ import java.util.Set;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.export.ExportManager;
 import org.voltdb.fault.FaultHandler;
 import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault;
@@ -63,20 +62,5 @@ class VoltDBSiteFailureFaultHandler implements FaultHandler {
         if (m_rvdb.rejoining()) {
             VoltDB.crashLocalVoltDB("Detected a node failure during recovery", false, null);
         }
-        /*
-         * Use a new thread since this is a asynchronous (and infrequent)
-         * task and locks are being held by the fault distributor.
-         */
-        new Thread() {
-            @Override
-            public void run() {
-                // if we see an early fault (during startup), then it's ok not to
-                // notify the export manager
-                if (ExportManager.instance() != null) {
-                    //Notify the export manager the cluster topology has changed
-                    ExportManager.instance().notifyOfClusterTopologyChange();
-                }
-            }
-        }.start();
     }
 }

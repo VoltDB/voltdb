@@ -26,10 +26,8 @@ import java.util.Random;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.*;
-import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
-import org.voltdb.export.ExportProtoMessage;
 
 public class MockExecutionEngine extends ExecutionEngine {
 
@@ -186,9 +184,8 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public ExportProtoMessage exportAction(boolean syncAction,
+    public void exportAction(boolean syncAction,
             long ackOffset, long seqNo, int partitionId, String mTableSignature) {
-        return null;
     }
 
     @Override

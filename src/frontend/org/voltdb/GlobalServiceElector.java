@@ -25,7 +25,6 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.LeaderNoticeHandler;
-import org.voltdb.export.ExportManager;
 
 /**
  * GlobalServiceElector performs leader election to determine which VoltDB cluster node
@@ -94,9 +93,6 @@ class GlobalServiceElector implements LeaderNoticeHandler
     }
 
     @Override
-    public void noticedTopologyChange() {
-        if (ExportManager.instance() != null) {
-            ExportManager.instance().notifyOfClusterTopologyChange();
-        }
+    public void noticedTopologyChange(boolean added, boolean removed) {
     }
 }

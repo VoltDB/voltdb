@@ -40,13 +40,12 @@
 
 package scans;
 
-import java.util.Random;
-import java.util.concurrent.CountDownLatch;
-import java.util.List;
-import java.util.Arrays;
 import java.io.FileWriter;
 import java.io.PrintWriter;
-import java.lang.Math;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Random;
+import java.util.concurrent.CountDownLatch;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
@@ -222,7 +221,7 @@ public class ScanBenchmark {
             try {
                 outputStream = new PrintWriter(new FileWriter(config.statsfile));
                 // for stats: duration in milliseconds, # iterations (# rows in this case)
-                outputStream.printf("0,%d,%d,0,0,0,0\n", (long)Math.round(averageTimePerScan), config.rows);
+                outputStream.printf("0,%d,%d,0,0,0,0\n", Math.round(averageTimePerScan), config.rows);
             } catch (Exception e) {
                 System.err.println("ERROR unable to write stats file");
                 System.err.println(e);
@@ -316,11 +315,32 @@ public class ScanBenchmark {
      * @see {@link VoterConfig}
      */
     public static void main(String[] args) throws Exception {
+        /*VoltDB.Configuration vconfig = new VoltDB.Configuration();
+
+        CatalogBuilder cb = new CatalogBuilder();
+        cb.addSchema("/Users/jhugg/Documents/workspace/voltdb/tests/test_apps/scans/ddl.sql");
+        vconfig.m_pathToCatalog = Configuration.getPathToCatalogForTest("scans.jar");
+        boolean success = cb.compile(vconfig.m_pathToCatalog);
+        assert(success);
+
+        DeploymentBuilder db = new DeploymentBuilder(1, 1, 0);
+        vconfig.m_pathToDeployment = Configuration.getPathToCatalogForTest("scans.xml");
+        db.writeXML(vconfig.m_pathToDeployment);
+
+        ServerThread server = new ServerThread(vconfig);
+
+        server.start();
+        server.waitForInitialization();*/
+
         // create a configuration from the arguments
         ScanConfig config = new ScanConfig();
+        //config.test = "sequential";
         config.parse(ScanBenchmark.class.getName(), args);
 
         ScanBenchmark benchmark = new ScanBenchmark(config);
         benchmark.runBenchmark();
+
+        //server.shutdown();
+        //server.join();
     }
 }

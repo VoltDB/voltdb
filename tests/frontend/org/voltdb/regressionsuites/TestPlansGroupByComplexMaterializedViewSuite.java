@@ -1290,6 +1290,111 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         }
     }
 
+    public void testENG5386() throws Exception {
+        System.out.println("Test MV partition agg query NO FIX edge cases. ENG5386...");
+        VoltTable vt = null;
+        Client client = this.getClient();
+
+        // Load data
+        loadTableForMVFixSuite();
+        String[] tbs = {"V_R4_ENG5386", "V_P1_ENG5386"};
+        /*
+        * Current expected data:
+        * V_G1, V_G2, V_CNT, V_sum_age, V_min_age, V_max_rent, V_count_rent
+        * 10,   1,     4,     101,       21,        12,             4
+        * 20,   2,     2,     45,        22,         7,             2
+        * 30,   2,     1,     24,        24,         8,             1
+        * 30,   3,     3,     85,        26,        14,             3
+        * */
+
+        for (String tb: tbs) {
+            vt = client.callProcedure("@AdHoc", "Select SUM(V_sum_age), MIN(V_min_age), MAX(V_max_rent), " +
+                    "SUM(V_count_rent)  from " + tb + " ;").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{255,21,14,10}});
+
+
+            vt = client.callProcedure("@AdHoc", "Select V_G1, SUM(V_sum_age), MIN(V_min_age), MAX(V_max_rent), " +
+                    "SUM(V_count_rent)  from " + tb + " GROUP BY V_G1 ORDER BY 1;").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{10,101,21,12,4}, {20,45,22,7,2}, {30,109,24,14,4}});
+
+
+            vt = client.callProcedure("@AdHoc", "Select V_G2, SUM(V_sum_age), MIN(V_min_age), MAX(V_max_rent), " +
+                    "SUM(V_count_rent)  from " + tb + " GROUP BY V_G2 ORDER BY 1;").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{1,101,21,12,4}, {2,69,22,8,3}, {3,85,26,14,3}});
+
+
+            // Where clause.
+            vt = client.callProcedure("@AdHoc", "Select SUM(V_sum_age), MIN(V_min_age), MAX(V_max_rent), " +
+                    "SUM(V_count_rent)  from " + tb + " WHERE v_g1 > 10;").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{154,22,14,6}});
+
+            vt = client.callProcedure("@AdHoc", "Select V_G1, SUM(V_sum_age), MIN(V_min_age), MAX(V_max_rent), " +
+                    "SUM(V_count_rent)  from " + tb + " WHERE v_g1 > 10 GROUP BY V_G1 ORDER BY 1;").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{20,45,22,7,2}, {30,109,24,14,4}});
+
+            vt = client.callProcedure("@AdHoc", "Select V_G1, SUM(V_sum_age), MIN(V_min_age), MAX(V_max_rent), " +
+                    "SUM(V_count_rent)  from " + tb + " WHERE v_g2 > 1 GROUP BY V_G1 ORDER BY 1;").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{20,45,22,7,2}, {30,109,24,14,4}});
+
+            // join
+            String sql = "";
+            sql = "Select SUM(V_P1_ENG5386.v_sum_age), MAX(v_r4.v_sum_rent), MAX(V_P1_ENG5386.V_max_rent), " +
+                    "MIN(V_P1_ENG5386.V_min_age) from V_P1_ENG5386 join v_r4 on V_P1_ENG5386.v_g1 = v_r4.v_g1;";
+            sql = sql.replace("V_P1_ENG5386", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{364, 37, 14, 21}});
+
+
+            sql = "Select V_P1_ENG5386.v_g1, SUM(V_P1_ENG5386.v_sum_age), MAX(v_r4.v_sum_rent), " +
+                    "MAX(V_P1_ENG5386.V_max_rent), MIN(V_P1_ENG5386.V_min_age) from V_P1_ENG5386 " +
+                    "join v_r4 on V_P1_ENG5386.v_g1 = v_r4.v_g1 GROUP BY V_P1_ENG5386.v_g1 ORDER BY 1;";
+            sql = sql.replace("V_P1_ENG5386", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{10,101,37,12,21}, {20,45,13,7,22}, {30,218,37,14,24}});
+
+
+            // join + where
+            sql = "Select SUM(V_P1_ENG5386.v_sum_age), MAX(v_r4.v_sum_rent), MAX(V_P1_ENG5386.V_max_rent), " +
+                    "MIN(V_P1_ENG5386.V_min_age) from V_P1_ENG5386 join v_r4 on V_P1_ENG5386.v_g1 = v_r4.v_g1 " +
+                    "WHERE V_P1_ENG5386.v_g1 > 10;";
+            sql = sql.replace("V_P1_ENG5386", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{263,37,14,22}});
+
+
+            sql = "Select V_P1_ENG5386.v_g1, SUM(V_P1_ENG5386.v_sum_age), MAX(v_r4.v_sum_rent), " +
+                    "MAX(V_P1_ENG5386.V_max_rent), MIN(V_P1_ENG5386.V_min_age) from V_P1_ENG5386 " +
+                    "join v_r4 on V_P1_ENG5386.v_g1 = v_r4.v_g1 WHERE V_P1_ENG5386.v_g1 > 10 " +
+                    "GROUP BY V_P1_ENG5386.v_g1 ORDER BY 1;";
+            sql = sql.replace("V_P1_ENG5386", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{20,45,13,7,22}, {30,218,37,14,24}});
+
+
+            // Outer join
+            sql = "Select SUM(V_P1_ENG5386.v_sum_age), MAX(v_r4.v_sum_rent), MAX(V_P1_ENG5386.V_max_rent), " +
+                    "MIN(V_P1_ENG5386.V_min_age) from V_P1_ENG5386 left join v_r4 on V_P1_ENG5386.v_g1 < v_r4.v_g1;";
+            sql = sql.replace("V_P1_ENG5386", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{502, 37, 14, 21}});
+
+
+            sql = "Select V_P1_ENG5386.v_g1, SUM(V_P1_ENG5386.v_sum_age), MAX(v_r4.v_sum_rent), " +
+                    "MAX(V_P1_ENG5386.V_max_rent), MIN(V_P1_ENG5386.V_min_age) from V_P1_ENG5386 " +
+                    "left join v_r4 on V_P1_ENG5386.v_g1 < v_r4.v_g1 GROUP BY V_P1_ENG5386.v_g1 ORDER BY 1;";
+            sql = sql.replace("V_P1_ENG5386", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            System.out.println(vt);
+            long voltNullLong = Long.MIN_VALUE;
+            if (isHSQL()) {
+                voltNullLong = 0l;
+            }
+            validateTableOfLongs(vt, new long[][] {{10,303,37,12,21}, {20,90,37,7,22}, {30,109,voltNullLong,14,24}});
+
+        }
+
+    }
+
     //
     // Suite builder boilerplate
     //
@@ -1488,14 +1593,18 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "AS SELECT abs(wage), dept, count(*), sum(age), sum(rent)  FROM P1 " +
                 "GROUP BY abs(wage), dept;" +
 
+                "CREATE VIEW V_P1_ENG5386 (V_G1, V_G2, V_CNT, V_sum_age, v_min_age, V_max_rent, v_count_rent) " +
+                "AS SELECT wage, dept, count(*), sum(age), min(age), max(rent), count(rent)  FROM P1 " +
+                "GROUP BY wage, dept;" +
+
                 // NO Need to fix mv query
                 "CREATE TABLE P2 ( " +
-                "id INTEGER DEFAULT 0 NOT NULL, " +
+                "id INTEGER DEFAULT 0 NOT NULL ASSUMEUNIQUE, " +
                 "wage INTEGER, " +
                 "dept INTEGER NOT NULL, " +
                 "age INTEGER,  " +
                 "rent INTEGER, " +
-                "PRIMARY KEY (id) );" +
+                "PRIMARY KEY (dept, id) );" +
                 "PARTITION TABLE P2 ON COLUMN dept;" +
 
                 "CREATE VIEW V_P2 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) " +
@@ -1513,6 +1622,10 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
 
                 "CREATE VIEW V_R4 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) " +
                 "AS SELECT wage, dept, count(*), sum(age), sum(rent)  FROM R4 " +
+                "GROUP BY wage, dept;" +
+
+                "CREATE VIEW V_R4_ENG5386 (V_G1, V_G2, V_CNT, V_sum_age, v_min_age, V_max_rent, v_count_rent) " +
+                "AS SELECT wage, dept, count(*), sum(age), min(age), max(rent), count(rent)  FROM R4 " +
                 "GROUP BY wage, dept;" +
 
                 "CREATE VIEW V0_R4 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) " +

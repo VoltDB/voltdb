@@ -54,11 +54,13 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         return schemaFile.getPath();
     }
 
+    @Override
     public void setUp() throws Exception
     {
         testout_jar = BuildDirectoryUtils.getBuildDirectoryPath() + File.separator + "jdbctestout.jar";
     }
 
+    @Override
     public void tearDown() throws Exception
     {
         File tjar = new File(testout_jar);
@@ -353,8 +355,8 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
     public void testGetIndexInfo()
     {
         String schema =
-            "create table Table1 (Column1 smallint, Column2 integer, Column3 bigint not null, Column4 integer, Column5 integer, " +
-            "  constraint pk_tree primary key (Column1));" +
+            "create table Table1 (Column1 smallint ASSUMEUNIQUE, Column2 integer, Column3 bigint not null, Column4 integer, Column5 integer, " +
+            "  constraint pk_tree primary key (Column1, Column3));" +
             "create index Index1_tree on Table1 (Column2, Column3);" +
             "create index Index2_hash on Table1 (Column4, Column5);";
         String project =
@@ -374,7 +376,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         VoltTable indexes = dut.getMetaData("IndexInfo");
         System.out.println(indexes);
         assertEquals(13, indexes.getColumnCount());
-        assertEquals(5, indexes.getRowCount());
+        assertEquals(7, indexes.getRowCount());
         assertTrue(moveToMatchingRow(indexes, "COLUMN_NAME", "Column2"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)1, indexes.get("NON_UNIQUE", VoltType.TINYINT));

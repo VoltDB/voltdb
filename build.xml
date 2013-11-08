@@ -493,12 +493,6 @@ DISTRIBUTION
     <!-- copy license to voltdb dir -->
     <copy todir="${dist.dir}/voltdb" file="LICENSE"/>
 
-    <!-- make tutorial shell scripts executable -->
-    <chmod perm="ugo+rx">
-        <fileset dir="${dist.dir}" defaultexcludes="yes">
-            <include name="doc/tutorials/**/run.sh"/>
-        </fileset>
-    </chmod>
 </target>
 
 <!-- internal target for building a full distribution. dist_internal_core
@@ -513,7 +507,6 @@ DISTRIBUTION
             <include name="doc/tutorials/**" />
             <include name="examples/**"/>
             <include name="lib/python/**"/>
-            <include name="tools/demo/**"/>
             <exclude name="**/*.pyc" />
         </fileset>
     </copy>
@@ -539,14 +532,13 @@ DISTRIBUTION
         </fileset>
     </copy>
 
-    <!-- make shell scripts executable
-         (doc/tutorials handled by dist_internal_core) -->
+    <!-- make shell scripts executable -->
     <chmod perm="ugo+rx">
         <fileset dir="${dist.dir}" defaultexcludes="yes">
             <include name="bin/*"/>
-            <include name="tools/demo/launch"/>
             <include name="tools/volt"/>
             <include name="examples/**/run.sh"/>
+            <include name="doc/tutorials/**/run.sh"/>
         </fileset>
     </chmod>
 
@@ -600,7 +592,6 @@ DISTRIBUTION
     <!-- make shell scripts executable -->
     <chmod perm="ugo+rx">
         <fileset dir="${dist.dir}-client-java/" defaultexcludes="yes">
-            <include name="tools/demo/launch"/>
             <include name="doc/tutorials/auction/run.sh"/>
             <include name="doc/tutorials/helloworld/run.sh"/>
             <include name="examples/voltcache/run.sh"/>
@@ -669,6 +660,7 @@ DISTRIBUTION
     <sequential>
         <mkdir dir="${dist.dir}@{distlabel}/bin" />
         <mkdir dir="${dist.dir}@{distlabel}/lib" />
+        <mkdir dir="${dist.dir}@{distlabel}/tools" />
         <mkdir dir="${raw.dist.dir}/voltdb-@{distlabel}-${dist.version}" />
         <copy todir="${dist.dir}@{distlabel}">
             <fileset dir="${base.dir}">
@@ -678,11 +670,6 @@ DISTRIBUTION
         <copy todir="${dist.dir}@{distlabel}/bin">
             <fileset dir="${base.dir}/bin">
                 <include name="voltadmin" />
-            </fileset>
-        </copy>
-        <copy todir="${dist.dir}@{distlabel}/tools">
-            <fileset dir="${base.dir}/tools">
-                <include name="volt" />
             </fileset>
         </copy>
         <copy todir="${dist.dir}@{distlabel}/lib">
@@ -698,7 +685,6 @@ DISTRIBUTION
         </chmod>
         <chmod perm="ugo+rx">
             <fileset dir="${dist.dir}@{distlabel}/tools">
-                <include name="volt" />
             </fileset>
         </chmod>
     </sequential>
@@ -1387,7 +1373,6 @@ TEST CASES
                 <!-- Standard junit fileset -->
                 <include name='org/hsqldb_voltpatches/**/Test*.class'/>
                 <include name='org/voltdb/**/Test*.class'/>
-                <include name='org/voltdb/utils/**/*Test.class'/>
                 <!-- Exclude many tests not directly related to sql functionality -->
                 <exclude name="**/*$*.class"/>
                 <exclude name='org/voltdb/client/TestClientFeatures.class'/>
@@ -1509,9 +1494,6 @@ TEST CASES
                 <include name='org/voltcore/**/Test*.class' />
                 <include name='org/voltdb/**/Test*.class'/>
                 <include name='org/voltdb/network/**/Test*.class'/>
-                <include name='org/voltdb/messaging/**/*Test.class'/>
-                <include name='org/voltdb/network/**/*Test.class'/>
-                <include name='org/voltdb/utils/**/*Test.class'/>
                 <exclude name="**/*$*.class"/>
                 <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>

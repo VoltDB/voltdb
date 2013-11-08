@@ -134,6 +134,7 @@ public final class Constraint implements SchemaObject {
     OrderedHashSet refColSet;
     // Is this for temp constraints only? What's a temp constraint?
     Expression[] indexExprs; // A VoltDB extension to support indexed expressions
+    boolean assumeUnique = false; // For VoltDB
 
     //
     final public static Constraint[] emptyArray = new Constraint[]{};
@@ -1065,6 +1066,7 @@ public final class Constraint implements SchemaObject {
         VoltXMLElement constraint = new VoltXMLElement("constraint");
         constraint.attributes.put("name", getName().name);
         constraint.attributes.put("constrainttype", getTypeName());
+        constraint.attributes.put("assumeunique", assumeUnique ? "true" : "false");
 
         // VoltDB implements constraints by defining an index, by annotating metadata (such as for NOT NULL columns),
         // or by issuing a "not supported" warning (such as for foreign keys).
@@ -1098,6 +1100,11 @@ public final class Constraint implements SchemaObject {
             sep = ", ";
         }
         return sb.toString();
+    }
+
+    public Constraint setAssumeUnique(boolean assumeUnique) {
+        this.assumeUnique = assumeUnique;
+        return this;
     }
 
 }
