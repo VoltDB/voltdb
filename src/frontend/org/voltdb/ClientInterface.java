@@ -144,8 +144,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final ClientAcceptor m_acceptor;
     private ClientAcceptor m_adminAcceptor;
 
-    private final ConcurrentHashMap<Connection, Object> m_connections =
-            new ConcurrentHashMap<Connection, Object>(10240, .75f, 128);
     private final SnapshotDaemon m_snapshotDaemon = new SnapshotDaemon();
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
 
@@ -168,7 +166,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * lookup.
      */
     private final ConcurrentHashMap<Long, ClientInterfaceHandleManager> m_cihm =
-            new ConcurrentHashMap<Long, ClientInterfaceHandleManager>(10240, .75f, 128);
+            new ConcurrentHashMap<Long, ClientInterfaceHandleManager>(2048, .75f, 128);
     private final Cartographer m_cartographer;
 
     /**
@@ -717,12 +715,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (!m_acg.get().hasBackPressure()) {
                 c.enableReadSelection();
             }
-            m_connections.put(c, "");
-        }
-
-        @Override
-        public void stopping(Connection c) {
-            m_connections.remove(c);
         }
 
         @Override
@@ -2182,10 +2174,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     private final void checkForDeadConnections(final long now) {
         final ArrayList<Connection> connectionsToRemove = new ArrayList<Connection>();
-        for (final Connection c : m_connections.keySet()) {
-            final int delta = c.writeStream().calculatePendingWriteDelta(now);
+        for (final ClientInterfaceHandleManager cihm : m_cihm.values()) {
+            final int delta = cihm.connection.writeStream().calculatePendingWriteDelta(now);
             if (delta > 4000) {
-                connectionsToRemove.add(c);
+                connectionsToRemove.add(cihm.connection);
             }
         }
 
