@@ -564,7 +564,7 @@ inline void NValue::streamTimestamp(std::stringstream& value) const
     }
     char mbstr[27];    // Format: "YYYY-MM-DD HH:MM:SS."- 20 characters + terminator
     snprintf(mbstr, sizeof(mbstr), "%04d-%02d-%02d %02d:%02d:%02d.%06d",
-             (int)as_date.year(), (int)as_date.month(), (int)as_date.day(), 
+             (int)as_date.year(), (int)as_date.month(), (int)as_date.day(),
              (int)as_time.hours(), (int)as_time.minutes(), (int)as_time.seconds(), (int)micro);
     value << mbstr;
 }
