@@ -574,7 +574,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_commandLog.initForRejoin(
                         m_catalogContext,
                         Long.MIN_VALUE,
-                        m_cartographer.getPartitionCount(),
+                        m_configuredNumberOfPartitions,
                         true,
                         m_config.m_commandLogBinding, m_iv2InitiatorStartingTxnIds);
             }
@@ -2145,7 +2145,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     public void onRestoreCompletion(long txnId, Map<Integer, Long> perPartitionTxnIds) {
 
         /*
-         * Command log is already initialized if this is a rejoin
+         * Command log is already initialized if this is a rejoin or a join
          */
         if ((m_commandLog != null) && (m_commandLog.needsInitialization())) {
             // Initialize command logger
