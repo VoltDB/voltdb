@@ -17,6 +17,7 @@
 package org.voltdb;
 
 import java.util.ArrayList;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -149,6 +150,8 @@ public interface VoltDBInterface
     public OperationMode getMode();
 
     public SnapshotCompletionMonitor getSnapshotCompletionMonitor();
+
+    public ScheduledExecutorService getSES(boolean priority);
 
     /**
      * Schedule a work to be performed once or periodically.
