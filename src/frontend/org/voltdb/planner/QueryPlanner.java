@@ -145,7 +145,6 @@ public class QueryPlanner {
         try {
             m_xmlSQL = m_HSQL.getXMLCompiledStatement(m_sql);
         } catch (HSQLParseException e) {
-e.printStackTrace();
             // XXXLOG probably want a real log message here
             throw new PlanningErrorException(e.getMessage());
         }

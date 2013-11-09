@@ -17,9 +17,6 @@
 
 package org.voltdb.expressions;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -27,13 +24,13 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
-import org.voltdb.planner.StmtTableScan;
 import org.voltdb.plannodes.NodeSchema;
+import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
 
 /**
- *
- */
+*
+*/
 public class TupleValueExpression extends AbstractValueExpression {
 
     public enum Members {
@@ -50,22 +47,17 @@ public class TupleValueExpression extends AbstractValueExpression {
     protected String m_columnName = null;
     protected String m_columnAlias = null;
     protected int m_tableIdx = 0;
-    protected int m_tableCacheIdx = 0;
 
     private boolean m_hasAggregate = false;
 
-    private List<TupleValueExpression> m_childrenTVE = null;
-
-    private boolean m_resolved = false;
-
     /**
      * Create a new TupleValueExpression
-     * @param tableName  The name of the table where this column originated,
-     *        if any.  Currently, internally created columns will be assigned
-     *        the table name "VOLT_TEMP_TABLE" for disambiguation.
-     * @param tableAlias  The alias assigned to this table, if any
-     * @param columnName  The name of this column, if any
-     * @param columnAlias  The alias assigned to this column, if any
+     * @param tableName The name of the table where this column originated,
+     * if any. Currently, internally created columns will be assigned
+     * the table name "VOLT_TEMP_TABLE" for disambiguation.
+     * @param tableAlias The alias assigned to this table, if any
+     * @param columnName The name of this column, if any
+     * @param columnAlias The alias assigned to this column, if any
      * @param columnIndex. The column index in the table
      */
     public TupleValueExpression(String tableName,
@@ -116,12 +108,6 @@ public class TupleValueExpression extends AbstractValueExpression {
         clone.m_tableAlias = m_tableAlias;
         clone.m_columnName = m_columnName;
         clone.m_columnAlias = m_columnAlias;
-        if (m_childrenTVE != null) {
-            clone.m_childrenTVE = new ArrayList<TupleValueExpression>();
-            for (TupleValueExpression childTVE : m_childrenTVE) {
-                clone.m_childrenTVE.add((TupleValueExpression) childTVE.clone());
-            }
-        }
         return clone;
     }
 
@@ -209,18 +195,6 @@ public class TupleValueExpression extends AbstractValueExpression {
         m_tableIdx = idx;
     }
 
-    public int getTableCacheIndex() {
-        return m_tableCacheIdx;
-    }
-
-    public void setTableCacheIndex(int idx) {
-        m_tableCacheIdx = idx;
-    }
-
-    public void setChildExpressions(List<TupleValueExpression> childrenTVE) {
-        m_childrenTVE = childrenTVE;
-    }
-
     @Override
     public boolean equals(Object obj) {
         if (obj instanceof TupleValueExpression == false) {
@@ -297,31 +271,8 @@ public class TupleValueExpression extends AbstractValueExpression {
         }
     }
 
-//    @Override
-//    public void resolveForDB(Database db) {
-//        if (m_tableName == null && m_columnName == null) {
-//            // This is a dummy TVE standing in for a simplecolumn
-//            // -- the assumption has to be that it is not being used in a general expression,
-//            // so the schema-dependent type implications don't matter
-//            // and its "target" value is getting properly validated, so we can shortcut checking here.
-//            assert(false);
-//            return;
-//        }
-//        // TODO(XIN): getIgnoreCase takes 2% of Planner CPU, Optimize it later
-//        // Need to use cache idx to get table avoiding db call
-//        Table table = db.getTables().getIgnoreCase(m_tableName);
-//        resolveForTable(table);
-//        if (m_childrenTVE != null) {
-//            for (TupleValueExpression childTVE : m_childrenTVE) {
-//                childTVE.resolveForDB(db);
-//            }
-//        }
-//    }
-    public void resolveForDB(List <StmtTableScan> catalogCache) {
-        resolveForDB(catalogCache, m_tableCacheIdx);
-    }
-
-    private void resolveForDB(List <StmtTableScan> catalogCache, int tableCacheIdx) {
+    @Override
+    public void resolveForDB(Database db) {
         if (m_tableName == null && m_columnName == null) {
             // This is a dummy TVE standing in for a simplecolumn
             // -- the assumption has to be that it is not being used in a general expression,
@@ -330,54 +281,24 @@ public class TupleValueExpression extends AbstractValueExpression {
             assert(false);
             return;
         }
-        m_resolved = false;
-        StmtTableScan tableCache = catalogCache.get(tableCacheIdx);
-        resolveForTable(tableCache.m_table);
-        if (!m_resolved) {
-            for (int i = 0; !m_resolved && i < tableCache.m_children.length; ++i) {
-                resolveForDB(catalogCache, tableCache.m_children[i]);
-            }
-        }
-        assert(m_resolved == true);
-
-        if (m_childrenTVE != null) {
-            for (TupleValueExpression childTVE : m_childrenTVE) {
-                childTVE.resolveForDB(catalogCache);
-            }
-        }
+        // TODO(XIN): getIgnoreCase takes 2% of Planner CPU, Optimize it later
+        Table table = db.getTables().getIgnoreCase(m_tableName);
+        resolveForTable(table);
     }
 
-//    @Override
-//    public void resolveForTable(Table table) {
-//        assert(table != null);
-//        // It MAY be that for the case in which this function is called (expression indexes), the column's
-//        // table name is not specified (and not missed?).
-//        // It is possible to "correct" that here by cribbing it from the supplied table (base table for the index)
-//        // -- not bothering for now.
-//        Column column = table.getColumns().getIgnoreCase(m_columnName);
-//        assert(column != null);
-//        m_tableName = table.getTypeName();
-//        m_columnIndex = column.getIndex();
-//        setValueType(VoltType.get((byte)column.getType()));
-//        setValueSize(column.getSize());
-//    }
+    @Override
     public void resolveForTable(Table table) {
-        if (table == null) {
-            return;
-        }
+        assert(table != null);
         // It MAY be that for the case in which this function is called (expression indexes), the column's
         // table name is not specified (and not missed?).
         // It is possible to "correct" that here by cribbing it from the supplied table (base table for the index)
         // -- not bothering for now.
         Column column = table.getColumns().getIgnoreCase(m_columnName);
-        if (column == null) {
-            return;
-        }
+        assert(column != null);
         m_tableName = table.getTypeName();
         m_columnIndex = column.getIndex();
         setValueType(VoltType.get((byte)column.getType()));
         setValueSize(column.getSize());
-        m_resolved = true;
     }
 
     /**
@@ -386,14 +307,12 @@ public class TupleValueExpression extends AbstractValueExpression {
      */
     public int resolveColumnIndexesUsingSchema(NodeSchema inputSchema) {
         int index = inputSchema.getIndexOfTve(this);
-        if (index == -1 && m_childrenTVE != null) {
-            // Try to resolve column index using nested TVE
-            for (TupleValueExpression childTVE : m_childrenTVE) {
-                index = inputSchema.getIndexOfTve(childTVE);
-                if (index != -1) {
-                   break;
-                }
-            }
+        if (getValueType() == null && index != -1) {
+            // In case of sub-queries the TVE may not have its value type and size
+            // resolved yet. Try to resolve it now
+            SchemaColumn inputColumn = inputSchema.getColumns().get(index);
+            setValueType(inputColumn.getType());
+            setValueSize(inputColumn.getSize());
         }
         return index;
     }

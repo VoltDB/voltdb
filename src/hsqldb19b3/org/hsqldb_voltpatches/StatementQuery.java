@@ -33,6 +33,7 @@ package org.hsqldb_voltpatches;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -418,7 +419,6 @@ public class StatementQuery extends StatementDMQL {
 
         // parameters
         voltAppendParameters(session, query, parameters);
-//        voltAppendParameters(session, query);
 
         // scans
         VoltXMLElement scans = new VoltXMLElement("tablescans");
@@ -428,11 +428,6 @@ public class StatementQuery extends StatementDMQL {
         for (RangeVariable rangeVariable : select.rangeVariables) {
             scans.children.add(rangeVariable.voltGetRangeVariableXML(session));
         }
-
-        // Columns from USING expression in join are not qualified.
-        // if join is INNER then the column from USING expression can be from any table
-        // participating in join. In case of OUTER join, it must be the outer column
-        resolveUsingColumns(cols, select.rangeVariables);
 
         // having
         if (select.havingCondition != null) {
@@ -461,8 +456,30 @@ public class StatementQuery extends StatementDMQL {
                 orderCols.children.add(xml);
             }
         }
-System.out.println(query.toString());
+
+        // Columns from USING expression in join are not qualified.
+        // if join is INNER then the column from USING expression can be from any table
+        // participating in join. In case of OUTER join, it must be the outer column
+        List<VoltXMLElement> exprCols = new ArrayList<VoltXMLElement>();
+        extractColumnReferences(query, exprCols);
+        resolveUsingColumns(exprCols, select.rangeVariables);
+
         return query;
+    }
+    
+    /**
+     * Extract columnref elements from the input element.
+     * @param element
+     * @param cols - output collection containing the column references 
+     */
+    static protected void extractColumnReferences(VoltXMLElement element, List<VoltXMLElement> cols) {
+        if ("columnref".equalsIgnoreCase(element.name)) {
+            cols.add(element);
+        } else {
+            for (VoltXMLElement child : element.children) {
+                extractColumnReferences(child, cols);
+            }
+        }
     }
 
     /**
@@ -472,19 +489,14 @@ System.out.println(query.toString());
      * @param columnName
      * @return table name this column belongs to
      */
-    static protected void resolveUsingColumns(VoltXMLElement columns, RangeVariable[] rvs) throws HSQLParseException {
+    static protected void resolveUsingColumns(List<VoltXMLElement> columns, RangeVariable[] rvs) throws HSQLParseException {
         // Only one OUTER join for a whole select is supported so far
-        for (VoltXMLElement columnElmt : columns.children) {
-            boolean innerJoin = true;
+        for (VoltXMLElement columnElmt : columns) {
             String table = null;
+            String tableAlias = null;
             if (columnElmt.attributes.get("table") == null) {
+                columnElmt.attributes.put("using", "true");
                 for (RangeVariable rv : rvs) {
-                    if (rv.isLeftJoin || rv.isRightJoin) {
-                        if (innerJoin == false) {
-                            throw new HSQLParseException("VoltDB does not support outer joins with more than two tables involved");
-                        }
-                        innerJoin = false;
-                    }
 
                     if (!rv.getTable().columnList.containsKey(columnElmt.attributes.get("column"))) {
                         // The column is not from this table. Skip it
@@ -495,15 +507,28 @@ System.out.println(query.toString());
                     if (rv.isRightJoin == true) {
                         // this is the outer table. no need to search further.
                         table = rv.getTable().getName().name;
+                        if (rv.tableAlias != null) {
+                            tableAlias = rv.tableAlias.name;
+                        } else {
+                            tableAlias = null;
+                        }
                         break;
                     } else if (rv.isLeftJoin == false) {
                         // it's the inner join. we found the table but still need to iterate
                         // just in case there is an outer table we haven't seen yet.
                         table = rv.getTable().getName().name;
+                        if (rv.tableAlias != null) {
+                            tableAlias = rv.tableAlias.name;
+                        } else {
+                            tableAlias = null;
+                        }
                     }
                 }
                 if (table != null) {
                     columnElmt.attributes.put("table", table);
+                }
+                if (tableAlias != null) {
+                    columnElmt.attributes.put("tablealias", tableAlias);
                 }
             }
         }

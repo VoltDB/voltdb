@@ -59,8 +59,6 @@ public class JoinNode implements Cloneable {
     public AbstractExpression m_whereExpr = null;
     // Node id. Must be unique within a given tree
     public int m_id = 0;
-    // Sub Query
-    public AbstractParsedStmt m_subQuery = null;
 
     // Buckets for children expression classification
     public final ArrayList<AbstractExpression> m_joinOuterList = new ArrayList<AbstractExpression>();
@@ -78,34 +76,18 @@ public class JoinNode implements Cloneable {
     /**
      * Construct a leaf node
      * @param id - node unique id
+     * @param nodeType - node type
      * @param joinType - join type
      * @param table - join table index
      * @param joinExpr - join expression
      * @param whereExpr - filter expression
      * @param id - node id
      */
-    JoinNode(int id, JoinType joinType, int tableAliasIdx, AbstractExpression joinExpr, AbstractExpression  whereExpr) {
-        this(id, joinType, NodeType.LEAF);
+    JoinNode(int id, NodeType nodeType, JoinType joinType, int tableAliasIdx, AbstractExpression joinExpr, AbstractExpression  whereExpr) {
+        this(id, joinType, nodeType);
         m_tableAliasIndex = tableAliasIdx;
         m_joinExpr = joinExpr;
         m_whereExpr = whereExpr;
-    }
-
-    /**
-     * Construct a leaf node
-     * @param id - node unique id
-     * @param joinType - join type
-     * @param table - join table index
-     * @param joinExpr - join expression
-     * @param whereExpr - filter expression
-     * @param id - node id
-     */
-    JoinNode(int id, JoinType joinType, int tableAliasIdx, AbstractExpression joinExpr, AbstractExpression  whereExpr, AbstractParsedStmt subQuery) {
-        this(id, joinType, NodeType.SUBQUERY);
-        m_tableAliasIndex = tableAliasIdx;
-        m_joinExpr = joinExpr;
-        m_whereExpr = whereExpr;
-        m_subQuery = subQuery;
     }
 
     /**
@@ -149,10 +131,6 @@ public class JoinNode implements Cloneable {
         } else {
             newNode.m_tableAliasIndex = m_tableAliasIndex;
         }
-        if (m_subQuery != null) {
-            // @TODO: We really don't need to clone the Sub Query.
-            newNode.m_subQuery = m_subQuery;
-        }
         return newNode;
     }
 
@@ -183,6 +161,9 @@ public class JoinNode implements Cloneable {
         if (m_whereExpr != null) {
             sb.append(indent).append(m_whereExpr.explain("be explicit")).append("\n");
         }
+
+        // Node type type
+        sb.append(indent).append("node type: ").append(m_nodeType.name()).append("\n");
 
         // Join type
         if (m_tableAliasIndex == StmtTableScan.NULL_ALIAS_INDEX) {
@@ -438,6 +419,29 @@ public class JoinNode implements Cloneable {
     }
 
     /**
+     * Returns a list of immediate sub-queries which are part of this query.
+     * @return List<AbstractParsedStmt> - list of sub-queries from this query
+     */
+    public List<JoinNode> extractSubQueries() {
+        List<JoinNode> subQueries = new ArrayList<JoinNode>();
+        extractSubQueries(this, subQueries);
+        return subQueries;
+    }
+
+    private void extractSubQueries(JoinNode joinTree, List<JoinNode> subQueries) {
+        if (joinTree.m_nodeType == NodeType.SUBQUERY) {
+            subQueries.add(joinTree);
+        }
+        if (joinTree.m_leftNode != null) {
+            extractSubQueries(joinTree.m_leftNode, subQueries);
+        }
+        if (joinTree.m_rightNode != null) {
+            extractSubQueries(joinTree.m_rightNode, subQueries);
+        }
+    }
+
+
+    /**
      * Split a join tree into one or more sub-trees. Each sub-tree has the same join type
      * for all join nodes. The root of the child tree in the parent tree is replaced with a 'dummy' node
      * which id is negated id of the child root node.
@@ -494,7 +498,7 @@ public class JoinNode implements Cloneable {
                 // a join of two nodes m_leftNode != null && m_rightNode != null
                 int tempAliasIdx = StmtTableScan.NULL_ALIAS_INDEX - 1 - child.m_id;
                 JoinNode tempNode = new JoinNode(
-                        -child.m_id, child.m_joinType, tempAliasIdx, child.m_joinExpr, child.m_whereExpr);
+                        -child.m_id, child.m_nodeType, child.m_joinType, tempAliasIdx, child.m_joinExpr, child.m_whereExpr);
                 if (child == m_leftNode) {
                     m_leftNode = tempNode;
                 } else {
@@ -514,7 +518,7 @@ public class JoinNode implements Cloneable {
         JoinNode root = null;
         for (JoinNode leafNode : tableNodes) {
             assert(leafNode.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX);
-            JoinNode node = new JoinNode(leafNode.m_id, leafNode.m_joinType, leafNode.m_tableAliasIndex, null, null);
+            JoinNode node = new JoinNode(leafNode.m_id, leafNode.m_nodeType, leafNode.m_joinType, leafNode.m_tableAliasIndex, null, null);
             if (root == null) {
                 root = node;
             } else {

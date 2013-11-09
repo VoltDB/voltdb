@@ -31,6 +31,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.JoinNode.NodeType;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
@@ -706,6 +707,16 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         }
         // End of recursion
         AbstractPlanNode scanNode = getAccessPlanForTable(joinNode.m_tableAliasIndex, joinNode.m_currentAccessPath);
+        // Connect the sub-query tree if any
+        if (joinNode.m_nodeType == NodeType.SUBQUERY) {
+            assert(joinNode.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX);
+            StmtTableScan tableCache = m_parsedStmt.stmtCache.get(joinNode.m_tableAliasIndex);
+            assert(tableCache.m_tableDerived != null);
+            CompiledPlan subQueryPlan = tableCache.m_tableDerived.getBetsCostPlan();
+            assert(subQueryPlan != null);
+            assert(subQueryPlan.rootPlanGraph != null);
+            scanNode.addAndLinkChild(subQueryPlan.rootPlanGraph);
+        }
         return scanNode;
     }
 

@@ -17,7 +17,10 @@
 
 package org.voltdb.planner;
 
+import java.util.HashSet;
+
 import org.voltdb.catalog.Table;
+import org.voltdb.plannodes.SchemaColumn;
 
 /**
  * StmtTableScan caches data related to a given instance of a table within the statement scope
@@ -26,11 +29,11 @@ public class StmtTableScan {
 
     public static final int NULL_ALIAS_INDEX = -1;
     // Catalog table
-    public Table m_table;
-    // If table represents a sub-query this array contains indexes
-    // of the children tables
-    public int m_children[] = null;
+    public Table m_table = null;
+    // Sub-Query
+    public TableDerived m_tableDerived = null;
     // table alias
-    public String m_tableAlias;
-
+    public String m_tableAlias = null;
+    // Store a unique list of the columns actually used by this table instance.
+    public HashSet<SchemaColumn> m_scanColumns = null ;
 }

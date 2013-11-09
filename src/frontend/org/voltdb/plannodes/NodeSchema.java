@@ -98,8 +98,7 @@ public class NodeSchema
         Integer index = m_columnsMapHelper.get(col);
         if (index != null) {
             return index.intValue();
-        }
-        return -1;
+        }        return -1;
     }
 
     /** Convenience method to sort the SchemaColumns.  Only applies if they

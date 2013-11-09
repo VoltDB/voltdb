@@ -19,8 +19,10 @@ package org.voltdb.plannodes;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -53,6 +55,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     // The target table is the table that the plannode wants to perform some operation on.
     protected String m_targetTableName = "";
     protected String m_targetTableAlias = null;
+
+    // Flag marking the sub-query plan
+    protected boolean m_isSubQuery = false;
 
     protected AbstractScanPlanNode() {
         super();
@@ -180,29 +185,30 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         return m_tableSchema;
     }
 
+    /**
+     * Set the sub-query flag
+     * @param isSubQuery
+     */
+
+    public void setSubQuery(boolean isSubQuery) {
+        m_isSubQuery = isSubQuery;
+    }
+
+    /**
+     * Accessor to return the sub-query flag
+     * @return m_isSubQuery
+     */
+    public boolean isSubQuery() {
+        return m_isSubQuery;
+    }
+
     @Override
     public void generateOutputSchema(Database db)
     {
         // fill in the table schema if we haven't already
         if (m_tableSchema == null)
         {
-            m_tableSchema = new NodeSchema();
-            CatalogMap<Column> cols =
-                db.getTables().getIgnoreCase(m_targetTableName).getColumns();
-            // you don't strictly need to sort this, but it makes diff-ing easier
-            for (Column col : CatalogUtil.getSortedCatalogItems(cols, "index"))
-            {
-                // must produce a tuple value expression for this column.
-                TupleValueExpression tve = new TupleValueExpression(
-                        m_targetTableName, m_targetTableAlias, col.getTypeName(), col.getTypeName(), col.getIndex());
-                tve.setValueType(VoltType.get((byte)col.getType()));
-                tve.setValueSize(col.getSize());
-                m_tableSchema.addColumn(new SchemaColumn(m_targetTableName,
-                                                         m_targetTableAlias,
-                                                         col.getTypeName(),
-                                                         col.getTypeName(),
-                                                         tve));
-            }
+            generateTableSchema(db);
         }
 
         // Until the scan has an implicit projection rather than an explicitly
@@ -266,6 +272,32 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 m_hasSignificantOutputSchema = true;
             }
         }
+        if (m_isSubQuery) {
+            // The TVE for the sub-query columns need their type and size to be set
+            Map<String, SchemaColumn> colMap = new HashMap<String, SchemaColumn>();
+            for (SchemaColumn col : this.m_tableSchema.getColumns()) {
+                colMap.put(col.getColumnName(), col);
+            }
+            // Set the tve size and type for the output schema
+            if (m_tableScanSchema != null) {
+                for (SchemaColumn scanCol : m_tableScanSchema.getColumns()) {
+                    assert(colMap.containsKey(scanCol.getColumnName()) == true);
+                    SchemaColumn tableCol = colMap.get(scanCol.getColumnName());
+                    scanCol.getExpression().setValueType(tableCol.getExpression().getValueType());
+                    scanCol.getExpression().setValueSize(tableCol.getExpression().getValueSize());
+                }
+            }
+            if (m_outputSchema != null) {
+                for (SchemaColumn outputCol : m_outputSchema.getColumns()) {
+                    assert(colMap.containsKey(outputCol.getColumnName()) == true);
+                    SchemaColumn tableCol = colMap.get(outputCol.getColumnName());
+                    outputCol.getExpression().setValueType(tableCol.getExpression().getValueType());
+                    outputCol.getExpression().setValueSize(tableCol.getExpression().getValueSize());
+                }
+            }
+
+        }
+
     }
 
     @Override
@@ -370,4 +402,23 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         return "";
     }
 
+    protected void generateTableSchema(Database db) {
+        m_tableSchema = new NodeSchema();
+        CatalogMap<Column> cols =
+            db.getTables().getIgnoreCase(m_targetTableName).getColumns();
+        // you don't strictly need to sort this, but it makes diff-ing easier
+        for (Column col : CatalogUtil.getSortedCatalogItems(cols, "index"))
+        {
+            // must produce a tuple value expression for this column.
+            TupleValueExpression tve = new TupleValueExpression(
+                    m_targetTableName, m_targetTableAlias, col.getTypeName(), col.getTypeName(), col.getIndex());
+            tve.setValueType(VoltType.get((byte)col.getType()));
+            tve.setValueSize(col.getSize());
+            m_tableSchema.addColumn(new SchemaColumn(m_targetTableName,
+                                                     m_targetTableAlias,
+                                                     col.getTypeName(),
+                                                     col.getTypeName(),
+                                                     tve));
+        }
+    }
 }

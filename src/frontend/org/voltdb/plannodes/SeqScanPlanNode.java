@@ -22,12 +22,11 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.types.PlanNodeType;
 
 public class SeqScanPlanNode extends AbstractScanPlanNode {
-    // Flag marking the sub-query plan
-    private boolean m_isSubQuery = false;
-    
+
     public SeqScanPlanNode() {
         super();
     }
@@ -50,8 +49,7 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
     @Override
     public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
         Table target = db.getTables().getIgnoreCase(m_targetTableName);
-        if (target != null) {
-            // This is a real table and not a sub-query
+        if (!m_isSubQuery) {
             DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(target.getTypeName());
             // This maxTuples value estimates the number of tuples fetched from the sequential scan.
             // It's a vague measure of the cost of the scan.
@@ -68,31 +66,57 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
             m_estimatedProcessedTupleCount = tableEstimates.maxTuples;
             m_estimatedOutputTupleCount = tableEstimates.maxTuples;
         } else {
-            // For the sub-query the cost estimates will be calculated separately
+            // Get estimates from the sub-query
+            assert(m_children.size() == 1);
+            // @TODO For the sub-query the cost estimates will be calculated separately
+            // At the moment its contribution to the parent's cost plan is irrelevant because
+            // all parent plans have the same best cost plan for the sub-query
             m_estimatedProcessedTupleCount = 0;
             m_estimatedOutputTupleCount = 0;
         }
     }
 
-    /**
-     * Set the sub-query flag
-     * @param isSubQuery
-     */
-    
-    public void setSubQuery(boolean isSubQuery) {
-        m_isSubQuery = isSubQuery;
-    }
-
-    /**
-     * Accessor to return the sub-query flag
-     * @return m_isSubQuery
-     */
-    public boolean isSubQuery() {
-        return m_isSubQuery;
+    @Override
+    public void resolveColumnIndexes() {
+        if (m_isSubQuery == true) {
+            assert(m_children.size() == 1);
+            m_children.get(0).resolveColumnIndexes();
+        }
+        super.resolveColumnIndexes();
     }
 
     @Override
     protected String explainPlanForNode(String indent) {
         return "SEQUENTIAL SCAN of \"" + m_targetTableName + "\"" + explainPredicate("\n" + indent + " filter by ");
     }
+
+    @Override
+    protected void generateTableSchema(Database db) {
+        if (m_isSubQuery == false) {
+            super.generateTableSchema(db);
+        } else {
+            assert(m_children.size() == 1);
+            // Generate the sub-query table schema
+            m_children.get(0).generateOutputSchema(db);
+
+            m_tableSchema = new NodeSchema();
+            NodeSchema subQuerySchema = m_children.get(0).getOutputSchema();
+            for (SchemaColumn col : subQuerySchema.getColumns()) {
+                // get the column from the sub-query schema and replace the table name and alias
+                // with the derived table name and alias.
+                String columnAlias = col.getColumnAlias();
+                String columnName = col.getColumnName();
+                if (columnAlias != null) {
+                    columnName = columnAlias;
+                }
+                SchemaColumn newCol = new SchemaColumn(m_targetTableName,
+                        m_targetTableAlias,
+                        columnName,
+                        columnAlias,
+                        (AbstractExpression) col.getExpression().clone());
+                m_tableSchema.addColumn(newCol);
+            }
+        }
+    }
+
 }

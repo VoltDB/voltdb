@@ -19,6 +19,7 @@ package org.voltdb.planner;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
@@ -42,6 +43,7 @@ import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.MaterializedScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
+import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ExpressionType;
@@ -1167,15 +1169,17 @@ public abstract class SubPlanAssembler {
         SeqScanPlanNode scanNode = new SeqScanPlanNode();
         StmtTableScan tableCache = m_parsedStmt.stmtCache.get(tableAliasIdx);
         if (tableCache.m_table != null) {
-            // This is a real table and not a sub-query
             scanNode.setTargetTableName(tableCache.m_table.getTypeName());
+        } else {
+            scanNode.setTargetTableName(tableCache.m_tableDerived.getTableName());
             scanNode.setSubQuery(true);
         }
         scanNode.setTargetTableAlias(tableCache.m_tableAlias);
         //TODO: push scan column identification into "setTargetTableName"
         // (on the way to enabling it for DML plans).
-        if (!m_parsedStmt.scanColumns.isEmpty()) {
-            scanNode.setScanColumns(m_parsedStmt.scanColumns.get(tableAliasIdx));
+        Set<SchemaColumn> scanColumns = m_parsedStmt.stmtCache.get(tableAliasIdx).m_scanColumns;
+        if (scanColumns != null) {
+            scanNode.setScanColumns(scanColumns);
         }
 
         // build the predicate
@@ -1242,8 +1246,9 @@ public abstract class SubPlanAssembler {
         scanNode.setTargetTableAlias(tableCache.m_tableAlias);
         //TODO: push scan column identification into "setTargetTableName"
         // (on the way to enabling it for DML plans).
-        if (!m_parsedStmt.scanColumns.isEmpty()) {
-            scanNode.setScanColumns(m_parsedStmt.scanColumns.get(tableAliasIdx));
+        Set<SchemaColumn> scanColumns = m_parsedStmt.stmtCache.get(tableAliasIdx).m_scanColumns;
+        if (scanColumns != null) {
+            scanNode.setScanColumns(scanColumns);
         }
         scanNode.setTargetTableAlias(tableCache.m_tableAlias);
         scanNode.setTargetIndexName(index.getTypeName());
