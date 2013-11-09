@@ -66,11 +66,12 @@ public class CurrentTimestampProcedure extends VoltProcedure {
 
         long timeValue = -1;
         long id = 0;
-        while(vt.advanceRow()) {
-            if(vt.getRowCount() != 4) {
-                throw new VoltAbortException("bad row count");
-            }
 
+        if(vt.getRowCount() != 4) {
+            throw new VoltAbortException("bad row count");
+        }
+
+        while(vt.advanceRow()) {
             ++id;
             if (vt.getLong(0) != id) {
                 throw new VoltAbortException("bad row ID " + id);
