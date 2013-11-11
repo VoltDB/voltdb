@@ -15,7 +15,7 @@
 {@dmltable = "_table"}
 
 -- Here's the materialized view fudge.
--- It relies on updates and deletes referencing _table values while selects use @from_tables.
+-- It relies on updates and deletes referencing _table values while selects use @fromtables.
 -- A similar hack is used to query joins of _table values.
 -- To avoid invalid statements, the view DDL should use consistent view column names from the base tables,
 -- even for counts and sums.

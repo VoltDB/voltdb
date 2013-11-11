@@ -2764,6 +2764,239 @@ TEST_F(NValueTest, TestDedupAndSort) {
     delete testPool;
 }
 
+TEST_F(NValueTest, TestTimestampStringParse)
+{
+    assert(ExecutorContext::getExecutorContext() == NULL);
+    Pool* testPool = new Pool();
+    UndoQuantum* wantNoQuantum = NULL;
+    Topend* topless = NULL;
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, false, "", 0);
+
+    bool failed = false;
+    const char* trials[] = {
+        "",
+        //Variants of "2000-01-01 01:01:01.000000" with a dropped character,
+        "200-01-01 01:01:01.000000",
+        "200001-01 01:01:01.000000",
+        "2000-1-01 01:01:01.000000",
+        "2000-0-01 01:01:01.000000",
+        "2000-0101 01:01:01.000000",
+        "2000-01-1 01:01:01.000000",
+        "2000-01-0 01:01:01.000000",
+        "2000-01-0101:01:01.000000",
+        "2000-01-01 1:01:01.000000",
+        "2000-01-01 0:01:01.000000",
+        "2000-01-01 0101:01.000000",
+        "2000-01-01 01:1:01.000000",
+        "2000-01-01 01:0:01.000000",
+        "2000-01-01 01:0101.000000",
+        "2000-01-01 01:01:1.000000",
+        "2000-01-01 01:01:0.000000",
+        "2000-01-01 01:01:01000000",
+        "2000-01-01 01:01:01.00000",
+        //Variants of "2000-01-01 01:01:01.000000" with an added character,
+        "02000-01-01 01:01:01.000000",
+        "20000-01-01 01:01:01.000000",
+        "2000-001-01 01:01:01.000000",
+        "2000-010-01 01:01:01.000000",
+        "2000-01-001 01:01:01.000000",
+        "2000-01-010 01:01:01.000000",
+        "2000-01-01 001:01:01.000000",
+        "2000-01-01 010:01:01.000000",
+        "2000-01-01 01:001:01.000000",
+        "2000-01-01 01:010:01.000000",
+        "2000-01-01 01:01:001.000000",
+        "2000-01-01 01:01:010.000000",
+        "2000-01-01 01:01:01.0000000",
+        //Variants of "2000-01-01 01:01:01.000000" with an out-of-range component,
+        "2000-21-01 01:01:01.000000",
+        "2000-13-01 01:01:01.000000",
+        "2000-01-41 01:01:01.000000",
+        "2000-01-32 01:01:01.000000",
+        "2000-01-01 30:01:01.000000",
+        "2000-01-01 25:01:01.000000",
+        "2000-01-01 01:60:01.000000",
+        };
+    int ii = sizeof(trials) / sizeof(const char*);
+    while (ii--) {
+        try {
+            NValue::parseTimestampString(trials[ii]);
+            cout << "Timestamp cast should have failed for string '" << trials[ii] << "'.\n";
+            failed = true;
+        } catch(SQLException& exc) {
+            const char* msg = exc.message().c_str();
+            string to_find = "\'";
+            to_find += trials[ii];
+            to_find += "\'";
+            const char* found = strstr(msg, to_find.c_str());
+            if (found && found > msg && found[0] == '\'' && found[strlen(trials[ii])+1] == '\'') {
+                continue;
+            }
+            cout << "Timestamp cast exception message looks corrupted: '" << msg << "'.\n";
+            failed = true;
+        }
+    }
+    EXPECT_FALSE(failed);
+
+    long base;
+    std::string peekString = "Failed to start";
+
+    // Test round-trip conversion for a pivotal value that would fail a mktime-based implementation.
+    // leveraged in the algorithm for the high end of the range.
+    base = NValue::parseTimestampString("2038-12-31 23:59:59.999999");
+    try {
+        NValue ts = ValueFactory::getTimestampValue(base);
+        NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
+        peekString = ValuePeeker::peekStringCopy(str);
+        long roundtrip = NValue::parseTimestampString(peekString.c_str());
+        EXPECT_EQ(base, roundtrip);
+        if (base != roundtrip) {
+            cout << "Failing for base " << base << " vs roundtrip " << roundtrip <<
+                "as string \'" << peekString << "\'.";
+        }
+    } catch(SQLException& exc) {
+        cout << "Low timestamp did not work: '" << peekString << "' / " << base << ".\n";
+        EXPECT_FALSE(true);
+    }
+
+    char dateStr[27];
+    dateStr[0] = '\0';
+    try {
+        base = NValue::parseTimestampString("1400-12-31 23:59:59.999999");
+        // Test that various centuries are of equal length.
+        long centuryMicros = NValue::parseTimestampString("1500-12-31 23:59:59.999999") - base;
+        long extraLeapdayMicros = 24L * 60L * 60L * 1000L * 1000L;
+        // Test parsing up through year 9000.
+        for (int century = 15; century <= 90; ++century) {
+            snprintf(dateStr, sizeof(dateStr), "%02d00-12-31 23:59:59.999999", century);
+            long newbase = NValue::parseTimestampString(dateStr);
+            if ((newbase - base != centuryMicros) &&
+                (newbase - base != centuryMicros + extraLeapdayMicros)) {
+                cout << "Failing century for \'" << dateStr <<
+                    "\' (off by " << (newbase - base - centuryMicros) << ").\n";
+            }
+            base = newbase;
+        }
+    } catch(SQLException& exc) {
+        cout << "Century parse did not work: '" << exc.message() << "' / " << dateStr << "." << endl;
+        EXPECT_FALSE(true);
+    }
+
+
+    dateStr[0] = '\0';
+    try {
+        base = NValue::parseTimestampString("1837-12-31 23:59:59.999999");
+        long decadeMicros = NValue::parseTimestampString("1847-12-31 23:59:59.999999") - base;
+        long extraLeapdayMicros = 24L * 60L * 60L * 1000L * 1000L;
+        // Test parsing up through 2437.
+        for (int decade = 184; decade <= 243; ++decade) {
+            snprintf(dateStr, sizeof(dateStr), "%03d7-12-31 23:59:59.999999", decade);
+            long newbase = NValue::parseTimestampString(dateStr);
+            if ((newbase - base != decadeMicros) &&
+                (newbase - base != decadeMicros + extraLeapdayMicros) &&
+                (newbase - base + extraLeapdayMicros != decadeMicros)) {
+                cout << "Failing decade for \'" << dateStr <<
+                    "\' (value " << (newbase - base) << " off by " << (newbase - base - decadeMicros) << ").\n";
+            }
+            base = newbase;
+        }
+    } catch(SQLException& exc) {
+        cout << "Decade parse did not work: '" << exc.message() << "' / " << dateStr << ".\n";
+        EXPECT_FALSE(true);
+    }
+
+
+    dateStr[0] = '\0';
+    try {
+        base = NValue::parseTimestampString("1925-12-31 23:59:59.999999");
+        long yearMicros = NValue::parseTimestampString("1926-12-31 23:59:59.999999") - base;
+        long extraLeapdayMicros = 24L * 60L * 60L * 1000L * 1000L;
+        // Test parsing up through 2126.
+        for (int year = 1926; year <= 2126; ++year) {
+            snprintf(dateStr, sizeof(dateStr), "%04d-12-31 23:59:59.999999", year);
+            long newbase = NValue::parseTimestampString(dateStr);
+            if ((newbase - base != yearMicros) &&
+                (newbase - base != yearMicros + extraLeapdayMicros)) {
+                cout << "Failing year for \'" << dateStr <<
+                    "\' (value " << (newbase - base) << " off by " << (newbase - base - yearMicros) << ").\n";
+            }
+            base = newbase;
+        }
+    } catch(SQLException& exc) {
+        cout << "Annual parse did not work: '" << exc.message() << "' / " << dateStr << ".\n";
+        EXPECT_FALSE(true);
+    }
+
+    dateStr[0] = '\0';
+    try {
+        base = NValue::parseTimestampString("1982-12-13 23:59:59.999999");
+        long dayMicros = NValue::parseTimestampString("1982-12-14 23:59:59.999999") - base;
+        EXPECT_EQ(0, dayMicros % 100000000L);
+        // Test parsing through 1983.
+        for (int month = 1; month <= 12; ++month) {
+            snprintf(dateStr, sizeof(dateStr), "1983-%02d-13 23:59:59.999999", month);
+            long newbase = NValue::parseTimestampString(dateStr);
+            if ((newbase - base) % 100000000L) {
+                cout << "Failing month for \'" << dateStr <<
+                    "\' (value " << (newbase - base) << " off by " << ((newbase - base) % 100000000L) << ").\n";
+            }
+            base = newbase;
+        }
+    } catch(SQLException& exc) {
+        cout << "Monthly parse did not work: '" << exc.message() << "' / " << dateStr << ".\n";
+        EXPECT_FALSE(true);
+    }
+
+
+    dateStr[0] = '\0';
+    try {
+        base = NValue::parseTimestampString("1883-10-31 23:59:59.999999");
+        long dayMicros = NValue::parseTimestampString("1883-11-01 23:59:59.999999") - base;
+        EXPECT_EQ(0, dayMicros % 100000000L);
+        // Test parsing through a month.
+        for (int day = 1; day <= 30; ++day) {
+            snprintf(dateStr, sizeof(dateStr), "1883-11-%02d 23:59:59.999999", day);
+            long newbase = NValue::parseTimestampString(dateStr);
+            EXPECT_EQ(newbase, base + dayMicros);
+            if (newbase != base + dayMicros) {
+                cout << "Failing day for \'" << dateStr <<
+                    "\' (value " << (newbase - base) << " off by " << ((newbase - base) % 100000000L) << ").\n";
+            }
+            base = newbase;
+        }
+    } catch(SQLException& exc) {
+        cout << "Daily parse did not work: '" << exc.message() << "' / " << dateStr << ".\n";
+        EXPECT_FALSE(true);
+    }
+
+
+    // Test round-trip conversions for sample dates in a broad range.
+    base = NValue::parseTimestampString("1900-01-01 00:00:00.000000");
+    long top = NValue::parseTimestampString("2900-12-31 23:59:59.999999");
+    long increment = (top - base) / 997;
+    for (long jj = base; jj <= top; jj+=increment) {
+        try {
+            NValue ts = ValueFactory::getTimestampValue(jj);
+            NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
+            peekString = ValuePeeker::peekStringCopy(str);
+            long roundtrip = NValue::parseTimestampString(peekString.c_str());
+            EXPECT_EQ(jj, roundtrip);
+            if (jj != roundtrip) {
+                cout << "Failing for iteration " << ((jj-base)/increment) << " base " << base <<
+                    " vs roundtrip " << roundtrip << " as string \'" << peekString << "\'." << endl;
+                cout << "Off by " << (jj - roundtrip) << "us " << (jj - roundtrip)/1000000L << "s ";
+            }
+        } catch(SQLException& exc) {
+            cout << "Timestamp incremented past cast range at or after: '" << peekString <<
+                "' / " << jj << " iteration " << ((jj-base)/increment) << ".\n";
+            EXPECT_FALSE(true);
+            break;
+        }
+    }
+    delete poolHolder;
+    delete testPool;
+}
+
 int main() {
     return TestSuite::globalInstance()->runAll();
 }

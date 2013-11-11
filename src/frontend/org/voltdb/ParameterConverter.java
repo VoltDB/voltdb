@@ -358,14 +358,14 @@ public class ParameterConverter {
             if (inputClz == Date.class) return new TimestampType((Date) param);
             // if a string is given for a date, use java's JDBC parsing
             if (inputClz == String.class) {
-                String longtime = ((String) param).trim();
+                String timestring = ((String) param).trim();
                 try {
-                    return new TimestampType(Long.parseLong(longtime));
+                    return new TimestampType(Long.parseLong(timestring));
                 } catch (IllegalArgumentException e) {
                     // Defer errors to the generic Exception throw below, if it's not the right format
                 }
                 try {
-                    return new TimestampType(longtime);
+                    return new TimestampType(timestring);
                 }
                 catch (IllegalArgumentException e) {
                     // Defer errors to the generic Exception throw below, if it's not the right format

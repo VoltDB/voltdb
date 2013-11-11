@@ -31,6 +31,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -446,6 +447,11 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public SnapshotCompletionMonitor getSnapshotCompletionMonitor() {
         return m_snapshotCompletionMonitor;
+    }
+
+    @Override
+    public ScheduledExecutorService getSES(boolean priority) {
+        return null;
     }
 
     @Override

@@ -69,14 +69,15 @@ public class NodeSchema
     /**
      * Retrieve the SchemaColumn that matches the provided arguments.
      * @param tableName
+     * @param tableAlias
      * @param columnName
      * @param columnAlias
      * @return The matching SchemaColumn.  Returns null if the column wasn't
      *         found.
      */
-    public SchemaColumn find(String tableName, String columnName, String columnAlias)
+    public SchemaColumn find(String tableName, String tableAlias, String columnName, String columnAlias)
     {
-        SchemaColumn col = new SchemaColumn(tableName, columnName, columnAlias);
+        SchemaColumn col = new SchemaColumn(tableName, tableAlias, columnName, columnAlias);
         Integer index = m_columnsMapHelper.get(col);
         if (index != null) {
             return m_columns.get(index.intValue());
@@ -89,9 +90,9 @@ public class NodeSchema
      *  AbstractExpression in a plan node needs to have its column_idx updated
      *  during the column index resolution phase.
      */
-    int getIndexOfTve(TupleValueExpression tve)
+    public int getIndexOfTve(TupleValueExpression tve)
     {
-        SchemaColumn col = new SchemaColumn(tve.getTableName(),
+        SchemaColumn col = new SchemaColumn(tve.getTableName(), tve.getTableAlias(),
                 tve.getColumnName(), tve.getColumnAlias());
 
         Integer index = m_columnsMapHelper.get(col);

@@ -350,7 +350,9 @@ public class Inits {
 
             // note if this fails it will print an error first
             try {
-                m_rvdb.m_depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_deployment, true);
+                //This is where we compile real catalog and create runtime catalog context. To validate deployment
+                //we compile and create a starter context which uses a placeholder catalog.
+                m_rvdb.m_depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_deployment, true, false);
                 if (m_rvdb.m_depCRC < 0)
                     System.exit(-1);
             } catch (Exception e) {

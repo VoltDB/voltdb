@@ -15,6 +15,7 @@
 
 
 {@insertvals = "_id, _value[decimal], _value[decimal], _value[float]"}
+{@onefun = "ABS"}
 {@optionalfn = "_numfun"}
 {@updatecolumn = "CASH"}
 {@updatesource = "ID"}

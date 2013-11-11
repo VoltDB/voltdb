@@ -37,6 +37,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.BufferArrayProc;
+import org.voltdb_testprocs.regressionsuites.CurrentTimestampProcedure;
 import org.voltdb_testprocs.regressionsuites.LastBatchLie;
 import org.voltdb_testprocs.regressionsuites.VariableBatchSizeMP;
 import org.voltdb_testprocs.regressionsuites.VariableBatchSizeSP;
@@ -45,7 +46,8 @@ public class TestProcedureAPISuite extends RegressionSuite {
 
     // procedures used by these tests
     static final Class<?>[] PROCEDURES = {
-        VariableBatchSizeMP.class, VariableBatchSizeSP.class, LastBatchLie.class, BufferArrayProc.class
+        VariableBatchSizeMP.class, VariableBatchSizeSP.class, LastBatchLie.class, BufferArrayProc.class,
+        CurrentTimestampProcedure.class
     };
 
     /**
@@ -150,6 +152,13 @@ public class TestProcedureAPISuite extends RegressionSuite {
         data3[2] = "1234567890abcdef";
 
         client.callProcedure(BufferArrayProc.class.getSimpleName(), data, data, data3);
+    }
+
+    public void testMultiPartitionCURRENT_TIMESTAMP() throws IOException, ProcCallException {
+        Client client = getClient();
+        if (!isHSQL()) {
+            client.callProcedure(CurrentTimestampProcedure.class.getSimpleName());
+        }
     }
 
     /**

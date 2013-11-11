@@ -24,6 +24,8 @@
 package org.voltdb.planner;
 
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.NestLoopPlanNode;
+import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
 
@@ -182,11 +184,6 @@ public class TestUnion extends PlannerTestCase {
         // At this point, coordinator designation is only supported for single-fragment plans.
         failToCompile("select DESC from T1 WHERE A = 1 UNION select TEXT from T5 WHERE E = 2");
 
-        // The same table can not be scanned multiple times in a union.
-        failToCompile("select A from T1 UNION select A from T1");
-        failToCompile("(select A from T1 UNION select B from T2) EXCEPT select A from T1");
-        failToCompile("select A from T1 UNION (select B from T2 EXCEPT select A from T1)");
-
         // Column types must match.
         failToCompile("select A, DESC from T1 UNION select B from T2");
         failToCompile("select B from T2 EXCEPT select A, DESC from T1");
@@ -195,6 +192,40 @@ public class TestUnion extends PlannerTestCase {
         // nonsense syntax in place of union ops (trying various internal symbol names meaning n/a)
         failToCompile("select A from T1 NOUNION select B from T2");
         failToCompile("select A from T1 TERM select B from T2");
+    }
+
+    public void testSelfUnion() {
+        AbstractPlanNode pn = compile("select B from T2 UNION select B from T2");
+        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn.getChildCount() == 2);
+        assertTrue(pn.getChild(0) instanceof SeqScanPlanNode);
+        assertTrue(pn.getChild(1) instanceof SeqScanPlanNode);
+
+        // The same table/alias is repeated twice in the union but in the different selects
+        pn = compile("select B from T2 A1, T2 A2 WHERE A1.B = A2.B UNION select B from T2 A1");
+        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn.getChildCount() == 2);
+        assertTrue(pn.getChild(0) instanceof ProjectionPlanNode);
+        assertTrue(pn.getChild(0).getChild(0) instanceof NestLoopPlanNode);
+        assertTrue(pn.getChild(1) instanceof SeqScanPlanNode);
+
+        // BOTH sides are single-partitioned  for the same partition
+        pn = compile("select F from T1 WHERE T1.A = 2 UNION select F from T1 WHERE T1.A = 2");
+        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+
+        // If BOTH sides are single-partitioned, but for different partitions,
+        // it would theoretically be possible to satisfy
+        // the query with a 2-fragment plan IFF the coordinator fragment could be forced to
+        // execute on one of the designated single partitions.
+        // At this point, coordinator designation is only supported for single-fragment plans.
+        failToCompile("select DESC from T1 WHERE A = 1 UNION select DESC from T1 WHERE A = 2");
+
+        // If both sides are multi-partitioned, there is no facility for pushing down the
+        // union processing below the send/receive, so each child of the union requires
+        // its own send/receive so the plan ends up as an unsupported 3-fragment plan.
+        failToCompile("select DESC from T1 UNION select DESC from T1");
     }
 
     @Override

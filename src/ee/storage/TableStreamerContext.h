@@ -165,7 +165,7 @@ public:
     /**
      * Parse and save predicates.
      */
-    void updatePredicates(const std::vector<std::string> &predicateStrings);
+    virtual void updatePredicates(const std::vector<std::string> &predicateStrings);
 
 protected:
 
@@ -196,17 +196,17 @@ protected:
 
     PersistentTableSurgeon &m_surgeon;
 
+    /**
+     * Parsed hash range predicates.
+     */
+    StreamPredicateList m_predicates;
+
 private:
 
     /**
      * Table being streamed.
      */
     PersistentTable &m_table;
-
-    /**
-     * Parsed hash range predicates.
-     */
-    StreamPredicateList m_predicates;
 
     /**
      * Per-predicate delete if true flags.
