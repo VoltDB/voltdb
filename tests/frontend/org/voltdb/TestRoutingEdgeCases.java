@@ -63,8 +63,10 @@ public class TestRoutingEdgeCases extends TestCase {
                 assertTrue(pce.getMessage().contains("Array / Scalar parameter mismatch"));
             }
 
-            // for now, @LoadSinglepartitionTable assumes 8 byte integers, even if type is < 8 bytes
-            // this is ok because we don't expose this functionality
+            // For now, @LoadSinglepartitionTable assumes 8 byte integers, even if type is < 8 bytes
+            // This is ok because we don't expose this functionality.
+            // The code below will throw a constraint violation, but it really shouldn't. There's
+            // Another comment about this in ProcedureRunner about a reasonable fix for this.
 
             //VoltTable t = new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.INTEGER));
             //t.addRow(13);
