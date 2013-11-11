@@ -42,5 +42,5 @@ showchange
 
 # Change mainui.js
 file="src/frontend/org/voltdb/studio/js/mainui.js"
-sed -i "s/var $volt_version = \".*\"/var $volt_version = \'${version}\'/" $file
+sed "s/var \$volt_version = '.*'/var \$volt_version = '${version}'/" $file
 showchange
