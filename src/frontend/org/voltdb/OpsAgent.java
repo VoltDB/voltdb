@@ -67,6 +67,11 @@ public abstract class OpsAgent
     protected final String m_name;
     private final ScheduledThreadPoolExecutor m_es;
 
+    //Just ack everything that passes through and don't do the work
+    //For startup this avoids initialization dependencies but allows
+    //new nodes to not block other agents on timeouts
+    private volatile boolean m_dummyMode;
+
     protected HostMessenger m_messenger;
 
     // Things that would be nice in the future:
@@ -127,6 +132,15 @@ public abstract class OpsAgent
     abstract protected void handleJSONMessage(JSONObject obj) throws Exception;
 
     /**
+     * For OPS actions generate a dummy response to the distributed
+     * work to avoid startup initialization dependencies. Startup can take
+     * a long time and we don't want to prevent other agents from making progress
+     */
+    protected void handleJSONMessageAsDummy(JSONObject obj) throws Exception {
+        sendOpsResponse(null, obj);
+    }
+
+    /**
      * Awkward interface.  For OPS actions which may want to perform some final
      * post-processing on the aggregated tables before the response is sent to
      * the client, this will be called immediately before that send.
@@ -162,7 +176,12 @@ public abstract class OpsAgent
                 if (bpm.m_metadata[0] == JSON_PAYLOAD) {
                     String jsonString = new String(payload, "UTF-8");
                     JSONObject obj = new JSONObject(jsonString);
-                    handleJSONMessage(obj);
+                    //In early startup generate dummy responses
+                    if (m_dummyMode) {
+                        handleJSONMessageAsDummy(obj);
+                    } else {
+                        handleJSONMessage(obj);
+                    }
                 } else if (bpm.m_metadata[0] == OPS_PAYLOAD) {
                     handleOpsResponse(payload);
                 }
@@ -400,5 +419,9 @@ public abstract class OpsAgent
         errorResponse.flattenToBuffer(buf).flip();
         c.writeStream().enqueue(buf);
         return;
+    }
+
+    public void setDummyMode(boolean enabled) {
+        m_dummyMode = enabled;
     }
 }
