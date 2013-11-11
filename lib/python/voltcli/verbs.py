@@ -394,12 +394,13 @@ class ServerBundle(JavaBundle):
     Supports needing catalog and live keyword option for rejoin.
     All other options are supported as common options.
     """
-    def __init__(self, subcommand, needs_catalog=True, supports_live=False, default_host=True):
+    def __init__(self, subcommand, needs_catalog=True, supports_live=False, default_host=True, safemode_available=False):
         JavaBundle.__init__(self, 'org.voltdb.VoltDB')
         self.subcommand = subcommand
         self.needs_catalog = needs_catalog
         self.supports_live = supports_live
         self.default_host = default_host
+        self.safemode_available = safemode_available
 
     def initialize(self, verb):
         JavaBundle.initialize(self, verb)
@@ -416,6 +417,9 @@ class ServerBundle(JavaBundle):
         if self.needs_catalog:
             verb.add_arguments(cli.PathArgument('catalog',
                               'the application catalog jar file path'))
+        # --safemode only used by recover server action.
+        if self.safemode_available:
+           verb.add_options(cli.BooleanOption(None, '--safemode', 'safemode', 'perform recover in safemode'))
 
     def start(self, verb, runner):
         # Add appropriate server-ish Java options.
@@ -436,6 +440,10 @@ class ServerBundle(JavaBundle):
                 final_args = ['live', self.subcommand]
         else: 
             final_args = [self.subcommand]
+        if self.safemode_available:
+            if runner.opts.safemode:
+                final_args.extend(['safemode'])
+
         if self.needs_catalog:
             catalog = runner.opts.catalog
             if not catalog:
