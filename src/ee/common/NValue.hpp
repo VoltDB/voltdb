@@ -568,6 +568,9 @@ class NValue {
         return rt;
     }
 
+    // Declared public for cppunit test purposes .
+    static int64_t parseTimestampString(const char* str);
+
   private:
     /*
      * Private methods are private for a reason. Don't expose the raw
@@ -1188,9 +1191,11 @@ class NValue {
             whole /= NValue::kMaxScaleFactor;
             retval.getTimestamp() = whole.ToInt(); break;
         }
-        case VALUE_TYPE_VARCHAR:
-            //TODO: Seems like we want to also allow actual date formatting OR? a numeric value, here? See ENG-4284.
-            retval.getTimestamp() = static_cast<int64_t>(getNumberFromString()); break;
+        case VALUE_TYPE_VARCHAR: {
+            const char* str = reinterpret_cast<const char*>(getObjectValue());
+            retval.getTimestamp() = parseTimestampString(str);
+            break;
+        }
         case VALUE_TYPE_VARBINARY:
         default:
             throwCastSQLException(type, VALUE_TYPE_TIMESTAMP);
@@ -1364,6 +1369,8 @@ class NValue {
         return retval;
     }
 
+    void streamTimestamp(std::stringstream& value) const;
+
     NValue castAsString() const {
         if (isNull()) {
             NValue retval(VALUE_TYPE_VARCHAR);
@@ -1400,6 +1407,10 @@ class NValue {
             NValue retval(VALUE_TYPE_VARCHAR);
             memcpy(retval.m_data, m_data, sizeof(m_data));
             return retval;
+        }
+        case VALUE_TYPE_TIMESTAMP: {
+            streamTimestamp(value);
+            break;
         }
         default:
             throwCastSQLException(type, VALUE_TYPE_VARCHAR);

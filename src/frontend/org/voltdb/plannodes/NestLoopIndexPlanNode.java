@@ -111,7 +111,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         {
             // this double-schema search is somewhat common, maybe it
             // can find a static home in NodeSchema or something --izzy
-            int index = outer_schema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(outer_schema);
             int tableIdx = 0;   // 0 for outer table
             if (index == -1)
             {
@@ -138,7 +138,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         }
         for (TupleValueExpression tve : index_tves)
         {
-            int index = outer_schema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(outer_schema);
             int tableIdx = 0;   // 0 for outer table
             if (index == -1)
             {
@@ -167,7 +167,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
             int tableIdx = 0;   // 0 for outer table
             if (index == -1)
             {
-                index = index_schema.getIndexOfTve(tve);
+                index = tve.resolveColumnIndexesUsingSchema(index_schema);
                 if (index == -1)
                 {
                     throw new RuntimeException("Unable to find index for column: " +

@@ -1126,6 +1126,8 @@ public class DDLCompiler {
         String defaultvalue = null;
         String defaulttype = null;
 
+        int defaultFuncID = -1;
+
         // Default Value
         for (VoltXMLElement child : node.children) {
             if (child.name.equals("default")) {
@@ -1134,6 +1136,12 @@ public class DDLCompiler {
                     if (inner_child.name.equals("value")) {
                         assert(defaulttype == null); // There should be only one default value/type.
                         defaultvalue = inner_child.attributes.get("value");
+                        defaulttype = inner_child.attributes.get("valuetype");
+                        assert(defaulttype != null);
+                    } else if (inner_child.name.equals("function")) {
+                        assert(defaulttype == null); // There should be only one default value/type.
+                        defaultFuncID = Integer.parseInt(inner_child.attributes.get("function_id"));
+                        defaultvalue = inner_child.attributes.get("name");
                         defaulttype = inner_child.attributes.get("valuetype");
                         assert(defaulttype != null);
                     }
@@ -1154,12 +1162,17 @@ public class DDLCompiler {
         // fyi: Historically, VoltType class initialization errors get reported on this line (?).
         VoltType type = VoltType.typeFromString(typename);
         columnTypes.add(type);
-        if (defaultvalue != null && (type == VoltType.DECIMAL || type == VoltType.NUMERIC))
-        {
-            // Until we support deserializing scientific notation in the EE, we'll
-            // coerce default values to plain notation here.  See ENG-952 for more info.
-            BigDecimal temp = new BigDecimal(defaultvalue);
-            defaultvalue = temp.toPlainString();
+        if (defaultFuncID == -1) {
+            if (defaultvalue != null && (type == VoltType.DECIMAL || type == VoltType.NUMERIC)) {
+                // Until we support deserializing scientific notation in the EE, we'll
+                // coerce default values to plain notation here.  See ENG-952 for more info.
+                BigDecimal temp = new BigDecimal(defaultvalue);
+                defaultvalue = temp.toPlainString();
+            }
+        } else {
+            // Concat function name and function id, format: NAME:ID
+            // Used by PlanAssembler:getNextInsertPlan().
+            defaultvalue = defaultvalue + ":" + String.valueOf(defaultFuncID);
         }
 
         Column column = table.getColumns().add(name);

@@ -554,18 +554,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
                     scanFilter == null? null: new String[] {scanFilter});
     }
 
-    private void checkMVFixWithWhere(String[] aggFilters, String[] scanFilters) {
-        if (aggFilters != null) {
-            for (int i = 0; i < aggFilters.length; i++) {
-                aggFilters[i] = aggFilters[i].toLowerCase();
-            }
-        }
-        if (scanFilters != null) {
-            for (int i = 0; i < scanFilters.length; i++) {
-                scanFilters[i] = scanFilters[i].toLowerCase();
-            }
-        }
-
+    private void checkMVFixWithWhere(Object aggFilters, Object scanFilters) {
         AbstractPlanNode p = pns.get(0);
 
         List<AbstractPlanNode> nodes = p.findAllNodesOfType(PlanNodeType.RECEIVE);
@@ -577,32 +566,46 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertTrue(p.getParent(0) instanceof HashAggregatePlanNode);
         HashAggregatePlanNode reAggNode = (HashAggregatePlanNode) p.getParent(0);
         String reAggNodeStr = reAggNode.toExplainPlanString().toLowerCase();
+
+        // Find scan node.
+        p = pns.get(1);
+        assert (p.getScanNodeList().size() == 1);
+        p = p.getScanNodeList().get(0);
+        String scanNodeStr = p.toExplainPlanString().toLowerCase();
+
         if (aggFilters != null) {
-            for (String aggFilter: aggFilters) {
-                assertTrue(reAggNodeStr.contains(aggFilter));
+            String[] aggFilterStrings = null;
+            if (aggFilters instanceof String) {
+                aggFilterStrings = new String[] { (String) aggFilters };
+            } else {
+                aggFilterStrings = (String[]) aggFilters;
+            }
+            for (String aggFilter : aggFilterStrings) {
+                System.out.println(reAggNodeStr.contains(aggFilter
+                        .toLowerCase()));
+                assertTrue(reAggNodeStr.contains(aggFilter.toLowerCase()));
+                System.out
+                        .println(scanNodeStr.contains(aggFilter.toLowerCase()));
+                assertFalse(scanNodeStr.contains(aggFilter.toLowerCase()));
             }
         } else {
             assertNull(reAggNode.getPostPredicate());
         }
-        if (scanFilters != null) {
-            for (String scanFilter: scanFilters) {
-                assertFalse(reAggNodeStr.contains(scanFilter));
-            }
-        }
 
-        // Find scan node.
-        p = pns.get(1);
-        assert(p.getScanNodeList().size() == 1);
-        p = p.getScanNodeList().get(0);
-        String scanNodeStr = p.toExplainPlanString().toLowerCase();
         if (scanFilters != null) {
-            for (String scanFilter: scanFilters) {
-                assertTrue(scanNodeStr.contains(scanFilter));
+            String[] scanFilterStrings = null;
+            if (scanFilters instanceof String) {
+                scanFilterStrings = new String[] { (String) scanFilters };
+            } else {
+                scanFilterStrings = (String[]) scanFilters;
             }
-        }
-        if (aggFilters != null) {
-            for (String aggFilter: aggFilters) {
-                assertFalse(scanNodeStr.contains(aggFilter));
+            for (String scanFilter : scanFilterStrings) {
+                System.out.println(reAggNodeStr.contains(scanFilter
+                        .toLowerCase()));
+                assertFalse(reAggNodeStr.contains(scanFilter.toLowerCase()));
+                System.out.println(scanNodeStr.contains(scanFilter
+                        .toLowerCase()));
+                assertTrue(scanNodeStr.contains(scanFilter.toLowerCase()));
             }
         }
     }
@@ -619,27 +622,24 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkMVFixWithWhere("SELECT * FROM V_P1 where v_a1 = v_cnt + 1", "v_a1 = (v_cnt + 1)", null);
     }
 
-    private void checkMVFixWithJoin_reAgg (String sql, int numGroupbyOfReaggNode, int numAggsOfReaggNode,
-            String aggFilter, String scanFilter) {
+    private void checkMVFixWithJoin_reAgg(String sql, int numGroupbyOfReaggNode, int numAggsOfReaggNode,
+            Object aggFilter, String scanFilter) {
         checkMVFixWithJoin(sql, -1, -1, numGroupbyOfReaggNode, numAggsOfReaggNode, aggFilter, scanFilter);
     }
 
-    private void checkMVFixWithJoin_reAgg_noOrder (String sql, int numGroupbyOfReaggNode, int numAggsOfReaggNode,
-            String[] aggFilters, String[] scanFilters) {
+    private void checkMVFixWithJoin_reAgg_noOrder(String sql, int numGroupbyOfReaggNode, int numAggsOfReaggNode,
+            Object aggFilters, Object scanFilters) {
         checkMVFixWithJoin_noOrder(sql, -1, -1, numGroupbyOfReaggNode, numAggsOfReaggNode, aggFilters, scanFilters);
     }
 
-    private void checkMVFixWithJoin (String sql, int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
-            int numGroupbyOfReaggNode, int numAggsOfReaggNode, String aggFilter, String scanFilter) {
-        checkMVFixWithJoin_noOrder(sql, numGroupbyOfTopAggNode, numAggsOfTopAggNode,
-                numGroupbyOfReaggNode, numAggsOfReaggNode,
-                aggFilter == null ? null: new String[] {aggFilter},
-                scanFilter == null ? null: new String[] {scanFilter}
-        );
+    private void checkMVFixWithJoin(String sql, int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
+            int numGroupbyOfReaggNode, int numAggsOfReaggNode, Object aggFilter, Object scanFilter) {
+        checkMVFixWithJoin_noOrder(sql, numGroupbyOfTopAggNode, numAggsOfTopAggNode, numGroupbyOfReaggNode, numAggsOfReaggNode,
+                aggFilter, scanFilter);
     }
 
-    private void checkMVFixWithJoin_noOrder (String sql, int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
-            int numGroupbyOfReaggNode, int numAggsOfReaggNode, String[] aggFilters, String[] scanFilters) {
+    private void checkMVFixWithJoin_noOrder(String sql, int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
+            int numGroupbyOfReaggNode, int numAggsOfReaggNode, Object aggFilters, Object scanFilters) {
 
         String[] joinType = {"inner join", "left join", "right join"};
 
@@ -679,11 +679,12 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         sql = "select v_a1 from v_p1 @joinType v_r1 using(v_a1) " +
                 "where v_a1 > 1 and v_p1.v_cnt > 2 and v_r1.v_b1 < 3 ";
-        checkMVFixWithJoin_reAgg(sql, 2, 1, "v_cnt > 2", "v_a1 > 1");
+        checkMVFixWithJoin_reAgg(sql, 2, 1, "v_cnt > 2", null /* "v_a1 > 1" is optional */);
 
         sql = "select v_cnt from v_p1 @joinType v_r1 on v_p1.v_cnt = v_r1.v_cnt " +
                 "where v_p1.v_cnt > 1 and v_p1.v_a1 > 2 and v_p1.v_sum_c1 < 3 and v_r1.v_b1 < 4 ";
-        checkMVFixWithJoin_reAgg(sql, 2, 2, "(v_cnt > 1) and (v_sum_c1 < 3)", "v_a1 > 2");
+        checkMVFixWithJoin_reAgg(sql, 2, 2,
+                new String[] { "(v_sum_c1 < 3)", "(v_cnt > 1)" }, "v_a1 > 2");
 
         // join on different columns.
         sql = "select v_p1.v_cnt from v_r1 @joinType v_p1 on v_r1.v_sum_c1 = v_p1.v_sum_d1 ";
@@ -708,13 +709,13 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 "@joinType r1v on v_p1.v_cnt = r1v.v_cnt " +
                 "where v_p1.v_cnt > 1 and v_p1.v_a1 > 2 and v_p1.v_sum_c1 < 3 and v_r1.v_b1 < 4 ";
         checkMVFixWithJoin_reAgg_noOrder(sql, 2, 2,
-                new String[] {"v_cnt > 1", "v_sum_c1 < 3"}, new String[] {"v_a1 > 2"});
+                new String[] {"v_cnt > 1", "v_sum_c1 < 3"}, "v_a1 > 2");
 
         sql = "select v_r1.v_cnt, v_r1.v_a1 from v_p1 @joinType v_r1 on v_p1.v_cnt = v_r1.v_cnt " +
                 "@joinType r1v on v_p1.v_cnt = r1v.v_cnt where v_p1.v_cnt > 1 and v_p1.v_a1 > 2 and " +
                 "v_p1.v_sum_c1 < 3 and v_r1.v_b1 < 4 and r1v.v_sum_c1 > 6";
         checkMVFixWithJoin_reAgg_noOrder(sql, 2, 2,
-                new String[] {"v_cnt > 1", "v_sum_c1 < 3"}, new String[] {"v_a1 > 2"});
+                new String[] {"v_cnt > 1", "v_sum_c1 < 3"}, "v_a1 > 2");
 
     }
 
@@ -727,6 +728,12 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         // Two tables joins.
         sql = "select sum(v_a1) from v_p1 @joinType v_r1 using(v_a1)";
+        checkMVFixWithJoin(sql, 0, 1, 2, 0, null, null);
+
+        sql = "select sum(v_p1.v_a1) from v_p1 @joinType v_r1 on v_p1.v_a1 = v_r1.v_a1";
+        checkMVFixWithJoin(sql, 0, 1, 2, 0, null, null);
+
+        sql = "select sum(v_r1.v_a1) from v_p1 @joinType v_r1 on v_p1.v_a1 = v_r1.v_a1";
         checkMVFixWithJoin(sql, 0, 1, 2, 0, null, null);
 
         sql = "select v_p1.v_b1, sum(v_a1) from v_p1 @joinType v_r1 using(v_a1) group by v_p1.v_b1;";
@@ -788,7 +795,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 "from v_p1 @joinType v_r1 on v_p1.v_cnt = v_r1.v_cnt @joinType r1v on v_p1.v_cnt = r1v.v_cnt " +
                 "where v_p1.v_cnt > 1 and v_p1.v_a1 > 2 and v_p1.v_sum_c1 < 3 and v_r1.v_b1 < 4 " +
                 "group by v_p1.v_cnt, v_p1.v_b1 ";
-        checkMVFixWithJoin(sql, 2, 1, 2, 3, "(v_sum_c1 < 3) and (v_cnt > 1)", "v_a1 > 2");
+        checkMVFixWithJoin(sql, 2, 1, 2, 3, new String[] { "(v_sum_c1 < 3)", "(v_cnt > 1)" }, "v_a1 > 2");
     }
 
     public void testENG5385() {
