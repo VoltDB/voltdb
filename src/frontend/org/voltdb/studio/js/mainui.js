@@ -294,7 +294,7 @@ this.InitWorkspace = function()
                 autoConnect = true;
             setTimeout(function() {$("#new-query").button().click()}, 100);
         }
-        parent.frames['versioncheck'].location.href = 'http://community.voltdb.com/versioncheck?app=webstudio&ver=1.3.5&productid=ws-ipc';
+        parent.frames['versioncheck'].location.href = 'http://community.voltdb.com/versioncheck?app=webstudio&ver=4.0&productid=ws-ipc';
     }
 }
 function hasQueryParameters()
