@@ -419,7 +419,7 @@ class ServerBundle(JavaBundle):
                               'the application catalog jar file path'))
         # --safemode only used by recover server action.
         if self.safemode_available:
-           verb.add_options(cli.BooleanOption(None, '--safemode', 'safemode', 'perform recover in safemode'))
+           verb.add_options(cli.BooleanOption(None, '--safemode', 'safemode', None))
 
     def start(self, verb, runner):
         # Add appropriate server-ish Java options.
