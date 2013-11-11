@@ -295,7 +295,9 @@ public class Cartographer extends StatsSource
                 retval.add(Long.valueOf(child.split("_")[0]));
             }
         }
-        catch (KeeperException ke) {
+        catch (KeeperException.NoNodeException e) {
+            //Can happen when partitions are being removed
+        } catch (KeeperException ke) {
             org.voltdb.VoltDB.crashLocalVoltDB("KeeperException getting replicas for partition: " + partition,
                     true, ke);
         }
