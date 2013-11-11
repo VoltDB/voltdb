@@ -17,8 +17,14 @@
 
 package org.voltdb.iv2;
 
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -42,8 +48,11 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKUtil;
-import org.voltdb.*;
-import org.voltdb.TheHashinator.HashinatorType;
+import org.voltdb.Promotable;
+import org.voltdb.SnapshotFormat;
+import org.voltdb.TheHashinator;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -632,7 +641,6 @@ public class LeaderAppointer implements Promotable
 
         for (String partitionDir : partitionDirs) {
             int pid = LeaderElector.getPartitionFromElectionDir(partitionDir);
-            if (pid == MpInitiator.MP_INIT_PID) continue;
 
             String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
             try {
@@ -646,6 +654,7 @@ public class LeaderAppointer implements Promotable
                 }
 
                 List<String> replicas = childrenCallbacks.poll().getChildren();
+                if (pid == MpInitiator.MP_INIT_PID) continue;
                 final boolean partitionNotOnHashRing = partitionNotOnHashRing(pid);
                 if (!isInitializing && replicas.isEmpty()) {
                     //These partitions can fail, just cleanup and remove the partition from the system
