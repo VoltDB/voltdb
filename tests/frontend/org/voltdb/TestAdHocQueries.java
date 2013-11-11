@@ -291,6 +291,13 @@ public class TestAdHocQueries extends AdHocQueryTester {
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
 
+            // verify that inserts to a table partitioned on an integer get handled correctly - results not used later
+            for (int i = -7; i <= 7; i++) {
+                modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED4 VALUES (%d, %d);", i, i)).getResults()[0];
+                assertEquals(1, modCount.getRowCount());
+                assertEquals(1, modCount.asScalarLong());
+            }
+
             runAllAdHocSPtests(hashableA, hashableB, hashableC, hashableD);
         }
         finally {

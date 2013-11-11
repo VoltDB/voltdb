@@ -60,6 +60,11 @@ public abstract class AdHocQueryTester extends TestCase {
                 "NONPART bigint not null ASSUMEUNIQUE," +
                 "PRIMARY KEY(NONPART, PARTVAL));" +
 
+                "create table PARTED4 (" +
+                "PARTVAL integer not null, " +
+                "NONPART bigint not null ASSUMEUNIQUE," +
+                "PRIMARY KEY(NONPART, PARTVAL));" +
+
                 "create table REPPED1 (" +
                 "REPPEDVAL bigint not null, " +
                 "NONPART bigint not null," +
@@ -85,6 +90,7 @@ public abstract class AdHocQueryTester extends TestCase {
         builder.addPartitionInfo("PARTED1", "PARTVAL");
         builder.addPartitionInfo("PARTED2", "PARTVAL");
         builder.addPartitionInfo("PARTED3", "PARTVAL");
+        builder.addPartitionInfo("PARTED4", "PARTVAL");
         builder.addProcedures(
                 new Class<?>[] {
                         org.voltdb_testprocs.adhoc.executeSQLMP.class,
