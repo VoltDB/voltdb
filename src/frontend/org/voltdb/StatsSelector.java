@@ -43,5 +43,6 @@ public enum StatsSelector {
     DRNODE,
 
     TOPO,           // return leader and site info for iv2
-    REBALANCE       // return elastic rebalance progress
+    REBALANCE,      // return elastic rebalance progress
+    KSAFETY         // return ksafety coverage information
 }

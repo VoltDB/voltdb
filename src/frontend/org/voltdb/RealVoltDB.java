@@ -95,6 +95,7 @@ import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Initiator;
+import org.voltdb.iv2.KSafetyStats;
 import org.voltdb.iv2.LeaderAppointer;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SpInitiator;
@@ -557,6 +558,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             BalancePartitionsStatistics rebalanceStats = new BalancePartitionsStatistics();
             getStatsAgent().registerStatsSource(StatsSelector.REBALANCE, 0, rebalanceStats);
 
+            KSafetyStats kSafetyStats = new KSafetyStats();
+            getStatsAgent().registerStatsSource(StatsSelector.KSAFETY, 0, kSafetyStats);
+
             /*
              * Initialize the command log on rejoin and join before configuring the IV2
              * initiators.  This will prevent them from receiving transactions
@@ -596,7 +600,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         m_catalogContext.cluster.getNetworkpartition(),
                         m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"),
                         usingCommandLog,
-                        topo, m_MPI);
+                        topo, m_MPI, kSafetyStats);
                 m_globalServiceElector.registerService(m_leaderAppointer);
 
                 for (Initiator iv2init : m_iv2Initiators) {

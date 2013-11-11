@@ -382,6 +382,9 @@ public class StatsAgent extends OpsAgent
         case REBALANCE:
             stats = collectRebalanceStats(interval);
             break;
+        case KSAFETY:
+            stats = collectKSafetyStats(interval);
+            break;
         default:
             // Should have been successfully groomed in collectStatsImpl().  Log something
             // for our information but let the null check below return harmlessly
@@ -617,6 +620,19 @@ public class StatsAgent extends OpsAgent
         VoltTable[] stats = null;
 
         VoltTable mStats = getStatsAggregate(StatsSelector.REBALANCE, interval, now);
+        if (mStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = mStats;
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectKSafetyStats(boolean interval)
+    {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable mStats = getStatsAggregate(StatsSelector.KSAFETY, interval, now);
         if (mStats != null) {
             stats = new VoltTable[1];
             stats[0] = mStats;
