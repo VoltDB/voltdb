@@ -4,6 +4,7 @@ var IMainUI = (function(){
 
 var tab_counter = 1;
 var $tabs = null;
+var $volt_version = '4.0';
 
 this.InitWorkspace = function()
 {
@@ -294,7 +295,7 @@ this.InitWorkspace = function()
                 autoConnect = true;
             setTimeout(function() {$("#new-query").button().click()}, 100);
         }
-        parent.frames['versioncheck'].location.href = 'http://community.voltdb.com/versioncheck?app=webstudio&ver=4.0&productid=ws-ipc';
+        parent.frames['versioncheck'].location.href = 'http://community.voltdb.com/versioncheck?app=webstudio&ver=' + $volt_version + '&productid=ws-ipc';
     }
 }
 function hasQueryParameters()

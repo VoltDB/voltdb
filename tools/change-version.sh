@@ -39,3 +39,10 @@ showchange
 file="tools/kit_tools/verify_kits.py"
 sed -i "s/version = \".*\"/version = \"${version}\"/" $file
 showchange
+
+# Change mainui.js
+file="src/frontend/org/voltdb/studio/js/mainui.js"
+var $volt_version = '4.0';
+
+sed -i "s/var $volt_version = \".*\"/var $volt_version = \'${version}\'/" $file
+showchange
