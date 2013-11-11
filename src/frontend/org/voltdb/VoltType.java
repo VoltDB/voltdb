@@ -116,11 +116,6 @@ public enum VoltType {
     DECIMAL  ((byte)22, 16, "decimal", new Class[] {BigDecimal.class}, BigDecimal[].class, 'd'),
 
     /**
-     * Fixed precision=38, scale=12 string representation of a decimal
-     */
-    DECIMAL_STRING  ((byte)23, 9, "decimal", new Class[] {}, null, '0'),
-
-    /**
      * Array of bytes of variable length
      */
     VARBINARY    ((byte)25, -1, "varbinary", new Class[] { byte[].class, Byte[].class }, byte[][].class, 'l');
