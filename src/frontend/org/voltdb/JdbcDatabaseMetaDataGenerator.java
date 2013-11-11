@@ -149,6 +149,28 @@ public class JdbcDatabaseMetaDataGenerator
                           new ColumnInfo("SPECIFIC_NAME", VoltType.STRING)
         };
 
+    static public final ColumnInfo[] TYPEINFO_SCHEMA =
+        new ColumnInfo[] {
+            new ColumnInfo("TYPE_NAME", VoltType.STRING),
+            new ColumnInfo("DATA_TYPE", VoltType.INTEGER),
+            new ColumnInfo("PRECISION", VoltType.INTEGER),
+            new ColumnInfo("LITERAL_PREFIX", VoltType.STRING),
+            new ColumnInfo("LITERAL_SUFFIX", VoltType.STRING),
+            new ColumnInfo("CREATE_PARAMS", VoltType.STRING),
+            new ColumnInfo("NULLABLE", VoltType.SMALLINT),
+            new ColumnInfo("CASE_SENSITIVE", VoltType.TINYINT), //should be bool...
+            new ColumnInfo("SEARCHABLE", VoltType.SMALLINT),
+            new ColumnInfo("UNSIGNED_ATTRIBUTE", VoltType.TINYINT), //should be bool
+            new ColumnInfo("FIXED_PREC_SCALE", VoltType.TINYINT), //should be bool
+            new ColumnInfo("AUTO_INCREMENT", VoltType.TINYINT), //should be bool
+            new ColumnInfo("LOCAL_TYPE_NAME", VoltType.STRING),
+            new ColumnInfo("MINIMUM_SCALE", VoltType.SMALLINT),
+            new ColumnInfo("MAXIMUM_SCALE", VoltType.SMALLINT),
+            new ColumnInfo("SQL_DATA_TYPE", VoltType.INTEGER),
+            new ColumnInfo("SQL_DATETIME_SUB", VoltType.INTEGER),
+            new ColumnInfo("NUM_PREC_RADIX", VoltType.INTEGER)
+        };
+
     JdbcDatabaseMetaDataGenerator(Catalog catalog)
     {
         m_catalog = catalog;
