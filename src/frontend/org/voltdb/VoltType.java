@@ -118,7 +118,10 @@ public enum VoltType {
     /**
      * Array of bytes of variable length
      */
-    VARBINARY    ((byte)25, -1, "varbinary", new Class[] { byte[].class, Byte[].class }, byte[][].class, 'l');
+    VARBINARY    ((byte)25, -1, "varbinary",
+            new Class[] {byte[].class,
+                         Byte[].class },
+                         byte[][].class, 'l');
 
     /**
      * Size in bytes of the maximum length for a VoltDB field value, presumably a
@@ -140,9 +143,98 @@ public enum VoltType {
     private final Class<?>[] m_classes;
     private final Class<?> m_vectorClass;
     private final char m_signatureChar;
+    // Is this type visible to JDBC?
+    private final boolean m_jdbcVisible;
+    // JDBC getTypeInfo values
+    // If we add yet more stuff to this for MySQL or ODBC or something,
+    // it might be time to consider some sort of data-driven type specification
+    // mechanism.
+    private final Integer m_dataType;
+    private final int m_precision;
+    private final String m_literalPrefix;
+    private final String m_literalSuffix;
+    private final String m_createParams;
+    private final int m_nullable;
+    private final boolean m_caseSensitive;
+    private final int m_searchable;
+    private final Boolean m_unsignedAttribute;
+    private final boolean m_fixedPrecScale;
+    private final Integer m_minimumScale;
+    private final Integer m_maximumScale;
+    private final Integer m_numPrecRadix;
 
+    // Constructor for non-JDBC-visible types
     private VoltType(byte val, int lengthInBytes, String sqlString,
                      Class<?>[] classes, Class<?> vectorClass, char signatureChar)
+    {
+        this(val, lengthInBytes, sqlString, classes, vectorClass, signatureChar,
+                false,
+                Integer.MIN_VALUE,
+                Integer.MIN_VALUE,
+                null,
+                null,
+                null,
+                Integer.MIN_VALUE,
+                false,
+                Integer.MIN_VALUE,
+                null,
+                false,
+                null,
+                null,
+                null);
+    }
+
+    // Constructor for JDBC-visible types.  Only types constructed in this way will
+    // appear in the JDBC getTypeInfo() metadata.
+    private VoltType(byte val, int lengthInBytes, String sqlString,
+                     Class<?>[] classes, Class<?> vectorClass, char signatureChar,
+                     int dataType,
+                     int precision,
+                     String literalPrefix,
+                     String literalSuffix,
+                     String createParams,
+                     int nullable,
+                     boolean caseSensitive,
+                     int searchable,
+                     Boolean unsignedAttribute,
+                     boolean fixedPrecScale,
+                     Integer minimumScale,
+                     Integer maximumScale,
+                     Integer numPrecRadix)
+    {
+        this(val, lengthInBytes, sqlString, classes, vectorClass, signatureChar,
+                true,
+                dataType,
+                precision,
+                literalPrefix,
+                literalSuffix,
+                createParams,
+                nullable,
+                caseSensitive,
+                searchable,
+                unsignedAttribute,
+                fixedPrecScale,
+                minimumScale,
+                maximumScale,
+                numPrecRadix);
+    }
+
+    private VoltType(byte val, int lengthInBytes, String sqlString,
+                     Class<?>[] classes, Class<?> vectorClass, char signatureChar,
+                     boolean jdbcVisible,
+                     int dataType,
+                     int precision,
+                     String literalPrefix,
+                     String literalSuffix,
+                     String createParams,
+                     int nullable,
+                     boolean caseSensitive,
+                     int searchable,
+                     Boolean unsignedAttribute,
+                     boolean fixedPrecScale,
+                     Integer minimumScale,
+                     Integer maximumScale,
+                     Integer numPrecRadix)
     {
         m_val = val;
         m_lengthInBytes = lengthInBytes;
@@ -150,6 +242,20 @@ public enum VoltType {
         m_classes = classes;
         m_vectorClass = vectorClass;
         m_signatureChar = signatureChar;
+        m_jdbcVisible = jdbcVisible;
+        m_dataType = dataType;
+        m_precision = precision;
+        m_literalPrefix = literalPrefix;
+        m_literalSuffix = literalSuffix;
+        m_createParams = createParams;
+        m_nullable = nullable;
+        m_caseSensitive = caseSensitive;
+        m_searchable = searchable;
+        m_unsignedAttribute = unsignedAttribute;
+        m_fixedPrecScale = fixedPrecScale;
+        m_minimumScale = minimumScale;
+        m_maximumScale = maximumScale;
+        m_numPrecRadix = numPrecRadix;
     }
 
     private final static Map<Class<?>, VoltType> s_classes;
