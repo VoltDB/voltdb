@@ -261,7 +261,7 @@ Description: %(description)s
             arch        = 'x86_64',
             summary     = self.summary,
             license     = self.license,
-            prefix      = '/usr/share'
+            prefix      = '/usr'
             )
 
         self.rpm_control_template = '''\
@@ -312,20 +312,20 @@ drives business value.
 %%include myfiles
 
 %%post
-%%include postcmd
-ln -sf %%{prefix}/%%{name}-%%{version} %%{prefix}/voltdb
 
 %%preun
-unlink %%{prefix}/voltdb
 %%include preuncmd
 
 %%postun
 # remove voltdb directory tree
-if [ -n "%%{name}-%%{version}" ]; then
-    rm -rf %%{prefix}/%%{name}-%%{version}
+if [ -n "%%{name}" ]; then
+    rm -rf %%{prefix}/lib/%%{name}
+    rm -rf %%{prefix}/share/%%{name}
 fi
 
 %%changelog
+* Mon Nov 11 2013  Phil Rosegay <support@voltdb.com> 4.0-1
+- GA-4.0
 * Fri Jan 14 2013  Phil Rosegay <support@voltdb.com> 3.0-1
 - GA-3.0
 '''
@@ -557,11 +557,8 @@ def debian():
 
 def rpm():
 
-    installdir = os.path.join("usr","share")
-    installbin = os.path.join(os.sep, "usr","bin")
-
     blddir = os.path.join(meta.build_root, 'rpmbuild')
-    meta.options.prefix = blddir
+
     if os.path.exists(meta.build_root):
         info('Removing existing output directory "%s"...' % meta.build_root)
         if not meta.options.dryrun:
@@ -589,8 +586,9 @@ def rpm():
 
     # stage the voltdb distribution files where rpmbuild needs them
     buildroot = os.path.join(blddir, "tmp", voltdb_build)
-    voltdb_prefix = os.path.join(buildroot, installdir, voltdb_dist)
-    shutil.copytree(volt_root, voltdb_prefix, symlinks=False, ignore=None)
+    meta.options.prefix = buildroot
+    install()
+    #shutil.move(os.path.join(blddir,"usr"), os.path.join(blddir,"tmp",voltdb_build,"usr"))
 
     # make a list of the files that rpmbuild will package
     # only FILES that go into the rpm should be listed
@@ -598,20 +596,27 @@ def rpm():
     # also spit out command lists for the %post and %preun sections
     # that will link/unlink the binaries from /usr/bin
     with ChDir(buildroot):
-        with open(os.path.join(blddir, "SPECS", "myfiles"), 'w') as fout:
-            with open(os.path.join(blddir, "SPECS", "postcmd"), 'w') as pout:
-                with open(os.path.join(blddir, "SPECS", "preuncmd"), 'w') as uout:
-                    for l in pipe_cmd("find", ".", "-type", "f"):
-                        fout.write("\"%s\"\n" % string.lstrip(l, '.'))
-                        if l.startswith(os.path.join(installdir, voltdb_dist, 'bin'), 2):
-                            pout.write("ln -sf /%s %s\n" % (os.path.relpath(l, buildroot), installbin))
-                            uout.write("unlink %s\n" % os.path.join(installbin,
-                                os.path.relpath(l, os.path.join(buildroot, installdir, voltdb_dist, 'bin'))))
+        files = [] 
+        for l in pipe_cmd("find", ".", "-not", "-type", "d"):
+            files.append(string.lstrip(l, '.'))
+
+        links = [] 
+        for l in pipe_cmd("find", ".", "-type", "l"):
+            print l
+            links.append(string.lstrip(l, '.'))
+
+    with open(os.path.join(blddir, "SPECS", "myfiles"), 'w') as fout:
+        for f in files:
+            fout.write("\"%s\"\n" % f)
+        
+    with open(os.path.join(blddir, "SPECS", "preuncmd"), 'w') as uout:
+        for l in links:
+            uout.write("unlink %s\n" % l)
 
     # make an empty SOURCE tarball to satisfy rpmbuild's need to build something from source
     rpm_sources = os.path.join(blddir, "SOURCES")
     os.mkdir(os.path.join(rpm_sources, voltdb_dist))
-    with ChDir(os.path.join(blddir, "SOURCES")):
+    with ChDir(rpm_sources):
         run_cmd("tar", "-cf", voltdb_dist+".tar.gz", voltdb_dist)
         os.rmdir(voltdb_dist)
 
@@ -775,7 +780,10 @@ that tarball instead of the working directory.''')
         source_root  = find_volt_root(os.path.realpath(__file__))
         version      = get_source_version(source_root)
         volt_root    = find_volt_root(os.getcwd())
-        build_root   = os.path.join(volt_root, 'obj', 'debian')
+        if meta.options.debian:
+            build_root   = os.path.join(volt_root, 'obj', 'debian')
+        elif meta.options.rpm:
+            build_root   = os.path.join(volt_root, 'obj', 'rpm')
         output_root  = build_root
     meta.initialize(version, volt_root, build_root, output_root, clean_up_items)
 
