@@ -259,7 +259,7 @@ public enum VoltType {
     {
         this(val, lengthInBytes, sqlString, classes, vectorClass, signatureChar,
                 false,
-                Integer.MIN_VALUE,
+                java.sql.Types.OTHER,
                 null,
                 null,
                 null,
@@ -509,6 +509,13 @@ public enum VoltType {
      */
     public String toSQLString() {
         return m_sqlString;
+    }
+
+    /**
+     * Get the java.sql.Types type of this type.  Type.  Type you, typing typer.
+     */
+    public int getJdbcSqlType() {
+        return m_dataType;
     }
 
     // Really hacky cast overflow detection for primitive types
