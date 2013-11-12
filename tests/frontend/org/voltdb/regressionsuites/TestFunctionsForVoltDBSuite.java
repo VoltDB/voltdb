@@ -250,11 +250,21 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
     }
 
     public void testDECODE() throws NoConnectionsException, IOException, ProcCallException {
+        DECODE();
+        DECODENoDefault();
+        DECODEVeryLong();
+        DECODEInlineVarcharColumn_ENG5078();
+        DECODEAsInput();
+        DECODEWithNULL();
+    }
+
+    private void DECODE() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING DECODE");
         Client client = getClient();
         ClientResponse cr;
         VoltTable result;
 
+        cr = client.callProcedure("@AdHoc", "Delete from P1;");
         cr = client.callProcedure("P1.insert", 1, "IBM", 10, 1.1);
         cr = client.callProcedure("P1.insert", 2, "Microsoft", 10, 1.1);
         cr = client.callProcedure("P1.insert", 3, "Hewlett Packard", 10, 1.1);
@@ -345,12 +355,13 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
-    public void testDECODENoDefault() throws NoConnectionsException, IOException, ProcCallException {
+    private void DECODENoDefault() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING DECODE No Default");
         Client client = getClient();
         ClientResponse cr;
         VoltTable result;
 
+        cr = client.callProcedure("@AdHoc", "Delete from P1;");
         cr = client.callProcedure("P1.insert", 1, "zheng", 10, 1.1);
         cr = client.callProcedure("P1.insert", 2, "li", 10, 1.1);
         cr = client.callProcedure("P1.insert", 3, null, 10, 1.1);
@@ -365,12 +376,13 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(null,result.getString(1));
     }
 
-    public void testDECODEVeryLong() throws NoConnectionsException, IOException, ProcCallException {
+    private void DECODEVeryLong() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING DECODE Exceed Limit");
         Client client = getClient();
         ClientResponse cr;
         VoltTable result;
 
+        cr = client.callProcedure("@AdHoc", "Delete from P1;");
         cr = client.callProcedure("P1.insert", 1, "zheng", 10, 1.1);
         cr = client.callProcedure("P1.insert", 2, "li", 10, 1.1);
         cr = client.callProcedure("P1.insert", 3, null, 10, 1.1);
@@ -385,7 +397,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals("where",result.getString(1));
     }
 
-    public void testDECODEInlineVarcharColumn_ENG5078()
+    private void DECODEInlineVarcharColumn_ENG5078()
     throws NoConnectionsException, IOException, ProcCallException
     {
         System.out.println("STARTING DECODE inline varchar column pass-through");
@@ -393,6 +405,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         ClientResponse cr;
         VoltTable result;
 
+        cr = client.callProcedure("@AdHoc", "Delete from P3_INLINE_DESC;");
         cr = client.callProcedure("P3_INLINE_DESC.insert", 1, "zheng", 10, 1.1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
@@ -411,12 +424,13 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
-    public void testDECODEAsInput() throws NoConnectionsException, IOException, ProcCallException {
+    private void DECODEAsInput() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING DECODE No Default");
         Client client = getClient();
         ClientResponse cr;
         VoltTable result;
 
+        cr = client.callProcedure("@AdHoc", "Delete from P1;");
         cr = client.callProcedure("P1.insert", 1, "zheng", 10, 1.1);
         cr = client.callProcedure("P1.insert", 2, "li", 10, 1.1);
         cr = client.callProcedure("P1.insert", 3, null, 10, 1.1);
@@ -485,11 +499,12 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
-    public void testDECODEWithNULL() throws NoConnectionsException, IOException, ProcCallException {
+    private void DECODEWithNULL() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING DECODE with NULL");
         Client client = getClient();
         ClientResponse cr;
 
+        cr = client.callProcedure("@AdHoc", "Delete from R3;");
         cr = client.callProcedure("R3.insert", 1, 1, 1, 1, 1, 1.1, "2013-07-18 02:00:00.123457", "IBM", 1);
         cr = client.callProcedure("R3.insert", 2, null, null, null, null, null, null, null, null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
