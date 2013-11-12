@@ -128,6 +128,10 @@ public:
             return NValue::getFalse();
         }*/
 
+        if (lnv.isNull() || rnv.isNull()) {
+            return NValue::getFalse();
+        }
+
         return compare.cmp(lnv, rnv);
     }
 
