@@ -17,9 +17,10 @@
 
 package org.voltdb;
 
-import com.google.common.base.*;
-
+import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
@@ -27,12 +28,13 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
-
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
+
+import com.google.common.base.Charsets;
+import com.google.common.base.Supplier;
+import com.google.common.base.Suppliers;
+import com.google.common.base.Throwables;
 
 /**
  * Class that maps object values to partitions. It's rather simple
@@ -328,8 +330,7 @@ public abstract class TheHashinator {
                     }
                 }
             }
-            else if (this.getConfigurationType() == HashinatorType.LEGACY
-                    && partitionValue.getClass() == byte[].class) {
+            else if (partitionValue.getClass() == byte[].class) {
                 partitionValue = bytesToValue(partitionParamType, (byte[]) partitionValue);
             }
         }
