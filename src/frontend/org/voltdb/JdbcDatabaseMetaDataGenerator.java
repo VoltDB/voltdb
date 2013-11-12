@@ -616,39 +616,8 @@ public class JdbcDatabaseMetaDataGenerator
     // Integer[0] is the column size and Integer[1] is the radix
     private Integer[] getParamPrecisionAndRadix(ProcParameter param)
     {
-        Integer[] col_size_radix = {null, null};
         VoltType type = VoltType.get((byte) param.getType());
-        switch(type)
-        {
-        //
-        case TINYINT:
-        case SMALLINT:
-        case INTEGER:
-        case BIGINT:
-        case TIMESTAMP:
-            col_size_radix[0] = (type.getLengthInBytesForFixedTypes() * 8) - 1;
-            col_size_radix[1] = 2;
-            break;
-        case FLOAT:
-            col_size_radix[0] = 53;  // magic for double
-            col_size_radix[1] = 2;
-            break;
-        case STRING:
-            col_size_radix[0] = VoltType.MAX_VALUE_LENGTH;
-            col_size_radix[1] = null;
-            break;
-        case DECIMAL:
-            col_size_radix[0] = VoltDecimalHelper.kDefaultPrecision;
-            col_size_radix[1] = 10;
-            break;
-        case VARBINARY:
-            col_size_radix[0] = VoltType.MAX_VALUE_LENGTH;
-            col_size_radix[1] = null;
-            break;
-        default:
-            // XXX What's the right behavior here?
-        }
-        return col_size_radix;
+        return VoltType.getTypePrecisionAndRadix(type);
     }
 
     private int getParamLength(ProcParameter param)
