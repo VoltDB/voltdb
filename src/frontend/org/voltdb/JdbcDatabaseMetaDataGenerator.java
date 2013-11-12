@@ -246,42 +246,10 @@ public class JdbcDatabaseMetaDataGenerator
     }
 
     // Might consider consolidating this into VoltType if we go big on JDBC stuff.
+    // Considered and done
     private int getColumnSqlDataType(VoltType type)
     {
-        int jdbc_sql_type = java.sql.Types.OTHER;
-        switch(type)
-        {
-        case TINYINT:
-            jdbc_sql_type = java.sql.Types.TINYINT;
-            break;
-        case SMALLINT:
-            jdbc_sql_type = java.sql.Types.SMALLINT;
-            break;
-        case INTEGER:
-            jdbc_sql_type = java.sql.Types.INTEGER;
-            break;
-        case BIGINT:
-            jdbc_sql_type = java.sql.Types.BIGINT;
-            break;
-        case FLOAT:
-            jdbc_sql_type = java.sql.Types.DOUBLE;
-            break;
-        case TIMESTAMP:
-            jdbc_sql_type = java.sql.Types.TIMESTAMP;
-            break;
-        case STRING:
-            jdbc_sql_type = java.sql.Types.VARCHAR;
-            break;
-        case DECIMAL:
-            jdbc_sql_type = java.sql.Types.DECIMAL;
-            break;
-        case VARBINARY:
-            jdbc_sql_type = java.sql.Types.VARBINARY;
-            break;
-        default:
-            // XXX What's the right behavior here?
-        }
-        return jdbc_sql_type;
+        return type.getJdbcSqlType();
     }
 
     private String getColumnSqlTypeName(VoltType type)
