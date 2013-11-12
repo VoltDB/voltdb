@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.voltdb.types.TimestampType;
+import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
 
 
@@ -58,34 +59,84 @@ public enum VoltType {
      * 1-byte signed 2s-compliment byte.
      * Lowest value means NULL in the database.
      */
-    TINYINT   ((byte)3, 1, "tinyint", new Class[] {byte.class, Byte.class}, byte[].class, 't'),
+    TINYINT   ((byte)3, 1, "tinyint", new Class[] {byte.class, Byte.class}, byte[].class, 't',
+            java.sql.Types.TINYINT,  // java.sql.Types DATA_TYPE
+            null, // prefix to specify a literal
+            null, // suffix to specify a literal
+            null, // necessary params to create
+            java.sql.DatabaseMetaData.typeNullable, // nullability
+            false, // case-sensitive
+            java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
+            false, // unsigned?
+            0, // minimum scale
+            0), // maximum scale
 
     /**
      * 2-byte signed 2s-compliment short.
      * Lowest value means NULL in the database.
      */
-    SMALLINT  ((byte)4, 2, "smallint", new Class[] {short.class, Short.class}, short[].class, 's'),
+    SMALLINT  ((byte)4, 2, "smallint", new Class[] {short.class, Short.class}, short[].class, 's',
+            java.sql.Types.SMALLINT,  // java.sql.Types DATA_TYPE
+            null, // prefix to specify a literal
+            null, // suffix to specify a literal
+            null, // necessary params to create
+            java.sql.DatabaseMetaData.typeNullable, // nullability
+            false, // case-sensitive
+            java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
+            false, // unsigned?
+            0, // minimum scale
+            0), // maximum scale
 
     /**
      * 4-byte signed 2s-compliment integer.
      * Lowest value means NULL in the database.
      */
     INTEGER   ((byte)5, 4, "integer",
-               new Class[] {int.class, Integer.class, AtomicInteger.class}, int[].class, 'i'),
+               new Class[] {int.class, Integer.class, AtomicInteger.class}, int[].class, 'i',
+            java.sql.Types.INTEGER,  // java.sql.Types DATA_TYPE
+            null, // prefix to specify a literal
+            null, // suffix to specify a literal
+            null, // necessary params to create
+            java.sql.DatabaseMetaData.typeNullable, // nullability
+            false, // case-sensitive
+            java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
+            false, // unsigned?
+            0, // minimum scale
+            0), // maximum scale
 
     /**
      * 8-byte signed 2s-compliment long.
      * Lowest value means NULL in the database.
      */
     BIGINT    ((byte)6, 8, "bigint",
-               new Class[] {long.class, Long.class, AtomicLong.class}, long[].class, 'b'),
+               new Class[] {long.class, Long.class, AtomicLong.class}, long[].class, 'b',
+            java.sql.Types.BIGINT,  // java.sql.Types DATA_TYPE
+            null, // prefix to specify a literal
+            null, // suffix to specify a literal
+            null, // necessary params to create
+            java.sql.DatabaseMetaData.typeNullable, // nullability
+            false, // case-sensitive
+            java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
+            false, // unsigned?
+            0, // minimum scale
+            0), // maximum scale
 
     /**
      * 8-bytes in IEEE 754 "double format".
      * Some NaN values may represent NULL in the database (TBD).
      */
     FLOAT     ((byte)8, 8, "float",
-            new Class[] {double.class, Double.class, float.class, Float.class}, double[].class, 'f'),
+            new Class[] {double.class, Double.class, float.class, Float.class}, double[].class, 'f',
+            java.sql.Types.DOUBLE,  // java.sql.Types DATA_TYPE
+            null, // prefix to specify a literal
+            null, // suffix to specify a literal
+            null, // necessary params to create
+            java.sql.DatabaseMetaData.typeNullable, // nullability
+            false, // case-sensitive
+            java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
+            false, // unsigned?
+            null, // minimum scale
+            null), // maximum scale
 
     /**
      * 8-byte long value representing microseconds after the epoch.
@@ -96,14 +147,34 @@ public enum VoltType {
             new Class[] {TimestampType.class,
                          java.util.Date.class,
                          java.sql.Date.class,
-                         java.sql.Timestamp.class}, TimestampType[].class, 'p'),
+                         java.sql.Timestamp.class}, TimestampType[].class, 'p',
+            java.sql.Types.TIMESTAMP,  // java.sql.Types DATA_TYPE
+            "'", // prefix to specify a literal
+            "'", // suffix to specify a literal
+            null, // necessary params to create
+            java.sql.DatabaseMetaData.typeNullable, // nullability
+            false, // case-sensitive
+            java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
+            null, // unsigned?
+            null, // minimum scale
+            null), // maximum scale
 
     /**
      * UTF-8 string with up to 32K chars.
      * The database supports char arrays and varchars
      * but the API uses strings.
      */
-    STRING    ((byte)9, -1, "varchar", new Class[] {String.class}, String[].class, 'v'),
+    STRING    ((byte)9, -1, "varchar", new Class[] {String.class}, String[].class, 'v',
+            java.sql.Types.VARCHAR,  // java.sql.Types DATA_TYPE
+            "'", // prefix to specify a literal
+            "'", // suffix to specify a literal
+            "max_length", // necessary params to create
+            java.sql.DatabaseMetaData.typeNullable, // nullability
+            true, // case-sensitive
+            java.sql.DatabaseMetaData.typeSearchable, // where-clauses supported
+            null, // unsigned?
+            null, // minimum scale
+            null), // maximum scale
 
     /**
      * VoltTable type for Procedure parameters
@@ -113,7 +184,18 @@ public enum VoltType {
     /**
      * Fixed precision=38, scale=12 storing sign and null-status in a preceding byte
      */
-    DECIMAL  ((byte)22, 16, "decimal", new Class[] {BigDecimal.class}, BigDecimal[].class, 'd'),
+    DECIMAL  ((byte)22, 16, "decimal", new Class[] {BigDecimal.class}, BigDecimal[].class, 'd',
+            java.sql.Types.DECIMAL,  // java.sql.Types DATA_TYPE
+            null, // prefix to specify a literal
+            null, // suffix to specify a literal
+            null, // necessary params to create
+            java.sql.DatabaseMetaData.typeNullable, // nullability
+            false, // case-sensitive
+            java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
+            false, // unsigned?
+            12, // minimum scale
+            12), // maximum scale
+
 
     /**
      * Array of bytes of variable length
@@ -121,7 +203,18 @@ public enum VoltType {
     VARBINARY    ((byte)25, -1, "varbinary",
             new Class[] {byte[].class,
                          Byte[].class },
-                         byte[][].class, 'l');
+                         byte[][].class, 'l',
+            java.sql.Types.VARBINARY,  // java.sql.Types DATA_TYPE
+            "'", // prefix to specify a literal
+            "'", // suffix to specify a literal
+            "max_length", // necessary params to create
+            java.sql.DatabaseMetaData.typeNullable, // nullability
+            true, // case-sensitive
+            java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
+            false, // unsigned?
+            null, // minimum scale
+            null); // maximum scale
+
 
     /**
      * Size in bytes of the maximum length for a VoltDB field value, presumably a
@@ -150,7 +243,6 @@ public enum VoltType {
     // it might be time to consider some sort of data-driven type specification
     // mechanism.
     private final Integer m_dataType;
-    private final int m_precision;
     private final String m_literalPrefix;
     private final String m_literalSuffix;
     private final String m_createParams;
@@ -158,10 +250,8 @@ public enum VoltType {
     private final boolean m_caseSensitive;
     private final int m_searchable;
     private final Boolean m_unsignedAttribute;
-    private final boolean m_fixedPrecScale;
     private final Integer m_minimumScale;
     private final Integer m_maximumScale;
-    private final Integer m_numPrecRadix;
 
     // Constructor for non-JDBC-visible types
     private VoltType(byte val, int lengthInBytes, String sqlString,
@@ -170,15 +260,12 @@ public enum VoltType {
         this(val, lengthInBytes, sqlString, classes, vectorClass, signatureChar,
                 false,
                 Integer.MIN_VALUE,
-                Integer.MIN_VALUE,
                 null,
                 null,
                 null,
                 Integer.MIN_VALUE,
                 false,
                 Integer.MIN_VALUE,
-                null,
-                false,
                 null,
                 null,
                 null);
@@ -189,7 +276,6 @@ public enum VoltType {
     private VoltType(byte val, int lengthInBytes, String sqlString,
                      Class<?>[] classes, Class<?> vectorClass, char signatureChar,
                      int dataType,
-                     int precision,
                      String literalPrefix,
                      String literalSuffix,
                      String createParams,
@@ -197,15 +283,12 @@ public enum VoltType {
                      boolean caseSensitive,
                      int searchable,
                      Boolean unsignedAttribute,
-                     boolean fixedPrecScale,
                      Integer minimumScale,
-                     Integer maximumScale,
-                     Integer numPrecRadix)
+                     Integer maximumScale)
     {
         this(val, lengthInBytes, sqlString, classes, vectorClass, signatureChar,
                 true,
                 dataType,
-                precision,
                 literalPrefix,
                 literalSuffix,
                 createParams,
@@ -213,17 +296,14 @@ public enum VoltType {
                 caseSensitive,
                 searchable,
                 unsignedAttribute,
-                fixedPrecScale,
                 minimumScale,
-                maximumScale,
-                numPrecRadix);
+                maximumScale);
     }
 
     private VoltType(byte val, int lengthInBytes, String sqlString,
                      Class<?>[] classes, Class<?> vectorClass, char signatureChar,
                      boolean jdbcVisible,
                      int dataType,
-                     int precision,
                      String literalPrefix,
                      String literalSuffix,
                      String createParams,
@@ -231,10 +311,8 @@ public enum VoltType {
                      boolean caseSensitive,
                      int searchable,
                      Boolean unsignedAttribute,
-                     boolean fixedPrecScale,
                      Integer minimumScale,
-                     Integer maximumScale,
-                     Integer numPrecRadix)
+                     Integer maximumScale)
     {
         m_val = val;
         m_lengthInBytes = lengthInBytes;
@@ -244,7 +322,6 @@ public enum VoltType {
         m_signatureChar = signatureChar;
         m_jdbcVisible = jdbcVisible;
         m_dataType = dataType;
-        m_precision = precision;
         m_literalPrefix = literalPrefix;
         m_literalSuffix = literalSuffix;
         m_createParams = createParams;
@@ -252,10 +329,8 @@ public enum VoltType {
         m_caseSensitive = caseSensitive;
         m_searchable = searchable;
         m_unsignedAttribute = unsignedAttribute;
-        m_fixedPrecScale = fixedPrecScale;
         m_minimumScale = minimumScale;
         m_maximumScale = maximumScale;
-        m_numPrecRadix = numPrecRadix;
     }
 
     private final static Map<Class<?>, VoltType> s_classes;
@@ -738,6 +813,42 @@ public enum VoltType {
         }
         sb.append("]");
         return sb.toString();
+    }
+
+    // Integer[0] is the column size and Integer[1] is the radix
+    public static Integer[] getTypePrecisionAndRadix(VoltType type)
+    {
+        Integer[] col_size_radix = {null, null};
+        switch(type)
+        {
+        case TINYINT:
+        case SMALLINT:
+        case INTEGER:
+        case BIGINT:
+        case TIMESTAMP:
+            col_size_radix[0] = (type.getLengthInBytesForFixedTypes() * 8) - 1;
+            col_size_radix[1] = 2;
+            break;
+        case FLOAT:
+            col_size_radix[0] = 53;  // magic for double
+            col_size_radix[1] = 2;
+            break;
+        case STRING:
+            col_size_radix[0] = VoltType.MAX_VALUE_LENGTH;
+            col_size_radix[1] = null;
+            break;
+        case DECIMAL:
+            col_size_radix[0] = VoltDecimalHelper.kDefaultPrecision;
+            col_size_radix[1] = 10;
+            break;
+        case VARBINARY:
+            col_size_radix[0] = VoltType.MAX_VALUE_LENGTH;
+            col_size_radix[1] = null;
+            break;
+        default:
+            // What's the right behavior here?
+        }
+        return col_size_radix;
     }
 
     /** Length value for a null string. */
