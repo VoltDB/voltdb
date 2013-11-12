@@ -466,13 +466,21 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     public void removeFromGraph() {
-       for (AbstractPlanNode parent : m_parents)
-           parent.m_children.remove(this);
-       for (AbstractPlanNode child : m_children)
-           child.m_parents.remove(this);
-       m_parents.clear();
-       m_children.clear();
+        disconnectParents();
+        disconnectChildren();
     }
+
+    public void disconnectParents() {
+        for (AbstractPlanNode parent : m_parents)
+            parent.m_children.remove(this);
+        m_parents.clear();
+     }
+
+    public void disconnectChildren() {
+        for (AbstractPlanNode child : m_children)
+            child.m_parents.remove(this);
+        m_children.clear();
+     }
 
     /** Interject the provided node between this node and this node's current children */
     public void addIntermediary(AbstractPlanNode node) {

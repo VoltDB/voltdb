@@ -715,6 +715,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             CompiledPlan subQueryPlan = tableCache.m_tableDerived.getBetsCostPlan();
             assert(subQueryPlan != null);
             assert(subQueryPlan.rootPlanGraph != null);
+            // The sub-query best cost plan needs to be un-linked from the previous parent plan
+            // it's the same child plan that gets re-attached to many parents one at a time
+            subQueryPlan.rootPlanGraph.disconnectParents();
             scanNode.addAndLinkChild(subQueryPlan.rootPlanGraph);
         }
         return scanNode;

@@ -30,6 +30,8 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
@@ -49,59 +51,98 @@ public class TestSubQueries   extends PlannerTestCase {
             assertEquals("TEMP", ((TupleValueExpression) p).getTableAlias());
             assertTrue(pn.getChildCount() == 1);
             assertTrue(pn.getChild(0) instanceof SeqScanPlanNode);
-            NodeSchema ns = pn.getOutputSchema();
-            String columns[] = {"A", "C"};
-            List<SchemaColumn> scs = ns.getColumns();
-            for (int i = 0; i < scs.size(); ++i) {
-                SchemaColumn col = scs.get(i);
-                assertEquals(columns[i], col.getColumnName());
-                assertEquals(4, col.getSize());
-                assertEquals(VoltType.INTEGER, col.getType());
-                assertTrue(col.getExpression() instanceof TupleValueExpression);
-                assertTrue(((TupleValueExpression)col.getExpression()).getColumnIndex() != -1);
-            }
+            verifyOutputSchema(pn, "A", "C");
         }
 
         {
             AbstractPlanNode pn = compile("select A1, C1 FROM (SELECT A A1, C C1 FROM R1) TEMP WHERE TEMP.A1 > 0");
             pn = pn.getChild(0);
             assertTrue(pn instanceof SeqScanPlanNode);
-            NodeSchema ns = pn.getOutputSchema();
-            String columns[] = {"A1", "C1"};
-            List<SchemaColumn> scs = ns.getColumns();
-            for (int i = 0; i < scs.size(); ++i) {
-                SchemaColumn col = scs.get(i);
-                assertEquals(columns[i], col.getColumnName());
-                assertEquals(4, col.getSize());
-                assertEquals(VoltType.INTEGER, col.getType());
-                assertTrue(col.getExpression() instanceof TupleValueExpression);
-                assertTrue(((TupleValueExpression)col.getExpression()).getColumnIndex() != -1);
-            }
+            verifyOutputSchema(pn, "A1", "C1");
         }
 
         {
             AbstractPlanNode pn = compile("select A2 FROM (SELECT A1 AS A2 FROM (SELECT A AS A1 FROM R1) TEMP1 WHERE TEMP1.A1 > 0) TEMP2 WHERE TEMP2.A2 = 3");
             pn = pn.getChild(0);
             assertTrue(pn instanceof SeqScanPlanNode);
-            NodeSchema ns = pn.getOutputSchema();
-            String columns[] = {"A2"};
-            List<SchemaColumn> scs = ns.getColumns();
-            for (int i = 0; i < scs.size(); ++i) {
-                SchemaColumn col = scs.get(i);
-                assertEquals(columns[i], col.getColumnName());
-                assertEquals(4, col.getSize());
-                assertEquals(VoltType.INTEGER, col.getType());
-                assertTrue(col.getExpression() instanceof TupleValueExpression);
-                assertTrue(((TupleValueExpression)col.getExpression()).getColumnIndex() != -1);
-            }
+            verifyOutputSchema(pn, "A2");
         }
 
+        {
+            AbstractPlanNode pn = compile("select A, C FROM (SELECT A FROM R1) TEMP1, (SELECT C FROM R2) TEMP2 WHERE A = C");
+            pn = pn.getChild(0).getChild(0);
+            assertTrue(pn instanceof NestLoopPlanNode);
+            verifyOutputSchema(pn, "A", "C");
+        }
     }
 
-//    failToCompile("select * from new_order where no_w_id in (select w_id from warehouse);",
-//            "VoltDB does not support subqueries");
+    public void testDistributedSubQuery() {
+        {
+            // Partitioned sub-query
+            List<AbstractPlanNode> lpn = compileToFragments("select A, C FROM (SELECT A, C FROM P1) TEMP ");
+            assertTrue(lpn.size() == 2);
+            AbstractPlanNode n = lpn.get(0).getChild(0);
+            assertTrue(n instanceof SeqScanPlanNode);
+            assertEquals("SYSTEM_SUBQUERY", ((SeqScanPlanNode) n).getTargetTableName());
+            n = lpn.get(1).getChild(0);
+            assertTrue(n instanceof IndexScanPlanNode);
+        }
 
-// params
+        {
+            // Two sub-queries. One is partitioned and the other one is replicated
+            List<AbstractPlanNode> lpn = compileToFragments("select A, C FROM (SELECT A FROM R1) TEMP1, (SELECT C FROM P2) TEMP2 WHERE TEMP1.A = TEMP2.C ");
+            assertTrue(lpn.size() == 2);
+            AbstractPlanNode n = lpn.get(0).getChild(0).getChild(0);
+            assertTrue(n instanceof NestLoopPlanNode);
+            AbstractPlanNode c = n.getChild(0);
+            assertTrue(c instanceof SeqScanPlanNode);
+            assertEquals("TEMP1", ((SeqScanPlanNode) c).getTargetTableAlias());
+            c = n.getChild(1);
+            assertTrue(c instanceof SeqScanPlanNode);
+            assertEquals("TEMP2", ((SeqScanPlanNode) c).getTargetTableAlias());
+            n = lpn.get(1).getChild(0);
+            assertTrue(n instanceof IndexScanPlanNode);
+        }
+
+        {
+            // Join of two multi-partitioned sub-queries on non-partition column. Should fail
+            failToCompile("select A, C FROM (SELECT A FROM P1) TEMP1, (SELECT C FROM P2) TEMP2 WHERE TEMP1.A = TEMP2.C ",
+                    "Statements are too complex in set operation or sub-query using multiple partitioned");
+        }
+        {
+            // Join of two single partitioned sub-queries. Should compile
+            List<AbstractPlanNode> lpn = compileToFragments("select D1, D2 FROM (SELECT D D1 FROM P1 WHERE A=1) TEMP1, (SELECT D D2 FROM P2 WHERE A=1) TEMP2 WHERE TEMP1.D1 = TEMP2.D2 ");
+            assertTrue(lpn.size() == 1);
+            AbstractPlanNode n = lpn.get(0).getChild(0).getChild(0);
+            assertTrue(n instanceof NestLoopPlanNode);
+            AbstractPlanNode c = n.getChild(0);
+            assertTrue(c instanceof SeqScanPlanNode);
+            assertEquals("TEMP1", ((SeqScanPlanNode) c).getTargetTableAlias());
+            c = n.getChild(1);
+            assertTrue(c instanceof SeqScanPlanNode);
+            assertEquals("TEMP2", ((SeqScanPlanNode) c).getTargetTableAlias());
+        }
+        {
+            // Join of two multi-partitioned sub-queries on the partition column. Should compile ?
+            List<AbstractPlanNode> lpn = compileToFragments("select A1, A2 FROM (SELECT A A1 FROM P1) TEMP1, (SELECT A A2 FROM P2) TEMP2 WHERE TEMP1.A1 = TEMP2.A2 ");
+            assertTrue(lpn.size() == 2);
+        }
+    }
+
+    private void verifyOutputSchema(AbstractPlanNode pn, String... columns) {
+        NodeSchema ns = pn.getOutputSchema();
+        List<SchemaColumn> scs = ns.getColumns();
+        for (int i = 0; i < scs.size(); ++i) {
+            SchemaColumn col = scs.get(i);
+            assertEquals(columns[i], col.getColumnName());
+            assertEquals(4, col.getSize());
+            assertEquals(VoltType.INTEGER, col.getType());
+            assertTrue(col.getExpression() instanceof TupleValueExpression);
+            assertTrue(((TupleValueExpression)col.getExpression()).getColumnIndex() != -1);
+        }
+    }
+
+    // params
     // update
     // delete
 
@@ -127,8 +168,6 @@ public class TestSubQueries   extends PlannerTestCase {
 //            "                                    WHERE PROJ.CITY='Tampa')); \n" +
 //            "";
 
-
-    // need the case with two  sub-queries on the same lavel (table names will be identical)
 
     //failToCompile("select * from new_order where no_w_id in (select w_id from warehouse);",
     //        "VoltDB does not support subqueries");

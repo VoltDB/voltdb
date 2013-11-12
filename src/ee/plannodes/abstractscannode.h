@@ -66,6 +66,10 @@ public:
     void setPredicate(AbstractExpression* predicate);
     AbstractExpression* getPredicate() const;
 
+    bool isSubQuery() const {
+        return m_isSubQuery;
+    }
+
     virtual std::string debugInfo(const std::string& spacer) const;
 
 protected:
@@ -85,6 +89,8 @@ protected:
     // This is the predicate used to filter out tuples during the scan
     //
     AbstractExpression* m_predicate;
+    // True if this scan represents a sub query
+    bool m_isSubQuery;
 };
 
 }

@@ -42,7 +42,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     public enum Members {
         PREDICATE,
         TARGET_TABLE_NAME,
-        TARGET_TABLE_ALIAS;
+        TARGET_TABLE_ALIAS,
+        SUBQUERY_INDICATOR;
     }
 
     // Store the columns from the table as an internal NodeSchema
@@ -369,6 +370,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         stringer.value(m_predicate);
         stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_targetTableName);
         stringer.key(Members.TARGET_TABLE_ALIAS.name()).value(m_targetTableAlias);
+        if (m_isSubQuery) {
+            stringer.key(Members.SUBQUERY_INDICATOR.name()).value("TRUE");
+        }
     }
 
     @Override
@@ -380,7 +384,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
         m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
         m_targetTableAlias = jobj.getString( Members.TARGET_TABLE_ALIAS.name() );
-
+        m_isSubQuery = "TRUE".equalsIgnoreCase(jobj.getString( Members.SUBQUERY_INDICATOR.name() ));
     }
 
     @Override

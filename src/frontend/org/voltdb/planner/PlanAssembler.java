@@ -320,6 +320,11 @@ public class PlanAssembler {
             boolean orderIsDeterministic =
                     subQueryResult.m_orderIsDeterministic && retval.isOrderDeterministic();
             retval.statementGuaranteesDeterminism(contentIsDeterministic, orderIsDeterministic);
+
+            // Need to re-attach the sub-queries plans to the best parent plan. The same best plan for each
+            // sub-query is reused with all parent candidate plans and needs to be reconnected with
+            // the final best parent plan
+            retval.rootPlanGraph = connectChildrenBestPlans(retval.rootPlanGraph);
         }
         return retval;
     }
@@ -564,6 +569,27 @@ public class PlanAssembler {
                     "Statements use conflicting partitioned table filters in set operation or sub-query.");
         }
         return commonPartitioning;
+    }
+
+    private AbstractPlanNode connectChildrenBestPlans(AbstractPlanNode parentPlan) {
+        if (parentPlan instanceof AbstractScanPlanNode) {
+            AbstractScanPlanNode scanNode = (AbstractScanPlanNode) parentPlan;
+            if (scanNode.isSubQuery()) {
+                String tableAlias = scanNode.getTargetTableAlias();
+                assert (subAssembler.m_parsedStmt.tableAliasIndexMap.containsKey(tableAlias));
+                int tableIdx = subAssembler.m_parsedStmt.tableAliasIndexMap.get(tableAlias);
+                StmtTableScan tableCache = subAssembler.m_parsedStmt.stmtCache.get(tableIdx);
+                assert (tableCache.m_tableDerived != null);
+                AbstractPlanNode subQueryRoot = tableCache.m_tableDerived.getBetsCostPlan().rootPlanGraph;
+                subQueryRoot.disconnectParents();
+                scanNode.addAndLinkChild(subQueryRoot);
+            }
+        } else {
+            for (int i = 0; i < parentPlan.getChildCount(); ++i) {
+                connectChildrenBestPlans(parentPlan.getChild(i));
+            }
+        }
+        return parentPlan;
     }
 
     private AbstractPlanNode getNextSelectPlan() {
