@@ -18,11 +18,9 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
 
 public class ParsedUnionStmt extends AbstractParsedStmt {
 
@@ -35,8 +33,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         EXCEPT_ALL,
         EXCEPT
     };
-    /** Hash Set to enforce table uniqueness across all the sub-selects */
-    private HashSet<String> m_uniqueTables = new HashSet<String>();
+
     ArrayList<AbstractParsedStmt> m_children = new ArrayList<AbstractParsedStmt>();
     UnionType m_unionType = UnionType.NOUNION;
 
@@ -79,35 +76,14 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
                 childStmt.parseTablesAndParams(childSQL);
                 m_children.add(childStmt);
 
-                // So far T UNION T (as well as T JOIN T) are not handled properly
-                // by the fragmentizer. Need to give an error if any table is mentioned
-                // in the UNION TREE more than once.
-                if (childStmt.scanColumns != null) {
-                    for (Table table : childStmt.tableList) {
-                        String tableName = table.getTypeName();
-                        if (m_uniqueTables.contains(tableName)) {
-                            // The table is not 'unique' across the union
-                            throw new PlanningErrorException("Table " + tableName +
-                                    " appears more than once in the union statement");
-                        } else {
-                            m_uniqueTables.add(tableName);
-                        }
-                    }
-                } else {
-                    throw new PlanningErrorException("Scan columns are NULL the UNION statement");
-                }
                 // Add statement's tables to the consolidated list
                 tableList.addAll(childStmt.tableList);
             } else if (childSQL.name.equalsIgnoreCase(UNION_NODE_NAME)) {
                 ParsedUnionStmt childStmt = new ParsedUnionStmt(this.m_paramValues, this.m_db);
-                // Pass already accumulated unique tables to the child union
-                childStmt.m_uniqueTables = m_uniqueTables;
                 childStmt.parseTablesAndParams(childSQL);
                 m_children.add(childStmt);
                 // Add statement's tables to the consolidated list
                 tableList.addAll(childStmt.tableList);
-                // Child's unique tables now contains the consolidated list
-                m_uniqueTables = childStmt.m_uniqueTables;
             } else {
                 throw new PlanningErrorException("Unexpected Element in UNION statement: " + childSQL.name);
             }

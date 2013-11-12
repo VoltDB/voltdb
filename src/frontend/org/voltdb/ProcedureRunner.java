@@ -54,6 +54,7 @@ import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.planner.ActivePlanRepository;
+import org.voltdb.sysprocs.AdHocBase;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
@@ -381,6 +382,18 @@ public class ProcedureRunner {
             int parameterType = m_catProc.getPartitioncolumn().getType();
             int partitionparameter = m_catProc.getPartitionparameter();
             Object parameterAtIndex = invocation.getParameterAtIndex(partitionparameter);
+
+            // check if AdHoc_RO_SP or AdHoc_RW_SP
+            if (m_procedure instanceof AdHocBase) {
+                // ClientInterface should pre-validate this param is valid
+                parameterType = (Byte) invocation.getParameterAtIndex(partitionparameter + 1);
+            }
+
+            // Note that @LoadSinglepartitionTable has problems if the parititoning param
+            // uses integers as bytes and isn't padded to 8b or using the right byte order.
+            // Since this is not exposed to users, we're ok for now. The right fix is to probably
+            // accept the right partitioning type from the user, then rewrite the params internally
+            // before we initiate the proc (like adhocs).
 
             try {
                 int partition = TheHashinator.getPartitionForParameter(parameterType, parameterAtIndex);

@@ -14,9 +14,24 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.voltcore.zk;
 
-public interface LeaderNoticeHandler {
-    public abstract void becomeLeader();
-    public void noticedTopologyChange(boolean added, boolean removed);
+package org.voltdb.planner;
+
+import java.util.HashSet;
+
+import org.voltdb.catalog.Table;
+import org.voltdb.plannodes.SchemaColumn;
+
+/**
+ * StmtTableScan caches data related to a given instance of a table within the statement scope
+ */
+public class StmtTableScan {
+
+    public static final int NULL_ALIAS_INDEX = -1;
+    // Catalog table
+    public Table m_table = null;
+    // table alias
+    public String m_tableAlias = null;
+    // Store a table-hashed list of the columns actually used by this statement.
+    public HashSet<SchemaColumn> m_scanColumns = null ;
 }

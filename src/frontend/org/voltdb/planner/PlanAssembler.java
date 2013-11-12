@@ -38,6 +38,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
+import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -266,7 +267,7 @@ public class PlanAssembler {
                 // per-join-order basis, and so, so must this analysis.
                 HashMap<AbstractExpression, Set<AbstractExpression>>
                     valueEquivalence = parsedStmt.analyzeValueEquivalence();
-                m_partitioning.analyzeForMultiPartitionAccess(parsedStmt.tableList, valueEquivalence);
+                m_partitioning.analyzeForMultiPartitionAccess(parsedStmt.stmtCache, valueEquivalence);
             }
             subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
         }
@@ -673,6 +674,7 @@ public class PlanAssembler {
         NodeSchema proj_schema = new NodeSchema();
         // This planner-created column is magic.
         proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
+                                               "VOLT_TEMP_TABLE",
                                                "tuple_address",
                                                "tuple_address",
                                                addressExpr));
@@ -736,6 +738,7 @@ public class PlanAssembler {
         NodeSchema proj_schema = new NodeSchema();
         // This planner-generated column is magic.
         proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
+                                               "VOLT_TEMP_TABLE",
                                                "tuple_address",
                                                "tuple_address",
                                                tae));
@@ -752,6 +755,7 @@ public class PlanAssembler {
         // to avoid any false schema/column matches with the actual table.
         for (Entry<Column, AbstractExpression> col : m_parsedUpdate.columns.entrySet()) {
             proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
+                                                   "VOLT_TEMP_TABLE",
                                                    col.getKey().getTypeName(),
                                                    col.getKey().getTypeName(),
                                                    col.getValue()));
@@ -829,23 +833,54 @@ public class PlanAssembler {
             // some supported default value
             if (expr == null) {
                 // if it's not nullable or defaulted we have a problem
-                if (column.getNullable() == false && column.getDefaulttype() == 0)
-                {
+                if (column.getNullable() == false && column.getDefaulttype() == 0) {
                     throw new PlanningErrorException("Column " + column.getName()
                             + " has no default and is not nullable.");
                 }
-                ConstantValueExpression const_expr =
-                    new ConstantValueExpression();
-                expr = const_expr;
-                if (column.getDefaulttype() != 0)
-                {
-                    const_expr.setValue(column.getDefaultvalue());
-                    const_expr.refineValueType(VoltType.get((byte) column.getDefaulttype()), column.getSize());
+
+
+                boolean isConstantValue = true;
+                if (column.getDefaulttype() == VoltType.TIMESTAMP.getValue()) {
+
+                    boolean isFunctionFormat = true;
+                    String timeValue = column.getDefaultvalue();
+                    try {
+                        Long.parseLong(timeValue);
+                        isFunctionFormat = false;
+                    } catch (NumberFormatException  e) {}
+                    if (isFunctionFormat) {
+                        try {
+                            java.sql.Timestamp.valueOf(timeValue);
+                            isFunctionFormat = false;
+                        } catch (IllegalArgumentException e) {}
+                    }
+
+                    if (isFunctionFormat) {
+                        String name = timeValue.split(":")[0];
+                        int id = Integer.parseInt(timeValue.split(":")[1]);
+
+                        FunctionExpression funcExpr = new FunctionExpression();
+                        funcExpr.setAttributes(name, name , id);
+
+                        funcExpr.setValueType(VoltType.TIMESTAMP);
+                        funcExpr.setValueSize(VoltType.TIMESTAMP.getMaxLengthInBytes());
+
+                        expr = funcExpr;
+                        isConstantValue = false;
+                    }
                 }
-                else
-                {
-                    const_expr.setValue(null);
-                    const_expr.refineValueType(VoltType.get((byte) column.getType()), column.getSize());
+                if (isConstantValue) {
+                    // Not Default sql function.
+                    ConstantValueExpression const_expr = new ConstantValueExpression();
+                    expr = const_expr;
+                    if (column.getDefaulttype() != 0) {
+                        const_expr.setValue(column.getDefaultvalue());
+                        const_expr.refineValueType(VoltType.get((byte) column.getDefaulttype()), column.getSize());
+                    }
+                    else {
+                        const_expr.setValue(null);
+                        const_expr.refineValueType(VoltType.get((byte) column.getType()), column.getSize());
+                    }
                 }
             }
 
@@ -859,6 +894,7 @@ public class PlanAssembler {
             // add column to the materialize node.
             // This table name is magic.
             mat_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
+                                                  "VOLT_TEMP_TABLE",
                                                   column.getTypeName(),
                                                   column.getTypeName(),
                                                   expr));
@@ -915,28 +951,23 @@ public class PlanAssembler {
             // Create a TVE that should match the tuple count input column
             // This TVE is magic.
             // really really need to make this less hard-wired
-            TupleValueExpression count_tve = new TupleValueExpression();
+            TupleValueExpression count_tve = new TupleValueExpression(
+                    "VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "modified_tuples", "modified_tuples", 0);
             count_tve.setValueType(VoltType.BIGINT);
             count_tve.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
-            count_tve.setColumnIndex(0);
-            count_tve.setColumnName("modified_tuples");
-            count_tve.setColumnAlias("modified_tuples");
-            count_tve.setTableName("VOLT_TEMP_TABLE");
             countNode.addAggregate(ExpressionType.AGGREGATE_SUM, false, 0, count_tve);
 
             // The output column. Not really based on a TVE (it is really the
             // count expression represented by the count configured above). But
             // this is sufficient for now.  This looks identical to the above
             // TVE but it's logically different so we'll create a fresh one.
-            TupleValueExpression tve = new TupleValueExpression();
+            TupleValueExpression tve = new TupleValueExpression(
+                    "VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "modified_tuples", "modified_tuples", 0);
             tve.setValueType(VoltType.BIGINT);
             tve.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
-            tve.setColumnIndex(0);
-            tve.setColumnName("modified_tuples");
-            tve.setColumnAlias("modified_tuples");
-            tve.setTableName("VOLT_TEMP_TABLE");
             NodeSchema count_schema = new NodeSchema();
             SchemaColumn col = new SchemaColumn("VOLT_TEMP_TABLE",
+                    "VOLT_TEMP_TABLE",
                     "modified_tuples",
                     "modified_tuples",
                     tve);
@@ -1067,12 +1098,10 @@ public class PlanAssembler {
                 if (jsonExpr.isEmpty()) {
                     for (ColumnRef cref : index.getColumns()) {
                         Column col = cref.getColumn();
-                        TupleValueExpression tve = new TupleValueExpression();
-                        tve.setColumnIndex(col.getIndex());
-                        tve.setColumnName(col.getName());
-                        tve.setExpressionType(ExpressionType.VALUE_TUPLE);
-                        tve.setHasAggregate(false);
-                        tve.setTableName(table.getTypeName());
+                        // Can not set table Alias here, only table name
+                        TupleValueExpression tve = new TupleValueExpression(table.getTypeName(),
+                                                                            col.getName(),
+                                                                            col.getIndex());
                         tve.setValueSize(col.getSize());
                         tve.setValueType(VoltType.get((byte) col.getType()));
                         indexExpressions.add(tve);
@@ -1371,17 +1400,14 @@ public class PlanAssembler {
                     // and the offset into the output table schema for the
                     // aggregate node that we're computing.
                     // Oh, oh, it's magic, you know..
-                    TupleValueExpression tve = new TupleValueExpression();
+                    TupleValueExpression tve = new TupleValueExpression(
+                            "VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "", col.alias, outputColumnIndex);
                     tve.setValueType(rootExpr.getValueType());
                     tve.setValueSize(rootExpr.getValueSize());
-                    tve.setColumnIndex(outputColumnIndex);
-                    tve.setColumnName("");
-                    tve.setColumnAlias(col.alias);
-                    tve.setTableName("VOLT_TEMP_TABLE");
                     boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
                     aggNode.addAggregate(agg_expression_type, is_distinct, outputColumnIndex, agg_input_expr);
-                    schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "", col.alias, tve);
-                    top_schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "", col.alias, tve);
+                    schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "", col.alias, tve);
+                    top_schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "", col.alias, tve);
 
                     /*
                      * Special case count(*), count(), sum(), min() and max() to
@@ -1455,14 +1481,14 @@ public class PlanAssembler {
                      * MUST already exist in the child node's output. Find them and
                      * add them to the aggregate's output.
                      */
-                    schema_col = new SchemaColumn(col.tableName, col.columnName, col.alias, col.expression);
+                    schema_col = new SchemaColumn(col.tableName, col.tableAlias, col.columnName, col.alias, col.expression);
                     AbstractExpression topExpr = null;
                     if (col.groupBy) {
                         topExpr = m_parsedSelect.groupByExpressions.get(col.alias);
                     } else {
                         topExpr = col.expression;
                     }
-                    top_schema_col = new SchemaColumn(col.tableName, col.columnName, col.alias, topExpr);
+                    top_schema_col = new SchemaColumn(col.tableName, col.tableAlias, col.columnName, col.alias, topExpr);
                 }
 
                 agg_schema.addColumn(schema_col);

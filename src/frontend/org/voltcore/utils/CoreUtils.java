@@ -42,6 +42,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.base.*;
 
+import com.google.common.util.concurrent.*;
 import org.voltcore.logging.VoltLogger;
 
 import org.voltcore.network.ReverseDNSCache;
@@ -49,8 +50,6 @@ import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.MoreExecutors;
 
 public class CoreUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -465,38 +464,84 @@ public class CoreUtils {
     }
 
     public static final class RetryException extends RuntimeException {}
-    public static final <T> T retryHelper(
-            Callable<T> callable,
-            Long maxAttempts,
-            int startInterval,
-            TimeUnit startUnit,
-            int maxInterval,
-            TimeUnit maxUnit) {
+
+    /*
+     * A helper for retrying tasks asynchronously returns a settable future
+     * that can be used to attempt to cancel the task
+     *
+     * The first executor service is used to schedule retry attempts
+     * The second is where the task will be subsmitted for execution
+     * If the two services are the same only the scheduled service is used
+     */
+    public static final<T>  ListenableFuture<T> retryHelper(
+            final ScheduledExecutorService ses,
+            final ExecutorService es,
+            final Callable<T> callable,
+            final Long maxAttempts,
+            final long startInterval,
+            final TimeUnit startUnit,
+            final long maxInterval,
+            final TimeUnit maxUnit) {
         Preconditions.checkNotNull(maxUnit);
         Preconditions.checkNotNull(startUnit);
         Preconditions.checkArgument(startUnit.toMillis(startInterval) >= 1);
         Preconditions.checkArgument(maxUnit.toMillis(maxInterval) >= 1);
         Preconditions.checkNotNull(callable);
 
-        long attemptsMax = maxAttempts == null ? Long.MAX_VALUE : maxAttempts;
-        long interval = startUnit.toMillis(startInterval);
-        long intervalMax = maxUnit.toMillis(maxInterval);
-        for (long ii = 0; ii < attemptsMax; ii++) {
-            try {
-                return callable.call();
-            } catch (RetryException e) {
+        final SettableFuture<T> retval = SettableFuture.create();
+        /*
+         * Base case with no retry, attempt the task once
+         */
+        es.execute(new Runnable() {
+            @Override
+            public void run() {
                 try {
-                    interval *= 2;
-                    interval = Math.min(intervalMax, interval);
-                    Thread.sleep(interval);
-                } catch (InterruptedException e2) {
-                    Throwables.propagate(e2);
+                    retval.set(callable.call());
+                } catch (RetryException e) {
+                    //Now schedule a retry
+                    retryHelper(ses, es, callable, maxAttempts, startInterval, startUnit, maxInterval, maxUnit, 0, retval);
+                } catch (Exception e) {
+                    retval.setException(e);
                 }
-            } catch (Exception e3) {
-                Throwables.propagate(e3);
             }
-        }
-        return null;
+        });
+        return retval;
     }
 
+    private static final <T> void retryHelper(
+            final ScheduledExecutorService ses,
+            final ExecutorService es,
+            final Callable<T> callable,
+            final Long maxAttempts,
+            final long startInterval,
+            final TimeUnit startUnit,
+            final long maxInterval,
+            final TimeUnit maxUnit,
+            final long ii,
+            final SettableFuture<T> retval) {
+        long intervalMax = maxUnit.toMillis(maxInterval);
+        final long interval = Math.min(intervalMax, startUnit.toMillis(startInterval) * 2);
+        ses.schedule(new Runnable() {
+            @Override
+            public void run() {
+                Runnable task = new Runnable() {
+                    @Override
+                    public void run() {
+                        if (retval.isCancelled()) return;
+
+                        try {
+                            retval.set(callable.call());
+                        } catch (RetryException e) {
+                            retryHelper(ses, es, callable, maxAttempts, interval, TimeUnit.MILLISECONDS, maxInterval,  maxUnit, ii + 1, retval);
+                        } catch (Exception e3) {
+                            retval.setException(e3);
+                        }
+                    }
+                };
+                if (ses == es) task.run();
+                else es.execute(task);
+            }
+
+        }, interval, TimeUnit.MILLISECONDS);
+    }
 }

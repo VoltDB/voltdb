@@ -75,7 +75,8 @@ CopyOnWriteContext::handleActivation(TableStreamType streamType)
     }
 
     if (m_surgeon.hasIndex() && !m_surgeon.isIndexingComplete()) {
-        VOLT_ERROR("COW context activation is not allowed while elastic indexing is in progress.");
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR,
+            "COW context activation is not allowed while elastic indexing is in progress.");
         return ACTIVATION_FAILED;
     }
 
@@ -432,14 +433,17 @@ void CopyOnWriteContext::checkRemainingTuples(const std::string &label) {
         count2++;
     }
     if (m_tuplesRemaining != count1 + count2) {
-        VOLT_ERROR("CopyOnWriteContext::%s remaining tuple count mismatch: "
-                   "table=%s partcol=%d count=%jd count1=%jd count2=%jd "
-                   "expected=%jd compacted=%jd batch=%jd "
-                   "inserts=%jd updates=%jd",
-                   label.c_str(), getTable().name().c_str(), getTable().partitionColumn(),
-                   count1 + count2, count1, count2, (intmax_t)m_tuplesRemaining,
-                   (intmax_t)m_blocksCompacted, (intmax_t)m_serializationBatches,
-                   (intmax_t)m_inserts, (intmax_t)m_updates);
+        char errMsg[1024 * 16];
+        snprintf(errMsg, 1024 * 16,
+                 "CopyOnWriteContext::%s remaining tuple count mismatch: "
+                 "table=%s partcol=%d count=%jd count1=%jd count2=%jd "
+                 "expected=%jd compacted=%jd batch=%jd "
+                 "inserts=%jd updates=%jd",
+                 label.c_str(), getTable().name().c_str(), getTable().partitionColumn(),
+                 count1 + count2, count1, count2, (intmax_t)m_tuplesRemaining,
+                 (intmax_t)m_blocksCompacted, (intmax_t)m_serializationBatches,
+                 (intmax_t)m_inserts, (intmax_t)m_updates);
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
     }
 }
 

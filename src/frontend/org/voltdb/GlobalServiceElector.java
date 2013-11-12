@@ -93,6 +93,6 @@ class GlobalServiceElector implements LeaderNoticeHandler
     }
 
     @Override
-    public void noticedTopologyChange() {
+    public void noticedTopologyChange(boolean added, boolean removed) {
     }
 }

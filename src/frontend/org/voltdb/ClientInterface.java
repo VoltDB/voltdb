@@ -63,6 +63,7 @@ import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.ReverseDNSPolicy;
 import org.voltcore.network.VoltNetworkPool;
+import org.voltcore.network.VoltPort;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
@@ -144,8 +145,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final ClientAcceptor m_acceptor;
     private ClientAcceptor m_adminAcceptor;
 
-    private final ConcurrentHashMap<Connection, Object> m_connections =
-            new ConcurrentHashMap<Connection, Object>(10240, .75f, 128);
     private final SnapshotDaemon m_snapshotDaemon = new SnapshotDaemon();
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
 
@@ -168,7 +167,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * lookup.
      */
     private final ConcurrentHashMap<Long, ClientInterfaceHandleManager> m_cihm =
-            new ConcurrentHashMap<Long, ClientInterfaceHandleManager>(10240, .75f, 128);
+            new ConcurrentHashMap<Long, ClientInterfaceHandleManager>(2048, .75f, 128);
     private final Cartographer m_cartographer;
 
     /**
@@ -717,12 +716,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (!m_acg.get().hasBackPressure()) {
                 c.enableReadSelection();
             }
-            m_connections.put(c, "");
-        }
-
-        @Override
-        public void stopping(Connection c) {
-            m_connections.remove(c);
         }
 
         @Override
@@ -1119,15 +1112,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             JSONObject jsObj = new JSONObject(new String(message.m_payload, "UTF-8"));
             final int partitionId = jsObj.getInt(Cartographer.JSON_PARTITION_ID);
             final long initiatorHSId = jsObj.getLong(Cartographer.JSON_INITIATOR_HSID);
-            for (final Connection c : m_connections.keySet()) {
-                c.queueTask(new Runnable() {
-                    @Override
-                    public void run() {
-                        failOverConnection(partitionId, initiatorHSId, c);
-                    }
-                });
+            for (final ClientInterfaceHandleManager cihm : m_cihm.values()) {
+                try {
+                    cihm.connection.queueTask(new Runnable() {
+                        @Override
+                        public void run() {
+                            failOverConnection(partitionId, initiatorHSId, cihm.connection);
+                        }
+                    });
+                } catch (UnsupportedOperationException ignore) {
+                    // In case some internal connections don't implement queueTask()
+                    failOverConnection(partitionId, initiatorHSId, cihm.connection);
+                }
             }
-            failOverConnection(partitionId, initiatorHSId, m_snapshotDaemonAdapter);
         } catch (Exception e) {
             hostLog.warn("Error handling partition fail over at ClientInterface, continuing anyways", e);
         }
@@ -2178,10 +2175,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     private final void checkForDeadConnections(final long now) {
         final ArrayList<Connection> connectionsToRemove = new ArrayList<Connection>();
-        for (final Connection c : m_connections.keySet()) {
-            final int delta = c.writeStream().calculatePendingWriteDelta(now);
-            if (delta > 4000) {
-                connectionsToRemove.add(c);
+        for (final ClientInterfaceHandleManager cihm : m_cihm.values()) {
+            // Internal connections don't implement calculatePendingWriteDelta(), so check for real connection first
+            if (VoltPort.class == cihm.connection.getClass()) {
+                final int delta = cihm.connection.writeStream().calculatePendingWriteDelta(now);
+                if (delta > 4000) {
+                    connectionsToRemove.add(cihm.connection);
+                }
             }
         }
 
@@ -2444,7 +2444,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         @Override
         public void queueTask(Runnable r) {
-            throw new UnsupportedOperationException();
+            // Called when node failure happens
+            r.run();
         }
     }
 
