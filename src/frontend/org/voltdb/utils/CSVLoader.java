@@ -295,8 +295,9 @@ public class CSVLoader {
                     new HashMap<Long, BlockingQueue<CSVLineWithMetaData>>(CSVPartitionProcessor.m_numProcessors);
             List<CSVPartitionProcessor> processors = new ArrayList<CSVPartitionProcessor>(CSVPartitionProcessor.m_numProcessors);
             for (long i = 0; i < CSVPartitionProcessor.m_numProcessors; i++) {
-                LinkedBlockingQueue<CSVLineWithMetaData> partitionQueue =
-                        new LinkedBlockingQueue<CSVLineWithMetaData>(Integer.MAX_VALUE);
+                //Keep only 1000 batches worth data in queue.
+                LinkedBlockingQueue<CSVLineWithMetaData> partitionQueue
+                        = new LinkedBlockingQueue<CSVLineWithMetaData>(config.batch * 1000);
                 lineq.put(i, partitionQueue);
                 CSVPartitionProcessor processor = new CSVPartitionProcessor(csvClient, i,
                         CSVPartitionProcessor.m_partitionedColumnIndex, partitionQueue, endOfData);
