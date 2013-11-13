@@ -41,6 +41,7 @@ import org.voltdb.client.ProcCallException;
 
 public class JDBC4Statement implements java.sql.Statement
 {
+    protected int timeout_sec = 0;
     static class VoltSQL
     {
         public static final byte TYPE_SELECT = 1;
@@ -647,7 +648,7 @@ public class JDBC4Statement implements java.sql.Statement
     public int getQueryTimeout() throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();  // Fake client-side timeout can be done, however true timeouts and the ability to cancel queries is not possible - do not mislead client by implementing this!
+        return this.timeout_sec;
     }
 
     // Retrieves the current result as a ResultSet object.
@@ -784,7 +785,7 @@ public class JDBC4Statement implements java.sql.Statement
         checkClosed();
         if (seconds < 0)
             throw SQLError.get(SQLError.ILLEGAL_ARGUMENT, seconds);
-        throw SQLError.noSupport();  // Fake client-side timeout can be done, however true timeouts and the ability to cancel queries is not possible - do not mislead client by implementing this!
+        this.timeout_sec = seconds;
     }
 
     // Returns true if this either implements the interface argument or is directly or indirectly a wrapper for an object that does.
