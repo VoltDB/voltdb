@@ -92,6 +92,8 @@ private:
      */
     void deleteStreamedTuples();
 
+    void scanAndCheck();
+
     /// Predicate strings (parsed in handleActivation()/handleReactivation()).
     const std::vector<std::string> &m_predicateStrings;
 
@@ -100,6 +102,8 @@ private:
 
     /// Set to true after index was completely materialized.
     bool m_materialized;
+
+    ElasticIndexHashRange range;
 };
 
 }
