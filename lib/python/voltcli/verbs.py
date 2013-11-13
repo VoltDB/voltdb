@@ -467,7 +467,7 @@ class ServerBundle(JavaBundle):
         if runner.opts.internalport:
             final_args.extend(['internalport', runner.opts.internalport])
         if runner.opts.replicationport:
-            final_args.extend(['replicationport', runner.opts.internalport])
+            final_args.extend(['replicationport', runner.opts.replicationport])
         if runner.opts.zkport:
             final_args.extend(['zkport', runner.opts.zkport])
         if runner.opts.externalinterface:
