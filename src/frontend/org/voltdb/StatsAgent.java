@@ -623,6 +623,8 @@ public class StatsAgent extends OpsAgent
         assert source != null;
         final NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>> siteIdToStatsSources = registeredStatsSources.get(selector);
         assert siteIdToStatsSources != null;
+
+        //Racy putIfAbsent idiom, may return existing map value from another thread http://goo.gl/jptTS7
         NonBlockingHashSet<StatsSource> statsSources = siteIdToStatsSources.get(siteId);
         if (statsSources == null) {
             statsSources = new NonBlockingHashSet<StatsSource>();
