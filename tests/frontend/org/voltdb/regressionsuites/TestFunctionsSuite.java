@@ -638,7 +638,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         resultB = r.asScalarLong();
-        assertEquals(resultA, resultB);
+        int numOfNullRows = 5;
+        assertEquals(resultA, resultB - numOfNullRows);
 
         boolean caught = false;
 
