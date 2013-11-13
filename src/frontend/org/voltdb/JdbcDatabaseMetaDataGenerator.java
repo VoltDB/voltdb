@@ -204,6 +204,10 @@ public class JdbcDatabaseMetaDataGenerator
         {
             result = getProcedureColumns();
         }
+        else if (selector.equalsIgnoreCase("TYPEINFO"))
+        {
+            result = getTypeInfo();
+        }
         return result;
     }
 
@@ -648,6 +652,40 @@ public class JdbcDatabaseMetaDataGenerator
                                "", // is_nullable
                                proc.getTypeName()  // specific name
                 );
+            }
+        }
+        return results;
+    }
+
+    VoltTable getTypeInfo()
+    {
+        VoltTable results = new VoltTable(TYPEINFO_SCHEMA);
+        for (VoltType type : VoltType.values())
+        {
+            if (type.isJdbcVisible()) {
+                Byte unsigned = null;
+                if (type.isUnsigned() != null) {
+                    unsigned = (byte)(type.isUnsigned() ? 1 : 0);
+                }
+                results.addRow(type.toSQLString().toUpperCase(),
+                        type.getJdbcSqlType(),
+                        VoltType.getTypePrecisionAndRadix(type)[0],
+                        type.getLiteralPrefix(),
+                        type.getLiteralSuffix(),
+                        type.getCreateParams(),
+                        type.getNullable(),
+                        type.isCaseSensitive() ? 1 : 0,
+                        type.getSearchable(),
+                        unsigned,
+                        0,  // no money types (according to definition) in Volt?
+                        0,  // no auto-increment
+                        type.toSQLString().toUpperCase(),
+                        type.getMinimumScale(),
+                        type.getMaximumScale(),
+                        null,
+                        null,
+                        VoltType.getTypePrecisionAndRadix(type)[1]
+                        );
             }
         }
         return results;
