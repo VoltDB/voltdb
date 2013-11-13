@@ -84,7 +84,7 @@ function server-mysql() {
     $VOLTDB create -d deployment_mysql.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
-# run the voltdb server locally with mysql connector
+# run the voltdb server locally with postgresql connector
 function server-pg() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
