@@ -1745,12 +1745,17 @@ public class TestVoltCompiler extends TestCase {
         compileForDDLTest(getPathForSchema(s), false);
     }
 
+    private static final String msgP = "does not include the partitioning column";
+    private static final String msgPR =
+            "ASSUMEUNIQUE is not valid for an index that includes the partitioning column. " +
+            "Please use UNIQUE instead";
+    private static final String msgR =
+            "ASSUMEUNIQUE is not valid for replicated tables. " +
+            "Please use UNIQUE instead";
+
     public void testColumnUniqueGiveException()
     {
-        String msgP = "must include the partitioning column";
-        String msgPR= "ASSUMEUNIQUE is not required if the index includes the partitioning column. Use UNIQUE instead";
-        String msgR = "ASSUMEUNIQUE is not valid for replicated tables. Please use UNIQUE instead";
-        String schema = "";
+        String schema;
 
         // (1) ****** Replicate tables
         // A unique index on the non-primary key for replicated table gets no error.
@@ -1864,10 +1869,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testUniqueIndexGiveException() {
-        String msgP = "must include the partitioning column";
-        String msgPR= "ASSUMEUNIQUE is not required if the index includes the partitioning column. Use UNIQUE instead";
-        String msgR = "ASSUMEUNIQUE is not valid for replicated tables. Please use UNIQUE instead";
-        String schema = "";
+         String schema;
 
         // (1) ****** Replicate tables
         // A unique index on the non-primary key for replicated table gets no error.
