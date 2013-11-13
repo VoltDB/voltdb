@@ -829,7 +829,9 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public ResultSet getTypeInfo() throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();
+        this.sysCatalog.setString(1, "TYPEINFO");
+        ResultSet res = this.sysCatalog.executeQuery();
+        return res;
     }
 
     // Retrieves a description of the user-defined types (UDTs) defined in a particular schema.

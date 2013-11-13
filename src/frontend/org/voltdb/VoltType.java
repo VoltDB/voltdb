@@ -242,7 +242,7 @@ public enum VoltType {
     // If we add yet more stuff to this for MySQL or ODBC or something,
     // it might be time to consider some sort of data-driven type specification
     // mechanism.
-    private final Integer m_dataType;
+    private final int m_dataType;
     private final String m_literalPrefix;
     private final String m_literalSuffix;
     private final String m_createParams;
@@ -502,6 +502,8 @@ public enum VoltType {
         return m_lengthInBytes;
     }
 
+    /** JDBC getTypeInfo() accessors */
+
     /**
      * Get the corresponding SQL type as for a given <tt>VoltType</tt> enum.
      * For example, {@link #STRING} will probably convert to "VARCHAR".
@@ -511,11 +513,51 @@ public enum VoltType {
         return m_sqlString;
     }
 
+    public boolean isJdbcVisible() {
+        return m_jdbcVisible;
+    }
+
     /**
      * Get the java.sql.Types type of this type.  Type.  Type you, typing typer.
      */
     public int getJdbcSqlType() {
         return m_dataType;
+    }
+
+    public String getLiteralPrefix() {
+        return m_literalPrefix;
+    }
+
+    public String getLiteralSuffix() {
+        return m_literalSuffix;
+    }
+
+    public String getCreateParams() {
+        return m_createParams;
+    }
+
+    public int getNullable() {
+        return m_nullable;
+    }
+
+    public boolean isCaseSensitive() {
+        return m_caseSensitive;
+    }
+
+    public int getSearchable() {
+        return m_searchable;
+    }
+
+    public Boolean isUnsigned() {
+        return m_unsignedAttribute;
+    }
+
+    public Integer getMinimumScale() {
+        return m_minimumScale;
+    }
+
+    public Integer getMaximumScale() {
+        return m_maximumScale;
     }
 
     // Really hacky cast overflow detection for primitive types
