@@ -72,7 +72,7 @@ public abstract class OpsAgent
     //Just ack everything that passes through and don't do the work
     //For startup this avoids initialization dependencies but allows
     //new nodes to not block other agents on timeouts
-    private volatile boolean m_dummyMode;
+    private volatile boolean m_dummyMode = true;
 
     protected HostMessenger m_messenger;
 
