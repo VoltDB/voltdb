@@ -41,3 +41,12 @@ TO RUN onserver Export Client to connect to JDBC (mysql):
     -- Run the export client:
     ./run.sh async-export
     -- Verify in mysql a schema with name vexport has tables. and table has data. (TODO)
+
+TO RUN onserver Export Client to connect to JDBC (postgresql):
+    -- Install postgresql
+    -- Copy postgresql driver jar in $VOLTDB_LIB/extension/ directory
+    -- Start server with postgresql connector enabled.
+    ./run.sh server-pg
+    -- Run the export client:
+    ./run.sh async-export
+    -- Verify in postgresql a schema with name vexport has tables. and table has data. (TODO)
