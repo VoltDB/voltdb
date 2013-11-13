@@ -25,6 +25,7 @@ CLASSPATH=$({ \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
+
 VOLTDB="$VOLTDB_BIN/voltdb"
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
@@ -73,6 +74,14 @@ function server() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+}
+
+# run the voltdb server locally with mysql connector
+function server-mysql() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create -d deployment_mysql.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
 # run the voltdb server locally
