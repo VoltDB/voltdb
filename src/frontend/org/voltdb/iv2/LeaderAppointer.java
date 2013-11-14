@@ -25,9 +25,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -311,8 +309,18 @@ public class LeaderAppointer implements Promotable
     }
 
     @Override
-    public void acceptPromotion() throws InterruptedException, ExecutionException, KeeperException
+    public void acceptPromotion() throws InterruptedException, ExecutionException
     {
+        m_es.submit(new Callable<Object>()  {
+            @Override
+            public Object call() throws Exception {
+                acceptPromotionImpl();
+                return null;
+            }
+        }).get();
+    }
+
+    private void acceptPromotionImpl() throws InterruptedException, ExecutionException, KeeperException {
         // Crank up the leader caches.  Use blocking startup so that we'll have valid point-in-time caches later.
         m_iv2appointees.start(true);
         m_iv2masters.start(true);
@@ -327,8 +335,8 @@ public class LeaderAppointer implements Promotable
             ImmutableMap<Integer, Long> masters = m_iv2masters.pointInTimeCache();
             try {
                 if ((appointees.size() < getInitialPartitionCount()) ||
-                    (masters.size() < getInitialPartitionCount()) ||
-                    (appointees.size() != masters.size())) {
+                        (masters.size() < getInitialPartitionCount()) ||
+                        (appointees.size() != masters.size())) {
                     // If we are promoted and the appointees or masters set is partial, the previous appointer failed
                     // during startup (at least for now, until we add remove a partition on the fly).
                     VoltDB.crashGlobalVoltDB("Detected failure during startup, unable to start", false, null);
@@ -360,7 +368,7 @@ public class LeaderAppointer implements Promotable
                 final int initialPartitionCount = getInitialPartitionCount();
                 for (int i = 0; i < initialPartitionCount; i++) {
                     LeaderElector.createRootIfNotExist(m_zk,
-                                                       LeaderElector.electionDirForPartition(i));
+                            LeaderElector.electionDirForPartition(i));
                     watchPartition(i, m_es, true);
                 }
             } catch (IllegalAccessException e) {
@@ -386,7 +394,7 @@ public class LeaderAppointer implements Promotable
                 String dir = LeaderElector.electionDirForPartition(partId);
                 m_callbacks.put(partId, new PartitionCallback(partId, master.getValue()));
                 Pair<BabySitter, List<String>> sitterstuff =
-                    BabySitter.blockingFactory(m_zk, dir, m_callbacks.get(partId), m_es);
+                        BabySitter.blockingFactory(m_zk, dir, m_callbacks.get(partId), m_es);
                 m_partitionWatchers.put(partId, sitterstuff.getFirst());
             }
             // just go ahead and promote our MPI
@@ -734,14 +742,25 @@ public class LeaderAppointer implements Promotable
     public void shutdown()
     {
         try {
-            m_iv2appointees.shutdown();
-            m_iv2masters.shutdown();
-            for (BabySitter watcher : m_partitionWatchers.values()) {
-                watcher.shutdown();
-            }
+            m_es.execute(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        m_iv2appointees.shutdown();
+                        m_iv2masters.shutdown();
+                        for (BabySitter watcher : m_partitionWatchers.values()) {
+                            watcher.shutdown();
+                        }
+                    } catch (Exception e) {
+                        // don't care, we're going down
+                    }
+                }
+            });
+            m_es.shutdown();
+            m_es.awaitTermination(356, TimeUnit.DAYS);
         }
-        catch (Exception e) {
-            // don't care, we're going down
+        catch (InterruptedException e) {
+            tmLog.warn("Unexpected interrupted exception", e);
         }
     }
 }
