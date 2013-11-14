@@ -166,10 +166,9 @@ class ElasticIndex : public stx::btree_set<ElasticIndexKey, ElasticIndexComparat
      * Get partial const_iterator based on upper bound.
      */
     const_iterator createUpperBoundIterator(ElasticHash upperBound) const;
+    static ElasticHash generateHash(const PersistentTable &table, const TableTuple &tuple);
 
   private:
-
-    static ElasticHash generateHash(const PersistentTable &table, const TableTuple &tuple);
 
     static ElasticIndexKey generateKey(const PersistentTable &table, const TableTuple &tuple);
 };
