@@ -502,4 +502,45 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         assertWithNullCheck(null, params.get("CHAR_OCTET_LENGTH", VoltType.INTEGER), params);
         assertWithNullCheck(null, params.get("REMARKS", VoltType.STRING), params);
     }
+
+    public void testGetTypeInfo()
+    {
+        String schema =
+            "create table Table1 (Column1 varchar(200) not null, Column2 integer);";
+        String project =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "  <database name='database'>" +
+            "    <schemas><schema path='" + getPathForSchema(schema) + "' /></schemas>" +
+            "    <procedures>" +
+            "      <procedure class='proc1' partitioninfo=\"Table1.Column1:0\"><sql>select * from Table1 where Column1=?</sql></procedure>" +
+            "      <procedure class='proc2'><sql>select * from Table1 where Column2=?</sql></procedure>" +
+            "    </procedures>" +
+            "    <partitions><partition table='Table1' column='Column1'/></partitions>" +
+            "  </database>" +
+            "</project>";
+
+        VoltCompiler c = compileForDDLTest(project);
+        JdbcDatabaseMetaDataGenerator dut =
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog());
+        VoltTable typeInfo = dut.getMetaData("typEINfo");
+        System.out.println(typeInfo);
+        // just do some minor sanity checks on size of table and that it contains the types
+        // we expect
+        HashMap<String, VoltType> expectedTypes = new HashMap<String, VoltType>();
+        for (VoltType type : VoltType.values()) {
+            if (type.isJdbcVisible()) {
+                expectedTypes.put(type.toSQLString().toUpperCase(), type);
+            }
+        }
+        assertEquals(expectedTypes.size(), typeInfo.getRowCount());
+        assertEquals(18, typeInfo.getColumnCount());
+        typeInfo.resetRowPosition();
+        while (typeInfo.advanceRow()) {
+            String gotName = typeInfo.getString("TYPE_NAME");
+            VoltType expectedType = expectedTypes.remove(gotName);
+            assertTrue(expectedType != null);
+        }
+        assertTrue(expectedTypes.isEmpty());
+    }
 }
