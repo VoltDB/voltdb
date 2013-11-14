@@ -50,7 +50,7 @@ import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Select;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Update;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.UpdateDecimal;
 
-import com.google.common.base.Charsets;
+import com.google_voltpatches.common.base.Charsets;
 
 public class TestSQLTypesSuite extends RegressionSuite {
 

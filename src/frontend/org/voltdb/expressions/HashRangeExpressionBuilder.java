@@ -19,8 +19,8 @@ package org.voltdb.expressions;
 
 import java.util.Map;
 
-import com.google.common.collect.ImmutableSortedMap;
-import com.google.common.collect.Ordering;
+import com.google_voltpatches.common.collect.ImmutableSortedMap;
+import com.google_voltpatches.common.collect.Ordering;
 
 /**
  * Convenience class to generate a HashRangeExpression.

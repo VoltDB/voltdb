@@ -58,7 +58,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
 
-import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  * LeaderAppointer handles centralized appointment of partition leaders across

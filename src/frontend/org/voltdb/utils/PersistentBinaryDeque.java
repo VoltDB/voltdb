@@ -32,11 +32,11 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.TreeMap;
 
-import com.google.common.base.Throwables;
+import com.google_voltpatches.common.base.Throwables;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 
-import com.google.common.base.Joiner;
+import com.google_voltpatches.common.base.Joiner;
 
 /**
  * A deque that specializes in providing persistence of binary objects to disk. Any object placed

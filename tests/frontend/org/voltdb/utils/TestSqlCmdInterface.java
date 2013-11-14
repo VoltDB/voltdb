@@ -47,7 +47,7 @@ import java.util.regex.PatternSyntaxException;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.google.common.base.Joiner;
+import com.google_voltpatches.common.base.Joiner;
 
 public class TestSqlCmdInterface
 {

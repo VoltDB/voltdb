@@ -36,9 +36,9 @@ import org.voltcore.messaging.SiteFailureForwardMessage;
 import org.voltcore.messaging.SiteFailureMessage;
 import org.voltcore.utils.Pair;
 
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Sets;
-import com.google.common.primitives.Longs;
+import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.Sets;
+import com.google_voltpatches.common.primitives.Longs;
 import com.natpryce.makeiteasy.Donor;
 import com.natpryce.makeiteasy.Instantiator;
 import com.natpryce.makeiteasy.Property;

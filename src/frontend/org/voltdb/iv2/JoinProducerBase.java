@@ -36,7 +36,7 @@ import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.CachedByteBufferAllocator;
 import org.voltdb.utils.MiscUtils;
 
-import com.google.common.util.concurrent.SettableFuture;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public abstract class JoinProducerBase extends SiteTasker {
     protected static final VoltLogger JOINLOG = new VoltLogger("JOIN");

@@ -28,7 +28,7 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.utils.LogKeys;
 
-import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class LoadedProcedureSet {
 

@@ -44,8 +44,8 @@ import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
-import com.google.common.base.Charsets;
-import com.google.common.base.Throwables;
+import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Throwables;
 
 /* Serializes data over a connection that presumably is being read
  * by a voltdb execution engine. The serialization is currently a

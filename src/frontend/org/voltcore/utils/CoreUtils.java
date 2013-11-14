@@ -40,16 +40,16 @@ import java.util.Queue;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.google.common.base.*;
+import com.google_voltpatches.common.base.*;
 
-import com.google.common.util.concurrent.*;
+import com.google_voltpatches.common.util.concurrent.*;
 import org.voltcore.logging.VoltLogger;
 
 import org.voltcore.network.ReverseDNSCache;
 import vanilla.java.affinity.impl.PosixJNAAffinity;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class CoreUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");

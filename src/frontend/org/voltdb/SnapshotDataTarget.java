@@ -17,7 +17,7 @@
 
 package org.voltdb;
 
-import com.google.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 import java.io.IOException;
 import java.util.concurrent.Callable;

@@ -56,7 +56,7 @@ import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 
-import com.google.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 /**
  * This breaks up VoltDB initialization tasks into discrete units.

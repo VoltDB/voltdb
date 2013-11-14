@@ -32,8 +32,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.SettableFuture;
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
@@ -44,8 +44,8 @@ import org.voltdb.SnapshotFormat;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.CompressionService;
 
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.Futures;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 /**
  * A stream snapshot target for sending snapshot data directly to a rejoining

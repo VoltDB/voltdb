@@ -23,8 +23,8 @@
 
 package org.voltcore.agreement;
 
-import static com.google.common.base.Predicates.equalTo;
-import static com.google.common.base.Predicates.not;
+import static com.google_voltpatches.common.base.Predicates.equalTo;
+import static com.google_voltpatches.common.base.Predicates.not;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -43,11 +43,11 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSortedMap;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-import com.google.common.primitives.Ints;
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.collect.ImmutableSortedMap;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Sets;
+import com.google_voltpatches.common.primitives.Ints;
 
 
 public class TestFuzzMeshArbiter extends TestCase

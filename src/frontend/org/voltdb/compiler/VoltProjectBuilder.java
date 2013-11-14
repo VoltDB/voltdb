@@ -81,7 +81,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Text;
 
-import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  * Alternate (programmatic) interface to VoltCompiler. Give the class all of

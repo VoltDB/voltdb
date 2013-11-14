@@ -110,10 +110,10 @@ import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListenableFutureTask;
-import com.google.common.util.concurrent.MoreExecutors;
+import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
+import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.

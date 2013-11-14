@@ -45,8 +45,8 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltcore.utils.Pair;
 
-import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.base.Throwables;
 
 public class ZKUtil {
 

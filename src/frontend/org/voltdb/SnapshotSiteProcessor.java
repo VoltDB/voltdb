@@ -37,7 +37,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google.common.collect.Maps;
+import com.google_voltpatches.common.collect.Maps;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -56,9 +56,9 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.MiscUtils;
 
-import com.google.common.collect.ListMultimap;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.MoreExecutors;
+import com.google_voltpatches.common.collect.ListMultimap;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 /**
  * Encapsulates the state needed to manage an ongoing snapshot at the

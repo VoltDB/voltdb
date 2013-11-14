@@ -35,9 +35,9 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 
 /**

@@ -55,7 +55,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2LogFaultMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
-import com.google.common.primitives.Longs;
+import com.google_voltpatches.common.primitives.Longs;
 
 public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 {
@@ -597,7 +597,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (!needsRepair.isEmpty()) {
             Iv2InitiateTaskMessage replmsg =
                 new Iv2InitiateTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
-            m_mailbox.send(com.google.common.primitives.Longs.toArray(needsRepair), replmsg);
+            m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(needsRepair), replmsg);
         }
     }
 
@@ -633,7 +633,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (!needsRepair.isEmpty()) {
             FragmentTaskMessage replmsg =
                 new FragmentTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
-            m_mailbox.send(com.google.common.primitives.Longs.toArray(needsRepair), replmsg);
+            m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(needsRepair), replmsg);
         }
     }
 

@@ -37,7 +37,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.messaging.LocalMailbox;
 
-import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 public class AsyncCompilerAgent {
 

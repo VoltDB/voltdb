@@ -55,8 +55,8 @@ import org.voltdb.utils.Encoder;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.SystemStatsCollector;
 
-import com.google.common.base.Charsets;
-import com.google.common.io.Resources;
+import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.io.Resources;
 
 public class ReportMaker {
 
