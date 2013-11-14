@@ -20,10 +20,7 @@ package org.voltcore.zk;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -33,6 +30,7 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltdb.VoltDB;
 
 /**
  * BabySitter watches a zookeeper node and alerts on appearances
@@ -112,8 +110,12 @@ public class BabySitter
         throws InterruptedException, ExecutionException
     {
         BabySitter bs = new BabySitter(zk, dir, cb, es);
-        Future<List<String>> task = bs.m_es.submit(bs.m_eventHandler);
-        List<String> initialChildren = task.get();
+        List<String> initialChildren;
+        try {
+            initialChildren = bs.m_eventHandler.call();
+        } catch (Exception e) {
+            throw new ExecutionException(e);
+        }
         return new Pair<BabySitter, List<String>>(bs, initialChildren);
     }
 
@@ -157,7 +159,12 @@ public class BabySitter
         @Override
         public void process(WatchedEvent event)
         {
-            m_es.submit(m_eventHandler);
+            try {
+                m_es.submit(m_eventHandler);
+            } catch (RejectedExecutionException e) {
+                if (m_shutdown.get()) return;
+                VoltDB.crashLocalVoltDB("Unexpected rejected execution exception", true, e);
+            }
         }
     };
 
