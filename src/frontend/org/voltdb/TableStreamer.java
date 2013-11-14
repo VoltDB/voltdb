@@ -131,7 +131,7 @@ public class TableStreamer {
      *         the number of rows contained within the given list of {@link BBContainer}
      */
     private int getTupleDataRowCount(List<DBBPool.BBContainer> outputBuffers) {
-        if (outputBuffers == null || outputBuffers.size() != m_tableTasks.size()) return -1;
+        if (outputBuffers == null || outputBuffers.size() != m_tableTasks.size()) return 0;
         int accumulator = 0;
         for (int i = 0; i < outputBuffers.size(); ++i) {
             SnapshotDataTarget target = m_tableTasks.get(i).m_target;
