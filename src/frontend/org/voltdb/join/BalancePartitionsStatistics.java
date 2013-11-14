@@ -17,6 +17,12 @@
 
 package org.voltdb.join;
 
+import static java.util.concurrent.TimeUnit.DAYS;
+import static java.util.concurrent.TimeUnit.HOURS;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.MINUTES;
+import static java.util.concurrent.TimeUnit.SECONDS;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -32,6 +38,7 @@ import org.voltdb.VoltType;
 
 import com.google.common.collect.Maps;
 
+
 public class BalancePartitionsStatistics extends StatsSource {
     private static final VoltLogger log = new VoltLogger("JOIN");
 
@@ -44,6 +51,7 @@ public class BalancePartitionsStatistics extends StatsSource {
     long totalBalanceTime = 0;
     long lastBalanceDuration = 0;
     long balanceStart = 0;
+    long rowCount;
 
 
     // Bytes transferred in each @BalancePartitions call in the past second. Keyed by timestamp.
@@ -74,6 +82,7 @@ public class BalancePartitionsStatistics extends StatsSource {
         this.lastBalanceDuration = 0;
         this.balanceStart = 0;
         this.count = 0;
+        this.rowCount = 0;
 
         this.statsPoint.set(new StatsPoint((int)totalRangeSize));
         this.bytesTransferredInLastSec.clear();
@@ -84,7 +93,7 @@ public class BalancePartitionsStatistics extends StatsSource {
         balanceStart = System.nanoTime();
     }
 
-    public void logBalanceEnds(long rangeSizeMoved, long bytesTransferred, long transferTimeMS)
+    public void logBalanceEnds(long rangeSizeMoved, long bytesTransferred, long transferTimeMS, long rowsTranfered)
     {
         final long balanceEnd = System.nanoTime();
         if (balanceEnd > balanceStart) {
@@ -96,6 +105,7 @@ public class BalancePartitionsStatistics extends StatsSource {
         final long now = System.currentTimeMillis();
         this.rangeSizeMoved += rangeSizeMoved;
         bytesTransferredInLastSec.put(now, bytesTransferred);
+        rowCount += rowsTranfered;
         throughput += bytesTransferred;
 
 
@@ -142,40 +152,43 @@ public class BalancePartitionsStatistics extends StatsSource {
     {
         if (bytesTransferredInLastSec.isEmpty()) return;
 
-        double durationInSecs = (bytesTransferredInLastSec.lastKey() - start) / (double)1000.0;
-        double rangesPerSecond = rangeSizeMoved / durationInSecs;
-        double avgBalanceTime = totalBalanceTime / (double)count;
-        //Convert to floating point millis
-        avgBalanceTime /= 1000000.0;
+        long durationInMillis = bytesTransferredInLastSec.lastKey() - start;
 
         StatsPoint sp = new StatsPoint(
-                (int)totalRangeSize,
-                (int)rangeSizeMoved,
-                rangesPerSecond,
-                avgBalanceTime,
-                throughput / (1024.0 * 1024.0)
-                );
+                totalRangeSize,
+                rangeSizeMoved,
+                rowCount,
+                durationInMillis,
+                count,
+                totalBalanceTime,
+                throughput);
+
         statsPoint.set(sp);
     }
 
     public static interface Constants
     {
         public final static String TOTAL_RANGES = "TOTAL_RANGES";
-        public final static String MOVED_RANGES = "MOVED_RANGES";
-        public final static String RANGES_PER_SECOND = "RANGES_PER_SECOND";
-        public final static String BALANCE_TX_LATENCY = "BALANCE_TX_LATENCY";
-        public final static String BALANCE_THROUGHPUT = "BALANCE_THROUGHPUT";
+        public final static String PERCENTAGE_MOVED = "PERCENTAGE_MOVED";
+        public final static String MOVED_ROWS = "MOVED_ROWS";
+        public final static String ROWS_PER_SECOND = "ROWS_PER_SECOND";
+        public final static String ESTIMATED_REMAINING = "ESTIMATED_REMAINING";
+        public final static String MEGABYTES_PER_SECOND = "MEGABYTES_PER_SECOND";
+        public final static String CALLS_PER_SECOND = "CALLS_PER_SECOND";
+        public final static String CALLS_LATENCY = "CALLS_LATENCY";
     }
 
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns)
     {
-        columns.add(new ColumnInfo(Constants.TOTAL_RANGES, VoltType.INTEGER));
-        columns.add(new ColumnInfo(Constants.MOVED_RANGES, VoltType.INTEGER));
-        columns.add(new ColumnInfo(Constants.RANGES_PER_SECOND, VoltType.FLOAT));
-
-        columns.add(new ColumnInfo(Constants.BALANCE_TX_LATENCY, VoltType.FLOAT));
-        columns.add(new ColumnInfo(Constants.BALANCE_THROUGHPUT, VoltType.FLOAT));
+        columns.add(new ColumnInfo(Constants.TOTAL_RANGES, VoltType.BIGINT));
+        columns.add(new ColumnInfo(Constants.PERCENTAGE_MOVED, VoltType.FLOAT));
+        columns.add(new ColumnInfo(Constants.MOVED_ROWS, VoltType.BIGINT));
+        columns.add(new ColumnInfo(Constants.ROWS_PER_SECOND, VoltType.FLOAT));
+        columns.add(new ColumnInfo(Constants.ESTIMATED_REMAINING, VoltType.BIGINT));
+        columns.add(new ColumnInfo(Constants.MEGABYTES_PER_SECOND, VoltType.FLOAT));
+        columns.add(new ColumnInfo(Constants.CALLS_PER_SECOND, VoltType.FLOAT));
+        columns.add(new ColumnInfo(Constants.CALLS_LATENCY, VoltType.FLOAT));
     }
 
     @Override
@@ -183,11 +196,14 @@ public class BalancePartitionsStatistics extends StatsSource {
     {
         StatsPoint point = statsPoint.get();
 
-        rowValues[columnNameToIndex.get(Constants.TOTAL_RANGES)] = point.totalRanges;
-        rowValues[columnNameToIndex.get(Constants.MOVED_RANGES)] = point.movedRanges;
-        rowValues[columnNameToIndex.get(Constants.RANGES_PER_SECOND)] = point.rangesPerSecond;
-        rowValues[columnNameToIndex.get(Constants.BALANCE_TX_LATENCY)] = point.balanceTxLatency;
-        rowValues[columnNameToIndex.get(Constants.BALANCE_THROUGHPUT)] = point.balanceThroughput;
+        rowValues[columnNameToIndex.get(Constants.TOTAL_RANGES)] = point.getTotalRanges();
+        rowValues[columnNameToIndex.get(Constants.PERCENTAGE_MOVED)] = point.getPercentageMoved();
+        rowValues[columnNameToIndex.get(Constants.MOVED_ROWS)] = point.getMovedRows();
+        rowValues[columnNameToIndex.get(Constants.ROWS_PER_SECOND)] = point.getRowsPerSecond();
+        rowValues[columnNameToIndex.get(Constants.ESTIMATED_REMAINING)] = point.getEstimatedRemaining();
+        rowValues[columnNameToIndex.get(Constants.MEGABYTES_PER_SECOND)] = point.getMegabytesPerSecond();
+        rowValues[columnNameToIndex.get(Constants.CALLS_PER_SECOND)] = point.getInvocationsPerSecond();
+        rowValues[columnNameToIndex.get(Constants.CALLS_LATENCY)] = point.getAverageInvocationTime();
     }
 
     @Override
@@ -208,40 +224,136 @@ public class BalancePartitionsStatistics extends StatsSource {
 
         private static final long serialVersionUID = 2635982992941464809L;
 
-        public final int totalRanges;
-        public final int movedRanges;
-        public final double rangesPerSecond;
-        public final double balanceTxLatency;
-        public final double balanceThroughput;
+        private final long   totalRanges;
+        private final long   movedRanges;
+        private final long   movedRows;
+        private final long   durationMillis;
+        private final long   invocationCount;
+        private final long   invocationTime;
+        private final long   throughput;
 
         public StatsPoint()
         {
-            this(0,0,0.0,0.0,0.0);
+            this(0,0,0,0,0,0,0);
         }
 
         public StatsPoint(int totalRanges)
         {
-            this(totalRanges,0,0.0,0.0,0.0);
+            this(totalRanges,0,0,0,0,0,0);
         }
 
-        public StatsPoint(int totalRanges, int movedRanges,
-                double rangesPerSecond, double balanceOpLatency,
-                double balanceOpThroughput)
+        public StatsPoint(long totalRanges, long movedRanges,
+                long movedRows, long durationMillis,
+                long invocationCount, long invocationTime,
+                long throughput)
         {
             this.totalRanges = totalRanges;
             this.movedRanges = movedRanges;
-            this.rangesPerSecond = rangesPerSecond;
-            this.balanceTxLatency = balanceOpLatency;
-            this.balanceThroughput = balanceOpThroughput;
+            this.movedRows = movedRows;
+            this.durationMillis = durationMillis;
+            this.invocationCount = invocationCount;
+            this.invocationTime = invocationTime;
+            this.throughput = throughput;
+        }
+
+        long getTotalRanges()
+        {
+            return totalRanges;
+        }
+
+        long getMovedRanges()
+        {
+            return movedRanges;
+        }
+
+        long getMovedRows()
+        {
+            return movedRows;
+        }
+
+        long getDurationMillis()
+        {
+            return durationMillis;
+        }
+
+        long getInvocationCount()
+        {
+            return invocationCount;
+        }
+
+        long getInvocationTime()
+        {
+            return invocationTime;
+        }
+
+        long getThroughput()
+        {
+            return throughput;
+        }
+
+        public double getPercentageMoved()
+        {
+            return (movedRanges / (double)totalRanges) * 100.0;
+        }
+
+        public double getRowsPerSecond()
+        {
+            final double durationInSecs = durationMillis / (double)1000.0;
+            return movedRows / durationInSecs;
+        }
+
+        public String getFormattedEstimatedRemaining()
+        {
+            return formatTimeInterval(getEstimatedRemaining());
+        }
+
+        public long getEstimatedRemaining() {
+            long estimatedRemaining = -1L;
+            if (movedRanges > 0) {
+                estimatedRemaining = (totalRanges * durationMillis) / movedRanges;
+            }
+            return estimatedRemaining;
+        }
+
+        public double getMegabytesPerSecond()
+        {
+            return (double)throughput / (1024.0 * 1024.0);
+        }
+
+        public double getInvocationsPerSecond()
+        {
+            final double durationInSecs = durationMillis / (double)1000.0;
+            return invocationCount / durationInSecs;
+        }
+
+        public double getAverageInvocationTime()
+        {
+            double avgBalanceTime = invocationTime / (double)invocationCount;
+            //Convert to floating point millis
+            return avgBalanceTime / 1000000.0;
+        }
+
+        public final static String formatTimeInterval(long l)
+        {
+            if (l < 0) return null;
+            final long day = MILLISECONDS.toDays(l);
+            if (day > 100) return null;
+            final long hr  = MILLISECONDS.toHours(l   - DAYS.toMillis(day));
+            final long min = MILLISECONDS.toMinutes(l - DAYS.toMillis(day)  - HOURS.toMillis(hr));
+            final long sec = MILLISECONDS.toSeconds(l - DAYS.toMillis(day)  - HOURS.toMillis(hr) - MINUTES.toMillis(min));
+            final long ms  = MILLISECONDS.toMillis(l  - DAYS.toMillis(day)  - HOURS.toMillis(hr) - MINUTES.toMillis(min) - SECONDS.toMillis(sec));
+            return String.format("%4d %02d:%02d:%02d.%03d", day, hr, min, sec, ms);
         }
 
         @Override
         public String toString()
         {
             return "StatsPoint [totalRanges=" + totalRanges + ", movedRanges="
-                    + movedRanges + ", rangesPerSecond=" + rangesPerSecond
-                    + ", balanceTcLatency=" + balanceTxLatency
-                    + ", balanceThroughput=" + balanceThroughput + "]";
+                    + movedRanges + ", movedRows=" + movedRows
+                    + ", durationMillis=" + durationMillis
+                    + ", invocationCount=" + invocationCount
+                    + ", invocationTime=" + invocationTime + ", throughput="
+                    + throughput + "]";
         }
     }
 }
