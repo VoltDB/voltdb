@@ -210,7 +210,8 @@ class Distributer {
 
                             // if the timeout is expired, call the callback and remove the
                             // bookeeping data
-                            if ((now - cb.timestamp) > m_procedureCallTimeoutMS) {
+                            long expiredin = ((cb.expired != 0) ? cb.expired : m_procedureCallTimeoutMS);
+                            if ((now - cb.timestamp) > expiredin) {
 
                                 // make the minimum timeout for certain long running system procedures
                                 //  higher than the default 2m.
@@ -229,7 +230,7 @@ class Distributer {
                                         "",
                                         new VoltTable[0],
                                         String.format("No response received in the allotted time (set to %d ms).",
-                                                m_procedureCallTimeoutMS));
+                                                expiredin));
                                 r.setClientHandle(handle);
                                 r.setClientRoundtrip((int) (now - cb.timestamp));
                                 r.setClusterRoundtrip((int) (now - cb.timestamp));
@@ -254,13 +255,17 @@ class Distributer {
     }
 
     class CallbackBookeeping {
-        public CallbackBookeeping(long timestamp, ProcedureCallback callback, String name) {
+        public CallbackBookeeping(long timestamp, ProcedureCallback callback, String name, long timeout) {
             assert(callback != null);
             this.timestamp = timestamp;
             this.callback = callback;
             this.name = name;
+            if (timeout > 0) {
+                expired = timeout * 1000L;
+            }
         }
         long timestamp;
+        long expired = 0;
         ProcedureCallback callback;
         String name;
     }
@@ -281,7 +286,7 @@ class Distributer {
         }
 
         public void createWork(long handle, String name, ByteBuffer c,
-                ProcedureCallback callback, boolean ignoreBackpressure) {
+                ProcedureCallback callback, boolean ignoreBackpressure, long timeout) {
             assert(callback != null);
             long now = System.currentTimeMillis();
             now = m_rateLimiter.sendTxnWithOptionalBlockAndReturnCurrentTime(
@@ -303,7 +308,7 @@ class Distributer {
                 }
 
                 assert(m_callbacks.containsKey(handle) == false);
-                m_callbacks.put(handle, new CallbackBookeeping(now, callback, name));
+                m_callbacks.put(handle, new CallbackBookeeping(now, callback, name, timeout));
                 m_callbacksToInvoke.incrementAndGet();
             }
             m_connection.writeStream().enqueue(c);
@@ -655,11 +660,11 @@ class Distributer {
 
             ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
             //The handle is specific to topology updates and has special cased handling
-            queue(spi, new TopoUpdateCallback(), true);
+            queue(spi, new TopoUpdateCallback(), true, 0);
 
             spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@SystemCatalog", "PROCEDURES");
             //The handle is specific to procedure updates and has special cased handling
-            queue(spi, new ProcUpdateCallback(), true);
+            queue(spi, new ProcUpdateCallback(), true, 0);
         }
     }
 
@@ -675,8 +680,8 @@ class Distributer {
     boolean queue(
             ProcedureInvocation invocation,
             ProcedureCallback cb,
-            final boolean ignoreBackpressure)
-    throws NoConnectionsException {
+            final boolean ignoreBackpressure, final long timeout)
+            throws NoConnectionsException {
         assert(invocation != null);
         assert(cb != null);
 
@@ -778,7 +783,7 @@ class Distributer {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            cxn.createWork(invocation.getHandle(), invocation.getProcName(), buf, cb, ignoreBackpressure);
+            cxn.createWork(invocation.getHandle(), invocation.getProcName(), buf, cb, ignoreBackpressure, timeout);
         }
 
         return !backpressure;
