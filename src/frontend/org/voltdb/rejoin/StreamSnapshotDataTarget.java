@@ -302,6 +302,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         private final AtomicInteger m_expectedEOFs;
 
         final Map<Long, AtomicLong> m_bytesSent;
+        final Map<Long, AtomicLong> m_worksSent;
         volatile Exception m_lastException = null;
 
         public SnapshotSender(Mailbox mb)
@@ -317,12 +318,14 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             m_workQueue = new LinkedBlockingQueue<SendWork>();
             m_expectedEOFs = new AtomicInteger();
             m_bytesSent = Collections.synchronizedMap(new HashMap<Long, AtomicLong>());
+            m_worksSent = Collections.synchronizedMap(new HashMap<Long, AtomicLong>());
         }
 
         public void registerDataTarget(long targetId)
         {
             m_expectedEOFs.incrementAndGet();
             m_bytesSent.put(targetId, new AtomicLong());
+            m_worksSent.put(targetId, new AtomicLong());
         }
 
         public void offer(SendWork work)
@@ -357,6 +360,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                     }
 
                     m_bytesSent.get(work.m_targetId).addAndGet(work.doWork(m_mb, m_msgFactory));
+                    m_worksSent.get(work.m_targetId).incrementAndGet();
                 }
                 catch (Exception e) {
                     m_lastException = e;
@@ -534,6 +538,11 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     @Override
     public long getBytesWritten() {
         return m_sender.m_bytesSent.get(m_targetId).get();
+    }
+
+    public long getWorksWritten()
+    {
+        return m_sender.m_worksSent.get(m_targetId).get();
     }
 
     @Override

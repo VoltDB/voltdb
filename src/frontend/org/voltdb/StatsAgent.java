@@ -16,30 +16,34 @@
  */
 package org.voltdb;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Map;
 
+import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
+import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashSet;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.network.Connection;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 
+import com.google.common.base.Supplier;
+import com.google.common.base.Suppliers;
+import com.google.common.collect.ImmutableMap;
+
 /**
  * Agent responsible for collecting stats on this host.
  */
 public class StatsAgent extends OpsAgent
 {
-    private final HashMap<StatsSelector, HashMap<Long, ArrayList<StatsSource>>> registeredStatsSources =
-            new HashMap<StatsSelector, HashMap<Long, ArrayList<StatsSource>>>();
+    private final NonBlockingHashMap<StatsSelector, NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>>> registeredStatsSources =
+            new NonBlockingHashMap<StatsSelector, NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>>>();
 
     public StatsAgent()
     {
         super("StatsAgent");
         StatsSelector selectors[] = StatsSelector.values();
         for (int ii = 0; ii < selectors.length; ii++) {
-            registeredStatsSources.put(selectors[ii], new HashMap<Long, ArrayList<StatsSource>>());
+            registeredStatsSources.put(selectors[ii], new NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>>());
         }
     }
 
@@ -64,7 +68,23 @@ public class StatsAgent extends OpsAgent
         default:
         }
     }
-    private Map<String, Boolean> m_procInfo = null;
+
+    private Supplier<Map<String, Boolean>> m_procInfo = getProcInfoSupplier();
+
+    private Supplier<Map<String, Boolean>> getProcInfoSupplier() {
+        return Suppliers.memoize(new Supplier<Map<String, Boolean>>() {
+                @Override
+                public Map<String, Boolean> get() {
+                    ImmutableMap.Builder<String, Boolean> b = ImmutableMap.builder();
+                    CatalogContext ctx = VoltDB.instance().getCatalogContext();
+                    for (Procedure p : ctx.procedures) {
+                        b.put(p.getClassname(), p.getReadonly());
+                    }
+                    return b.build();
+                }
+            });
+    }
+
     /**
      * Check if proc is readonly?
      *
@@ -72,17 +92,7 @@ public class StatsAgent extends OpsAgent
      * @return
      */
     private boolean isReadOnlyProcedure(String pname) {
-        synchronized (this) {
-            if (m_procInfo == null) {
-                Map<String, Boolean> mm = new HashMap<String, Boolean>();
-                CatalogContext ctx = VoltDB.instance().getCatalogContext();
-                for (Procedure p : ctx.procedures) {
-                    mm.put(p.getClassname(), p.getReadonly());
-                }
-                m_procInfo = mm;
-            }
-        }
-        final Boolean b = m_procInfo.get(pname);
+        final Boolean b = m_procInfo.get().get(pname);
         if (b == null) {
             return false;
         }
@@ -174,10 +184,10 @@ public class StatsAgent extends OpsAgent
      * Need to release references to catalog related stats sources
      * to avoid hoarding references to the catalog.
      */
-    public synchronized void notifyOfCatalogUpdate() {
-        final HashMap<Long, ArrayList<StatsSource>> siteIdToStatsSources =
-                registeredStatsSources.get(StatsSelector.PROCEDURE);
-        siteIdToStatsSources.clear();
+    public void notifyOfCatalogUpdate() {
+        m_procInfo = getProcInfoSupplier();
+        registeredStatsSources.put(StatsSelector.PROCEDURE,
+                                   new NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>>());
     }
 
     @Override
@@ -640,15 +650,18 @@ public class StatsAgent extends OpsAgent
         return stats;
     }
 
-    public synchronized void registerStatsSource(StatsSelector selector, long siteId, StatsSource source) {
+    public void registerStatsSource(StatsSelector selector, long siteId, StatsSource source) {
         assert selector != null;
         assert source != null;
-        final HashMap<Long, ArrayList<StatsSource>> siteIdToStatsSources = registeredStatsSources.get(selector);
+        final NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>> siteIdToStatsSources = registeredStatsSources.get(selector);
         assert siteIdToStatsSources != null;
-        ArrayList<StatsSource> statsSources = siteIdToStatsSources.get(siteId);
+
+        //Racy putIfAbsent idiom, may return existing map value from another thread http://goo.gl/jptTS7
+        NonBlockingHashSet<StatsSource> statsSources = siteIdToStatsSources.get(siteId);
         if (statsSources == null) {
-            statsSources = new ArrayList<StatsSource>();
-            siteIdToStatsSources.put(siteId, statsSources);
+            statsSources = new NonBlockingHashSet<StatsSource>();
+            NonBlockingHashSet<StatsSource> oldval = siteIdToStatsSources.putIfAbsent(siteId, statsSources);
+            if (oldval != null) statsSources = oldval;
         }
         statsSources.add(source);
     }
@@ -664,14 +677,14 @@ public class StatsAgent extends OpsAgent
      * @param now         current timestamp
      * @return  statistics VoltTable results
      */
-    public synchronized VoltTable getStatsAggregate(
+    public VoltTable getStatsAggregate(
             final StatsSelector selector,
             final boolean interval,
             final Long now) {
         return getStatsAggregateInternal(selector, interval, now, null);
     }
 
-    private synchronized VoltTable getStatsAggregateInternal(
+    private VoltTable getStatsAggregateInternal(
             final StatsSelector selector,
             final boolean interval,
             final Long now,
@@ -679,15 +692,21 @@ public class StatsAgent extends OpsAgent
     {
 
         assert selector != null;
-        final HashMap<Long, ArrayList<StatsSource>> siteIdToStatsSources = registeredStatsSources.get(selector);
+        final NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>> siteIdToStatsSources = registeredStatsSources.get(selector);
 
         // There are cases early in rejoin where we can get polled before the server is ready to provide
         // stats.  Just return null for now, which will result in no tables from this node.
         if (siteIdToStatsSources == null || siteIdToStatsSources.isEmpty()) {
             return null;
         }
+
         // Just need a random site's list to do some things
-        ArrayList<StatsSource> sSources = siteIdToStatsSources.entrySet().iterator().next().getValue();
+        NonBlockingHashSet<StatsSource> sSources = siteIdToStatsSources.entrySet().iterator().next().getValue();
+
+        //There is a window registering the first source where the empty set is visible, don't panic it's coming
+        while (sSources.isEmpty()) {
+            Thread.yield();
+        }
 
         /*
          * Some sources like TableStats use VoltTable to keep track of
@@ -695,10 +714,11 @@ public class StatsAgent extends OpsAgent
          * case.
          */
         VoltTable.ColumnInfo columns[] = null;
-        if (!sSources.get(0).isEEStats())
-            columns = sSources.get(0).getColumnSchema().toArray(new VoltTable.ColumnInfo[0]);
+        final StatsSource firstSource = sSources.iterator().next();
+        if (!firstSource.isEEStats())
+            columns = firstSource.getColumnSchema().toArray(new VoltTable.ColumnInfo[0]);
         else {
-            final VoltTable table = sSources.get(0).getStatsTable();
+            final VoltTable table = firstSource.getStatsTable();
             if (table == null)
                 return null;
             columns = new VoltTable.ColumnInfo[table.getColumnCount()];
@@ -710,7 +730,13 @@ public class StatsAgent extends OpsAgent
         // Append to previous results if provided.
         final VoltTable resultTable = prevResults != null ? prevResults : new VoltTable(columns);
 
-        for (ArrayList<StatsSource> statsSources : siteIdToStatsSources.values()) {
+        for (NonBlockingHashSet<StatsSource> statsSources : siteIdToStatsSources.values()) {
+
+            //The window where it is empty exists here to
+            while (statsSources.isEmpty()) {
+                Thread.yield();
+            }
+
             assert statsSources != null;
             for (final StatsSource ss : statsSources) {
                 assert ss != null;

@@ -373,6 +373,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             buildClusterMesh(isRejoin || m_joining);
 
+            //Register dummy agents immediately
+            m_opsRegistrar.registerMailboxes(m_messenger);
+
+
             //Start validating the build string in the background
             final Future<?> buildStringValidation = validateBuildString(getBuildString(), m_messenger.getZK());
 
@@ -635,7 +639,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
 
             // Need to register the OpsAgents right before we turn on the client interface
-            m_opsRegistrar.registerMailboxes(m_messenger);
+            m_opsRegistrar.setDummyMode(false);
 
             // Create the client interface
             int portOffset = 0;
