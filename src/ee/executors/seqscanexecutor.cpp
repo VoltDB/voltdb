@@ -187,7 +187,10 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
         int tuple_ctr = 0;
         int tuple_skipped = 0;
-        m_engine->setLastAccessedTable(target_table);
+        if (!node->isSubQuery()) {
+            // Input table is the target table in this case
+            m_engine->setLastAccessedTable(input_table);
+        }
         while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
         {
             VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
