@@ -547,7 +547,8 @@ void NValue::castAndSortAndDedupArrayForInList(const ValueType outputType, std::
         outList.push_back(*iter);
     }
 }
-inline void NValue::streamTimestamp(std::stringstream& value) const
+
+void NValue::streamTimestamp(std::stringstream& value) const
 {
     int64_t epoch_micros = getTimestamp();
     boost::gregorian::date as_date;
@@ -578,7 +579,7 @@ inline static void throwTimestampFormatError(const char* str)
 }
 
 
-inline int64_t NValue::parseTimestampString(const char* str)
+int64_t NValue::parseTimestampString(const char* str)
 {
     // date_str
     std::string date_str = str;
