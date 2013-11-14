@@ -54,6 +54,7 @@ import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.planner.ActivePlanRepository;
+import org.voltdb.sysprocs.AdHocBase;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
@@ -113,6 +114,10 @@ public class ProcedureRunner {
 
     // current hash of sql and params
     protected final PureJavaCrc32C m_inputCRC = new PureJavaCrc32C();
+
+    // running procedure info
+    //  - track the current call to voltExecuteSQL for logging progress
+    protected int m_batchIndex;
 
     // Used to get around the "abstract" for StmtProcedures.
     // Path of least resistance?
@@ -197,6 +202,12 @@ public class ProcedureRunner {
 
         // reset the hash of results
         m_inputCRC.reset();
+
+        // reset batch context info
+        m_batchIndex = -1;
+
+        // set procedure name in the site/ee
+        m_site.setProcedureName(m_procedureName);
 
         // use local var to avoid warnings about reassigning method argument
         Object[] paramList = paramListIn;
@@ -345,6 +356,8 @@ public class ProcedureRunner {
             m_cachedSingleStmt.params = null;
             m_cachedSingleStmt.expectation = null;
             m_seenFinalBatch = false;
+
+            m_site.setProcedureName(null);
         }
 
         return retval;
@@ -369,6 +382,18 @@ public class ProcedureRunner {
             int parameterType = m_catProc.getPartitioncolumn().getType();
             int partitionparameter = m_catProc.getPartitionparameter();
             Object parameterAtIndex = invocation.getParameterAtIndex(partitionparameter);
+
+            // check if AdHoc_RO_SP or AdHoc_RW_SP
+            if (m_procedure instanceof AdHocBase) {
+                // ClientInterface should pre-validate this param is valid
+                parameterType = (Byte) invocation.getParameterAtIndex(partitionparameter + 1);
+            }
+
+            // Note that @LoadSinglepartitionTable has problems if the parititoning param
+            // uses integers as bytes and isn't padded to 8b or using the right byte order.
+            // Since this is not exposed to users, we're ok for now. The right fix is to probably
+            // accept the right partitioning type from the user, then rewrite the params internally
+            // before we initiate the proc (like adhocs).
 
             try {
                 int partition = TheHashinator.getPartitionForParameter(parameterType, parameterAtIndex);
@@ -568,6 +593,9 @@ public class ProcedureRunner {
 
             // memo-ize the original batch size here
             int batchSize = m_batch.size();
+            // increment the number of voltExecuteSQL calls for this proc
+            m_batchIndex++;
+            m_site.setBatch(m_batchIndex);
 
             // if batch is small (or reasonable size), do it in one go
             if (batchSize <= MAX_BATCH_SIZE) {
@@ -655,7 +683,7 @@ public class ProcedureRunner {
         try {
             return m_site.loadTable(m_txnState.txnId,
                              clusterName, databaseName,
-                             tableName, data, returnUniqueViolations, Long.MAX_VALUE);
+                             tableName, data, returnUniqueViolations, false);
         }
         catch (EEException e) {
             throw new VoltAbortException("Failed to load table: " + tableName);
@@ -721,7 +749,7 @@ public class ProcedureRunner {
 
         for (PlanFragment frag : catStmt.getFragments()) {
             byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
-            byte[] plan = Encoder.base64Decode(frag.getPlannodetree());
+            byte[] plan = Encoder.decodeBase64AndDecompressToBytes(frag.getPlannodetree());
             long id = ActivePlanRepository.loadOrAddRefPlanFragment(planHash, plan);
             boolean transactional = frag.getNontransactional() == false;
 
@@ -866,6 +894,12 @@ public class ProcedureRunner {
        else if (e.getClass() == org.voltdb.exceptions.SQLException.class) {
            status = ClientResponse.GRACEFUL_FAILURE;
            msg.append("SQL ERROR\n");
+       }
+       // Interrupt exception will be thrown when the procedure is killed by a user
+       // or by a timeout in the middle of executing.
+       else if (e.getClass() == org.voltdb.exceptions.InterruptException.class) {
+           status = ClientResponse.GRACEFUL_FAILURE;
+           msg.append("Transaction Interrupted\n");
        }
        else if (e.getClass() == org.voltdb.ExpectedProcedureException.class) {
            msg.append("HSQL-BACKEND ERROR\n");
@@ -1039,7 +1073,7 @@ public class ProcedureRunner {
        // holds query results
        final VoltTable[] m_results;
 
-       BatchState(int batchSize, TransactionState txnState, long siteId, boolean finalTask) {
+       BatchState(int batchSize, TransactionState txnState, long siteId, boolean finalTask, String procedureName) {
            m_batchSize = batchSize;
            m_txnState = txnState;
 
@@ -1055,6 +1089,7 @@ public class ProcedureRunner {
                                                  m_txnState.isReadOnly(),
                                                  false,
                                                  txnState.isForReplay());
+           m_localTask.setProcedureName(procedureName);
 
            // the data and message for all sites in the transaction
            m_distributedTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
@@ -1064,7 +1099,7 @@ public class ProcedureRunner {
                                                        m_txnState.isReadOnly(),
                                                        finalTask,
                                                        txnState.isForReplay());
-
+           m_distributedTask.setProcedureName(procedureName);
        }
 
        /*
@@ -1117,7 +1152,11 @@ public class ProcedureRunner {
     */
    VoltTable[] executeSlowHomogeneousBatch(final List<QueuedSQL> batch, final boolean finalTask) {
 
-       BatchState state = new BatchState(batch.size(), m_txnState, m_site.getCorrespondingSiteId(), finalTask);
+       BatchState state = new BatchState(batch.size(),
+                                         m_txnState,
+                                         m_site.getCorrespondingSiteId(),
+                                         finalTask,
+                                         m_procedureName);
 
        // iterate over all sql in the batch, filling out the above data structures
        for (int i = 0; i < batch.size(); ++i) {
@@ -1174,6 +1213,7 @@ public class ProcedureRunner {
                                           state.m_localFragsAreNonTransactional && finalTask);
 
        if (!state.m_distributedTask.isEmpty()) {
+           state.m_distributedTask.setBatch(m_batchIndex);
            m_txnState.createAllParticipatingFragmentWork(state.m_distributedTask);
        }
 

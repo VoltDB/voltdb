@@ -29,9 +29,7 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
-
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Database;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
@@ -41,8 +39,10 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.CommandLog;
 import org.voltdb.catalog.Connector;
+import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.SnapshotSchedule;
@@ -349,7 +349,7 @@ public class SystemInformation extends VoltSystemProcedure
             addr = org.voltcore.utils.CoreUtils.getLocalAddress();
         }
         vt.addRow(hostId, "IPADDRESS", addr.getHostAddress());
-        vt.addRow(hostId, "HOSTNAME", addr.getHostName());
+        vt.addRow(hostId, "HOSTNAME", CoreUtils.getHostnameOrAddress());
         vt.addRow(hostId, "CLIENTPORT", Integer.toString(clientPort));
 
         // build string
@@ -381,9 +381,7 @@ public class SystemInformation extends VoltSystemProcedure
         vt.addRow(hostId, "CATALOGCRC",
                 Long.toString(VoltDB.instance().getCatalogContext().getCatalogCRC()));
 
-        if (VoltDB.instance().isIV2Enabled()) {
-            vt.addRow(hostId, "IV2ENABLED", "true");
-        }
+        vt.addRow(hostId, "IV2ENABLED", "true");
 
         return vt;
     }

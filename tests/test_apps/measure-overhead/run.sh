@@ -34,7 +34,7 @@ function clean() {
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -target 1.6 -source 1.6 -classpath $CLASSPATH -d obj \
+    javac -target 1.7 -source 1.7 -classpath $CLASSPATH -d obj \
         src/measureoverhead/*.java \
         src/measureoverhead/procedures/*.java
     # stop if compilation fails
@@ -54,8 +54,7 @@ function server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE host $HOST
+    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
 # run the client that drives the example

@@ -18,6 +18,8 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,15 +27,10 @@ import java.util.Map;
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.DependencyPair;
-import org.voltdb.ParameterSet;
-import org.voltdb.SiteProcedureConnection;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltSystemProcedure;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
+import org.voltdb.*;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
+import org.voltdb.exceptions.SerializableException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.rejoin.TaskLog;
@@ -41,12 +38,21 @@ import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTableUtil;
+import org.voltdb.VoltProcedure.VoltAbortException;
 
 public class SysprocFragmentTask extends TransactionTask
 {
     final Mailbox m_initiator;
     final FragmentTaskMessage m_fragmentMsg;
     Map<Integer, List<VoltTable>> m_inputDeps;
+
+    // This constructor is used during live rejoin log replay.
+    SysprocFragmentTask(Mailbox mailbox,
+                        FragmentTaskMessage message,
+                        ParticipantTransactionState txnState)
+    {
+        this(mailbox, txnState, null, message, null);
+    }
 
     SysprocFragmentTask(Mailbox mailbox,
                  ParticipantTransactionState txnState,
@@ -137,7 +143,13 @@ public class SysprocFragmentTask extends TransactionTask
     @Override
     public void runFromTaskLog(SiteProcedureConnection siteConnection)
     {
-        throw new RuntimeException("Not implemented: replay sysproc during live rejoin.");
+        if (!m_txnState.isReadOnly()) {
+            if (m_txnState.getBeginUndoToken() == Site.kInvalidUndoToken) {
+                m_txnState.setBeginUndoToken(siteConnection.getLatestUndoToken());
+            }
+        }
+
+        processFragmentTask(siteConnection);
     }
 
 
@@ -178,6 +190,12 @@ public class SysprocFragmentTask extends TransactionTask
                 hostLog.l7dlog(Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(),
                         new Object[] { Encoder.hexEncode(m_fragmentMsg.getFragmentPlan(frag)) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                break;
+            } catch (final VoltAbortException e) {
+                hostLog.warn("Error running system procedure plan fragment", e);
+                currentFragResponse.setStatus(
+                        FragmentResponseMessage.UNEXPECTED_ERROR,
+                        new SerializableException(CoreUtils.throwableToString(e)));
                 break;
             }
         }

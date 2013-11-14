@@ -29,9 +29,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.StartAction;
 import org.voltdb.ServerThread;
-import org.voltdb.VoltDB;
+import org.voltdb.StartAction;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.VoltProjectBuilder;
 
@@ -54,7 +53,7 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
     boolean m_compiled = false;
     protected String m_pathToDeployment;
     private File m_pathToVoltRoot = null;
-    private final ArrayList<EEProcess> m_siteProcesses = new ArrayList<EEProcess>();
+    private EEProcess m_siteProcess = null;
 
     public LocalSingleProcessServer(String jarFileName, int siteCount,
                                     BackendTarget target)
@@ -166,10 +165,7 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
     @Override
     public void shutDown() throws InterruptedException {
         m_server.shutdown();
-        for (EEProcess proc : m_siteProcesses) {
-            proc.waitForShutdown();
-        }
-        m_siteProcesses.clear();
+        m_siteProcess.waitForShutdown();
         if (m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
             if (!EEProcess.m_valgrindErrors.isEmpty()) {
                 String failString = "";
@@ -202,15 +198,9 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
         config.m_pathToCatalog = m_jarFileName;
         config.m_pathToDeployment = m_pathToDeployment;
         config.m_startAction = StartAction.CREATE;
-        config.m_enableIV2 = VoltDB.checkTestEnvForIv2();
 
-        config.m_ipcPorts = java.util.Collections.synchronizedList(new ArrayList<Integer>());
-        for (int ii = 0; ii < m_siteCount; ii++) {
-            m_siteProcesses.add(new EEProcess(m_target, "LocalSingleProcessServer_site_" + ii + ".log"));
-        }
-        for (EEProcess proc : m_siteProcesses) {
-            config.m_ipcPorts.add(proc.port());
-        }
+        m_siteProcess = new EEProcess(m_target, m_siteCount, "LocalSingleProcessServer.log");
+        config.m_ipcPort = m_siteProcess.port();
 
         m_server = new ServerThread(config);
         m_server.start();

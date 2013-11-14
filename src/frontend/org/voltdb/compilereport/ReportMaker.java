@@ -23,7 +23,9 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltDB;
@@ -33,6 +35,8 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Connector;
+import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.GroupRef;
@@ -42,11 +46,14 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.catalog.Table;
+import org.voltdb.compiler.VoltCompiler.Feedback;
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.PlatformProperties;
+import org.voltdb.utils.SystemStatsCollector;
 
 import com.google.common.base.Charsets;
 import com.google.common.io.Resources;
@@ -144,7 +151,7 @@ public class ReportMaker {
         return sb.toString();
     }
 
-    static String generateSchemaRow(Table table) {
+    static String generateSchemaRow(Table table, boolean isExportTable) {
         StringBuilder sb = new StringBuilder();
         sb.append("<tr class='primaryrow'>");
 
@@ -161,7 +168,11 @@ public class ReportMaker {
             tag(sb, "info", "Materialized View");
         }
         else {
-            tag(sb, null, "Table");
+            if (isExportTable) {
+                tag(sb, "inverse", "Export Table");
+            } else {
+                tag(sb, null, "Table");
+            }
         }
         sb.append("</td>");
 
@@ -264,10 +275,11 @@ public class ReportMaker {
         return sb.toString();
     }
 
-    static String generateSchemaTable(CatalogMap<Table> tables) {
+    static String generateSchemaTable(CatalogMap<Table> tables, CatalogMap<Connector> connectors) {
         StringBuilder sb = new StringBuilder();
+        List<Table> exportTables = getExportTables(connectors);
         for (Table table : tables) {
-            sb.append(generateSchemaRow(table));
+            sb.append(generateSchemaRow(table, exportTables.contains(table) ? true : false));
         }
         return sb.toString();
     }
@@ -293,7 +305,7 @@ public class ReportMaker {
         List<StmtParameter> params = CatalogUtil.getSortedCatalogItems(statement.getParameters(), "index");
         List<String> paramTypes = new ArrayList<String>();
         for (StmtParameter param : params) {
-            paramTypes.add(VoltType.get((byte) param.getSqltype()).name());
+            paramTypes.add(VoltType.get((byte) param.getJavatype()).name());
         }
         if (paramTypes.size() == 0) {
             sb.append("<i>None</i>");
@@ -543,7 +555,7 @@ public class ReportMaker {
      * Get some embeddable HTML of some generic catalog/application stats
      * that is drawn on the first page of the report.
      */
-    static String getStatsHTML(Database db) {
+    static String getStatsHTML(Database db, ArrayList<Feedback> warnings) {
         StringBuilder sb = new StringBuilder();
         sb.append("<table class='table table-condensed'>\n");
 
@@ -620,16 +632,41 @@ public class ReportMaker {
 
         // statements
         sb.append("<tr><td>SQL Statement Count</td><td>").append(statements).append("</td></tr>\n");
+        sb.append("</table>\n\n");
 
-        sb.append("</table>\n");
+        // warnings, add warning section if any
+        if (warnings.size() > 0){
+            sb.append("<h4>Warnings</h4>");
+            sb.append("<table class='table table-condensed'>\n");
+            for (Feedback warning : warnings) {
+                String procName = warning.getFileName().replace(".class", "");
+                String nameLink = "";
+                // not a warning during compiling procedures, must from the schema
+                if (procName.compareToIgnoreCase("null") == 0) {
+                    String schemaName = "";
+                    String warningMsg = warning.getMessage().toLowerCase();
+                    if (warningMsg.contains("table ")) {
+                        int begin = warningMsg.indexOf("table ") + 6;
+                        int end = (warningMsg.substring(begin)).indexOf(" ");
+                        schemaName = warningMsg.substring(begin, begin + end);
+                    }
+                    nameLink = "<a href='#s-" + schemaName + "'>" + schemaName.toUpperCase() + "</a>";
+                } else {
+                    nameLink = "<a href='#p-" + procName.toLowerCase() + "'>" + procName + "</a>";
+                }
+                sb.append("<tr><td>").append(nameLink).append("</td><td>").append(warning.getMessage()).append("</td></tr>\n");
+            }
+            sb.append("").append("</table>\n").append("</td></tr>\n");
+        }
+
         return sb.toString();
     }
 
     /**
      * Generate the HTML catalog report from a newly compiled VoltDB catalog
      */
-    public static String report(Catalog catalog) throws IOException {
-        // asyncronously get platform properties
+    public static String report(Catalog catalog, ArrayList<Feedback> warnings) throws IOException {
+        // asynchronously get platform properties
         new Thread() {
             @Override
             public void run() {
@@ -646,10 +683,10 @@ public class ReportMaker {
         Database db = cluster.getDatabases().get("database");
         assert(db != null);
 
-        String statsData = getStatsHTML(db);
+        String statsData = getStatsHTML(db, warnings);
         contents = contents.replace("##STATS##", statsData);
 
-        String schemaData = generateSchemaTable(db.getTables());
+        String schemaData = generateSchemaTable(db.getTables(), db.getConnectors());
         contents = contents.replace("##SCHEMA##", schemaData);
 
         String procData = generateProceduresTable(db.getProcedures());
@@ -669,6 +706,51 @@ public class ReportMaker {
         return contents;
     }
 
+    private static List<Table> getExportTables(CatalogMap<Connector> connectors) {
+        List<Table> retval = new ArrayList<Table>();
+
+        for (Connector conn : connectors) {
+            for (ConnectorTableInfo cti : conn.getTableinfo()) {
+                retval.add(cti.getTable());
+            }
+        }
+        return retval;
+    }
+
+    public static String getLiveSystemOverview()
+    {
+        // get the start time
+        long t = SystemStatsCollector.getStartTime();
+        Date date = new Date(t);
+        long duration = System.currentTimeMillis() - t;
+        long minutes = duration / 60000;
+        long hours = minutes / 60; minutes -= hours * 60;
+        long days = hours / 24; hours -= days * 24;
+        String starttime = String.format("%s (%dd %dh %dm)",
+                date.toString(), days, hours, minutes);
+
+        // handle the basic info page below this
+        SiteTracker st = VoltDB.instance().getSiteTrackerForSnapshot();
+
+        // get the cluster info
+        String clusterinfo = st.getAllHosts().size() + " hosts ";
+        clusterinfo += " with " + st.getAllSites().size() + " sites ";
+        clusterinfo += " (" + st.getAllSites().size() / st.getAllHosts().size();
+        clusterinfo += " per host)";
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("<table class='table table-condensed'>\n");
+        sb.append("<tr><td>Mode                     </td><td>" + VoltDB.instance().getMode().toString() + "</td><td>\n");
+        sb.append("<tr><td>VoltDB Version           </td><td>" + VoltDB.instance().getVersionString() + "</td><td>\n");
+        sb.append("<tr><td>Buildstring              </td><td>" + VoltDB.instance().getBuildString() + "</td><td>\n");
+        sb.append("<tr><td>Cluster Composition      </td><td>" + clusterinfo + "</td><td>\n");
+        sb.append("<tr><td>Running Since            </td><td>" + starttime + "</td><td>\n");
+
+        sb.append("</table>\n");
+
+        return sb.toString();
+    }
+
     /**
      * Find the pre-compild catalog report in the jarfile, and modify it for use in the
      * the built-in web portal.
@@ -680,6 +762,10 @@ public class ReportMaker {
         // remove commented out code
         report = report.replace("<!--##RESOURCES", "");
         report = report.replace("##RESOURCES-->", "");
+
+        // inject the cluster overview
+        String clusterStr = "<h4>System Overview</h4>\n<p>" + getLiveSystemOverview() + "</p><br/>\n";
+        report = report.replace("<!--##CLUSTER##-->", clusterStr);
 
         // inject the running system platform properties
         PlatformProperties pp = PlatformProperties.getPlatformProperties();

@@ -358,13 +358,16 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
         Expression exp = getDefaultExpression();
 
         // if there is a default value for the column
+        // and the column value is not NULL. (Ignore "DEFAULT NULL" in DDL)
         if (exp != null) {
-            exp.dataType = dataType;
+            if (exp.valueData != null || (exp instanceof FunctionSQL && ((FunctionSQL)exp).isValueFunction)) {
+                exp.dataType = dataType;
 
-            // add default value to body of column element
-            VoltXMLElement defaultElem = new VoltXMLElement("default");
-            column.children.add(defaultElem);
-            defaultElem.children.add(exp.voltGetXML(session));
+                // add default value to body of column element
+                VoltXMLElement defaultElem = new VoltXMLElement("default");
+                column.children.add(defaultElem);
+                defaultElem.children.add(exp.voltGetXML(session));
+            }
         }
 
         return column;

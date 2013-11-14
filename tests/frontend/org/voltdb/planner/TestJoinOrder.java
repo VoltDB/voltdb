@@ -63,6 +63,23 @@ public class TestJoinOrder extends PlannerTestCase {
         }
     }
 
+    public void testAliasJoinOrder() {
+        AbstractPlanNode pn = compileWithJoinOrder("select * from P1 X, P2 Y where A=B", "X,Y");
+        AbstractPlanNode n = pn.getChild(0).getChild(0);
+        assertEquals("P1", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
+        assertEquals("P2", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
+
+        pn = compileWithJoinOrder("select * from P1, P2 Y where A=B", "P1,Y");
+        n = pn.getChild(0).getChild(0);
+        assertEquals("P1", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
+        assertEquals("P2", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
+
+        pn = compileWithJoinOrder("select * from P1 , P1 Y where P1.A=Y.A", "P1,Y");
+        n = pn.getChild(0).getChild(0);
+        assertEquals("P1", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
+        assertEquals("P1", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
+    }
+
     public void testOuterJoinOrder() {
         AbstractPlanNode pn = compileWithJoinOrder("select * FROM T1 LEFT JOIN T2 ON T1.A = T2.B", "T1, T2");
         AbstractPlanNode n = pn.getChild(0).getChild(0);
@@ -102,7 +119,7 @@ public class TestJoinOrder extends PlannerTestCase {
                 n = n.getChild(0);
             }
             assertTrue(joinOrder[i].equals(s.getTargetTableName()));
-         }
+        }
 
         try {
             compileWithInvalidJoinOrder("select * FROM T1, T2, T3 LEFT JOIN T4 ON T3.C = T4.D LEFT JOIN T5 ON T3.C = T5.E, T6,T7",

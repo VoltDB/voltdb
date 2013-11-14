@@ -59,7 +59,6 @@ import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
-import org.voltdb.compiler.deploymentfile.ExportOnServerType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
@@ -77,7 +76,6 @@ import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
-import org.voltdb.export.processors.GuestProcessor;
 import org.voltdb.utils.NotImplementedException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -236,7 +234,6 @@ public class VoltProjectBuilder {
 
     String m_elloader = null;         // loader package.Classname
     private boolean m_elenabled;      // true if enabled; false if disabled
-    List<String> m_elAuthGroups;      // authorized groups
 
     // zero defaults to first open port >= 8080.
     // negative one means disabled in the deployment file.
@@ -261,7 +258,7 @@ public class VoltProjectBuilder {
     private String m_internalSnapshotPath;
     private String m_commandLogPath;
     private Boolean m_commandLogSync;
-    private Boolean m_commandLogEnabled;
+    private boolean m_commandLogEnabled = false;
     private Integer m_commandLogSize;
     private Integer m_commandLogFsyncInterval;
     private Integer m_commandLogMaxTxnsBeforeFsync;
@@ -273,8 +270,7 @@ public class VoltProjectBuilder {
     private List<String> m_diagnostics;
 
     private Properties m_elConfig;
-    private boolean m_elOnServer;
-    private String m_elExportTo;
+    private String m_elExportTarget = "file";
 
     private Integer m_deadHostTimeout = null;
 
@@ -481,18 +477,9 @@ public class VoltProjectBuilder {
         m_ppdPrefix = ppdPrefix;
     }
 
-    public void addExport(final String loader, boolean enabled, List<String> groups) {
-        m_elloader = loader;
+    public void addExport(boolean enabled, String exportTarget, Properties config) {
+        m_elloader = "org.voltdb.export.processors.GuestProcessor";
         m_elenabled = enabled;
-        m_elAuthGroups = groups;
-        m_elOnServer = false;
-    }
-
-    public void addOnServerExport(boolean enabled, List<String> groups, String exportTo, Properties config) {
-        m_elloader = GuestProcessor.class.getName();
-        m_elenabled = enabled;
-        m_elAuthGroups = groups;
-        m_elOnServer = true;
 
         if (config == null) {
             config = new Properties();
@@ -502,14 +489,13 @@ public class VoltProjectBuilder {
         }
         m_elConfig = config;
 
-        if (exportTo == null || exportTo.trim().isEmpty()) {
-            exportTo = "file";
+        if ((exportTarget != null) && !exportTarget.trim().isEmpty()) {
+            m_elExportTarget = exportTarget;
         }
-        m_elExportTo = exportTo;
     }
 
-    public void addOnServerExport( boolean enabled, List<String> groups) {
-        addOnServerExport(enabled, groups, null, null);
+    public void addExport(boolean enabled) {
+        addExport(enabled, null, null);
     }
 
     public void setTableAsExportOnly(String name) {
@@ -874,20 +860,6 @@ public class VoltProjectBuilder {
             final Element export = doc.createElement("export");
             database.appendChild(export);
 
-            // turn list into stupid comma separated attribute list
-            String groupsattr = "";
-            if (m_elAuthGroups != null) {
-                for (String s : m_elAuthGroups) {
-                    if (groupsattr.isEmpty()) {
-                        groupsattr += s;
-                    }
-                    else {
-                        groupsattr += "," + s;
-                    }
-                }
-                export.setAttribute("groups", groupsattr);
-            }
-
             if (m_exportTables.size() > 0) {
                 final Element tables = doc.createElement("tables");
                 export.appendChild(tables);
@@ -998,31 +970,26 @@ public class VoltProjectBuilder {
         deployment.setSecurity(security);
         security.setEnabled(m_securityEnabled);
 
-        if (m_commandLogSync != null || m_commandLogEnabled != null ||
-                m_commandLogFsyncInterval != null || m_commandLogMaxTxnsBeforeFsync != null ||
-                m_commandLogSize != null) {
-            CommandLogType commandLogType = factory.createCommandLogType();
-            if (m_commandLogSync != null) {
-                commandLogType.setSynchronous(m_commandLogSync.booleanValue());
-            }
-            if (m_commandLogEnabled != null) {
-                commandLogType.setEnabled(m_commandLogEnabled);
-            }
-            if (m_commandLogSize != null) {
-                commandLogType.setLogsize(m_commandLogSize);
-            }
-            if (m_commandLogFsyncInterval != null || m_commandLogMaxTxnsBeforeFsync != null) {
-                CommandLogType.Frequency frequency = factory.createCommandLogTypeFrequency();
-                if (m_commandLogFsyncInterval != null) {
-                    frequency.setTime(m_commandLogFsyncInterval);
-                }
-                if (m_commandLogMaxTxnsBeforeFsync != null) {
-                    frequency.setTransactions(m_commandLogMaxTxnsBeforeFsync);
-                }
-                commandLogType.setFrequency(frequency);
-            }
-            deployment.setCommandlog(commandLogType);
+        // set the command log (which defaults to off)
+        CommandLogType commandLogType = factory.createCommandLogType();
+        commandLogType.setEnabled(m_commandLogEnabled);
+        if (m_commandLogSync != null) {
+            commandLogType.setSynchronous(m_commandLogSync.booleanValue());
         }
+        if (m_commandLogSize != null) {
+            commandLogType.setLogsize(m_commandLogSize);
+        }
+        if (m_commandLogFsyncInterval != null || m_commandLogMaxTxnsBeforeFsync != null) {
+            CommandLogType.Frequency frequency = factory.createCommandLogTypeFrequency();
+            if (m_commandLogFsyncInterval != null) {
+                frequency.setTime(m_commandLogFsyncInterval);
+            }
+            if (m_commandLogMaxTxnsBeforeFsync != null) {
+                frequency.setTransactions(m_commandLogMaxTxnsBeforeFsync);
+            }
+            commandLogType.setFrequency(frequency);
+        }
+        deployment.setCommandlog(commandLogType);
 
         // <partition-detection>/<snapshot>
         PartitionDetectionType ppd = factory.createPartitionDetectionType();
@@ -1096,26 +1063,22 @@ public class VoltProjectBuilder {
         // this is for old generation export test suite backward compatibility
         export.setEnabled(m_elenabled && m_elloader != null && !m_elloader.trim().isEmpty());
 
-        if (m_elOnServer) {
-            ExportOnServerType onServer = factory.createExportOnServerType();
-            ServerExportEnum exportTo = ServerExportEnum.fromValue(m_elExportTo.toLowerCase());
-            onServer.setExportto(exportTo);
-            export.setOnserver(onServer);
-            if( m_elConfig != null && m_elConfig.size() > 0) {
-                ExportConfigurationType exportConfig = factory.createExportConfigurationType();
-                List<PropertyType> configProperties = exportConfig.getProperty();
+        ServerExportEnum exportTarget = ServerExportEnum.fromValue(m_elExportTarget.toLowerCase());
+        export.setTarget(exportTarget);
+        if((m_elConfig != null) && (m_elConfig.size() > 0)) {
+            ExportConfigurationType exportConfig = factory.createExportConfigurationType();
+            List<PropertyType> configProperties = exportConfig.getProperty();
 
-                for( Object nameObj: m_elConfig.keySet()) {
-                    String name = String.class.cast(nameObj);
+            for( Object nameObj: m_elConfig.keySet()) {
+                String name = String.class.cast(nameObj);
 
-                    PropertyType prop = factory.createPropertyType();
-                    prop.setName(name);
-                    prop.setValue(m_elConfig.getProperty(name));
+                PropertyType prop = factory.createPropertyType();
+                prop.setName(name);
+                prop.setValue(m_elConfig.getProperty(name));
 
-                    configProperties.add(prop);
-                }
-                onServer.setConfiguration(exportConfig);
+                configProperties.add(prop);
             }
+            export.setConfiguration(exportConfig);
         }
 
         // Have some yummy boilerplate!

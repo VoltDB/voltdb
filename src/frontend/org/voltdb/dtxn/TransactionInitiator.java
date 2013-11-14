@@ -45,8 +45,7 @@ public abstract class TransactionInitiator implements TransactionCreator {
      * @param connectionId A unique integer identifying which TCP/IP connection
      * spawned this transaction.
      * @param invocation The data describing the work to be done.
-     * @param partitions The partitions (from the catalog) involved in this
-     * transaction (Errs on the side of too many).
+     * @param partition The partition for routing if it is a single part
      * @param messageSize Size in bytes of the message that created this invocation
      */
     @Override
@@ -56,7 +55,7 @@ public abstract class TransactionInitiator implements TransactionCreator {
             boolean isReadOnly,
             boolean isSinglePartition,
             boolean isEverySite,
-            int partitions[],
+            int partition,
             int messageSize,
             long now);
 
@@ -79,9 +78,8 @@ public abstract class TransactionInitiator implements TransactionCreator {
      *            The transaction ID to assign to this initiation
      * @param invocation
      *            The data describing the work to be done.
-     * @param partitions
-     *            The partitions (from the catalog) involved in this transaction
-     *            (Errs on the side of too many).
+     * @param partition
+     *            The partition for routing if it is a single part
      * @param messageSize
      *            Size in bytes of the message that created this invocation
      */
@@ -94,7 +92,7 @@ public abstract class TransactionInitiator implements TransactionCreator {
             boolean isReadOnly,
             boolean isSinglePartition,
             boolean isEverySite,
-            int partitions[],
+            int partition,
             int messageSize,
             long now);
 
@@ -129,25 +127,6 @@ public abstract class TransactionInitiator implements TransactionCreator {
     public abstract void notifyExecutionSiteRejoin(ArrayList<Long> executorSiteIds);
 
     public abstract Map<Long, long[]> getOutstandingTxnStats();
-
-    /**
-     * Whether or not to send out heartbeats
-     *
-     * @param val
-     *            true to send, false to stop sending
-     */
-    @Override
-    public abstract void setSendHeartbeats(boolean val);
-
-    @Override
-    public abstract void sendHeartbeat(long txnId);
-
-    /**
-     * Whether or not the initiator is on back pressure.
-     * @return
-     */
-    @Override
-    public abstract boolean isOnBackPressure();
 
     /**
      * Removes client connection statistics when the connection dies

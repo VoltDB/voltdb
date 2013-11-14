@@ -16,6 +16,7 @@
  */
 package org.voltdb.utils;
 
+import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.math.BigDecimal;
@@ -30,7 +31,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
 
-import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 
 /*
  * Utility methods for work with VoltTables.
@@ -182,9 +182,11 @@ public class VoltTableUtil {
 
         if (result != null) {
             for (VoltTable vt : operands) {
-                // elastic joining nodes will return null tables
-                while (vt != null && vt.advanceRow()) {
-                    result.add(vt);
+                if (vt != null) {
+                    vt.resetRowPosition();
+                    while (vt.advanceRow()) {
+                        result.add(vt);
+                    }
                 }
             }
         }

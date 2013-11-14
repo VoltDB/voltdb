@@ -32,6 +32,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.network.ReverseDNSCache;
+
 /** Encapsulates a socket registration for a VoltNetwork */
 public class VoltPort implements Connection
 {
@@ -41,16 +43,6 @@ public class VoltPort implements Connection
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
     private final NetworkDBBPool m_pool;
-
-    /*
-     * Thread pool for doing reverse DNS lookups. It will create new threads on
-     * demand, until the maximum of 16 threads is reached, in which case it will
-     * queue new works.
-     */
-    private static final ThreadPoolExecutor m_es =
-            new ThreadPoolExecutor(0, 16, 1, TimeUnit.SECONDS,
-                                   new SynchronousQueue<Runnable>(),
-                                   CoreUtils.getThreadFactory("VoltPort DNS Reverse Lookup"));
 
     /** The currently selected operations on this port. */
     private int m_readyOps = 0;
@@ -123,7 +115,7 @@ public class VoltPort implements Connection
         Runnable r = new Runnable() {
             @Override
             public void run() {
-                String remoteHost = m_remoteSocketAddress.getHostName();
+                String remoteHost = ReverseDNSCache.hostnameOrAddress(m_remoteSocketAddress.getAddress());
                 if (!remoteHost.equals(m_remoteSocketAddress.getAddress().getHostAddress())) {
                     m_remoteHostname = remoteHost;
                     m_remoteHostAndAddressAndPort = remoteHost + m_remoteHostAndAddressAndPort;
@@ -139,7 +131,7 @@ public class VoltPort implements Connection
              * very slow if the hostname is not specified in local /etc/hosts.
              */
             try {
-                m_es.submit(r);
+                ReverseDNSCache.m_es.submit(r);
             } catch (RejectedExecutionException e) {
                 networkLog.debug(
                         "Reverse DNS lookup for " + m_remoteSocketAddress + " rejected because the queue was full");

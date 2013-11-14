@@ -115,7 +115,6 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
     : m_currentUndoQuantum(NULL),
       m_hashinator(NULL),
       m_staticParams(MAX_PARAM_COUNT),
-      m_currentOutputDepId(-1),
       m_currentInputDepId(-1),
       m_isELEnabled(false),
       m_stringPool(16777216, 2),
@@ -161,9 +160,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          int32_t partitionId,
                          int32_t hostId,
                          string hostname,
-                         int64_t tempTableMemoryLimit,
-                         HashinatorType hashinatorType,
-                         char *hashinatorConfig)
+                         int64_t tempTableMemoryLimit)
 {
     // Be explicit about running in the standard C locale for now.
     locale::global(locale("C"));
@@ -213,18 +210,6 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_isELEnabled,
                                             hostname,
                                             hostId);
-
-    switch (hashinatorType) {
-    case HASHINATOR_LEGACY:
-        m_hashinator.reset(LegacyHashinator::newInstance(hashinatorConfig));
-        break;
-    case HASHINATOR_ELASTIC:
-        m_hashinator.reset(ElasticHashinator::newInstance(hashinatorConfig));
-        break;
-    default:
-        throwFatalException("Unknown hashinator type %d", hashinatorType);
-        break;
-    }
 
     return true;
 }
@@ -299,19 +284,73 @@ bool VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput* out) const {
 // ------------------------------------------------------------------
 // EXECUTION FUNCTIONS
 // ------------------------------------------------------------------
-int VoltDBEngine::executeQuery(int64_t planfragmentId,
-                               int32_t outputDependencyId,
-                               int32_t inputDependencyId,
-                               const NValueArray &params,
-                               int64_t spHandle, int64_t lastCommittedSpHandle,
-                               int64_t uniqueId,
-                               bool first, bool last)
+
+int VoltDBEngine::executePlanFragments(int32_t numFragments,
+                                       int64_t planfragmentIds[],
+                                       int64_t intputDependencyIds[],
+                                       ReferenceSerializeInput &serialize_in,
+                                       int64_t spHandle,
+                                       int64_t lastCommittedSpHandle,
+                                       int64_t uniqueId,
+                                       int64_t undoToken)
+{
+    // count failures
+    int failures = 0;
+
+    setUndoToken(undoToken);
+
+    // reset these at the start of each batch
+    m_tuplesProcessedInBatch = 0;
+    m_tuplesProcessedInFragment = 0;
+
+    for (m_currentIndexInBatch = 0; m_currentIndexInBatch < numFragments; ++m_currentIndexInBatch) {
+
+        m_usedParamcnt = serialize_in.readShort();
+        if (m_usedParamcnt < 0) {
+            throwFatalException("parameter count is negative: %d", m_usedParamcnt);
+        }
+        assert (m_usedParamcnt < MAX_PARAM_COUNT);
+
+        for (int j = 0; j < m_usedParamcnt; ++j) {
+            m_staticParams[j].deserializeFromAllocateForStorage(serialize_in, &m_stringPool);
+        }
+
+        // success is 0 and error is 1.
+        if (executePlanFragment(planfragmentIds[m_currentIndexInBatch],
+                                intputDependencyIds ? intputDependencyIds[m_currentIndexInBatch] : -1,
+                                m_staticParams,
+                                spHandle,
+                                lastCommittedSpHandle,
+                                uniqueId,
+                                m_currentIndexInBatch == 0,
+                                m_currentIndexInBatch == (numFragments - 1)))
+        {
+            ++failures;
+        }
+
+        // at the end of each frag, rollup and reset counters
+        m_tuplesProcessedInBatch += m_tuplesProcessedInFragment;
+        m_tuplesProcessedInFragment = 0;
+    }
+
+    m_stringPool.purge();
+
+    return failures;
+}
+
+int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
+                                      int64_t inputDependencyId,
+                                      const NValueArray &params,
+                                      int64_t spHandle,
+                                      int64_t lastCommittedSpHandle,
+                                      int64_t uniqueId,
+                                      bool first,
+                                      bool last)
 {
     assert(planfragmentId != 0);
 
     Table *cleanUpTable = NULL;
-    m_currentOutputDepId = outputDependencyId;
-    m_currentInputDepId = inputDependencyId;
+    m_currentInputDepId = static_cast<int32_t>(inputDependencyId);
 
     /*
      * Reserve space in the result output buffer for the number of
@@ -355,8 +394,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
         resetReusedResultOutputBuffer();
         e.serialize(getExceptionOutputSerializer());
 
-        // set these back to -1 for error handling
-        m_currentOutputDepId = -1;
+        // set this back to -1 for error handling
         m_currentInputDepId = -1;
         return ENGINE_ERRORCODE_ERROR;
     }
@@ -367,6 +405,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
     // children are positioned before it in this list, therefore
     // dependency tracking is not needed here.
     size_t ttl = execsForFrag->list.size();
+
     for (int ctr = 0; ctr < ttl; ++ctr) {
         AbstractExecutor *executor = execsForFrag->list[ctr];
         assert (executor);
@@ -384,8 +423,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
                            ctr, (intmax_t)planfragmentId);
                 if (cleanUpTable != NULL)
                     cleanUpTable->deleteAllTuples(false);
-                // set these back to -1 for error handling
-                m_currentOutputDepId = -1;
+                // set this back to -1 for error handling
                 m_currentInputDepId = -1;
                 return ENGINE_ERRORCODE_ERROR;
             }
@@ -398,8 +436,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
             resetReusedResultOutputBuffer();
             e.serialize(getExceptionOutputSerializer());
 
-            // set these back to -1 for error handling
-            m_currentOutputDepId = -1;
+            // set this back to -1 for error handling
             m_currentInputDepId = -1;
             return ENGINE_ERRORCODE_ERROR;
         }
@@ -431,8 +468,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
         m_resultOutput.writeBoolAt(m_startOfResultBuffer + sizeof(int32_t), m_dirtyFragmentBatch);
     }
 
-    // set these back to -1 for error handling
-    m_currentOutputDepId = -1;
+    // set this back to -1 for error handling
     m_currentInputDepId = -1;
 
     VOLT_DEBUG("Finished executing.");
@@ -443,8 +479,8 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
 // RESULT FUNCTIONS
 // -------------------------------------------------
 bool VoltDBEngine::send(Table* dependency) {
-    VOLT_DEBUG("Sending Dependency '%d' from C++", m_currentOutputDepId);
-    m_resultOutput.writeInt(m_currentOutputDepId);
+    VOLT_DEBUG("Sending Dependency from C++");
+    m_resultOutput.writeInt(-1); // legacy placeholder for old output id
     if (!dependency->serializeTo(m_resultOutput))
         return false;
     m_numResultDependencies++;
@@ -485,6 +521,8 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
 
     assert(m_catalog != NULL);
     VOLT_DEBUG("Loading catalog...");
+
+    VOLT_TRACE("Catalog string contents:\n%s\n",catalogPayload.c_str());
     m_catalog->execute(catalogPayload);
 
 
@@ -727,7 +765,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                  indexIter != catalogTable->indexes().end();
                  indexIter++)
             {
-                std::string indexName = indexIter->first;
+                std::string indexName = indexIter->second->name();
                 std::string catalogIndexId = TableCatalogDelegate::getIndexIdString(*indexIter->second);
 
                 // Look for an index on the table to match the catalog index
@@ -840,9 +878,6 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                         targetTable = newTargetTable;
                     }
                 }
-                DEBUG_STREAM_HERE("Adding new mat view " << targetTable->name() << "@" << targetTable <<
-                                  " was @" << oldTargetTable <<
-                                  " on " << persistenttable->name() << "@" << persistenttable);
                 // This is not a leak -- the view metadata is self-installing into the new table.
                 // Also, it guards its targetTable from accidental deletion with a refcount bump.
                 new MaterializedViewMetadata(persistenttable, targetTable, currInfo);
@@ -931,7 +966,7 @@ VoltDBEngine::loadTable(int32_t tableId,
     }
 
     try {
-        table->loadTuplesFrom(serializeIn, NULL, returnUniqueViolations ? getResultOutputSerializer() : NULL);
+        table->loadTuplesFrom(serializeIn, NULL, returnUniqueViolations ? &m_resultOutput : NULL);
     } catch (const SerializableEEException &e) {
         throwFatalException("%s", e.message().c_str());
     }
@@ -1151,13 +1186,11 @@ void VoltDBEngine::initMaterializedViews(bool addAll) {
             PersistentTable *destTable = dynamic_cast<PersistentTable*>(m_tables[destCatalogTable->relativeIndex()]);
             // connect source and destination tables
             if (addAll || catalogView->wasAdded()) {
-                DEBUG_STREAM_HERE("Adding new mat view " << destTable->name() <<
-                                  " on " << srcTable->name());
                 // This is not a leak -- the materialized view is self-installing into srcTable.
                 new MaterializedViewMetadata(srcTable, destTable, catalogView);
             } else {
                 // Ensure that the materialized view is using the latest version of the target table.
-                srcTable->updateMaterializedViewTargetTable(destTable);
+                srcTable->updateMaterializedViewTargetTable(destTable, catalogView);
             }
         }
     }
@@ -1367,6 +1400,7 @@ ExecutorContext * VoltDBEngine::getExecutorContext() {
 bool VoltDBEngine::activateTableStream(
         const CatalogId tableId,
         TableStreamType streamType,
+        int64_t undoToken,
         ReferenceSerializeInput &serializeIn) {
     Table* found = getTable(tableId);
     if (! found) {
@@ -1379,14 +1413,16 @@ bool VoltDBEngine::activateTableStream(
         return false;
     }
 
+    setUndoToken(undoToken);
+
     // Crank up the necessary persistent table streaming mechanism(s).
-    if (table->activateStream(m_tupleSerializer, streamType, m_partitionId, tableId, serializeIn)) {
+    if (!table->activateStream(m_tupleSerializer, streamType, m_partitionId, tableId, serializeIn)) {
         return false;
     }
 
     // keep track of snapshotting tables. a table already in cow mode
     // can not be re-activated for cow mode.
-    if (streamType == TABLE_STREAM_SNAPSHOT) {
+    if (tableStreamTypeIsSnapshot(streamType)) {
         if (m_snapshottingTables.find(tableId) != m_snapshottingTables.end()) {
             assert(false);
             return false;
@@ -1402,18 +1438,13 @@ bool VoltDBEngine::activateTableStream(
 /**
  * Serialize tuples to output streams from a table in COW mode.
  * Overload that serializes a stream position array.
- * Returns:
- *  0-n: remaining tuple count
- *  -1: streaming was completed by the previous call
- *  -2: error, e.g. when no longer in COW mode.
- * Note that -1 is only returned once after the previous call serialized all
- * remaining tuples. Further calls are considered errors and will return -2.
+ * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
  */
 int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
                                                const TableStreamType streamType,
                                                ReferenceSerializeInput &serialize_in)
 {
-    int64_t remaining = -2;
+    int64_t remaining = TABLE_STREAM_SERIALIZATION_ERROR;
     try {
         std::vector<int> positions;
         remaining = tableStreamSerializeMore(tableId, streamType, serialize_in, positions);
@@ -1435,12 +1466,12 @@ int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
             }
         }
         VOLT_DEBUG("tableStreamSerializeMore: deserialized %d buffers, %ld remaining",
-                   (int)positions.size(), remaining);
+                   (int)positions.size(), (long)remaining);
     }
     catch (SerializableEEException &e) {
         resetReusedResultOutputBuffer();
         e.serialize(getExceptionOutputSerializer());
-        remaining = -2; // error
+        remaining = TABLE_STREAM_SERIALIZATION_ERROR;
     }
 
     return remaining;
@@ -1449,12 +1480,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
 /**
  * Serialize tuples to output streams from a table in COW mode.
  * Overload that populates a position vector provided by the caller.
- * Returns:
- *  0-n: remaining tuple count
- *  -1: streaming was completed by the previous call
- *  -2: error, e.g. when no longer in COW mode.
- * Note that -1 is only returned once after the previous call serialized all
- * remaining tuples. Further calls are considered errors and will return -2.
+ * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
  */
 int64_t VoltDBEngine::tableStreamSerializeMore(
         const CatalogId tableId,
@@ -1484,35 +1510,30 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
     // time (it doesn't see the hasMore return code).
     int64_t remaining = -1;
     PersistentTable *table = NULL;
-    switch (streamType) {
-        case TABLE_STREAM_SNAPSHOT: {
-            // If a completed table is polled, return 0 bytes serialized. The
-            // Java engine will always poll a fully serialized table one more
-            // time (it doesn't see the hasMore return code).  Note that the
-            // dynamic cast was already verified in activateCopyOnWrite.
-            table = findInMapOrNull(tableId, m_snapshottingTables);
-            break;
+    if (tableStreamTypeIsSnapshot(streamType)) {
+        // If a completed table is polled, return 0 bytes serialized. The
+        // Java engine will always poll a fully serialized table one more
+        // time (it doesn't see the hasMore return code).  Note that the
+        // dynamic cast was already verified in activateCopyOnWrite.
+        table = findInMapOrNull(tableId, m_snapshottingTables);
+    }
+    else if (tableStreamTypeIsValid(streamType)) {
+        Table* found = getTable(tableId);
+        if (found) {
+            table = dynamic_cast<PersistentTable*>(found);
         }
-
-        case TABLE_STREAM_RECOVERY: {
-            Table* found = getTable(tableId);
-            if (found) {
-                table = dynamic_cast<PersistentTable*>(found);
-            }
-            break;
-        }
-
-        default:
-            // Failure.
-            return -2;
+    }
+    else {
+        // Failure.
+        return -1;
     }
 
     // Perform the streaming.
     if (table != NULL) {
-        remaining = table->streamMore(outputStreams, retPositions);
+        remaining = table->streamMore(outputStreams, streamType, retPositions);
 
         // Clear it from the snapshot table as appropriate.
-        if (remaining <= 0 && streamType == TABLE_STREAM_SNAPSHOT) {
+        if (remaining <= 0 && tableStreamTypeIsSnapshot(streamType)) {
             m_snapshottingTables.erase(tableId);
             table->decrementRefcount();
         }
@@ -1596,13 +1617,13 @@ size_t VoltDBEngine::tableHashCode(int32_t tableId) {
     return table->hashCode();
 }
 
-void VoltDBEngine::updateHashinator(HashinatorType type, const char *config) {
+void VoltDBEngine::updateHashinator(HashinatorType type, const char *config, int32_t *configPtr, uint32_t numTokens) {
     switch (type) {
     case HASHINATOR_LEGACY:
         m_hashinator.reset(LegacyHashinator::newInstance(config));
         break;
     case HASHINATOR_ELASTIC:
-        m_hashinator.reset(ElasticHashinator::newInstance(config));
+        m_hashinator.reset(ElasticHashinator::newInstance(config, configPtr, numTokens));
         break;
     default:
         throwFatalException("Unknown hashinator type %d", type);
@@ -1626,7 +1647,7 @@ void VoltDBEngine::dispatchValidatePartitioningTask(const char *taskParams) {
             hashinator.reset(LegacyHashinator::newInstance(config));
             break;
         case HASHINATOR_ELASTIC:
-            hashinator.reset(ElasticHashinator::newInstance(config));
+            hashinator.reset(ElasticHashinator::newInstance(config, NULL, 0));
             break;
         default:
             throwFatalException("Unknown hashinator type %d", type);
@@ -1644,11 +1665,10 @@ void VoltDBEngine::dispatchValidatePartitioningTask(const char *taskParams) {
         }
     }
 
-    ReferenceSerializeOutput *output = getResultOutputSerializer();
-    output->writeInt(static_cast<int32_t>(sizeof(int64_t) * numTables));
+    m_resultOutput.writeInt(static_cast<int32_t>(sizeof(int64_t) * numTables));
 
     BOOST_FOREACH( int64_t mispartitionedRowCount, mispartitionedRowCounts) {
-        output->writeLong(mispartitionedRowCount);
+        m_resultOutput.writeLong(mispartitionedRowCount);
     }
 }
 
@@ -1662,5 +1682,26 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
     }
 }
 
+void VoltDBEngine::reportProgessToTopend() {
+    std::string tableName;
+    int64_t tableSize;
+    if (m_lastAccessedTable == NULL) {
+        tableName = "None";
+        tableSize = 0;
+    }
+    else {
+        tableName = m_lastAccessedTable->name();
+        tableSize = m_lastAccessedTable->activeTupleCount();
+    }
+    //Update stats in java and let java determine if we should cancel this query.
+    if(m_topend->fragmentProgressUpdate(m_currentIndexInBatch,
+                                        *m_lastAccessedPlanNodeName,
+                                        tableName,
+                                        tableSize,
+                                        m_tuplesProcessedInBatch + m_tuplesProcessedInFragment)){
+        VOLT_DEBUG("Interrupt query.");
+        throw InterruptException("Query interrupted.");
+    }
+}
 
 }

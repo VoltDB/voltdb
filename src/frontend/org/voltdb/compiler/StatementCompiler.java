@@ -27,7 +27,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
-import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.StatementAnnotation;
 import org.voltdb.planner.CompiledPlan;
@@ -46,6 +45,8 @@ import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
+
+import com.google.common.base.Charsets;
 
 /**
  * Compiles individual SQL statements and updates the given catalog.
@@ -106,6 +107,13 @@ public abstract class StatementCompiler {
         catch (Exception e) {
             e.printStackTrace();
             throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());
+        }
+
+        // There is a hard-coded limit to the number of parameters that can be passed to the EE.
+        if (plan.parameters.length > CompiledPlan.MAX_PARAM_COUNT) {
+            throw compiler.new VoltCompilerException(
+                "The statement's parameter count " + plan.parameters.length +
+                " must not exceed the maximum " + CompiledPlan.MAX_PARAM_COUNT);
         }
 
         // Check order determinism before accessing the detail which it caches.
@@ -225,8 +233,8 @@ public abstract class StatementCompiler {
         String json = node_list.toJSONString();
         compiler.captureDiagnosticJsonFragment(json);
         // Place serialized version of PlanNodeTree into a PlanFragment
-        byte[] jsonBytes = json.getBytes(Constants.UTF8ENCODING);
-        String bin64String = Encoder.base64Encode(jsonBytes);
+        byte[] jsonBytes = json.getBytes(Charsets.UTF_8);
+        String bin64String = Encoder.compressAndBase64Encode(jsonBytes);
         fragment.setPlannodetree(bin64String);
         return jsonBytes;
     }

@@ -31,6 +31,8 @@ public enum StatsSelector {
     MANAGEMENT,       // Returns pretty much everything
     PROCEDUREPROFILE, // performs an aggregation of the procedure statistics
     SNAPSHOTSTATUS,
+    PROCEDUREINPUT,
+    PROCEDUREOUTPUT,
 
     /*
      * DRPARTITION and DRNODE are internal names

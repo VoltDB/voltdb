@@ -38,6 +38,7 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ReplicationRole;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
@@ -160,7 +161,11 @@ public class MiscUtils {
         // verify the license file exists.
         File licenseFile = new File(pathToLicense);
         if (licenseFile.exists() == false) {
-            hostLog.fatal("Unable to open license file: " + pathToLicense);
+            String canonicalName = "path unknown?";
+            try {
+                canonicalName = licenseFile.getCanonicalPath();
+            } catch (IOException ioexc) {}
+            hostLog.fatal("Unable to open license file: " + pathToLicense + " (" + canonicalName + ")");
             hostLog.fatal("Please contact sales@voltdb.com to request a license.");
             return null;
         }
@@ -466,10 +471,22 @@ public class MiscUtils {
      */
     public static synchronized void printPortsInUse(VoltLogger log) {
         try {
-            Process p = Runtime.getRuntime().exec("lsof -i");
+            /*
+             * Don't do DNS resolution, don't use names for port numbers
+             */
+            ProcessBuilder pb = new ProcessBuilder("lsof", "-i", "-n", "-P");
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
             java.io.InputStreamReader reader = new java.io.InputStreamReader(p.getInputStream());
             java.io.BufferedReader br = new java.io.BufferedReader(reader);
-            String str = null;
+            String str = br.readLine();
+            log.fatal("Logging ports that are bound for listening, " +
+                      "this doesn't include ports bound by outgoing connections " +
+                      "which can also cause a failure to bind");
+            log.fatal("The PID of this process is " + CLibrary.getpid());
+            if (str != null) {
+                log.fatal(str);
+            }
             while((str = br.readLine()) != null) {
                 if (str.contains("LISTEN")) {
                     log.fatal(str);
@@ -695,5 +712,26 @@ public class MiscUtils {
                 return Lists.newArrayList();
             }
         });
+    }
+
+    /**
+     * Serialize and then deserialize an invocation so that it has serializedParams set for command logging if the
+     * invocation is sent to a local site.
+     * @return The round-tripped version of the invocation
+     * @throws IOException
+     */
+    public static StoredProcedureInvocation roundTripForCL(StoredProcedureInvocation invocation) throws IOException
+    {
+        if (invocation.getSerializedParams() == null) {
+            ByteBuffer buf = ByteBuffer.allocate(invocation.getSerializedSize());
+            invocation.flattenToBuffer(buf);
+            buf.flip();
+
+            StoredProcedureInvocation rti = new StoredProcedureInvocation();
+            rti.initFromBuffer(buf);
+            return rti;
+        } else {
+            return invocation;
+        }
     }
 }

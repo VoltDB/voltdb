@@ -3,16 +3,25 @@
 -- keywords that we want to support for a version 1 release.
 --
 -- Required preprocessor template:
--- @insert_vals: the list of types of the table columns for INSERT
--- @cmp_type
--- @assign_col
--- @assign_type
+-- {@aftermath = " _math _value[int:1,3]"}
+-- {@agg = "_numagg"}
+-- {@columntype = "decimal"}
+-- {@columnpredicate = "_numericcolumnpredicate"}
+-- {@comparableconstant = "42.42"}
+-- {@comparabletype = "numeric"}
+-- {@dmlcolumnpredicate = "_numericcolumnpredicate"}
+-- {@dmltable = "_table"}
+-- {@fromtables = "_table"}
+-- {@insertvals = "_id, _value[decimal], _value[decimal], _value[float]"}
+-- {@idcol = "ID"}
+-- {@optionalfn = "_numfun"}
+-- {@updatecolumn = "CASH"}
+-- {@updatevalue = "_value[decimal]"}
 
--- DML, generate random data first.
---INSERT
--- test basic INSERT
-INSERT INTO _table VALUES (@insert_vals)
---SELECT * FROM P1 INNER JOIN R1 ON P1.RATIO = R1.ID
+-- DML, purge and regenerate random data first.
+DELETE FROM @dmltable
+INSERT INTO @dmltable VALUES (@insertvals)
+
 <basic-select.sql>
 <basic-update.sql>
 <basic-delete.sql>

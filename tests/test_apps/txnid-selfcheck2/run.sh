@@ -29,12 +29,13 @@ HOST="localhost"
 # remove build artifacts
 function clean() {
     rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput $APPNAME-alt.jar voltdbroot voltdbroot
 }
 
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -target 1.6 -source 1.6 -classpath $CLASSPATH -d obj \
+    javac -target 1.7 -source 1.7 -classpath $CLASSPATH -d obj \
         src/txnIdSelfCheck/*.java \
         src/txnIdSelfCheck/procedures/*.java
     # stop if compilation fails
@@ -55,6 +56,12 @@ function catalog() {
         src/txnIdSelfCheck/ddl.sql src/txnIdSelfCheck/ddl-annex.sql
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
+
+    # primary no-export catalog
+    $VOLTDB compile --classpath obj -o $APPNAME-noexport.jar src/txnIdSelfCheck/ddl-noexport.sql
+    # stop if compilation fails
+    if [ $? != 0 ]; then exit; fi
+
 }
 
 # run the voltdb server locally
@@ -62,8 +69,7 @@ function server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE host $HOST
+    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
 # run the client that drives the example

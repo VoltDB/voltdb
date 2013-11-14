@@ -24,6 +24,7 @@ import java.util.concurrent.Future;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.iv2.JoinProducerBase;
 
@@ -34,7 +35,6 @@ import org.voltdb.iv2.JoinProducerBase;
 public interface SiteProcedureConnection {
 
     public long getLatestUndoToken();
-    public long getNextUndoToken();
 
     /**
      * Get the HSQL backend, if any.  Returns null if we're not configured
@@ -72,7 +72,7 @@ public interface SiteProcedureConnection {
             String tableName,
             VoltTable data,
             boolean returnUniqueViolations,
-            long undoToken)
+            boolean undo)
     throws VoltAbortException;
 
     /**
@@ -83,7 +83,7 @@ public interface SiteProcedureConnection {
             int tableId,
             VoltTable data,
             boolean returnUniqueViolations,
-            long undoToken);
+            boolean undo);
 
     /**
      * Execute a set of plan fragments.
@@ -100,9 +100,16 @@ public interface SiteProcedureConnection {
             boolean readOnly) throws EEException;
 
     /**
-     * For test cases that need to mimic a plan fragment being invoked
+     * Let the EE know which batch of sql is running so it can include this
+     * information in any slow query progress log messages.
      */
-    public void simulateExecutePlanFragments(long txnId, boolean readOnly);
+    public void setBatch(int batchIndex);
+
+    /**
+     * Let the EE know what the name of the currently executing procedure is
+     * so it can include this information in any slow query progress log messages.
+     */
+    public void setProcedureName(String procedureName);
 
     /**
      * Legacy recursable execution interface for MP transaction states.
@@ -110,9 +117,15 @@ public interface SiteProcedureConnection {
     public Map<Integer, List<VoltTable>> recursableRun(TransactionState currentTxnState);
 
     /**
+     * Set the spHandle that's used by snapshot digest as the per-partition txnId. This gets updated during rejoin so
+     * that the snapshot right after rejoin can have the correct value. It is also updated when transaction commits.
+     */
+    public void setSpHandleForSnapshotDigest(long spHandle);
+
+    /**
      * IV2 commit / rollback interface to the EE
      */
-    public void truncateUndoLog(boolean rollback, long token, long txnId, long spHandle);
+    public void truncateUndoLog(boolean rollback, long token, long spHandle, List<UndoAction> undoActions);
 
     /**
      * IV2: send dependencies to the EE
@@ -139,7 +152,8 @@ public interface SiteProcedureConnection {
      */
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction action,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers);
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            boolean requireExistingSequenceNumbers);
 
     public long[] getUSOForExportTable(String signature);
 
@@ -160,7 +174,7 @@ public interface SiteProcedureConnection {
 
     // Snapshot services provided by the site
     public Future<?> doSnapshotWork();
-    public void setPerPartitionTxnIds(long[] perPartitionTxnIds);
+    public void setPerPartitionTxnIds(long[] perPartitionTxnIds, boolean skipMultiPart);
 
     public long[] validatePartitioning(long tableIds[], int hashinatorType, byte hashinatorConfig[]);
 }

@@ -37,27 +37,19 @@ import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
-import jsr166y.LinkedTransferQueue;
+import com.google.common.base.*;
 
+import com.google.common.util.concurrent.*;
 import org.voltcore.logging.VoltLogger;
 
+import org.voltcore.network.ReverseDNSCache;
 import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.MoreExecutors;
 
 public class CoreUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -284,35 +276,43 @@ public class CoreUtils {
      *         if we can find one; the empty string otherwise
      */
     public static String getHostnameOrAddress() {
-        try {
-            final InetAddress addr = InetAddress.getLocalHost();
-            return addr.getHostName();
-        } catch (UnknownHostException e) {
-            try {
-                // XXX-izzy Won't we randomly pull localhost here sometimes?
-                Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
-                if (interfaces == null) {
-                    return "";
-                }
-                NetworkInterface intf = interfaces.nextElement();
-                Enumeration<InetAddress> addresses = intf.getInetAddresses();
-                while (addresses.hasMoreElements()) {
-                    InetAddress address = addresses.nextElement();
-                    if (address instanceof Inet4Address) {
-                        return address.getHostAddress();
+        final InetAddress addr = m_localAddressSupplier.get();
+        if (addr == null) return "";
+        return ReverseDNSCache.hostnameOrAddress(addr);
+    }
+
+    private static final Supplier<InetAddress> m_localAddressSupplier =
+            Suppliers.memoizeWithExpiration(new Supplier<InetAddress>() {
+                @Override
+                public InetAddress get() {
+                    try {
+                        final InetAddress addr = InetAddress.getLocalHost();
+                        return addr;
+                    } catch (UnknownHostException e) {
+                        try {
+                            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+                            if (interfaces == null) {
+                                return null;
+                            }
+                            NetworkInterface intf = interfaces.nextElement();
+                            Enumeration<InetAddress> addresses = intf.getInetAddresses();
+                            while (addresses.hasMoreElements()) {
+                                InetAddress address = addresses.nextElement();
+                                if (address instanceof Inet4Address) {
+                                    return address;
+                                }
+                            }
+                            addresses = intf.getInetAddresses();
+                            if (addresses.hasMoreElements()) {
+                                return addresses.nextElement();
+                            }
+                            return null;
+                        } catch (SocketException e1) {
+                            return null;
+                        }
                     }
                 }
-                addresses = intf.getInetAddresses();
-                if (addresses.hasMoreElements())
-                {
-                    return addresses.nextElement().getHostAddress();
-                }
-                return "";
-            } catch (SocketException e1) {
-                return "";
-            }
-        }
-    }
+            }, 3600, TimeUnit.SECONDS);
 
     /**
      * Return the local IP address, if it's resolvable.  If not,
@@ -322,32 +322,7 @@ public class CoreUtils {
      *         if we can find one; the empty string otherwise
      */
     public static InetAddress getLocalAddress() {
-        try {
-            final InetAddress addr = InetAddress.getLocalHost();
-            return addr;
-        } catch (UnknownHostException e) {
-            try {
-                Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
-                if (interfaces == null) {
-                    return null;
-                }
-                NetworkInterface intf = interfaces.nextElement();
-                Enumeration<InetAddress> addresses = intf.getInetAddresses();
-                while (addresses.hasMoreElements()) {
-                    InetAddress address = addresses.nextElement();
-                    if (address instanceof Inet4Address) {
-                        return address;
-                    }
-                }
-                addresses = intf.getInetAddresses();
-                if (addresses.hasMoreElements()) {
-                    return addresses.nextElement();
-                }
-                return null;
-            } catch (SocketException e1) {
-                return null;
-            }
-        }
+        return m_localAddressSupplier.get();
     }
 
     public static long getHSIdFromHostAndSite(int host, int site) {
@@ -450,17 +425,31 @@ public class CoreUtils {
             if (!first) sb.append(", ");
             first = false;
             sb.append(CoreUtils.hsIdToString(entry.getKey()));
-            sb.append(entry.getValue());
+            sb.append("->").append(entry.getValue());
         }
         sb.append('}');
         return sb.toString();
     }
 
-    public static String hsIdEntriesToString(Collection<Map.Entry<Long, Long>> entries) {
+    public static String hsIdValueMapToString(Map<?, Long> m) {
         StringBuilder sb = new StringBuilder();
         sb.append('{');
         boolean first = true;
-        for (Map.Entry<Long, Long> entry : entries) {
+        for (Map.Entry<?, Long> entry : m.entrySet()) {
+            if (!first) sb.append(", ");
+            first = false;
+            sb.append(entry.getKey()).append("->");
+            sb.append(CoreUtils.hsIdToString(entry.getValue()));
+        }
+        sb.append('}');
+        return sb.toString();
+    }
+
+    public static String hsIdMapToString(Map<Long, Long> m) {
+        StringBuilder sb = new StringBuilder();
+        sb.append('{');
+        boolean first = true;
+        for (Map.Entry<Long, Long> entry : m.entrySet()) {
             if (!first) sb.append(", ");
             first = false;
             sb.append(CoreUtils.hsIdToString(entry.getKey())).append(" -> ");
@@ -472,5 +461,87 @@ public class CoreUtils {
 
     public static int availableProcessors() {
         return Math.max(1, Runtime.getRuntime().availableProcessors());
+    }
+
+    public static final class RetryException extends RuntimeException {}
+
+    /*
+     * A helper for retrying tasks asynchronously returns a settable future
+     * that can be used to attempt to cancel the task
+     *
+     * The first executor service is used to schedule retry attempts
+     * The second is where the task will be subsmitted for execution
+     * If the two services are the same only the scheduled service is used
+     */
+    public static final<T>  ListenableFuture<T> retryHelper(
+            final ScheduledExecutorService ses,
+            final ExecutorService es,
+            final Callable<T> callable,
+            final Long maxAttempts,
+            final long startInterval,
+            final TimeUnit startUnit,
+            final long maxInterval,
+            final TimeUnit maxUnit) {
+        Preconditions.checkNotNull(maxUnit);
+        Preconditions.checkNotNull(startUnit);
+        Preconditions.checkArgument(startUnit.toMillis(startInterval) >= 1);
+        Preconditions.checkArgument(maxUnit.toMillis(maxInterval) >= 1);
+        Preconditions.checkNotNull(callable);
+
+        final SettableFuture<T> retval = SettableFuture.create();
+        /*
+         * Base case with no retry, attempt the task once
+         */
+        es.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    retval.set(callable.call());
+                } catch (RetryException e) {
+                    //Now schedule a retry
+                    retryHelper(ses, es, callable, maxAttempts, startInterval, startUnit, maxInterval, maxUnit, 0, retval);
+                } catch (Exception e) {
+                    retval.setException(e);
+                }
+            }
+        });
+        return retval;
+    }
+
+    private static final <T> void retryHelper(
+            final ScheduledExecutorService ses,
+            final ExecutorService es,
+            final Callable<T> callable,
+            final Long maxAttempts,
+            final long startInterval,
+            final TimeUnit startUnit,
+            final long maxInterval,
+            final TimeUnit maxUnit,
+            final long ii,
+            final SettableFuture<T> retval) {
+        long intervalMax = maxUnit.toMillis(maxInterval);
+        final long interval = Math.min(intervalMax, startUnit.toMillis(startInterval) * 2);
+        ses.schedule(new Runnable() {
+            @Override
+            public void run() {
+                Runnable task = new Runnable() {
+                    @Override
+                    public void run() {
+                        if (retval.isCancelled()) return;
+
+                        try {
+                            retval.set(callable.call());
+                        } catch (RetryException e) {
+                            retryHelper(ses, es, callable, maxAttempts, interval, TimeUnit.MILLISECONDS, maxInterval,  maxUnit, ii + 1, retval);
+                        } catch (Exception e3) {
+                            retval.setException(e3);
+                        }
+                    }
+                };
+                if (ses == es) task.run();
+                else es.execute(task);
+            }
+
+        }, interval, TimeUnit.MILLISECONDS);
     }
 }

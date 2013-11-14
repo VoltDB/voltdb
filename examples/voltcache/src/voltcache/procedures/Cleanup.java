@@ -25,8 +25,6 @@ package voltcache.procedures;
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 
-@ProcInfo(singlePartition = false)
-
 public class Cleanup extends VoltCacheProcBase
 {
     private final SQLStmt cleanup = new SQLStmt("DELETE FROM cache WHERE Expires < ?;");

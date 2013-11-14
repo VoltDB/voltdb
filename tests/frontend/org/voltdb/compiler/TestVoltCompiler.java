@@ -384,7 +384,7 @@ public class TestVoltCompiler extends TestCase {
                 VoltCompiler.readFileFromJarfile("/tmp/snapshot_settings_test.jar", "catalog.txt");
             final Catalog cat = new Catalog();
             cat.execute(catalogContents);
-            CatalogUtil.compileDeploymentAndGetCRC(cat, builder.getPathToDeployment(), true);
+            CatalogUtil.compileDeploymentAndGetCRC(cat, builder.getPathToDeployment(), true, false);
             SnapshotSchedule schedule =
                 cat.getClusters().get("cluster").getDatabases().
                     get("database").getSnapshotschedule().get("default");
@@ -404,7 +404,7 @@ public class TestVoltCompiler extends TestCase {
     public void testExportSetting() throws IOException {
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(getClass().getResource("ExportTester-ddl.sql"));
-        project.addExport("org.voltdb.export.processors.RawProcessor", false, null);
+        project.addExport(false /* disabled */);
         project.setTableAsExportOnly("A");
         project.setTableAsExportOnly("B");
         try {
@@ -436,7 +436,7 @@ public class TestVoltCompiler extends TestCase {
         project.addPartitionInfo("B", "B_ID");
         project.addPartitionInfo("e", "e_id");
         project.addPartitionInfo("f", "f_id");
-        project.addExport("org.voltdb.export.processors.RawProcessor", true, null);
+        project.addExport(true /* enabled */);
         project.setTableAsExportOnly("A"); // uppercase DDL, uppercase export
         project.setTableAsExportOnly("b"); // uppercase DDL, lowercase export
         project.setTableAsExportOnly("E"); // lowercase DDL, uppercase export
@@ -447,7 +447,7 @@ public class TestVoltCompiler extends TestCase {
                 VoltCompiler.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
             final Catalog cat = new Catalog();
             cat.execute(catalogContents);
-            CatalogUtil.compileDeploymentAndGetCRC(cat, project.getPathToDeployment(), true);
+            CatalogUtil.compileDeploymentAndGetCRC(cat, project.getPathToDeployment(), true, false);
             Connector connector = cat.getClusters().get("cluster").getDatabases().
                 get("database").getConnectors().get("0");
             assertTrue(connector.getEnabled());
@@ -467,7 +467,7 @@ public class TestVoltCompiler extends TestCase {
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
         project.addStmtProcedure("Dummy", "select * from v_table1r_el_only");
-        project.addExport("org.voltdb.export.processors.RawProcessor", true, null);
+        project.addExport(true /* enabled */);
         project.setTableAsExportOnly("table1r_el_only");
         try {
             assertFalse(project.compile("/tmp/exporttestview.jar"));
@@ -483,7 +483,7 @@ public class TestVoltCompiler extends TestCase {
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
         project.addStmtProcedure("Dummy", "select * from table1r_el_only");
-        project.addExport("org.voltdb.export.processors.RawProcessor", true, null);
+        project.addExport(true /* enabled */);
         project.setTableAsExportOnly("v_table1r_el_only");
         try {
             assertFalse(project.compile("/tmp/exporttestview.jar"));
@@ -1745,6 +1745,205 @@ public class TestVoltCompiler extends TestCase {
         compileForDDLTest(getPathForSchema(s), false);
     }
 
+    public void testColumnUniqueGiveException()
+    {
+        String msgP = "must include the partitioning column";
+        String msgPR= "ASSUMEUNIQUE is not required if the index includes the partitioning column. Use UNIQUE instead";
+        String msgR = "ASSUMEUNIQUE is not valid for replicated tables. Please use UNIQUE instead";
+        String schema = "";
+
+        // (1) ****** Replicate tables
+        // A unique index on the non-primary key for replicated table gets no error.
+        schema = "create table t0 (id bigint not null, name varchar(32) not null UNIQUE, age integer,  primary key (id));\n";
+        checkValidUniqueAndAssumeUnique(schema, null, msgR);
+
+        // Similar to above, but use a different way to define unique column.
+        schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  " +
+                "primary key (id), UNIQUE (name) );\n";
+        checkValidUniqueAndAssumeUnique(schema, null, msgR);
+
+
+        // (2) ****** Partition Table: UNIQUE valid, ASSUMEUNIQUE not valid
+        // A unique index on the partitioning key ( no primary key) gets no error.
+        schema = "create table t0 (id bigint not null UNIQUE, name varchar(32) not null, age integer);\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n";
+        checkValidUniqueAndAssumeUnique(schema, null, msgPR);
+
+        // Similar to above, but use a different way to define unique column.
+        schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  " +
+                "primary key (id), UNIQUE(id) );\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n";
+        checkValidUniqueAndAssumeUnique(schema, null, msgPR);
+
+        // A unique index on the partitioning key ( also primary key) gets no error.
+        schema = "create table t0 (id bigint not null UNIQUE, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n";
+        checkValidUniqueAndAssumeUnique(schema, null, msgPR);
+
+
+        // A unique compound index on the partitioning key and another column gets no error.
+        schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  " +
+                "UNIQUE (id, age), primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n";
+        checkValidUniqueAndAssumeUnique(schema, null, msgPR);
+
+        // A unique index on the partitioning key and an expression like abs(age) gets no error.
+        schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  " +
+                "primary key (id), UNIQUE (id, abs(age)) );\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n";
+        checkValidUniqueAndAssumeUnique(schema, null, msgPR);
+
+
+        // (3) ****** Partition Table: UNIQUE not valid
+        // A unique index on the partitioning key ( non-primary key) gets one error.
+        schema = "create table t0 (id bigint not null, name varchar(32) not null UNIQUE, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN name;\n";
+        checkValidUniqueAndAssumeUnique(schema, msgP, msgPR);
+
+        // A unique index on the partitioning key ( no primary key) gets one error.
+        schema = "create table t0 (id bigint not null, name varchar(32) not null UNIQUE, age integer);\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n";
+        checkValidUniqueAndAssumeUnique(schema, msgP, null);
+
+        // A unique index on the non-partitioning key gets one error.
+        schema = "create table t0 (id bigint not null, name varchar(32) UNIQUE, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n";
+        checkValidUniqueAndAssumeUnique(schema, msgP, null);
+
+        // A unique index on an unrelated expression like abs(age) gets a error.
+        schema = "create table t0 (id bigint not null, name varchar(32), age integer, UNIQUE (abs(age)), primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n";
+        checkValidUniqueAndAssumeUnique(schema, msgP, null);
+
+
+        // A unique index on an expression of the partitioning key like substr(1, 2, name) gets two errors.
+        schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  " +
+                "primary key (id), UNIQUE (substr(name, 1, 2 )) );\n" +
+                "PARTITION TABLE t0 ON COLUMN name;\n";
+        // 1) unique index, 2) primary key
+        checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
+
+        // A unique index on the non-partitioning key, non-partitioned column gets two errors.
+        schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer UNIQUE,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN name;\n";
+        // 1) unique index, 2) primary key
+        checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
+    }
+
+    private void checkValidUnique(String ddl, String errorMsg) {
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
+        final String schemaPath = schemaFile.getPath();
+
+        final String simpleProject =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database name='database'>" +
+            "<schemas>" +
+            "<schema path='" + schemaPath + "' />" +
+            "</schemas>" +
+            "<procedures/>" +
+            "</database>" +
+            "</project>";
+
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+        final String projectPath = projectFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+
+        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        boolean expectSuccess = errorMsg == null ? true : false;
+        assertEquals(expectSuccess, success);
+        if (!expectSuccess) {
+            assertTrue(isFeedbackPresent(errorMsg, compiler.m_errors));
+        }
+    }
+
+    private void checkValidUniqueAndAssumeUnique(String ddl, String errorUnique, String errorAssumeUnique) {
+        checkValidUnique(ddl, errorUnique);
+        checkValidUnique(ddl.replace("UNIQUE", "ASSUMEUNIQUE"), errorAssumeUnique);
+    }
+
+    public void testUniqueIndexGiveException() {
+        String msgP = "must include the partitioning column";
+        String msgPR= "ASSUMEUNIQUE is not required if the index includes the partitioning column. Use UNIQUE instead";
+        String msgR = "ASSUMEUNIQUE is not valid for replicated tables. Please use UNIQUE instead";
+        String schema = "";
+
+        // (1) ****** Replicate tables
+        // A unique index on the non-primary key for replicated table gets no error.
+        schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "CREATE UNIQUE INDEX user_index0 ON t0 (name) ;";
+        checkValidUniqueAndAssumeUnique(schema, null, msgR);
+
+
+        // (2) ****** Partition Table: UNIQUE valid, ASSUMEUNIQUE not valid
+        // A unique index on the partitioning key ( no primary key) gets no error.
+        schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer);\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index1 ON t0 (id) ;";
+        checkValidUniqueAndAssumeUnique(schema, null, msgPR);
+
+        // A unique index on the partitioning key ( also primary key) gets no error.
+        schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index2 ON t0 (id) ;";
+        checkValidUniqueAndAssumeUnique(schema, null, msgPR);
+
+        // A unique compound index on the partitioning key and another column gets no error.
+        schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index3 ON t0 (id, age) ;";
+        checkValidUniqueAndAssumeUnique(schema, null, msgPR);
+
+        // A unique index on the partitioning key and an expression like abs(age) gets no error.
+        schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index4 ON t0 (id, abs(age)) ;";
+        checkValidUniqueAndAssumeUnique(schema, null, msgPR);
+
+
+        // (3) ****** Partition Table: UNIQUE not valid
+        // A unique index on the partitioning key ( no primary key) gets one error.
+        schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer);\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index7 ON t0 (name) ;";
+        checkValidUniqueAndAssumeUnique(schema, msgP, null);
+
+        // A unique index on the non-partitioning key gets one error.
+        schema = "create table t0 (id bigint not null, name varchar(32), age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index8 ON t0 (name) ;";
+        checkValidUniqueAndAssumeUnique(schema, msgP, null);
+
+        // A unique index on an unrelated expression like abs(age) gets a error.
+        schema = "create table t0 (id bigint not null, name varchar(32), age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index9 ON t0 (abs(age)) ;";
+        checkValidUniqueAndAssumeUnique(schema, msgP, null);
+
+        // A unique index on the partitioning key ( non-primary key) gets one error.
+        schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN name;\n" +
+                "CREATE UNIQUE INDEX user_index6 ON t0 (name) ;";
+        checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
+
+
+        // A unique index on an expression of the partitioning key like substr(1, 2, name) gets two errors.
+        schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN name;\n" +
+                "CREATE UNIQUE INDEX user_index10 ON t0 (substr(name, 1, 2 )) ;";
+        // 1) unique index, 2) primary key
+        checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
+
+        // A unique index on the non-partitioning key, non-partitioned column gets two errors.
+        schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN name;\n" +
+                "CREATE UNIQUE INDEX user_index12 ON t0 (age) ;";
+        // 1) unique index, 2) primary key
+        checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
+    }
+
+
     public void testPartitionOnBadType() {
         final String simpleSchema =
             "create table books (cash float default 0.0 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));";
@@ -2269,7 +2468,6 @@ public class TestVoltCompiler extends TestCase {
         boolean adhoc = false;
         boolean sysproc = false;
         boolean defaultproc = false;
-        boolean export = false;
 
         public TestRole(String name) {
             this.name = name;
@@ -2280,14 +2478,6 @@ public class TestVoltCompiler extends TestCase {
             this.adhoc = adhoc;
             this.sysproc = sysproc;
             this.defaultproc = defaultproc;
-        }
-
-        public TestRole(String name, boolean adhoc, boolean sysproc, boolean defaultproc, boolean export) {
-            this.name = name;
-            this.adhoc = adhoc;
-            this.sysproc = sysproc;
-            this.defaultproc = defaultproc;
-            this.export = export;
         }
     }
 
@@ -2326,10 +2516,8 @@ public class TestVoltCompiler extends TestCase {
             if (connectors.get("0") == null ) {
                 connectors.add("0");
             }
-            CatalogMap<GroupRef> authGroups = connectors.get("0").getAuthgroups();
 
             assertNotNull(groups);
-            assertNotNull(authGroups);
             assertEquals(roles.length, groups.size());
 
             for (TestRole role : roles) {
@@ -2338,9 +2526,6 @@ public class TestVoltCompiler extends TestCase {
                 assertEquals(String.format("Role \"%s\" adhoc flag mismatch:", role.name), role.adhoc, group.getAdhoc());
                 assertEquals(String.format("Role \"%s\" sysproc flag mismatch:", role.name), role.sysproc, group.getSysproc());
                 assertEquals(String.format("Role \"%s\" defaultproc flag mismatch:", role.name), role.defaultproc, group.getDefaultproc());
-
-                boolean allowedToExport = authGroups.get(role.name) != null;
-                assertEquals(String.format("Role \"%s\" export flag mismatch:", role.name), role.export, allowedToExport);
             }
         }
         else {
@@ -2371,14 +2556,12 @@ public class TestVoltCompiler extends TestCase {
     public void testRoleDDL() throws Exception {
         goodRoleDDL("create role r1;", new TestRole("r1"));
         goodRoleDDL("create role r1;create role r2;", new TestRole("r1"), new TestRole("r2"));
-        goodRoleDDL("create role r1 with adhoc;", new TestRole("r1", true, false, false,false));
-        goodRoleDDL("create role r1 with sysproc;", new TestRole("r1", false, true, false,false));
-        goodRoleDDL("create role r1 with defaultproc;", new TestRole("r1", false, false, true, false));
-        goodRoleDDL("create role r1 with export;", new TestRole("r1", false, false, false, true));
-        goodRoleDDL("create role r1 with adhoc,sysproc,defaultproc,export;", new TestRole("r1", true, true, true, true));
-        goodRoleDDL("create role r1 with adhoc ,sysproc, defaultproc, export;", new TestRole("r1", true, true, true, true));
-        goodRoleDDL("create role r1 with adhoc,sysproc,sysproc;", new TestRole("r1", true, true, false,false));
-        goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc,Export;", new TestRole("r1", true, true, true, true));
+        goodRoleDDL("create role r1 with adhoc;", new TestRole("r1", true, false, false));
+        goodRoleDDL("create role r1 with sysproc;", new TestRole("r1", false, true, false));
+        goodRoleDDL("create role r1 with defaultproc;", new TestRole("r1", false, false, true));
+        goodRoleDDL("create role r1 with adhoc,sysproc,defaultproc;", new TestRole("r1", true, true, true));
+        goodRoleDDL("create role r1 with adhoc,sysproc,sysproc;", new TestRole("r1", true, true, false));
+        goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc;", new TestRole("r1", true, true, true));
     }
 
     public void testBadRoleDDL() throws Exception {

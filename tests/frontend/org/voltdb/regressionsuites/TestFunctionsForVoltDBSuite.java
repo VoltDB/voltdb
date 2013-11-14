@@ -385,6 +385,32 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals("where",result.getString(1));
     }
 
+    public void testDECODEInlineVarcharColumn_ENG5078()
+    throws NoConnectionsException, IOException, ProcCallException
+    {
+        System.out.println("STARTING DECODE inline varchar column pass-through");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P3_INLINE_DESC.insert", 1, "zheng", 10, 1.1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // null case
+        try {
+            cr = client.callProcedure("@AdHoc",
+                                      "select DECODE(id, -1, 'INVALID', desc) from P3_INLINE_DESC");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals("zheng",result.getString(0));
+        } catch (ProcCallException pce) {
+            System.out.println(pce);
+            fail("Looks like a regression of ENG-5078 inline varchar column pass-through by decode");
+        }
+    }
+
     public void testDECODEAsInput() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING DECODE No Default");
         Client client = getClient();
@@ -431,7 +457,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
-    private void checkDecodeNullResult (ClientResponse cr, Object[] input) {
+    private void checkDecodeNullResult (ClientResponse cr, Object input) {
         VoltTable result;
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
@@ -512,13 +538,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         cr = client.callProcedure("P2.insert", 1, new Timestamp(1000L));
         cr = client.callProcedure("P2.insert", 2, null);
         // Test timestamp
-        try {
-            // Timstamp converted to varchar, See ENG-4284.
-            cr = client.callProcedure("TestDecodeNullTimestamp", 1);
-            fail();
-        } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("TIMESTAMP can't be cast as VARCHAR"));
-        }
+        cr = client.callProcedure("TestDecodeNullTimestamp", 1);
+        checkDecodeNullResult(cr, new String[]{"2013-07-18 02:00:00.123457"});
 
         // Test NULL as the second search expression.
         cr = client.callProcedure("@AdHoc", "select DECODE(tiny, -1, -1, NULL, 0, tiny)," +
@@ -538,13 +559,13 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(Integer.MIN_VALUE, cr.getResults()[0].getLong(0));
 
         try {
-            cr = client.callProcedure("@AdHoc","select DECODE(tiny, 4, 5, NULL, 'null tiny', tiny) " +
+            cr = client.callProcedure("@AdHoc","select DECODE(tiny, 4, 5, NULL, 'tiny null', tiny) " +
                     " from R3 where id = 2");
             fail();
         } catch (Exception ex) {
             System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains("SQL ERROR"));
-            assertTrue(ex.getMessage().contains("value: 'null tiny'"));
+            assertTrue(ex.getMessage().contains("value: 'tiny null'"));
         }
     }
 
@@ -1431,6 +1452,14 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "PRIMARY KEY (ID) ); " +
                 "PARTITION TABLE P2 ON COLUMN ID;\n" +
 
+                "CREATE TABLE P3_INLINE_DESC ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "DESC VARCHAR(30), " +
+                "NUM INTEGER, " +
+                "RATIO FLOAT, " +
+                "PRIMARY KEY (ID) ); " +
+                "PARTITION TABLE P3_INLINE_DESC ON COLUMN ID;" +
+
                 "CREATE TABLE R3 ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
                 "TINY TINYINT, " +
@@ -1557,7 +1586,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "DECODE(tm, ?, 'null tm', 'tm'), DECODE(var, ?, 'null var', var), " +
                 "DECODE(dec, ?, 'null dec', dec) from R3 where id = ?");
 
-        project.addStmtProcedure("TestDecodeNullTimestamp", "select DECODE(tm, NULL, 'null tm', tm) from p2 where id = ?");
+        project.addStmtProcedure("TestDecodeNullTimestamp", "select DECODE(tm, NULL, 'null tm', tm) from R3 where id = ?");
 
         // CONFIG #1: Local Site/Partition running on JNI backend
         config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);

@@ -50,6 +50,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <pthread.h>
 
 
 // Please don't make this different from the JNI result buffer size.
@@ -132,6 +133,7 @@ typedef struct {
     struct ipc_command cmd;
     voltdb::CatalogId tableId;
     voltdb::TableStreamType streamType;
+    int64_t undoToken;
     char data[0];
 }__attribute__((packed)) activate_tablestream;
 
@@ -425,8 +427,6 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         int hostId;
         int64_t logLevels;
         int64_t tempTableMemory;
-        int32_t hashinatorType;
-        int32_t hashinatorConfigLength;
         int32_t hostnameLength;
         char data[0];
     }__attribute__((packed));
@@ -440,11 +440,9 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     cs->hostId = ntohl(cs->hostId);
     cs->logLevels = ntohll(cs->logLevels);
     cs->tempTableMemory = ntohll(cs->tempTableMemory);
-    cs->hashinatorType = ntohl(cs->hashinatorType);
-    cs->hashinatorConfigLength = ntohl(cs->hashinatorConfigLength);
     cs->hostnameLength = ntohl(cs->hostnameLength);
 
-    std::string hostname(cs->data + cs->hashinatorConfigLength, cs->hostnameLength);
+    std::string hostname(cs->data, cs->hostnameLength);
     try {
         m_engine = new VoltDBEngine(new voltdb::IPCTopend(this), new voltdb::StdoutLogProxy());
         m_engine->getLogManager()->setLogLevels(cs->logLevels);
@@ -460,9 +458,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
                                  cs->partitionId,
                                  cs->hostId,
                                  hostname,
-                                 cs->tempTableMemory,
-                                 (HashinatorType)cs->hashinatorType,
-                                 (char*)cs->data) == true) {
+                                 cs->tempTableMemory) == true) {
             return kErrorCode_Success;
         }
     } catch (const FatalException &e) {
@@ -566,52 +562,46 @@ int8_t VoltDBIPC::quiesce(struct ipc_command *cmd) {
 
 void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
     int errors = 0;
-    NValueArray &params = m_engine->getParameterContainer();
 
     querypfs *queryCommand = (querypfs*) cmd;
 
     int32_t numFrags = ntohl(queryCommand->numFragmentIds);
 
-    if (0)
+    if (0) {
         std::cout << "querypfs:"
                   << " spHandle=" << ntohll(queryCommand->spHandle)
                   << " lastCommittedSphandle=" << ntohll(queryCommand->lastCommittedSpHandle)
                   << " undoToken=" << ntohll(queryCommand->undoToken)
                   << " numFragIds=" << numFrags << std::endl;
+    }
 
     // data has binary packed fragmentIds first
-    int64_t *fragmentId = (int64_t*) (&(queryCommand->data));
-    int64_t *inputDepId = fragmentId + numFrags;
+    int64_t *fragmentIds = (int64_t*) (&(queryCommand->data));
+    int64_t *inputDepIds = fragmentIds + numFrags;
+
+    // fix network byte order
+    for (int i = 0; i < numFrags; ++i) {
+        fragmentIds[i] = ntohll(fragmentIds[i]);
+        inputDepIds[i] = ntohll(inputDepIds[i]);
+    }
 
     // ...and fast serialized parameter sets last.
     void* offset = queryCommand->data + (sizeof(int64_t) * numFrags * 2);
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(querypfs) - sizeof(int32_t) * ntohl(queryCommand->numFragmentIds));
     ReferenceSerializeInput serialize_in(offset, sz);
 
-    try {
-        // and reset to space for the results output
-        m_engine->resetReusedResultOutputBuffer(1);//1 byte to add status code
-        m_engine->setUndoToken(ntohll(queryCommand->undoToken));
-        Pool *pool = m_engine->getStringPool();
-        for (int i = 0; i < numFrags; ++i) {
-            int cnt = serialize_in.readShort();
-            assert(cnt> -1);
+    // and reset to space for the results output
+    m_engine->resetReusedResultOutputBuffer(1);//1 byte to add status code
 
-            deserializeParameterSetCommon(cnt, serialize_in, params, pool);
-            m_engine->setUsedParamcnt(cnt);
-            if (m_engine->executeQuery(ntohll(fragmentId[i]),
-                                       1,
-                                       (int32_t)(ntohll(inputDepId[i])), // Java sends int64 but EE wants int32
-                                       params,
-                                       ntohll(queryCommand->spHandle),
-                                       ntohll(queryCommand->lastCommittedSpHandle),
-                                       ntohll(queryCommand->uniqueId),
-                                       i == 0 ? true : false, //first
-                                       i == numFrags - 1 ? true : false)) { //last
-                ++errors;
-            }
-        }
-        pool->purge();
+    try {
+        errors = m_engine->executePlanFragments(numFrags,
+                                                fragmentIds,
+                                                inputDepIds,
+                                                serialize_in,
+                                                ntohll(queryCommand->spHandle),
+                                                ntohll(queryCommand->lastCommittedSpHandle),
+                                                ntohll(queryCommand->uniqueId),
+                                                ntohll(queryCommand->undoToken));
     }
     catch (const FatalException &e) {
         crashVoltDB(e);
@@ -763,6 +753,58 @@ char *VoltDBIPC::retrieveDependency(int32_t dependencyId, size_t *dependencySz) 
         exit(-1);
     }
     return dependencyData;
+}
+
+bool VoltDBIPC::fragmentProgressUpdate(int32_t batchIndex,
+        std::string planNodeName,
+        std::string targetTableName,
+        int64_t targetTableSize,
+        int64_t tuplesProcessed) {
+    char message[sizeof(int8_t) + sizeof(int32_t) + sizeof(planNodeName) + sizeof(targetTableName) +
+                 sizeof(targetTableSize) + sizeof(tuplesProcessed)];
+    message[0] = static_cast<int8_t>(kErrorCode_progressUpdate);
+    *reinterpret_cast<int32_t*>(&message[1]) = htonl(batchIndex);
+
+    int16_t strSize = static_cast<int16_t>(planNodeName.size());
+    *reinterpret_cast<int16_t*>(&message[5]) = htons(strSize);
+    ::memcpy( &message[7], planNodeName.c_str(), strSize);
+    int offset = 7 + strSize;
+
+    strSize = static_cast<int16_t>(targetTableName.size());
+    *reinterpret_cast<int16_t*>(&message[offset]) = htons(strSize);
+    offset += 2;
+    ::memcpy( &message[offset], targetTableName.c_str(), strSize);
+    offset += strSize;
+
+    *reinterpret_cast<int64_t*>(&message[offset]) = htonll(targetTableSize);
+    offset += 8;
+
+    *reinterpret_cast<int64_t*>(&message[offset]) = htonll(tuplesProcessed);
+
+    int32_t length;
+    ssize_t bytes = read(m_fd, &length, sizeof(int32_t));
+    if (bytes != sizeof(int32_t)) {
+        printf("Error - blocking read failed. %jd read %jd attempted",
+                (intmax_t)bytes, (intmax_t)sizeof(int32_t));
+        fflush(stdout);
+        assert(false);
+        exit(-1);
+    }
+    length = static_cast<int32_t>(ntohl(length) - sizeof(int32_t));
+    assert(length > 0);
+
+    int16_t isCancel;
+    bytes = read(m_fd, &isCancel, sizeof(int16_t));
+    if (bytes != sizeof(int16_t)) {
+        printf("Error - blocking read failed. %jd read %jd attempted",
+                (intmax_t)bytes, (intmax_t)sizeof(int16_t));
+        fflush(stdout);
+        assert(false);
+        exit(-1);
+    }
+    isCancel = static_cast<int16_t>(ntohs(isCancel));
+
+    return (isCancel == 1);
 }
 
 std::string VoltDBIPC::planForFragmentId(int64_t fragmentId) {
@@ -932,10 +974,11 @@ int8_t VoltDBIPC::activateTableStream(struct ipc_command *cmd) {
     // Provide access to the serialized message data, i.e. the predicates.
     void* offset = activateTableStreamCommand->data;
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(activate_tablestream));
+    int64_t undoToken = ntohll(activateTableStreamCommand->undoToken);
     ReferenceSerializeInput serialize_in(offset, sz);
 
     try {
-        if (m_engine->activateTableStream(tableId, streamType, serialize_in)) {
+        if (m_engine->activateTableStream(tableId, streamType, undoToken, serialize_in)) {
             return kErrorCode_Success;
         } else {
             return kErrorCode_Error;
@@ -1109,7 +1152,7 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
         hashinator.reset(LegacyHashinator::newInstance(hash->data));
         break;
     case HASHINATOR_ELASTIC:
-        hashinator.reset(ElasticHashinator::newInstance(hash->data));
+        hashinator.reset(ElasticHashinator::newInstance(hash->data, NULL, 0));
         break;
     default:
         try {
@@ -1146,7 +1189,7 @@ void VoltDBIPC::updateHashinator(struct ipc_command *cmd) {
 
     HashinatorType hashinatorType = static_cast<HashinatorType>(ntohl(hash->hashinatorType));
     try {
-        m_engine->updateHashinator(hashinatorType, hash->data);
+        m_engine->updateHashinator(hashinatorType, hash->data, NULL, 0);
     } catch (const FatalException &e) {
         crashVoltDB(e);
     }
@@ -1256,6 +1299,90 @@ void VoltDBIPC::executeTask(struct ipc_command *cmd) {
     writeOrDie(m_fd, (unsigned char*)resultsBuffer, responseLength);
 }
 
+void *eethread(void *ptr) {
+    // copy and free the file descriptor ptr allocated by the select thread
+    int *fdPtr = static_cast<int*>(ptr);
+    int fd = *fdPtr;
+    delete fdPtr;
+    fdPtr = NULL;
+
+    /* max message size that can be read from java */
+    int max_ipc_message_size = (1024 * 1024 * 2);
+
+    // requests larger than this will cause havoc.
+    // cry havoc and let loose the dogs of war
+    boost::shared_array<char> data(new char[max_ipc_message_size]);
+    memset(data.get(), 0, max_ipc_message_size);
+
+    // instantiate voltdbipc to interface to EE.
+    boost::shared_ptr<VoltDBIPC> voltipc(new VoltDBIPC(fd));
+
+    // loop until the terminate/shutdown command is seen
+    while (true) {
+        size_t bytesread = 0;
+
+        // read the header
+        while (bytesread < 4) {
+            std::size_t b = read(fd, data.get() + bytesread, 4 - bytesread);
+            if (b == 0) {
+                printf("client eof\n");
+                close(fd);
+                return NULL;
+            } else if (b == -1) {
+                printf("client error\n");
+                close(fd);
+                return NULL;
+            }
+            bytesread += b;
+        }
+
+        // read the message body in to the same data buffer
+        int msg_size = ntohl(((struct ipc_command*) data.get())->msgsize);
+        //printf("Received message size %d\n", msg_size);
+        if (msg_size > max_ipc_message_size) {
+            max_ipc_message_size = msg_size;
+            char* newdata = new char[max_ipc_message_size];
+            memset(newdata, 0, max_ipc_message_size);
+            memcpy(newdata, data.get(), 4);
+            data.reset(newdata);
+        }
+
+        while (bytesread < msg_size) {
+            std::size_t b = read(fd, data.get() + bytesread, msg_size - bytesread);
+            if (b == 0) {
+                printf("client eof\n");
+                close(fd);
+                return NULL;
+            } else if (b == -1) {
+                printf("client error\n");
+                close(fd);
+                return NULL;
+            }
+            bytesread += b;
+        }
+
+        // dispatch the request
+        struct ipc_command *cmd = (struct ipc_command*) data.get();
+
+        // size at least length + command
+        if (ntohl(cmd->msgsize) < sizeof(struct ipc_command)) {
+            printf("bytesread=%zx cmd=%d msgsize=%d\n",
+                   bytesread, cmd->command, ntohl(cmd->msgsize));
+            for (int ii = 0; ii < bytesread; ++ii) {
+                printf("%x ", data[ii]);
+            }
+            assert(ntohl(cmd->msgsize) >= sizeof(struct ipc_command));
+        }
+        bool terminate = voltipc->execute(cmd);
+        if (terminate) {
+            close(fd);
+            return NULL;
+        }
+    }
+
+    return NULL;
+}
+
 int main(int argc, char **argv) {
     //Create a pool ref to init the thread local in case a poll message comes early
     voltdb::ThreadLocalPool poolRef;
@@ -1264,23 +1391,34 @@ int main(int argc, char **argv) {
     fflush(stdout);
     int sock = -1;
     int fd = -1;
-    /* max message size that can be read from java */
-    int max_ipc_message_size = (1024 * 1024 * 2);
 
-    int port = 0;
+    int eecount = 1;
+    int port = 0; // 0 means pick any port
 
-    // allow called to override port with the first argument
-    if (argc == 2) {
-        char *portStr = argv[1];
+    // allow caller to specify the number of ees - defaults to 1
+    if (argc >= 2) {
+        char *eecountStr = argv[1];
+        assert(eecountStr);
+        eecount = atoi(eecountStr);
+        assert(eecount >= 0);
+        printf("==%d==\n", eecount);
+    }
+
+    boost::shared_array<pthread_t> eeThreads(new pthread_t[eecount]);
+
+    // allow caller to override port with the second argument
+    if (argc == 3) {
+        char *portStr = argv[2];
         assert(portStr);
         port = atoi(portStr);
+        assert(port > 0);
+        assert(port <= 65535);
     }
 
     struct sockaddr_in address;
     address.sin_family = AF_INET;
     address.sin_port = htons(port);
     address.sin_addr.s_addr = INADDR_ANY;
-
 
     // read args which presumably configure VoltDBIPC
 
@@ -1312,92 +1450,44 @@ int main(int argc, char **argv) {
     printf("listening\n");
     fflush(stdout);
 
-    struct sockaddr_in client_addr;
-    socklen_t addr_size = sizeof(struct sockaddr_in);
-    fd = accept(sock, (struct sockaddr*) (&client_addr), &addr_size);
-    if (fd < 0) {
-        printf("Failed to accept socket.\n");
-        exit(-6);
-    }
-
-    int flag = 1;
-    int ret = setsockopt( fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag) );
-    if (ret == -1) {
-      printf("Couldn't setsockopt(TCP_NODELAY)\n");
-      exit( EXIT_FAILURE );
-    }
-
-    // requests larger than this will cause havoc.
-    // cry havoc and let loose the dogs of war
-    char* data = (char*) malloc(max_ipc_message_size);
-    memset(data, 0, max_ipc_message_size);
-
-    // instantiate voltdbipc to interface to EE.
-    VoltDBIPC *voltipc = new VoltDBIPC(fd);
-    int more = 1;
-    while (more) {
-        size_t bytesread = 0;
-
-        // read the header
-        while (bytesread < 4) {
-            std::size_t b = read(fd, data + bytesread, 4 - bytesread);
-            if (b == 0) {
-                printf("client eof\n");
-                goto done;
-            } else if (b == -1) {
-                printf("client error\n");
-                goto done;
-            }
-            bytesread += b;
+    // connect to each Site from Java over a new socket
+    for (int ee = 0; ee < eecount; ee++) {
+        struct sockaddr_in client_addr;
+        socklen_t addr_size = sizeof(struct sockaddr_in);
+        fd = accept(sock, (struct sockaddr*) (&client_addr), &addr_size);
+        if (fd < 0) {
+            printf("Failed to accept socket.\n");
+            exit(-6);
         }
 
-        // read the message body in to the same data buffer
-        int msg_size = ntohl(((struct ipc_command*) data)->msgsize);
-        //printf("Received message size %d\n", msg_size);
-        if (msg_size > max_ipc_message_size) {
-            max_ipc_message_size = msg_size;
-            char* newdata = (char*) malloc(max_ipc_message_size);
-            memset(newdata, 0, max_ipc_message_size);
-            memcpy(newdata, data, 4);
-            free(data);
-            data = newdata;
+        int flag = 1;
+        int ret = setsockopt( fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag) );
+        if (ret == -1) {
+            printf("Couldn't setsockopt(TCP_NODELAY)\n");
+            exit( EXIT_FAILURE );
         }
 
-        while (bytesread < msg_size) {
-            std::size_t b = read(fd, data + bytesread, msg_size - bytesread);
-            if (b == 0) {
-                printf("client eof\n");
-                goto done;
-            } else if (b == -1) {
-                printf("client error\n");
-                goto done;
-            }
-            bytesread += b;
-        }
+        // make a heap file descriptor to pass to the thread (which it will free)
+        int *fdPtr = new int;
+        *fdPtr = fd;
 
-        // dispatch the request
-        struct ipc_command *cmd = (struct ipc_command*) data;
-
-        // size at least length + command
-        if (ntohl(cmd->msgsize) < sizeof(struct ipc_command)) {
-            printf("bytesread=%zx cmd=%d msgsize=%d\n",
-                   bytesread, cmd->command, ntohl(cmd->msgsize));
-            for (int ii = 0; ii < bytesread; ++ii) {
-                printf("%x ", data[ii]);
-            }
-            assert(ntohl(cmd->msgsize) >= sizeof(struct ipc_command));
-        }
-        bool terminate = voltipc->execute(cmd);
-        if (terminate) {
-            goto done;
+        int status = pthread_create(&eeThreads[ee], NULL, eethread, fdPtr);
+        if (status) {
+            // error
         }
     }
 
-  done:
     close(sock);
-    close(fd);
-    delete voltipc;
-    free(data);
+
+    // wait for all of the EEs to finish
+    for (int ee = 0; ee < eecount; ee++) {
+        int code = pthread_join(eeThreads[ee], NULL);
+        // stupid if to avoid compiler warning
+        if (code != 0) {
+            assert(code == 0);
+        }
+    }
+
     fflush(stdout);
     return 0;
 }

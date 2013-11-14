@@ -65,8 +65,6 @@ end
 begin Connector                      "Export connector"
   string loaderclass                 "The class name of the connector"
   bool enabled                       "Is the connector enabled"
-  UserRef* authUsers                 "Users authorized to invoke this procedure"
-  GroupRef* authGroups               "Groups authorized to invoke this procedure"
   ConnectorTableInfo* tableInfo      "Per table configuration"
   ConnectorProperty* config          "Connector configuration properties"
 end
@@ -129,9 +127,12 @@ begin Table                   "A table (relation) in the database"
 end
 
 begin MaterializedViewInfo "Information used to build and update a materialized view"
-  Table? dest              "The table which will be updated when the source table is updated"
-  ColumnRef* groupbycols   "The columns involved in the group by of the aggregation"
-  string predicate         "A filtering predicate"
+  Table? dest                       "The table which will be updated when the source table is updated"
+  ColumnRef* groupbycols            "The columns involved in the group by of the aggregation"
+  string predicate                  "A filtering predicate"
+  string groupbyExpressionsJson     "A serialized representation of the groupby expression trees"
+  string aggregationExpressionsJson "A serialized representation of the aggregation expression trees"
+  string indexForMinMax             "The name of index on srcTable which can be used to maintain min()/max()"
 end
 
 begin AuthProgram "The name of a program with access to a specific procedure. This is effectively a weak reference to a 'program'"
@@ -180,6 +181,7 @@ end
 
 begin Index          "A index structure on a database table's columns"
   bool unique        "May the index contain duplicate keys?"
+  bool assumeUnique  "User allow unique index on partition table without including partition key?"
   bool countable     "Index counter feature"
   int type           "What data structure is the index using and what kinds of keys does it support?"
   ColumnRef* columns "Columns referenced by the index"

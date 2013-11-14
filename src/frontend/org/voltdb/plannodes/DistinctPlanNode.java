@@ -120,9 +120,7 @@ public class DistinctPlanNode extends AbstractPlanNode {
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
-        if( !jobj.isNull( Members.DISTINCT_EXPRESSION.name() ) ) {
-            m_distinctExpression = AbstractExpression.fromJSONObject( jobj.getJSONObject(Members.DISTINCT_EXPRESSION.name()), db);
-        }
+        m_distinctExpression = AbstractExpression.fromJSONChild(jobj, Members.DISTINCT_EXPRESSION.name());
     }
     @Override
     protected String explainPlanForNode(String indent) {

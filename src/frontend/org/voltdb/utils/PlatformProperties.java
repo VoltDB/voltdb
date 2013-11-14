@@ -187,8 +187,8 @@ public class PlatformProperties implements Serializable {
             hw = getLinuxHardwareInfo();
         }
         else {
-            System.err.println("Unable to determine operating system. Exiting.");
-            System.exit(-1);
+            hostLog.warn("Unable to determine supported operating system. Hardware info such as Memory,CPU will be incorrectly reported.");
+            hw = new HardwareInfo();
         }
 
         // hardware

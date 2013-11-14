@@ -62,7 +62,7 @@ function catalog() {
     # stop if compilation fails
     rm -rf $EXPORTDATA
     mkdir $EXPORTDATA
-    rm -rf $CLIENTLOG
+    rm -fR $CLIENTLOG
     mkdir $CLIENTLOG
     if [ $? != 0 ]; then exit; fi
 }
@@ -72,8 +72,7 @@ function server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE host $HOST
+    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
 # run the voltdb server locally
@@ -81,8 +80,7 @@ function server-legacy() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment_legacy.xml \
-        license $LICENSE host $HOST
+    $VOLTDB create -d deployment_legacy.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
 function server-custom() {
@@ -94,8 +92,7 @@ function server-custom() {
     cd ..
     cp customexport.jar $VOLTDB_LIB/extension/customexport.jar
     # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment_custom.xml \
-        license $LICENSE host $HOST
+    $VOLTDB create -d deployment_custom.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
 # run the voltdb server locally
@@ -103,24 +100,21 @@ function server1() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment_multinode.xml \
-        license $LICENSE host $HOST:3021 internalport 3024 enableiv2
+    $VOLTDB create -d deployment_multinode.xml -l $LICENSE -H $HOST:3021 --internalport=3024 $APPNAME.jar
 }
 
 function server2() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment_multinode.xml \
-        license $LICENSE host $HOST:3021 internalport 3022 adminport 21215 port 21216 zkport 2182 enableiv2
+    $VOLTDB create -d deployment_multinode.xml -l $LICENSE -H $HOST:21216 --adminport=21215 --internalport=3022 --zkport=2182 $APPNAME.jar
 }
 
 function server3() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment_multinode.xml \
-        license $LICENSE host $HOST:3021 internalport 3023 adminport 21213 port 21214 zkport 2183 enableiv2
+    $VOLTDB create -d deployment_multinode.xml -l $LICENSE -H $HOST:3021 --internalport==3023 --adminport=21213 --port=21214 --zkport=2183 $APPNAME.jar
 }
 
 
@@ -206,45 +200,6 @@ function jdbc-benchmark() {
         --procedure=JiggleSinglePartition \
         --poolsize=100000 \
         --wait=0
-}
-
-function export-tofile() {
-    rm -rf $EXPORTDATA/*
-    mkdir $EXPORTDATA
-    java -Dlog4j.configuration=file:${PWD}/../../log4j-allconsole.xml \
-         -classpath obj:$CLASSPATH:obj org.voltdb.exportclient.ExportToFileClient \
-        --connect client \
-        --servers localhost \
-        --type csv \
-        --outdir ./$EXPORTDATA \
-        --nonce export \
-        --period 1
-}
-
-function export-tosqoop() {
-    echo "Running sqoop export process"
-    #rm -rf $EXPORTDATA
-    #Change these if sqoop or hadoop are installed elsewhere
-    export SQOOP_HOME="/usr/lib/sqoop"
-    export HADOOP_HOME="/usr/lib/hadoop"
-    H_PATH="$HADOOP_HOME/*:$HADOOP_HOME/conf:$HADOOP_HOME/lib/*"
-    S_PATH="$SQOOP_HOME/*:$SQOOP_HOME/lib/*"
-    export CLASSPATH="$CLASSPATH:$H_PATH:$S_PATH"
-    java org.voltdb.hadoop.VoltDBSqoopExportClient \
-       --connect client \
-       --servers localhost \
-       --verbose \
-       --period 3 \
-       --target-dir /tmp/sqoop-export \
-       --nonce ExportData
-}
-
-
-function export-verify() {
-    java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj genqa.ExportVerifier \
-        4 \
-        $EXPORTDATA \
-        $CLIENTLOG
 }
 
 function export-on-server-verify() {

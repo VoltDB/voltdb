@@ -46,8 +46,6 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.common.Constants;
-import org.voltdb.export.processors.RawProcessor;
-import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
@@ -59,6 +57,7 @@ import com.google.common.io.Files;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.SettableFuture;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  *  Allows an ExportDataProcessor to access underlying table queues
@@ -92,6 +91,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final Semaphore m_bufferPushPermits = new Semaphore(16);
 
     private final int m_nullArrayLength;
+    private long m_polledBlockSize = 0;
 
     /**
      * Create a new data source.
@@ -266,13 +266,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_ackMailboxRefs.set( ackMailboxes);
     }
 
-    private void resetPollMarker() throws IOException {
-        if (!m_committedBuffers.isEmpty()) {
-            StreamBlock oldestBlock = m_committedBuffers.peek();
-            m_firstUnpolledUso = oldestBlock.unreleasedUso();
-        }
-    }
-
     private void releaseExportBytes(long releaseOffset) throws IOException {
         // if released offset is in an already-released past, just return success
         if (!m_committedBuffers.isEmpty() && releaseOffset < m_committedBuffers.peek().uso())
@@ -298,127 +291,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         }
         m_firstUnpolledUso = Math.max(m_firstUnpolledUso, lastUso);
-    }
-
-    private void exportActionImpl(RawProcessor.ExportInternalMessage m) {
-        assert(m.m_m.getGeneration() == m_generation);
-        ExportProtoMessage message = m.m_m;
-        ExportProtoMessage result =
-            new ExportProtoMessage(
-                    message.getGeneration(), message.m_partitionId, message.m_signature);
-        ExportInternalMessage mbp = new ExportInternalMessage(m.m_sb, result);
-        StreamBlock first_unpolled_block = null;
-
-        //Assemble a list of blocks to delete so that they can be deleted
-        //outside of the m_committedBuffers critical section
-        ArrayList<StreamBlock> blocksToDelete = new ArrayList<StreamBlock>();
-
-        boolean hitEndOfStreamWithNoRunnable = false;
-        try {
-            //Process the ack if any and add blocks to the delete list or move the released USO pointer
-            if (message.isAck() && message.getAckOffset() > 0) {
-                try {
-                    releaseExportBytes(message.getAckOffset());
-                } catch (IOException e) {
-                    VoltDB.crashLocalVoltDB("Error attempting to release export bytes", true, e);
-                    return;
-                }
-            }
-
-            if (m_endOfStream && m_committedBuffers.sizeInBytes() == 0) {
-                if (m_onDrain != null) {
-                    m_onDrain.run();
-                } else {
-                    hitEndOfStreamWithNoRunnable = true;
-                }
-                return;
-            }
-
-            //Reset the first unpolled uso so that blocks that have already been polled will
-            //be served up to the next connection
-            if (message.isClose()) {
-                try {
-                    resetPollMarker();
-                } catch (IOException e) {
-                    exportLog.error(e);
-                }
-            }
-
-            //Inside this critical section do the work to find out
-            //what block should be returned by the next poll.
-            //Copying and sending the data will take place outside the critical section
-            try {
-                if (message.isPoll()) {
-                    Iterator<StreamBlock> iter = m_committedBuffers.iterator();
-                    while (iter.hasNext()) {
-                        StreamBlock block = iter.next();
-                        // find the first block that has unpolled data
-                        if (m_firstUnpolledUso < block.uso() + block.totalUso()) {
-                            first_unpolled_block = block;
-                            m_firstUnpolledUso = block.uso() + block.totalUso();
-                            break;
-                        } else {
-                            blocksToDelete.add(block);
-                            iter.remove();
-                        }
-                    }
-                }
-            } catch (RuntimeException e) {
-                if (e.getCause() instanceof IOException) {
-                    VoltDB.crashLocalVoltDB("Error attempting to find unpolled export data", true, e);
-                } else {
-                    throw e;
-                }
-            }
-        } finally {
-            //Try hard not to leak memory
-            for (StreamBlock sb : blocksToDelete) {
-                sb.deleteContent();
-            }
-            //Cheesy hack for now where we serve info about old
-            //data sources from previous generations. In reality accessing
-            //this generation is something of an error
-            if (hitEndOfStreamWithNoRunnable) {
-                ByteBuffer buf = ByteBuffer.allocate(4);
-                buf.putInt(0).flip();
-                result.pollResponse(m_firstUnpolledUso, buf);
-                mbp.m_sb.event(result);
-            }
-        }
-
-        if (message.isPoll()) {
-            //If there are no unpolled blocks return the firstUnpolledUSO with no data
-            if (first_unpolled_block == null) {
-                ByteBuffer buf = ByteBuffer.allocate(4);
-                buf.putInt(0).flip();
-                result.pollResponse(m_firstUnpolledUso, buf);
-            } else {
-                //Otherwise return the block with the USO for the end of the block
-                //since the entire remainder of the block is being sent.
-                result.pollResponse(
-                        first_unpolled_block.uso() + first_unpolled_block.totalUso(),
-                        first_unpolled_block.unreleasedBuffer());
-            }
-            mbp.m_sb.event(result);
-        }
-    }
-
-    /**
-     * Obtain next block of data from source
-     */
-    public ListenableFuture<?> exportAction(final RawProcessor.ExportInternalMessage m) {
-        return m_es.submit(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        exportActionImpl(m);
-                    } catch (Exception e) {
-                        exportLog.error("Error processing export action", e);
-                    } catch (Error e) {
-                        VoltDB.crashLocalVoltDB("Error processing export action", true, e);
-                    }
-                }
-        });
     }
 
     public String getDatabase() {
@@ -524,7 +396,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return m_es.submit(new Callable<Long>() {
                 @Override
                 public Long call() throws Exception {
-                    return m_committedBuffers.sizeInBytes();
+                    return m_committedBuffers.sizeInBytes() + m_polledBlockSize;
                 }
             }).get();
         } catch (Throwable t) {
@@ -616,7 +488,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         } catch (InterruptedException e) {
             Throwables.propagate(e);
         }
-        m_es.execute(new Runnable() {
+        executeExportDataSourceRunner((new Runnable() {
             @Override
             public void run() {
                 try {
@@ -629,7 +501,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     m_bufferPushPermits.release();
                 }
             }
-        });
+        }));
     }
 
     public ListenableFuture<?> closeAndDelete() {
@@ -651,7 +523,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ListenableFuture<?> truncateExportToTxnId(final long txnId) {
-        return m_es.submit(new Runnable() {
+        return runExportDataSourceRunner((new Runnable() {
             @Override
             public void run() {
                 try {
@@ -669,11 +541,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     VoltDB.crashLocalVoltDB("Error while trying to truncate export to txnid " + txnId, true, e);
                 }
             }
-        });
+        }));
     }
 
     public ListenableFuture<?> close() {
-        return m_es.submit(new Runnable() {
+        return runExportDataSourceRunner((new Runnable() {
             @Override
             public void run() {
                 try {
@@ -684,12 +556,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     m_es.shutdown();
                 }
             }
-        });
+        }));
     }
 
     public ListenableFuture<BBContainer> poll() {
         final SettableFuture<BBContainer> fut = SettableFuture.create();
-        m_es.submit(new Runnable() {
+        runExportDataSourceRunner(new Runnable() {
             @Override
             public void run() {
                 /*
@@ -721,7 +593,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
                 return;
             }
-
             //Assemble a list of blocks to delete so that they can be deleted
             //outside of the m_committedBuffers critical section
             ArrayList<StreamBlock> blocksToDelete = new ArrayList<StreamBlock>();
@@ -761,6 +632,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             } else {
                 //Otherwise return the block with the USO for the end of the block
                 //since the entire remainder of the block is being sent.
+                m_polledBlockSize = first_unpolled_block.totalUso();
                 fut.set(
                         new AckingContainer(first_unpolled_block.unreleasedBufferV2(),
                                 first_unpolled_block.uso() + first_unpolled_block.totalUso()));
@@ -813,7 +685,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void ack(final long uso) {
-        m_es.execute(new Runnable() {
+        executeExportDataSourceRunner(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -852,7 +724,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void acceptMastership() {
         Preconditions.checkNotNull(m_onMastership, "mastership runnable is not yet set");
 
-        m_es.execute(m_onMastership);
+        executeExportDataSourceRunner(m_onMastership);
     }
 
     /**
@@ -863,5 +735,54 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         Preconditions.checkNotNull(toBeRunOnMastership, "mastership runnable is null");
 
         m_onMastership = toBeRunOnMastership;
+    }
+
+    public void resetInFlightSize() {
+        m_polledBlockSize = 0;
+    }
+
+    private void executeExportDataSourceRunner(Runnable runner) {
+        if (m_es.isShutdown()) {
+            return;
+        }
+        try {
+            m_es.execute(new ExportDataSourceRunnable(runner));
+        } catch (RejectedExecutionException rej) {
+        }
+    }
+
+    /**
+     * Convenience method to submit wrapped Runnables to executor.
+     *
+     * @param runner Runnable task.
+     * @return ListenableFuture
+     */
+    private ListenableFuture<?> runExportDataSourceRunner(Runnable runner) {
+        if (m_es.isShutdown()) {
+            return null;
+        }
+        try {
+            return m_es.submit((Runnable) new ExportDataSourceRunnable(runner));
+        } catch (RejectedExecutionException rej) {
+        }
+        return null;
+    }
+
+    //Wrapper Runnable.
+    final class ExportDataSourceRunnable implements Runnable {
+
+        private final Runnable m_runner;
+
+        public ExportDataSourceRunnable(Runnable runner) {
+            m_runner = runner;
+        }
+
+        @Override
+        public void run() {
+            if (m_es.isShutdown()) {
+                return;
+            }
+            m_runner.run();
+        }
     }
 }

@@ -41,13 +41,14 @@ public:
          * from Java. These do not exist in ExecutionEngine.java since they are IPC specific.
          * These constants are mirrored in ExecutionEngine.java.
          */
-        kErrorCode_RetrieveDependency = 100, //Request for dependency
-        kErrorCode_DependencyFound = 101,    //Response to 100
-        kErrorCode_DependencyNotFound = 102, //Also response to 100
-        kErrorCode_pushExportBuffer = 103, //Indication that el buffer is next
-        kErrorCode_CrashVoltDB = 104, //Crash with reason string
+        kErrorCode_RetrieveDependency = 100,   // Request for dependency
+        kErrorCode_DependencyFound = 101,      // Response to 100
+        kErrorCode_DependencyNotFound = 102,   // Also response to 100
+        kErrorCode_pushExportBuffer = 103,     // Indication that el buffer is next
+        kErrorCode_CrashVoltDB = 104,          // Crash with reason string
         kErrorCode_getQueuedExportBytes = 105, //Retrieve value for stats
-        kErrorCode_needPlan = 110 // fetch a plan from java for a fragment
+        kErrorCode_needPlan = 110,             // fetch a plan from java for a fragment
+        kErrorCode_progressUpdate = 111        //
     };
 
     VoltDBIPC(int fd);
@@ -64,6 +65,9 @@ public:
      * Returns dependency size with out parameter.
      */
     char *retrieveDependency(int32_t dependencyId, size_t *dependencySz);
+
+    bool fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
+            std::string lastAccessedTable, int64_t lastAccessedTableSize, int64_t tuplesProcessed);
 
     /**
      * Retrieve a plan from Java via the IPC connection for a fragment id.

@@ -58,13 +58,21 @@ public abstract class OpsAgent
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final byte JSON_PAYLOAD = 0;
     private static final byte OPS_PAYLOAD = 1;
-    private static final int MAX_IN_FLIGHT_REQUESTS = 5;
+    private static final byte OPS_DUMMY = 2;
+
+    // ENG-5125
+    private static final int MAX_IN_FLIGHT_REQUESTS = 20;
     static int OPS_COLLECTION_TIMEOUT = 60 * 1000;
 
     private long m_nextRequestId = 0;
     private Mailbox m_mailbox;
     protected final String m_name;
     private final ScheduledThreadPoolExecutor m_es;
+
+    //Just ack everything that passes through and don't do the work
+    //For startup this avoids initialization dependencies but allows
+    //new nodes to not block other agents on timeouts
+    private volatile boolean m_dummyMode;
 
     protected HostMessenger m_messenger;
 
@@ -126,6 +134,16 @@ public abstract class OpsAgent
     abstract protected void handleJSONMessage(JSONObject obj) throws Exception;
 
     /**
+     * For OPS actions generate a dummy response to the distributed
+     * work to avoid startup initialization dependencies. Startup can take
+     * a long time and we don't want to prevent other agents from making progress
+     */
+    protected void handleJSONMessageAsDummy(JSONObject obj) throws Exception {
+        hostLog.info("Generating dummy response for ops request " + obj);
+        sendOpsResponse(null, obj);
+    }
+
+    /**
      * Awkward interface.  For OPS actions which may want to perform some final
      * post-processing on the aggregated tables before the response is sent to
      * the client, this will be called immediately before that send.
@@ -161,9 +179,16 @@ public abstract class OpsAgent
                 if (bpm.m_metadata[0] == JSON_PAYLOAD) {
                     String jsonString = new String(payload, "UTF-8");
                     JSONObject obj = new JSONObject(jsonString);
-                    handleJSONMessage(obj);
+                    //In early startup generate dummy responses
+                    if (m_dummyMode) {
+                        handleJSONMessageAsDummy(obj);
+                    } else {
+                        handleJSONMessage(obj);
+                    }
                 } else if (bpm.m_metadata[0] == OPS_PAYLOAD) {
-                    handleOpsResponse(payload);
+                    handleOpsResponse(payload, false);
+                } else if (bpm.m_metadata[0] == OPS_DUMMY) {
+                    handleOpsResponse(payload, true);
                 }
             }
         } catch (Exception e) {
@@ -172,7 +197,7 @@ public abstract class OpsAgent
 
     }
 
-    private void handleOpsResponse(byte[] payload) {
+    private void handleOpsResponse(byte[] payload, boolean dummy) {
         ByteBuffer buf = ByteBuffer.wrap(payload);
         Long requestId = buf.getLong();
 
@@ -185,7 +210,7 @@ public abstract class OpsAgent
         // The first message we receive will create the correct number of tables.  Nobody else better
         // disagree or there will be trouble here in River City.  Nobody else better add non-table
         // stuff after the responses to the returned messages or said trouble will also occur.  Ick, fragile.
-        if (request.aggregateTables == null) {
+        if (request.aggregateTables == null && !dummy) {
             List<VoltTable> tables = new ArrayList<VoltTable>();
             while (buf.hasRemaining()) {
                 final int tableLength = buf.getInt();
@@ -202,7 +227,7 @@ public abstract class OpsAgent
             }
             request.aggregateTables = tables.toArray(new VoltTable[tables.size()]);
         }
-        else {
+        else if (!dummy) {
             for (int ii = 0; ii < request.aggregateTables.length; ii++) {
                 if (buf.hasRemaining()) {
                     final int tableLength = buf.getInt();
@@ -399,5 +424,9 @@ public abstract class OpsAgent
         errorResponse.flattenToBuffer(buf).flip();
         c.writeStream().enqueue(buf);
         return;
+    }
+
+    public void setDummyMode(boolean enabled) {
+        m_dummyMode = enabled;
     }
 }

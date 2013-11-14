@@ -92,13 +92,15 @@ public abstract class AbstractParsedStmt {
         this.m_paramValues = paramValues;
         this.m_db = db;
     }
+
     /**
      *
      * @param sql
      * @param xmlSQL
      * @param db
      */
-    public static AbstractParsedStmt parse(String sql, VoltXMLElement stmtTypeElement, String[] paramValues, Database db, String joinOrder) {
+    public static AbstractParsedStmt parse(String sql, VoltXMLElement stmtTypeElement, String[] paramValues,
+            Database db, String joinOrder) {
 
         AbstractParsedStmt retval = null;
 
@@ -604,9 +606,9 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
-    *
-    * @param tableNode
-    */
+*
+* @param tableNode
+*/
     private void parseTable(VoltXMLElement tableNode) {
         String tableName = tableNode.attributes.get("table");
         assert(tableName != null);
@@ -657,9 +659,9 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
-     *
-     * @param tablesNode
-     */
+*
+* @param tablesNode
+*/
     private void parseTables(VoltXMLElement tablesNode) {
         Set<String> visited = new HashSet<String>();
 
@@ -841,7 +843,7 @@ public abstract class AbstractParsedStmt {
             } else {
                 boolean outer = false;
                 boolean inner = false;
-                for (int aliasIdx : tableAliasIdxs) {
+                for (Integer aliasIdx : tableAliasIdxs) {
                     outer = outer || outerSet.contains(aliasIdx);
                     inner = inner || innerSet.contains(aliasIdx);
                 }

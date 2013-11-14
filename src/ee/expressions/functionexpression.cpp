@@ -88,7 +88,7 @@ namespace functionexpression {
 template <int F>
 class ConstantFunctionExpression : public AbstractExpression {
 public:
-    ConstantFunctionExpression(const std::string& sqlName, const std::string& uniqueName)
+    ConstantFunctionExpression()
         : AbstractExpression(EXPRESSION_TYPE_FUNCTION) {
     };
 
@@ -212,22 +212,21 @@ using namespace functionexpression;
 
 AbstractExpression*
 ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpression*>* arguments) {
-    assert(arguments);
     AbstractExpression* ret = 0;
+    if (!arguments) {
+        switch(functionId) {
+        case FUNC_CURRENT_TIMESTAMP:
+            ret = new ConstantFunctionExpression<FUNC_CURRENT_TIMESTAMP>();
+            break;
+        default:
+            break;
+        }
+        return ret;
+    }
+
     size_t nArgs = arguments->size();
-    switch(nArgs) {
-    case 0:
-        //Uncomment this to support the first constant function, e.g. PI().
-        //switch(functionId) {
-        //case FUNC_???:
-        //    ret = new ConstantFunctionExpression<FUNC_???>();
-        //    break;
-        //default:
-            return NULL;
-        //}
-        //delete arguments;
-        //break;
-    case 1:
+    assert(nArgs != 0);
+    if (nArgs == 1) {
         switch(functionId) {
         case FUNC_ABS:
             ret = new UnaryFunctionExpression<FUNC_ABS>((*arguments)[0]);
@@ -342,8 +341,7 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             return NULL;
         }
         delete arguments;
-        break;
-    default:
+    } else {
         // GeneralFunctions defer deleting the arguments container until through with it.
         switch(functionId) {
         case FUNC_CONCAT:

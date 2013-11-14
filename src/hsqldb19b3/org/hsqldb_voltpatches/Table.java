@@ -1063,7 +1063,7 @@ public class Table extends TableBase implements SchemaObject {
             Expression[] exprArr = idx.getExpressions();
             if (exprArr != null) {
                 idx = tn.createExprIndexStructure(idx.getName(), colarr, adjustExprs(exprArr, colIndex, adjust),
-                                                  idx.isUnique(), idx.isConstraint());
+                                                  idx.isUnique(), idx.isConstraint()).setAssumeUnique(idx.isAssumeUnique());
                 tn.addIndex(idx);
                 continue;
             }
@@ -1071,7 +1071,7 @@ public class Table extends TableBase implements SchemaObject {
             idx = tn.createIndexStructure(idx.getName(), colarr,
                                           idx.getColumnDesc(), null,
                                           idx.isUnique(), idx.isConstraint(),
-                                          idx.isForward());
+                                          idx.isForward()).setAssumeUnique(idx.isAssumeUnique());
 
             tn.addIndex(idx);
         }

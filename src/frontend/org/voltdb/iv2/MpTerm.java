@@ -72,7 +72,7 @@ public class MpTerm implements Term
                       + CoreUtils.hsIdCollectionToString(leaders));
             m_knownLeaders.clear();
             m_knownLeaders.addAll(updatedLeaders);
-            m_mailbox.updateReplicas(leaders);
+            m_mailbox.updateReplicas(leaders, cache);
         }
     };
 

@@ -37,7 +37,7 @@ import org.voltdb.VoltTable;
 public class SelectBids extends VoltProcedure {
 
     public final SQLStmt select = new SQLStmt(
-            "SELECT * FROM BID ORDER BY BIDID;");
+            "SELECT * FROM BID ORDER BY BIDID,ITEMID;");
 
     /**
      *

@@ -151,14 +151,14 @@ public final class DBBPool {
      * @param length Length of the buffer to calculate
      * @return First 8 bytes of  Murmur hash3_x64_128 of buffer
      */
-    public static native long getMurmur3128( long ptr, int offset, int length);
+    public static native int getMurmur3128( long ptr, int offset, int length);
 
     /**
      * Retrieve the first 8 bytes of the Murmur hash3_x64_128 of long value
-     * @param long value to hash
+     * @param value value to hash
      * @return First 8 bytes of  Murmur hash3_x64_128 of value
      */
-    public static native long getMurmur3128( long value);
+    public static native int getMurmur3128( long value);
 
     /**
      * Static factory method to wrap a ByteBuffer in a BBContainer that is not

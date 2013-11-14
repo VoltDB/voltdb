@@ -28,6 +28,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
+import org.voltdb.TheHashinator.HashinatorType;
 
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -578,5 +579,20 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
                 stats.kPercentileLatency(0.95),
                 stats.kPercentileLatency(0.99)));
         fw.close();
+    }
+
+    //Hidden method to check if Hashinator is initialized.
+    public boolean isHashinatorInitialized() {
+        return m_distributer.isHashinatorInitialized();
+    }
+
+    //Hidden method for getPartitionForParameter
+    public long getPartitionForParameter(byte typeValue, Object value) {
+        return m_distributer.getPartitionForParameter(typeValue, value);
+
+    }
+
+    public HashinatorType getHashinatorType() {
+        return m_distributer.getHashinatorType();
     }
 }

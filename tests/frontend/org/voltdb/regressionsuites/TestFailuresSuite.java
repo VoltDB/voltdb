@@ -332,7 +332,10 @@ public class TestFailuresSuite extends RegressionSuite {
 
         for (int ii = 0; ii < 4; ii++) {
             results = client.callProcedure("SelectBigString", ii).getResults();
-            assertEquals(874, results[0].getRowCount());
+            System.out.println(results[0].getRowCount());
+            long rowCount = results[0].getRowCount();
+            //With elastic hashing the numbers are a little fuzzy
+            assertTrue(rowCount > 800 && rowCount < 950);
         }
 
         //System.out.printf("Fail Bytes: %d, Expected Rows %d\n", totalBytes, expectedRows);
@@ -484,11 +487,6 @@ public class TestFailuresSuite extends RegressionSuite {
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(DivideByZero.class.getResource("failures-ddl.sql"));
-        project.addPartitionInfo("NEW_ORDER", "NO_W_ID");
-        project.addPartitionInfo("FIVEK_STRING", "P");
-        project.addPartitionInfo("FIVEK_STRING_WITH_INDEX", "ID");
-        project.addPartitionInfo("WIDE", "P");
-        //project.addPartitionInfo("BAD_COMPARES", "ID");
         project.addProcedures(PROCEDURES);
         project.addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2");
 

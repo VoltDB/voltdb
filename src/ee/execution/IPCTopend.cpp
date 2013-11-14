@@ -48,6 +48,15 @@ int IPCTopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
     }
 }
 
+bool IPCTopend::fragmentProgressUpdate(int32_t batchIndex,
+        std::string planNodeName,
+        std::string lastAccessedTable,
+        int64_t lastAccessedTableSize,
+        int64_t tuplesProcessed) {
+    return m_vdbipc->fragmentProgressUpdate(batchIndex, planNodeName, lastAccessedTable, lastAccessedTableSize,
+            tuplesProcessed);
+}
+
 std::string IPCTopend::planForFragmentId(int64_t fragmentId) {
     return m_vdbipc->planForFragmentId(fragmentId);
 }

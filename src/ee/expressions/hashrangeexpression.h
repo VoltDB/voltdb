@@ -26,7 +26,7 @@
 
 namespace voltdb {
 
-typedef std::pair<int64_t, int64_t> srange_type;
+typedef std::pair<int32_t, int32_t> srange_type;
 
 class HashRangeExpression : public AbstractExpression {
 public:
@@ -43,9 +43,8 @@ public:
                     throwFatalException("Ranges overlap or are out of order");
                 }
             }
-            if (ranges[ii].first >= ranges[ii].second && ii != num_ranges - 1) {
-                throwFatalException("Range begin is >= range end and it isn't the last "
-                        "range that might span Long.MAX_VALUE to Long.MIN_VALUE");
+            if (ranges[ii].first > ranges[ii].second) {
+                throwFatalException("Range begin is > range end, we don't support spanning Long.MAX to Long.MIN");
             }
         }
 };
@@ -58,30 +57,38 @@ public:
                     "eval:"
                     " Couldn't find tuple 1 (possible index scan planning error)");
         }
-        int64_t out[2];
-        tuple1->getNValue(this->value_idx).murmurHash3(out);
-        const int64_t hash = out[0];
-        /*
-         * Bottom of a range is inclusive, top is exclusive
-         */
-        for (int ii = 0; ii < num_ranges; ii++) {
-            const srange_type range = ranges[ii];
-            if (range.first < range.second) {
-                /*
-                 * The common case where the range doesn't span Long.MAX_VALUE to Long.MIN_VALUE
-                 */
-                if (range.first <= hash && hash < range.second) {
-                    return NValue::getTrue();
-                }
-            } else {
-                assert(ii == num_ranges - 1); //Always should be the last range
-                if (hash >= range.first || hash < range.second) {
-                    return NValue::getTrue();
-                }
-                //The loop will terminate and return false
-            }
+        const int32_t hash = tuple1->getNValue(this->value_idx).murmurHash3();
 
+        return binarySearch(hash);
+    }
+
+    voltdb::NValue binarySearch(const int32_t hash) const {
+        //The binary search blows up on only one range
+        if (num_ranges == 1) {
+            if (hash >= ranges[0].first && hash <= ranges[0].second) return NValue::getTrue();
+            return NValue::getFalse();
         }
+
+        /*
+         * Bottom of a range is inclusive as well as the top. Necessary because we no longer support wrapping
+         * from Integer.MIN_VALUE
+         * Doing a binary search, is just a hair easier than std::lower_bound
+         */
+        int32_t min = 0;
+        int32_t max = num_ranges - 1;
+        while (min <= max) {
+            assert(min >= 0);
+            assert(max >= 0);
+            uint32_t mid = (min + max) >> 1;
+            if (ranges[mid].second < hash) {
+                min = mid + 1;
+            } else if (ranges[mid].first > hash) {
+                max = mid - 1;
+            } else {
+                return NValue::getTrue();
+            }
+        }
+
         return NValue::getFalse();
     }
 

@@ -40,6 +40,7 @@ public class OpsRegistrar {
                 Constructor<?> constructor = selector.getAgentClass()
                         .getConstructor();
                 OpsAgent newAgent = (OpsAgent) constructor.newInstance();
+                newAgent.setDummyMode(true);
                 m_agents.put(selector, newAgent);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(
@@ -58,6 +59,17 @@ public class OpsRegistrar {
         for (Entry<OpsSelector, OpsAgent> entry : m_agents.entrySet()) {
             entry.getValue().registerMailbox(messenger,
                     entry.getKey().getHSId(messenger.getHostId()));
+        }
+    }
+
+    /**
+     * Toggle dummy mode where agents give empty responses to all incoming requests
+     * Allows new agents at startup to not block the cluster
+     * @param enabled
+     */
+    public void setDummyMode(boolean enabled) {
+        for (OpsAgent agent : m_agents.values()) {
+            agent.setDummyMode(enabled);
         }
     }
 

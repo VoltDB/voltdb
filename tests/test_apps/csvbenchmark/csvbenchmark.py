@@ -32,6 +32,8 @@ import random
 from subprocess import Popen,PIPE
 import shlex
 import datetime
+from voltdbclient import FastSerializer, VoltProcedure
+import time
 
 CSVLOADER = "bin/csvloader"
 #SQLCMD = "$VOLTDB_HOME/bin/sqlcmd --servers=%s" % servers
@@ -48,6 +50,7 @@ CASES = {
     "narrow_long_hasview"        : "data_narrow_long",
     "generic_noix"               : "data_generic",
     "generic_ix"                 : "data_generic",
+    "replicated_pk"              : "data_replicated_pk",
     }
 
 def list_cases():
@@ -101,17 +104,19 @@ def gentext(size):
     assert len(s) == size
     return QUOTE_CHAR + s[:size] + QUOTE_CHAR
 
-def genfixeddecimal(size=38, precision=12):
+def genfixeddecimalstr(size=38, precision=12, signed=True):
     # voltdb decimal is 16-byte with fixed scale of 12 and precision of 38
-    #p = -1*random.randrange(precision)
     p = -1*precision
     r = ''.join(random.sample(NUMERIC_CHARSET, len(NUMERIC_CHARSET)))
     r = r * int(size/len(r)) + r[:size%len(r)]
-    r = r[:p] + '.' + r[p:]
+    if (p>0):
+        r = r[:p] + '.' + r[p:]
+    if signed:
+        r = random.choose(["-","+",""]) + r
     return r
 
 def gencurrency(size=16, precision=4):
-    c = genfixeddecimal(size, precision)
+    c = genfixeddecimalstr(size, precision)
     curr = re.match(r'^0*(\d+\.*\d+)0*$', c)
     print curr.group(1)
     return curr.group(1)
@@ -127,6 +132,12 @@ def genint(size):
         return randint(-2**63+1, 2**63-1)
     else:
         raise RuntimeError ("invalid size for integer %d" % size)
+
+def gennumsequence(__seq):
+    # pass in a list of on one number
+    assert (isinstance(__seq, list) and len(__seq) == 1)
+    __seq[0] += 1
+    return __seq[0]
 
 def gentimestamp():
     return datetime.datetime.today().strftime('"%Y-%m-%d %H:%M:%S"')
@@ -148,35 +159,36 @@ def run_csvloader(schema, data_file):
     loading_results = []
     for I in range(0, options.TRIES):
         home = os.getenv("VOLTDB_HOME")
+        before_row_count = get_table_row_count(schema)
         cmd = "%s --servers=%s" % (os.path.join(home, CSVLOADER), ','.join(options.servers))
         if options.csvoptions:
             cmd += " -o " + ",".join(options.csvoptions)
         cmd += " %s -f %s" % (schema, data_file)
         if options.VERBOSE:
             print "starting csvloader with command: " + cmd
+        start_time = time.time()
         p = Popen(shlex.split(cmd), stdout=PIPE, stderr=PIPE)
         (stdout, stderr) = p.communicate()
+        run_time = time.time() - start_time
         stdout_lines = stdout.split('\n')
         if options.VERBOSE:
             for l in stdout_lines:
                 print '[csvloader stdout] ' + l
         rc = p.returncode
+        actual_row_count = get_table_row_count(schema)
         if rc != 0:
             print "CSVLoader failed with rc %d" % rc
             for l in stderr.split('\n'):
                 print '[csvloader stderr] ' + l
             raise RuntimeError ("CSV Loader failed")
         # XXX seems that csvloader doesnt always returncode nonzero if it fails to load rows
-        m = re.search(r'^Inserted (\d+) and acknowledged (\d+) rows \(final\)$',
+        m = re.search(r'^Read (\d+) rows from file and successfully inserted (\d+) rows \(final\)$',
                         stdout, flags=re.M)
         if m is None or int(m.group(1)) != rowcount or m.group(1) != m.group(2):
             raise RuntimeError ("CSV Loader failed to load all rows")
-        stats = csvloader_getstatistics(stdout)
-        print "try %d %s elapsed: %f parsing: %f inserting: %f" % ((I+1, schema)+stats)
-        elapsed_results.append(stats[0])
-        parsing_results.append(stats[1])
-        loading_results.append(stats[2])
-
+        if int(before_row_count) + rowcount != int(actual_row_count):
+            raise RuntimeError ("Actual table row count was not as expected exp:%d act:%d" % (rowcount,actual_row_count))
+        elapsed_results.append(float(run_time))
 
     def analyze_results(perf_results):
         #print "raw perf_results: %s" % perf_results
@@ -186,44 +198,26 @@ def run_csvloader(schema, data_file):
         return (average(pr), std(pr))
 
     avg, stddev = analyze_results(elapsed_results)
-    parsing, foo = analyze_results(parsing_results)
-    loading, foo = analyze_results(loading_results)
-    print "statistics for %s execution time avg: %f stddev: %f rows/sec: %f rows: %d file size: %d tries: %d parsing: %f inserting: %f" %\
-                 (schema, avg, stddev, rowcount/avg, rowcount, os.path.getsize(data_file), options.TRIES, parsing, loading)
+    print "statistics for %s execution time avg: %f stddev: %f rows/sec: %f rows: %d file size: %d tries: %d" %\
+                 (schema, avg, stddev, rowcount/avg, rowcount, os.path.getsize(data_file), options.TRIES)
     if options.statsfile:
         with open(options.statsfile, "a") as sf:
             # report duration in milliseconds for stats collector
-            print "%s,%d,%d,0,0,0,0" % (schema, int(round(avg*1000.0)), rowcount)
             print >>sf, "%s,%d,%d,0,0,0,0" % (schema, int(round(avg*1000.0)), rowcount)
     return (rowcount, avg, stddev)
 
-def csvloader_getstatistics(lines):
-    def setscale(tuple):
-        value, scale = tuple
-        if value == None:
-            return float("nan")
-        v = float(value) if '.' in value else int(value)
-        if scale == 'seconds':
-            return v
-        if scale == 'milliseconds':
-            return v/1000.0
-        elif scale == 'microseconds':
-            return v/1000000.0
-        else:
-            raise Runtimeerror ("unknown scale factor")
-    elapsed = float("nan")
-    parsing = float("nan")
-    inserting = float("nan")
-    m = re.search(r'^CSVLoader elapsed: (\d+\.*\d*)\s+(\w*seconds)$', lines, flags=re.M)
-    if m and m.lastindex > 0:
-        elapsed = setscale(m.groups())
-    m = re.search(r'Parsing CSV file took (\d+\.*\d)\s+(\w*seconds).$', lines, flags=re.M)
-    if m and m.lastindex > 0:
-        parsing = setscale(m.groups())
-    m = re.search(r'Inserting Data took (\d+\.*\d)\s+(\w*seconds).$', lines, flags=re.M)
-    if m and m.lastindex > 0:
-        inserting = setscale(m.groups())
-    return (elapsed, parsing, inserting)
+def get_table_row_count(table_name):
+    host = random.choice(options.servers)
+    pyclient = FastSerializer(host=host, port=21212)
+    count = VoltProcedure(pyclient, '@AdHoc', [FastSerializer.VOLTTYPE_STRING])
+    resp = count.call(['select count(*) from %s' % table_name], timeout=360)
+    if resp.status != 1 or len(resp.tables[0].tuples) != 1:
+        print "Unexpected response to count query from host %s: %s" % (host, resp)
+        raise RuntimeError()
+    __tuples = resp.tables[0].tuples[0]
+    result = __tuples[0]
+    print "count query returned: %s" % result
+    return result
 
 def get_datafile_path(case):
     return os.path.join(DATA_DIR, "csvbench_%s_%d.dat" % (case, options.ROW_COUNT))
@@ -319,7 +313,7 @@ def data_narrow_short(rebuild=False):
     if rebuild or not os.path.exists(data_file):
         with open(data_file, "w") as f:
             for I in range(0, options.ROW_COUNT):
-                print >>f, "%d,%d,%d,%d,%s" % (genint(4), genint(2), genint(1), genint(8), gentext(60))
+                print >>f, "%d,%d,%d,%d,%s" % (I, genint(2), genint(1), genint(8), gentext(60))
         print "data file %s was written" % data_file
     return data_file
 
@@ -329,7 +323,7 @@ def data_narrow_long(rebuild=False):
     if rebuild or not os.path.exists(data_file):
         with open(data_file, "w") as f:
             for I in range(0, options.ROW_COUNT):
-                print >>f, "%d,%d,%d,%d,%s" % (genint(4) ,randint(-32766,32767),randint(-127,127),randint(-2**63,2**63),gentext(512))
+                print >>f, "%d,%d,%d,%d,%s" % (I, randint(-32766,32767),randint(-127,127),randint(-2**63,2**63),gentext(512))
         print "data file %s was written" % data_file
     return data_file
 
@@ -403,6 +397,22 @@ def case_generic_noix():
     schema = "generic_noix"
     data_file = data_generic(False)
     run_csvloader(schema, data_file)
+
+def data_replicated_pk(rebuild=False):
+    data_file = get_datafile_path("replicated_pk")
+    if rebuild or not os.path.exists(data_file):
+        myseq = [0]
+        with open(data_file, "w") as f:
+            for I in range(0, options.ROW_COUNT):
+                print >>f, "%d,%s,%s,%s,%s,%s" % (gennumsequence(myseq),
+                                                    gentext(60),
+                                                    gentext(1024),
+                                                    gentimestamp(),
+                                                    gentext(30),
+                                                    genfixeddecimalstr(size=1, precision=0, signed=False)
+                                                    )
+        print "data file %s was written" % data_file
+    return data_file
 
 parse_cmdline()
 

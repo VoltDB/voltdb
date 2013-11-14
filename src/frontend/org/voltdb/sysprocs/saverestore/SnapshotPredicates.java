@@ -24,6 +24,7 @@ import java.util.List;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
+import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 
 import com.google.common.base.Charsets;
@@ -32,8 +33,14 @@ import com.google.common.base.Charsets;
  * A helper class to encapsulate the serialization of snapshot predicates.
  */
 public class SnapshotPredicates {
+    public final int m_tableId;
     private final List<Pair<AbstractExpression, Boolean>> m_predicates =
             new ArrayList<Pair<AbstractExpression, Boolean>>();
+
+    public SnapshotPredicates(int tableId)
+    {
+        m_tableId = tableId;
+    }
 
     public void addPredicate(AbstractExpression predicate, boolean deleteTuples)
     {

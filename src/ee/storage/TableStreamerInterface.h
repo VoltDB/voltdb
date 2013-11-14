@@ -18,12 +18,16 @@
 #ifndef TABLE_STREAMER_INTERFACE_H
 #define TABLE_STREAMER_INTERFACE_H
 
+#include <boost/shared_ptr.hpp>
 #include "common/types.h"
 #include "storage/TupleBlock.h"
+#include "storage/TableStreamerContext.h"
 
 namespace voltdb
 {
+    class TupleSerializer;
     class TupleOutputStreamProcessor;
+    class PersistentTableSurgeon;
 
     /**
      * Defines the interface for table streaming.
@@ -38,12 +42,16 @@ namespace voltdb
         /**
          * Activate streaming.
          */
-        virtual bool activateStream(PersistentTable &table, CatalogId tableId) = 0;
+        virtual bool activateStream(PersistentTableSurgeon &surgeon,
+                                    TupleSerializer &serializer,
+                                    TableStreamType streamType,
+                                    const std::vector<std::string> &predicateStrings) = 0;
 
         /**
          * Continue streaming.
          */
         virtual int64_t streamMore(TupleOutputStreamProcessor &outputStreams,
+                                   TableStreamType streamType,
                                    std::vector<int> &retPositions) = 0;
 
         /**
@@ -52,21 +60,9 @@ namespace voltdb
         virtual bool canSafelyFreeTuple(TableTuple &tuple) const = 0;
 
         /**
-         * Return true if the stream has already been activated.
+         * Return the partition ID.
          */
-        virtual bool isAlreadyActive() const = 0;
-
-        /**
-         * Return the stream type, snapshot, recovery, etc..
-         * TODO: Refactor so the caller doesn't need to know the stream type, just the context.
-         */
-        virtual TableStreamType getStreamType() const = 0;
-
-        /**
-         * Return the current active stream type or TABLE_STREAM_NONE if nothing is active.
-         * TODO: Refactor so the caller doesn't need to know the stream type, just the context.
-         */
-        virtual TableStreamType getActiveStreamType() const = 0;
+        virtual int32_t getPartitionID() const = 0;
 
         /**
          * Tuple insert hook.
@@ -97,6 +93,26 @@ namespace voltdb
         virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
                                          TableTuple &sourceTuple, TableTuple &targetTuple) = 0;
 
+        /**
+         * Return context or null for specified type.
+         */
+        virtual TableStreamerContextPtr findStreamContext(TableStreamType streamType) = 0;
+
+        /**
+         * Return context or null for specified type (const flavor).
+         */
+        TableStreamerContextPtr findStreamContext(TableStreamType streamType) const
+        {
+            return const_cast<TableStreamerInterface*>(this)->findStreamContext(streamType);
+        }
+
+        /**
+         * Return true if managing a stream of the specified type.
+         */
+        bool hasStreamType(TableStreamType streamType) const
+        {
+            return (findStreamContext(streamType) != NULL);
+        }
     };
 
 } // namespace voltdb

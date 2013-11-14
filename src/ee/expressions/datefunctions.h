@@ -22,6 +22,7 @@
 #include "boost/date_time/posix_time/conversion.hpp"
 #include <ctime>
 #include "common/SQLException.h"
+#include "common/executorcontext.hpp"
 
 static const boost::posix_time::ptime EPOCH(boost::gregorian::date(1970,1,1));
 static const int64_t GREGORIAN_EPOCH = -12212553600000000;  // 1583-01-01 00:00:00
@@ -73,6 +74,14 @@ static inline int64_t epoch_microseconds_from_components(unsigned short int year
 }
 
 namespace voltdb {
+
+// REFER JAVA class: UniqueIdGenerator.
+// 23 bits are used for COUNTER_BITS and PARTITIONID_BITS.
+// The left 41 bits (64 - 23) are used for TIMESTAMP.
+
+static const long COUNTER_BITS = 9;
+static const long PARTITIONID_BITS = 14;
+static const int64_t VOLT_EPOCH = epoch_microseconds_from_components(2008);
 
 /** implement the timestamp YEAR extract function **/
 template<> inline NValue NValue::callUnary<FUNC_EXTRACT_YEAR>() const {
@@ -363,6 +372,12 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MICROSECOND>() const {
     }
     int64_t epoch_micros = getTimestamp();
     return getTimestampValue(epoch_micros);
+}
+
+template<> inline NValue NValue::callConstant<FUNC_CURRENT_TIMESTAMP>() {
+    ExecutorContext * context = voltdb::ExecutorContext::getExecutorContext();
+    int64_t currentTimeMillis = context->currentUniqueId() >> (COUNTER_BITS + PARTITIONID_BITS);
+    return getTimestampValue(currentTimeMillis * 1000 + VOLT_EPOCH);
 }
 
 }

@@ -31,6 +31,7 @@ import java.util.Set;
 
 import org.voltdb.VoltDB;
 
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb_testprocs.regressionsuites.SaveRestoreBase;
 
 import junit.framework.Test;
@@ -110,7 +111,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         while (result.advanceRow()) {
             String procName = result.getString(columnName);
             if (procName.equalsIgnoreCase(rowId)) {
-                Long thisSiteId = result.getLong("SITE_ID");
+                long hostId = result.getLong("HOST_ID");
+                long thisSiteId = result.getLong("SITE_ID");
+                thisSiteId |= hostId << 32;
                 if (enforceUnique) {
                     assertFalse("SITE_ID: " + thisSiteId + " seen twice in table looking for " + rowId +
                             " in column " + columnName, sitesSeen.contains(thisSiteId));
@@ -131,7 +134,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         while (result.advanceRow()) {
             String procName = result.getString(columnName);
             if (procName.equalsIgnoreCase(rowId)) {
-                Long thisPartId = result.getLong("PARTITION_ID");
+                long thisPartId = result.getLong("PARTITION_ID");
                 if (enforceUnique) {
                     assertFalse("PARTITION_ID: " + thisPartId + " seen twice in table looking for " + rowId +
                             " in column " + columnName, partsSeen.contains(thisPartId));
@@ -301,9 +304,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
 
         ColumnInfo[] expectedSchema = new ColumnInfo[11];
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
-        expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.BIGINT);
+        expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
-        expectedSchema[3] = new ColumnInfo("SITE_ID", VoltType.BIGINT);
+        expectedSchema[3] = new ColumnInfo("SITE_ID", VoltType.INTEGER);
         expectedSchema[4] = new ColumnInfo("PARTITION_ID", VoltType.BIGINT);
         expectedSchema[5] = new ColumnInfo("TABLE_NAME", VoltType.STRING);
         expectedSchema[6] = new ColumnInfo("TABLE_TYPE", VoltType.STRING);
@@ -335,9 +338,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
 
         ColumnInfo[] expectedSchema = new ColumnInfo[12];
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
-        expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.BIGINT);
+        expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
-        expectedSchema[3] = new ColumnInfo("SITE_ID", VoltType.BIGINT);
+        expectedSchema[3] = new ColumnInfo("SITE_ID", VoltType.INTEGER);
         expectedSchema[4] = new ColumnInfo("PARTITION_ID", VoltType.BIGINT);
         expectedSchema[5] = new ColumnInfo("INDEX_NAME", VoltType.STRING);
         expectedSchema[6] = new ColumnInfo("TABLE_NAME", VoltType.STRING);
@@ -590,7 +593,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         // Make sure we can find the MPI, at least
         boolean found = false;
         while (topo.advanceRow()) {
-            if ((int)topo.getLong("Partition") == TxnEgo.MP_PARTITIONID) {
+            if ((int)topo.getLong("Partition") == MpInitiator.MP_INIT_PID) {
                 found = true;
             }
         }

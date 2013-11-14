@@ -67,8 +67,6 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Group;
-import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Procedure;
@@ -125,9 +123,11 @@ public class VoltCompiler {
     String m_jarOutputPath = null;
     String m_currentFilename = null;
     Map<String, String> m_ddlFilePaths = new HashMap<String, String>();
+    String[] m_addedClasses = null;
 
     // generated html text for catalog report
     String m_report = null;
+    String m_reportPath = null;
 
     InMemoryJarfile m_jarOutput = null;
     Catalog m_catalog = null;
@@ -566,11 +566,12 @@ public class VoltCompiler {
 
         // generate the catalog report and write it to disk
         try {
-            m_report = ReportMaker.report(m_catalog);
+            m_report = ReportMaker.report(m_catalog, m_warnings);
             File file = new File("catalog-report.html");
             FileWriter fw = new FileWriter(file);
             fw.write(m_report);
             fw.close();
+            m_reportPath = file.getAbsolutePath();
         } catch (IOException e) {
             e.printStackTrace();
             return null;
@@ -759,112 +760,71 @@ public class VoltCompiler {
         // this needs to happen before procedures are compiled
         String msg = "In database, ";
         final CatalogMap<Table> tables = db.getTables();
-        for (String tableName : voltDdlTracker.m_partitionMap.keySet()) {
-            String colName = voltDdlTracker.m_partitionMap.get(tableName);
-            // A null column name indicates a replicated table. Ignore it here
-            // because it defaults to replicated in the catalog.
-            if (colName != null) {
-                final Table t = tables.getIgnoreCase(tableName);
-                if (t == null) {
-                    msg += "PARTITION has unknown TABLE '" + tableName + "'";
-                    throw new VoltCompilerException(msg);
-                }
-                final Column c = t.getColumns().getIgnoreCase(colName);
-                // make sure the column exists
-                if (c == null) {
-                    msg += "PARTITION has unknown COLUMN '" + colName + "'";
-                    throw new VoltCompilerException(msg);
-                }
-                // make sure the column is marked not-nullable
-                if (c.getNullable() == true) {
-                    msg += "Partition column '" + tableName + "." + colName + "' is nullable. " +
-                        "Partition columns must be constrained \"NOT NULL\".";
-                    throw new VoltCompilerException(msg);
-                }
-                // verify that the partition column is a supported type
-                VoltType pcolType = VoltType.get((byte) c.getType());
-                switch (pcolType) {
-                    case TINYINT:
-                    case SMALLINT:
-                    case INTEGER:
-                    case BIGINT:
-                    case STRING:
-                    case VARBINARY:
-                        break;
-                    default:
-                        msg += "Partition column '" + tableName + "." + colName + "' is not a valid type. " +
-                        "Partition columns must be an integer or varchar type.";
+        for (Table table: tables) {
+            String tableName = table.getTypeName();
+            if (voltDdlTracker.m_partitionMap.containsKey(tableName.toLowerCase())) {
+                String colName = voltDdlTracker.m_partitionMap.get(tableName.toLowerCase());
+                // A null column name indicates a replicated table. Ignore it here
+                // because it defaults to replicated in the catalog.
+                if (colName != null) {
+                    assert(tables.getIgnoreCase(tableName) != null);
+                    final Column partitionCol = table.getColumns().getIgnoreCase(colName);
+                    // make sure the column exists
+                    if (partitionCol == null) {
+                        msg += "PARTITION has unknown COLUMN '" + colName + "'";
                         throw new VoltCompilerException(msg);
+                    }
+                    // make sure the column is marked not-nullable
+                    if (partitionCol.getNullable() == true) {
+                        msg += "Partition column '" + tableName + "." + colName + "' is nullable. " +
+                            "Partition columns must be constrained \"NOT NULL\".";
+                        throw new VoltCompilerException(msg);
+                    }
+                    // verify that the partition column is a supported type
+                    VoltType pcolType = VoltType.get((byte) partitionCol.getType());
+                    switch (pcolType) {
+                        case TINYINT:
+                        case SMALLINT:
+                        case INTEGER:
+                        case BIGINT:
+                        case STRING:
+                        case VARBINARY:
+                            break;
+                        default:
+                            msg += "Partition column '" + tableName + "." + colName + "' is not a valid type. " +
+                            "Partition columns must be an integer or varchar type.";
+                            throw new VoltCompilerException(msg);
+                    }
+
+                    table.setPartitioncolumn(partitionCol);
+                    table.setIsreplicated(false);
+
+                    // Check valid indexes, whether they contain the partition column or not.
+                    for (Index index: table.getIndexes()) {
+                        checkValidPartitionTableIndex(index, partitionCol, tableName);
+                    }
+                    // Set the partitioning of destination tables of associated views.
+                    // If a view's source table is replicated, then a full scan of the
+                    // associated view is single-sited. If the source is partitioned,
+                    // a full scan of the view must be distributed, unless it is filtered
+                    // by the original table's partitioning key, which, to be filtered,
+                    // must also be a GROUP BY key.
+                    final CatalogMap<MaterializedViewInfo> views = table.getViews();
+                    for (final MaterializedViewInfo mvi : views) {
+                        mvi.getDest().setIsreplicated(false);
+                        setGroupedTablePartitionColumn(mvi, partitionCol);
+                    }
                 }
-
-                t.setPartitioncolumn(c);
-                t.setIsreplicated(false);
-
-                for (Index index: t.getIndexes())
-                {
-                    // skip non-unique indexes
-                    if (!index.getUnique()) {
-                        continue;
-                    }
-                    boolean contain = false;
-                    String jsonExpr = index.getExpressionsjson();
-                    // if this is a pure-column index...
-                    if (jsonExpr.isEmpty()) {
-                        for (ColumnRef cref : index.getColumns()) {
-                            Column col = cref.getColumn();
-                            // unique index contains partitioned column
-                            if (col.equals(c)) {
-                                contain = true;
-                                break;
-                            }
-                        }
-                    }
-                    // if this is a fancy expression-based index...
-                    else {
-                        try {
-                            List<AbstractExpression> indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, null);
-                            for (AbstractExpression expr: indexExpressions) {
-                                if (expr instanceof TupleValueExpression &&
-                                        ((TupleValueExpression) expr).getColumnName().equals(c.getName()) ) {
-                                    contain = true;
-                                    break;
-                                }
-                            }
-                        } catch (JSONException e) {
-                            e.printStackTrace(); // danger will robinson
-                            assert(false);
-                        }
-                    }
-
-                    if (!contain) {
-                        // Add warning message
-                        String indexName = index.getTypeName();
-                        if (indexName.startsWith("SYS_IDX_PK_") || indexName.startsWith("SYS_IDX_SYS_PK_") ||
-                                indexName.startsWith("MATVIEW_PK_INDEX") ) {
-                            indexName = "PRIMARY KEY index";
-                        } else {
-                            indexName = "unique index " + indexName;
-                        }
-                        String warnMsg = String.format("A %s on the partitioned table %s does not include the partitioning column %s. " +
-                                "This does not guarantee uniqueness across the database and can cause constraint violations when repartitioning the data.",
-                                indexName, tableName, c.getName());
-                        addWarn(warnMsg);
+            } else {
+                // Replicated tables case.
+                for (Index index: table.getIndexes()) {
+                    if (index.getAssumeunique()) {
+                        String exceptionMsg = String.format(
+                                "ASSUMEUNIQUE is not valid for replicated tables. Please use UNIQUE instead");
+                        throw new VoltCompilerException(exceptionMsg);
                     }
                 }
 
-
-
-                // Set the partitioning of destination tables of associated views.
-                // If a view's source table is replicated, then a full scan of the
-                // associated view is single-sited. If the source is partitioned,
-                // a full scan of the view must be distributed, unless it is filtered
-                // by the original table's partitioning key, which, to be filtered,
-                // must also be a GROUP BY key.
-                final CatalogMap<MaterializedViewInfo> views = t.getViews();
-                for (final MaterializedViewInfo mvi : views) {
-                    mvi.getDest().setIsreplicated(false);
-                    setGroupedTablePartitionColumn(mvi, c);
-                }
             }
         }
 
@@ -888,8 +848,100 @@ public class VoltCompiler {
             Collection<ProcedureDescriptor> allProcs = voltDdlTracker.getProcedureDescriptors();
             compileProcedures(db, hsql, allProcs, classDependencies, whichProcs);
         }
+
+        // add extra classes from the DDL
+        m_addedClasses = voltDdlTracker.m_extraClassses;
+        addExtraClasses();
     }
 
+    private void checkValidPartitionTableIndex(Index index, Column partitionCol, String tableName)
+            throws VoltCompilerException {
+        // skip checking for non-unique indexes.
+        if (!index.getUnique()) {
+            return;
+        }
+
+        boolean contain = false;
+        String jsonExpr = index.getExpressionsjson();
+        // if this is a pure-column index...
+        if (jsonExpr.isEmpty()) {
+            for (ColumnRef cref : index.getColumns()) {
+                Column col = cref.getColumn();
+                // unique index contains partitioned column
+                if (col.equals(partitionCol)) {
+                    contain = true;
+                    break;
+                }
+            }
+        }
+        // if this is a fancy expression-based index...
+        else {
+            try {
+                List<AbstractExpression> indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr);
+                for (AbstractExpression expr: indexExpressions) {
+                    if (expr instanceof TupleValueExpression &&
+                            ((TupleValueExpression) expr).getColumnName().equals(partitionCol.getName()) ) {
+                        contain = true;
+                        break;
+                    }
+                }
+            } catch (JSONException e) {
+                e.printStackTrace(); // danger will robinson
+                assert(false);
+            }
+        }
+
+        if (contain && index.getAssumeunique()) {
+            String exceptionMsg = String.format("ASSUMEUNIQUE is not required " +
+            "if the index includes the partitioning column. Use UNIQUE instead.");
+            throw new VoltCompilerException(exceptionMsg);
+        } else if (!contain && !index.getAssumeunique()) {
+            // Throw compiler exception.
+            String indexName = index.getTypeName();
+            String keyword = "";
+            if (indexName.startsWith("SYS_IDX_PK_") || indexName.startsWith("SYS_IDX_SYS_PK_") ) {
+                indexName = "PRIMARY KEY";
+                keyword = "PRIMARY KEY";
+            } else {
+                indexName = "UNIQUE INDEX " + indexName;
+                keyword = "UNIQUE";
+            }
+
+            String exceptionMsg = String.format("Invalid use of %s. " +
+                    "%s indexes on partitioned table %s must include the partitioning column %s.  " +
+                    "Add the partitioning column %s to the %s or remove the %s keyword.",
+                    indexName, keyword, tableName, partitionCol.getName(), partitionCol.getName(), indexName, keyword);
+            throw new VoltCompilerException(exceptionMsg);
+        }
+
+    }
+
+    /**
+     * Once the DDL file is over, take all of the extra classes found and add them to the jar.
+     */
+    private void addExtraClasses() throws VoltCompilerException {
+
+        List<String> addedClasses = new ArrayList<String>();
+
+        for (String className : m_addedClasses) {
+            try {
+                Class<?> clz = Class.forName(className);
+
+                if (addClassToJar(clz)) {
+                    addedClasses.add(className);
+                }
+
+            } catch (Exception e) {
+                String msg = "Class %s could not be loaded/found/added to the jar. " +
+                             "";
+                msg = String.format(msg, className);
+                throw new VoltCompilerException(msg);
+            }
+
+            // reset the added classes to the actual added classes
+            m_addedClasses = addedClasses.toArray(new String[0]);
+        }
+    }
 
     /**
      * @param db the database entry in the catalog
@@ -1460,44 +1512,6 @@ public class VoltCompiler {
         return cls;
     }
 
-    void grantExportToGroup( final String groupName, final Database catdb)
-        throws VoltCompilerException
-    {
-        assert groupName != null && ! groupName.trim().isEmpty() && catdb != null;
-
-        // Catalog Connector
-        // Relying on schema's enforcement of at most 1 connector
-        org.voltdb.catalog.Connector catconn = catdb.getConnectors().getIgnoreCase("0");
-        if (catconn == null) {
-            catconn = catdb.getConnectors().add("0");
-        }
-
-        final Group group = catdb.getGroups().getIgnoreCase(groupName);
-        if (group == null) {
-            throw new VoltCompilerException("Export has a role " + groupName + " that does not exist");
-        }
-
-        GroupRef groupRef = catconn.getAuthgroups().getIgnoreCase(groupName);
-
-        if      (groupRef == null) {
-            groupRef = catconn.getAuthgroups().add(groupName);
-            groupRef.setGroup(group);
-        }
-        else if (groupRef.getGroup() == null) {
-                groupRef.setGroup(group);
-        }
-
-        if (groupRef.getGroup() != group) {
-            throw new VoltCompilerException(
-                    "Mismatched group reference found in export connector auth groups: " +
-                    "it references '" + groupRef.getGroup().getTypeName() +
-                    "(" + System.identityHashCode(groupRef.getGroup()) +") " +
-                    "', when it should reference '" + group.getTypeName() +
-                    "(" + System.identityHashCode(group) +")" +
-                    "' instead");
-        }
-    }
-
     private void compileExport(final ExportType export, final Database catdb)
         throws VoltCompilerException
     {
@@ -1517,20 +1531,6 @@ public class VoltCompiler {
         org.voltdb.catalog.Connector catconn = catdb.getConnectors().getIgnoreCase("0");
         if (catconn == null) {
             catconn = catdb.getConnectors().add("0");
-        }
-
-        // add authorized users and groups
-        final ArrayList<String> groupslist = new ArrayList<String>();
-
-        // @groups
-        if (export.getGroups() != null) {
-            for (String group : export.getGroups().split(",")) {
-                groupslist.add(group);
-            }
-        }
-
-        for (String groupName : groupslist) {
-            grantExportToGroup(groupName, catdb);
         }
 
         // Catalog Connector.ConnectorTableInfo
@@ -1739,6 +1739,23 @@ public class VoltCompiler {
             }
             outputStream.println("------------------------------------------\n");
 
+            if (m_addedClasses.length > 0) {
+
+                if (m_addedClasses.length > 10) {
+                    outputStream.printf("Added %d additional classes to the catalog jar.\n\n",
+                            m_addedClasses.length);
+                }
+                else {
+                    String logMsg = "Added the following additional classes to the catalog jar:\n";
+                    for (String className : m_addedClasses) {
+                        logMsg += "  " + className + "\n";
+                    }
+                    outputStream.println(logMsg);
+                }
+
+                outputStream.println("------------------------------------------\n");
+            }
+
             //
             // post-compile summary and legend.
             //
@@ -1798,6 +1815,9 @@ public class VoltCompiler {
                         "\thttp://voltdb.com/docs/UsingVoltDB/ChapAppDesign.php\n\n");
             }
             outputStream.println("------------------------------------------\n");
+            outputStream.println("Full catalog report can be found at file://" + m_reportPath + "\n" +
+                        "\t or can be viewed at \"http://localhost:8080\" when the server is running.\n");
+            outputStream.println("------------------------------------------\n");
         }
         if (feedbackStream != null) {
             for (Feedback fb : m_warnings) {
@@ -1836,11 +1856,15 @@ public class VoltCompiler {
     // this needs to be reset in the main compile func
     private static final HashSet<Class<?>> cachedAddedClasses = new HashSet<Class<?>>();
 
-    public void addClassToJar(final Class<?> cls)
+    /**
+     * Return true if the class was added. Return false if the class was already in the
+     * jar. Throw and exception if the class can't be added for another reason.
+     */
+    public boolean addClassToJar(final Class<?> cls)
     throws VoltCompiler.VoltCompilerException {
 
         if (cachedAddedClasses.contains(cls)) {
-            return;
+            return false;
         } else {
             cachedAddedClasses.add(cls);
         }
@@ -1883,7 +1907,7 @@ public class VoltCompiler {
             e.printStackTrace();
             System.exit(-1);
             // Prevent warning  about fis possibly being null below.
-            return;
+            return false;
         }
 
         assert(fileSize > 0);
@@ -1901,6 +1925,7 @@ public class VoltCompiler {
         }
 
         m_jarOutput.put(packagePath, fileBytes);
+        return true;
     }
 
     /**

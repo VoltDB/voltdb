@@ -74,6 +74,8 @@ public class Benchmark {
     long benchmarkStartTS;
     // Timer for writing the checkpoint count for apprunner
     Timer checkpointTimer;
+    // Timer for refreshing ratelimit permits
+    Timer permitsTimer;
 
     final TxnId2RateLimiter rateLimiter;
 
@@ -147,13 +149,16 @@ public class Benchmark {
         boolean disableadhoc = false;
 
         @Option(desc = "Maximum TPS rate for benchmark.")
-        int ratelimit = 100000;
+        int ratelimit = Integer.MAX_VALUE;
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
         @Option(desc = "Allow experimental in-procedure adhoc statments.")
         boolean allowinprocadhoc = false;
+
+        @Option(desc = "Allow set ratio of mp to sp workload.")
+        float mpratio = (float)0.20;
 
         @Override
         public void validate() {
@@ -162,13 +167,14 @@ public class Benchmark {
             if (threadoffset < 0) exitWithMessageAndUsage("threadoffset must be >= 0");
             if (threads <= 0) exitWithMessageAndUsage("threads must be > 0");
             if (threadoffset > 127) exitWithMessageAndUsage("threadoffset must be within [0, 127]");
-            if (threadoffset + threads > 128) exitWithMessageAndUsage("max thread offset must be <= 127");
+            if (threadoffset + threads > 127) exitWithMessageAndUsage("max thread offset must be <= 127");
             if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
 
             if (minvaluesize <= 0) exitWithMessageAndUsage("minvaluesize must be > 0");
             if (maxvaluesize <= 0) exitWithMessageAndUsage("maxvaluesize must be > 0");
             if (entropy <= 0) exitWithMessageAndUsage("entropy must be > 0");
             if (entropy > 127) exitWithMessageAndUsage("entropy must be <= 127");
+            if (mpratio < 0.0 || mpratio > 1.0) exitWithMessageAndUsage("mpRatio must be between 0.0 and 1.0");
         }
 
         @Override
@@ -334,7 +340,7 @@ public class Benchmark {
      * disk to make it available to apprunner
      */
     private void schedulePeriodicCheckpoint() throws IOException {
-        checkpointTimer = new Timer();
+        checkpointTimer = new Timer("Checkpoint Timer", true);
         TimerTask checkpointTask = new TimerTask() {
             @Override
             public void run() {
@@ -359,7 +365,7 @@ public class Benchmark {
      * It calls printStatistics() every displayInterval seconds
      */
     private void schedulePeriodicStats() {
-        timer = new Timer();
+        timer = new Timer("Stats Timer", true);
         TimerTask statsPrinting = new TimerTask() {
             @Override
             public void run() { printStatistics(); }
@@ -367,6 +373,18 @@ public class Benchmark {
         timer.scheduleAtFixedRate(statsPrinting,
                                   config.displayinterval * 1000,
                                   config.displayinterval * 1000);
+    }
+
+    /**
+     * Create a Timer task to refresh ratelimit permits
+     */
+    private void scheduleRefreshPermits() {
+        permitsTimer = new Timer("Ratelimiter Permits Timer", true);
+        TimerTask refreshPermits = new TimerTask() {
+            @Override
+            public void run() { rateLimiter.updateActivePermits(System.currentTimeMillis()); }
+        };
+        permitsTimer.scheduleAtFixedRate(refreshPermits, 0, 10);
     }
 
     /**
@@ -454,48 +472,48 @@ public class Benchmark {
         lastProgressTimestamp = System.currentTimeMillis();
         schedulePeriodicStats();
         schedulePeriodicCheckpoint();
+        scheduleRefreshPermits();
 
         // Run the benchmark loop for the requested duration
         // The throughput may be throttled depending on client configuration
         log.info("Running benchmark...");
 
         BigTableLoader partitionedLoader = new BigTableLoader(client, "bigp",
-                (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize);
+                         (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits);
         partitionedLoader.start();
         BigTableLoader replicatedLoader = new BigTableLoader(client, "bigr",
-                (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize);
+                         (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits);
         replicatedLoader.start();
 
         ReadThread readThread = new ReadThread(client, config.threads, config.threadoffset,
-                config.allowinprocadhoc);
+                config.allowinprocadhoc, config.mpratio, permits);
         readThread.start();
 
-        AdHocMayhemThread adHocMayhemThread = new AdHocMayhemThread(client);
+        AdHocMayhemThread adHocMayhemThread = new AdHocMayhemThread(client, config.mpratio, permits);
         if (!config.disableadhoc) {
             adHocMayhemThread.start();
         }
 
+        InvokeDroppedProcedureThread idpt = new InvokeDroppedProcedureThread(client);
+        idpt.start();
+
         List<ClientThread> clientThreads = new ArrayList<ClientThread>();
         for (byte cid = (byte) config.threadoffset; cid < config.threadoffset + config.threads; cid++) {
             ClientThread clientThread = new ClientThread(cid, txnCount, client, processor, permits,
-                    config.allowinprocadhoc);
+                    config.allowinprocadhoc, config.mpratio);
             clientThread.start();
             clientThreads.add(clientThread);
         }
+        log.info("All threads started...");
 
-        final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
-
-        long currentTs = System.currentTimeMillis();
-        while (benchmarkEndTime > currentTs) {
-            rateLimiter.updateActivePermits(currentTs);
-            Thread.yield();
-            currentTs = System.currentTimeMillis();
-        }
+        // subtract time spent initializing threads and starting them
+        Thread.sleep((1000l * config.duration) - (System.currentTimeMillis() - benchmarkStartTS));
 
         replicatedLoader.shutdown();
         partitionedLoader.shutdown();
         readThread.shutdown();
         adHocMayhemThread.shutdown();
+        idpt.shutdown();
         for (ClientThread clientThread : clientThreads) {
             clientThread.shutdown();
         }
@@ -503,6 +521,7 @@ public class Benchmark {
         partitionedLoader.join();
         readThread.join();
         adHocMayhemThread.join();
+        idpt.join();
         for (ClientThread clientThread : clientThreads) {
             clientThread.join();
         }
@@ -517,6 +536,7 @@ public class Benchmark {
         // block until all outstanding txns return
         client.drain();
         client.close();
+        permitsTimer.cancel();
 
         log.info(HORIZONTAL_RULE);
         log.info("Benchmark Complete");

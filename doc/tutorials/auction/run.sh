@@ -27,7 +27,6 @@ APPCLASSPATH=$CLASSPATH:$({ \
 VOLTDB="$VOLTDB_BIN/voltdb"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 CSVLOADER="$VOLTDB_BIN/csvloader"
-EXPORTTOFILE="$VOLTDB_BIN/exporttofile"
 
 DATAFILES="src/com/auctionexample/datafiles/"
 
@@ -40,7 +39,7 @@ function clean() {
 function srccompile() {
     mkdir -p obj/com/auctionexample/datafiles
     cp src/com/auctionexample/datafiles/*.txt obj/com/auctionexample/datafiles/
-    javac -target 1.6 -source 1.6 -classpath $APPCLASSPATH -d obj \
+    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH -d obj \
         src/com/auctionexample/*.java \
         procedures/com/auctionexample/*.java \
         procedures/com/auctionexample/debug/*.java
@@ -61,8 +60,7 @@ function server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE host localhost
+    $VOLTDB create -d deployment.xml -l $LICENSE -H localhost $APPNAME.jar
 }
 
 # run the client that drives the example
@@ -84,14 +82,8 @@ function client() {
     java -classpath obj:$APPCLASSPATH com.auctionexample.Client
 }
 
-function export() {
-    $EXPORTTOFILE \
-        --connect client --servers localhost --type csv \
-        --nonce EXPORTDEMO --user voltdb --password demo
-}
-
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|client|server|export}"
+    echo "Usage: ./run.sh {clean|catalog|client|server}"
 }
 
 # Run the target passed as the first arg on the command line

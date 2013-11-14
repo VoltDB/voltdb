@@ -35,6 +35,8 @@ import org.voltdb.common.Constants;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
+import com.google.common.base.Charsets;
+
 /**
  * Message from a stored procedure coordinator to an execution site
  * which is participating in the transaction. This message specifies
@@ -121,9 +123,18 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     // If this flag is set, the message should contain a single fragment with the
     // desired output dep ID, but no real work to do.
     boolean m_emptyForRestart = false;
+
     int m_inputDepCount = 0;
     Iv2InitiateTaskMessage m_initiateTask;
     ByteBuffer m_initiateTaskBuffer;
+
+    // context for long running fragment status log messages
+    byte[] m_procedureName = null;
+    int m_currentBatchIndex = 0;
+
+    public int getCurrentBatchIndex() {
+        return m_currentBatchIndex;
+    }
 
     /** Empty constructor for de-serialization */
     FragmentTaskMessage() {
@@ -151,6 +162,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         assert(selfCheck());
     }
 
+    // If you add a new field to the message and you don't want to lose information at all point,
+    // remember to add it to the constructor below, Because this constructor is used to copy a message at some place.
+    // for example, in SpScheduler.handleFragmentTaskMessage()
     // The parameter sets are .duplicate()'d in flattenToBuffer,
     // so we can make a shallow copy here and still be thread-safe
     // when we serialize the copy.
@@ -168,10 +182,26 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_items = ftask.m_items;
         m_initiateTask = ftask.m_initiateTask;
         m_emptyForRestart = ftask.m_emptyForRestart;
+        m_procedureName = ftask.m_procedureName;
+        m_currentBatchIndex = ftask.m_currentBatchIndex;
         if (ftask.m_initiateTaskBuffer != null) {
             m_initiateTaskBuffer = ftask.m_initiateTaskBuffer.duplicate();
         }
         assert(selfCheck());
+    }
+
+    public void setProcedureName(String procedureName) {
+        Iv2InitiateTaskMessage it = getInitiateTask();
+        if (it != null) {
+            assert(it.getStoredProcedureName().equals(procedureName));
+        }
+        else {
+            m_procedureName = procedureName.getBytes(Charsets.UTF_8);
+        }
+    }
+
+    public void setBatch(int batchIndex) {
+        m_currentBatchIndex = batchIndex;
     }
 
     /**
@@ -208,7 +238,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
 
     /**
-     * Convenience factory method to replace constructory that includes arrays of stuff.
+     * Convenience factory method to replace constructor that includes arrays of stuff.
      *
      * @param initiatorHSId
      * @param coordinatorHSId
@@ -228,12 +258,24 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                                                             boolean isReadOnly,
                                                             byte[] planHash,
                                                             int outputDepId,
-                                                            ByteBuffer parameterSet,
+                                                            ParameterSet params,
                                                             boolean isFinal,
                                                             boolean isForReplay) {
+        ByteBuffer parambytes = null;
+        if (params != null) {
+            FastSerializer fs = new FastSerializer();
+            try {
+                params.writeExternal(fs);
+            }
+            catch (IOException e) {
+                VoltDB.crashLocalVoltDB("Failed to serialize parameter for fragment: " + params.toString(), true, e);
+            }
+            parambytes = fs.getBuffer();
+        }
+
         FragmentTaskMessage ret = new FragmentTaskMessage(initiatorHSId, coordinatorHSId,
                                                           txnId, uniqueId, isReadOnly, isFinal, isForReplay);
-        ret.addFragment(planHash, outputDepId, parameterSet);
+        ret.addFragment(planHash, outputDepId, parambytes);
         return ret;
     }
 
@@ -332,6 +374,19 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         return m_emptyForRestart;
     }
 
+    public String getProcedureName() {
+        Iv2InitiateTaskMessage initMsg = getInitiateTask();
+        if (initMsg != null) {
+            return initMsg.m_invocation.getProcName();
+        }
+        else if (m_procedureName != null) {
+            return new String(m_procedureName, Charsets.UTF_8);
+        }
+        else {
+            return null;
+        }
+    }
+
     /*
      * The first fragment contains the initiate task for a multi-part txn for command logging
      */
@@ -414,6 +469,12 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
      * Fragment ID block (1 per item):
      *     fragment ID: long: 8 * nitems
      *
+     * Procedure name: byte: length of the name string.
+     *
+     * voltExecuteIndex: short: 2
+     *
+     * batchIndexBase: short: 2
+     *
      * Parameter set block (1 per item):
      *     parameter buffer size: int: 4 * nitems
      *     parameter buffer: bytes: ? * nitems
@@ -445,6 +506,15 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         // Fragment ID block (20 bytes per sha1-hash)
         msgsize += 20 * m_items.size();
+
+        // short + str for proc name
+        msgsize += 2;
+        if (m_procedureName != null) {
+            msgsize += m_procedureName.length;
+        }
+
+        // int for which batch (4)
+        msgsize += 4;
 
         //nested initiate task message length prefix
         msgsize += 4;
@@ -567,6 +637,19 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             }
         }
 
+        // write procedure name
+        if (m_procedureName == null) {
+            buf.putShort((short) -1);
+        }
+        else {
+            assert(m_procedureName.length <= Short.MAX_VALUE);
+            buf.putShort((short) m_procedureName.length);
+            buf.put(m_procedureName);
+        }
+
+        // ints for batch context
+        buf.putInt(m_currentBatchIndex);
+
         if (m_initiateTaskBuffer != null) {
             ByteBuffer dup = m_initiateTaskBuffer.duplicate();
             buf.putInt(dup.remaining());
@@ -657,6 +740,19 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             }
         }
 
+        // read procedure name if there
+        short procNameLen = buf.getShort();
+        if (procNameLen >= 0) {
+            m_procedureName = new byte[procNameLen];
+            buf.get(m_procedureName);
+        }
+        else {
+            m_procedureName = null;
+        }
+
+        // ints for batch context
+        m_currentBatchIndex = buf.getInt();
+
         int initiateTaskMessageLength = buf.getInt();
         if (initiateTaskMessageLength > 0) {
             int startPosition = buf.position();
@@ -699,7 +795,6 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 buf.get(item.m_fragmentPlan);
             }
         }
-
     }
 
     @Override

@@ -171,7 +171,8 @@ if len(sys.argv) == 3:
     createCandidate = False
     voltdbTreeish = sys.argv[1]
     proTreeish = sys.argv[2]
-    oneOff = True               #force on-off behavior
+    if voltdbTreeish != proTreeish:
+        oneOff = True     #force oneoff when not same tag/branch
 
 print "Building with pro: %s and voltdb: %s" % (proTreeish, voltdbTreeish)
 
@@ -249,5 +250,5 @@ with settings(user=username,host_string=volt5f[1],disable_known_hosts=True,key_f
         get("voltdb-ent-%s-1.x86_64.rpm" % (versionVolt5f), releaseDir)
 
 computeChecksums(releaseDir)
-archiveDir = os.path.join(os.getenv('HOME'), "releases", "archive", voltdbTreeish, versionVolt5f)
-backupReleaseDir(releaseDir, archiveDir, versionVolt5f)
+#archiveDir = os.path.join(os.getenv('HOME'), "releases", "archive", voltdbTreeish, versionVolt5f)
+#backupReleaseDir(releaseDir, archiveDir, versionVolt5f)

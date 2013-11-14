@@ -28,12 +28,12 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.network.InputHandler;
 import org.voltcore.utils.COWSortedMap;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
@@ -43,7 +43,6 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorProperty;
 import org.voltdb.catalog.Database;
-import org.voltdb.export.processors.RawProcessor;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltFile;
 
@@ -116,6 +115,15 @@ public class ExportManager
 
     private volatile Properties m_processorConfig = new Properties();
 
+    /*
+     * Issue a permit when a generation is drained so that when we are truncating if a generation
+     * is completely truncated we can wait for the on generation drained task to finish.
+     *
+     * This eliminates a race with CL replay where it may do catalog updates and such while truncation
+     * is still running on generation drained.
+     */
+    private final Semaphore m_onGenerationDrainedForTruncation = new Semaphore(0);
+
     private final Runnable m_onGenerationDrained = new Runnable() {
         @Override
         public void run() {
@@ -130,71 +138,83 @@ public class ExportManager
             proc.queueWork(new Runnable() {
                 @Override
                 public void run() {
-
-                    ExportGeneration oldGeneration = m_generations.firstEntry().getValue();
-                    ExportDataProcessor newProcessor = null;
-                    ExportDataProcessor oldProcessor = null;
-                    synchronized (ExportManager.this) {
-
-                        m_generationGhosts.add(m_generations.remove(m_generations.firstEntry().getKey()).m_timestamp);
-                        exportLog.info("Finished draining generation " + oldGeneration.m_timestamp);
-
-                        try {
-                            if (m_loaderClass != null && !m_generations.isEmpty()) {
-                                exportLog.info("Creating connector " + m_loaderClass);
-                                final Class<?> loaderClass = Class.forName(m_loaderClass);
-                                //Make it so
-                                ExportGeneration nextGeneration = m_generations.firstEntry().getValue();
-                                newProcessor = (ExportDataProcessor)loaderClass.newInstance();
-                                newProcessor.addLogger(exportLog);
-                                newProcessor.setExportGeneration(nextGeneration);
-                                newProcessor.setProcessorConfig(m_processorConfig);
-                                newProcessor.readyForData();
-
-                                if (!m_loaderClass.equals(RawProcessor.class.getName())) {
-                                    if (nextGeneration.isDiskBased()) {
-                                        /*
-                                         * Changes in partition count can make the load balancing strategy not capture
-                                         * all partitions for data that was from a previously larger cluster.
-                                         * For those use a naive leader election strategy that is implemented
-                                         * by export generation.
-                                         */
-                                        nextGeneration.kickOffLeaderElection();
-                                    } else {
-                                        /*
-                                         * This strategy is the one that piggy backs on
-                                         * regular partition mastership distribution to determine
-                                         * who will process export data for different partitions.
-                                         * We stashed away all the ones we have mastership of
-                                         * in m_masterOfPartitions
-                                         */
-                                        for( Integer partitionId: m_masterOfPartitions) {
-                                            nextGeneration.acceptMastershipTask(partitionId);
-                                        }
-                                    }
-                                }
-                            }
-                        } catch (Exception e) {
-                            VoltDB.crashLocalVoltDB("Error creating next export processor", true, e);
-                        }
-                        oldProcessor = m_processor.getAndSet(newProcessor);
+                    try {
+                        rollToNextGeneration();
+                    } catch (RuntimeException e) {
+                        exportLog.error("Error rolling to next export generation", e);
+                    } catch (Exception e) {
+                        exportLog.error("Error rolling to next export generation", e);
+                    } finally {
+                        m_onGenerationDrainedForTruncation.release();
                     }
+                }
+
+            });
+        }
+    };
+
+    private void rollToNextGeneration() throws Exception {
+        ExportDataProcessor newProcessor = null;
+        ExportDataProcessor oldProcessor = null;
+        ExportGeneration oldGeneration = null;
+        synchronized (ExportManager.this) {
+             oldGeneration = m_generations.firstEntry().getValue();
+
+            m_generationGhosts.add(m_generations.remove(m_generations.firstEntry().getKey()).m_timestamp);
+            exportLog.info("Finished draining generation " + oldGeneration.m_timestamp);
+
+            try {
+                if (m_loaderClass != null && !m_generations.isEmpty()) {
+                    exportLog.info("Creating connector " + m_loaderClass);
+                    final Class<?> loaderClass = Class.forName(m_loaderClass);
+                    //Make it so
+                    ExportGeneration nextGeneration = m_generations.firstEntry().getValue();
+                    newProcessor = (ExportDataProcessor)loaderClass.newInstance();
+                    newProcessor.addLogger(exportLog);
+                    newProcessor.setExportGeneration(nextGeneration);
+                    newProcessor.setProcessorConfig(m_processorConfig);
+                    newProcessor.readyForData();
+
+                    if (nextGeneration.isDiskBased()) {
+                        /*
+                         * Changes in partition count can make the load balancing strategy not capture
+                         * all partitions for data that was from a previously larger cluster.
+                         * For those use a naive leader election strategy that is implemented
+                         * by export generation.
+                         */
+                        nextGeneration.kickOffLeaderElection();
+                    } else {
+                        /*
+                         * This strategy is the one that piggy backs on
+                         * regular partition mastership distribution to determine
+                         * who will process export data for different partitions.
+                         * We stashed away all the ones we have mastership of
+                         * in m_masterOfPartitions
+                         */
+                        for( Integer partitionId: m_masterOfPartitions) {
+                            nextGeneration.acceptMastershipTask(partitionId);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Error creating next export processor", true, e);
+            }
+            oldProcessor = m_processor.getAndSet(newProcessor);
+        }
 
                     /*
                      * The old processor should not be null since this shutdown task
                      * is running for this processor
                      */
-                    oldProcessor.shutdown();
-                    try {
-                        oldGeneration.closeAndDelete();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                        exportLog.error(e);
-                    }
-                }
-            });
+        oldProcessor.shutdown();
+        try {
+            if (oldGeneration != null)
+                oldGeneration.closeAndDelete();
+        } catch (IOException e) {
+            e.printStackTrace();
+            exportLog.error(e);
         }
-    };
+    }
 
     /**
      * Construct ExportManager using catalog.
@@ -217,8 +237,13 @@ public class ExportManager
         if (isRejoin) {
             deleteExportOverflowData(catalogContext);
         }
-        ExportManager tmp = new ExportManager(myHostId, catalogContext, messenger, partitions);
-        m_self = tmp;
+        ExportManager em = new ExportManager(myHostId, catalogContext, messenger, partitions);
+        Connector connector = getConnector(catalogContext);
+
+        m_self = em;
+        if (connector != null && connector.getEnabled() == true) {
+            em.createInitialExportProcessor(catalogContext, connector, true, partitions);
+        }
     }
 
     /**
@@ -227,7 +252,9 @@ public class ExportManager
      * @param partitionId
      */
     synchronized public void acceptMastership(int partitionId) {
-        if (m_loaderClass == null || m_loaderClass.equals(RawProcessor.class.getName())) return;
+        if (m_loaderClass == null) {
+            return;
+        }
         Preconditions.checkArgument(
                 m_masterOfPartitions.add(partitionId),
                 "can't acquire mastership twice for partition id: " + partitionId
@@ -277,6 +304,13 @@ public class ExportManager
         m_messenger = null;
     }
 
+    private static Connector getConnector(CatalogContext catalogContext) {
+        final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
+        final Database db = cluster.getDatabases().get("database");
+        final Connector conn= db.getConnectors().get("0");
+        return conn;
+    }
+
     /**
      * Read the catalog to setup manager and loader(s)
      * @param siteTracker
@@ -291,8 +325,7 @@ public class ExportManager
         m_hostId = myHostId;
         m_messenger = messenger;
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
-        final Database db = cluster.getDatabases().get("database");
-        final Connector conn= db.getConnectors().get("0");
+        final Connector conn = getConnector(catalogContext);
 
         if (conn == null) {
             exportLog.info("System is not using any export functionality.");
@@ -309,11 +342,9 @@ public class ExportManager
         exportLog.info(String.format("Export is enabled and can overflow to %s.", cluster.getExportoverflow()));
 
         m_loaderClass = conn.getLoaderclass();
-
-        createInitialExportProcessor(catalogContext, conn, true, partitions);
     }
 
-    private void createInitialExportProcessor(
+    private synchronized void createInitialExportProcessor(
             CatalogContext catalogContext,
             final Connector conn,
             boolean startup,
@@ -323,8 +354,10 @@ public class ExportManager
             ExportDataProcessor newProcessor = null;
             final Class<?> loaderClass = Class.forName(m_loaderClass);
             newProcessor = (ExportDataProcessor)loaderClass.newInstance();
-            m_processor.set(newProcessor);
             newProcessor.addLogger(exportLog);
+            newProcessor.setProcessorConfig(m_processorConfig);
+            m_processor.set(newProcessor);
+
             File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
 
             /*
@@ -354,7 +387,6 @@ public class ExportManager
              * For the newly constructed processor, provide it the oldest known generation
              */
             newProcessor.setExportGeneration(nextGeneration);
-            newProcessor.setProcessorConfig(m_processorConfig);
             newProcessor.readyForData();
 
             if (startup) {
@@ -363,8 +395,7 @@ public class ExportManager
                  * and we are using server side export we need to kick off a leader election
                  * to choose which server is going to export each partition
                  */
-                if (nextGeneration.isDiskBased() &&
-                        !m_loaderClass.equals(RawProcessor.class.getName())) {
+                if (nextGeneration.isDiskBased()) {
                     nextGeneration.kickOffLeaderElection();
                 }
             } else {
@@ -372,26 +403,24 @@ public class ExportManager
                  * When it isn't startup, it is necessary to kick things off with the mastership
                  * settings that already exist
                  */
-                if (!m_loaderClass.equals(RawProcessor.class.getName())) {
-                    if (nextGeneration.isDiskBased()) {
-                        /*
-                         * Changes in partition count can make the load balancing strategy not capture
-                         * all partitions for data that was from a previously larger cluster.
-                         * For those use a naive leader election strategy that is implemented
-                         * by export generation.
-                         */
-                        nextGeneration.kickOffLeaderElection();
-                    } else {
-                        /*
-                         * This strategy is the one that piggy backs on
-                         * regular partition mastership distribution to determine
-                         * who will process export data for different partitions.
-                         * We stashed away all the ones we have mastership of
-                         * in m_masterOfPartitions
-                         */
-                        for( Integer partitionId: m_masterOfPartitions) {
-                            nextGeneration.acceptMastershipTask(partitionId);
-                        }
+                if (nextGeneration.isDiskBased()) {
+                    /*
+                     * Changes in partition count can make the load balancing strategy not capture
+                     * all partitions for data that was from a previously larger cluster.
+                     * For those use a naive leader election strategy that is implemented
+                     * by export generation.
+                     */
+                    nextGeneration.kickOffLeaderElection();
+                } else {
+                    /*
+                     * This strategy is the one that piggy backs on
+                     * regular partition mastership distribution to determine
+                     * who will process export data for different partitions.
+                     * We stashed away all the ones we have mastership of
+                     * in m_masterOfPartitions
+                     */
+                    for( Integer partitionId: m_masterOfPartitions) {
+                        nextGeneration.acceptMastershipTask(partitionId);
                     }
                 }
             }
@@ -431,19 +460,6 @@ public class ExportManager
                         " this will have to be cleaned up manually.");
             }
         }
-    }
-
-    public void notifyOfClusterTopologyChange() {
-        exportLog.info("Attempting to boot export client due to rejoin or other cluster topology change");
-        if (m_loaderClass == null) {
-            return;
-        }
-        ExportDataProcessor proc = m_processor.get();
-        while (proc == null) {
-            Thread.yield();
-            proc = m_processor.get();
-        }
-        proc.bootClient();
     }
 
     private void updateProcessorConfig(final Connector conn) {
@@ -506,33 +522,6 @@ public class ExportManager
         }
         m_generations.clear();
         m_loaderClass = null;
-    }
-
-    /**
-     * Factory for input handlers
-     * @return InputHandler for new client connection
-     */
-    public InputHandler createInputHandler(String service, boolean isAdminPort)
-    {
-        ExportDataProcessor proc = m_processor.get();
-        if (proc != null) {
-            return proc.createInputHandler(service, isAdminPort);
-        }
-        return null;
-    }
-
-
-    /**
-     * Map service strings to connector class names
-     * @param service
-     * @return classname responsible for service
-     */
-    public String getConnectorForService(String service) {
-        ExportDataProcessor proc = m_processor.get();
-        if (proc != null && proc.isConnectorForService(service)) {
-            return proc.getClass().getCanonicalName();
-        }
-        return null;
     }
 
     public static long getQueuedExportBytes(int partitionId, String signature) {
@@ -615,7 +604,15 @@ public class ExportManager
     public void truncateExportToTxnId(long snapshotTxnId, long[] perPartitionTxnIds) {
         exportLog.info("Truncating export data after txnId " + snapshotTxnId);
         for (ExportGeneration generation : m_generations.values()) {
-            generation.truncateExportToTxnId(snapshotTxnId, perPartitionTxnIds);
+            //If the generation was completely drained, wait for the task to finish running
+            //by waiting for the permit that will be generated
+            if (generation.truncateExportToTxnId(snapshotTxnId, perPartitionTxnIds)) {
+                try {
+                    m_onGenerationDrainedForTruncation.acquire();
+                } catch (InterruptedException e) {
+                    VoltDB.crashLocalVoltDB("Interrupted truncating export data", true, e);
+                }
+            }
         }
     }
 }

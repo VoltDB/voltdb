@@ -6,7 +6,14 @@ APPNAME="json"
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
     VOLTDB_BIN=$(dirname "$(which voltdb)")
 else
-    VOLTDB_BIN="$(pwd)/../../bin"
+    VOLTDB_BIN="$(dirname $(dirname $(pwd)))/bin"
+    echo "The VoltDB scripts are not in your PATH."
+    echo "For ease of use, add the VoltDB bin directory: "
+    echo
+    echo $VOLTDB_BIN
+    echo
+    echo "to your PATH."
+    echo
 fi
 # installation layout has all libraries in $VOLTDB_ROOT/lib/voltdb
 if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
@@ -15,8 +22,9 @@ if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
     VOLTDB_VOLTDB="$VOLTDB_LIB"
 # distribution layout has libraries in separate lib and voltdb directories
 else
-    VOLTDB_LIB="`pwd`/../../lib"
-    VOLTDB_VOLTDB="`pwd`/../../voltdb"
+    VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
+    VOLTDB_LIB="$VOLTDB_BASE/lib"
+    VOLTDB_VOLTDB="$VOLTDB_BASE/voltdb"
 fi
 
 APPCLASSPATH=$CLASSPATH:$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
@@ -33,7 +41,7 @@ function clean() {
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -target 1.6 -source 1.6 -classpath $APPCLASSPATH:gson-2.2.2.jar -d obj \
+    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH:gson-2.2.2.jar -d obj \
         src/json/*.java \
         src/json/procedures/*.java
     # stop if compilation fails
@@ -43,6 +51,11 @@ function srccompile() {
 # build an application catalog
 function catalog() {
     srccompile
+    echo "Compiling the json-session application catalog."
+    echo "To perform this action manually, use the command line: "
+    echo
+    echo "voltdb compile --classpath obj -o $APPNAME.jar ddl.sql"
+    echo
     $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
@@ -53,8 +66,12 @@ function server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE host $HOST
+    echo "Starting the VoltDB server."
+    echo "To perform this action manually, use the command line: "
+    echo
+    echo "$VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar"
+    echo
+    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
 # run the client that drives the example

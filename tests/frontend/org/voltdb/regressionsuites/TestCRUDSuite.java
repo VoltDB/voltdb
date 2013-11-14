@@ -227,9 +227,9 @@ public class TestCRUDSuite extends RegressionSuite {
             // a partitioned table that should not generate procedures (pkey not partition key)
             project.addLiteralSchema(
                     "CREATE TABLE p3(a1 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL); " +
-                    "CREATE UNIQUE INDEX p3_tree_idx ON p3(a1);"
+                    "CREATE ASSUMEUNIQUE INDEX p3_tree_idx ON p3(a1); " +
+                    "PARTITION TABLE P3 ON COLUMN a2;"
             );
-            project.addPartitionInfo("p3", "a2");
 
             // a replicated table (should not generate procedures).
             project.addLiteralSchema(
@@ -254,13 +254,13 @@ public class TestCRUDSuite extends RegressionSuite {
         }
 
         // JNI
-        config = new LocalCluster("sqltypes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("crud-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         boolean t1 = config.compile(project);
         assertTrue(t1);
         builder.addServerConfig(config);
 
         // CLUSTER
-        config = new LocalCluster("sqltypes-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("crud-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         boolean t2 = config.compile(project);
         assertTrue(t2);
         builder.addServerConfig(config);

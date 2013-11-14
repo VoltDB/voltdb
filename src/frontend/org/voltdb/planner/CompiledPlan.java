@@ -42,6 +42,8 @@ import org.voltdb.types.PlanNodeType;
  */
 public class CompiledPlan {
 
+    public final static int MAX_PARAM_COUNT = 1025; // keep synched with value in EE VoltDBEngine.h
+
     /** A complete plan graph for SP plans and the top part of MP plans */
     public AbstractPlanNode rootPlanGraph;
 
@@ -178,6 +180,16 @@ public class CompiledPlan {
         int total = rootPlanGraph.findAllNodesOfType(PlanNodeType.SEQSCAN).size();
         if (subPlanGraph != null) {
             total += subPlanGraph.findAllNodesOfType(PlanNodeType.SEQSCAN).size();
+        }
+        // add full index scans
+        ArrayList<AbstractPlanNode> indexScanNodes = rootPlanGraph.findAllNodesOfType(PlanNodeType.INDEXSCAN);
+        if (subPlanGraph != null) {
+            indexScanNodes.addAll(subPlanGraph.findAllNodesOfType(PlanNodeType.INDEXSCAN));
+        }
+        for (AbstractPlanNode node : indexScanNodes) {
+            if (((IndexScanPlanNode)node).getSearchKeyExpressions().isEmpty()) {
+                total++;
+            }
         }
         return total;
     }

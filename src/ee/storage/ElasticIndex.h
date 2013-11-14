@@ -20,58 +20,16 @@
 #include <iostream>
 #include <stx/btree.h>
 #include <boost/iterator/iterator_facade.hpp>
-#include "storage/persistenttable.h"
 #include "storage/TupleBlock.h"
 #include "common/tabletuple.h"
 
 namespace voltdb {
 
 class ElasticIndexIterator;
+class PersistentTable;
 
-/**
- * Elastic hash value container with some useful/convenient operations.
- */
-class ElasticHash
-{
-    friend std::ostream &operator<<(std::ostream&, const ElasticHash&);
-
-  public:
-
-    /**
-     * Default constructor
-     */
-    ElasticHash();
-
-    /**
-     * Full constructor
-     */
-    ElasticHash(const PersistentTable &table, const TableTuple &tuple);
-
-   /**
-     * Copy constructor
-     */
-    ElasticHash(const ElasticHash &other);
-
-    /**
-     * Assignment operator
-     */
-    const ElasticHash &operator=(const ElasticHash &other);
-
-    /**
-     * Less than operator
-     */
-    bool operator<(const ElasticHash &other) const;
-
-    /**
-     * Equality operator
-     */
-    bool operator==(const ElasticHash &other) const;
-
-  private:
-
-    // Elastic hashes are 16 bytes, but we only keep the least significant 8 bytes.
-    int64_t m_hashValue;
-};
+/// Hash value type.
+typedef int32_t ElasticHash;
 
 /**
  * Data for the elastic index key.
@@ -91,7 +49,12 @@ class ElasticIndexKey
     /**
      * Full constructor.
      */
-    ElasticIndexKey(const PersistentTable &table, const TableTuple &tuple);
+    ElasticIndexKey(ElasticHash hash, char *ptr);
+
+    /**
+     * Full constructor that takes the casted pointer value directly.
+     */
+    ElasticIndexKey(ElasticHash hash, uintptr_t ptrVal);
 
     /**
      * Copy constructor.
@@ -109,6 +72,11 @@ class ElasticIndexKey
     bool operator==(const ElasticIndexKey &other) const;
 
     /**
+     * Hash accessor.
+     */
+    ElasticHash getHash() const;
+
+    /**
      * Tuple address accessor.
      */
     char *getTupleAddress() const;
@@ -116,7 +84,7 @@ class ElasticIndexKey
   private:
 
     ElasticHash m_hash;
-    char *m_ptr;
+    uintptr_t m_ptrVal;
 };
 
 /**
@@ -132,16 +100,18 @@ class ElasticIndexComparator
  * The elastic index (set)
  */
 class ElasticIndex : public stx::btree_set<ElasticIndexKey, ElasticIndexComparator,
-                                           stx::btree_default_set_traits<ElasticIndexKey> >
+                                    stx::btree_default_set_traits<ElasticIndexKey> >
 {
     friend class ElasticIndexIterator;
 
   public:
 
+    virtual ~ElasticIndex() {}
+
     /**
-     * Return true if key is in the index.
+     * Return true if key is in the index (indirect from tuple).
      */
-    bool has(const PersistentTable &table, const TableTuple &tuple);
+    bool has(const PersistentTable &table, const TableTuple &tuple) const;
 
     /**
      * Get the hash and tuple address if found.
@@ -150,90 +120,163 @@ class ElasticIndex : public stx::btree_set<ElasticIndexKey, ElasticIndexComparat
     bool get(const PersistentTable &table, const TableTuple &tuple, ElasticIndexKey &key);
 
     /**
-     * Add key to index.
+     * Add key to index (indirect from tuple).
      * Return true if it wasn't present and got added.
      */
     bool add(const PersistentTable &table, const TableTuple &tuple);
+
+    /**
+     * Add key to index (direct).
+     * Return true if it wasn't present and got added.
+     */
+    bool add(const ElasticIndexKey &key);
 
     /**
      * Remove key from index.
      * Return true if the key was present and removed.
      */
     bool remove(const PersistentTable &table, const TableTuple &tuple);
+
+    /**
+     * Get full iterator.
+     */
+    iterator createIterator();
+
+    /**
+     * Get partial iterator based on lower bound.
+     */
+    iterator createLowerBoundIterator(ElasticHash lowerBound);
+
+    /**
+     * Get partial iterator based on upper bound.
+     */
+    iterator createUpperBoundIterator(ElasticHash upperBound);
+
+    /**
+     * Get full const_iterator.
+     */
+    const_iterator createIterator() const;
+
+    /**
+     * Get partial const_iterator based on lower bound.
+     */
+    const_iterator createLowerBoundIterator(ElasticHash lowerBound) const;
+
+    /**
+     * Get partial const_iterator based on upper bound.
+     */
+    const_iterator createUpperBoundIterator(ElasticHash upperBound) const;
+
+  private:
+
+    static ElasticHash generateHash(const PersistentTable &table, const TableTuple &tuple);
+
+    static ElasticIndexKey generateKey(const PersistentTable &table, const TableTuple &tuple);
 };
 
 /**
- * Default constructor
+ * Hash range for filtering.
+ * The range specification is exclusive, specifically:
+ *  from < to:
+ *      from..to-1
+ *  from >= to:
+ *      from..max_int and min_int..to-1 (wraps around)
+ * All possible value pairs are valid.
  */
-inline ElasticHash::ElasticHash() :
-    m_hashValue(0)
-{}
-
-/**
- * Full constructor
- */
-inline ElasticHash::ElasticHash(const PersistentTable &table, const TableTuple &tuple)
+class ElasticIndexHashRange
 {
-    int64_t hashValues[2];
-    tuple.getNValue(table.partitionColumn()).murmurHash3(hashValues);
-    // Only the least significant 8 bytes is used.
-    m_hashValue = hashValues[0];
-}
+public:
+
+    /**
+     * Full constructor.
+     */
+    ElasticIndexHashRange(ElasticHash from, ElasticHash to);
+
+    /**
+     * Default constructor.
+     */
+    ElasticIndexHashRange();
+
+    /**
+     * Copy constructor.
+     */
+    ElasticIndexHashRange(const ElasticIndexHashRange &other);
+
+    /**
+     * From hash accessor.
+     */
+    ElasticHash getLowerBound() const;
+
+    /**
+     * From hash accessor.
+     */
+    ElasticHash getUpperBound() const;
+
+private:
+
+    ElasticHash m_from;
+    ElasticHash m_to;
+};
 
 /**
- * Copy constructor
+ * Special purpose index tuple iterator that is bounded by a hash range.
+ * Handles wrap-around when to <= from.
  */
-inline ElasticHash::ElasticHash(const ElasticHash &other) :
-    m_hashValue(other.m_hashValue)
-{}
-
-/**
- * Assignment operator
- */
-inline const ElasticHash &ElasticHash::operator=(const ElasticHash &other)
+class ElasticIndexTupleRangeIterator
 {
-    m_hashValue = other.m_hashValue;
-    return *this;
-}
+public:
 
-/**
- * Less than operator
- */
-inline bool ElasticHash::operator<(const ElasticHash &other) const
-{
-    return (m_hashValue < other.m_hashValue);
-}
+    /**
+     * Constructor.
+     */
+    ElasticIndexTupleRangeIterator(ElasticIndex &index,
+                                   const TupleSchema &schema,
+                                   const ElasticIndexHashRange &range);
 
-/**
- * Equality operator
- */
-inline bool ElasticHash::operator==(const ElasticHash &other) const
-{
-    return (m_hashValue == other.m_hashValue);
-}
+    /**
+     * Move to next tuple, if available.
+     * Update the tuple argument variable to access the current tuple.
+     * Return false when no more are available.
+     */
+    bool next(TableTuple &tuple);
 
-/**
- * ElasticHash streaming operator.
- */
-inline std::ostream &operator<<(std::ostream &os, const ElasticHash &hash)
-{
-    os << std::setfill('0') << std::setw(16) << std::hex << hash.m_hashValue;
-    return os;
-}
+    /**
+     * Reset iteration.
+     */
+    void reset();
+
+private:
+
+    ElasticIndex &m_index;
+    const TupleSchema &m_schema;
+    ElasticIndexHashRange m_range;
+    ElasticIndex::iterator m_iter;
+    ElasticIndex::iterator m_end;
+};
+
 
 /**
  * Default constructor.
  */
 inline ElasticIndexKey::ElasticIndexKey() :
-    m_ptr(NULL)
+    m_hash(0),
+    m_ptrVal(0)
 {}
 
 /**
  * Full constructor.
  */
-inline ElasticIndexKey::ElasticIndexKey(const PersistentTable &table, const TableTuple &tuple) :
-    m_hash(table, tuple),
-    m_ptr(tuple.address())
+inline ElasticIndexKey::ElasticIndexKey(ElasticHash hash, char *ptr) :
+    m_hash(hash)
+{
+    // Cast pointer to unsigned integer so that it can be used in comparison
+    // safely. Directly comparing less than of two pointers is undefined in C++.
+    m_ptrVal = reinterpret_cast<uintptr_t>(ptr);
+}
+
+inline ElasticIndexKey::ElasticIndexKey(ElasticHash hash, uintptr_t ptrVal) :
+    m_hash(hash),
+    m_ptrVal(ptrVal)
 {}
 
 /**
@@ -241,7 +284,7 @@ inline ElasticIndexKey::ElasticIndexKey(const PersistentTable &table, const Tabl
  */
 inline ElasticIndexKey::ElasticIndexKey(const ElasticIndexKey &other) :
     m_hash(other.m_hash),
-    m_ptr(other.m_ptr)
+    m_ptrVal(other.m_ptrVal)
 {}
 
 /**
@@ -250,7 +293,7 @@ inline ElasticIndexKey::ElasticIndexKey(const ElasticIndexKey &other) :
 inline const ElasticIndexKey &ElasticIndexKey::operator=(const ElasticIndexKey &other)
 {
     m_hash = other.m_hash;
-    m_ptr = other.m_ptr;
+    m_ptrVal = other.m_ptrVal;
     return *this;
 }
 
@@ -259,7 +302,15 @@ inline const ElasticIndexKey &ElasticIndexKey::operator=(const ElasticIndexKey &
  */
 inline bool ElasticIndexKey::operator==(const ElasticIndexKey &other) const
 {
-    return m_hash == other.m_hash && m_ptr == other.m_ptr;
+    return m_hash == other.m_hash && m_ptrVal == other.m_ptrVal;
+}
+
+/**
+ * Hash accessor.
+ */
+inline ElasticHash ElasticIndexKey::getHash() const
+{
+    return m_hash;
 }
 
 /**
@@ -267,7 +318,7 @@ inline bool ElasticIndexKey::operator==(const ElasticIndexKey &other) const
  */
 inline char *ElasticIndexKey::getTupleAddress() const
 {
-    return m_ptr;
+    return reinterpret_cast<char *>(m_ptrVal);
 }
 
 /**
@@ -276,15 +327,23 @@ inline char *ElasticIndexKey::getTupleAddress() const
 inline bool ElasticIndexComparator::operator()(
        const ElasticIndexKey &a, const ElasticIndexKey &b) const
 {
-    return (a.m_hash < b.m_hash || (a.m_hash == b.m_hash && a.m_ptr < b.m_ptr));
+    return (a.m_hash < b.m_hash || (a.m_hash == b.m_hash && a.m_ptrVal < b.m_ptrVal));
 }
 
 /**
- * Return true if key is in the index.
+ * Internal method to generate a key from a table/tuple.
  */
-inline bool ElasticIndex::has(const PersistentTable &table, const TableTuple &tuple)
+inline ElasticIndexKey ElasticIndex::generateKey(const PersistentTable &table, const TableTuple &tuple)
 {
-    return exists(ElasticIndexKey(table, tuple));
+    return ElasticIndexKey(generateHash(table, tuple), tuple.address());
+}
+
+/**
+ * Return true if key is in the index (indirect from tuple).
+ */
+inline bool ElasticIndex::has(const PersistentTable &table, const TableTuple &tuple) const
+{
+    return exists(generateKey(table, tuple));
 }
 
 /**
@@ -294,7 +353,7 @@ inline bool ElasticIndex::has(const PersistentTable &table, const TableTuple &tu
 inline bool ElasticIndex::get(const PersistentTable &table, const TableTuple &tuple,
                               ElasticIndexKey &key)
 {
-    ElasticIndexKey keyCmp(table, tuple);
+    ElasticIndexKey keyCmp = generateKey(table, tuple);
     if (exists(keyCmp)) {
         key = keyCmp;
         return true;
@@ -303,13 +362,21 @@ inline bool ElasticIndex::get(const PersistentTable &table, const TableTuple &tu
 }
 
 /**
- * Add key to index.
+ * Add key to index (indirect from tuple).
  * Return true if it wasn't present and needed to be added.
  */
 inline bool ElasticIndex::add(const PersistentTable &table, const TableTuple &tuple)
 {
+    return add(generateKey(table, tuple));
+}
+
+/**
+ * Add key to index (direct).
+ * Return true if it wasn't present and needed to be added.
+ */
+inline bool ElasticIndex::add(const ElasticIndexKey &key)
+{
     bool inserted = false;
-    ElasticIndexKey key(table, tuple);
     if (!exists(key)) {
         inserted = insert(key).second;
         assert(inserted);
@@ -324,7 +391,7 @@ inline bool ElasticIndex::add(const PersistentTable &table, const TableTuple &tu
 inline bool ElasticIndex::remove(const PersistentTable &table, const TableTuple &tuple)
 {
     bool removed = false;
-    ElasticIndexKey key(table, tuple);
+    ElasticIndexKey key = generateKey(table, tuple);
     if (exists(key)) {
         removed = this->erase(key);
     }
@@ -332,12 +399,98 @@ inline bool ElasticIndex::remove(const PersistentTable &table, const TableTuple 
 }
 
 /**
+ * Get full iterator.
+ */
+inline ElasticIndex::iterator ElasticIndex::createIterator()
+{
+    return begin();
+}
+
+/**
+ * Get partial iterator based on lower bound.
+ */
+inline ElasticIndex::iterator ElasticIndex::createLowerBoundIterator(ElasticHash lowerBound)
+{
+    return lower_bound(ElasticIndexKey(lowerBound, (uintptr_t) 0));
+}
+
+/**
+ * Get partial iterator based on upper bound.
+ */
+inline ElasticIndex::iterator ElasticIndex::createUpperBoundIterator(ElasticHash upperBound)
+{
+    return upper_bound(ElasticIndexKey(upperBound, std::numeric_limits<uintptr_t>::max()));
+}
+
+/**
+ * Get full const_iterator.
+ */
+inline ElasticIndex::const_iterator ElasticIndex::createIterator() const
+{
+    return begin();
+}
+
+/**
+ * Get partial const_iterator based on lower bound.
+ */
+inline ElasticIndex::const_iterator ElasticIndex::createLowerBoundIterator(ElasticHash lowerBound) const
+{
+    return lower_bound(ElasticIndexKey(lowerBound, (uintptr_t) 0));
+}
+
+/**
+ * Get partial const_iterator based on upper bound.
+ */
+inline ElasticIndex::const_iterator ElasticIndex::createUpperBoundIterator(ElasticHash upperBound) const
+{
+    return upper_bound(ElasticIndexKey(upperBound, std::numeric_limits<uintptr_t>::max()));
+}
+
+/**
  * ElasticIndexKey streaming operator.
  */
 inline std::ostream &operator<<(std::ostream &os, const ElasticIndexKey &key)
 {
-    os << key.m_hash << ':' << std::hex << reinterpret_cast<long>(key.m_ptr);
+    os << std::hex << key.m_hash << ':' << key.m_ptrVal;
     return os;
+}
+
+/**
+ * Full constructor.
+ */
+inline ElasticIndexHashRange::ElasticIndexHashRange(ElasticHash from, ElasticHash to) :
+    m_from(from), m_to(to)
+{}
+
+/**
+ * Default constructor (full range).
+ */
+inline ElasticIndexHashRange::ElasticIndexHashRange() :
+    // min->min covers all possible values, min->max would not.
+    m_from(std::numeric_limits<int32_t>::min()), m_to(std::numeric_limits<int32_t>::max())
+{}
+
+/**
+ * Copy constructor.
+ */
+inline ElasticIndexHashRange::ElasticIndexHashRange(const ElasticIndexHashRange &other) :
+    m_from(other.m_from), m_to(other.m_to)
+{}
+
+/**
+ * From hash accessor.
+ */
+inline ElasticHash ElasticIndexHashRange::getLowerBound() const
+{
+    return m_from;
+}
+
+/**
+ * From hash accessor.
+ */
+inline ElasticHash ElasticIndexHashRange::getUpperBound() const
+{
+    return m_to;
 }
 
 } // namespace voltdb

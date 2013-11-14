@@ -85,7 +85,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public long backwardsTimeForgivenessWindow = 1000 * 60 * 60 * 24 * 7;
         public VoltMessageFactory factory = new VoltMessageFactory();
         public int networkThreads =  Math.max(2, CoreUtils.availableProcessors() / 4);
-        public Queue<String> coreBindIds;;
+        public Queue<String> coreBindIds;
 
         public Config(String coordIp, int coordPort) {
             if (coordIp == null || coordIp.length() == 0) {
@@ -158,6 +158,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public static final int SYSINFO_SITE_ID = -6;
     public static final int SNAPSHOTSCAN_SITE_ID = -7;
     public static final int SNAPSHOTDELETE_SITE_ID = -8;
+    public static final int REBALANCE_SITE_ID = -9;
 
     // we should never hand out this site ID.  Use it as an empty message destination
     public static final int VALHALLA = Integer.MIN_VALUE;
@@ -385,7 +386,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     @Override
     public void notifyOfJoin(int hostId, SocketChannel socket, InetSocketAddress listeningAddress) {
-        System.out.println(getHostId() + " notified of " + hostId);
+        logger.info(getHostId() + " notified of " + hostId);
         prepSocketChannel(socket);
         ForeignHost fhost = null;
         try {
@@ -575,7 +576,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         m_network.start();//network must be running for register to work
 
         for (int ii = 0; ii < hosts.length; ii++) {
-            System.out.println(yourHostId + " Notified of host " + hosts[ii]);
+            logger.info(yourHostId + " notified of host " + hosts[ii]);
             agreementSites.add(CoreUtils.getHSIdFromHostAndSite(hosts[ii], AGREEMENT_SITE_ID));
             prepSocketChannel(sockets[ii]);
             ForeignHost fhost = null;

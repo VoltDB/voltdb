@@ -33,7 +33,7 @@ public class MPIEndOfLogTransactionState extends TransactionState {
     @Override
     public boolean isSinglePartition()
     {
-        return true;
+        return false;
     }
 
     @Override

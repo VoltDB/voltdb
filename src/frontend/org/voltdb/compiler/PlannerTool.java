@@ -69,8 +69,8 @@ public class PlannerTool {
 
         // LOAD HSQL
         m_hsql = HSQLInterface.loadHsqldb();
-        String hexDDL = m_database.getSchema();
-        String ddl = Encoder.hexDecodeToString(hexDDL);
+        String binDDL = m_database.getSchema();
+        String ddl = Encoder.decodeBase64AndDecompress(binDDL);
         String[] commands = ddl.split("\n");
         for (String command : commands) {
             String decoded_cmd = Encoder.hexDecodeToString(command);
@@ -143,6 +143,7 @@ public class PlannerTool {
                     sql, "PlannerTool", "PlannerToolProc", m_cluster, m_database,
                     partitioning, m_hsql, new DatabaseEstimates(), true,
                     AD_HOC_JOINED_TABLE_LIMIT, costModel, null, null, DeterminismMode.FASTER);
+
             CompiledPlan plan = null;
             String[] extractedLiterals = null;
             String parsedToken = null;

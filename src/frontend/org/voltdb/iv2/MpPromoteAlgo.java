@@ -30,6 +30,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltdb.TheHashinator;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -46,7 +47,7 @@ public class MpPromoteAlgo implements RepairAlgo
     private final List<Long> m_survivors;
     private long m_maxSeenTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
     private final List<Iv2InitiateTaskMessage> m_interruptedTxns = new ArrayList<Iv2InitiateTaskMessage>();
-
+    private Pair<Long, byte[]> m_newestHashinatorConfig = Pair.of(Long.MIN_VALUE,new byte[0]);
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
     private final InaugurationFuture m_promotionResult = new InaugurationFuture();
@@ -88,7 +89,13 @@ public class MpPromoteAlgo implements RepairAlgo
         @Override
         public int compare(Iv2RepairLogResponseMessage o1, Iv2RepairLogResponseMessage o2)
         {
-            return (int)(o1.getTxnId() - o2.getTxnId());
+            if (o1.getTxnId() < o2.getTxnId()) {
+                return -1;
+            }
+            else if (o1.getTxnId() > o2.getTxnId()) {
+                return 1;
+            }
+            return 0;
         }
     };
 
@@ -161,14 +168,23 @@ public class MpPromoteAlgo implements RepairAlgo
                 m_maxSeenTxnId = Math.max(m_maxSeenTxnId, response.getTxnId());
             }
 
-            // Step 2: offer to the union
+            // Step 2: track hashinator versions
+
+            if (response.hasHashinatorConfig()) {
+                Pair<Long,byte[]> proposed = response.getHashinatorVersionedConfig();
+                if (proposed.getFirst() > m_newestHashinatorConfig.getFirst()) {
+                    m_newestHashinatorConfig = proposed;
+                }
+            }
+
+            // Step 3: offer to the union
             addToRepairLog(response);
             if (tmLog.isTraceEnabled()) {
                 tmLog.trace(m_whoami + " collected from " + CoreUtils.hsIdToString(response.m_sourceHSId) +
                         ", message: " + response.getPayload());
             }
 
-            // Step 3: update the corresponding replica repair struct.
+            // Step 4: update the corresponding replica repair struct.
             ReplicaRepairStruct rrs = m_replicaRepairStructs.get(response.m_sourceHSId);
             if (rrs.m_expectedResponses < 0) {
                 tmLog.debug(m_whoami + "collecting " + response.getOfTotal()
@@ -180,7 +196,12 @@ public class MpPromoteAlgo implements RepairAlgo
                 tmLog.debug(m_whoami + "collected " + rrs.m_receivedResponses
                           + " responses for " + rrs.m_expectedResponses
                           + " repair log entries from " + CoreUtils.hsIdToString(response.m_sourceHSId));
+
                 if (areRepairLogsComplete()) {
+
+                    TheHashinator.updateHashinator(TheHashinator.getConfiguredHashinatorType().hashinatorClass,
+                            m_newestHashinatorConfig.getFirst(), m_newestHashinatorConfig.getSecond(), true);
+
                     repairSurvivors();
                 }
             }

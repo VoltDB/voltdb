@@ -294,7 +294,7 @@ public class TableWorks {
 
                     // create an autonamed index
                     index = table.createAndAddIndexStructure(indexName,
-                            c.getMainColumns(), null, null, true, true, false);
+                            c.getMainColumns(), null, null, true, true, false).setAssumeUnique(c.assumeUnique);
                     c.core.mainTable = table;
                     c.core.mainIndex = index;
 
@@ -586,7 +586,7 @@ public class TableWorks {
      * @param cols int[]
      * @param name HsqlName
      */
-    void addUniqueConstraint(int[] cols, HsqlName name) {
+    void addUniqueConstraint(int[] cols, HsqlName name, boolean assumeUnique) {
 
         database.schemaManager.checkSchemaObjectNotExists(name);
 
@@ -601,7 +601,7 @@ public class TableWorks {
         Index index = table.createIndexStructure(indexname, cols, null, null,
             true, true, false);
         Constraint constraint = new Constraint(name, table, index,
-                                               Constraint.UNIQUE);
+                                               Constraint.UNIQUE).setAssumeUnique(assumeUnique);
         Table tn = table.moveDefinition(session, table.tableType, null,
                                         constraint, index, -1, 0, emptySet,
                                         emptySet);
@@ -623,7 +623,7 @@ public class TableWorks {
      * @param indexExprs
      * @param name HsqlName
      */
-    public void addUniqueExprConstraint(int[] cols, Expression[] indexExprs, HsqlName name) {
+    public void addUniqueExprConstraint(int[] cols, Expression[] indexExprs, HsqlName name, boolean assumeUnique) {
         database.schemaManager.checkSchemaObjectNotExists(name);
 
         if (table.getUniqueConstraintForExprs(indexExprs) != null) {
@@ -635,7 +635,7 @@ public class TableWorks {
             name.name, table.getSchemaName(), table.getName(),
             SchemaObject.INDEX);
         Index exprIndex = table.createExprIndexStructure(indexname, cols, indexExprs, true, true);
-        Constraint constraint = new Constraint(name, table, exprIndex, Constraint.UNIQUE);
+        Constraint constraint = new Constraint(name, table, exprIndex, Constraint.UNIQUE).setAssumeUnique(assumeUnique);
         Table tn = table.moveDefinition(session, table.tableType, null,
                                         constraint, exprIndex, -1, 0, emptySet, emptySet);
         tn.moveData(session, table, -1, 0);

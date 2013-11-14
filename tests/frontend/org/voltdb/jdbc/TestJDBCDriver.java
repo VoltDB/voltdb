@@ -120,8 +120,8 @@ public class TestJDBCDriver {
      * @param expected Expected total count
      * @throws SQLException
      */
-    private void tableTest(String[] types, int expected) throws SQLException {
-        ResultSet tables = conn.getMetaData().getTables("blah", "blah", "%",
+    private void tableTest(String[] types, String pattern, int expected) throws SQLException {
+        ResultSet tables = conn.getMetaData().getTables("blah", "blah", pattern,
                                                         types);
         int count = 0;
         List<String> typeList = Arrays.asList(JDBC4DatabaseMetaData.tableTypes);
@@ -140,7 +140,7 @@ public class TestJDBCDriver {
     @Test
     public void testAllTables() throws SQLException {
         // TPCC has 10 tables
-        tableTest(null, 10);
+        tableTest(null, "%", 10);
     }
 
     @Test
@@ -151,18 +151,33 @@ public class TestJDBCDriver {
             if (type.equals("TABLE")) {
                 expected = 10;
             }
-            tableTest(new String[] {type}, expected);
+            tableTest(new String[] {type}, "%", expected);
         }
     }
 
     @Test
-    public void testFilterTableByName() {
-        try {
-            conn.getMetaData().getTables("blah", "blah", "ORDERS", null);
-        } catch (SQLException e) {
-            return;
-        }
-        fail("Should fail, we don't support filtering by table name");
+    public void testFilterTableByName() throws SQLException {
+        // TPCC has 1 "ORDERS" tables
+        tableTest(null, "ORDERS", 1);
+         // TPCC has 1 "ORDER_" table
+        tableTest(null, "ORDER_", 1);
+         // TPCC has 2 tables that start with "O"
+        tableTest(null, "O%", 2);
+         // TPCC has 5 tables with names containing "ST"
+        tableTest(null, "%ST%", 5);
+        // TPCC has 10 tables
+        tableTest(null, "", 10);
+        // TPCC has 10 tables, but won't match the types array
+        tableTest(new String[] {""}, "", 0);
+    }
+
+    @Test
+    public void testFilterTableByNameNoMatch() throws SQLException {
+        // No matches
+        tableTest(null, "%xyzzy", 0);
+        tableTest(null, "_", 0);
+        tableTest(null, "gobbly_gook", 0);
+        tableTest(null, "noname", 0);
     }
 
     /**
@@ -179,7 +194,6 @@ public class TestJDBCDriver {
                                                           table, column);
         int count = 0;
         while (columns.next()) {
-            assertEquals(table, columns.getString("TABLE_NAME"));
             assertFalse(columns.getString("COLUMN_NAME").isEmpty());
             count++;
         }
@@ -195,6 +209,17 @@ public class TestJDBCDriver {
     @Test
     public void testFilterColumnByName() throws SQLException {
         tableColumnTest("WAREHOUSE", "W_ID", 1);
+    }
+
+    @Test
+    public void testFilterColumnByWildcard() throws SQLException {
+        tableColumnTest("CUSTOMER%", null, 26);
+        tableColumnTest("CUSTOMER%", "", 26);
+        tableColumnTest("CUSTOMER%", "%MIDDLE", 1);
+        tableColumnTest("CUSTOMER", "____", 1);
+        tableColumnTest("%", "%ID", 32);
+        tableColumnTest(null, "%ID", 32);
+        tableColumnTest(null, "", 97);
     }
 
     /**

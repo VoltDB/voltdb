@@ -65,7 +65,6 @@ tail = "tar.gz"
 # http://volt0/kits/candidate/LINUX-voltdb-ent-2.8.1.tar.gz
 root = "http://volt0/kits/branch/"
 testname = os.path.basename(os.path.abspath(__file__)).replace(".py", "")
-#logDir = destDir + getpass.getuser() + "_" + testname + "_log/"
 elem2Test = {'helloworld':'./run.sh', 'voltcache':'./run.sh', 'voltkv':'./run.sh', 'voter':'./run.sh'}
 defaultHost = "localhost"
 defaultPort = 21212
@@ -213,34 +212,31 @@ def setTestSuite(dname, suite):
                             testSuiteList[subdirname] = path
     return testSuiteList
 
-# Not used yet.
-# It would be necessary if we wanted to run certain queries before
 def stopPS(ps):
+    print ps.returncode
+    if ps.returncode != None:
+        print "Process %d exited early with return code %d" % (ps.pid, ps.returncode)
     print "Going to kill this process: '%d'" % ps.pid
-    killer = subprocess.Popen("kill -9 %d" % (ps.pid), shell = True)
-    killer.communicate()
-    if killer.returncode != 0:
-#        print >> sys.stderr, "Failed to kill the server process %d" % (server.pid)
-        print "Failed to kill the server process %d" % (ps.pid)
+    ps.kill()
 
 # To return a voltDB client
-def getClient():
+def getQueryClient():
     host = defaultHost
     port = defaultPort
     client = None
-    for i in xrange(10):
+    for i in xrange(25):
         try:
             client = VoltQueryClient(host, port)
             client.set_quiet(True)
             client.set_timeout(5.0) # 5 seconds
-            break
+            return client
         except socket.error:
             time.sleep(1)
 
     if client == None:
-        print >> sys.stderr, "Unable to connect/create client"
+        print >> sys.stderr, "Unable to connect python client to server"
         sys.stderr.flush()
-        exit(1)
+        return None
 
     return client
 
@@ -253,7 +249,9 @@ def startService(service, logS, logC):
     cmd = service + " > " + logS + " 2>&1"
     service_ps = subprocess.Popen(cmd, shell=True)
     time.sleep(2)
-    client = getClient()
+    client = getQueryClient()
+    if not client:
+        return None
     cmd = service + " client > " + logC + " 2>&1"
     ret = call(cmd, shell=True)
     print "returning results from service execution: '%s'" % ret
@@ -272,7 +270,12 @@ def execThisService(service, logS, logC):
     print "   Server - Exec CMD: '%s'" % cmd
     service_ps = subprocess.Popen(cmd, shell=True)
     time.sleep(2)
-    client = getClient()
+    client = getQueryClient()
+    if not client:
+        print "    Couldn't connect to server. Killing and giving up"
+        #TODO - write something in log
+        stopPS(service_ps)
+        return
     cmd = service + " client > " + logC + " 2>&1"
     print "   Client - Exec CMD: '%s'" % cmd
     ret = call(cmd, shell=True)
@@ -388,15 +391,18 @@ def startTest(testSuiteList):
         keyStrSet = None
         if suiteName in elem2Test.keys():
             # Could be an overkill
+            #currDir = os.path.join(logDir, suiteName + "_logs")
             os.chdir(path)
             currDir = os.getcwd()
             service = elem2Test[suiteName]
-            print ">>> Test: %s\n   Current Directory: '%s'" % (suiteName, currDir)
+            print ">>> Test: %s" % suiteName
+            print "   Current Directory: '%s'" % currDir
             logFileS = os.path.join(logDir, suiteName + "_server")
             logFileC = os.path.join(logDir,suiteName + "_client")
             print "   Log File for VoltDB Server: '%s'" % logFileS
             print "   Log File for VoltDB Client: '%s'" % logFileC
             execThisService(service, logFileS, logFileC)
+
             if(suiteName == "helloworld"):
                 (result, msg) = assertHelloWorld(suiteName, logFileC)
             elif(suiteName == "voter"):
@@ -492,7 +498,7 @@ if __name__ == "__main__":
                       help="Report file location")
     parser.add_option("-b","--branch", dest="branch", default="master",
                       help="Branch name to test")
-    parser.add_option("-o","--output", dest="destDir", default=os.getcwd(),
+    parser.add_option("-o","--output", dest="destDir", default='/tmp',
                       help="Output Directory")
 
 
@@ -501,8 +507,7 @@ if __name__ == "__main__":
     parser.set_defaults(suite="all")
     (options, args) = parser.parse_args()
     destDir = options.destDir
-    logDir = os.path.join(destDir,getpass.getuser() + "_" + testname + '_log')
-
+    logDir = os.path.join(os.getcwd(), getpass.getuser() + "_" + testname + '_log')
     workDir = os.path.join(destDir,getpass.getuser() + "_" + testname)
 
     if not os.path.exists(logDir):

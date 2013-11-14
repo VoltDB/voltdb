@@ -56,6 +56,7 @@
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
 #include "plannodes/nestloopnode.h"
+#include "plannodes/limitnode.h"
 
 #ifdef VOLT_DEBUG_ENABLED
 #include <ctime>
@@ -143,6 +144,13 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     JoinType join_type = node->getJoinType();
     assert(join_type == JOIN_TYPE_INNER || join_type == JOIN_TYPE_LEFT);
 
+    LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+    int limit = -1;
+    int offset = -1;
+    if (limit_node) {
+        limit_node->getLimitAndOffsetByReference(params, limit, offset);
+    }
+
     int outer_cols = outer_table->columnCount();
     int inner_cols = inner_table->columnCount();
     TableTuple outer_tuple(node->getInputTables()[0]->schema());
@@ -151,8 +159,11 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     TableTuple null_tuple = m_null_tuple;
 
     TableIterator iterator0 = outer_table->iterator();
-    while (iterator0.next(outer_tuple)) {
-
+    int tuple_ctr = 0;
+    int tuple_skipped = 0;
+    m_engine->setLastAccessedTable(inner_table);
+    while ((limit == -1 || tuple_ctr < limit) && iterator0.next(outer_tuple)) {
+        m_engine->noteTuplesProcessedForProgressMonitoring(1);
         // did this loop body find at least one match for this tuple?
         bool match = false;
         // For outer joins if outer tuple fails pre-join predicate
@@ -166,13 +177,20 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
             joined.setNValues(0, outer_tuple, 0, outer_cols);
 
             TableIterator iterator1 = inner_table->iterator();
-            while (iterator1.next(inner_tuple)) {
+            while ((limit == -1 || tuple_ctr < limit) && iterator1.next(inner_tuple)) {
+                m_engine->noteTuplesProcessedForProgressMonitoring(1);
                 // Apply join filter to produce matches for each outer that has them,
                 // then pad unmatched outers, then filter them all
                 if (joinPredicate == NULL || joinPredicate->eval(&outer_tuple, &inner_tuple).isTrue()) {
                     match = true;
                     // Filter the joined tuple
                     if (wherePredicate == NULL || wherePredicate->eval(&outer_tuple, &inner_tuple).isTrue()) {
+                        // Check if we have to skip this tuple because of offset
+                        if (tuple_skipped < offset) {
+                            tuple_skipped++;
+                            continue;
+                        }
+                        ++tuple_ctr;
                         // Matched! Complete the joined tuple with the inner column values.
                         joined.setNValues(outer_cols, inner_tuple, 0, inner_cols);
                         output_table->insertTupleNonVirtual(joined);
@@ -183,9 +201,15 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         //
         // Left Outer Join
         //
-        if (join_type == JOIN_TYPE_LEFT && !match) {
+        if ((limit == -1 || tuple_ctr < limit) && join_type == JOIN_TYPE_LEFT && !match) {
             // Still needs to pass the filter
             if (wherePredicate == NULL || wherePredicate->eval(&outer_tuple, &null_tuple).isTrue()) {
+                // Check if we have to skip this tuple because of offset
+                if (tuple_skipped < offset) {
+                    tuple_skipped++;
+                    continue;
+                }
+                ++tuple_ctr;
                 joined.setNValues(outer_cols, null_tuple, 0, inner_cols);
                 output_table->insertTupleNonVirtual(joined);
             }

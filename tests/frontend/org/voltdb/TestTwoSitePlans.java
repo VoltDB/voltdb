@@ -32,6 +32,7 @@ import junit.framework.TestCase;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.InsertNewOrder;
+import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
@@ -90,7 +91,7 @@ public class TestTwoSitePlans extends TestCase {
 
         // update the catalog with the data from the deployment file
         String pathToDeployment = pb.getPathToDeployment();
-        assertTrue(CatalogUtil.compileDeploymentAndGetCRC(catalog, pathToDeployment, true) >= 0);
+        assertTrue(CatalogUtil.compileDeploymentAndGetCRC(catalog, pathToDeployment, true, false) >= 0);
 
         cluster = catalog.getClusters().get("cluster");
         CatalogMap<Procedure> procedures = cluster.getDatabases().get("database").getProcedures();
@@ -113,8 +114,7 @@ public class TestTwoSitePlans extends TestCase {
                                 0,
                                 "",
                                 100,
-                                HashinatorType.LEGACY,
-                                configBytes));
+                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0)));
             }
         };
         site1Thread.start();
@@ -132,8 +132,7 @@ public class TestTwoSitePlans extends TestCase {
                                 0,
                                 "",
                                 100,
-                                HashinatorType.LEGACY,
-                                configBytes));
+                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0)));
             }
         };
         site2Thread.start();
@@ -177,13 +176,13 @@ public class TestTwoSitePlans extends TestCase {
         ActivePlanRepository.clear();
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
-                Encoder.base64Decode(selectBottomFrag.getPlannodetree()));
+                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()));
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(selectTopFrag),
-                Encoder.base64Decode(selectTopFrag.getPlannodetree()));
+                Encoder.decodeBase64AndDecompressToBytes(selectTopFrag.getPlannodetree()));
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(insertFrag),
-                Encoder.base64Decode(insertFrag.getPlannodetree()));
+                Encoder.decodeBase64AndDecompressToBytes(insertFrag.getPlannodetree()));
 
         // insert some data
         ParameterSet params = ParameterSet.fromArrayNoCopy(1L, 1L, 1L);

@@ -291,7 +291,7 @@ class NValue {
     void serializeToExport(ExportSerializeOutput&) const;
 
     // See comment with inlined body, below.
-    void allocatePersistentObjectFromInlineValue();
+    void allocateObjectFromInlinedValue(Pool* stringPool = NULL);
 
     /* Check if the value represents SQL NULL */
     bool isNull() const;
@@ -383,7 +383,7 @@ class NValue {
     /*
      * Out must have space for 16 bytes
      */
-    void murmurHash3(void *out) const;
+    int32_t murmurHash3() const;
 
     /*
      * callConstant, callUnary, and call are templates for arbitrary NValue member functions that implement
@@ -567,6 +567,9 @@ class NValue {
         // assert(rt != VALUE_TYPE_INVALID);
         return rt;
     }
+
+    // Declared public for cppunit test purposes .
+    static int64_t parseTimestampString(const char* str);
 
   private:
     /*
@@ -1188,9 +1191,11 @@ class NValue {
             whole /= NValue::kMaxScaleFactor;
             retval.getTimestamp() = whole.ToInt(); break;
         }
-        case VALUE_TYPE_VARCHAR:
-            //TODO: Seems like we want to also allow actual date formatting OR? a numeric value, here? See ENG-4284.
-            retval.getTimestamp() = static_cast<int64_t>(getNumberFromString()); break;
+        case VALUE_TYPE_VARCHAR: {
+            const char* str = reinterpret_cast<const char*>(getObjectValue());
+            retval.getTimestamp() = parseTimestampString(str);
+            break;
+        }
         case VALUE_TYPE_VARBINARY:
         default:
             throwCastSQLException(type, VALUE_TYPE_TIMESTAMP);
@@ -1364,6 +1369,8 @@ class NValue {
         return retval;
     }
 
+    void streamTimestamp(std::stringstream& value) const;
+
     NValue castAsString() const {
         if (isNull()) {
             NValue retval(VALUE_TYPE_VARCHAR);
@@ -1400,6 +1407,10 @@ class NValue {
             NValue retval(VALUE_TYPE_VARCHAR);
             memcpy(retval.m_data, m_data, sizeof(m_data));
             return retval;
+        }
+        case VALUE_TYPE_TIMESTAMP: {
+            streamTimestamp(value);
+            break;
         }
         default:
             throwCastSQLException(type, VALUE_TYPE_VARCHAR);
@@ -2749,8 +2760,8 @@ inline void NValue::serializeToExport(ExportSerializeOutput &io) const
 }
 
 /** Reformat an object-typed value from its inlined form to its allocated out-of-line form,
- *  for use with a widened tuple column. **/
-inline void NValue::allocatePersistentObjectFromInlineValue()
+ *  for use with a wider/widened tuple column, either persistent (stringPool==NULL) or temp **/
+inline void NValue::allocateObjectFromInlinedValue(Pool* stringPool)
 {
     if (m_valueType == VALUE_TYPE_NULL || m_valueType == VALUE_TYPE_INVALID) {
         return;
@@ -2772,11 +2783,6 @@ inline void NValue::allocatePersistentObjectFromInlineValue()
         setSourceInlined(false);
         return;
     }
-
-    // A future version/variant of this function may take an optional Pool argument,
-    // so that it could be used for temp values/tables.
-    // The default persistent string pool specified by NULL works fine here and now.
-    Pool* stringPool = NULL;
 
     // When an object is inlined, m_data is a direct pointer into a tuple's inline storage area.
     char* source = *reinterpret_cast<char**>(m_data);
@@ -3201,7 +3207,7 @@ inline NValue NValue::op_divide(const NValue rhs) const {
 /*
  * Out must have storage for 16 bytes
  */
-inline void NValue::murmurHash3(void * out) const {
+inline int32_t NValue::murmurHash3() const {
     const ValueType type = getValueType();
     switch(type) {
     case VALUE_TYPE_TIMESTAMP:
@@ -3210,12 +3216,10 @@ inline void NValue::murmurHash3(void * out) const {
     case VALUE_TYPE_INTEGER:
     case VALUE_TYPE_SMALLINT:
     case VALUE_TYPE_TINYINT:
-        MurmurHash3_x64_128( m_data, 8, 0, out);
-        break;
+        return MurmurHash3_x64_128( m_data, 8, 0);
     case VALUE_TYPE_VARBINARY:
     case VALUE_TYPE_VARCHAR:
-        MurmurHash3_x64_128( getObjectValue(), getObjectLength(), 0, out);
-        break;
+        return MurmurHash3_x64_128( getObjectValue(), getObjectLength(), 0);
     default:
         throwFatalException("Unknown type for murmur hashing %d", type);
         break;

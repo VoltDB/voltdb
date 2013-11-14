@@ -118,6 +118,8 @@ public class AsyncBenchmark {
     final AtomicLong successfulPutsMPT = new AtomicLong(0);
     final AtomicLong successfulPutsMPF = new AtomicLong(0);
 
+    long lastSuccessfulResponse = 0;
+
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -233,22 +235,19 @@ public class AsyncBenchmark {
                     prt(msg);
                 }
                 System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
-                if(connectionsLeft > 0) {
-                    totalConnections.decrementAndGet();
+                totalConnections.decrementAndGet();
+                if (config.recover) {
                     try {
                         connectThis(hostname, "Retry");
                     } catch (Exception e) {
                         // TODO Auto-generated catch block
                         e.printStackTrace();
                     }
-                }
-                else {
-                    if(debug) {
-                        String msg = "Since we've lost all connections, we're going to explicitely ";
-                        msg += "reset total number of connections to -1";
-                        System.out.println(msg);
+                } else {
+                    if (totalConnections.get() == 0) {
+                        //totalConnections.set(-1);
+                        System.exit(1);
                     }
-                    totalConnections.set(-1);
                 }
             } // if ((currentTime - benchmarkStartTS) < (config.duration * 1000))
         }
@@ -425,6 +424,10 @@ public class AsyncBenchmark {
             String msg = "In printStatistics. We got an exception: '" + e.getMessage() + "'!!";
             prt(msg);
         }
+        if ((System.currentTimeMillis() - lastSuccessfulResponse) > 6*60*1000) {
+            prt("Not making any progress, exiting");
+            System.exit(1);
+        }
     }
 
     public void exitOnError(String err) {
@@ -459,6 +462,8 @@ public class AsyncBenchmark {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
+
+        System.exit(1);
     }
     /**
      * Prints the results of the voting simulation and statistics
@@ -572,6 +577,7 @@ public class AsyncBenchmark {
                             processor.retrieveFromStore(pairData.fetchRow(0).getString(0),
                                                         pairData.fetchRow(0).getVarbinary(1));
                     successfulGets.incrementAndGet();
+                    lastSuccessfulResponse = System.currentTimeMillis();
                     if(rand < config.multisingleratio)
                         successfulGetsMPT.incrementAndGet();
                     else
@@ -614,6 +620,7 @@ public class AsyncBenchmark {
                 final VoltTableRow tablerow = pairData.fetchRow(0);
                 final long counter = tablerow.getLong(0);
                 hashMap.put(thisPair.Key, counter);
+                lastSuccessfulResponse = System.currentTimeMillis();
             }
             else {
                 failedPuts.incrementAndGet();
@@ -687,6 +694,7 @@ public class AsyncBenchmark {
                                      "Put",
                                      String.format(processor.KeyFormat, i),
                                      processor.generateForStore().getStoreValue());
+                lastSuccessfulResponse = System.currentTimeMillis();
             }
             client.drain();
             System.out.println("Preloading complete.\n");
@@ -717,6 +725,7 @@ public class AsyncBenchmark {
                     final PayloadProcessor.Pair pair = processor.generateForStore();
                     client.callProcedure(new NullCallback(), "Put", pair.Key, pair.getStoreValue());
                 }
+                lastSuccessfulResponse = System.currentTimeMillis();
             }
         }
 
@@ -756,6 +765,7 @@ public class AsyncBenchmark {
                 }
                 msg += "All connections are lost! VoltDB could be down!!";
                 prt(msg);
+                System.exit(1);
             }
 
             // Decide whether to perform a GET or PUT operation
@@ -860,9 +870,13 @@ public class AsyncBenchmark {
     }
 
     public void summary4qa() {
-        // Put a key/value pair, asynchronously
-
-        System.out.printf("Checking put count in the database against expected data");
+        // print the summary results
+        try {
+            printResults();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        System.out.printf("\n\nChecking put count in the database against expected data");
         Iterator<String> it = hashMap.keySet().iterator();
         if(debug) {
             System.out.printf("HashMap Size: %10d\n", hashMap.size());
