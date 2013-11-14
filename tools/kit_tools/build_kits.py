@@ -7,6 +7,7 @@ from fabric_ssh_config import getSSHInfoForHost
 username='test'
 builddir = "/tmp/" + username + "Kits/buildtemp"
 version = "UNKNOWN"
+defaultlicensedays = 37 #default trial license in kit = 30 days + 1 week
 
 ################################################
 # CHECKOUT CODE INTO A TEMP DIR
@@ -59,7 +60,7 @@ def buildPro():
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run("VOLTCORE=../voltdb TRIALLICENSE=no ant -f mmt.xml -Dallowreplication=true clean dist.pro")
+        run("VOLTCORE=../voltdb ant -f mmt.xml -Dallowreplication=true -Dlicensedays=%d clean dist.pro" % defaultlicensedays)
 
 ################################################
 # MAKE AN ENTERPRISE TRIAL LICENSE
