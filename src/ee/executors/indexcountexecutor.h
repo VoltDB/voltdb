@@ -51,6 +51,8 @@ protected:
             TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
 
+    long p_countNulls(AbstractExpression * nextSearchkeyExpr);
+
     // Data in this class is arranged roughly in the order it is read for
     // p_execute(). Please don't reshuffle it only in the name of beauty.
 
@@ -75,6 +77,9 @@ protected:
     TempTable* m_outputTable;
     PersistentTable* m_targetTable;
     TableIndex *m_index;
+    TableTuple m_tuple;
+
+    bool m_needsSubstituteCountNullExpression;
 
     // arrange the memory mgmt aids at the bottom to try to maximize
     // cache hits (by keeping them out of the way of useful runtime data)

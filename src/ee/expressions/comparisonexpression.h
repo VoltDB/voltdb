@@ -129,7 +129,7 @@ public:
         }*/
 
         if (lnv.isNull() || rnv.isNull()) {
-            return NValue::getFalse();
+            return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
         }
 
         return compare.cmp(lnv, rnv);

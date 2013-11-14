@@ -1272,7 +1272,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 " select count(*), count(num1) from DEFAULT_NULL where num1 > 3;").getResults()[0];
         validateTableOfLongs(result, new long[][]{{0, 0}});
 
-
         // Test null column comparison with index
         result = client.callProcedure("@AdHoc",
                 " select count(*), count(num3) from DEFAULT_NULL where num3 > 3;").getResults()[0];
@@ -1286,6 +1285,9 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 " select count(*), count(num3) from DEFAULT_NULL where num3 <= 3;").getResults()[0];
         validateTableOfLongs(result, new long[][]{{0, 0}});
 
+        result = client.callProcedure("@Explain",
+                " select count(*) from DEFAULT_NULL where num3 < 3;").getResults()[0];
+        System.out.println(result);
 
         // Reverse scan, count(*)
         result = client.callProcedure("@AdHoc",

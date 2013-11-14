@@ -37,6 +37,7 @@ IndexCountPlanNode::~IndexCountPlanNode() {
     for (int ii = 0; ii < endkey_expressions.size(); ii++) {
         delete endkey_expressions[ii];
     }
+    delete count_null_expression;
     delete getOutputTable();
     setOutputTable(NULL);
 }
@@ -80,6 +81,10 @@ std::vector<AbstractExpression*>& IndexCountPlanNode::getSearchKeyExpressions() 
 }
 const std::vector<AbstractExpression*>& IndexCountPlanNode::getSearchKeyExpressions() const {
     return (this->searchkey_expressions);
+}
+
+AbstractExpression* IndexCountPlanNode::getCountNULLExpression() const {
+    return (this->count_null_expression);
 }
 
 std::string IndexCountPlanNode::debugInfo(const std::string &spacer) const {
@@ -136,6 +141,13 @@ void IndexCountPlanNode::loadFromJSONObject(PlannerDomValue obj) {
     for (int i = 0; i < searchKeyExprArray.arrayLen(); i++) {
         AbstractExpression *expr = AbstractExpression::buildExpressionTree(searchKeyExprArray.valueAtIndex(i));
         searchkey_expressions.push_back(expr);
+    }
+
+    if (obj.hasNonNullKey("COUNT_NULL_EXPRESSION")) {
+        PlannerDomValue exprValue = obj.valueForKey("COUNT_NULL_EXPRESSION");
+        count_null_expression = AbstractExpression::buildExpressionTree(exprValue);
+    } else {
+        count_null_expression = NULL;
     }
 }
 

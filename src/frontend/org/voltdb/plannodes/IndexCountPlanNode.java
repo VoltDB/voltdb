@@ -27,14 +27,17 @@ import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
@@ -48,6 +51,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         KEY_ITERATE,
         SEARCHKEY_EXPRESSIONS,
         ENDKEY_EXPRESSIONS,
+        COUNT_NULL_EXPRESSION,
         LOOKUP_TYPE,
         END_TYPE;
     }
@@ -81,6 +85,8 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
     private ArrayList<AbstractExpression> m_bindings;
 
+    private AbstractExpression m_countNULLKeyExpr;
+
     public IndexCountPlanNode() {
         super();
     }
@@ -112,14 +118,78 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
             m_endType = endType;
             m_endkeyExpressions.addAll(endKeys);
+
+            // Possible useful for underflow case to eliminate nulls
+            if (m_searchkeyExpressions.size() >= m_endkeyExpressions.size()) {
+                if (m_lookupType == IndexLookupType.GT || m_lookupType == IndexLookupType.GTE) {
+                    assert(m_searchkeyExpressions.size() > 0);
+                    setNextSearchKeyExpresson(m_searchkeyExpressions.size() - 1);
+                }
+            }
         } else {
             // for reverse scan, swap everything of searchkey and endkey
             // because we added the last < / <= to searchkey but not endExpr
+            assert(endType == IndexLookupType.EQ);
             m_lookupType = endType;     // must be EQ, but doesn't matter, since previous lookup type is not GT
             m_searchkeyExpressions.addAll(endKeys);
             m_endType = isp.m_lookupType;
             m_endkeyExpressions = isp.getSearchKeyExpressions();
+
+            if (m_searchkeyExpressions.size() < m_endkeyExpressions.size()) {
+                assert(m_endType == IndexLookupType.LT || m_endType == IndexLookupType.LTE);
+                assert( m_endkeyExpressions.size() - m_searchkeyExpressions.size() == 1);
+                setNextSearchKeyExpresson(m_searchkeyExpressions.size());
+            }
         }
+    }
+
+    private void setNextSearchKeyExpresson(int nextKeyIndex) {
+        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+
+        String exprsjson = m_catalogIndex.getExpressionsjson();
+        if (exprsjson.isEmpty()) {
+            List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(m_catalogIndex.getColumns(), "index");
+
+            for (int i = 0; i <= nextKeyIndex; i++) {
+                ColumnRef colRef = indexedColRefs.get(i);
+                Column col = colRef.getColumn();
+                TupleValueExpression tve = new TupleValueExpression(m_targetTableName, m_targetTableAlias,
+                        col.getTypeName(), col.getTypeName());
+
+                AbstractExpression expr;
+                if (i == nextKeyIndex) {
+                    expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, tve, null);
+
+                } else {
+                    expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
+                            tve, m_searchkeyExpressions.get(i));
+                }
+                exprs.add((AbstractExpression) expr.clone());
+            }
+        } else {
+            List<AbstractExpression> indexedExprs = null;
+            try {
+                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson);
+            } catch (JSONException e) {
+                e.printStackTrace();
+                assert(false);
+            }
+
+            for (int i = 0; i <= nextKeyIndex; i++) {
+                AbstractExpression idxExpr = indexedExprs.get(i);
+
+                AbstractExpression expr;
+                if (i == nextKeyIndex) {
+                    expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, idxExpr, null);
+
+                } else {
+                    expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
+                            idxExpr, m_searchkeyExpressions.get(i));
+                }
+                exprs.add((AbstractExpression) expr.clone());
+            }
+        }
+        m_countNULLKeyExpr = ExpressionUtil.combine(exprs);
     }
 
     // Create an IndexCountPlanNode that replaces the parent aggregate and chile indexscan
@@ -325,6 +395,10 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             stringer.value(ae);
         }
         stringer.endArray();
+
+        if (m_countNULLKeyExpr != null) {
+            stringer.key(Members.COUNT_NULL_EXPRESSION.name()).value(m_countNULLKeyExpr);
+        }
     }
 
     @Override
@@ -336,12 +410,13 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_endType = IndexLookupType.get( jobj.getString( Members.END_TYPE.name() ) );
         m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
         m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
-        JSONObject tempjobj = null;
         //load end_expression
         AbstractExpression.loadFromJSONArrayChild(m_endkeyExpressions, jobj,
                 Members.ENDKEY_EXPRESSIONS.name());
         AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
                 Members.SEARCHKEY_EXPRESSIONS.name());
+
+        m_countNULLKeyExpr = AbstractExpression.fromJSONChild(jobj, Members.COUNT_NULL_EXPRESSION.name());
     }
 
     @Override

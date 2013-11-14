@@ -21,6 +21,8 @@
 // We use these values for NULL to make it compact and fast
 // "-1" is a hack to shut up gcc warning
 
+#define BOOL_NULL (-127 - 1)
+
 // null DECIMAL is private. Use VoltDecimal.isNull()
 
 #define INT8_NULL (-127 - 1)
