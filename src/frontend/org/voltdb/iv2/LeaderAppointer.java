@@ -313,17 +313,22 @@ public class LeaderAppointer implements Promotable
     public void acceptPromotion() throws InterruptedException, ExecutionException
     {
         final SettableFuture<Object> blocker = SettableFuture.create();
-        m_es.submit(new Runnable()  {
-            @Override
-            public void run() {
-                try {
-                    acceptPromotionImpl(blocker);
-                } catch (Throwable t) {
-                    blocker.setException(t);
+        try {
+            m_es.submit(new Runnable()  {
+                @Override
+                public void run() {
+                    try {
+                        acceptPromotionImpl(blocker);
+                    } catch (Throwable t) {
+                        blocker.setException(t);
+                    }
                 }
-            }
-        });
-        blocker.get();
+            });
+            blocker.get();
+        } catch (RejectedExecutionException e) {
+            if (m_es.isShutdown()) return;
+            throw new RejectedExecutionException(e);
+        }
     }
 
     private void acceptPromotionImpl(final SettableFuture<Object> blocker) throws InterruptedException, ExecutionException, KeeperException {
