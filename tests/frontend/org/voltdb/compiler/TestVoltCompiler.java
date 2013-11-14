@@ -1869,7 +1869,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testUniqueIndexGiveException() {
-         String schema;
+        String schema;
 
         // (1) ****** Replicate tables
         // A unique index on the non-primary key for replicated table gets no error.
