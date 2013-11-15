@@ -29,7 +29,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.TreeMap;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.StatsSource;
@@ -59,7 +58,7 @@ public class BalancePartitionsStatistics extends StatsSource {
     long throughput = 0;
     long lastTransferTimeMS = 0;
 
-    AtomicReference<StatsPoint> statsPoint = new AtomicReference<>(new StatsPoint());
+    private volatile StatsPoint statsPoint = new StatsPoint();
 
     public BalancePartitionsStatistics()
     {
@@ -84,7 +83,7 @@ public class BalancePartitionsStatistics extends StatsSource {
         this.count = 0;
         this.rowCount = 0;
 
-        this.statsPoint.set(new StatsPoint((int)totalRangeSize));
+        this.statsPoint = new StatsPoint((int)totalRangeSize);
         this.bytesTransferredInLastSec.clear();
     }
 
@@ -163,7 +162,7 @@ public class BalancePartitionsStatistics extends StatsSource {
                 totalBalanceTime,
                 throughput);
 
-        statsPoint.set(sp);
+        statsPoint = sp;
     }
 
     public static interface Constants
@@ -194,7 +193,7 @@ public class BalancePartitionsStatistics extends StatsSource {
     @Override
     protected void updateStatsRow(Object rowKey, Object[] rowValues)
     {
-        StatsPoint point = statsPoint.get();
+        StatsPoint point = statsPoint;
 
         rowValues[columnNameToIndex.get(Constants.TOTAL_RANGES)] = point.getTotalRanges();
         rowValues[columnNameToIndex.get(Constants.PERCENTAGE_MOVED)] = point.getPercentageMoved();
