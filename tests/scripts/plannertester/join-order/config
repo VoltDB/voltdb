@@ -48,14 +48,14 @@ JOIN:P2,J1:select * from J1, P2 where A=B;
 JOIN:J1,J2:select * from J1, J2 where A=B;
 JOIN:J2,J1:select * from J1, J2 where A=B;
 # ENG-2648 validation - 2-way with aliases
-JOIN:P1,P2:select * from P1 X, P2 Y where A=B;
-JOIN:P2,P1:select * from P1 X, P2 Y where A=B;
-JOIN:P1,J2:select * from P1 X, J2 Y where A=B;
-JOIN:J2,P1:select * from P1 X, J2 Y where A=B;
-JOIN:J1,P2:select * from J1 X, P2 Y where A=B;
-JOIN:P2,J1:select * from J1 X, P2 Y where A=B;
-JOIN:J1,J2:select * from J1 X, J2 Y where A=B;
-JOIN:J2,J1:select * from J1 X, J2 Y where A=B;
+JOIN:X,Y:select * from P1 X, P2 Y where A=B;
+JOIN:Y,X:select * from P1 X, P2 Y where A=B;
+JOIN:X,Y:select * from P1 X, J2 Y where A=B;
+JOIN:Y,X:select * from P1 X, J2 Y where A=B;
+JOIN:X,Y:select * from J1 X, P2 Y where A=B;
+JOIN:Y,X:select * from J1 X, P2 Y where A=B;
+JOIN:X,Y:select * from J1 X, J2 Y where A=B;
+JOIN:Y,X:select * from J1 X, J2 Y where A=B;
 # ENG-2648 validation - 4-way with transitive equality 2 indexed 2 not
 JOIN:P1,J2,P3,J4:select * from P1, J2, P3, J4 where A=C and A=B and A=D;
 JOIN:P1,P3,J2,J4:select * from P1, J2, P3, J4 where A=C and A=B and A=D;
