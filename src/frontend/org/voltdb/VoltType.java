@@ -855,17 +855,17 @@ public enum VoltType {
     }
 
     // Integer[0] is the column size and Integer[1] is the radix
-    public static Integer[] getTypePrecisionAndRadix(VoltType type)
+    public Integer[] getTypePrecisionAndRadix()
     {
         Integer[] col_size_radix = {null, null};
-        switch(type)
+        switch(this)
         {
         case TINYINT:
         case SMALLINT:
         case INTEGER:
         case BIGINT:
         case TIMESTAMP:
-            col_size_radix[0] = (type.getLengthInBytesForFixedTypes() * 8) - 1;
+            col_size_radix[0] = (getLengthInBytesForFixedTypes() * 8) - 1;
             col_size_radix[1] = 2;
             break;
         case FLOAT:
