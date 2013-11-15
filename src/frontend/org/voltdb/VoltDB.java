@@ -512,8 +512,8 @@ public class VoltDB {
                         + "       voltdb3 recover [host <hostname>] [deployment <deployment.xml>]\n"
                         + "       voltdb3 rejoin host <hostname>\n";
             }
-            message += "       voltdb collect [<option> ...] <path-to-voltdbroot> (run voltdb collect -h for more details)\n";
-            message += "       voltdb compile [<option> ...] [<ddl-file> ...]  (run voltdb compile -h for more details)\n";
+            message += "       voltdb3 collect [<option> ...] <path-to-voltdbroot> (run voltdb collect -h for more details)\n";
+            message += "       voltdb3 compile [<option> ...] [<ddl-file> ...]  (run voltdb compile -h for more details)\n";
             os.print(message);
             // Log it to log4j as well, which will capture the output to a file for (hopefully never) cases where VEM has issues (it generates command lines).
             hostLog.info(message);
