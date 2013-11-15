@@ -63,7 +63,7 @@ class IndexScanPlanNode : public AbstractScanPlanNode {
             , m_initial_expression(NULL)
             , m_lookup_type(INDEX_LOOKUP_TYPE_EQ)
             , m_sort_direction(SORT_DIRECTION_TYPE_INVALID)
-            , m_count_null_expression(NULL)
+            , m_skip_null_predicate(NULL)
         {}
 
         IndexScanPlanNode() : AbstractScanPlanNode()
@@ -71,7 +71,7 @@ class IndexScanPlanNode : public AbstractScanPlanNode {
             , m_initial_expression(NULL)
             , m_lookup_type(INDEX_LOOKUP_TYPE_EQ)
             , m_sort_direction(SORT_DIRECTION_TYPE_INVALID)
-            , m_count_null_expression(NULL)
+            , m_skip_null_predicate(NULL)
         {}
 
         ~IndexScanPlanNode();
@@ -90,7 +90,7 @@ class IndexScanPlanNode : public AbstractScanPlanNode {
 
         AbstractExpression* getInitialExpression() const { return m_initial_expression; }
 
-        AbstractExpression* getCountNULLExpression() const { return m_count_null_expression; }
+        AbstractExpression* getSkipNullPredicate() const { return m_skip_null_predicate; }
 
         std::string debugInfo(const std::string &spacer) const;
 
@@ -116,8 +116,8 @@ class IndexScanPlanNode : public AbstractScanPlanNode {
         // Sorting Direction
         SortDirectionType m_sort_direction;
 
-        // null row expression for underflow edge case
-        AbstractExpression* m_count_null_expression;
+        // null row predicate for underflow edge case
+        AbstractExpression* m_skip_null_predicate;
 };
 
 }

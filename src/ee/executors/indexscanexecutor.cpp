@@ -321,7 +321,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     //
     // COUNT NULL EXPRESSION
     //
-    AbstractExpression* countNULLExpr = m_node->getCountNULLExpression();
+    AbstractExpression* countNULLExpr = m_node->getSkipNullPredicate();
     // For reverse scan edge case NULL values and forward scan underflow case.
     if (countNULLExpr != NULL) {
         countNULLExpr->substitute(params);
@@ -353,11 +353,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
             m_index->moveToGreaterThanKey(&m_searchKey);
-
-            if (searchKeyUnderflow) {
-                assert(countNULLExpr);
-                skipNulls(countNULLExpr);
-            }
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
             m_index->moveToKeyOrGreater(&m_searchKey);
@@ -390,12 +385,10 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     } else {
         bool toStartActually = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
         m_index->moveToEnd(toStartActually);
+    }
 
-        if (toStartActually) {
-            // forward scan may have NULL row problems.
-            assert(countNULLExpr);
-            skipNulls(countNULLExpr);
-        }
+    if (!searchKeyUnderflow) {
+        countNULLExpr = NULL;
     }
 
     int tuple_ctr = 0;
@@ -417,6 +410,17 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", tuple.debug("tablename").c_str());
 
         m_engine->noteTuplesProcessedForProgressMonitoring(1);
+        //
+        // First check to eliminate the null index rows for UNDERFLOW case only
+        //
+        if (countNULLExpr != NULL) {
+            if (countNULLExpr->eval(&tuple, NULL).isTrue()) {
+                VOLT_DEBUG("Index scan: find out null rows or columns.");
+                continue;
+            } else {
+                countNULLExpr = NULL;
+            }
+        }
         //
         // First check whether the end_expression is now false
         //
@@ -471,22 +475,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
 
     VOLT_DEBUG ("Index Scanned :\n %s", m_outputTable->debug().c_str());
     return true;
-}
-
-void IndexScanExecutor::skipNulls(AbstractExpression * countNULLExpr) {
-    if (countNULLExpr == NULL) {
-        return;
-    }
-    long numNULLs = 0;
-    TableTuple tuple;
-    while ( ! (tuple = m_index->nextValue()).isNullTuple()) {
-        if ( ! countNULLExpr->eval(&tuple, NULL).isTrue()) {
-            m_index->moveToPriorEntry();
-            break;
-        }
-        numNULLs++;
-    }
-    VOLT_DEBUG("Index scan[]: find out %ld null rows or columns.", numNULLs);
 }
 
 IndexScanExecutor::~IndexScanExecutor() {

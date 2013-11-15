@@ -63,7 +63,7 @@ IndexScanPlanNode::~IndexScanPlanNode() {
     }
     delete m_end_expression;
     delete m_initial_expression;
-    delete m_count_null_expression;
+    delete m_skip_null_predicate;
     delete getOutputTable();
     setOutputTable(NULL);
 }
@@ -88,8 +88,8 @@ std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const {
     }
 
     buffer << spacer << "Skip Null Expression: ";
-    if (m_count_null_expression != NULL) {
-        buffer << "\n" << m_count_null_expression->debug(spacer);
+    if (m_skip_null_predicate != NULL) {
+        buffer << "\n" << m_skip_null_predicate->debug(spacer);
     } else {
         buffer << "<NULL>\n";
     }
@@ -124,14 +124,9 @@ void IndexScanPlanNode::loadFromJSONObject(PlannerDomValue obj) {
         m_initial_expression = AbstractExpression::buildExpressionTree(exprValue);
     }
 
-    if (obj.hasNonNullKey("COUNT_NULL_EXPRESSION")) {
-        PlannerDomValue exprValue = obj.valueForKey("COUNT_NULL_EXPRESSION");
-        m_count_null_expression = AbstractExpression::buildExpressionTree(exprValue);
-    }
-
-    if (obj.hasNonNullKey("COUNT_NULL_EXPRESSION")) {
-        PlannerDomValue exprValue = obj.valueForKey("COUNT_NULL_EXPRESSION");
-        m_count_null_expression = AbstractExpression::buildExpressionTree(exprValue);
+    if (obj.hasNonNullKey("SKIP_NULL_PREDICATE")) {
+        PlannerDomValue exprValue = obj.valueForKey("SKIP_NULL_PREDICATE");
+        m_skip_null_predicate = AbstractExpression::buildExpressionTree(exprValue);
     }
 
     PlannerDomValue searchKeyExprArray = obj.valueForKey("SEARCHKEY_EXPRESSIONS");

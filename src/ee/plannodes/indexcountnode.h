@@ -35,13 +35,13 @@ class IndexCountPlanNode : public AbstractScanPlanNode {
         IndexCountPlanNode(CatalogId id) : AbstractScanPlanNode(id)
         , m_lookup_type(INDEX_LOOKUP_TYPE_EQ)
         , m_end_type(INDEX_LOOKUP_TYPE_EQ)
-        , m_count_null_expression(NULL)
+        , m_skip_null_predicate(NULL)
         {}
 
         IndexCountPlanNode() : AbstractScanPlanNode()
         , m_lookup_type(INDEX_LOOKUP_TYPE_EQ)
         , m_end_type(INDEX_LOOKUP_TYPE_EQ)
-        , m_count_null_expression(NULL)
+        , m_skip_null_predicate(NULL)
         {}
 
         ~IndexCountPlanNode();
@@ -59,8 +59,8 @@ class IndexCountPlanNode : public AbstractScanPlanNode {
         const std::vector<AbstractExpression*>& getSearchKeyExpressions() const
         { return m_searchkey_expressions; }
 
-        AbstractExpression* getCountNullExpression() const
-        { return m_count_null_expression; }
+        AbstractExpression* getSkipNullPredicate() const
+        { return m_skip_null_predicate; }
 
         std::string debugInfo(const std::string &spacer) const;
 
@@ -82,8 +82,8 @@ class IndexCountPlanNode : public AbstractScanPlanNode {
         // Index Lookup End Type
         IndexLookupType m_end_type;
 
-        // count null row expression for edge cases: reverse scan or underflow case
-        AbstractExpression* m_count_null_expression;
+        // count null row predicate for edge cases: reverse scan or underflow case
+        AbstractExpression* m_skip_null_predicate;
 };
 
 }

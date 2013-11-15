@@ -37,7 +37,7 @@ IndexCountPlanNode::~IndexCountPlanNode() {
     for (int ii = 0; ii < m_endkey_expressions.size(); ii++) {
         delete m_endkey_expressions[ii];
     }
-    delete m_count_null_expression;
+    delete m_skip_null_predicate;
     delete getOutputTable();
     setOutputTable(NULL);
 }
@@ -94,9 +94,9 @@ void IndexCountPlanNode::loadFromJSONObject(PlannerDomValue obj) {
         m_searchkey_expressions.push_back(expr);
     }
 
-    if (obj.hasNonNullKey("COUNT_NULL_EXPRESSION")) {
-        PlannerDomValue exprValue = obj.valueForKey("COUNT_NULL_EXPRESSION");
-        m_count_null_expression = AbstractExpression::buildExpressionTree(exprValue);
+    if (obj.hasNonNullKey("SKIP_NULL_PREDICATE")) {
+        PlannerDomValue exprValue = obj.valueForKey("SKIP_NULL_PREDICATE");
+        m_skip_null_predicate = AbstractExpression::buildExpressionTree(exprValue);
     }
 }
 

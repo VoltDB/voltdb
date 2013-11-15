@@ -267,7 +267,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     //
     // COUNT NULL EXPRESSION
     //
-    AbstractExpression* countNULLExpr = m_node->getCountNullExpression();
+    AbstractExpression* countNULLExpr = m_node->getSkipNullPredicate();
     // For reverse scan edge case NULL values and forward scan underflow case.
     if (countNULLExpr != NULL) {
         countNULLExpr->substitute(params);

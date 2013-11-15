@@ -51,7 +51,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         TARGET_INDEX_NAME,
         SEARCHKEY_EXPRESSIONS,
         ENDKEY_EXPRESSIONS,
-        COUNT_NULL_EXPRESSION,
+        SKIP_NULL_PREDICATE,
         LOOKUP_TYPE,
         END_TYPE;
     }
@@ -82,7 +82,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
     private ArrayList<AbstractExpression> m_bindings;
 
-    private AbstractExpression m_countNULLKeyExpr;
+    private AbstractExpression m_skip_null_predicate;
 
     public IndexCountPlanNode() {
         super();
@@ -116,14 +116,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             m_endType = endType;
             m_endkeyExpressions.addAll(endKeys);
 
-            // Possible useful for underflow case to eliminate nulls
-            if (m_searchkeyExpressions.size() >= m_endkeyExpressions.size()) {
-                if (m_lookupType == IndexLookupType.GT || m_lookupType == IndexLookupType.GTE) {
-                    assert(m_searchkeyExpressions.size() > 0);
-                    setNullSearchKeyExpression(m_searchkeyExpressions.size() - 1);
-
-                }
-            }
+            setSkipNullPredicate(false);
         } else {
             // for reverse scan, swap everything of searchkey and endkey
             // because we added the last < / <= to searchkey but not endExpr
@@ -133,16 +126,33 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             m_endType = isp.m_lookupType;
             m_endkeyExpressions = isp.getSearchKeyExpressions();
 
-            if (m_searchkeyExpressions.size() < m_endkeyExpressions.size()) {
-                assert(m_endType == IndexLookupType.LT || m_endType == IndexLookupType.LTE);
-                assert( m_endkeyExpressions.size() - m_searchkeyExpressions.size() == 1);
-
-                setNullSearchKeyExpression(m_searchkeyExpressions.size());
-            }
+            setSkipNullPredicate(true);
         }
     }
 
-    private void setNullSearchKeyExpression(int numOfKeysToSetup) {
+    private void setSkipNullPredicate(boolean isReverseScan) {
+
+        int nextKeyIndex = -1;
+
+        if (isReverseScan) {
+            if (m_searchkeyExpressions.size() < m_endkeyExpressions.size()) {
+                assert(m_endType == IndexLookupType.LT || m_endType == IndexLookupType.LTE);
+                assert( m_endkeyExpressions.size() - m_searchkeyExpressions.size() == 1);
+                nextKeyIndex = m_searchkeyExpressions.size();
+            }
+        } else {
+            // useful for underflow case to eliminate nulls
+            if (m_searchkeyExpressions.size() >= m_endkeyExpressions.size()) {
+                if (m_lookupType == IndexLookupType.GT || m_lookupType == IndexLookupType.GTE) {
+                    assert(m_searchkeyExpressions.size() > 0);
+                    nextKeyIndex = m_searchkeyExpressions.size() - 1;
+                }
+            }
+        }
+        if (nextKeyIndex < 0) {
+            return ;
+        }
+
         List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
 
         String exprsjson = m_catalogIndex.getExpressionsjson();
@@ -151,24 +161,15 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             indexedExprs = new ArrayList<AbstractExpression>();
 
             List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(m_catalogIndex.getColumns(), "index");
-            for (int i = 0; i <= numOfKeysToSetup; i++) {
+            for (int i = 0; i <= nextKeyIndex; i++) {
                 ColumnRef colRef = indexedColRefs.get(i);
                 Column col = colRef.getColumn();
                 TupleValueExpression tve = new TupleValueExpression(m_targetTableName, m_targetTableAlias,
-                        col.getTypeName(), col.getTypeName(), col.getIndex());
+                        col.getTypeName(), col.getTypeName());
                 tve.setValueType(VoltType.get((byte)col.getType()));
                 tve.setValueSize(col.getSize());
                 tve.resolveForTable((Table)m_catalogIndex.getParent());
-
-                AbstractExpression expr;
-                if (i == numOfKeysToSetup) {
-                    expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, tve, null);
-                } else {
-                    expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
-                            tve, m_searchkeyExpressions.get(i));
-                }
-                ExpressionUtil.finalizeValueTypes(expr);
-                exprs.add(expr);
+                indexedExprs.add(tve);
             }
         } else {
             try {
@@ -177,23 +178,20 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
                 e.printStackTrace();
                 assert(false);
             }
-            for (int i = 0; i <= numOfKeysToSetup; i++) {
-                AbstractExpression idxExpr = indexedExprs.get(i);
 
-                AbstractExpression expr;
-                if (i == numOfKeysToSetup) {
-                    expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, idxExpr, null);
-
-                } else {
-                    expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
-                            idxExpr, m_searchkeyExpressions.get(i));
-                }
-                ExpressionUtil.finalizeValueTypes(expr);
-                exprs.add(expr);
-            }
         }
-        m_countNULLKeyExpr = ExpressionUtil.combine(exprs);
-        m_countNULLKeyExpr.finalizeValueTypes();
+        AbstractExpression expr;
+        for (int i = 0; i < nextKeyIndex; i++) {
+            AbstractExpression idxExpr = indexedExprs.get(i);
+            expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
+                    idxExpr, (AbstractExpression) m_searchkeyExpressions.get(i).clone());
+            exprs.add(expr);
+        }
+        AbstractExpression nullExpr = indexedExprs.get(nextKeyIndex);
+        expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
+        exprs.add(expr);
+        m_skip_null_predicate = ExpressionUtil.combine(exprs);
+        m_skip_null_predicate.finalizeValueTypes();
     }
 
     // Create an IndexCountPlanNode that replaces the parent aggregate and chile indexscan
@@ -399,8 +397,8 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         }
         stringer.endArray();
 
-        if (m_countNULLKeyExpr != null) {
-            stringer.key(Members.COUNT_NULL_EXPRESSION.name()).value(m_countNULLKeyExpr);
+        if (m_skip_null_predicate != null) {
+            stringer.key(Members.SKIP_NULL_PREDICATE.name()).value(m_skip_null_predicate);
         }
     }
 
@@ -418,7 +416,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
                 Members.SEARCHKEY_EXPRESSIONS.name());
 
-        m_countNULLKeyExpr = AbstractExpression.fromJSONChild(jobj, Members.COUNT_NULL_EXPRESSION.name());
+        m_skip_null_predicate = AbstractExpression.fromJSONChild(jobj, Members.SKIP_NULL_PREDICATE.name());
     }
 
     @Override
@@ -478,8 +476,8 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             String end = explainKeys(asIndexed, m_endkeyExpressions, m_targetTableName, m_endType);
             usageInfo += "\n" + indent + " count matches to " + end;
         }
-        if (m_countNULLKeyExpr != null) {
-            String predicate = m_countNULLKeyExpr.explain(m_targetTableName);
+        if (m_skip_null_predicate != null) {
+            String predicate = m_skip_null_predicate.explain(m_targetTableName);
             usageInfo += "\n" + indent + " discounting rows where " + predicate;
         }
         // Describe the table name and either a user-provided name of the index or

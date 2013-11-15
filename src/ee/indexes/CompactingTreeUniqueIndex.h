@@ -177,11 +177,6 @@ class CompactingTreeUniqueIndex : public TableIndex
         m_keyIter.movePrev();
     }
 
-    void moveToPriorEntry()
-    {
-        m_keyIter.movePrev();
-    }
-
     void moveToEnd(bool begin)
     {
         ++m_lookups;

@@ -54,7 +54,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         END_EXPRESSION,
         SEARCHKEY_EXPRESSIONS,
         INITIAL_EXPRESSION,
-        COUNT_NULL_EXPRESSION,
+        SKIP_NULL_PREDICATE,
         KEY_ITERATE,
         LOOKUP_TYPE,
         DETERMINISM_ONLY,
@@ -83,7 +83,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // for reverse scan LTE only. used to do forward scan to find the correct starting point
     protected AbstractExpression m_initialExpression;
 
-    private AbstractExpression m_skipNullExpr;
+    private AbstractExpression m_skip_null_predicate;
 
     // ???
     protected Boolean m_keyIterate = false;
@@ -123,14 +123,12 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         if (apn != null) {
             m_outputSchema = apn.m_outputSchema.clone();
         }
-        setNullSearchKeyExpression();
     }
 
-    // In future, use static function and replace that function in IndexCountPlanNode.java also
-    public void setNullSearchKeyExpression() {
+    public void setSkipNullPredicate() {
         int nextKeyIndex = m_searchkeyExpressions.size() - 1;
-        if (nextKeyIndex < 0) {
-            m_skipNullExpr = null;
+        if (nextKeyIndex < 0 || isReverseScan()) {
+            m_skip_null_predicate = null;
             return;
         }
         List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
@@ -170,8 +168,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         AbstractExpression nullExpr = indexedExprs.get(nextKeyIndex);
         expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
         exprs.add(expr);
-        m_skipNullExpr = ExpressionUtil.combine(exprs);
-        m_skipNullExpr.finalizeValueTypes();
+        m_skip_null_predicate = ExpressionUtil.combine(exprs);
+        m_skip_null_predicate.finalizeValueTypes();
     }
 
     @Override
@@ -554,8 +552,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             stringer.key(Members.INITIAL_EXPRESSION.name()).value(m_initialExpression);
         }
 
-        if (m_skipNullExpr != null) {
-            stringer.key(Members.COUNT_NULL_EXPRESSION.name()).value(m_skipNullExpr);
+        if (m_skip_null_predicate != null) {
+            stringer.key(Members.SKIP_NULL_PREDICATE.name()).value(m_skip_null_predicate);
         }
 
         stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array();
@@ -583,7 +581,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         //load searchkey_expressions
         AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
                 Members.SEARCHKEY_EXPRESSIONS.name());
-        m_skipNullExpr = AbstractExpression.fromJSONChild(jobj, Members.COUNT_NULL_EXPRESSION.name());
+        m_skip_null_predicate = AbstractExpression.fromJSONChild(jobj, Members.SKIP_NULL_PREDICATE.name());
     }
 
     @Override
