@@ -47,7 +47,7 @@ SELECT COUNT(*) FROM @fromtables
 
 -- test where expressions
 --- test comparison operators (<, <=, =, >=, >)
-SELECT * FROM @fromtables WHERE _variable[@comparabletype] _cmp @comparableconstant
+SELECT * FROM @fromtables WHERE _maybe _variable[@comparabletype] _cmp @comparableconstant
 --- test arithmetic operators (+, -, *, /) with comparison ops
 SELECT * FROM @fromtables WHERE (_variable[@comparabletype] @aftermath) _cmp @comparableconstant
 --- test logic operators (AND) with comparison ops

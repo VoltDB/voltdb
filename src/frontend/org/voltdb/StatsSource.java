@@ -32,7 +32,9 @@ public abstract class StatsSource {
      * Statistics from ee are already formatted in VoltTable
      */
     private final boolean m_isEEStats;
-    private VoltTable m_table = null;
+
+    //Volatile for safe publication of the table objects
+    private volatile VoltTable m_table = null;
 
     /**
      * Column schema for statistical result rows
@@ -143,7 +145,8 @@ public abstract class StatsSource {
      *         getStatsRows()
      */
     public VoltTable getStatsTable() {
-        return m_table;
+        //Create a view for thread safety even though stats are retrieved single threaded right now
+        return new VoltTable(m_table.getBuffer(), true);
     }
 
     /**
