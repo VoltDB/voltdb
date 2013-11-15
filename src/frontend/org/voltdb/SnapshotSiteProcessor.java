@@ -37,7 +37,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google.common.collect.Maps;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -57,6 +56,7 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.MiscUtils;
 
 import com.google.common.collect.ListMultimap;
+import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
 
@@ -584,7 +584,8 @@ public class SnapshotSiteProcessor {
             }
 
             // Stream more and add a listener to handle any failures
-            Pair<ListenableFuture, Boolean> streamResult = m_streamers.get(tableId).streamMore(context, outputBuffers);
+            Pair<ListenableFuture, Boolean> streamResult =
+                    m_streamers.get(tableId).streamMore(context, outputBuffers, null);
             if (streamResult.getFirst() != null) {
                 final ListenableFuture writeFutures = streamResult.getFirst();
                 writeFutures.addListener(new Runnable() {
