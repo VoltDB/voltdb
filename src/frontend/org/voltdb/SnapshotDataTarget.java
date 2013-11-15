@@ -70,7 +70,8 @@ public interface SnapshotDataTarget {
     /**
      * Get the row count if any, of the content wrapped in the given {@link BBContainer}
      * @param tupleData
-     * @return the numbers of tuple data rows contained within a container
+     * @return the numbers of tuple data rows contained within a container or
+     *   ROW_COUNT_UNSUPPORTED if the implementor does not support it
      */
     public int getInContainerRowCount(BBContainer tupleData);
 }

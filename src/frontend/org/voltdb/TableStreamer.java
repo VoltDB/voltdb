@@ -127,8 +127,7 @@ public class TableStreamer {
     /**
      * Get the number of rows contained of rows contained within the given list of {@link BBContainer}
      * @param outputBuffers a list of tuple data BBContainers
-     * @return -1 if output buffer count does not match the configured table task count, or the
-     *         the number of rows contained within the given list of {@link BBContainer}
+     * @return the number of rows contained within the given list of {@link BBContainer}
      */
     private int getTupleDataRowCount(List<DBBPool.BBContainer> outputBuffers) {
         if (outputBuffers == null || outputBuffers.size() != m_tableTasks.size()) return 0;
