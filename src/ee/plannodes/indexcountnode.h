@@ -82,7 +82,7 @@ class IndexCountPlanNode : public AbstractScanPlanNode {
         // Index Lookup End Type
         IndexLookupType m_end_type;
 
-        // End criteria for null value counting for reverse scan and underflow edge case
+        // count null row expression for edge cases: reverse scan or underflow case
         AbstractExpression* m_count_null_expression;
 };
 

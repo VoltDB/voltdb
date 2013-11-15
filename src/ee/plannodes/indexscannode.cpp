@@ -58,86 +58,38 @@
 namespace voltdb {
 
 IndexScanPlanNode::~IndexScanPlanNode() {
-    for (int ii = 0; ii < searchkey_expressions.size(); ii++) {
-        delete searchkey_expressions[ii];
+    for (int ii = 0; ii < m_searchkey_expressions.size(); ii++) {
+        delete m_searchkey_expressions[ii];
     }
-    delete end_expression;
-    delete initial_expression;
+    delete m_end_expression;
+    delete m_initial_expression;
+    delete m_count_null_expression;
     delete getOutputTable();
     setOutputTable(NULL);
 }
 
-void IndexScanPlanNode::setKeyIterate(bool val) {
-    this->key_iterate = val;
-}
-bool IndexScanPlanNode::getKeyIterate() const {
-    return (this->key_iterate);
-}
-
-void IndexScanPlanNode::setLookupType(IndexLookupType lookup_type) {
-    this->lookup_type = lookup_type;
-}
-IndexLookupType IndexScanPlanNode::getLookupType() const {
-    return lookup_type;
-}
-
-void IndexScanPlanNode::setSortDirection(SortDirectionType val) {
-    this->sort_direction = val;
-}
-SortDirectionType IndexScanPlanNode::getSortDirection() const {
-    return sort_direction;
-}
-
-void IndexScanPlanNode::setTargetIndexName(std::string name) {
-    this->target_index_name = name;
-}
-std::string IndexScanPlanNode::getTargetIndexName() const {
-    return this->target_index_name;
-}
-
-void IndexScanPlanNode::setEndExpression(AbstractExpression* val) {
-    // only expect this to be initialized once
-    if (end_expression && end_expression != val)
-    {
-        throwFatalException("end_expression initialized twice in IndexScanPlanNode?");
-        delete end_expression;
-    }
-    this->end_expression = val;
-}
-AbstractExpression* IndexScanPlanNode::getEndExpression() const {
-    return (this->end_expression);
-}
-
-void IndexScanPlanNode::setSearchKeyExpressions(std::vector<AbstractExpression*> &exps) {
-    this->searchkey_expressions = exps;
-}
-std::vector<AbstractExpression*>& IndexScanPlanNode::getSearchKeyExpressions() {
-    return (this->searchkey_expressions);
-}
-const std::vector<AbstractExpression*>& IndexScanPlanNode::getSearchKeyExpressions() const {
-    return (this->searchkey_expressions);
-}
-
-AbstractExpression* IndexScanPlanNode::getInitialExpression() const {
-    return (this->initial_expression);
-}
-
 std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;
-    buffer << this->AbstractScanPlanNode::debugInfo(spacer);
-    buffer << spacer << "TargetIndexName[" << this->target_index_name << "]\n";
-    buffer << spacer << "EnableKeyIteration[" << std::boolalpha << this->key_iterate << "]\n";
-    buffer << spacer << "IndexLookupType[" << this->lookup_type << "]\n";
-    buffer << spacer << "SortDirection[" << this->sort_direction << "]\n";
+    buffer << AbstractScanPlanNode::debugInfo(spacer);
+    buffer << spacer << "TargetIndexName[" << m_target_index_name << "]\n";
+    buffer << spacer << "IndexLookupType[" << m_lookup_type << "]\n";
+    buffer << spacer << "SortDirection[" << m_sort_direction << "]\n";
 
     buffer << spacer << "SearchKey Expressions:\n";
-    for (int ctr = 0, cnt = (int)this->searchkey_expressions.size(); ctr < cnt; ctr++) {
-        buffer << this->searchkey_expressions[ctr]->debug(spacer);
+    for (int ctr = 0, cnt = (int)m_searchkey_expressions.size(); ctr < cnt; ctr++) {
+        buffer << m_searchkey_expressions[ctr]->debug(spacer);
     }
 
     buffer << spacer << "End Expression: ";
-    if (this->end_expression != NULL) {
-        buffer << "\n" << this->end_expression->debug(spacer);
+    if (m_end_expression != NULL) {
+        buffer << "\n" << m_end_expression->debug(spacer);
+    } else {
+        buffer << "<NULL>\n";
+    }
+
+    buffer << spacer << "Skip Null Expression: ";
+    if (m_count_null_expression != NULL) {
+        buffer << "\n" << m_count_null_expression->debug(spacer);
     } else {
         buffer << "<NULL>\n";
     }
@@ -154,35 +106,33 @@ std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const {
 void IndexScanPlanNode::loadFromJSONObject(PlannerDomValue obj) {
     AbstractScanPlanNode::loadFromJSONObject(obj);
 
-    key_iterate = obj.valueForKey("KEY_ITERATE").asBool();
-
     std::string lookupTypeString = obj.valueForKey("LOOKUP_TYPE").asStr();
-    lookup_type = stringToIndexLookup(lookupTypeString);
+    m_lookup_type = stringToIndexLookup(lookupTypeString);
 
     std::string sortDirectionString = obj.valueForKey("SORT_DIRECTION").asStr();
-    sort_direction = stringToSortDirection(sortDirectionString);
+    m_sort_direction = stringToSortDirection(sortDirectionString);
 
-    target_index_name = obj.valueForKey("TARGET_INDEX_NAME").asStr();
+    m_target_index_name = obj.valueForKey("TARGET_INDEX_NAME").asStr();
 
     if (obj.hasNonNullKey("END_EXPRESSION")) {
         PlannerDomValue exprValue = obj.valueForKey("END_EXPRESSION");
-        end_expression = AbstractExpression::buildExpressionTree(exprValue);
-    }
-    else {
-        end_expression = NULL;
+        m_end_expression = AbstractExpression::buildExpressionTree(exprValue);
     }
 
     if (obj.hasNonNullKey("INITIAL_EXPRESSION")) {
         PlannerDomValue exprValue = obj.valueForKey("INITIAL_EXPRESSION");
-        initial_expression = AbstractExpression::buildExpressionTree(exprValue);
-    } else {
-        initial_expression = NULL;
+        m_initial_expression = AbstractExpression::buildExpressionTree(exprValue);
+    }
+
+    if (obj.hasNonNullKey("COUNT_NULL_EXPRESSION")) {
+        PlannerDomValue exprValue = obj.valueForKey("COUNT_NULL_EXPRESSION");
+        m_count_null_expression = AbstractExpression::buildExpressionTree(exprValue);
     }
 
     PlannerDomValue searchKeyExprArray = obj.valueForKey("SEARCHKEY_EXPRESSIONS");
     for (int i = 0; i < searchKeyExprArray.arrayLen(); i++) {
         AbstractExpression *expr = AbstractExpression::buildExpressionTree(searchKeyExprArray.valueAtIndex(i));
-        searchkey_expressions.push_back(expr);
+        m_searchkey_expressions.push_back(expr);
     }
 }
 

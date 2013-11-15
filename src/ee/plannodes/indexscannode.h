@@ -58,43 +58,39 @@ class AbstractExpression;
  */
 class IndexScanPlanNode : public AbstractScanPlanNode {
     public:
-        IndexScanPlanNode(CatalogId id) : AbstractScanPlanNode(id) {
-            this->key_iterate = false;
-            this->lookup_type = INDEX_LOOKUP_TYPE_EQ;
-            this->sort_direction = SORT_DIRECTION_TYPE_INVALID;
-            this->end_expression = NULL;
-            this->initial_expression = NULL;
-        }
-        IndexScanPlanNode() : AbstractScanPlanNode() {
-            this->key_iterate = false;
-            this->lookup_type = INDEX_LOOKUP_TYPE_EQ;
-            this->sort_direction = SORT_DIRECTION_TYPE_INVALID;
-            this->end_expression = NULL;
-            this->initial_expression = NULL;
-        }
+        IndexScanPlanNode(CatalogId id) : AbstractScanPlanNode(id)
+            , m_end_expression(NULL)
+            , m_initial_expression(NULL)
+            , m_lookup_type(INDEX_LOOKUP_TYPE_EQ)
+            , m_sort_direction(SORT_DIRECTION_TYPE_INVALID)
+            , m_count_null_expression(NULL)
+        {}
+
+        IndexScanPlanNode() : AbstractScanPlanNode()
+            , m_end_expression(NULL)
+            , m_initial_expression(NULL)
+            , m_lookup_type(INDEX_LOOKUP_TYPE_EQ)
+            , m_sort_direction(SORT_DIRECTION_TYPE_INVALID)
+            , m_count_null_expression(NULL)
+        {}
+
         ~IndexScanPlanNode();
         virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_INDEXSCAN); }
 
-        void setKeyIterate(bool val);
-        bool getKeyIterate() const;
+        IndexLookupType getLookupType() const { return m_lookup_type; }
 
-        void setLookupType(IndexLookupType val);
-        IndexLookupType getLookupType() const;
+        SortDirectionType getSortDirection() const { return m_sort_direction; }
 
-        void setSortDirection(SortDirectionType val);
-        SortDirectionType getSortDirection() const;
+        std::string getTargetIndexName() const { return m_target_index_name; }
 
-        void setTargetIndexName(std::string name);
-        std::string getTargetIndexName() const;
+        AbstractExpression* getEndExpression() const { return m_end_expression; }
 
-        void setEndExpression(AbstractExpression* val);
-        AbstractExpression* getEndExpression() const;
+        const std::vector<AbstractExpression*>& getSearchKeyExpressions() const
+        { return m_searchkey_expressions; }
 
-        void setSearchKeyExpressions(std::vector<AbstractExpression*> &exps);
-        std::vector<AbstractExpression*>& getSearchKeyExpressions();
-        const std::vector<AbstractExpression*>& getSearchKeyExpressions() const;
+        AbstractExpression* getInitialExpression() const { return m_initial_expression; }
 
-        AbstractExpression* getInitialExpression() const;
+        AbstractExpression* getCountNULLExpression() const { return m_count_null_expression; }
 
         std::string debugInfo(const std::string &spacer) const;
 
@@ -103,30 +99,25 @@ class IndexScanPlanNode : public AbstractScanPlanNode {
         //
         // This is the id of the index to reference during execution
         //
-        std::string target_index_name;
+        std::string m_target_index_name;
 
-        //
         // TODO: Document
-        AbstractExpression* end_expression;
-        //
+        AbstractExpression* m_end_expression;
+
         // TODO: Document
-        //
-        std::vector<AbstractExpression*> searchkey_expressions;
+        std::vector<AbstractExpression*> m_searchkey_expressions;
 
-        AbstractExpression* initial_expression;
+        // TODO: Document
+        AbstractExpression* m_initial_expression;
 
-        //
-        // Enable Index Key Iteration
-        //
-        bool key_iterate;
-        //
         // Index Lookup Type
-        //
-        IndexLookupType lookup_type;
-        //
+        IndexLookupType m_lookup_type;
+
         // Sorting Direction
-        //
-        SortDirectionType sort_direction;
+        SortDirectionType m_sort_direction;
+
+        // null row expression for underflow edge case
+        AbstractExpression* m_count_null_expression;
 };
 
 }

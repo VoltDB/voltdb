@@ -52,19 +52,16 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     if (m_numOfSearchkeys != 0) {
         m_searchKeyArrayPtr =
             boost::shared_array<AbstractExpression*>
-        (new AbstractExpression*[m_numOfSearchkeys]);
+            (new AbstractExpression*[m_numOfSearchkeys]);
         m_searchKeyArray = m_searchKeyArrayPtr.get();
 
-        for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++)
-        {
-            if (m_node->getSearchKeyExpressions()[ctr] == NULL)
-            {
+        for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++) {
+            if (m_node->getSearchKeyExpressions()[ctr] == NULL) {
                 VOLT_ERROR("The search key expression at position '%d' is NULL for"
                     " PlanNode '%s'", ctr, m_node->debug().c_str());
                 return false;
             }
-            m_searchKeyArrayPtr[ctr] =
-                m_node->getSearchKeyExpressions()[ctr];
+            m_searchKeyArrayPtr[ctr] = m_node->getSearchKeyExpressions()[ctr];
         }
     }
 
@@ -80,8 +77,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
                     " PlanNode '%s'", ctr, m_node->debug().c_str());
                 return false;
             }
-            m_endKeyArrayPtr[ctr] =
-                m_node->getEndKeyExpressions()[ctr];
+            m_endKeyArrayPtr[ctr] = m_node->getEndKeyExpressions()[ctr];
         }
     }
 
@@ -128,10 +124,6 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
         m_endType = m_node->getEndType();
     }
 
-    if (m_node->getCountNullExpression() != NULL) {
-        m_tuple = TableTuple(m_targetTable->schema());
-    }
-
     // Need to move GTE to find (x,_) when doing a partial covering search.
     // The planner sometimes used to lie in this case: index_lookup_type_eq is incorrect.
     // Index_lookup_type_gte is necessary.
@@ -159,7 +151,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     // default 0 count as their result.
     TableTuple& tmptup = m_outputTable->tempTuple();
     tmptup.setNValue(0, ValueFactory::getBigIntValue( 0 ));
-    TableTuple m_dummy;
 
     //
     // SEARCH KEY
@@ -169,7 +160,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         VOLT_DEBUG("<Index Count>Initial (all null) search key: '%s'", m_searchKey.debugNoHeader().c_str());
         for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
             m_searchKeyArray[ctr]->substitute(params);
-            NValue candidateValue = m_searchKeyArray[ctr]->eval(&m_dummy, NULL);
+            NValue candidateValue = m_searchKeyArray[ctr]->eval(NULL, NULL);
             try {
                 m_searchKey.setNValue(ctr, candidateValue);
             }
@@ -221,7 +212,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         VOLT_DEBUG("Initial (all null) end key: '%s'", m_endKey.debugNoHeader().c_str());
         for (int ctr = 0; ctr < m_numOfEndkeys; ctr++) {
             m_endKeyArray[ctr]->substitute(params);
-            NValue endKeyValue = m_endKeyArray[ctr]->eval(&m_dummy, NULL);
+            NValue endKeyValue = m_endKeyArray[ctr]->eval(NULL, NULL);
             try {
                 m_endKey.setNValue(ctr, endKeyValue);
             }
