@@ -5,6 +5,7 @@
 @Resume(0)
 @Shutdown(0)
 @SnapshotDelete(2)
+@SnapshotRestore(1)
 @SnapshotRestore(2)
 @SnapshotSave(1)
 @SnapshotSave(3)
@@ -16,3 +17,5 @@
 @UpdateApplicationCatalog(2)
 @UpdateLogging(1)
 @Promote(0)
+@ValidatePartitioning(2)
+@GetPartitionKeys(1)
