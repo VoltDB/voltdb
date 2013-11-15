@@ -394,18 +394,18 @@ public class Cartographer extends StatsSource
         return partitions;
     }
 
-    public List<Integer> getIv2PartitionsToReplace(JSONObject topology) throws JSONException
+    public List<Integer> getIv2PartitionsToReplace(int kfactor, int sitesPerHost)
+        throws JSONException
     {
-        ClusterConfig clusterConfig = new ClusterConfig(topology);
-        hostLog.info("Computing partitions to replace.  Total partitions: " + clusterConfig.getPartitionCount());
+        List<Integer> partitions = getPartitions();
+        hostLog.info("Computing partitions to replace.  Total partitions: " + partitions);
         Map<Integer, Integer> repsPerPart = new HashMap<Integer, Integer>();
-        for (int i = 0; i < clusterConfig.getPartitionCount(); i++) {
-            repsPerPart.put(i, getReplicaCountForPartition(i));
+        for (int pid : partitions) {
+            repsPerPart.put(pid, getReplicaCountForPartition(pid));
         }
-        List<Integer> partitions = computeReplacementPartitions(repsPerPart, clusterConfig.getReplicationFactor(),
-                clusterConfig.getSitesPerHost());
-        hostLog.info("IV2 Sites will replicate the following partitions: " + partitions);
-        return partitions;
+        List<Integer> partitionsToReplace = computeReplacementPartitions(repsPerPart, kfactor, sitesPerHost);
+        hostLog.info("IV2 Sites will replicate the following partitions: " + partitionsToReplace);
+        return partitionsToReplace;
     }
 
     /**
