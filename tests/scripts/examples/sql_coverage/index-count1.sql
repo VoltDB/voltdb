@@ -1,4 +1,5 @@
 <grammar.sql>
+INSERT INTO _table VALUES (0, NULL)
 INSERT INTO _table VALUES (2, 2)
 INSERT INTO _table VALUES (3, 3)
 INSERT INTO _table VALUES (6, 6)
