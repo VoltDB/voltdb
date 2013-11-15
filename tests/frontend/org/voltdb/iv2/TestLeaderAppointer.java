@@ -210,8 +210,10 @@ public class TestLeaderAppointer extends ZKTestBase {
         try {
             m_dut.acceptPromotion();
         }
-        catch (AssertionError ae) {
-            threw = true;
+        catch (ExecutionException e) {
+            if (e.getCause() instanceof AssertionError) {
+                threw = true;
+            }
         }
         assertTrue(threw);
         assertTrue(VoltDB.wasCrashCalled);
@@ -231,8 +233,10 @@ public class TestLeaderAppointer extends ZKTestBase {
         try {
             m_dut.acceptPromotion();
         }
-        catch (AssertionError ae) {
-            threw = true;
+        catch (ExecutionException e) {
+            if (e.getCause() instanceof AssertionError) {
+                threw = true;
+            }
         }
         assertTrue(threw);
         assertTrue(VoltDB.wasCrashCalled);

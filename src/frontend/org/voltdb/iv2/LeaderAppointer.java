@@ -25,12 +25,11 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google.common.util.concurrent.SettableFuture;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
@@ -91,7 +90,7 @@ public class LeaderAppointer implements Promotable
     private final MpInitiator m_MPI;
     private final AtomicReference<AppointerState> m_state =
         new AtomicReference<AppointerState>(AppointerState.INIT);
-    private CountDownLatch m_startupLatch = null;
+    private SettableFuture<Object> m_startupLatch = null;
     private final boolean m_partitionDetectionEnabled;
     private boolean m_partitionDetected = false;
     private boolean m_usingCommandLog = false;
@@ -251,7 +250,7 @@ public class LeaderAppointer implements Promotable
                         tmLog.debug("Leader appointment complete, promoting MPI and unblocking.");
                         m_state.set(AppointerState.DONE);
                         m_MPI.acceptPromotion();
-                        m_startupLatch.countDown();
+                        m_startupLatch.set(null);
                     }
                 } catch (IllegalAccessException e) {
                     // This should never happen
@@ -311,8 +310,28 @@ public class LeaderAppointer implements Promotable
     }
 
     @Override
-    public void acceptPromotion() throws InterruptedException, ExecutionException, KeeperException
+    public void acceptPromotion() throws InterruptedException, ExecutionException
     {
+        final SettableFuture<Object> blocker = SettableFuture.create();
+        try {
+            m_es.submit(new Runnable()  {
+                @Override
+                public void run() {
+                    try {
+                        acceptPromotionImpl(blocker);
+                    } catch (Throwable t) {
+                        blocker.setException(t);
+                    }
+                }
+            });
+            blocker.get();
+        } catch (RejectedExecutionException e) {
+            if (m_es.isShutdown()) return;
+            throw new RejectedExecutionException(e);
+        }
+    }
+
+    private void acceptPromotionImpl(final SettableFuture<Object> blocker) throws InterruptedException, ExecutionException, KeeperException {
         // Crank up the leader caches.  Use blocking startup so that we'll have valid point-in-time caches later.
         m_iv2appointees.start(true);
         m_iv2masters.start(true);
@@ -327,8 +346,8 @@ public class LeaderAppointer implements Promotable
             ImmutableMap<Integer, Long> masters = m_iv2masters.pointInTimeCache();
             try {
                 if ((appointees.size() < getInitialPartitionCount()) ||
-                    (masters.size() < getInitialPartitionCount()) ||
-                    (appointees.size() != masters.size())) {
+                        (masters.size() < getInitialPartitionCount()) ||
+                        (appointees.size() != masters.size())) {
                     // If we are promoted and the appointees or masters set is partial, the previous appointer failed
                     // during startup (at least for now, until we add remove a partition on the fly).
                     VoltDB.crashGlobalVoltDB("Detected failure during startup, unable to start", false, null);
@@ -348,7 +367,7 @@ public class LeaderAppointer implements Promotable
             // to countdown after appointing all the partition leaders.  The
             // LeaderCache callback will count it down once it has seen all the
             // appointed leaders publish themselves as the actual leaders.
-            m_startupLatch = new CountDownLatch(1);
+            m_startupLatch = SettableFuture.create();
             writeKnownLiveNodes(new HashSet<Integer>(m_hostMessenger.getLiveHostIds()));
 
             // Theoretically, the whole try/catch block below can be removed because the leader
@@ -360,16 +379,28 @@ public class LeaderAppointer implements Promotable
                 final int initialPartitionCount = getInitialPartitionCount();
                 for (int i = 0; i < initialPartitionCount; i++) {
                     LeaderElector.createRootIfNotExist(m_zk,
-                                                       LeaderElector.electionDirForPartition(i));
+                            LeaderElector.electionDirForPartition(i));
                     watchPartition(i, m_es, true);
                 }
             } catch (IllegalAccessException e) {
                 // This should never happen
                 VoltDB.crashLocalVoltDB("Failed to get partition count on startup", true, e);
             }
-            m_startupLatch.await();
 
-            m_zk.getChildren(VoltZK.leaders_initiators, m_partitionCallback);
+            //Asynchronously wait for this to finish otherwise it deadlocks
+            //on task that need to run on this thread
+            m_startupLatch.addListener(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            m_zk.getChildren(VoltZK.leaders_initiators, m_partitionCallback);
+                            blocker.set(null);
+                        } catch (Throwable t) {
+                            blocker.setException(t);
+                        }
+                    }
+            },
+            m_es);
         }
         else {
             // If we're taking over for a failed LeaderAppointer, we know when
@@ -386,11 +417,12 @@ public class LeaderAppointer implements Promotable
                 String dir = LeaderElector.electionDirForPartition(partId);
                 m_callbacks.put(partId, new PartitionCallback(partId, master.getValue()));
                 Pair<BabySitter, List<String>> sitterstuff =
-                    BabySitter.blockingFactory(m_zk, dir, m_callbacks.get(partId), m_es);
+                        BabySitter.blockingFactory(m_zk, dir, m_callbacks.get(partId), m_es);
                 m_partitionWatchers.put(partId, sitterstuff.getFirst());
             }
             // just go ahead and promote our MPI
             m_MPI.acceptPromotion();
+            blocker.set(null);
         }
     }
 
@@ -734,14 +766,25 @@ public class LeaderAppointer implements Promotable
     public void shutdown()
     {
         try {
-            m_iv2appointees.shutdown();
-            m_iv2masters.shutdown();
-            for (BabySitter watcher : m_partitionWatchers.values()) {
-                watcher.shutdown();
-            }
+            m_es.execute(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        m_iv2appointees.shutdown();
+                        m_iv2masters.shutdown();
+                        for (BabySitter watcher : m_partitionWatchers.values()) {
+                            watcher.shutdown();
+                        }
+                    } catch (Exception e) {
+                        // don't care, we're going down
+                    }
+                }
+            });
+            m_es.shutdown();
+            m_es.awaitTermination(356, TimeUnit.DAYS);
         }
-        catch (Exception e) {
-            // don't care, we're going down
+        catch (InterruptedException e) {
+            tmLog.warn("Unexpected interrupted exception", e);
         }
     }
 }
