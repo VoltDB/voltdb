@@ -198,6 +198,12 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
             m_node->getInitialExpression()->hasParameter();
     }
 
+    if (m_node->getCountNULLExpression() != NULL)
+    {
+        m_needsSubstituteCountNullExpression =
+                m_node->getCountNULLExpression()->hasParameter();
+    }
+
     //
     // Miscellanous Information
     //
@@ -223,6 +229,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     VOLT_DEBUG("IndexScan: %s.%s\n", m_targetTable->name().c_str(),
                m_index->getName().c_str());
 
+    bool searchKeyUnderflow = false;
     int activeNumOfSearchKeys = m_numOfSearchkeys;
     IndexLookupType localLookupType = m_lookupType;
     SortDirectionType localSortDirection = m_sortDirection;
@@ -304,6 +311,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                     else {
                         // don't allow GTE because it breaks null handling
                         localLookupType = INDEX_LOOKUP_TYPE_GT;
+                        searchKeyUnderflow = true;
                     }
                 }
 
@@ -361,6 +369,18 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         VOLT_DEBUG("Initial Expression:\n%s", initial_expression->debug(true).c_str());
     }
 
+    //
+    // COUNT NULL EXPRESSION
+    //
+    AbstractExpression* countNULLExpr = m_node->getCountNULLExpression();
+    // For reverse scan edge case NULL values and forward scan underflow case.
+    if (countNULLExpr != NULL) {
+        if (m_needsSubstituteCountNullExpression) {
+            countNULLExpr->substitute(params);
+        }
+        VOLT_DEBUG("COUNT NULL Expression:\n%s", countNULLExpr->debug(true).c_str());
+    }
+
     Table* targetTable = m_targetTable;
     m_engine->setLastAccessedTable(targetTable);
     //
@@ -375,6 +395,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     // Use our search key to prime the index iterator
     // Now loop through each tuple given to us by the iterator
     //
+    size_t indexSize = m_index->getSize();
     if (activeNumOfSearchKeys > 0)
     {
         VOLT_TRACE("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
@@ -385,6 +406,19 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
             m_index->moveToGreaterThanKey(&m_searchKey);
+
+            if (searchKeyUnderflow) {
+                assert(countNULLExpr);
+                long numNULLs = 0;
+                while (numNULLs < indexSize && countNULLExpr->eval(&(m_tuple = m_index->nextValue()), NULL).isTrue()) {
+                    // Move index position to the first non-null key
+                    numNULLs++;
+                }
+                VOLT_DEBUG("Index scan[underflow case]: find out %ld null rows or columns.", numNULLs);
+                if (indexSize != 0) {
+                    m_index->moveToPriorEntry();
+                }
+            }
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
             m_index->moveToKeyOrGreater(&m_searchKey);
@@ -417,6 +451,21 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     } else {
         bool toStartActually = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
         m_index->moveToEnd(toStartActually);
+
+        if (toStartActually) {
+            // forward scan may have NULL row problems.
+            assert(countNULLExpr);
+            long numNULLs = 0;
+
+            while (numNULLs < indexSize && countNULLExpr->eval(&(m_tuple = m_index->nextValue()), NULL).isTrue()) {
+                // Move index position to the first non-null key
+                numNULLs++;
+            }
+            VOLT_DEBUG("Index scan[No active search key]: find out %ld null rows or columns.", numNULLs);
+            if (indexSize != 0) {
+                m_index->moveToPriorEntry();
+            }
+        }
     }
 
     int tuple_ctr = 0;

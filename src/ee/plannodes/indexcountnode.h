@@ -97,7 +97,7 @@ class IndexCountPlanNode : public AbstractScanPlanNode {
         //
         IndexLookupType end_type;
         //
-        // Next search key for reverse scan null edge case
+        // count null row expression for edge cases: reverse scan or underflow case
         //
         AbstractExpression* count_null_expression;
 };

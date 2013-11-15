@@ -123,7 +123,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             if (m_searchkeyExpressions.size() >= m_endkeyExpressions.size()) {
                 if (m_lookupType == IndexLookupType.GT || m_lookupType == IndexLookupType.GTE) {
                     assert(m_searchkeyExpressions.size() > 0);
-                    setNextSearchKeyExpresson(m_searchkeyExpressions.size() - 1);
+                    setCountNULLExpresson(m_searchkeyExpressions.size() - 1);
                 }
             }
         } else {
@@ -138,33 +138,35 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             if (m_searchkeyExpressions.size() < m_endkeyExpressions.size()) {
                 assert(m_endType == IndexLookupType.LT || m_endType == IndexLookupType.LTE);
                 assert( m_endkeyExpressions.size() - m_searchkeyExpressions.size() == 1);
-                setNextSearchKeyExpresson(m_searchkeyExpressions.size());
+                setCountNULLExpresson(m_searchkeyExpressions.size());
             }
         }
     }
 
-    private void setNextSearchKeyExpresson(int nextKeyIndex) {
+    private void setCountNULLExpresson(int numOfKeysToSetup) {
         List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
 
         String exprsjson = m_catalogIndex.getExpressionsjson();
         if (exprsjson.isEmpty()) {
             List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(m_catalogIndex.getColumns(), "index");
 
-            for (int i = 0; i <= nextKeyIndex; i++) {
+            for (int i = 0; i <= numOfKeysToSetup; i++) {
                 ColumnRef colRef = indexedColRefs.get(i);
                 Column col = colRef.getColumn();
                 TupleValueExpression tve = new TupleValueExpression(m_targetTableName, m_targetTableAlias,
-                        col.getTypeName(), col.getTypeName());
+                        col.getTypeName(), col.getTypeName(), col.getIndex());
+                tve.setValueType(VoltType.get((byte)col.getType()));
+                tve.setValueSize(col.getSize());
 
                 AbstractExpression expr;
-                if (i == nextKeyIndex) {
+                if (i == numOfKeysToSetup) {
                     expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, tve, null);
-
                 } else {
                     expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
                             tve, m_searchkeyExpressions.get(i));
                 }
-                exprs.add((AbstractExpression) expr.clone());
+                ExpressionUtil.finalizeValueTypes(expr);
+                exprs.add(expr);
             }
         } else {
             List<AbstractExpression> indexedExprs = null;
@@ -175,18 +177,19 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
                 assert(false);
             }
 
-            for (int i = 0; i <= nextKeyIndex; i++) {
+            for (int i = 0; i <= numOfKeysToSetup; i++) {
                 AbstractExpression idxExpr = indexedExprs.get(i);
 
                 AbstractExpression expr;
-                if (i == nextKeyIndex) {
+                if (i == numOfKeysToSetup) {
                     expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, idxExpr, null);
 
                 } else {
                     expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
                             idxExpr, m_searchkeyExpressions.get(i));
                 }
-                exprs.add((AbstractExpression) expr.clone());
+                ExpressionUtil.finalizeValueTypes(expr);
+                exprs.add(expr);
             }
         }
         m_countNULLKeyExpr = ExpressionUtil.combine(exprs);
