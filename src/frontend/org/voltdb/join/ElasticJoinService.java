@@ -17,9 +17,7 @@
 
 package org.voltdb.join;
 
-import org.voltdb.StatsSource;
 
 public interface ElasticJoinService {
     void shutdown();
-    StatsSource getBalancePartitionStatsSource();
 }
