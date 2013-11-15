@@ -17,7 +17,6 @@
 
 package org.voltdb.join;
 
-
 public interface ElasticJoinService {
     void shutdown();
 }

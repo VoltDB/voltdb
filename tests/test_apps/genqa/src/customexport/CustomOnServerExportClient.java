@@ -23,7 +23,6 @@
 package customexport;
 
 import java.util.Properties;
-
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
