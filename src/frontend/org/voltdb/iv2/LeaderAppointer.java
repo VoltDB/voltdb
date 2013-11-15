@@ -23,7 +23,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.NavigableMap;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.*;
@@ -653,9 +652,6 @@ public class LeaderAppointer implements Promotable
         boolean retval = true;
         List<String> partitionDirs = null;
 
-        int [] stamp = new int[1];
-        NavigableMap<Integer, Integer> expected =
-                m_stats.getKSafetyMapReference().get(stamp);
         ImmutableSortedMap.Builder<Integer,Integer> lackingReplication =
                 ImmutableSortedMap.naturalOrder();
 
@@ -725,10 +721,7 @@ public class LeaderAppointer implements Promotable
                 VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
             }
         }
-        NavigableMap<Integer, Integer> lackingReplicationMap = lackingReplication.build();
-        boolean setSatus = m_stats.getKSafetyMapReference().compareAndSet(
-                expected, lackingReplicationMap, stamp[0], stamp[0]+1
-                );
+        m_stats.setSafetyMap(lackingReplication.build());
 
         return retval;
     }

@@ -21,30 +21,34 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NavigableMap;
-import java.util.concurrent.atomic.AtomicStampedReference;
 
 import org.voltdb.StatsSource;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSortedMap;
 
 public class KSafetyStats extends StatsSource {
-    final AtomicStampedReference<NavigableMap<Integer, Integer>> m_kSafetyMap;
+    private volatile NavigableMap<Integer, Integer> m_kSafetyMap;
 
     public KSafetyStats() {
         super(false);
-        NavigableMap<Integer, Integer> initial = ImmutableSortedMap.<Integer, Integer>of();
-        m_kSafetyMap = new AtomicStampedReference<>(initial,0);
-    }
-
-    public AtomicStampedReference<NavigableMap<Integer, Integer>> getKSafetyMapReference() {
-        return m_kSafetyMap;
+        m_kSafetyMap = ImmutableSortedMap.<Integer, Integer>of();
     }
 
     public static interface Constants {
         public final static String PARTITION_ID = "PARTITION_ID";
         public final static String REPLICA_COUNT = "REPLICA_COUNT";
+    }
+
+    NavigableMap<Integer, Integer> getSafetyMap() {
+        return m_kSafetyMap;
+    }
+
+    void setSafetyMap(NavigableMap<Integer, Integer> m_kSafetyMap) {
+        Preconditions.checkArgument(m_kSafetyMap != null, "specified null map");
+        this.m_kSafetyMap = m_kSafetyMap;
     }
 
     @Override
@@ -65,7 +69,7 @@ public class KSafetyStats extends StatsSource {
     @SuppressWarnings("unchecked")
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
         @SuppressWarnings("rawtypes")
-        Iterator iter = m_kSafetyMap.getReference().entrySet().iterator();
+        Iterator iter = m_kSafetyMap.entrySet().iterator();
         return (Iterator<Object>)iter;
     }
 }

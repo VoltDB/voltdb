@@ -690,7 +690,6 @@ public class StatsAgent extends OpsAgent
             final Long now,
             VoltTable prevResults)
     {
-
         assert selector != null;
         final NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>> siteIdToStatsSources = registeredStatsSources.get(selector);
 
