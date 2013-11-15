@@ -64,7 +64,6 @@ public enum VoltType {
             null, // prefix to specify a literal
             null, // suffix to specify a literal
             null, // necessary params to create
-            java.sql.DatabaseMetaData.typeNullable, // nullability
             false, // case-sensitive
             java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
             false, // unsigned?
@@ -80,7 +79,6 @@ public enum VoltType {
             null, // prefix to specify a literal
             null, // suffix to specify a literal
             null, // necessary params to create
-            java.sql.DatabaseMetaData.typeNullable, // nullability
             false, // case-sensitive
             java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
             false, // unsigned?
@@ -97,7 +95,6 @@ public enum VoltType {
             null, // prefix to specify a literal
             null, // suffix to specify a literal
             null, // necessary params to create
-            java.sql.DatabaseMetaData.typeNullable, // nullability
             false, // case-sensitive
             java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
             false, // unsigned?
@@ -114,7 +111,6 @@ public enum VoltType {
             null, // prefix to specify a literal
             null, // suffix to specify a literal
             null, // necessary params to create
-            java.sql.DatabaseMetaData.typeNullable, // nullability
             false, // case-sensitive
             java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
             false, // unsigned?
@@ -131,7 +127,6 @@ public enum VoltType {
             null, // prefix to specify a literal
             null, // suffix to specify a literal
             null, // necessary params to create
-            java.sql.DatabaseMetaData.typeNullable, // nullability
             false, // case-sensitive
             java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
             false, // unsigned?
@@ -152,7 +147,6 @@ public enum VoltType {
             "'", // prefix to specify a literal
             "'", // suffix to specify a literal
             null, // necessary params to create
-            java.sql.DatabaseMetaData.typeNullable, // nullability
             false, // case-sensitive
             java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
             null, // unsigned?
@@ -169,7 +163,6 @@ public enum VoltType {
             "'", // prefix to specify a literal
             "'", // suffix to specify a literal
             "max_length", // necessary params to create
-            java.sql.DatabaseMetaData.typeNullable, // nullability
             true, // case-sensitive
             java.sql.DatabaseMetaData.typeSearchable, // where-clauses supported
             null, // unsigned?
@@ -189,7 +182,6 @@ public enum VoltType {
             null, // prefix to specify a literal
             null, // suffix to specify a literal
             null, // necessary params to create
-            java.sql.DatabaseMetaData.typeNullable, // nullability
             false, // case-sensitive
             java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
             false, // unsigned?
@@ -208,7 +200,6 @@ public enum VoltType {
             "'", // prefix to specify a literal
             "'", // suffix to specify a literal
             "max_length", // necessary params to create
-            java.sql.DatabaseMetaData.typeNullable, // nullability
             true, // case-sensitive
             java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
             false, // unsigned?
@@ -263,7 +254,7 @@ public enum VoltType {
                 null,
                 null,
                 null,
-                Integer.MIN_VALUE,
+                java.sql.DatabaseMetaData.typeNullable,
                 false,
                 Integer.MIN_VALUE,
                 null,
@@ -279,7 +270,6 @@ public enum VoltType {
                      String literalPrefix,
                      String literalSuffix,
                      String createParams,
-                     int nullable,
                      boolean caseSensitive,
                      int searchable,
                      Boolean unsignedAttribute,
@@ -292,7 +282,7 @@ public enum VoltType {
                 literalPrefix,
                 literalSuffix,
                 createParams,
-                nullable,
+                java.sql.DatabaseMetaData.typeNullable,
                 caseSensitive,
                 searchable,
                 unsignedAttribute,
@@ -616,7 +606,7 @@ public enum VoltType {
         return retval;
     }
 
-    // XXX I feel like it should be possible to jam this into the enum
+    // I feel like it should be possible to jam this into the enum
     // constructor somehow but java hates me when I move constant definitions
     // above the enum constructors, so, meh
 
