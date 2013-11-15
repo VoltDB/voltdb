@@ -83,7 +83,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // for reverse scan LTE only. used to do forward scan to find the correct starting point
     protected AbstractExpression m_initialExpression;
 
-    private AbstractExpression m_countNULLKeyExpr;
+    private AbstractExpression m_skipNullExpr;
 
     // ???
     protected Boolean m_keyIterate = false;
@@ -123,40 +123,35 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         if (apn != null) {
             m_outputSchema = apn.m_outputSchema.clone();
         }
-        setCountNULLExpresson(m_searchkeyExpressions.size()-1);
+        setNullSearchKeyExpression();
     }
 
     // In future, use static function and replace that function in IndexCountPlanNode.java also
-    public void setCountNULLExpresson(int numOfKeysToSetup) {
-        if (numOfKeysToSetup < 0) {
+    public void setNullSearchKeyExpression() {
+        int nextKeyIndex = m_searchkeyExpressions.size() - 1;
+        if (nextKeyIndex < 0) {
+            m_skipNullExpr = null;
             return;
         }
         List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
 
         String exprsjson = m_catalogIndex.getExpressionsjson();
+        List<AbstractExpression> indexedExprs = null;
         if (exprsjson.isEmpty()) {
-            List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(m_catalogIndex.getColumns(), "index");
+            indexedExprs = new ArrayList<AbstractExpression>();
 
-            for (int i = 0; i <= numOfKeysToSetup; i++) {
+            List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(m_catalogIndex.getColumns(), "index");
+            for (int i = 0; i <= nextKeyIndex; i++) {
                 ColumnRef colRef = indexedColRefs.get(i);
                 Column col = colRef.getColumn();
                 TupleValueExpression tve = new TupleValueExpression(m_targetTableName, m_targetTableAlias,
-                        col.getTypeName(), col.getTypeName(), col.getIndex());
+                        col.getTypeName(), col.getTypeName());
                 tve.setValueType(VoltType.get((byte)col.getType()));
                 tve.setValueSize(col.getSize());
-
-                AbstractExpression expr;
-                if (i == numOfKeysToSetup) {
-                    expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, tve, null);
-                } else {
-                    expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
-                            tve, m_searchkeyExpressions.get(i));
-                }
-                ExpressionUtil.finalizeValueTypes(expr);
-                exprs.add(expr);
+                tve.resolveForTable((Table)m_catalogIndex.getParent());
+                indexedExprs.add(tve);
             }
         } else {
-            List<AbstractExpression> indexedExprs = null;
             try {
                 indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson);
             } catch (JSONException e) {
@@ -164,22 +159,19 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 assert(false);
             }
 
-            for (int i = 0; i <= numOfKeysToSetup; i++) {
-                AbstractExpression idxExpr = indexedExprs.get(i);
-
-                AbstractExpression expr;
-                if (i == numOfKeysToSetup) {
-                    expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, idxExpr, null);
-
-                } else {
-                    expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
-                            idxExpr, m_searchkeyExpressions.get(i));
-                }
-                ExpressionUtil.finalizeValueTypes(expr);
-                exprs.add(expr);
-            }
         }
-        m_countNULLKeyExpr = ExpressionUtil.combine(exprs);
+        AbstractExpression expr;
+        for (int i = 0; i < nextKeyIndex; i++) {
+            AbstractExpression idxExpr = indexedExprs.get(i);
+            expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
+                    idxExpr, (AbstractExpression) m_searchkeyExpressions.get(i).clone());
+            exprs.add(expr);
+        }
+        AbstractExpression nullExpr = indexedExprs.get(nextKeyIndex);
+        expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
+        exprs.add(expr);
+        m_skipNullExpr = ExpressionUtil.combine(exprs);
+        m_skipNullExpr.finalizeValueTypes();
     }
 
     @Override
@@ -561,8 +553,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         if (m_initialExpression != null) {
             stringer.key(Members.INITIAL_EXPRESSION.name()).value(m_initialExpression);
         }
-        if (m_countNULLKeyExpr != null) {
-            stringer.key(Members.COUNT_NULL_EXPRESSION.name()).value(m_countNULLKeyExpr);
+
+        if (m_skipNullExpr != null) {
+            stringer.key(Members.COUNT_NULL_EXPRESSION.name()).value(m_skipNullExpr);
         }
 
         stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array();
@@ -590,7 +583,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         //load searchkey_expressions
         AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
                 Members.SEARCHKEY_EXPRESSIONS.name());
-        m_countNULLKeyExpr = AbstractExpression.fromJSONChild(jobj, Members.COUNT_NULL_EXPRESSION.name());
+        m_skipNullExpr = AbstractExpression.fromJSONChild(jobj, Members.COUNT_NULL_EXPRESSION.name());
     }
 
     @Override

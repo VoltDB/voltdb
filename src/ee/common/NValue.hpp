@@ -302,7 +302,6 @@ class NValue {
     /* For boolean NValues, convert to bool */
     bool isTrue() const;
     bool isFalse() const;
-    bool isBooleanNULL() const;
 
     /* For number values, check the number line. */
     bool isZero() const;
@@ -875,9 +874,10 @@ class NValue {
         return *reinterpret_cast<double*>(m_data);
     }
 
-    const bool& getBoolean() const {
-        assert(getValueType() == VALUE_TYPE_BOOLEAN);
-        return *reinterpret_cast<const bool*>(m_data);
+    const TTInt& getDecimal() const {
+        assert(getValueType() == VALUE_TYPE_DECIMAL);
+        const void* retval = reinterpret_cast<const void*>(m_data);
+        return *reinterpret_cast<const TTInt*>(retval);
     }
 
     TTInt& getDecimal() {
@@ -886,16 +886,17 @@ class NValue {
         return *reinterpret_cast<TTInt*>(retval);
     }
 
-    const TTInt& getDecimal() const {
-        assert(getValueType() == VALUE_TYPE_DECIMAL);
-        const void* retval = reinterpret_cast<const void*>(m_data);
-        return *reinterpret_cast<const TTInt*>(retval);
+    const bool& getBoolean() const {
+        assert(getValueType() == VALUE_TYPE_BOOLEAN);
+        return *reinterpret_cast<const bool*>(m_data);
     }
 
     bool& getBoolean() {
         assert(getValueType() == VALUE_TYPE_BOOLEAN);
         return *reinterpret_cast<bool*>(m_data);
     }
+
+    bool isBooleanNULL() const ;
 
     std::size_t getAllocationSizeForObject() const;
     static std::size_t getAllocationSizeForObject(int32_t length);
@@ -2098,25 +2099,10 @@ inline NValue NValue::getFalse() {
 }
 
 /**
- * Return a new NValue that is the opposite of this one. Only works on
- * booleans
- */
-inline NValue NValue::op_negate() const {
-    assert(getValueType() == VALUE_TYPE_BOOLEAN);
-    if (isBooleanNULL()) {
-        return getNullValue(VALUE_TYPE_BOOLEAN);
-    }
-    NValue retval(VALUE_TYPE_BOOLEAN);
-    retval.getBoolean() = !getBoolean();
-    return retval;
-}
-
-/**
  * Returns C++ true if this NValue is a boolean and is true
  * If it is NULL, return false.
  */
 inline bool NValue::isTrue() const {
-    assert(getValueType() == VALUE_TYPE_BOOLEAN);
     if (isBooleanNULL()) {
         return false;
     }
@@ -2125,49 +2111,18 @@ inline bool NValue::isTrue() const {
 
 /**
  * Returns C++ false if this NValue is a boolean and is true
+ * If it is NULL, return false.
  */
 inline bool NValue::isFalse() const {
-    assert(getValueType() == VALUE_TYPE_BOOLEAN);
+    if (isBooleanNULL()) {
+        return false;
+    }
     return !getBoolean();
 }
 
 inline bool NValue::isBooleanNULL() const {
     assert(getValueType() == VALUE_TYPE_BOOLEAN);
-    return *reinterpret_cast<const int8_t*>(m_data) == BOOL_NULL;
-}
-
-/**
- * Logical and operation for NValues
- */
-inline NValue NValue::op_and(const NValue rhs) const {
-    if (isBooleanNULL() && (rhs.isBooleanNULL() || rhs.getBoolean() == true)) {
-        return getNullValue(VALUE_TYPE_BOOLEAN);
-    }
-    if (isBooleanNULL() && rhs.getBoolean() == false) {
-        return getFalse();
-    }
-    // Not null boolean operation any more
-    if (getBoolean() && rhs.getBoolean()) {
-        return getTrue();
-    }
-    return getFalse();
-}
-
-/*
- * Logical or operation for NValues
- */
-inline NValue NValue::op_or(const NValue rhs) const {
-    if (isBooleanNULL() && (rhs.isBooleanNULL() || rhs.getBoolean() == false)) {
-        return getNullValue(VALUE_TYPE_BOOLEAN);
-    }
-    if (isBooleanNULL() && rhs.getBoolean() == true) {
-        return getTrue();
-    }
-    // Not null boolean operation any more
-    if(getBoolean() || rhs.getBoolean()) {
-        return getTrue();
-    }
-    return getFalse();
+    return *reinterpret_cast<const int8_t*>(m_data) == INT8_NULL;
 }
 
 /**
@@ -2285,7 +2240,7 @@ inline void NValue::setNull() {
     {
     case VALUE_TYPE_BOOLEAN:
         // HACK BOOL NULL
-        *reinterpret_cast<int8_t*>(m_data) = BOOL_NULL;
+        *reinterpret_cast<int8_t*>(m_data) = INT8_NULL;
         break;
     case VALUE_TYPE_NULL:
     case VALUE_TYPE_INVALID:
@@ -2838,7 +2793,7 @@ inline bool NValue::isNull() const {
         case VALUE_TYPE_INVALID:
             return true;
         case VALUE_TYPE_BOOLEAN:
-            return *reinterpret_cast<const int8_t*>(m_data) == BOOL_NULL;
+            return *reinterpret_cast<const int8_t*>(m_data) == INT8_NULL;
         case VALUE_TYPE_TINYINT:
             return getTinyInt() == INT8_NULL;
         case VALUE_TYPE_SMALLINT:

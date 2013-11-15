@@ -1239,7 +1239,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
     }
 
     // Ticket: ENG-5486
-    public void testNULLcomparison() throws IOException, ProcCallException {
+    public void  testNULLcomparison() throws IOException, ProcCallException {
         System.out.println("STARTING default null test...");
         Client client = getClient();
         VoltTable result = null;
@@ -1286,7 +1286,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         validateTableOfLongs(result, new long[][]{{0, 0}});
 
         result = client.callProcedure("@Explain",
-                " select count(*) from DEFAULT_NULL where num3 < 3;").getResults()[0];
+                "select count(*) from DEFAULT_NULL where num3 < 3;").getResults()[0];
         System.out.println(result);
 
         // Reverse scan, count(*)
@@ -1361,19 +1361,24 @@ public class TestFixedSQLSuite extends RegressionSuite {
         project.addStmtProcedure("Eng1316Insert_P1", "insert into P1 values (?, ?, ?, ?);", "P1.ID: 0");
         project.addStmtProcedure("Eng1316Update_P1", "update P1 set num = num + 1 where id = ?", "P1.ID: 0");
 
-        // CONFIG #1: JNI
-        config = new LocalCluster("fixedsql-onesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        //* CONFIG #1: JNI -- keep this enabled by default with / / vs. / *
+        config = new LocalCluster("fixedsql-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
+
+        /*/ // CONFIG #1b: IPC -- keep this normally disabled with / * vs. //
+        config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
+        success = config.compile(project);
+        assertTrue(success);
+        builder.addServerConfig(config);
+        // end of normally disabled section */
 
         // CONFIG #2: HSQL
         config = new LocalCluster("fixedsql-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
-
-        // no cluster tests for SQL fixes
 
         return builder;
     }

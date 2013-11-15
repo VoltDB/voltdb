@@ -69,16 +69,18 @@ class IndexScanExecutor : public AbstractExecutor
 {
 public:
     IndexScanExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode)
-        : AbstractExecutor(engine, abstractNode), m_searchKeyBackingStore(NULL)
-    {
-        m_projectionExpressions = NULL;
-    }
+        : AbstractExecutor(engine, abstractNode)
+        , m_projectionExpressions(NULL)
+        , m_searchKeyBackingStore(NULL)
+    {}
     ~IndexScanExecutor();
 
 private:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
+
+    void skipNulls(AbstractExpression * skipNULLExpr);
 
     // Data in this class is arranged roughly in the order it is read for
     // p_execute(). Please don't reshuffle it only in the name of beauty.
@@ -94,14 +96,7 @@ private:
 
     // Search key
     TableTuple m_searchKey;
-    // search_key_beforesubstitute_array_ptr[]
-    AbstractExpression** m_searchKeyBeforeSubstituteArray;
-    bool* m_needsSubstituteProject; // needs_substitute_project_ptr[]
-    bool* m_needsSubstituteSearchKey; // needs_substitute_search_key_ptr[]
-    bool m_needsSubstitutePostExpression;
-    bool m_needsSubstituteEndExpression;
-    bool m_needsSubstituteInitialExpression;
-    bool m_needsSubstituteCountNullExpression;
+    AbstractExpression** m_searchKeyArray;
 
     IndexLookupType m_lookupType;
     SortDirectionType m_sortDirection;
@@ -111,16 +106,11 @@ private:
     PersistentTable* m_targetTable;
 
     TableIndex *m_index;
-    TableTuple m_dummy;
-    TableTuple m_tuple;
 
     // arrange the memory mgmt aids at the bottom to try to maximize
     // cache hits (by keeping them out of the way of useful runtime data)
-    boost::shared_array<bool> m_needsSubstituteSearchKeyPtr;
-    boost::shared_array<bool> m_needsSubstituteProjectPtr;
     boost::shared_array<int> m_projectionAllTupleArrayPtr;
-    boost::shared_array<AbstractExpression*>
-        m_searchKeyBeforeSubstituteArrayPtr;
+    boost::shared_array<AbstractExpression*> m_searchKeyArrayPtr;
     // So Valgrind doesn't complain:
     char* m_searchKeyBackingStore;
 };
