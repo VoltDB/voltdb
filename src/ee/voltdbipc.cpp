@@ -427,8 +427,6 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         int hostId;
         int64_t logLevels;
         int64_t tempTableMemory;
-        int32_t hashinatorType;
-        int32_t hashinatorConfigLength;
         int32_t hostnameLength;
         char data[0];
     }__attribute__((packed));
@@ -442,11 +440,9 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     cs->hostId = ntohl(cs->hostId);
     cs->logLevels = ntohll(cs->logLevels);
     cs->tempTableMemory = ntohll(cs->tempTableMemory);
-    cs->hashinatorType = ntohl(cs->hashinatorType);
-    cs->hashinatorConfigLength = ntohl(cs->hashinatorConfigLength);
     cs->hostnameLength = ntohl(cs->hostnameLength);
 
-    std::string hostname(cs->data + cs->hashinatorConfigLength, cs->hostnameLength);
+    std::string hostname(cs->data, cs->hostnameLength);
     try {
         m_engine = new VoltDBEngine(new voltdb::IPCTopend(this), new voltdb::StdoutLogProxy());
         m_engine->getLogManager()->setLogLevels(cs->logLevels);
@@ -462,9 +458,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
                                  cs->partitionId,
                                  cs->hostId,
                                  hostname,
-                                 cs->tempTableMemory,
-                                 (HashinatorType)cs->hashinatorType,
-                                 (char*)cs->data) == true) {
+                                 cs->tempTableMemory) == true) {
             return kErrorCode_Success;
         }
     } catch (const FatalException &e) {
@@ -568,52 +562,46 @@ int8_t VoltDBIPC::quiesce(struct ipc_command *cmd) {
 
 void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
     int errors = 0;
-    NValueArray &params = m_engine->getParameterContainer();
 
     querypfs *queryCommand = (querypfs*) cmd;
 
     int32_t numFrags = ntohl(queryCommand->numFragmentIds);
 
-    if (0)
+    if (0) {
         std::cout << "querypfs:"
                   << " spHandle=" << ntohll(queryCommand->spHandle)
                   << " lastCommittedSphandle=" << ntohll(queryCommand->lastCommittedSpHandle)
                   << " undoToken=" << ntohll(queryCommand->undoToken)
                   << " numFragIds=" << numFrags << std::endl;
+    }
 
     // data has binary packed fragmentIds first
-    int64_t *fragmentId = (int64_t*) (&(queryCommand->data));
-    int64_t *inputDepId = fragmentId + numFrags;
+    int64_t *fragmentIds = (int64_t*) (&(queryCommand->data));
+    int64_t *inputDepIds = fragmentIds + numFrags;
+
+    // fix network byte order
+    for (int i = 0; i < numFrags; ++i) {
+        fragmentIds[i] = ntohll(fragmentIds[i]);
+        inputDepIds[i] = ntohll(inputDepIds[i]);
+    }
 
     // ...and fast serialized parameter sets last.
     void* offset = queryCommand->data + (sizeof(int64_t) * numFrags * 2);
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(querypfs) - sizeof(int32_t) * ntohl(queryCommand->numFragmentIds));
     ReferenceSerializeInput serialize_in(offset, sz);
 
-    try {
-        // and reset to space for the results output
-        m_engine->resetReusedResultOutputBuffer(1);//1 byte to add status code
-        m_engine->setUndoToken(ntohll(queryCommand->undoToken));
-        Pool *pool = m_engine->getStringPool();
-        for (int i = 0; i < numFrags; ++i) {
-            int cnt = serialize_in.readShort();
-            assert(cnt> -1);
+    // and reset to space for the results output
+    m_engine->resetReusedResultOutputBuffer(1);//1 byte to add status code
 
-            deserializeParameterSetCommon(cnt, serialize_in, params, pool);
-            m_engine->setUsedParamcnt(cnt);
-            if (m_engine->executeQuery(ntohll(fragmentId[i]),
-                                       1,
-                                       (int32_t)(ntohll(inputDepId[i])), // Java sends int64 but EE wants int32
-                                       params,
-                                       ntohll(queryCommand->spHandle),
-                                       ntohll(queryCommand->lastCommittedSpHandle),
-                                       ntohll(queryCommand->uniqueId),
-                                       i == 0 ? true : false, //first
-                                       i == numFrags - 1 ? true : false)) { //last
-                ++errors;
-            }
-        }
-        pool->purge();
+    try {
+        errors = m_engine->executePlanFragments(numFrags,
+                                                fragmentIds,
+                                                inputDepIds,
+                                                serialize_in,
+                                                ntohll(queryCommand->spHandle),
+                                                ntohll(queryCommand->lastCommittedSpHandle),
+                                                ntohll(queryCommand->uniqueId),
+                                                ntohll(queryCommand->undoToken));
     }
     catch (const FatalException &e) {
         crashVoltDB(e);
@@ -765,6 +753,58 @@ char *VoltDBIPC::retrieveDependency(int32_t dependencyId, size_t *dependencySz) 
         exit(-1);
     }
     return dependencyData;
+}
+
+bool VoltDBIPC::fragmentProgressUpdate(int32_t batchIndex,
+        std::string planNodeName,
+        std::string targetTableName,
+        int64_t targetTableSize,
+        int64_t tuplesProcessed) {
+    char message[sizeof(int8_t) + sizeof(int32_t) + sizeof(planNodeName) + sizeof(targetTableName) +
+                 sizeof(targetTableSize) + sizeof(tuplesProcessed)];
+    message[0] = static_cast<int8_t>(kErrorCode_progressUpdate);
+    *reinterpret_cast<int32_t*>(&message[1]) = htonl(batchIndex);
+
+    int16_t strSize = static_cast<int16_t>(planNodeName.size());
+    *reinterpret_cast<int16_t*>(&message[5]) = htons(strSize);
+    ::memcpy( &message[7], planNodeName.c_str(), strSize);
+    int offset = 7 + strSize;
+
+    strSize = static_cast<int16_t>(targetTableName.size());
+    *reinterpret_cast<int16_t*>(&message[offset]) = htons(strSize);
+    offset += 2;
+    ::memcpy( &message[offset], targetTableName.c_str(), strSize);
+    offset += strSize;
+
+    *reinterpret_cast<int64_t*>(&message[offset]) = htonll(targetTableSize);
+    offset += 8;
+
+    *reinterpret_cast<int64_t*>(&message[offset]) = htonll(tuplesProcessed);
+
+    int32_t length;
+    ssize_t bytes = read(m_fd, &length, sizeof(int32_t));
+    if (bytes != sizeof(int32_t)) {
+        printf("Error - blocking read failed. %jd read %jd attempted",
+                (intmax_t)bytes, (intmax_t)sizeof(int32_t));
+        fflush(stdout);
+        assert(false);
+        exit(-1);
+    }
+    length = static_cast<int32_t>(ntohl(length) - sizeof(int32_t));
+    assert(length > 0);
+
+    int16_t isCancel;
+    bytes = read(m_fd, &isCancel, sizeof(int16_t));
+    if (bytes != sizeof(int16_t)) {
+        printf("Error - blocking read failed. %jd read %jd attempted",
+                (intmax_t)bytes, (intmax_t)sizeof(int16_t));
+        fflush(stdout);
+        assert(false);
+        exit(-1);
+    }
+    isCancel = static_cast<int16_t>(ntohs(isCancel));
+
+    return (isCancel == 1);
 }
 
 std::string VoltDBIPC::planForFragmentId(int64_t fragmentId) {
@@ -1112,7 +1152,7 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
         hashinator.reset(LegacyHashinator::newInstance(hash->data));
         break;
     case HASHINATOR_ELASTIC:
-        hashinator.reset(ElasticHashinator::newInstance(hash->data));
+        hashinator.reset(ElasticHashinator::newInstance(hash->data, NULL, 0));
         break;
     default:
         try {
@@ -1149,7 +1189,7 @@ void VoltDBIPC::updateHashinator(struct ipc_command *cmd) {
 
     HashinatorType hashinatorType = static_cast<HashinatorType>(ntohl(hash->hashinatorType));
     try {
-        m_engine->updateHashinator(hashinatorType, hash->data);
+        m_engine->updateHashinator(hashinatorType, hash->data, NULL, 0);
     } catch (const FatalException &e) {
         crashVoltDB(e);
     }

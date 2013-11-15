@@ -23,7 +23,7 @@
 package customexport;
 
 import java.util.Properties;
-import org.voltdb.export.ExportProtoMessage;
+import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
 
@@ -31,7 +31,7 @@ public class CustomOnServerExportClient extends ExportClientBase {
 
     public class ExportCounterDecoder extends ExportDecoderBase {
 
-        public ExportCounterDecoder(ExportProtoMessage.AdvertisedDataSource source) {
+        public ExportCounterDecoder(AdvertisedDataSource source) {
             super(source);
         }
 
@@ -41,7 +41,7 @@ public class CustomOnServerExportClient extends ExportClientBase {
         }
 
         @Override
-        public void sourceNoLongerAdvertised(ExportProtoMessage.AdvertisedDataSource source) {
+        public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
             // TODO Auto-generated method stub
         }
     }
@@ -50,12 +50,12 @@ public class CustomOnServerExportClient extends ExportClientBase {
     @Override
     public void configure(Properties config) throws Exception {
         m_props = config;
-        System.out.println("Custom OnServer Export client is configured: " + this.getClass().getName());
+        System.out.println("Custom Export client is configured: " + this.getClass().getName());
     }
 
 
     @Override
-    public ExportDecoderBase constructExportDecoder(ExportProtoMessage.AdvertisedDataSource source) {
+    public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source) {
         return new ExportCounterDecoder(source);
     }
 }

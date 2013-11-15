@@ -21,6 +21,7 @@
 #include "common/TupleOutputStreamProcessor.h"
 #include "storage/ElasticIndexReadContext.h"
 #include "storage/persistenttable.h"
+#include "logging/LogManager.h"
 
 namespace voltdb
 {
@@ -57,12 +58,11 @@ ElasticIndexReadContext::handleActivation(TableStreamType streamType)
     }
 
     if (!m_surgeon.hasIndex()) {
-        VOLT_ERROR("There is no index to materialize.");
         return ACTIVATION_FAILED;
     }
 
     if (!m_surgeon.isIndexingComplete()) {
-        VOLT_ERROR("Index generation has not completed.");
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, "Index generation has not completed.");
         return ACTIVATION_FAILED;
     }
 
@@ -103,13 +103,15 @@ int64_t ElasticIndexReadContext::handleStreamMore(
 
     // Check that activation happened.
     if (m_iter == NULL) {
-        VOLT_ERROR("Attempted to begin serialization without activating the context.");
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR,
+            "Attempted to begin serialization without activating the context.");
         remaining = TABLE_STREAM_SERIALIZATION_ERROR;
     }
 
     // Need to initialize the output stream list.
     else if (outputStreams.size() != 1) {
-        VOLT_ERROR("serializeMore() expects exactly one output stream.");
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR,
+            "serializeMore() expects exactly one output stream.");
         remaining = TABLE_STREAM_SERIALIZATION_ERROR;
     }
 
@@ -168,20 +170,26 @@ bool ElasticIndexReadContext::parseHashRange(
 {
     bool success = false;
     if (predicateStrings.size() != 1) {
-        VOLT_ERROR("Too many ElasticIndexReadContext predicates (>1): %ld",
-                   predicateStrings.size());
+        char errMsg[1024 * 16];
+        snprintf(errMsg, 1024 * 16,
+                 "Too many ElasticIndexReadContext predicates (>1): %ld",
+                 predicateStrings.size());
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
     }
     else {
         std::vector<std::string> rangeStrings = MiscUtil::splitToTwoString(predicateStrings.at(0), ':');
         if (rangeStrings.size() == 2) {
             try {
-                rangeOut = ElasticIndexHashRange(boost::lexical_cast<int64_t>(rangeStrings[0]),
-                                                 boost::lexical_cast<int64_t>(rangeStrings[1]));
+                rangeOut = ElasticIndexHashRange(boost::lexical_cast<int32_t>(rangeStrings[0]),
+                                                 boost::lexical_cast<int32_t>(rangeStrings[1]));
                 success = true;
             }
             catch(boost::bad_lexical_cast) {
-                VOLT_ERROR("Unable to parse ElasticIndexReadContext predicate \"%s\".",
-                           predicateStrings.at(0).c_str());
+                char errMsg[1024 * 16];
+                snprintf(errMsg, 1024 * 16,
+                         "Unable to parse ElasticIndexReadContext predicate \"%s\".",
+                         predicateStrings.at(0).c_str());
+                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
             }
         }
     }
@@ -199,7 +207,9 @@ void ElasticIndexReadContext::deleteStreamedTuples()
     m_iter->reset();
     TableTuple tuple;
     while (m_iter->next(tuple)) {
-        m_surgeon.deleteTuple(tuple);
+        if (!tuple.isPendingDelete()) {
+            m_surgeon.deleteTuple(tuple);
+        }
     }
 }
 

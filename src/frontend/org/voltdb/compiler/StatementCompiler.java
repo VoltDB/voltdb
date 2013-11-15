@@ -109,6 +109,13 @@ public abstract class StatementCompiler {
             throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());
         }
 
+        // There is a hard-coded limit to the number of parameters that can be passed to the EE.
+        if (plan.parameters.length > CompiledPlan.MAX_PARAM_COUNT) {
+            throw compiler.new VoltCompilerException(
+                "The statement's parameter count " + plan.parameters.length +
+                " must not exceed the maximum " + CompiledPlan.MAX_PARAM_COUNT);
+        }
+
         // Check order determinism before accessing the detail which it caches.
         boolean orderDeterministic = plan.isOrderDeterministic();
         catalogStmt.setIsorderdeterministic(orderDeterministic);

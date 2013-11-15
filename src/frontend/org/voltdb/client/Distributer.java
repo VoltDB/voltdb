@@ -34,11 +34,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-
-import jsr166y.ThreadLocalRandom;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -574,12 +573,6 @@ class Distributer {
                 Thread.sleep(5);
             }
         } while(more);
-
-        synchronized (this) {
-            for (NodeConnection cxn : m_connections ) {
-                assert(cxn.m_callbacks.size() == 0);
-            }
-        }
     }
 
     Distributer() {
@@ -1004,5 +997,12 @@ class Distributer {
             return -1;
         }
         return m_hashinator.getHashedPartitionForParameter(typeValue, value);
+    }
+
+    public HashinatorType getHashinatorType() {
+        if (m_hashinator == null) {
+            return HashinatorType.LEGACY;
+        }
+        return m_hashinator.getConfigurationType();
     }
 }

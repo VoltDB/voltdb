@@ -39,7 +39,6 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.HashRangeExpression;
 import org.voltdb.sysprocs.SnapshotRegistry;
-import org.voltdb.utils.CatalogUtil;
 
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -63,21 +62,18 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
             new IndexSnapshotRequestConfig(jsData, context.getDatabase());
         final Map<Integer, Long> pidToLocalHSIds = findLocalSources(config.partitionRanges, tracker);
 
-        // only create index on partitioned tables
-        List<Table> tables = CatalogUtil.getNormalTables(context.getDatabase(), false);
-
         // mark snapshot start in registry
-        final AtomicInteger numTables = new AtomicInteger(tables.size());
+        final AtomicInteger numTables = new AtomicInteger(config.tables.length);
         final SnapshotRegistry.Snapshot snapshotRecord =
             SnapshotRegistry.startSnapshot(txnId,
                                            context.getHostId(),
                                            file_path,
                                            file_nonce,
                                            SnapshotFormat.INDEX,
-                                           tables.toArray(new Table[0]));
+                                           config.tables);
 
         // create table tasks
-        for (Table table : tables) {
+        for (Table table : config.tables) {
             createTasksForTable(table,
                                 config.partitionRanges,
                                 pidToLocalHSIds,
@@ -111,15 +107,15 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
         return pidToLocalHSId;
     }
 
-    private static AbstractExpression
-    createPredicateForTable(Table table, IndexSnapshotRequestConfig.PartitionRanges partitionRanges)
+    /**
+     * Create the expression used to build elastic index for a given table.
+     * @param table     The table to build the elastic index on
+     * @param ranges    The hash ranges that the index should include
+     */
+    public static AbstractExpression createIndexExpressionForTable(Table table, Map<Integer, Integer> ranges)
     {
-        if (SNAP_LOG.isTraceEnabled()) {
-            SNAP_LOG.trace("Partition " + partitionRanges.partitionId + " has ranges " +
-                           partitionRanges.ranges);
-        }
         HashRangeExpression predicate = new HashRangeExpression();
-        predicate.setRanges(partitionRanges.ranges);
+        predicate.setRanges(ranges);
         predicate.setHashColumnIndex(table.getPartitioncolumn().getIndex());
 
         return predicate;
@@ -159,7 +155,7 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
                     new SnapshotTableTask(table,
                                           dataTarget,
                                           new SnapshotDataFilter[0],
-                                          createPredicateForTable(table, partitionRange),
+                                          createIndexExpressionForTable(table, partitionRange.ranges),
                                           false);
 
                 placeTask(task, Arrays.asList(localHSId));

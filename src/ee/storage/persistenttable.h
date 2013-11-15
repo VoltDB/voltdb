@@ -126,11 +126,11 @@ public:
     bool indexRemove(TableTuple &tuple);
     bool hasStreamType(TableStreamType streamType) const;
     ElasticIndex::iterator indexIterator();
-    ElasticIndex::iterator indexIteratorLowerBound(int64_t lowerBound);
-    ElasticIndex::iterator indexIteratorUpperBound(int64_t upperBound);
+    ElasticIndex::iterator indexIteratorLowerBound(int32_t lowerBound);
+    ElasticIndex::iterator indexIteratorUpperBound(int32_t upperBound);
     ElasticIndex::const_iterator indexIterator() const;
-    ElasticIndex::const_iterator indexIteratorLowerBound(int64_t lowerBound) const;
-    ElasticIndex::const_iterator indexIteratorUpperBound(int64_t upperBound) const;
+    ElasticIndex::const_iterator indexIteratorLowerBound(int32_t lowerBound) const;
+    ElasticIndex::const_iterator indexIteratorUpperBound(int32_t upperBound) const;
     ElasticIndex::iterator indexEnd();
     ElasticIndex::const_iterator indexEnd() const;
     boost::shared_ptr<ElasticIndexTupleRangeIterator>
@@ -423,6 +423,11 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     void swapTuples(TableTuple &sourceTupleWithNewValues, TableTuple &destinationTuple);
 
+    // The source tuple is used to create the ConstraintFailureException if one
+    // occurs. In case of exception, target tuple should be released, but the
+    // source tuple's memory should still be retained until the exception is
+    // handled.
+    void insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible);
     void insertTupleForUndo(char *tuple);
     void updateTupleForUndo(char* targetTupleToUpdate,
                             char* sourceTupleWithNewValues,
@@ -602,12 +607,12 @@ inline ElasticIndex::iterator PersistentTableSurgeon::indexIterator() {
     return m_index->createIterator();
 }
 
-inline ElasticIndex::iterator PersistentTableSurgeon::indexIteratorLowerBound(int64_t lowerBound) {
+inline ElasticIndex::iterator PersistentTableSurgeon::indexIteratorLowerBound(int32_t lowerBound) {
     assert (m_index != NULL);
     return m_index->createLowerBoundIterator(lowerBound);
 }
 
-inline ElasticIndex::iterator PersistentTableSurgeon::indexIteratorUpperBound(int64_t upperBound) {
+inline ElasticIndex::iterator PersistentTableSurgeon::indexIteratorUpperBound(int32_t upperBound) {
     assert (m_index != NULL);
     return m_index->createUpperBoundIterator(upperBound);
 }
@@ -617,12 +622,12 @@ inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIterator() cons
     return m_index->createIterator();
 }
 
-inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIteratorLowerBound(int64_t lowerBound) const {
+inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIteratorLowerBound(int32_t lowerBound) const {
     assert (m_index != NULL);
     return m_index->createLowerBoundIterator(lowerBound);
 }
 
-inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIteratorUpperBound(int64_t upperBound) const {
+inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIteratorUpperBound(int32_t upperBound) const {
     assert (m_index != NULL);
     return m_index->createUpperBoundIterator(upperBound);
 }
@@ -668,6 +673,12 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
     // The tempTuple is forever!
     assert(&tuple != &m_tempTuple);
 
+    // Let the context handle it as needed. Do this before freeing the memory
+    // of non-inlined columns
+    if (m_tableStreamer != NULL) {
+        m_tableStreamer->notifyTupleDelete(tuple);
+    }
+
     // This frees referenced strings -- when could possibly be a better time?
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
         decreaseStringMemCount(tuple.getNonInlinedMemorySize());
@@ -681,11 +692,6 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
     if (tuple.isPendingDelete()) {
         tuple.setPendingDeleteFalse();
         --m_invisibleTuplesPendingDeleteCount;
-    }
-
-    // Let the context handle it as needed.
-    if (m_tableStreamer != NULL) {
-        m_tableStreamer->notifyTupleDelete(tuple);
     }
 
     if (block.get() == NULL) {

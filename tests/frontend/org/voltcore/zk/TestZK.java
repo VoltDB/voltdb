@@ -275,7 +275,7 @@ public class TestZK extends ZKTestBase {
             }
 
             @Override
-            public void noticedTopologyChange() {}
+            public void noticedTopologyChange(boolean added, boolean removed) {}
         };
         final Semaphore sem3 = new Semaphore(0);
         LeaderNoticeHandler r3 = new LeaderNoticeHandler() {
@@ -285,7 +285,7 @@ public class TestZK extends ZKTestBase {
             }
 
             @Override
-            public void noticedTopologyChange() {}
+            public void noticedTopologyChange(boolean added, boolean removed) {}
         };
 
         LeaderElector elector1 = new LeaderElector(zk, "/election", "node", new byte[0], null);
@@ -331,7 +331,7 @@ public class TestZK extends ZKTestBase {
             }
 
             @Override
-            public void noticedTopologyChange() {}
+            public void noticedTopologyChange(boolean added, boolean removed) {}
         };
         final Semaphore sem3 = new Semaphore(0);
         LeaderNoticeHandler r3 = new LeaderNoticeHandler() {
@@ -341,7 +341,7 @@ public class TestZK extends ZKTestBase {
             }
 
             @Override
-            public void noticedTopologyChange() {}
+            public void noticedTopologyChange(boolean added, boolean removed) {}
         };
         final Semaphore sem4 = new Semaphore(0);
         LeaderNoticeHandler r4 = new LeaderNoticeHandler() {
@@ -351,7 +351,7 @@ public class TestZK extends ZKTestBase {
             }
 
             @Override
-            public void noticedTopologyChange() {}
+            public void noticedTopologyChange(boolean added, boolean removed) {}
         };
 
         LeaderElector elector1 = new LeaderElector(zk, "/election", "node", new byte[0], null);
@@ -403,7 +403,7 @@ public class TestZK extends ZKTestBase {
             }
 
             @Override
-            public void noticedTopologyChange() {
+            public void noticedTopologyChange(boolean added, boolean removed) {
             }
         };
         final Semaphore sem7 = new Semaphore(0);
@@ -414,7 +414,7 @@ public class TestZK extends ZKTestBase {
             }
 
             @Override
-            public void noticedTopologyChange() {
+            public void noticedTopologyChange(boolean added, boolean removed) {
             }
         };
 
@@ -484,7 +484,7 @@ public class TestZK extends ZKTestBase {
             }
 
             @Override
-            public void noticedTopologyChange() {}
+            public void noticedTopologyChange(boolean added, boolean removed) {}
         };
 
         LeaderElector elector1 = new LeaderElector(zk, "/election", "node", new byte[0], null);

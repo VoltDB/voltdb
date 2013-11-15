@@ -98,9 +98,6 @@ SnapshotCompletionInterest
     // Current state of the restore agent
     private volatile State m_state = State.RESTORE;
 
-    // Transaction ID of the restore sysproc
-    private final static long RESTORE_TXNID = 1l;
-
     // Restore adapter needs a completion functor.
     // Runnable here preferable to exposing all of RestoreAgent to RestoreAdapater.
     private final Runnable m_changeStateFunctor = new Runnable() {
@@ -115,10 +112,6 @@ SnapshotCompletionInterest
     private final SimpleClientResponseAdapter m_restoreAdapter =
         new SimpleClientResponseAdapter(ClientInterface.RESTORE_AGENT_CID, "RestoreAgentAdapter");
 
-    // RealVoltDB needs this to connect the ClientInterface and the Adapter.
-    SimpleClientResponseAdapter getAdapter() {
-        return m_restoreAdapter;
-    }
     private final ZooKeeper m_zk;
     private final SnapshotCompletionMonitor m_snapshotMonitor;
     private final Callback m_callback;
@@ -190,8 +183,13 @@ SnapshotCompletionInterest
                         if (m_action == StartAction.SAFE_RECOVER) {
                             jsObj.put(SnapshotUtil.JSON_DUPLICATES_PATH, m_voltdbrootPath);
                         }
+                        if (m_replayAgent.hasReplayedSegments() &&
+                            TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.ELASTIC) {
+                            // Restore the hashinator if there's command log to replay and we're running elastic
+                            jsObj.put(SnapshotUtil.JSON_HASHINATOR, true);
+                        }
                         Object[] params = new Object[] { jsObj.toString() };
-                        initSnapshotWork(RESTORE_TXNID, params);
+                        initSnapshotWork(params);
                     }
 
                     // if no snapshot to restore, transition immediately.
@@ -374,6 +372,49 @@ SnapshotCompletionInterest
         }
     }
 
+    /*
+     * A reusable callback for the incoming responses
+     */
+    private SimpleClientResponseAdapter.Callback m_clientAdapterCallback =
+            new SimpleClientResponseAdapter.Callback() {
+                @Override
+                public void handleResponse(ClientResponse res)
+                {
+                    boolean failure = false;
+                    if (res.getStatus() != ClientResponse.SUCCESS) {
+                        failure = true;
+                    }
+
+                    VoltTable[] results = res.getResults();
+                    if (results == null || results.length != 1) {
+                        failure = true;
+                    }
+
+                    while (!failure && results[0].advanceRow()) {
+                        String resultStatus = results[0].getString("RESULT");
+                        if (!resultStatus.equalsIgnoreCase("success")) {
+                            failure = true;
+                        }
+                    }
+
+                    if (failure) {
+                        for (VoltTable result : results) {
+                            LOG.fatal(result);
+                        }
+                        VoltDB.crashGlobalVoltDB("Failed to restore from snapshot: " +
+                                res.getStatusString(), false, null);
+                    } else {
+                        Thread networkHandoff = new Thread() {
+                            @Override
+                            public void run() {
+                                m_changeStateFunctor.run();
+                            }
+                        };
+                        networkHandoff.start();
+                    }
+                }
+            };
+
     public RestoreAgent(ZooKeeper zk, SnapshotCompletionMonitor snapshotMonitor,
                         Callback callback, int hostId, StartAction action, boolean clEnabled,
                         String clPath, String clSnapshotPath,
@@ -395,45 +436,6 @@ SnapshotCompletionInterest
         m_liveHosts = liveHosts;
         m_voltdbrootPath = voltdbrootPath;
 
-        m_restoreAdapter.setCallback(new SimpleClientResponseAdapter.Callback() {
-            @Override
-            public void handleResponse(ClientResponse res)
-            {
-                boolean failure = false;
-                if (res.getStatus() != ClientResponse.SUCCESS) {
-                    failure = true;
-                }
-
-                VoltTable[] results = res.getResults();
-                if (results == null || results.length != 1) {
-                    failure = true;
-                }
-
-                while (!failure && results[0].advanceRow()) {
-                    String resultStatus = results[0].getString("RESULT");
-                    if (!resultStatus.equalsIgnoreCase("success")) {
-                        failure = true;
-                    }
-                }
-
-                if (failure) {
-                    for (VoltTable result : results) {
-                        LOG.fatal(result);
-                    }
-                    VoltDB.crashGlobalVoltDB("Failed to restore from snapshot: " +
-                                             res.getStatusString(), false, null);
-                } else {
-                    Thread networkHandoff = new Thread() {
-                        @Override
-                        public void run() {
-                            m_changeStateFunctor.run();
-                        }
-                    };
-                    networkHandoff.start();
-                }
-            }
-        });
-
         initialize();
     }
 
@@ -448,18 +450,14 @@ SnapshotCompletionInterest
                                                StartAction.class,
                                                ZooKeeper.class,
                                                String.class,
-                                               int[].class,
-                                               Set.class,
-                                               long.class);
+                                               Set.class);
 
                 m_replayAgent =
                     (CommandLogReinitiator) constructor.newInstance(m_hostId,
                                                                     m_action,
                                                                     m_zk,
                                                                     m_clPath,
-                                                                    m_allPartitions,
-                                                                    m_liveHosts,
-                                                                    RESTORE_TXNID + 1);
+                                                                    m_liveHosts);
             }
         } catch (Exception e) {
             VoltDB.crashGlobalVoltDB("Unable to instantiate command log reinitiator",
@@ -605,19 +603,6 @@ SnapshotCompletionInterest
         final Long maxLastSeenTxn = m_replayAgent.getMaxLastSeenTxn();
         Set<SnapshotInfo> snapshotInfos = new HashSet<SnapshotInfo>();
         for (Snapshot e : snapshots.values()) {
-            if (!VoltDB.instance().isIV2Enabled()) {
-                /*
-                 * If the txn of the snapshot is before the latest txn
-                 * among the last seen txns across all initiators when the
-                 * log starts, there is a gap in between the snapshot was
-                 * taken and the beginning of the log. So the snapshot is
-                 * not viable for replay.
-                 */
-                if (maxLastSeenTxn != null && e.getTxnId() < maxLastSeenTxn) {
-                    continue;
-                }
-            }
-
             SnapshotInfo info = checkSnapshotIsComplete(e.getTxnId(), e);
             // if the cluster instance IDs in the snapshot and command log don't match, just move along
             if (m_replayAgent.getInstanceId() != null && info != null &&
@@ -631,7 +616,7 @@ SnapshotCompletionInterest
                                 .append(info.instanceId.serializeToJSONObject().toString());
                 continue;
             }
-            if (VoltDB.instance().isIV2Enabled() && info != null) {
+            if (info != null) {
                 final Map<Integer, Long> cmdlogmap = m_replayAgent.getMaxLastSeenTxnByPartition();
                 final Map<Integer, Long> snapmap = info.partitionToTxnId;
                 // If cmdlogmap is null, there were no command log segments, so all snapshots are potentially valid,
@@ -1186,7 +1171,7 @@ SnapshotCompletionInterest
      * Restore a snapshot. An arbitrarily early transaction is provided if command
      * log replay follows to maintain txnid sequence constraints (with simple dtxn).
      */
-    private void initSnapshotWork(Long txnId, final Object[] procParams) {
+    private void initSnapshotWork(final Object[] procParams) {
         final String procedureName = "@SnapshotRestore";
         Config restore = SystemProcedureCatalog.listing.get(procedureName);
         Procedure restoreProc = restore.asCatalogProcedure();
@@ -1199,35 +1184,15 @@ SnapshotCompletionInterest
                 return params;
             }
         });
+        spi.setClientHandle(m_restoreAdapter.registerCallback(m_clientAdapterCallback));
 
-        // txnId is hacked here for the SimpleDTXN case to maintain the constraint
-        // that it always precedes any txnid that might appear in the log. Basically,
-        // an invalid Id is used for the snapshot restore.
-        //
-        // Iv2 asserts/throws on invalid ids. And it doesn't have the same constraint,
-        // so only take the txnId hack path in the non-iv2 case.
-        if (VoltDB.instance().isIV2Enabled()) {
-            txnId = null;
-        }
-
-        if (txnId == null) {
-            m_initiator.createTransaction(m_restoreAdapter.connectionId(), spi,
-                                          restoreProc.getReadonly(),
-                                          restoreProc.getSinglepartition(),
-                                          restoreProc.getEverysite(),
-                                          0,//Can provide anything for multi-part
-                                          0,
-                                          EstTime.currentTimeMillis());
-        } else {
-            m_initiator.createTransaction(m_restoreAdapter.connectionId(),
-                                          txnId, System.currentTimeMillis(), spi,
-                                          restoreProc.getReadonly(),
-                                          restoreProc.getSinglepartition(),
-                                          restoreProc.getEverysite(),
-                                          0,//Can provide anything for multi-part
-                                          0,
-                                          EstTime.currentTimeMillis());
-        }
+        m_initiator.createTransaction(m_restoreAdapter.connectionId(), spi,
+                                      restoreProc.getReadonly(),
+                                      restoreProc.getSinglepartition(),
+                                      restoreProc.getEverysite(),
+                                      0,//Can provide anything for multi-part
+                                      0,
+                                      EstTime.currentTimeMillis());
     }
 
     /**
@@ -1236,12 +1201,6 @@ SnapshotCompletionInterest
     private void changeState() {
         if (m_state == State.RESTORE) {
             fetchSnapshotTxnId();
-
-            if (m_isLeader) {
-                if (!m_replayAgent.requestIndexSnapshot()) {
-                    VoltDB.crashLocalVoltDB("Failed to request index snapshot", false, null);
-                }
-            }
 
             exitRestore();
             m_state = State.REPLAY;

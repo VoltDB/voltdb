@@ -63,7 +63,6 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
-import org.voltdb.export.ExportInternalMessage;
 import org.voltdb.fault.FaultHandler;
 import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault;
@@ -86,8 +85,6 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
 import org.voltdb.utils.CachedByteBufferAllocator;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
-
-import com.google.common.collect.ImmutableMap;
 
 /**
  * The main executor of transactional work in the system. Controls running
@@ -569,7 +566,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
          * is multi-part then the txnid and SpHandle will not be the same.
          */
         @Override
-        public long getLastCommittedSpHandle()                     { return lastCommittedTxnId; }
+        public long getSpHandleForSnapshotDigest()                     { return lastCommittedTxnId; }
         @Override
         public long getCurrentTxnId()                           { return m_currentTransactionState.txnId; }
         @Override
@@ -618,7 +615,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         }
 
         @Override
-        public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config)
+        public void updateHashinator(TheHashinator.HashinatorConfig config)
         {
         }
 
@@ -652,7 +649,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         m_mailbox = null;
 
         // initialize the DR gateway
-        m_partitionDRGateway = new PartitionDRGateway(false);
+        m_partitionDRGateway = new PartitionDRGateway();
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
@@ -696,7 +693,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
         // initialize the DR gateway
         m_partitionDRGateway =
-            PartitionDRGateway.getInstance(partitionId, nodeDRGateway, false, m_rejoining);
+            PartitionDRGateway.getInstance(partitionId, nodeDRGateway, m_rejoining);
 
         if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
             ee = new MockExecutionEngine();
@@ -1208,14 +1205,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             if (txnState != null)
             {
             }
-        }
-        else if (message instanceof ExportInternalMessage) {
-            ExportInternalMessage exportm = (ExportInternalMessage) message;
-            ee.exportAction(exportm.m_m.isSync(),
-                                exportm.m_m.getAckOffset(),
-                                0,
-                                exportm.m_m.getPartitionId(),
-                                exportm.m_m.getSignature());
         } else if (message instanceof PotentialSnapshotWorkMessage) {
             m_snapshotter.doSnapshotWork(m_systemProcedureContext);
         }
@@ -1465,6 +1454,12 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         return null;
     }
 
+    @Override
+    public void setSpHandleForSnapshotDigest(long spHandle)
+    {
+
+    }
+
     public SiteTracker getSiteTracker() {
         return m_tracker;
     }
@@ -1614,7 +1609,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
     // do-nothing implementation of IV2 SiteProcedeConnection API
     @Override
-    public void truncateUndoLog(boolean rollback, long token, long txnId, long spHandle, List<UndoAction> undoLog) {
+    public void truncateUndoLog(boolean rollback, long token, long spHandle, List<UndoAction> undoLog) {
         throw new RuntimeException("Unsupported IV2-only API.");
     }
 
@@ -1695,7 +1690,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     }
 
     @Override
-    public void setPerPartitionTxnIds(long[] perPartitionTxnIds) {
+    public void setPerPartitionTxnIds(long[] perPartitionTxnIds, boolean skipMultipart) {
         //A noop pre-IV2
     }
 
@@ -1703,4 +1698,10 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     public long[] validatePartitioning(long[] tableIds, int hashinatorType, byte[] hashinatorConfig) {
         throw new UnsupportedOperationException();
     }
+
+    @Override
+    public void setBatch(int batchIndex) {}
+
+    @Override
+    public void setProcedureName(String procedureName) {}
 }

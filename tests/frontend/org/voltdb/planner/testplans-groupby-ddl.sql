@@ -11,6 +11,15 @@ CREATE VIEW V_R1 (V_A1, V_B1, V_CNT, V_SUM_C1, V_SUM_D1)
     AS SELECT A1, B1, COUNT(*), SUM(C1), COUNT(D1) 
     FROM R1  GROUP BY A1, B1;
 
+CREATE TABLE R1V (
+	V_A1 INTEGER NOT NULL,
+	V_B1 INTEGER NOT NULL,
+	V_CNT INTEGER NOT NULL,
+	V_SUM_C1 INTEGER NOT NULL,
+	V_SUM_D1 INTEGER NOT NULL,		
+	PRIMARY KEY (V_A1, V_B1)
+);
+
 CREATE TABLE P1 (
 	PKEY INTEGER NOT NULL,
 	A1 INTEGER NOT NULL,
@@ -22,6 +31,10 @@ CREATE TABLE P1 (
 
 PARTITION TABLE P1 ON COLUMN PKEY;
 
+CREATE VIEW V_P1_NO_FIX_NEEDED (V_A1, V_PKEY, V_CNT, V_SUM_C1, V_SUM_D1)
+    AS SELECT A1, PKEY, COUNT(*), SUM(C1), COUNT(D1) 
+    FROM P1  GROUP BY A1, PKEY;
+
 CREATE VIEW V_P1 (V_A1, V_B1, V_CNT, V_SUM_C1, V_SUM_D1)
     AS SELECT A1, B1, COUNT(*), SUM(C1), COUNT(D1) 
     FROM P1  GROUP BY A1, B1;
@@ -30,10 +43,10 @@ CREATE VIEW V_P1_ABS (V_A1, V_B1, V_CNT, V_SUM_C1, V_SUM_D1)
     AS SELECT abs(A1), B1, COUNT(*), SUM(C1), COUNT(D1) 
     FROM P1  GROUP BY abs(A1), B1;
     
-CREATE VIEW V_P1_TEST1 (V_A1, V_PKEY, V_CNT, V_SUM_C1, V_SUM_D1)
-    AS SELECT A1, PKEY, COUNT(*), SUM(C1), COUNT(D1) 
-    FROM P1  GROUP BY A1, PKEY;
-
+CREATE VIEW V_P1_NEW (V_A1, V_B1, V_CNT, V_SUM_C1, V_MIN_C1, V_MAX_D1, V_SUM_D1)
+    AS SELECT A1, B1, COUNT(*), SUM(C1), MIN(C1), MAX(D1), COUNT(D1)
+    FROM P1  GROUP BY A1, B1;
+        
 
 CREATE TABLE T1 (
 	PKEY INTEGER NOT NULL,
@@ -113,3 +126,40 @@ CREATE TABLE T2 (
 );
 
 PARTITION TABLE T2 ON COLUMN PKEY;
+
+
+--- ENG-5386: voter query example.
+CREATE TABLE contestants
+(
+  contestant_number integer     NOT NULL
+, contestant_name   varchar(50) NOT NULL
+, CONSTRAINT PK_contestants PRIMARY KEY
+  (
+    contestant_number
+  )
+);
+
+CREATE TABLE votes
+(
+  phone_number       bigint     NOT NULL
+, state              varchar(2) NOT NULL
+, contestant_number  integer    NOT NULL
+);
+
+PARTITION TABLE votes ON COLUMN phone_number;
+
+CREATE VIEW v_votes_by_contestant_number_state
+(
+  contestant_number
+, state
+, num_votes
+)
+AS
+   SELECT contestant_number
+        , state
+        , COUNT(*)
+     FROM votes
+ GROUP BY contestant_number
+        , state
+;
+

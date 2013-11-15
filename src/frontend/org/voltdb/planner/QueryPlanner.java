@@ -204,6 +204,9 @@ public class QueryPlanner {
                 Pair<Integer, Object[]> info = buildParameterSetFromExtractedLiteralsAndReturnPartitionIndex(
                         plan.parameterTypes());
                 plan.partitioningKeyIndex = info.getFirst();
+                if (info.getSecond().length > CompiledPlan.MAX_PARAM_COUNT) {
+                    throw new PlanningErrorException("Throw and catch to force a non-parameterized plan");
+                }
                 plan.extractedParamValues = ParameterSet.fromArrayNoCopy(info.getSecond());
 
                 // set the partition key value for SP plans
@@ -348,6 +351,7 @@ public class QueryPlanner {
         for (ParsedColInfo display_col : stmt.displayColumns)
         {
             SchemaColumn col = output_schema.find(display_col.tableName,
+                                                  display_col.tableAlias,
                                                   display_col.columnName,
                                                   display_col.alias);
             if (col == null)

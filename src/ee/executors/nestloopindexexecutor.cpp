@@ -251,10 +251,12 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     TableTuple null_tuple = m_null_tuple;
     int num_of_inner_cols = (join_type == JOIN_TYPE_LEFT)? null_tuple.sizeInValues() : 0;
 
+    m_engine->setLastAccessedTable(inner_table);
     VOLT_TRACE("<num_of_outer_cols>: %d\n", num_of_outer_cols);
-    while (outer_iterator.next(outer_tuple) && (limit == -1 || tuple_ctr < limit)) {
+    while ((limit == -1 || tuple_ctr < limit) && outer_iterator.next(outer_tuple)) {
         VOLT_TRACE("outer_tuple:%s",
                    outer_tuple.debug(outer_table->name()).c_str());
+        m_engine->noteTuplesProcessedForProgressMonitoring(1);
         // Set the outer tuple columns. Must be outside the inner loop
         // in case of the empty inner table
         join_tuple.setNValues(0, outer_tuple, 0, num_of_outer_cols);
@@ -356,7 +358,6 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
 
             // if a search value didn't fit into the targeted index key, skip this key
             if (!keyException) {
-
                 //
                 // Our index scan on the inner table is going to have three parts:
                 //  (1) Lookup tuples using the search key
@@ -390,14 +391,22 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                         // find the entry whose key is greater than search key,
                         // do a forward scan using initialExpr to find the correct
                         // start point to do reverse scan
-                        index->moveToGreaterThanKey(&index_values);
-                        while (!(inner_tuple = index->nextValue()).isNullTuple()) {
-                            if (initial_expression != NULL && initial_expression->eval(&inner_tuple, NULL).isFalse()) {
-                                break;
+                        bool isEnd = index->moveToGreaterThanKey(&index_values);
+                        if (isEnd) {
+                            index->moveToEnd(false);
+                        } else {
+                            while (!(inner_tuple = index->nextValue()).isNullTuple()) {
+                                m_engine->noteTuplesProcessedForProgressMonitoring(1);
+                                if (initial_expression != NULL && initial_expression->eval(&outer_tuple, &inner_tuple).isFalse()) {
+                                    // just passed the first failed entry, so move 2 backward
+                                    index->moveToBeforePriorEntry();
+                                    break;
+                                }
+                            }
+                            if (inner_tuple.isNullTuple()) {
+                                index->moveToEnd(false);
                             }
                         }
-                        // just passed the first failed entry, so move 2 backward
-                        index->moveToBeforePriorEntry();
                     }
                     else {
                         return false;
@@ -407,14 +416,15 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                     index->moveToEnd(toStartActually);
                 }
 
-                while (((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
+                while ((limit == -1 || tuple_ctr < limit) &&
+                       ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
                         !(inner_tuple = index->nextValueAtKey()).isNullTuple()) ||
                        ((localLookupType != INDEX_LOOKUP_TYPE_EQ || num_of_searchkeys == 0) &&
-                        !(inner_tuple = index->nextValue()).isNullTuple())) &&
-                        (limit == -1 || tuple_ctr < limit))
+                        !(inner_tuple = index->nextValue()).isNullTuple())))
                 {
                     VOLT_TRACE("inner_tuple:%s",
                                inner_tuple.debug(inner_table->name()).c_str());
+                    m_engine->noteTuplesProcessedForProgressMonitoring(1);
                     //
                     // First check whether the end_expression is now false
                     //
@@ -467,7 +477,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
         //
         // Left Outer Join
         //
-        if (join_type == JOIN_TYPE_LEFT && !match ) {
+        if ((limit == -1 || tuple_ctr < limit) && join_type == JOIN_TYPE_LEFT && !match ) {
             if (where_expression == NULL || where_expression->eval(&outer_tuple, &null_tuple).isTrue()) {
                 // Check if we have to skip this tuple because of offset
                 if (tuple_skipped < offset) {

@@ -184,10 +184,10 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
             // Right now these all need to be TVEs
             assert(col.getExpression() instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = outer_schema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(outer_schema);
             if (index == -1)
             {
-                index = inner_schema.getIndexOfTve(tve);
+                index = tve.resolveColumnIndexesUsingSchema(inner_schema);
                 if (index == -1)
                 {
                     throw new RuntimeException("Unable to find index for column: " +
@@ -234,6 +234,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         }
     }
 
+    @Override
     public boolean isContentDeterministic() {
         LimitPlanNode limit = (LimitPlanNode) getInlinePlanNode(PlanNodeType.LIMIT);
         if (super.isContentDeterministic() && limit != null) {
@@ -256,16 +257,10 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException
     {
         helpLoadFromJSONObject(jobj, db);
-        this.m_joinType = JoinType.get( jobj.getString( Members.JOIN_TYPE.name() ) );
-        if( !jobj.isNull( Members.PRE_JOIN_PREDICATE.name() )) {
-            m_preJoinPredicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.PRE_JOIN_PREDICATE.name()), db);
-        }
-        if( !jobj.isNull( Members.JOIN_PREDICATE.name() )) {
-            m_joinPredicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.JOIN_PREDICATE.name()), db);
-        }
-        if( !jobj.isNull( Members.WHERE_PREDICATE.name() )) {
-            m_wherePredicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.WHERE_PREDICATE.name()), db);
-        }
+        m_joinType = JoinType.get( jobj.getString( Members.JOIN_TYPE.name() ) );
+        m_preJoinPredicate = AbstractExpression.fromJSONChild(jobj, Members.PRE_JOIN_PREDICATE.name());
+        m_joinPredicate = AbstractExpression.fromJSONChild(jobj, Members.JOIN_PREDICATE.name());
+        m_wherePredicate = AbstractExpression.fromJSONChild(jobj, Members.WHERE_PREDICATE.name());
     }
 
     /**
@@ -278,11 +273,11 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
                 ExpressionUtil.getTupleValueExpressions(predicate);
         for (TupleValueExpression tve : predicate_tves)
         {
-            int index = outer_schema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(outer_schema);
             int tableIdx = 0;   // 0 for outer table
             if (index == -1)
             {
-                index = inner_schema.getIndexOfTve(tve);
+                index = tve.resolveColumnIndexesUsingSchema(inner_schema);
                 if (index == -1)
                 {
                     throw new RuntimeException("Unable to find index for join TVE: " +

@@ -27,19 +27,18 @@ import java.util.Map.Entry;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
-import org.voltdb.ExecutionSite;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
-import org.voltdb.TheHashinator;
+import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
-import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.LogKeys;
@@ -51,6 +50,8 @@ import org.voltdb.utils.VoltTableUtil;
  * for these implementations to the ExecutionSite.
  */
 public abstract class ExecutionEngine implements FastDeserializer.DeserializationMonitor {
+
+    static VoltLogger log = new VoltLogger("HOST");
 
     public static enum TaskType {
         VALIDATE_PARTITIONING(0);
@@ -70,6 +71,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public static final int ERRORCODE_ERROR = 1; // just error or not so far.
     public static final int ERRORCODE_WRONG_SERIALIZED_BYTES = 101;
     public static final int ERRORCODE_NEED_PLAN = 110;
+    public static final int ERRORCODE_PROGRESS_UPDATE = 111;
 
     /** For now sync this value with the value in the EE C++ code to get good stats. */
     public static final int EE_PLAN_CACHE_SIZE = 1000;
@@ -77,12 +79,27 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Partition ID */
     protected final int m_partitionId;
 
+    /** Site ID */
+    protected final long m_siteId;
+
     /** Statistics collector (provided later) */
     private PlannerStatsCollector m_plannerStats = null;
 
     // used for tracking statistics about the plan cache in the EE
     private int m_cacheMisses = 0;
     private int m_eeCacheSize = 0;
+
+    /** Context information of the current running procedure*/
+    String m_currentProcedureName = null;
+    int m_currentBatchIndex = 0;
+    private boolean m_readOnly;
+    private long m_startTime;
+    private long m_lastMsgTime;
+    private long m_logDuration = 1000;
+
+    /** information about EE calls back to JAVA. For test.*/
+    public int m_callsFromEE = 0;
+    public long m_lastTuplesAccessed = 0;
 
     /** Make the EE clean and ready to do new transactional work. */
     public void resetDirtyStatus() {
@@ -115,6 +132,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Create an ee and load the volt shared library */
     public ExecutionEngine(long siteId, int partitionId) {
         m_partitionId = partitionId;
+        m_siteId = siteId;
         org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
         // In mock test environments there may be no stats agent.
         final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
@@ -127,6 +145,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Alternate constructor without planner statistics tracking. */
     public ExecutionEngine() {
         m_partitionId = 0;  // not used
+        m_siteId = 0; // not used
         m_plannerStats = null;
     }
 
@@ -161,8 +180,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             new HashMap<Integer, ArrayDeque<VoltTable>>();
 
         private final VoltLogger hostLog = new VoltLogger("HOST");
-        private final VoltLogger log = new VoltLogger(ExecutionSite.class.getName());
-
 
         /**
          * Add a single dependency. Exists only for test cases.
@@ -243,8 +260,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                     // Prevent warnings.
                     return;
                 }
-                if (log.isTraceEnabled()) {
-                    log.l7dlog(Level.TRACE, LogKeys.org_voltdb_ExecutionSite_ImportingDependency.name(),
+                if (hostLog.isTraceEnabled()) {
+                    hostLog.l7dlog(Level.TRACE, LogKeys.org_voltdb_ExecutionSite_ImportingDependency.name(),
                                new Object[] { dependencyId, dependency.getClass().getName(), dependency.toString() },
                                null);
                 }
@@ -302,6 +319,39 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
     }
 
+    public boolean fragmentProgressUpdate(int batchIndex,
+                                          String planNodeName,
+                                          String lastAccessedTable,
+                                          long lastAccessedTableSize,
+                                          long tuplesProcessed)
+    {
+        ++m_callsFromEE;
+        m_lastTuplesAccessed = tuplesProcessed;
+
+        long currentTime = System.currentTimeMillis();
+        if (m_startTime == 0) {
+            m_startTime = m_lastMsgTime = currentTime;
+        }
+
+        if (currentTime > (m_logDuration + m_lastMsgTime)) {
+            String msg = String.format("Procedure %s is taking a long time to execute -- at least %.1f seconds spent accessing " +
+                    "%d tuples. Current plan fragment %s in call %d to voltExecuteSQL on site %s.",
+                    m_currentProcedureName,
+                    (currentTime - m_startTime) / 1000.0,
+                    tuplesProcessed,
+                    planNodeName,
+                    m_currentBatchIndex,
+                    CoreUtils.hsIdToString(m_siteId));
+            log.info(msg);
+            m_logDuration = (m_logDuration < 30000) ? (2 * m_logDuration) : 30000;
+            m_lastMsgTime = currentTime;
+        }
+
+        // Return true if we want to interrupt ee. Otherwise return false
+        // for now, always continue
+        return false;
+    }
+
     /**
      * Called from the execution engine to fetch a plan for a given hash.
      * Also update cache stats.
@@ -347,6 +397,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Pass diffs to apply to the EE's catalog to update it */
     abstract public void updateCatalog(final long timestamp, final String diffCommands) throws EEException;
 
+    public void setBatch(int batchIndex) {
+        m_currentBatchIndex = batchIndex;
+    }
+
+    public void setProcedureName(String procedureName) {
+        m_currentProcedureName = procedureName;
+    }
+
     /** Run multiple plan fragments */
     public VoltTable[] executePlanFragments(int numFragmentIds,
                                             long[] planFragmentIds,
@@ -358,6 +416,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                             long undoQuantumToken) throws EEException
     {
         try {
+            // For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
+            m_readOnly = (undoQuantumToken == Long.MAX_VALUE) ? true : false;
+
+            // reset context for progress updates
+            m_startTime = 0;
+            m_logDuration = 1000;
+
             VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
                     parameterSets, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
             m_plannerStats.updateEECacheStats(m_eeCacheSize, numFragmentIds - m_cacheMisses,
@@ -445,13 +510,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     /**
      * Execute an Export action against the execution engine.
-     * @param syncAction TODO
-     * @param ackTxnId if an ack, the transaction id being acked
-     * @param tableSignature the signature of the table being polled or acked.
-     * @param syncOffset TODO
-     * @return the response ExportMessage
      */
-    public abstract ExportProtoMessage exportAction( boolean syncAction,
+    public abstract void exportAction( boolean syncAction,
             long ackOffset, long seqNo, int partitionId, String tableSignature);
 
     /**
@@ -475,14 +535,16 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      *
      * THIS METHOD IS CURRENTLY ONLY USED FOR TESTING
      */
-    public abstract int hashinate(Object value, TheHashinator.HashinatorType type, byte config[]);
+    public abstract int hashinate(
+            Object value,
+            HashinatorConfig config);
 
     /**
      * Updates the hashinator with new config
      * @param type hashinator type
      * @param config new hashinator config
      */
-    public abstract void updateHashinator(TheHashinator.HashinatorType type, byte[] config);
+    public abstract void updateHashinator(HashinatorConfig config);
 
     /**
      * Execute an arbitrary task that is described by the task id and serialized task parameters.
@@ -526,7 +588,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param partitionId id of partitioned assigned to this EE
      * @param hostId id of the host this EE is running on
      * @param hostname name of the host this EE is running on
-     * @param totalPartitions number of partitions in the cluster for the hashinator
      * @return error code
      */
     protected native int nativeInitialize(
@@ -536,9 +597,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int partitionId,
             int hostId,
             byte hostname[],
-            long tempTableMemory,
-            int hashinatorType,
-            byte hashinatorConfig[]);
+            long tempTableMemory);
 
     /**
      * Sets (or re-sets) all the shared direct byte buffers in the EE.
@@ -657,12 +716,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * in the parameter buffer
      * @return
      */
-    protected native int nativeHashinate(long pointer);
+    protected native int nativeHashinate(long pointer, long configPtr, int tokenCount);
 
     /**
      * Updates the EE's hashinator
      */
-    protected native void nativeUpdateHashinator(long pointer);
+    protected native void nativeUpdateHashinator(long pointer, int typeId, long configPtr, int tokenCount);
 
     /**
      * Retrieve the thread local counter of pooled memory that has been allocated

@@ -111,7 +111,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         {
             // this double-schema search is somewhat common, maybe it
             // can find a static home in NodeSchema or something --izzy
-            int index = outer_schema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(outer_schema);
             int tableIdx = 0;   // 0 for outer table
             if (index == -1)
             {
@@ -131,13 +131,14 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         List<TupleValueExpression> index_tves =
             new ArrayList<TupleValueExpression>();
         index_tves.addAll(ExpressionUtil.getTupleValueExpressions(inline_scan.getEndExpression()));
+        index_tves.addAll(ExpressionUtil.getTupleValueExpressions(inline_scan.getInitialExpression()));
         for (AbstractExpression search_exp : inline_scan.getSearchKeyExpressions())
         {
             index_tves.addAll(ExpressionUtil.getTupleValueExpressions(search_exp));
         }
         for (TupleValueExpression tve : index_tves)
         {
-            int index = outer_schema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(outer_schema);
             int tableIdx = 0;   // 0 for outer table
             if (index == -1)
             {
@@ -166,7 +167,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
             int tableIdx = 0;   // 0 for outer table
             if (index == -1)
             {
-                index = index_schema.getIndexOfTve(tve);
+                index = tve.resolveColumnIndexesUsingSchema(index_schema);
                 if (index == -1)
                 {
                     throw new RuntimeException("Unable to find index for column: " +
@@ -197,6 +198,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         resolvePredicate(m_wherePredicate, outer_schema, index_schema);
     }
 
+    @Override
     public void resolveSortDirection() {
         super.resolveSortDirection();
         // special treatment for NLIJ, when the outer table is a materialized scan node
@@ -242,6 +244,17 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
     }
 
     @Override
+    public boolean hasInlinedIndexScanOfTable(String tableName) {
+        IndexScanPlanNode index_scan = (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assert(index_scan != null);
+        if (index_scan.getTargetTableName().equals(tableName)) {
+            return true;
+        } else {
+            return getChild(0).hasInlinedIndexScanOfTable(tableName);
+        }
+    }
+
+    @Override
     public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
 
         // Add the cost of the inlined index scan to the cost of processing the input tuples.
@@ -264,6 +277,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
                 explainFilters(indent);
     }
 
+    @Override
     public void toJSONString(JSONStringer stringer) throws JSONException
     {
         super.toJSONString(stringer);
@@ -272,6 +286,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         }
     }
 
+    @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException
     {
         super.loadFromJSONObject(jobj, db);

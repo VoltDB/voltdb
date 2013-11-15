@@ -146,8 +146,8 @@ class ExecutionEngineTest : public Test {
              */
             engine = new VoltDBEngine();
             int partitionCount = 3;
-            ASSERT_TRUE(engine->initialize(this->cluster_id, this->site_id, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY,
-                                           HASHINATOR_LEGACY, (char*)&partitionCount));
+            ASSERT_TRUE(engine->initialize(this->cluster_id, this->site_id, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY));
+            engine->updateHashinator( HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
             ASSERT_TRUE(engine->loadCatalog( -2, catalog_string));
 
             /*

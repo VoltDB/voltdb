@@ -100,14 +100,32 @@ public interface SiteProcedureConnection {
             boolean readOnly) throws EEException;
 
     /**
+     * Let the EE know which batch of sql is running so it can include this
+     * information in any slow query progress log messages.
+     */
+    public void setBatch(int batchIndex);
+
+    /**
+     * Let the EE know what the name of the currently executing procedure is
+     * so it can include this information in any slow query progress log messages.
+     */
+    public void setProcedureName(String procedureName);
+
+    /**
      * Legacy recursable execution interface for MP transaction states.
      */
     public Map<Integer, List<VoltTable>> recursableRun(TransactionState currentTxnState);
 
     /**
+     * Set the spHandle that's used by snapshot digest as the per-partition txnId. This gets updated during rejoin so
+     * that the snapshot right after rejoin can have the correct value. It is also updated when transaction commits.
+     */
+    public void setSpHandleForSnapshotDigest(long spHandle);
+
+    /**
      * IV2 commit / rollback interface to the EE
      */
-    public void truncateUndoLog(boolean rollback, long token, long txnId, long spHandle, List<UndoAction> undoActions);
+    public void truncateUndoLog(boolean rollback, long token, long spHandle, List<UndoAction> undoActions);
 
     /**
      * IV2: send dependencies to the EE
@@ -156,7 +174,7 @@ public interface SiteProcedureConnection {
 
     // Snapshot services provided by the site
     public Future<?> doSnapshotWork();
-    public void setPerPartitionTxnIds(long[] perPartitionTxnIds);
+    public void setPerPartitionTxnIds(long[] perPartitionTxnIds, boolean skipMultiPart);
 
     public long[] validatePartitioning(long tableIds[], int hashinatorType, byte hashinatorConfig[]);
 }

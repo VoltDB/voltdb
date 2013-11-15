@@ -25,6 +25,7 @@ import java.util.concurrent.Callable;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.utils.CatalogUtil;
 
@@ -78,7 +79,7 @@ public class TableStreamer {
     {
         if (!context.activateTableStream(m_tableId, m_type, undo, predicates)) {
             String tableName = CatalogUtil.getTableNameFromId(context.getDatabase(), m_tableId);
-            log.error("Attempted to activate a table stream of type " + m_type +
+            log.debug("Attempted to activate a table stream of type " + m_type +
                       "for table " + tableName + " and failed");
             return false;
         }
@@ -89,11 +90,15 @@ public class TableStreamer {
      * Streams more tuples from the table.
      * @param context          Context
      * @param outputBuffers    Allocated buffers to hold output tuples
+     * @param rowCountAccumulator an array of a single int use to accumulate streamed rows count
      * @return A future for all writes to data targets, and a boolean indicating if there's more left in the table.
-     * The future could be null if nothing is serialized.
+     * The future could be null if nothing is serialized. If row count is specified it sets the number of rows that
+     * is to stream
      */
+    @SuppressWarnings("rawtypes")
     public Pair<ListenableFuture, Boolean> streamMore(SystemProcedureExecutionContext context,
-                                                      List<DBBPool.BBContainer> outputBuffers)
+                                                      List<DBBPool.BBContainer> outputBuffers,
+                                                      int[] rowCountAccumulator)
     {
         ListenableFuture writeFuture = null;
 
@@ -105,6 +110,9 @@ public class TableStreamer {
         }
 
         if (serializeResult.getSecond()[0] > 0) {
+            if (rowCountAccumulator != null && rowCountAccumulator.length == 1) {
+                rowCountAccumulator[0] += getTupleDataRowCount(outputBuffers);
+            }
             writeFuture = writeBlocksToTargets(outputBuffers, serializeResult.getSecond());
         } else {
             // Return all allocated snapshot output buffers
@@ -114,6 +122,24 @@ public class TableStreamer {
         }
 
         return Pair.of(writeFuture, serializeResult.getFirst() > 0);
+    }
+
+    /**
+     * Get the number of rows contained of rows contained within the given list of {@link BBContainer}
+     * @param outputBuffers a list of tuple data BBContainers
+     * @return the number of rows contained within the given list of {@link BBContainer}
+     */
+    private int getTupleDataRowCount(List<DBBPool.BBContainer> outputBuffers) {
+        if (outputBuffers == null || outputBuffers.size() != m_tableTasks.size()) return 0;
+        int accumulator = 0;
+        for (int i = 0; i < outputBuffers.size(); ++i) {
+            SnapshotDataTarget target = m_tableTasks.get(i).m_target;
+            int rowCount = target.getInContainerRowCount(outputBuffers.get(i));
+            if (rowCount != SnapshotDataTarget.ROW_COUNT_UNSUPPORTED) {
+                accumulator += target.getInContainerRowCount(outputBuffers.get(i));
+            }
+        }
+        return accumulator;
     }
 
     /**

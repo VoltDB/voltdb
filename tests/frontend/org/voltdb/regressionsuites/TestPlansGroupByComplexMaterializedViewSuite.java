@@ -26,12 +26,14 @@ package org.voltdb.regressionsuites;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
@@ -420,7 +422,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         }
     }
 
-    private void verifyMVTestR3 (Client client, Object[][] expected13,
+    private void verifyMVTestR3(Client client, Object[][] expected13,
             Object[][] expected24, String orderbyStmt) {
         String mvTable = "V_R3";
 
@@ -530,67 +532,313 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
 
     public void testMaterializedViewMinMax() throws IOException, ProcCallException, Exception {
         System.out.println("Test Min and Max...");
-        if (isHSQL()) {
-            return;
-        }
         Client client = getClient();
-        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSSSS");
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+        final long expectedMinMostTM = dateFormat.parse("2010-06-11 02:00:00.123").getTime()*1000;
+        final long expectedMinTM = dateFormat.parse("2011-06-11 02:00:00.123").getTime()*1000;
+        final long expectedMedTM = dateFormat.parse("2012-06-11 02:00:00.123").getTime()*1000;
+        final long expectedMaxTM = dateFormat.parse("2013-06-11 02:00:00.123").getTime()*1000;
+        long[][] expected;
+        //                               id, wage, dept, tm
+        client.callProcedure("R2.insert", 0, 10,  0, "2013-06-11 02:00:00.123000");
+        client.callProcedure("R2.insert", 1, 10,  1, "2013-06-11 02:00:00.123000");
+        client.callProcedure("R2.insert", 2, 20, -1, "2012-06-11 02:00:00.123000");
+        client.callProcedure("R2.insert", 3, 30,  1, "2011-06-11 02:00:00.123000");
+        client.callProcedure("R2.insert", 4, 20, -1, "2012-06-11 02:00:00.123000");
+        client.callProcedure("R2.insert", 5, 10,  1, "2013-06-11 02:00:00.123000");
 
-        client.callProcedure("R2.insert", 1, 10, 1 , "2013-06-11 02:00:00.123456");
-        client.callProcedure("R2.insert", 2, 20, -1 , "2012-06-11 02:00:00.123456");
-        client.callProcedure("R2.insert", 3, 30, 1 , "2011-06-11 02:00:00.123456");
-        client.callProcedure("R2.insert", 4, 20, -1 , "2012-06-11 02:00:00.123456");
-        client.callProcedure("R2.insert", 5, 10, 1 , "2013-06-11 02:00:00.123456");
+        client.callProcedure("R2.insert", 7, 70,  2, "2011-06-11 02:00:00.123000");
 
-        VoltTable table;
-        table = client.callProcedure("@AdHoc", "SELECT * FROM V_R2_MIN_MAX").getResults()[0];
-        assertEquals(1, table.getRowCount());
-        System.out.println(table.toString());
-        table.advanceRow();
-        assertEquals(1, table.getLong(0));
-        assertEquals(5, table.getLong(1));
-        assertEquals(60, table.getLong(2));
-        long expectedTM = dateFormat.parse("2011-06-11 02:00:00.123456").getTime();
-        long realTM = dateFormat.parse(table.getTimestampAsTimestamp(3).toString()).getTime();
-        assertEquals(expectedTM, realTM);
+        // ABS(DEPT), COUNT (*), MAX(WAGE * 2), MIN(TM)
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,5,60,expectedMinTM},
+                                 {2,1,140,expectedMinTM}};
+        verifyMVTestR2MinMax(client, expected);
 
+        // Drop the min tm and max wage value for group 1
         client.callProcedure("R2.delete", 3);
 
-        table = client.callProcedure("@AdHoc", "SELECT * FROM V_R2_MIN_MAX").getResults()[0];
-        assertEquals(1, table.getRowCount());
-        System.out.println(table.toString());
-        table.advanceRow();
-        assertEquals(1, table.getLong(0));
-        assertEquals(4, table.getLong(1));
-        assertEquals(40, table.getLong(2));
-        expectedTM = dateFormat.parse("2012-06-11 02:00:00.123456").getTime();
-        realTM = dateFormat.parse(table.getTimestampAsTimestamp(3).toString()).getTime();
-        assertEquals(expectedTM, realTM);
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,4,40,expectedMedTM},
+                                 {2,1,140,expectedMinTM}};
+        verifyMVTestR2MinMax(client, expected);
 
+        // Drop 1 of 2 min tm and max wage values for group 1 -- expect no change except to the count
         client.callProcedure("R2.delete", 2);
 
-        table = client.callProcedure("@AdHoc", "SELECT * FROM V_R2_MIN_MAX").getResults()[0];
-        assertEquals(1, table.getRowCount());
-        System.out.println(table.toString());
-        table.advanceRow();
-        assertEquals(1, table.getLong(0));
-        assertEquals(3, table.getLong(1));
-        assertEquals(40, table.getLong(2));
-        expectedTM = dateFormat.parse("2012-06-11 02:00:00.123456").getTime();
-        assertEquals(expectedTM, realTM);
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,3,40,expectedMedTM},
+                                 {2,1,140,expectedMinTM}};
 
-        client.callProcedure("R2.insert", 6, 30, 1 , "2011-06-11 02:00:00.123456");
+        // Re-establish a min tm and max wage value for group 1
+        client.callProcedure("R2.insert", 6, 30, 1, "2011-06-11 02:00:00.123000");
 
-        table = client.callProcedure("@AdHoc", "SELECT * FROM V_R2_MIN_MAX").getResults()[0];
-        assertEquals(1, table.getRowCount());
-        System.out.println(table.toString());
-        table.advanceRow();
-        assertEquals(1, table.getLong(0));
-        assertEquals(4, table.getLong(1));
-        assertEquals(60, table.getLong(2));
-        expectedTM = dateFormat.parse("2011-06-11 02:00:00.123456").getTime();
-        realTM = dateFormat.parse(table.getTimestampAsTimestamp(3).toString()).getTime();
-        assertEquals(expectedTM, realTM);
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,4,60,expectedMinTM},
+                                 {2,1,140,expectedMinTM}};
+        verifyMVTestR2MinMax(client, expected);
+
+        // Re-establish a min tm and max wage value for group 2 via update of the sole base
+        client.callProcedure("R2.update", 7, 77, 2, "2013-06-11 02:00:00.123000", 7);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,4,60,expectedMinTM},
+                                 {2,1,154,expectedMaxTM}};
+        verifyMVTestR2MinMax(client, expected);
+
+        // Re-establish a min tm and max wage value for group 1 via update of the current extreme value
+        client.callProcedure("R2.update", 6, 40, 1, "2010-06-11 02:00:00.123000", 6);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,4,80,expectedMinMostTM},
+                                 {2,1,154,expectedMaxTM}};
+        verifyMVTestR2MinMax(client, expected);
+
+        // Re-establish a min tm and max wage value for groups 1 and 2 via switch of a grouped key
+        client.callProcedure("R2.update", 6, 80, 2, "2010-06-11 02:00:00.123000", 6);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,3,40,expectedMedTM},
+                                 {2,2,160,expectedMinMostTM}};
+        verifyMVTestR2MinMax(client, expected);
+
+        // Demonstrate that null values do not alter mins or maxs.
+        if ( ! isHSQL()) { // hsql backend does not know to filter VoltDB nulls? should it?
+           client.callProcedure("R2.insert", 10, null, 0, null);
+           client.callProcedure("R2.insert", 11, null, 1, null);
+           client.callProcedure("R2.insert", 12, null, 2, null);
+           expected = new long[][] {{0,2,20,expectedMaxTM},
+                                    {1,4,40,expectedMedTM},
+                                    {2,3,160,expectedMinMostTM}};
+           verifyMVTestR2MinMax(client, expected);
+        }
+
+    }
+
+    private void verifyMVTestR2MinMax(Client client, long[][] expected)
+        throws IOException, NoConnectionsException, ProcCallException, ParseException
+    {
+        VoltTable table = client.callProcedure("@AdHoc", "SELECT * FROM V_R2_MIN_MAX ORDER BY DEPT").getResults()[0];
+        System.out.println(table);
+        validateTableOfLongs(table, expected);
+    }
+
+    public void testMaterializedViewFieldMinMax() throws IOException, ProcCallException, Exception
+    {
+        if (isHSQL()) { // hsql backend does not support the FIELD function
+            return;
+        }
+        System.out.println("Test Field Function Min and Max...");
+        Client client = getClient();
+        final long expectedMinMostTM = 2010;
+        final long expectedMinTM = 2011;
+        final long expectedMedTM = 2012;
+        final long expectedMaxTM = 2013;
+        long[][] expected;
+        // JSON FIELDS:
+        //   wage INTEGER
+        //   dept INTEGER
+        //   tm_year INTEGER
+        //   tm_month INTEGER
+        //   tm_day INTEGER
+        //     id, json_data
+        client.callProcedure("R5.insert",
+                0, "{\"wage\":10 , \"dept\":0 , \"tm_year\":2013 , \"tm_month\":6 , \"tm_day\":11 }");
+        client.callProcedure("R5.insert",
+                1, "{\"wage\":10 , \"dept\":1 , \"tm_year\":2013 , \"tm_month\":6 , \"tm_day\":11 }");
+        client.callProcedure("R5.insert",
+                2, "{\"wage\":20 , \"dept\":-1, \"tm_year\":2012 , \"tm_month\":6 , \"tm_day\":11 }");
+        client.callProcedure("R5.insert",
+                3, "{\"wage\":30 , \"dept\":1 , \"tm_year\":2011 , \"tm_month\":6 , \"tm_day\":11 }");
+        client.callProcedure("R5.insert",
+                4, "{\"wage\":20 , \"dept\":-1, \"tm_year\":2012 , \"tm_month\":6 , \"tm_day\":11 }");
+        client.callProcedure("R5.insert",
+                5, "{\"wage\":10 , \"dept\":1 , \"tm_year\":2013 , \"tm_month\":6 , \"tm_day\":11 }");
+
+        client.callProcedure("R5.insert",
+                7, "{\"wage\":70 , \"dept\":2 , \"tm_year\":2011 , \"tm_month\":6 , \"tm_day\":11 }");
+
+        // ABS(DEPT), COUNT (*), MAX(WAGE * 2), MIN(TM)
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,5,60,expectedMinTM},
+                                 {2,1,140,expectedMinTM}};
+        verifyMVTestR5MinMax(client, expected);
+
+        // Drop the min tm and max wage value for group 1
+        client.callProcedure("R5.delete", 3);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,4,40,expectedMedTM},
+                                 {2,1,140,expectedMinTM}};
+        verifyMVTestR5MinMax(client, expected);
+
+        // Drop 1 of 2 min tm and max wage values for group 1 -- expect no change except to the count
+        client.callProcedure("R5.delete", 2);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,3,40,expectedMedTM},
+                                 {2,1,140,expectedMinTM}};
+
+        // Re-establish a min tm and max wage value for group 1
+        client.callProcedure("R5.insert",
+                6, "{\"wage\":30 , \"dept\":1 , \"tm_year\":2011 , \"tm_month\":6 , \"tm_day\":11 }");
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,4,60,expectedMinTM},
+                                 {2,1,140,expectedMinTM}};
+        verifyMVTestR5MinMax(client, expected);
+
+        // Re-establish a min tm and max wage value for group 2 via update of the sole base
+        client.callProcedure("R5.update", 7,
+                "{\"wage\":77 , \"dept\":2 , \"tm_year\":2013 , \"tm_month\":6 , \"tm_day\":11 }", 7);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,4,60,expectedMinTM},
+                                 {2,1,154,expectedMaxTM}};
+        verifyMVTestR5MinMax(client, expected);
+
+        // Re-establish a min tm and max wage value for group 1 via update of the current extreme value
+        client.callProcedure("R5.update", 6,
+                "{\"wage\":40 , \"dept\":1 , \"tm_year\":2010 , \"tm_month\":6 , \"tm_day\":11 }", 6);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,4,80,expectedMinMostTM},
+                                 {2,1,154,expectedMaxTM}};
+        verifyMVTestR5MinMax(client, expected);
+
+        // Re-establish a min tm and max wage value for groups 1 and 2 via switch of a grouped key
+        client.callProcedure("R5.update", 6,
+                "{\"wage\":80 , \"dept\":2 , \"tm_year\":2010 , \"tm_month\":6 , \"tm_day\":11 }", 6);
+
+        expected = new long[][] {{0,1,20,expectedMaxTM},
+                                 {1,3,40,expectedMedTM},
+                                 {2,2,160,expectedMinMostTM}};
+        verifyMVTestR5MinMax(client, expected);
+
+        // Demonstrate that null values do not alter mins or maxs.
+        client.callProcedure("R5.insert", 10, "{\"dept\":0}");
+        client.callProcedure("R5.insert", 11, "{\"dept\":1}");
+        client.callProcedure("R5.insert", 12, "{\"dept\":2}");
+        expected = new long[][] {{0,2,20,expectedMaxTM},
+                                 {1,4,40,expectedMedTM},
+                                 {2,3,160,expectedMinMostTM}};
+        verifyMVTestR5MinMax(client, expected);
+    }
+
+    private void verifyMVTestR5MinMax(Client client, long[][] expected)
+        throws IOException, NoConnectionsException, ProcCallException, ParseException
+    {
+        VoltTable table = client.callProcedure("@AdHoc",
+            "SELECT DEPT, CNT, CAST(MAX_WAGE AS INTEGER)*2, CAST(MIN_TM AS INTEGER) " +
+            "FROM V_R5_MIN_MAX ORDER BY DEPT").getResults()[0];
+        System.out.println(table);
+        validateTableOfLongs(table, expected);
+    }
+
+    public void testColumnWidthLimits() throws IOException, ProcCallException, Exception
+    {
+        if (isHSQL()) { // hsql backend does not support the FIELD function
+            return;
+        }
+        System.out.println("Test mat view VARCHAR limits...");
+        Client client = getClient();
+        // test that the arbitrary length limits imposed on matview columns prevent "disaster".
+        client.callProcedure("R6.insert", 0, 1, "{\"unused\":\"" +
+            "12345678901234567890123456789012345678901234567 50" +
+            "1234567890123456789012345678901234567890123456 100" +
+            "1234567890123456789012345678901234567890123456 150" +
+            "1234567890123456789012345678901234567890123456 200" +
+            "1234567890123456789012345678901234567890123456 250" +
+            "1234567890123456789012345678901234567890123456 300" +
+            "1234567890123456789012345678901234567890123456 350" +
+            "1234567890123456789012345678901234567890123456 400" +
+            "1234567890123456789012345678901234567890123456 450" +
+            "1234567890123456789012345678901234567890123456 500" +
+            "1234567890123456789012345678901234567890123456 550" +
+            "1234567890123456789012345678901234567890123456 600" +
+            "1234567890123456789012345678901234567890123456 650" +
+            "1234567890123456789012345678901234567890123456 700" +
+            "1234567890123456789012345678901234567890123456 750" +
+            "1234567890123456789012345678901234567890123456 800" +
+            "1234567890123456789012345678901234567890123456 850" +
+            "1234567890123456789012345678901234567890123456 900" +
+            "1234567890123456789012345678901234567890123456 950" +
+            "123456789012345678901234567890123456789012345 1000" +
+            "123456789012345678901234567890123456789012345 1050" +
+            "123456789012345678901234567890123456789012345 1100" +
+            "123456789012345678901234567890123456789012345 1150" +
+            "123456789012345678901234567890123456789012345 1200" +
+            "123456789012345678901234567890123456789012345 1250" +
+            "123456789012345678901234567890123456789012345 1300" +
+            "123456789012345678901234567890123456789012345 1350" +
+            "123456789012345678901234567890123456789012345 1400" +
+            "123456789012345678901234567890123456789012345 1450" +
+            "123456789012345678901234567890123456789012345 1500" +
+            "123456789012345678901234567890123456789012345 1550" +
+            "123456789012345678901234567890123456789012345 1600" +
+            "123456789012345678901234567890123456789012345 1650" +
+            "123456789012345678901234567890123456789012345 1700" +
+            "123456789012345678901234567890123456789012345 1750" +
+            "123456789012345678901234567890123456789012345 1800" +
+            "123456789012345678901234567890123456789012345 1850" +
+            "123456789012345678901234567890123456789012345 1900" +
+            "123456789012345678901234567890123456789012345 1950" +
+            "123456789012345678901234567890123456789012345 2000" +
+            "123456789012345678901234567890123456789012345 2050" +
+            "\", \"used\":\"9\"}");
+
+        // No problem for now until MAX_USED needs to be set to the over-long value.
+        client.callProcedure("R6.insert", 1, 1, "{\"unused\":\"1\", \"used\":\"" +
+            "12345678901234567890123456789012345678901234567 50" +
+            "1234567890123456789012345678901234567890123456 100" +
+            "1234567890123456789012345678901234567890123456 150" +
+            "1234567890123456789012345678901234567890123456 200" +
+            "1234567890123456789012345678901234567890123456 250" +
+            "1234567890123456789012345678901234567890123456 300" +
+            "1234567890123456789012345678901234567890123456 350" +
+            "1234567890123456789012345678901234567890123456 400" +
+            "1234567890123456789012345678901234567890123456 450" +
+            "1234567890123456789012345678901234567890123456 500" +
+            "1234567890123456789012345678901234567890123456 550" +
+            "1234567890123456789012345678901234567890123456 600" +
+            "1234567890123456789012345678901234567890123456 650" +
+            "1234567890123456789012345678901234567890123456 700" +
+            "1234567890123456789012345678901234567890123456 750" +
+            "1234567890123456789012345678901234567890123456 800" +
+            "1234567890123456789012345678901234567890123456 850" +
+            "1234567890123456789012345678901234567890123456 900" +
+            "1234567890123456789012345678901234567890123456 950" +
+            "123456789012345678901234567890123456789012345 1000" +
+            "123456789012345678901234567890123456789012345 1050" +
+            "123456789012345678901234567890123456789012345 1100" +
+            "123456789012345678901234567890123456789012345 1150" +
+            "123456789012345678901234567890123456789012345 1200" +
+            "123456789012345678901234567890123456789012345 1250" +
+            "123456789012345678901234567890123456789012345 1300" +
+            "123456789012345678901234567890123456789012345 1350" +
+            "123456789012345678901234567890123456789012345 1400" +
+            "123456789012345678901234567890123456789012345 1450" +
+            "123456789012345678901234567890123456789012345 1500" +
+            "123456789012345678901234567890123456789012345 1550" +
+            "123456789012345678901234567890123456789012345 1600" +
+            "123456789012345678901234567890123456789012345 1650" +
+            "123456789012345678901234567890123456789012345 1700" +
+            "123456789012345678901234567890123456789012345 1750" +
+            "123456789012345678901234567890123456789012345 1800" +
+            "123456789012345678901234567890123456789012345 1850" +
+            "123456789012345678901234567890123456789012345 1900" +
+            "123456789012345678901234567890123456789012345 1950" +
+            "123456789012345678901234567890123456789012345 2000" +
+            "123456789012345678901234567890123456789012345 2050" +
+            "\"}");
+        try {
+            // Problem: MAX_USED needs to fall back to the over-long value
+            // when the short value is removed.
+            client.callProcedure("R6.delete", 0);
+            fail();
+        } catch (Exception exc) {
+            assertTrue(exc.toString().contains("Object exceeds specified size"));
+        }
     }
 
     private void mvUpdateR4() throws IOException, ProcCallException {
@@ -629,9 +877,18 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         assertEquals(1, result.getResults()[0].asScalarLong());
         compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, -2, 2, 51}, {1, 2, 3, 104}}, orderbyStmt);
 
+        // Test ENG-5291 -- that inserting nulls effects only count(*)s but not aggregation columns.
+        client.callProcedure("R4.insert", 6, null, 1, null, null);
+        assertEquals(ClientResponse.SUCCESS, result.getStatus());
+        assertEquals(1, result.getResults()[0].asScalarLong());
+        client.callProcedure("R4.insert", 7, null, 1, null, null);
+        assertEquals(ClientResponse.SUCCESS, result.getStatus());
+        assertEquals(1, result.getResults()[0].asScalarLong());
+        compareMVcontentsOfLongs(client, mvTable, new long [][]{{1, -2, 2, 51}, {1, 2, 5, 104}}, orderbyStmt);
+
         result = client.callProcedure("@AdHoc","Delete from R4");
         assertEquals(ClientResponse.SUCCESS, result.getStatus());
-        assertEquals(5, result.getResults()[0].asScalarLong());
+        assertEquals(7, result.getResults()[0].asScalarLong());
         compareMVcontentsOfLongs(client, mvTable, null, orderbyStmt);
     }
 
@@ -701,7 +958,6 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
             // (1) Select *
             vt = client.callProcedure("@AdHoc", "Select * from " + tb +
                     " ORDER BY V_G1, V_G2").getResults()[0];
-            System.out.println(vt);
             validateTableOfLongs(vt, new long[][]{{ 10, 1, 4, 101, 37},
                     {20, 2, 2, 45, 13}, {30, 2, 1, 24, 8}, {30, 3, 3, 85, 37}});
 
@@ -735,6 +991,16 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
             vt = client.callProcedure("@AdHoc", "Select abs(V_sum_rent - V_sum_age) from " + tb +
                     " ORDER BY V_sum_age").getResults()[0];
             validateTableOfLongs(vt, new long[][]{{16}, {32}, {48}, {64}});
+
+            // (5) select with distict
+            vt = client.callProcedure("@AdHoc", "Select distinct v_cnt from " + tb +
+                    " ORDER BY v_cnt").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[]{ 1, 2, 3, 4});
+
+
+            vt = client.callProcedure("@AdHoc", "Select distinct v_g1 from " + tb +
+                    " ORDER BY v_g1").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[]{ 10, 20, 30});
         }
     }
 
@@ -903,6 +1169,268 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
 
     }
 
+    public void testPartitionedMVQueriesInnerJoin() throws Exception {
+        System.out.println("Test MV partition agg query inner join...");
+        VoltTable vt = null;
+        Client client = this.getClient();
+
+        // Load data
+        loadTableForMVFixSuite();
+        String sql = "";
+
+        String[] tbs = {"V_P1", "V_P1_ABS", "V_P2"};
+        /*
+        * Current expected data in tables {"V_P1", "V_P1_ABS", "V_P2", "V_R4"}:
+        * V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent
+        * 10,   1,     4,     101,       37
+        * 20,   2,     2,     45,        13
+        * 30,   2,     1,     24,        8
+        * 30,   3,     3,     85,        37
+        * */
+
+        for (String tb: tbs) {
+            System.out.println("Testing inner join with partitioned view: " + tb);
+            // (1) Two tables join.
+            sql = "Select v_p1.v_cnt from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
+                    "order by v_p1.v_cnt;";
+            sql = sql.replace("v_p1", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {1, 1, 2, 3, 3, 4});
+
+            sql = "Select SUM(v_p1.v_g1) from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
+                    "order by 1;";
+            sql = sql.replace("v_p1", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {150});
+
+            sql = "Select SUM(v_r4.v_g1) from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
+                    "order by 1;";
+            sql = sql.replace("v_p1", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {150});
+
+            sql = "Select MIN(v_p1.v_g1) from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
+                    "order by 1;";
+            sql = sql.replace("v_p1", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {10});
+
+            sql = "Select MIN(v_r4.v_g1) from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
+                    "order by 1;";
+            sql = sql.replace("v_p1", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {10});
+
+            sql = "Select MAX(v_p1.v_g1) from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
+                    "order by 1;";
+            sql = sql.replace("v_p1", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {30});
+
+            sql = "Select MAX(v_r4.v_g1) from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
+                    "order by 1;";
+            sql = sql.replace("v_p1", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {30});
+
+
+            sql = "Select v_p1.v_sum_age from v_p1 join v_r4 on v_p1.v_cnt = v_r4.v_cnt " +
+                    "order by v_p1.v_sum_age;";
+            sql = sql.replace("v_p1", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {24, 45, 85, 101});
+
+            // Refer H-SQL bug ticket: ENG-534.
+            if (!isHSQL()) {
+                sql = "Select v_p1.v_sum_age from v_p1 join v_r4 on v_p1.v_cnt = v_r4.v_cnt " +
+                        "where v_p1.v_sum_rent > 15 order by v_p1.v_sum_age;";
+                sql = sql.replace("v_p1", tb);
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+                validateTableOfScalarLongs(vt, new long[] {85, 101});
+
+
+                // Weird join on clause.
+                sql = "Select v_p1.v_cnt from v_p1 join v_r4 on v_p1.v_g2 = v_p1.v_cnt " +
+                        "order by v_p1.v_cnt;";
+                sql = sql.replace("v_p1", tb);
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+                System.out.println(vt);
+                validateTableOfScalarLongs(vt, new long[] {2, 2, 2, 2, 3, 3, 3,3});
+
+                // Join on different column names.
+                sql = "select v_p1.v_cnt from v_r4 inner join v_p1 on v_r4.v_sum_rent = v_p1.v_sum_age";
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+                System.out.println(vt);
+                validateTableOfScalarLongs(vt, new long[] {});
+
+                // test where clause.
+                sql = "Select v_p1.v_sum_age from v_p1 join v_r4 on v_p1.v_cnt = v_r4.v_cnt  " +
+                        "where v_p1.v_sum_rent > 15 order by v_p1.v_sum_age;";
+                sql = sql.replace("v_p1", tb);
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+                validateTableOfScalarLongs(vt, new long[] {85, 101});
+
+
+                sql = "Select v_p1.v_sum_age as c1, v_r4.v_sum_rent as c2 from v_p1 join v_r4 " +
+                        "on v_p1.v_cnt >= v_r4.v_cnt " +
+                        "where v_p1.v_sum_rent > -1 and v_p1.v_g1 > 15 and v_p1.v_cnt <= 2 " +
+                        "order by c1, c2 ";
+                sql = sql.replace("v_p1", tb);
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+                validateTableOfLongs(vt, new long[][] {{24,8}, {45, 8}, {45, 13} });
+
+
+                // Test aggregation.
+                sql = "Select SUM(v_p1.v_sum_age) as c1, MAX(v_r4.v_sum_rent) as c2 from v_p1 join v_r4 " +
+                        "on v_p1.v_cnt >= v_r4.v_cnt " +
+                        "where v_p1.v_sum_rent > -1 and v_p1.v_g1 > 15 and v_p1.v_cnt <= 2 " +
+                        "order by c1, c2 ";
+                sql = sql.replace("v_p1", tb);
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+                validateTableOfLongs(vt, new long[][] {{114,13}});
+
+                sql = "Select v_p1.v_g2 as c0 , SUM(v_p1.v_sum_age) as c1, MAX(v_p1.v_sum_rent) as c2 " +
+                        "from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
+                        "where v_p1.v_cnt < 4 " +
+                        "group by v_p1.v_g2 " +
+                        "order by c0, c1, c2 ";
+                sql = sql.replace("v_p1", tb);
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+                System.out.println(vt);
+                validateTableOfLongs(vt, new long[][] {{2, 93, 13}, {3, 170, 37}});
+
+
+                // (2) Three tables join.
+                sql = "Select v_p1.v_cnt from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
+                        "inner join v0_r4 on v_p1.v_g1 = v0_r4.v_g1 " +
+                        "order by v_p1.v_cnt;";
+                sql = sql.replace("v_p1", tb);
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+                validateTableOfScalarLongs(vt, new long[] {1, 1, 1, 1, 2, 3, 3, 3, 3, 4});
+
+                sql = "Select v_p1.v_sum_age from v_p1 join v_r4 on v_p1.v_cnt = v_r4.v_cnt " +
+                        "inner join v0_r4 on v_p1.v_cnt = v0_r4.v_cnt " +
+                        "order by v_p1.v_sum_age;";
+                sql = sql.replace("v_p1", tb);
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+
+                validateTableOfScalarLongs(vt, new long[] {24, 45, 85, 101});
+
+                sql = "Select v_p1.v_sum_age from v_p1 join v_r4 on v_p1.v_cnt = v_r4.v_cnt " +
+                        "inner join v0_r4 on v_p1.v_cnt = v0_r4.v_cnt " +
+                        "where v_p1.v_sum_rent > 15 order by v_p1.v_sum_age;";
+                sql = sql.replace("v_p1", tb);
+                vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+                validateTableOfScalarLongs(vt, new long[] {85, 101});
+            }
+        }
+    }
+
+    public void testENG5386() throws Exception {
+        System.out.println("Test MV partition agg query NO FIX edge cases. ENG5386...");
+        VoltTable vt = null;
+        Client client = this.getClient();
+
+        // Load data
+        loadTableForMVFixSuite();
+        String[] tbs = {"V_R4_ENG5386", "V_P1_ENG5386"};
+        /*
+        * Current expected data:
+        * V_G1, V_G2, V_CNT, V_sum_age, V_min_age, V_max_rent, V_count_rent
+        * 10,   1,     4,     101,       21,        12,             4
+        * 20,   2,     2,     45,        22,         7,             2
+        * 30,   2,     1,     24,        24,         8,             1
+        * 30,   3,     3,     85,        26,        14,             3
+        * */
+
+        for (String tb: tbs) {
+            vt = client.callProcedure("@AdHoc", "Select SUM(V_sum_age), MIN(V_min_age), MAX(V_max_rent), " +
+                    "SUM(V_count_rent)  from " + tb + " ;").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{255,21,14,10}});
+
+
+            vt = client.callProcedure("@AdHoc", "Select V_G1, SUM(V_sum_age), MIN(V_min_age), MAX(V_max_rent), " +
+                    "SUM(V_count_rent)  from " + tb + " GROUP BY V_G1 ORDER BY 1;").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{10,101,21,12,4}, {20,45,22,7,2}, {30,109,24,14,4}});
+
+
+            vt = client.callProcedure("@AdHoc", "Select V_G2, SUM(V_sum_age), MIN(V_min_age), MAX(V_max_rent), " +
+                    "SUM(V_count_rent)  from " + tb + " GROUP BY V_G2 ORDER BY 1;").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{1,101,21,12,4}, {2,69,22,8,3}, {3,85,26,14,3}});
+
+
+            // Where clause.
+            vt = client.callProcedure("@AdHoc", "Select SUM(V_sum_age), MIN(V_min_age), MAX(V_max_rent), " +
+                    "SUM(V_count_rent)  from " + tb + " WHERE v_g1 > 10;").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{154,22,14,6}});
+
+            vt = client.callProcedure("@AdHoc", "Select V_G1, SUM(V_sum_age), MIN(V_min_age), MAX(V_max_rent), " +
+                    "SUM(V_count_rent)  from " + tb + " WHERE v_g1 > 10 GROUP BY V_G1 ORDER BY 1;").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{20,45,22,7,2}, {30,109,24,14,4}});
+
+            vt = client.callProcedure("@AdHoc", "Select V_G1, SUM(V_sum_age), MIN(V_min_age), MAX(V_max_rent), " +
+                    "SUM(V_count_rent)  from " + tb + " WHERE v_g2 > 1 GROUP BY V_G1 ORDER BY 1;").getResults()[0];
+            validateTableOfLongs(vt, new long[][]{{20,45,22,7,2}, {30,109,24,14,4}});
+
+            // join
+            String sql = "";
+            sql = "Select SUM(V_P1_ENG5386.v_sum_age), MAX(v_r4.v_sum_rent), MAX(V_P1_ENG5386.V_max_rent), " +
+                    "MIN(V_P1_ENG5386.V_min_age) from V_P1_ENG5386 join v_r4 on V_P1_ENG5386.v_g1 = v_r4.v_g1;";
+            sql = sql.replace("V_P1_ENG5386", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{364, 37, 14, 21}});
+
+
+            sql = "Select V_P1_ENG5386.v_g1, SUM(V_P1_ENG5386.v_sum_age), MAX(v_r4.v_sum_rent), " +
+                    "MAX(V_P1_ENG5386.V_max_rent), MIN(V_P1_ENG5386.V_min_age) from V_P1_ENG5386 " +
+                    "join v_r4 on V_P1_ENG5386.v_g1 = v_r4.v_g1 GROUP BY V_P1_ENG5386.v_g1 ORDER BY 1;";
+            sql = sql.replace("V_P1_ENG5386", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{10,101,37,12,21}, {20,45,13,7,22}, {30,218,37,14,24}});
+
+
+            // join + where
+            sql = "Select SUM(V_P1_ENG5386.v_sum_age), MAX(v_r4.v_sum_rent), MAX(V_P1_ENG5386.V_max_rent), " +
+                    "MIN(V_P1_ENG5386.V_min_age) from V_P1_ENG5386 join v_r4 on V_P1_ENG5386.v_g1 = v_r4.v_g1 " +
+                    "WHERE V_P1_ENG5386.v_g1 > 10;";
+            sql = sql.replace("V_P1_ENG5386", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{263,37,14,22}});
+
+
+            sql = "Select V_P1_ENG5386.v_g1, SUM(V_P1_ENG5386.v_sum_age), MAX(v_r4.v_sum_rent), " +
+                    "MAX(V_P1_ENG5386.V_max_rent), MIN(V_P1_ENG5386.V_min_age) from V_P1_ENG5386 " +
+                    "join v_r4 on V_P1_ENG5386.v_g1 = v_r4.v_g1 WHERE V_P1_ENG5386.v_g1 > 10 " +
+                    "GROUP BY V_P1_ENG5386.v_g1 ORDER BY 1;";
+            sql = sql.replace("V_P1_ENG5386", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{20,45,13,7,22}, {30,218,37,14,24}});
+
+
+            // Outer join
+            sql = "Select SUM(V_P1_ENG5386.v_sum_age), MAX(v_r4.v_sum_rent), MAX(V_P1_ENG5386.V_max_rent), " +
+                    "MIN(V_P1_ENG5386.V_min_age) from V_P1_ENG5386 left join v_r4 on V_P1_ENG5386.v_g1 < v_r4.v_g1;";
+            sql = sql.replace("V_P1_ENG5386", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{502, 37, 14, 21}});
+
+
+            sql = "Select V_P1_ENG5386.v_g1, SUM(V_P1_ENG5386.v_sum_age), MAX(v_r4.v_sum_rent), " +
+                    "MAX(V_P1_ENG5386.V_max_rent), MIN(V_P1_ENG5386.V_min_age) from V_P1_ENG5386 " +
+                    "left join v_r4 on V_P1_ENG5386.v_g1 < v_r4.v_g1 GROUP BY V_P1_ENG5386.v_g1 ORDER BY 1;";
+            sql = sql.replace("V_P1_ENG5386", tb);
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            System.out.println(vt);
+            long voltNullLong = Long.MIN_VALUE;
+            if (isHSQL()) {
+                voltNullLong = 0l;
+            }
+            validateTableOfLongs(vt, new long[][] {{10,303,37,12,21}, {20,90,37,7,22}, {30,109,voltNullLong,14,24}});
+
+        }
+
+    }
+
     //
     // Suite builder boilerplate
     //
@@ -943,7 +1471,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         try {
             project0.addLiteralSchema(literalSchema);
         } catch (IOException e) {
-            assertFalse(true);
+            fail();
         }
 
         config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
@@ -975,7 +1503,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         try {
             project1.addLiteralSchema(literalSchema);
         } catch (IOException e) {
-            assertFalse(true);
+            fail();
         }
 
         config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
@@ -991,7 +1519,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         VoltProjectBuilder project = new VoltProjectBuilder();
         literalSchema =
                 "CREATE TABLE R1 ( " +
-                "id INTEGER DEFAULT '0' NOT NULL, " +
+                "id INTEGER NOT NULL, " +
                 "wage INTEGER, " +
                 "dept INTEGER, " +
                 "PRIMARY KEY (id) );" +
@@ -1009,7 +1537,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "AS SELECT ABS(dept), count(*), SUM(wage+id) FROM R1 GROUP BY ABS(dept);" +
 
                 "CREATE TABLE R2 ( " +
-                "id INTEGER DEFAULT '0' NOT NULL, " +
+                "id INTEGER NOT NULL, " +
                 "wage INTEGER, " +
                 "dept INTEGER, " +
                 "tm TIMESTAMP DEFAULT NULL, " +
@@ -1023,9 +1551,44 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "AS SELECT ABS(DEPT), COUNT (*), MAX(WAGE * 2), MIN(TM) " +
                 "FROM R2 GROUP BY ABS(DEPT);" +
 
+                // R5 mv tests are mainly for string handling concerns
+                // -- it's a JSONic variant of R2 and its views -- a test for ENG-5292
+                "CREATE TABLE R5 ( " +
+                "id INTEGER NOT NULL, " +
+                "JSON_DATA VARCHAR(100)," +
+                // JSON FIELDS:
+                //   wage INTEGER
+                //   dept INTEGER
+                //   tm_year INTEGER
+                //   tm_month INTEGER
+                //   tm_day INTEGER
+                "PRIMARY KEY (ID) );" +
+
+                "CREATE VIEW V_R5_MIN_MAX (DEPT, CNT, MAX_WAGE, MIN_TM) " +
+                "AS SELECT ABS(CAST(FIELD(JSON_DATA, 'dept') AS INTEGER)), COUNT(*), " +
+                "MAX(FIELD(JSON_DATA, 'wage')), MIN(FIELD(JSON_DATA, 'tm_year')) " +
+                "FROM R5 " +
+                "GROUP BY  ABS(CAST(FIELD(JSON_DATA, 'dept') AS INTEGER));" +
+
+                // R6 mv tests our arbitrary string limitations
+                "CREATE TABLE R6 ( " +
+                "id INTEGER NOT NULL, " +
+                "grupo INTEGER NOT NULL, " +
+                "JSON_DATA VARCHAR(10000)," +
+                // JSON FIELDS:
+                //   unused - an unused string that pads the base table column just to show we can.
+                //   used  - a string that gets used in a mat view MIN column, triggering the
+                //           size limitation when it gets too large.
+                "PRIMARY KEY (ID) );" +
+
+                "CREATE VIEW V_R6_MIN_MAX (GRUPO, CNT, MAX_USED) " +
+                "AS SELECT grupo, COUNT(*), MAX(FIELD(JSON_DATA, 'used')) " +
+                "FROM R6 " +
+                "GROUP BY grupo;" +
+
                 // R3 mv tests are mainly for memory concerns
                 "CREATE TABLE R3 ( " +
-                "id INTEGER DEFAULT '0' NOT NULL, " +
+                "id INTEGER DEFAULT 0 NOT NULL, " +
                 "wage INTEGER, " +
                 "vshort VARCHAR(20)," +
                 "vlong VARCHAR(200)," +
@@ -1049,9 +1612,8 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "count(*), SUM(wage) " +
                 "FROM R3 GROUP BY vlong || '" + longStr + "';" +
 
-
                 "CREATE TABLE P1 ( " +
-                "id INTEGER DEFAULT '0' NOT NULL, " +
+                "id INTEGER DEFAULT 0 NOT NULL, " +
                 "wage INTEGER, " +
                 "dept INTEGER, " +
                 "age INTEGER,  " +
@@ -1067,14 +1629,18 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "AS SELECT abs(wage), dept, count(*), sum(age), sum(rent)  FROM P1 " +
                 "GROUP BY abs(wage), dept;" +
 
+                "CREATE VIEW V_P1_ENG5386 (V_G1, V_G2, V_CNT, V_sum_age, v_min_age, V_max_rent, v_count_rent) " +
+                "AS SELECT wage, dept, count(*), sum(age), min(age), max(rent), count(rent)  FROM P1 " +
+                "GROUP BY wage, dept;" +
+
                 // NO Need to fix mv query
                 "CREATE TABLE P2 ( " +
-                "id INTEGER DEFAULT '0' NOT NULL, " +
+                "id INTEGER DEFAULT 0 NOT NULL ASSUMEUNIQUE, " +
                 "wage INTEGER, " +
                 "dept INTEGER NOT NULL, " +
                 "age INTEGER,  " +
                 "rent INTEGER, " +
-                "PRIMARY KEY (id) );" +
+                "PRIMARY KEY (dept, id) );" +
                 "PARTITION TABLE P2 ON COLUMN dept;" +
 
                 "CREATE VIEW V_P2 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) " +
@@ -1083,7 +1649,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
 
                 // NO Need to fix mv query
                 "CREATE TABLE R4 ( " +
-                "id INTEGER DEFAULT '0' NOT NULL, " +
+                "id INTEGER DEFAULT 0 NOT NULL, " +
                 "wage BIGINT, " +
                 "dept BIGINT, " +
                 "age INTEGER,  " +
@@ -1091,6 +1657,14 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "PRIMARY KEY (id) );" +
 
                 "CREATE VIEW V_R4 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) " +
+                "AS SELECT wage, dept, count(*), sum(age), sum(rent)  FROM R4 " +
+                "GROUP BY wage, dept;" +
+
+                "CREATE VIEW V_R4_ENG5386 (V_G1, V_G2, V_CNT, V_sum_age, v_min_age, V_max_rent, v_count_rent) " +
+                "AS SELECT wage, dept, count(*), sum(age), min(age), max(rent), count(rent)  FROM R4 " +
+                "GROUP BY wage, dept;" +
+
+                "CREATE VIEW V0_R4 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) " +
                 "AS SELECT wage, dept, count(*), sum(age), sum(rent)  FROM R4 " +
                 "GROUP BY wage, dept;" +
 
@@ -1102,7 +1676,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         try {
             project.addLiteralSchema(literalSchema);
         } catch (IOException e) {
-            assertFalse(true);
+            fail();
         }
 
         //* Single-server configuration  -- please do not remove or corrupt this structured comment

@@ -181,11 +181,10 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
                             "the next time the condition occurs to avoid log spam");
                 }
                 if (badPendingBytes) {
-                    networkLog.error("Admission control error, negative outstanding transaction byte count (" +
-                            m_pendingTxnBytes + "). " +
-                            "This is error is not fatal, but it does indicate that admission control " +
-                            "is not correctly tracking transaction resource usage. This message will not repeat " +
-                            "the next time the condition occurs to avoid log spam");
+                    networkLog.warn(
+                            "Backpressure reports a negative outstanding transaction byte count (" +
+                            m_pendingTxnBytes +
+                            "). No action required.");
                 }
             }
 
@@ -210,11 +209,13 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
         if (messageSize < 1) {
             throw new IllegalArgumentException("Message size must be > 0 but was " + messageSize);
         }
+
         m_pendingTxnBytes -= messageSize;
         m_pendingTxnCount--;
         checkAndLogInvariants();
-        if (m_pendingTxnBytes < LESS_THAN_MAX_DESIRED_PENDING_BYTES &&
-            m_pendingTxnCount < LESS_THAN_MAX_DESIRED_PENDING_TXNS)
+
+        if ((m_pendingTxnBytes < LESS_THAN_MAX_DESIRED_PENDING_BYTES) &&
+            (m_pendingTxnCount < LESS_THAN_MAX_DESIRED_PENDING_TXNS))
         {
             if (m_hadBackPressure) {
                 hostLog.debug("TXN backpressure ended");
@@ -245,29 +246,25 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
      */
     @Override
     public boolean queue(int bytes) {
-        if (bytes > 0) {
-            m_pendingTxnBytes += bytes;
-            checkAndLogInvariants();
-            if (m_pendingTxnBytes > MAX_DESIRED_PENDING_BYTES) {
-                if (!m_hadBackPressure) {
-                    hostLog.debug("TXN back pressure began");
-                    m_hadBackPressure = true;
-                    for (ACGMember m : m_members) {
-                        m.onBackpressure();
-                    }
+        m_pendingTxnBytes += bytes;
+        checkAndLogInvariants();
+
+        if (m_pendingTxnBytes > MAX_DESIRED_PENDING_BYTES) {
+            if (!m_hadBackPressure) {
+                hostLog.debug("TXN back pressure began");
+                m_hadBackPressure = true;
+                for (ACGMember m : m_members) {
+                    m.onBackpressure();
                 }
             }
-        } else {
-            m_pendingTxnBytes += bytes;
-            checkAndLogInvariants();
-            if (m_pendingTxnBytes < LESS_THAN_MAX_DESIRED_PENDING_BYTES &&
-                    m_pendingTxnCount < LESS_THAN_MAX_DESIRED_PENDING_TXNS) {
-                if (m_hadBackPressure) {
-                    hostLog.debug("TXN backpressure ended");
-                    m_hadBackPressure = false;
-                    for (ACGMember m : m_members) {
-                        m.offBackpressure();
-                    }
+        }
+        else if ((m_pendingTxnBytes < LESS_THAN_MAX_DESIRED_PENDING_BYTES) &&
+                (m_pendingTxnCount < LESS_THAN_MAX_DESIRED_PENDING_TXNS)) {
+            if (m_hadBackPressure) {
+                hostLog.debug("TXN backpressure ended");
+                m_hadBackPressure = false;
+                for (ACGMember m : m_members) {
+                    m.offBackpressure();
                 }
             }
         }

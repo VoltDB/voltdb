@@ -98,14 +98,14 @@ const size_t MAX_DETAIL_COUNT = 50;
 typedef int64_t T_Value;
 typedef stx::btree_set<T_Value> T_ValueSet;
 
-class T_HashRange : public std::pair<int64_t, int64_t> {
+class T_HashRange : public std::pair<int32_t, int32_t> {
 public:
-    T_HashRange(int64_t i1, int64_t i2, bool empty = false) :
-            std::pair<int64_t, int64_t>(i1, i2),
+    T_HashRange(int32_t i1, int32_t i2, bool empty = false) :
+            std::pair<int32_t, int32_t>(i1, i2),
             m_empty(empty)
     {}
 
-    bool inRange(int64_t i) {
+    bool inRange(int32_t i) {
         if (first >= second) {
             return i >= first || i < second;
         }
@@ -131,7 +131,7 @@ typedef std::vector<T_HashRange> T_HashRangeVector;
  */
 class CopyOnWriteTest : public Test {
 public:
-    CopyOnWriteTest() {
+    CopyOnWriteTest() : m_table(NULL) {
         m_tuplesInserted = 0;
         m_tuplesUpdated = 0;
         m_tuplesDeleted = 0;
@@ -139,7 +139,8 @@ public:
         m_tuplesDeletedInLastUndo = 0;
         m_engine = new voltdb::VoltDBEngine();
         int partitionCount = 1;
-        m_engine->initialize(1,1, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY, HASHINATOR_LEGACY, (char*)&partitionCount);
+        m_engine->initialize(1,1, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY);
+        m_engine->updateHashinator( HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
 
         m_columnNames.push_back("1");
         m_columnNames.push_back("2");
@@ -206,7 +207,9 @@ public:
 
     ~CopyOnWriteTest() {
         delete m_engine;
-        delete m_table;
+        if (m_table != NULL) {
+            delete m_table;
+        }
     }
 
     void iterate() {
@@ -755,9 +758,8 @@ public:
             bool isIndexed;
             if (directKey) {
                 // Direct key tests synthesize keys with NULL tuple addresses.
-                int64_t hash[2];
-                MurmurHash3_x64_128(tuple.address()+1, sizeof(int32_t), 0, hash);
-                ElasticIndexKey key(hash[0], NULL);
+                int32_t hash = MurmurHash3_x64_128(tuple.address()+1, sizeof(int32_t), 0);
+                ElasticIndexKey key(hash, (char *) NULL);
                 isIndexed = index->exists(key);
             }
             else {
@@ -1050,12 +1052,15 @@ public:
             if (serialized == 0) {
                 break;
             }
+
+            // Trying to clear an index that's not drained will fail, but should be side-effect free
+            clearIndex(testRange, false);
+
             int ii = 12; // skip partition id, row count, and first tuple size
             while (ii < (serialized - 4)) {
                 int value = ntohl(*reinterpret_cast<int32_t*>(&m_serializationBuffer[ii]));
-                int64_t hash[2];
-                MurmurHash3_x64_128(&value, sizeof(value), 0, hash);
-                ElasticIndexKey key(hash[0], NULL);
+                int32_t hash = MurmurHash3_x64_128(&value, sizeof(value), 0);
+                ElasticIndexKey key(hash, (char *) NULL);
                 bool inserted = index.add(key);
                 ASSERT_TRUE(inserted);
                 totalInserted++;
@@ -1790,7 +1795,7 @@ TEST_F(CopyOnWriteTest, ElasticIndex) {
     tableScrambler.initialize();
 
     T_HashRangeVector ranges;
-    ranges.push_back(T_HashRange(0x0000000000000000, 0x7fffffffffffffff));
+    ranges.push_back(T_HashRange(0x00000000, 0x7fffffff));
     std::vector<std::string> predicateStrings;
     predicateStrings.push_back(generateHashRangePredicate(ranges));
     std::vector<bool> deleteFlags;
@@ -1834,18 +1839,22 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
     // These ranges test edge conditions and also that hash range expressions
     // and elastic index predicates filter the same way.
     T_HashRangeVector testRanges;
-    const int64_t maxint = std::numeric_limits<int64_t>::max();
-    const int64_t minint = std::numeric_limits<int64_t>::min();
+    const int32_t maxint = std::numeric_limits<int32_t>::max();
+    const int32_t minint = std::numeric_limits<int32_t>::min();
     testRanges.push_back(T_HashRange(0, maxint));
-    testRanges.push_back(T_HashRange(maxint, 0));
+//Don't support wrapping
+//    testRanges.push_back(T_HashRange(maxint, 0));
     testRanges.push_back(T_HashRange(minint, 0));
-    testRanges.push_back(T_HashRange(0, minint));
+//Don't support wrapping
+//    testRanges.push_back(T_HashRange(0, minint));
     testRanges.push_back(T_HashRange(minint, maxint));
-    testRanges.push_back(T_HashRange(maxint, minint, true));    // empty range
+//Don't support wrapping
+//    testRanges.push_back(T_HashRange(maxint, minint, true));    // empty range
     testRanges.push_back(T_HashRange(-maxint/2, +maxint/2));
-    testRanges.push_back(T_HashRange(+maxint/2, -maxint/2));
-    testRanges.push_back(T_HashRange(0, 0));
-    testRanges.push_back(T_HashRange(maxint, maxint));
+//Don't support wrapping
+//    testRanges.push_back(T_HashRange(+maxint/2, -maxint/2));
+//    testRanges.push_back(T_HashRange(0, 0));
+//    testRanges.push_back(T_HashRange(maxint, maxint));
 
     for (int itest = 0; itest < testRanges.size(); ++itest) {
         resetTest();
@@ -1930,6 +1939,19 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
 
         itest++;
     }
+}
+
+TEST_F(CopyOnWriteTest, ElasticIndexLowerUpperBounds) {
+    ElasticIndex index;
+    ElasticIndexKey key1(1, (char *)&index);
+    bool inserted = index.add(key1);
+    ASSERT_TRUE(inserted);
+    ElasticIndexKey key2(3, (char *)&index);
+    inserted = index.add(key2);
+    ASSERT_TRUE(inserted);
+
+    ASSERT_TRUE(key1 == *index.createLowerBoundIterator(1));
+    ASSERT_TRUE(index.createUpperBoundIterator(3) == index.end());
 }
 
 int main() {

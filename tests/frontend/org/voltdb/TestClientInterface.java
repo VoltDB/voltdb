@@ -42,6 +42,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -173,7 +175,7 @@ public class TestClientInterface {
         catalog.execute(serializedCat);
 
         String deploymentPath = builder.getPathToDeployment();
-        CatalogUtil.compileDeploymentAndGetCRC(catalog, deploymentPath, true);
+        CatalogUtil.compileDeploymentAndGetCRC(catalog, deploymentPath, true, false);
 
         m_context = new CatalogContext(0, 0, catalog, bytes, 0, 0, 0);
         TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(3));
@@ -622,5 +624,60 @@ public class TestClientInterface {
 
         // the hashinator should've been updated in either case
         assertEquals(newHashinatorVersion, TheHashinator.getCurrentVersionedConfig().getFirst().longValue());
+    }
+
+    @Test
+    public void testGetPartitionKeys() throws IOException {
+        //Unsupported type
+        ByteBuffer msg = createMsg("@GetPartitionKeys", "BIGINT");
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNotNull(resp);
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
+
+        //Null param
+        msg = createMsg("@GetPartitionKeys", new Object[] { null });
+        resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNotNull(resp);
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
+
+        //Empty string param
+        msg = createMsg("@GetPartitionKeys", "");
+        resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNotNull(resp);
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
+
+        //Junk string
+        msg = createMsg("@GetPartitionKeys", "ryanlikestheyankees");
+        resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNotNull(resp);
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
+
+        //No param
+        msg = createMsg("@GetPartitionKeys");
+        resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNotNull(resp);
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
+
+        //Extra param
+        msg = createMsg("@GetPartitionKeys", "INTEGER", 99);
+        resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNotNull(resp);
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
+
+        //Correct param with no case sensitivity
+        msg = createMsg("@GetPartitionKeys", "InTeGeR");
+        resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNotNull(resp);
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        VoltTable vt = resp.getResults()[0];
+        assertEquals(3, vt.getRowCount());
+        assertEquals(VoltType.INTEGER, vt.getColumnType(1));
+
+        Set<Integer> partitions = new HashSet<Integer>(Arrays.asList( 0, 1, 2));
+        while (vt.advanceRow()) {
+            int partition = TheHashinator.getPartitionForParameter(VoltType.INTEGER.getValue(), vt.getLong(1));
+            assertTrue(partitions.remove(partition));
+        }
+        assertTrue(partitions.isEmpty());
     }
 }

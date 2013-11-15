@@ -17,48 +17,81 @@
 package org.voltdb;
 
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
-import java.util.Collection;
-import java.util.HashMap;
+import java.util.*;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.TreeSet;
-import java.util.zip.DeflaterOutputStream;
-import java.util.zip.InflaterOutputStream;
 
+import com.google.common.collect.ImmutableSortedSet;
+import com.google.common.collect.Maps;
+import com.google.common.collect.SortedMapDifference;
 import org.apache.cassandra_voltpatches.MurmurHash3;
 import org.voltcore.utils.Pair;
 
-import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSortedMap;
-import com.google.common.collect.Maps;
 import com.google.common.collect.UnmodifiableIterator;
+import org.voltdb.utils.CompressionService;
 
 /**
  * A hashinator that uses Murmur3_x64_128 to hash values and a consistent hash ring
  * to pick what partition to route a particular value.
  */
 public class ElasticHashinator extends TheHashinator {
-    public static int DEFAULT_TOKENS_PER_PARTITION =
-        Integer.parseInt(System.getProperty("ELASTIC_TOKENS_PER_PARTITION", "256"));
+    public static int DEFAULT_TOTAL_TOKENS =
+        Integer.parseInt(System.getProperty("ELASTIC_TOTAL_TOKENS", "16384"));
 
-    static final String SECURE_RANDOM_ALGORITHM = "SHA1PRNG";
-    static final byte [] SECURE_RANDON_SEED = "Festina Lente".getBytes(Charsets.UTF_8);
+    private static final sun.misc.Unsafe unsafe;
+
+    private static sun.misc.Unsafe getUnsafe() {
+        try {
+            return sun.misc.Unsafe.getUnsafe();
+        } catch (SecurityException se) {
+            try {
+                return java.security.AccessController.doPrivileged
+                        (new java.security
+                                .PrivilegedExceptionAction<sun.misc.Unsafe>() {
+                            public sun.misc.Unsafe run() throws Exception {
+                                java.lang.reflect.Field f = sun.misc
+                                        .Unsafe.class.getDeclaredField("theUnsafe");
+                                f.setAccessible(true);
+                                return (sun.misc.Unsafe) f.get(null);
+                            }});
+            } catch (java.security.PrivilegedActionException e) {
+                throw new RuntimeException("Could not initialize intrinsics",
+                        e.getCause());
+            }
+        }
+    }
+
+    static {
+        sun.misc.Unsafe unsafeTemp = null;
+        try {
+            unsafeTemp = getUnsafe();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        unsafe = unsafeTemp;
+    }
 
     /**
      * Tokens on the ring. A value hashes to a token if the token is the first value <=
      * the value's hash
      */
-    private final ImmutableSortedMap<Long, Integer> m_tokens;
+    private final Supplier<ImmutableSortedMap<Integer, Integer>> m_tokensMap;
+
+    /*
+     * Pointer to an array of integers containing the tokens and partitions. Even values are tokens and odd values
+     * are partition ids.
+     */
+    private final long m_tokens;
+    private final int m_tokenCount;
+
     private final Supplier<byte[]> m_configBytes;
     private final Supplier<byte[]> m_configBytesSupplier = Suppliers.memoize(new Supplier<byte[]>() {
         @Override
@@ -80,37 +113,9 @@ public class ElasticHashinator extends TheHashinator {
         }
     });
 
-
-    /**
-     * Encapsulates all knowledge of how to compress/uncompress hash tokens.
-     */
-    private static class TokenCompressor {
-        final static long TOKEN_MASK = 0xFFFFFFFF00000000L;
-        final static int COMPRESSED_SIZE = 4;
-
-        /**
-         * Prepare token for compression.
-         * @return cleaned up token
-         */
-        static long prepare(long token) {
-            return token & TOKEN_MASK;
-        }
-
-        /**
-         * Compress token.
-         * @return compressed token
-         */
-        static int compress(long token) {
-            return (int)(token >>> 32);
-        }
-
-        /**
-         * Uncompress token.
-         * @return uncompressed token
-         */
-        static long uncompress(int token) {
-            return (long)token << 32;
-        }
+    @Override
+    public int pHashToPartition(VoltType type, Object obj) {
+        return hashinateBytes(valueToBytes(obj));
     }
 
     /**
@@ -122,10 +127,26 @@ public class ElasticHashinator extends TheHashinator {
      * @param cooked  compressible wire serialization format if true
      */
     public ElasticHashinator(byte configBytes[], boolean cooked) {
-        m_tokens = (cooked ? updateCooked(configBytes)
+        Pair<Long, Integer> p = (cooked ? updateCooked(configBytes)
                 : updateRaw(configBytes));
+        m_tokens = p.getFirst();
+        m_tokenCount = p.getSecond();
         m_configBytes = !cooked ? Suppliers.ofInstance(configBytes) : m_configBytesSupplier;
         m_cookedBytes = cooked ? Suppliers.ofInstance(configBytes) : m_cookedBytesSupplier;
+        m_tokensMap =  Suppliers.memoize(new Supplier<ImmutableSortedMap<Integer, Integer>>() {
+
+            @Override
+            public ImmutableSortedMap<Integer, Integer> get() {
+                ImmutableSortedMap.Builder<Integer, Integer> builder = ImmutableSortedMap.naturalOrder();
+                for (int ii = 0; ii < m_tokenCount; ii++) {
+                    final long ptr = m_tokens + (ii * 8);
+                    final int token = unsafe.getInt(ptr);
+                    final int partition = unsafe.getInt(ptr + 4);
+                    builder.put(token, partition);
+                }
+                return builder.build();
+            }
+        });
     }
 
     /**
@@ -133,56 +154,30 @@ public class ElasticHashinator extends TheHashinator {
      * partitions from existing hashinator.
      * @param tokens
      */
-    private ElasticHashinator(Map<Long, Integer> tokens) {
-        this.m_tokens = ImmutableSortedMap.copyOf(tokens);
+    private ElasticHashinator(SortedMap<Integer, Integer> tokens) {
+        m_tokensMap = Suppliers.ofInstance(ImmutableSortedMap.copyOf(tokens));
+        Preconditions.checkArgument(m_tokensMap.get().firstEntry().getKey().equals(Integer.MIN_VALUE));
+        m_tokens = unsafe.allocateMemory(8 * tokens.size());
+        int ii = 0;
+        for (Map.Entry<Integer, Integer> e : tokens.entrySet()) {
+            final long ptr = m_tokens + (ii * 8);
+            unsafe.putInt(ptr, e.getKey());
+            unsafe.putInt(ptr + 4, e.getValue());
+            ii++;
+        }
+        m_tokenCount = tokens.size();
         m_configBytes = m_configBytesSupplier;
         m_cookedBytes = m_cookedBytesSupplier;
     }
 
-    /**
-     * Given an existing elastic hashinator, add a set of new partitions to the existing hash ring.
-     * @param oldHashinator An elastic hashinator
-     * @param newPartitions A set of new partitions to add
-     * @param tokensPerPartition The number of times a partition appears on the ring
-     * @return The config bytes of the new hash ring
-     */
     public static byte[] addPartitions(TheHashinator oldHashinator,
-                                       Collection<Integer> newPartitions,
-                                       int tokensPerPartition) {
+                                       int partitionsToAdd) {
         Preconditions.checkArgument(oldHashinator instanceof ElasticHashinator);
         ElasticHashinator oldElasticHashinator = (ElasticHashinator) oldHashinator;
 
-        SecureRandom sr;
-        try {
-            sr = SecureRandom.getInstance(SECURE_RANDOM_ALGORITHM);
-            sr.setSeed(SECURE_RANDON_SEED);
-        } catch (NoSuchAlgorithmException ex) {
-            throw new RuntimeException("Unable to initialize secure random generator", ex);
-        }
-
-        Map<Long, Integer> newConfig = new HashMap<Long, Integer>(oldElasticHashinator.m_tokens);
-        Set<Integer> existingPartitions = new HashSet<Integer>(oldElasticHashinator.m_tokens.values());
-        Set<Long> checkSet = new HashSet<Long>(oldElasticHashinator.m_tokens.keySet());
-
-        for (int pid : newPartitions) {
-            if (existingPartitions.contains(pid)) {
-                throw new RuntimeException("Partition " + pid + " already exists in the " +
-                        "hashinator");
-            }
-
-            for (int i = 0; i < tokensPerPartition; i++) {
-                while (true) {
-                    long candidateToken = TokenCompressor.prepare(sr.nextLong());
-                    if (!checkSet.add(candidateToken)) {
-                        continue;
-                    }
-                    newConfig.put(candidateToken, pid);
-                    break;
-                }
-            }
-        }
-
-        return new ElasticHashinator(newConfig).toBytes();
+        Buckets buckets = new Buckets(oldElasticHashinator.m_tokensMap.get());
+        buckets.addPartitions(partitionsToAdd);
+        return new ElasticHashinator(buckets.getTokens()).getConfigBytes();
     }
 
     /**
@@ -190,17 +185,12 @@ public class ElasticHashinator extends TheHashinator {
      * on a given partition count and tokens per partition. Each partition will have N tokens
      * placed randomly on the ring.
      */
-    public static byte[] getConfigureBytes(int partitionCount, int tokensPerPartition) {
+    public static byte[] getConfigureBytes(int partitionCount, int tokenCount) {
         Preconditions.checkArgument(partitionCount > 0);
-        Preconditions.checkArgument(tokensPerPartition > 0);
-        ElasticHashinator emptyHashinator = new ElasticHashinator(new HashMap<Long, Integer>());
-        Set<Integer> partitions = new TreeSet<Integer>();
-
-        for (int ii = 0; ii < partitionCount; ii++) {
-            partitions.add(ii);
-        }
-
-        return addPartitions(emptyHashinator, partitions, tokensPerPartition);
+        Preconditions.checkArgument(tokenCount > partitionCount);
+        Buckets buckets = new Buckets(partitionCount, tokenCount);
+        ElasticHashinator hashinator = new ElasticHashinator(buckets.getTokens());
+        return hashinator.getConfigBytes();
     }
 
     /**
@@ -208,16 +198,18 @@ public class ElasticHashinator extends TheHashinator {
      * @return The byte[] of the current configuration.
      */
     private byte[] toBytes() {
-        ByteBuffer buf = ByteBuffer.allocate(4 + (m_tokens.size() * (8 + TokenCompressor.COMPRESSED_SIZE)));
-        buf.putInt(m_tokens.size());
-
-        for (Map.Entry<Long, Integer> e : m_tokens.entrySet()) {
-            long token = e.getKey();
-            int pid = e.getValue();
-            buf.putLong(token);
+        ByteBuffer buf = ByteBuffer.allocate(4 + (m_tokenCount * 8));
+        buf.putInt(m_tokenCount);
+        int lastToken = Integer.MIN_VALUE;
+        for (int ii = 0; ii < m_tokenCount; ii++) {
+            final long ptr = m_tokens + (ii * 8);
+            final int token = unsafe.getInt(ptr);
+            Preconditions.checkArgument(token >= lastToken);
+            lastToken = token;
+            final int pid = unsafe.getInt(ptr + 4);
+            buf.putInt(token);
             buf.putInt(pid);
         }
-
         return buf.array();
     }
 
@@ -226,42 +218,52 @@ public class ElasticHashinator extends TheHashinator {
      * be the first token <= the value hash, or if the value hash is < the first token in the ring,
      * it wraps around to the last token in the ring closest to Long.MAX_VALUE
      */
-    public int partitionForToken(long hash) {
-        Map.Entry<Long, Integer> entry = m_tokens.floorEntry(hash);
-        //System.out.println("Finding partition for token " + token);
-        /*
-         * Because the tokens are randomly distributed it is likely there is a range
-         * near Long.MIN_VALUE that isn't covered by a token. Conceptually this is a ring
-         * so the correct token is the one near Long.MAX_VALUE.
-         */
-        if (entry != null) {
-            //System.out.println("Floor token was " + entry.getKey());
-            return entry.getValue();
-        } else {
-            //System.out.println("Last entry token " + tokens.lastEntry().getKey());
-            return m_tokens.lastEntry().getValue();
-        }
+    public int partitionForToken(int hash) {
+        long token = getTokenPtr(hash);
+        return unsafe.getInt(token + 4);
     }
 
     /**
      * Get all the tokens on the ring.
      */
-    public ImmutableSortedMap<Long, Integer> getTokens()
+    public ImmutableSortedMap<Integer, Integer> getTokens()
     {
-        return m_tokens;
+        return m_tokensMap.get();
     }
 
     /**
-     * Add the given token to the ring and generate the new hashinator. The current hashinator is not changed.
-     * @param token        The new token
-     * @param partition    The partition associated with the new token
+     * Add the given tokens to the ring and generate the new hashinator. The current hashinator is not changed.
+     * @param tokensToAdd    Tokens to add as a map of tokens to partitions
      * @return The new hashinator
      */
-    public ElasticHashinator addToken(long token, int partition)
+    public ElasticHashinator addTokens(NavigableMap<Integer, Integer> tokensToAdd)
     {
-        HashMap<Long, Integer> newTokens = Maps.newHashMap(m_tokens);
-        newTokens.put(token, partition);
-        return new ElasticHashinator(newTokens);
+        // figure out the interval
+        long interval = deriveTokenInterval(m_tokensMap.get().keySet());
+
+        Map<Integer, Integer> tokens = Maps.newTreeMap();
+        for (Map.Entry<Integer, Integer> e : m_tokensMap.get().entrySet()) {
+            if (tokensToAdd.containsKey(e.getKey())) {
+                continue;
+            }
+
+            // see if we are moving an intermediate token forward
+            if (isIntermediateToken(e.getKey(), interval)) {
+                Map.Entry<Integer, Integer> floorEntry = tokensToAdd.floorEntry(e.getKey());
+                // If the two tokens belong to the same partition and bucket, we are moving the one on the ring
+                // forward, so remove it from the ring
+                if (floorEntry != null &&
+                    floorEntry.getValue().equals(e.getValue()) &&
+                    containingBucket(floorEntry.getKey(), interval) == containingBucket(e.getKey(), interval)) {
+                    continue;
+                }
+            }
+
+            tokens.put(e.getKey(), e.getValue());
+        }
+        tokens.putAll(tokensToAdd);
+
+        return new ElasticHashinator(ImmutableSortedMap.copyOf(tokens));
     }
 
     @Override
@@ -274,13 +276,17 @@ public class ElasticHashinator extends TheHashinator {
     @Override
     public int pHashinateBytes(byte[] bytes) {
         ByteBuffer buf = ByteBuffer.wrap(bytes);
-        final long token = MurmurHash3.hash3_x64_128(buf, 0, bytes.length, 0);
+        final int token = MurmurHash3.hash3_x64_128(buf, 0, bytes.length, 0);
         return partitionForToken(token);
     }
 
     @Override
-    protected Pair<HashinatorType, byte[]> pGetCurrentConfig() {
-        return Pair.of(HashinatorType.ELASTIC, m_configBytes.get());
+    protected HashinatorConfig pGetCurrentConfig() {
+        return new HashinatorConfig(HashinatorType.ELASTIC, m_configBytes.get(), m_tokens, m_tokenCount) {
+            //Store a reference to this hashinator in the config so it doesn't get GCed and release
+            //the pointer to the config data that is off heap
+            private final ElasticHashinator myHashinator = ElasticHashinator.this;
+        };
     }
 
     /**
@@ -292,25 +298,25 @@ public class ElasticHashinator extends TheHashinator {
      * map will be empty.
      */
     @Override
-    public Map<Long, Integer> pPredecessors(int partition) {
-        Map<Long, Integer> predecessors = new TreeMap<Long, Integer>();
-        UnmodifiableIterator<Map.Entry<Long,Integer>> iter = m_tokens.entrySet().iterator();
-        Set<Long> pTokens = new HashSet<Long>();
+    public Map<Integer, Integer> pPredecessors(int partition) {
+        Map<Integer, Integer> predecessors = new TreeMap<Integer, Integer>();
+        UnmodifiableIterator<Map.Entry<Integer,Integer>> iter = m_tokensMap.get().entrySet().iterator();
+        Set<Integer> pTokens = new HashSet<Integer>();
         while (iter.hasNext()) {
-            Map.Entry<Long, Integer> next = iter.next();
+            Map.Entry<Integer, Integer> next = iter.next();
             if (next.getValue() == partition) {
                 pTokens.add(next.getKey());
             }
         }
 
-        for (Long token : pTokens) {
-            Map.Entry<Long, Integer> predecessor = null;
+        for (Integer token : pTokens) {
+            Map.Entry<Integer, Integer> predecessor = null;
             if (token != null) {
-                predecessor = m_tokens.headMap(token).lastEntry();
+                predecessor = m_tokensMap.get().headMap(token).lastEntry();
                 // If null, it means partition is the first one on the ring, so predecessor
                 // should be the last entry on the ring because it wraps around.
                 if (predecessor == null) {
-                    predecessor = m_tokens.lastEntry();
+                    predecessor = m_tokensMap.get().lastEntry();
                 }
             }
 
@@ -329,13 +335,13 @@ public class ElasticHashinator extends TheHashinator {
      * @return The predecessor of the given token.
      */
     @Override
-    public Pair<Long, Integer> pPredecessor(int partition, long token) {
-        Integer partForToken = m_tokens.get(token);
+    public Pair<Integer, Integer> pPredecessor(int partition, int token) {
+        Integer partForToken = m_tokensMap.get().get(token);
         if (partForToken != null && partForToken == partition) {
-            Map.Entry<Long, Integer> predecessor = m_tokens.headMap(token).lastEntry();
+            Map.Entry<Integer, Integer> predecessor = m_tokensMap.get().headMap(token).lastEntry();
 
             if (predecessor == null) {
-                predecessor = m_tokens.lastEntry();
+                predecessor = m_tokensMap.get().lastEntry();
             }
 
             if (predecessor.getKey() != token) {
@@ -355,17 +361,17 @@ public class ElasticHashinator extends TheHashinator {
      * This runs in linear time with respect to the number of tokens on the ring.
      */
     @Override
-    public Map<Long, Long> pGetRanges(int partition) {
-        Map<Long, Long> ranges = new TreeMap<Long, Long>();
-        Long first = null; // start of the very first token on the ring
-        Long start = null; // start of a range
-        UnmodifiableIterator<Map.Entry<Long,Integer>> iter = m_tokens.entrySet().iterator();
+    public Map<Integer, Integer> pGetRanges(int partition) {
+        Map<Integer, Integer> ranges = new TreeMap<Integer, Integer>();
+        Integer first = null; // start of the very first token on the ring
+        Integer start = null; // start of a range
+        UnmodifiableIterator<Map.Entry<Integer,Integer>> iter = m_tokensMap.get().entrySet().iterator();
 
         // Iterate through the token map to find the ranges assigned to
         // the given partition
         while (iter.hasNext()) {
-            Map.Entry<Long, Integer> next = iter.next();
-            long token = next.getKey();
+            Map.Entry<Integer, Integer> next = iter.next();
+            int token = next.getKey();
             int pid = next.getValue();
 
             if (first == null) {
@@ -376,7 +382,8 @@ public class ElasticHashinator extends TheHashinator {
             // the time to close it.
             // else there is no open range, keep on going.
             if (start != null) {
-                ranges.put(start, token);
+                //Range end is inclusive so do token - 1
+                ranges.put(start, token - 1);
                 start = null;
             }
 
@@ -386,13 +393,11 @@ public class ElasticHashinator extends TheHashinator {
             }
         }
 
-        // if there is an open range when we get here, it means that
-        // the last token on the ring belongs to the partition, and
-        // it wraps around the origin of the ring, so close the range
-        // with the the very first token on the ring.
+        // if there is an open range when we get here
+        // It is the last token which implicity ends at the next max value
         if (start != null) {
             assert first != null;
-            ranges.put(start, first);
+            ranges.put(start, Integer.MAX_VALUE);
         }
 
         return ranges;
@@ -410,9 +415,9 @@ public class ElasticHashinator extends TheHashinator {
     public String toString()
     {
         StringBuilder sb = new StringBuilder();
-        sb.append(" Token               ").append("   Partition\n");
-        for (Map.Entry<Long, Integer> entry : m_tokens.entrySet()) {
-            sb.append(String.format("[%20d => %8d]\n", entry.getKey(), entry.getValue()));
+        sb.append(" Token       ").append("   Partition\n");
+        for (Map.Entry<Integer, Integer> entry : m_tokensMap.get().entrySet()) {
+            sb.append(String.format("[%11d => %9d]\n", entry.getKey(), entry.getValue()));
         }
         return sb.toString();
     }
@@ -435,33 +440,30 @@ public class ElasticHashinator extends TheHashinator {
     private byte[] toCookedBytes()
     {
         // Allocate for a int pair per token/partition ID entry, plus a size.
-        ByteBuffer buf = ByteBuffer.allocate(4 + (m_tokens.size() * (4 + TokenCompressor.COMPRESSED_SIZE)));
+        ByteBuffer buf = ByteBuffer.allocate(4 + (m_tokenCount * 8));
 
-        int numEntries = m_tokens.size();
-        buf.putInt(numEntries);
-
+        buf.putInt(m_tokenCount);
         // Keep tokens and partition ids separate to aid compression.
-        for (Map.Entry<Long, Integer> e : m_tokens.entrySet()) {
-            int optimizedToken = TokenCompressor.compress(e.getKey());
-            buf.putInt(optimizedToken);
+        for (int zz = 3; zz >= 0; zz--) {
+            int lastToken = Integer.MIN_VALUE;
+            for (int ii = 0; ii < m_tokenCount; ii++) {
+                int token = unsafe.getInt(m_tokens + (ii * 8));
+                Preconditions.checkArgument(token >= lastToken);
+                lastToken = token;
+                token = token >>> (zz * 8);
+                token = token & 0xFF;
+                buf.put((byte)token);
+            }
         }
-        for (Map.Entry<Long, Integer> e : m_tokens.entrySet()) {
-            int partitionId = e.getValue();
-            buf.putInt(partitionId);
+        for (int ii = 0; ii < m_tokenCount; ii++) {
+            buf.putInt(unsafe.getInt(m_tokens + (ii * 8) + 4));
         }
 
-        // Compress (deflate) the bytes and cache the results.
-        ByteArrayOutputStream bos = new ByteArrayOutputStream(buf.array().length);
-        DeflaterOutputStream dos = new DeflaterOutputStream(bos);
         try {
-            dos.write(buf.array());
-            dos.close();
+            return CompressionService.gzipBytes(buf.array());
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to compress bytes", e);
         }
-        catch (IOException e) {
-            throw new RuntimeException(String.format(
-                    "Failed to deflate cooked bytes: %s", e.toString()));
-        }
-        return bos.toByteArray();
     }
 
     /**
@@ -473,16 +475,44 @@ public class ElasticHashinator extends TheHashinator {
      * @param configBytes  raw config data
      * @return  token/partition map
      */
-    private ImmutableSortedMap<Long, Integer> updateRaw(byte configBytes[]) {
+    private Pair<Long, Integer> updateRaw(byte configBytes[]) {
         ByteBuffer buf = ByteBuffer.wrap(configBytes);
         int numEntries = buf.getInt();
-        ImmutableSortedMap.Builder<Long, Integer> builder = ImmutableSortedMap.naturalOrder();
-        for (int ii = 0; ii < numEntries; ii++) {
-            final long token = buf.getLong();
-            final int partitionId = buf.getInt();
-            builder.put(token, partitionId);
+        if (numEntries < 0) {
+            throw new RuntimeException("Bad elastic hashinator config");
         }
-        return builder.build();
+        long tokens = unsafe.allocateMemory(8 * numEntries);
+        int lastToken = Integer.MIN_VALUE;
+        for (int ii = 0; ii < numEntries; ii++) {
+            long ptr = tokens + (ii * 8);
+            final int token = buf.getInt();
+            Preconditions.checkArgument(token >= lastToken);
+            lastToken = token;
+            unsafe.putInt(ptr, token);
+            final int partitionId = buf.getInt();
+            unsafe.putInt(ptr + 4, partitionId);
+        }
+        return Pair.of(tokens, numEntries);
+    }
+
+    private long getTokenPtr(int hash) {
+        int min = 0;
+        int max = m_tokenCount - 1;
+
+        while (min <= max) {
+            int mid = (min + max) >>> 1;
+            final long midPtr = m_tokens + (8 * mid);
+            int midval = unsafe.getInt(midPtr);
+
+            if (midval < hash) {
+                min = mid + 1;
+            } else if (midval > hash) {
+                max = mid - 1;
+            } else {
+                return midPtr;
+            }
+        }
+        return m_tokens + (min - 1) * 8;
     }
 
     /**
@@ -493,37 +523,47 @@ public class ElasticHashinator extends TheHashinator {
      * @param compressedData  optimized and compressed config data
      * @return  token/partition map
      */
-    private ImmutableSortedMap<Long, Integer> updateCooked(byte[] compressedData)
+    private Pair<Long, Integer> updateCooked(byte[] compressedData)
     {
         // Uncompress (inflate) the bytes.
-        ByteArrayOutputStream bos = new ByteArrayOutputStream((int)(compressedData.length * 1.5));
-        InflaterOutputStream dos = new InflaterOutputStream(bos);
+        byte[] cookedBytes;
         try {
-            dos.write(compressedData);
-            dos.close();
-        }
-        catch (IOException e) {
+            cookedBytes = CompressionService.gunzipBytes(compressedData);
+        } catch (IOException e) {
             throw new RuntimeException("Unable to decompress elastic hashinator data.");
         }
-        byte[] cookedBytes = bos.toByteArray();
 
         int numEntries = (cookedBytes.length >= 4
                                 ? ByteBuffer.wrap(cookedBytes).getInt()
                                 : 0);
-        int tokensSize = TokenCompressor.COMPRESSED_SIZE * numEntries;
+        int tokensSize = 4 * numEntries;
         int partitionsSize = 4 * numEntries;
         if (numEntries <= 0 || cookedBytes.length != 4 + tokensSize + partitionsSize) {
             throw new RuntimeException("Bad elastic hashinator cooked config size.");
         }
+        long tokens = unsafe.allocateMemory(8 * numEntries);
         ByteBuffer tokenBuf = ByteBuffer.wrap(cookedBytes, 4, tokensSize);
         ByteBuffer partitionBuf = ByteBuffer.wrap(cookedBytes, 4 + tokensSize, partitionsSize);
-        ImmutableSortedMap.Builder<Long, Integer> builder = ImmutableSortedMap.naturalOrder();
-        for (int ii = 0; ii < numEntries; ii++) {
-            final long token = TokenCompressor.uncompress(tokenBuf.getInt());
-            final int partitionId = partitionBuf.getInt();
-            builder.put( token, partitionId );
+        int tokensArray[] = new int[numEntries];
+        for (int zz = 3; zz >= 0; zz--) {
+            for (int ii = 0; ii < numEntries; ii++) {
+                int value = tokenBuf.get();
+                value = (value << (zz * 8)) & (0xFF << (zz * 8));
+                tokensArray[ii] = (tokensArray[ii] | value);
+            }
         }
-        return builder.build();
+
+        int lastToken = Integer.MIN_VALUE;
+        for (int ii = 0; ii < numEntries; ii++) {
+            int token = tokensArray[ii];
+            Preconditions.checkArgument(token >= lastToken);
+            lastToken = token;
+            long ptr = tokens + (ii * 8);
+            unsafe.putInt(ptr, token);
+            final int partitionId = partitionBuf.getInt();
+            unsafe.putInt(ptr + 4, partitionId);
+        }
+        return Pair.of(tokens, numEntries);
     }
 
     /**
@@ -534,5 +574,86 @@ public class ElasticHashinator extends TheHashinator {
     public byte[] getCookedBytes()
     {
         return m_cookedBytes.get();
+    }
+
+    @Override
+    public HashinatorType getConfigurationType() {
+        return TheHashinator.HashinatorType.ELASTIC;
+    }
+
+    @Override
+    public void finalize() {
+        unsafe.freeMemory(m_tokens);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        ElasticHashinator that = (ElasticHashinator) o;
+
+        if (m_signature.get().equals(that.m_signature.get())) return true;
+
+        SortedMapDifference<Integer,Integer> diff = Maps.difference(m_tokensMap.get(), that.m_tokensMap.get());
+        if (!diff.entriesDiffering().isEmpty()) return false;
+
+        // Tolerate tokens that are not on the bucket boundaries. As long as these tokens hash to the same partitions
+        // as they are in the other hashinator, it's fine.
+        for (Map.Entry<Integer, Integer> leftEntry : diff.entriesOnlyOnLeft().entrySet()) {
+            if (that.partitionForToken(leftEntry.getKey()) != leftEntry.getValue()) {
+                return false;
+            }
+        }
+
+        for (Map.Entry<Integer, Integer> rightEntry : diff.entriesOnlyOnRight().entrySet()) {
+            if (partitionForToken(rightEntry.getKey()) != rightEntry.getValue()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Figure out the token interval from the first 3 ranges, assuming that there is at most one token that doesn't
+     * fall onto the bucket boundary at any given time. The largest range will be the hashinator's bucket size.
+     * @return The bucket size, or token interval if you prefer.
+     */
+    private static long deriveTokenInterval(ImmutableSortedSet<Integer> tokens)
+    {
+        long interval = 0;
+        int count = 4;
+        int prevToken = Integer.MIN_VALUE;
+        UnmodifiableIterator<Integer> tokenIter = tokens.iterator();
+        while (tokenIter.hasNext() && count-- > 0) {
+            int nextToken = tokenIter.next();
+            interval = Math.max(interval, nextToken - prevToken);
+            prevToken = nextToken;
+        }
+        return interval;
+    }
+
+    /**
+     * Check if the token doesn't fall onto a bucket boundary given the token interval.
+     * @return true if the token doesn't fall onto any bucket boundary.
+     */
+    private static boolean isIntermediateToken(int token, long interval)
+    {
+        return (((long) token - Integer.MIN_VALUE)) % interval != 0;
+    }
+
+    /**
+     * Calculate the boundary of the bucket that countain the given token given the token interval.
+     * @return The token of the bucket boundary.
+     */
+    private static int containingBucket(int token, long interval)
+    {
+        return (int) ((((long) token - Integer.MIN_VALUE) / interval) * interval + Integer.MIN_VALUE);
+    }
+
+    @Override
+    protected Set<Integer> pGetPartitions() {
+        return new HashSet<Integer>(m_tokensMap.get().values());
     }
 }

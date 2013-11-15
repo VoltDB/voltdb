@@ -424,7 +424,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         m_runner.getTxnState().registerUndoAction(action);
     }
 
-    protected long getMasterHSId(int partition) {
+    protected Long getMasterHSId(int partition) {
         TransactionState txnState = m_runner.getTxnState();
         if (txnState instanceof MpTransactionState) {
             return ((MpTransactionState) txnState).getMasterHSId(partition);

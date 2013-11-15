@@ -117,20 +117,42 @@ public class TestLimitOffsetSuite extends RegressionSuite {
     public void testJoinAndLimitOffset() throws IOException, ProcCallException, InterruptedException {
         Client client = this.getClient();
         load(client);
+        int limits[] = new int[] { 1, 2, 5, 10, 12, 25 };
+        int offsets[] = new int[] { 0, 1, 2, 5, 10, 12, 25 };
+        String selecteds[] = new String[] { "*", "A.PKEY" };
+        String joinops[] = new String[] { ",", "LEFT JOIN", "RIGHT JOIN" };
+        String conditions[] = new String[] { " A.PKEY < B.PKEY ", " A.PKEY = B.PKEY ", " A.I = B.I " };
         client.callProcedure("InsertA", -1, 0);
-        VoltTable result = client.callProcedure("@AdHoc", "SELECT * FROM A, B WHERE A.PKEY < B.PKEY LIMIT 1 OFFSET 1;")
-                                 .getResults()[0];
-        assertEquals(1, result.getRowCount());
-        result = client.callProcedure("@AdHoc", "SELECT A.PKEY FROM A, B WHERE A.PKEY = B.PKEY LIMIT 1;")
-                .getResults()[0];
-        assertEquals(1, result.getRowCount());
-        result.advanceRow();
-        result = client.callProcedure("@AdHoc", "SELECT A.PKEY FROM A, B WHERE A.PKEY = B.PKEY LIMIT 2 OFFSET 2;")
-                .getResults()[0];
-        assertEquals(2, result.getRowCount());
-        result = client.callProcedure("@AdHoc", "SELECT A.PKEY FROM A LEFT JOIN B ON A.I = B.I LIMIT 10 OFFSET 5;")
-                .getResults()[0];
-        assertEquals(6, result.getRowCount());
+        for (String joinop : joinops) {
+            String onwhere = "ON";
+            if (joinop.equals(",")) {
+                onwhere = "WHERE";
+            }
+            for (String selected : selecteds) {
+                for (int limit : limits) {
+                    for (int offset : offsets) {
+                        for (String condition : conditions) {
+                            String query;
+                            VoltTable result;
+                            query = "SELECT COUNT(*) FROM A " + joinop + " B " +
+                                    onwhere + condition +
+                                    ";";
+                            result = client.callProcedure("@AdHoc", query).getResults()[0];
+                            long found = result.asScalarLong();
+                            query = "SELECT " + selected +
+                                    " FROM A " + joinop + " B " +
+                                    onwhere + condition +
+                                    " ORDER BY A.PKEY, B.PKEY " +
+                                    "LIMIT " + limit +
+                                    ((offset == 0) ? "" : " OFFSET " + offset) +
+                                    ";";
+                            result = client.callProcedure("@AdHoc", query).getResults()[0];
+                            assertEquals(Math.max(0, Math.min(limit, found-offset)), result.getRowCount());
+                        }
+                    }
+                }
+            }
+        }
     }
 
     public void testENG3487() throws IOException, ProcCallException {
@@ -163,6 +185,37 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         VoltTable result = client.callProcedure("@AdHoc", "select I from A limit 0").getResults()[0];
 
         assertEquals(0, result.getRowCount());
+    }
+
+    public void testENG5156() throws IOException, ProcCallException {
+        Client client = this.getClient();
+        VoltTable result = null;
+
+        String insertProc = "SCORE.insert";
+        client.callProcedure(insertProc,  1, "b", 1, 1378827221795L, 1, 1);
+        client.callProcedure(insertProc,  2, "b", 2, 1378827221795L, 2, 2);
+
+        result = client.callProcedure("@ExplainProc", "GetTopScores").getResults()[0];
+        // using the "IDX_SCORE_VALUE_USER" index for sort order only.
+        assertTrue(result.toString().contains("IDX_SCORE_VALUE_USER"));
+        assertTrue(result.toString().contains("inline LIMIT with parameter"));
+
+        result = client.callProcedure("GetTopScores", 1378827221793L, 1378827421793L, 1).getResults()[0];
+        validateTableOfLongs(result, new long[][] {{2,2}});
+
+        // Test AdHoc.
+        result = client.callProcedure("@Explain",
+                "SELECT user_id, score_value FROM score " +
+                "WHERE score_date > 1378827221793 AND score_date <= 1378827421793 " +
+                "ORDER BY score_value DESC, user_id DESC LIMIT 1; ").getResults()[0];
+        assertTrue(result.toString().contains("IDX_SCORE_VALUE_USER"));
+        assertTrue(result.toString().contains("inline LIMIT with parameter"));
+
+        result = client.callProcedure("@AdHoc",
+                "SELECT user_id, score_value FROM score " +
+                "WHERE score_date > 1378827221793 AND score_date <= 1378827421793 " +
+                "ORDER BY score_value DESC, user_id DESC LIMIT 1; ").getResults()[0];
+        validateTableOfLongs(result, new long[][] {{2,2}});
     }
 
     static public junit.framework.Test suite() {

@@ -329,12 +329,12 @@ public class TestCatalogUtil extends TestCase {
         final File tmpDep = VoltProjectBuilder.writeStringToTempFile(dep);
         final File tmpBoom = VoltProjectBuilder.writeStringToTempFile(boom);
 
-        long crcDep = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDep.getPath(), true);
+        long crcDep = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDep.getPath(), true, false);
 
         assertEquals(30, catalog.getClusters().get("cluster").getHeartbeattimeout());
 
         // This returns -1 on schema violation
-        crcDep = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpBoom.getPath(), true);
+        crcDep = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpBoom.getPath(), true, false);
         assertEquals(-1, crcDep);
     }
 
@@ -357,13 +357,13 @@ public class TestCatalogUtil extends TestCase {
             "</deployment>";
 
         final File tmpDepOff = VoltProjectBuilder.writeStringToTempFile(depOff);
-        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDepOff.getPath(), true);
+        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDepOff.getPath(), true, false);
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
         assertFalse(db.getSnapshotschedule().get("default").getEnabled());
 
         setUp();
         final File tmpDepOn = VoltProjectBuilder.writeStringToTempFile(depOn);
-        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDepOn.getPath(), true);
+        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDepOn.getPath(), true, false);
         db = catalog.getClusters().get("cluster").getDatabases().get("database");
         assertFalse(db.getSnapshotschedule().isEmpty());
         assertTrue(db.getSnapshotschedule().get("default").getEnabled());
@@ -389,13 +389,13 @@ public class TestCatalogUtil extends TestCase {
             "</deployment>";
 
         final File tmpSecOff = VoltProjectBuilder.writeStringToTempFile(secOff);
-        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpSecOff.getPath(), true);
+        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpSecOff.getPath(), true, false);
         Cluster cluster =  catalog.getClusters().get("cluster");
         assertFalse(cluster.getSecurityenabled());
 
         setUp();
         final File tmpSecOn = VoltProjectBuilder.writeStringToTempFile(secOn);
-        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpSecOn.getPath(), true);
+        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpSecOn.getPath(), true, false);
         cluster =  catalog.getClusters().get("cluster");
         assertTrue(cluster.getSecurityenabled());
     }
@@ -423,7 +423,7 @@ public class TestCatalogUtil extends TestCase {
         catalog_db.getGroups().add("latre");
 
         final File tmpRole = VoltProjectBuilder.writeStringToTempFile(depRole);
-        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpRole.getPath(), true);
+        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpRole.getPath(), true, false);
         Database db = catalog.getClusters().get("cluster")
                 .getDatabases().get("database");
 
@@ -462,7 +462,7 @@ public class TestCatalogUtil extends TestCase {
 
         final File tmpRole = VoltProjectBuilder.writeStringToTempFile(depRole);
 
-        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpRole.getPath(), true);
+        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpRole.getPath(), true, false);
 
         Database db = catalog.getClusters().get("cluster")
                 .getDatabases().get("database");
@@ -500,13 +500,13 @@ public class TestCatalogUtil extends TestCase {
             "</deployment>";
 
         final File tmpDepOff = VoltProjectBuilder.writeStringToTempFile(depOff);
-        long crcDepOff = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDepOff.getPath(), true);
+        long crcDepOff = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDepOff.getPath(), true, false);
         Systemsettings sysset = catalog.getClusters().get("cluster").getDeployment().get("deployment").getSystemsettings().get("systemsettings");
         assertEquals(100, sysset.getMaxtemptablesize());
 
         setUp();
         final File tmpDepOn = VoltProjectBuilder.writeStringToTempFile(depOn);
-        long crcDepOn = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDepOn.getPath(), true);
+        long crcDepOn = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDepOn.getPath(), true, false);
         sysset = catalog.getClusters().get("cluster").getDeployment().get("deployment").getSystemsettings().get("systemsettings");
         assertEquals(200, sysset.getMaxtemptablesize());
         assertTrue(crcDepOff != crcDepOn);
@@ -542,7 +542,7 @@ public class TestCatalogUtil extends TestCase {
             "</deployment>";
 
         final File tmpDeploy = VoltProjectBuilder.writeStringToTempFile(deploy);
-        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDeploy.getPath(), true);
+        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDeploy.getPath(), true, false);
 
         File snapdir = new File(voltdbroot, snappath);
         assertTrue("snapshot directory: " + snapdir.getAbsolutePath() + " does not exist",
@@ -589,7 +589,7 @@ public class TestCatalogUtil extends TestCase {
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(deploymentContent);
         final String depPath = schemaFile.getPath();
 
-        CatalogUtil.compileDeploymentAndGetCRC(catalog, depPath, false);
+        CatalogUtil.compileDeploymentAndGetCRC(catalog, depPath, false, false);
 
         String commands = catalog.serialize();
         System.out.println(commands);
@@ -653,9 +653,6 @@ public class TestCatalogUtil extends TestCase {
     // I'm not testing the legacy behavior here, just IV2
     public void testIv2PartitionDetectionSettings() throws Exception
     {
-        if (!VoltDB.checkTestEnvForIv2()) {
-            return;
-        }
         final String noElement =
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
@@ -688,7 +685,7 @@ public class TestCatalogUtil extends TestCase {
             "</deployment>";
 
         final File tmpNoElement = VoltProjectBuilder.writeStringToTempFile(noElement);
-        long crc = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpNoElement.getPath(), true);
+        long crc = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpNoElement.getPath(), true, false);
         assertTrue("Deployment file failed to parse", crc != -1);
         Cluster cluster = catalog.getClusters().get("cluster");
         assertTrue(cluster.getNetworkpartition());
@@ -696,7 +693,7 @@ public class TestCatalogUtil extends TestCase {
 
         setUp();
         final File tmpEnabledDefault = VoltProjectBuilder.writeStringToTempFile(ppdEnabledDefaultPrefix);
-        crc = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpEnabledDefault.getPath(), true);
+        crc = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpEnabledDefault.getPath(), true, false);
         assertTrue("Deployment file failed to parse", crc != -1);
         cluster = catalog.getClusters().get("cluster");
         assertTrue(cluster.getNetworkpartition());
@@ -704,7 +701,7 @@ public class TestCatalogUtil extends TestCase {
 
         setUp();
         final File tmpEnabledPrefix = VoltProjectBuilder.writeStringToTempFile(ppdEnabledWithPrefix);
-        crc = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpEnabledPrefix.getPath(), true);
+        crc = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpEnabledPrefix.getPath(), true, false);
         assertTrue("Deployment file failed to parse", crc != -1);
         cluster = catalog.getClusters().get("cluster");
         assertTrue(cluster.getNetworkpartition());
@@ -712,7 +709,7 @@ public class TestCatalogUtil extends TestCase {
 
         setUp();
         final File tmpDisabled = VoltProjectBuilder.writeStringToTempFile(ppdDisabledNoPrefix);
-        crc = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDisabled.getPath(), true);
+        crc = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDisabled.getPath(), true, false);
         assertTrue("Deployment file failed to parse", crc != -1);
         cluster = catalog.getClusters().get("cluster");
         assertFalse(cluster.getNetworkpartition());
@@ -771,7 +768,7 @@ public class TestCatalogUtil extends TestCase {
         String x[] = {tmpDdl.getAbsolutePath()};
         Catalog cat = compiler.compileCatalog(null, x);
 
-        long crc = CatalogUtil.compileDeploymentAndGetCRC(cat, bad_deployment, true);
+        long crc = CatalogUtil.compileDeploymentAndGetCRC(cat, bad_deployment, true, false);
         assertTrue("Deployment file failed to parse", crc != -1);
 
         Database db = cat.getClusters().get("cluster").getDatabases().get("database");
@@ -785,7 +782,7 @@ public class TestCatalogUtil extends TestCase {
         DeploymentType good_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpGood));
 
         Catalog cat2 = compiler.compileCatalog(null, x);
-        crc = CatalogUtil.compileDeploymentAndGetCRC(cat2, good_deployment, true);
+        crc = CatalogUtil.compileDeploymentAndGetCRC(cat2, good_deployment, true, false);
         assertTrue("Deployment file failed to parse", crc != -1);
 
         db = cat2.getClusters().get("cluster").getDatabases().get("database");
@@ -804,7 +801,7 @@ public class TestCatalogUtil extends TestCase {
         DeploymentType builtin_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpBuiltin));
 
         Catalog cat3 = compiler.compileCatalog(null, x);
-        crc = CatalogUtil.compileDeploymentAndGetCRC(cat3, builtin_deployment, true);
+        crc = CatalogUtil.compileDeploymentAndGetCRC(cat3, builtin_deployment, true, false);
         assertTrue("Deployment file failed to parse", crc != -1);
 
         db = cat3.getClusters().get("cluster").getDatabases().get("database");

@@ -45,36 +45,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
     private final String[] procs = {"R1.insert", "P1.insert", "P2.insert", "P3.insert"};
     private final String [] tbs = {"R1","P1","P2","P3"};
 
-    private void compareTable(VoltTable vt, long[][] expected) {
-        int len = expected.length;
-        for (int i=0; i < len; i++) {
-            compareRow(vt, expected[i]);
-        }
-    }
-
-    private void compareRow(VoltTable vt, long [] expected) {
-        int len = expected.length;
-        assertTrue(vt.advanceRow());
-        for (int i=0; i < len; i++) {
-            long actual = -10000000;
-            // ENG-4295: hsql bug: HSQLBackend sometimes returns wrong column type.
-            try {
-                actual = vt.getLong(i);
-            } catch (IllegalArgumentException ex) {
-                try {
-                    actual = (long) vt.getDouble(i);
-                } catch (IllegalArgumentException newEx) {
-                    try {
-                        actual = vt.getTimestampAsLong(i);
-                    } catch (IllegalArgumentException exTm) {
-                        fail();
-                    }
-                }
-            }
-            assertEquals(expected[i], actual);
-        }
-    }
-
     private void loadData() throws IOException, ProcCallException {
         Client client = this.getClient();
         ClientResponse cr = null;
@@ -106,6 +76,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         long[][] expected;
 
         for (String tb: tbs) {
+            // Test group by PRIMARY KEY
             // Test pass-through columns, group by primary key
             cr = client.callProcedure("@AdHoc", "SELECT dept, count(wage) from " + tb +
                     " GROUP BY id ORDER BY dept DESC");
@@ -113,7 +84,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] {{2,1}, {2,1}, {1,1}, {1,1}, {1,1} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Test duplicates, operator expression, group by primary key
             cr = client.callProcedure("@AdHoc", "SELECT id, id, dept, dept+5 from " + tb +
@@ -122,7 +93,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] {{1,1,1,6}, {2,2,1,6}, {3,3,1,6}, {4,4,2,7}, {5,5,2,7} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Test function expression with group by primary key
             cr = client.callProcedure("@AdHoc", "SELECT id, id + 1, sum(wage)/2, abs(dept-3) from " + tb +
@@ -131,7 +102,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] {{1,2,5,2}, {2,3,10,2}, {3,4,15,2}, {4,5,20,1}, {5,6,25,1} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Test order by expression column which is not in display columns
             cr = client.callProcedure("@AdHoc", "SELECT COUNT(*) as tag, sum(wage) from " + tb +
@@ -139,7 +110,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 90}, {3, 60}};
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Test order by expression column which is not in display columns, with complex aggregations
             cr = client.callProcedure("@AdHoc", "SELECT dept, COUNT(*) as tag, sum(wage) - 1 from " + tb +
@@ -148,14 +119,11 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 3, 59} , {2, 2, 89}};
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
         }
     }
 
-
-
     public void testComplexAggsSuite() throws IOException, ProcCallException {
-
 
         complexAggs();
         complexAggsOrderbySuite();
@@ -179,7 +147,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] {{2, 90, 7, 45}, {1, 60, 8, 20} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Test different group by column order, non-grouped TVE, sum for column, division
             cr = client.callProcedure("@AdHoc", "SELECT sum(wage)/count(wage) + 1, dept, " +
@@ -188,7 +156,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] {{21 ,1, 63, 30}, {46, 2, 92, 45}};
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Test Complex Agg with functions
             cr = client.callProcedure("@AdHoc", "SELECT dept, SUM(ABS(wage) - 1) as tag, " +
@@ -197,7 +165,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 57, 4} , {2, 88, 5}};
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Test sum()/count(), Addition
             cr = client.callProcedure("@AdHoc", "SELECT dept, SUM(wage), COUNT(wage), AVG(wage), " +
@@ -206,7 +174,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] {{1, 60, 3, 20, 30, 10, 20, 41}, {2, 90, 2, 45, 50, 40, 45, 91}};
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
         }
     }
 
@@ -224,28 +192,28 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2}, {3}, {4}, {6}, {7} };
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             cr = client.callProcedure("@AdHoc", "SELECT id+dept from " + tb + " ORDER BY id+dept");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2}, {3}, {4}, {6}, {7} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             cr = client.callProcedure("@AdHoc", "SELECT id+dept from " + tb + " ORDER BY id+dept, wage");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2}, {3}, {4}, {6}, {7} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             cr = client.callProcedure("@AdHoc", "SELECT id+dept, wage from " + tb + " ORDER BY id+dept, wage");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 10}, {3,20}, {4,30}, {6,40}, {7,50} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // (1) Test Order by COUNT(*) without complex expression
             // Test order by agg with tag
@@ -255,7 +223,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 3, 60} , {2, 2, 90}};
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
 
             // (2) Test Order by COUNT(*) with complex expression
@@ -266,7 +234,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 3, 59} , {2, 2, 89}};
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
 
             // (3) Test Order by with FUNCTION expression, no group by column in display columns
@@ -277,7 +245,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 57, 4} , {2, 88, 5}};
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Test Order by without tag
             cr = client.callProcedure("@AdHoc", "SELECT ABS(dept), SUM(ABS(wage) - 1) as tag, " +
@@ -286,7 +254,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 57, 4} , {2, 88, 5}};
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Test Order by column not in Display columns
             cr = client.callProcedure("@AdHoc", "SELECT SUM(ABS(wage) - 1) as tag, " +
@@ -295,7 +263,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {57, 4} , {88, 5}};
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
         }
     }
 
@@ -321,7 +289,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] {{2, 4, 100, 140, 8, 28}, {1, 3, 60, 60, 8, 15} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Test limit with complex aggregation.
             cr = client.callProcedure("@AdHoc", "SELECT wage, sum(id)+1, sum(id+1),  sum(dept+3)/count(dept) from " + tb +
@@ -330,7 +298,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] {{10, 8, 9, 4}, {20, 3, 3, 4}, {30, 4, 4, 4}, {40, 12, 13, 5}};
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Test distinct limit together with complex aggregation.
             cr = client.callProcedure("@AdHoc", "SELECT wage, sum(id)+1, sum(id+1),  sum(dept+3)/count(distinct dept) from " + tb +
@@ -339,7 +307,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] {{10, 8, 9, 4}, {20, 3, 3, 4}, {30, 4, 4, 4}, {40, 12, 13, 10}};
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
         }
     }
 
@@ -371,7 +339,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 3}, {2, 4} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Test complex group-by (normal expression) without complex aggregation.
             // Actually this AdHoc query has an extra projection node because of the pass-by column dept in order by columns.
@@ -383,7 +351,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 3}, {3, 4} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // (2) With extra aggregation expression
             // Test complex group-by with with complex aggregation.
@@ -393,7 +361,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 5}, {1, 4} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Test more complex group-by with with complex aggregation.
             cr = client.callProcedure("@AdHoc", "SELECT abs(dept-2) as tag, count(wage)+1 from " + tb +
@@ -402,7 +370,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {0, 5}, {1, 4} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // More hard general test case with multi group by columns and complex aggs
             cr = client.callProcedure("@AdHoc", "SELECT abs(dept-2) as tag, wage, wage/2, count(*)*2, " +
@@ -411,7 +379,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {0,10,5,2,7}, {0,40,20,4,6}, {0,50,25,2,6}, {1,10,5,2,2}, {1,20,10,2,3}, {1,30,15,2,4} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             if (!isHSQL()) {
                 // Timestamp function for complex group by
@@ -428,7 +396,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
                 expected = new long[][] { {time1.getTime()*1000, 2, 10}, {time2.getTime()*1000, 4, 20},
                         {time3.getTime()*1000, 2, 40},{time4.getTime()*1000, 3, 45},};
                 System.out.println(vt.toString());
-                compareTable(vt, expected);
+                validateTableOfLongs(vt, expected);
             }
         }
     }
@@ -456,7 +424,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {10, 2}, {20, 1}, {30, 1}, {40, 1}, {50, 1} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Test limit
             cr = client.callProcedure("@AdHoc", "SELECT abs(wage) as tag, count(dept) from " + tb +
@@ -465,7 +433,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {10, 2}, {20, 1}, {30, 1}, {40, 2} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Test distinct and limit
             cr = client.callProcedure("@AdHoc", "SELECT abs(wage) as tag, count(distinct dept) from " + tb +
@@ -474,7 +442,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {10, 2}, {20, 1}, {30, 1}, {40, 1} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
 
             // (2) With extra aggregation expression
@@ -486,7 +454,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {10, 3}, {20, 2}, {30, 2}, {40, 2}, {50, 2} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Test limit
             cr = client.callProcedure("@AdHoc", "SELECT abs(wage) as tag, count(dept)+1 from " + tb +
@@ -495,7 +463,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {10, 3}, {20, 2}, {30, 2}, {40, 3}};
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Test distinct and limit
             cr = client.callProcedure("@AdHoc", "SELECT abs(wage) as tag, count(distinct dept)+1 from " + tb +
@@ -504,7 +472,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {10, 3}, {20, 2}, {30, 2}, {40, 2} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
 
             // (3) More hard general test case with multi group by columns and complex aggs (Depulicates: two 40s for wage)
@@ -515,7 +483,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {0,10,5,2,7}, {0,40,20,2,6}, {0,50,25,2,6}, {1,10,5,2,2}, {1,20,10,2,3}, {1,30,15,2,4} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Test Limit
             cr = client.callProcedure("@AdHoc", "SELECT abs(dept-2) as tag, wage, wage/2, count(wage)*2, " +
@@ -524,7 +492,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {0,10,5,2,7}, {0,40,20,4,6}, {0,50,25,2,6}, {1,10,5,2,2}, {1,20,10,2,3} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Test distinct and limit
             cr = client.callProcedure("@AdHoc", "SELECT abs(dept-2) as tag, wage, wage/2, count(distinct wage)*2, " +
@@ -533,7 +501,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {0,10,5,2,7}, {0,40,20,2,6}, {0,50,25,2,6}, {1,10,5,2,2}, {1,20,10,2,3} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
         }
     }
 
@@ -560,7 +528,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 3, 6, 20}, {2, 4, 22, 35} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Test order by without tag
             cr = client.callProcedure("@AdHoc", "SELECT abs(dept) as tag, count(wage), sum(id), avg(wage) from " + tb +
@@ -569,7 +537,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 3, 6, 20}, {2, 4, 22, 35} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Test order by without tag and not in display columns
             cr = client.callProcedure("@AdHoc", "SELECT count(wage), sum(id), avg(wage)  from " + tb +
@@ -578,7 +546,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {3, 6, 20}, {4, 22, 35} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
 
             //(2) Test complex group-by with complex aggregation.
@@ -589,7 +557,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {0, 5, 17}, {1, 4, 10} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Test order by without tag
             cr = client.callProcedure("@AdHoc", "SELECT abs(dept-2) as tag, count(wage)+1, avg(wage)/2 from " + tb +
@@ -598,7 +566,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {0, 5, 17}, {1, 4, 10} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Test order by without tag and not in display columns
             cr = client.callProcedure("@AdHoc", "SELECT count(wage)+1, avg(wage)/2 from " + tb +
@@ -607,7 +575,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {5, 17}, {4, 10} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             //(3) More hard general test cases with multi group by columns and complex aggs
             // Test order by with tag
@@ -617,7 +585,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {0,10,5,2,7}, {0,40,20,4,6}, {0,50,25,2,6}, {1,10,5,2,2}, {1,20,10,2,3}, {1,30,15,2,4} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Test order by without tag
             cr = client.callProcedure("@AdHoc", "SELECT abs(dept-2) as tag, wage, wage/2, count(*)*2, " +
@@ -626,7 +594,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {0,10,5,2,7}, {0,40,20,4,6}, {0,50,25,2,6}, {1,10,5,2,2}, {1,20,10,2,3}, {1,30,15,2,4} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Test order by without tag and not in display columns
             cr = client.callProcedure("@AdHoc", "SELECT wage, wage/2, count(*)*2, sum(id)/count(id)+1 from " + tb +
@@ -635,7 +603,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {10,5,2,7}, {40,20,4,6}, {50,25,2,6}, {10,5,2,2}, {20,10,2,3}, {30,15,2,4} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
 
             //(4) Other order by expressions (id+dept), expressions on that.
@@ -644,14 +612,14 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 11}, {3,21}, {4,31}, {6,41}, {7,51}, {8,11}, {9,41} };
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             cr = client.callProcedure("@AdHoc", "SELECT id+dept, avg(wage) from " + tb +
                     " GROUP BY id+dept ORDER BY ABS(id+dept)");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 10}, {3,20}, {4,30}, {6,40}, {7,50}, {8,10}, {9,40} };
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             cr = client.callProcedure("@AdHoc", "SELECT id+dept from " + tb +
                     " GROUP BY id+dept ORDER BY ABS(id+dept)");
@@ -659,7 +627,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {2}, {3}, {4}, {6}, {7}, {8}, {9} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             cr = client.callProcedure("@AdHoc", "SELECT id+dept, wage from " + tb +
                     " GROUP BY id+dept, wage ORDER BY ABS(id+dept), abs(wage)");
@@ -667,7 +635,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 10}, {3,20}, {4,30}, {6,40}, {7,50}, {8,10}, {9,40} };
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
 
             // Expressions on the columns from selected list
@@ -676,21 +644,21 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 10}, {8,10}, {3,20}, {4,30}, {6,40}, {9,40}, {7,50}};
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             cr = client.callProcedure("@AdHoc", "SELECT id+dept, avg(wage) as tag from " + tb +
                     " GROUP BY id+dept ORDER BY ABS(avg(wage)), id+dept");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 10}, {8,10}, {3,20}, {4,30}, {6,40}, {9,40}, {7,50}};
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             cr = client.callProcedure("@AdHoc", "SELECT id+dept, avg(wage) as tag from " + tb +
                     " GROUP BY id+dept ORDER BY ABS(avg(wage)) + 1, id+dept");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 10}, {8,10}, {3,20}, {4,30}, {6,40}, {9,40}, {7,50}};
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
 
             cr = client.callProcedure("@AdHoc", "SELECT id+dept, avg(wage)+1 as tag from " + tb +
@@ -698,21 +666,21 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 11}, {8,11}, {3,21}, {4,31}, {6,41}, {9,41}, {7,51}};
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             cr = client.callProcedure("@AdHoc", "SELECT id+dept, avg(wage)+1 as tag from " + tb +
                     " GROUP BY id+dept ORDER BY ABS(avg(wage)+1), id+dept");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 11}, {8,11}, {3,21}, {4,31}, {6,41}, {9,41}, {7,51}};
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             cr = client.callProcedure("@AdHoc", "SELECT id+dept, avg(wage)+1 as tag from " + tb +
                     " GROUP BY id+dept ORDER BY ABS(avg(wage)+1) + 1, id+dept");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 11}, {8,11}, {3,21}, {4,31}, {6,41}, {9,41}, {7,51}};
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
         }
     }
 
@@ -741,7 +709,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 54} , {2, 81}};
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
 
             cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage-id), avg(wage-id), " +
@@ -750,7 +718,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 54, 18, 3} , {2, 81, 40, 2}};
             System.out.println(vt.toString());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
 
             cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage-id) + 1, " +
@@ -758,7 +726,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 55, 18, 3} , {2, 82, 40, 2}};
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
 
             cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage-extract(month from tm)), " +
@@ -767,7 +735,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 40, 13, 3} , {2, 73, 36, 2}};
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
         }
     }
 
@@ -786,14 +754,14 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {3, 60} , {2, 90}};
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             cr = client.callProcedure("@AdHoc", "SELECT count(*) as tag, sum(wage), sum(wage) from " + tb +
                     " GROUP BY dept ORDER BY tag");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 90, 90}, {3, 60, 60} };
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             // Demo bug, ENG-5149
             // Check column alias for the identical aggregation
@@ -808,7 +776,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 91, 91}, {3, 61, 61} };
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             assertEquals("NO_BUG", vt.getColumnName(1));
             assertEquals("C3", vt.getColumnName(2));
@@ -832,28 +800,28 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 3, 60} , {2, 2, 90}};
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             cr = client.callProcedure("@AdHoc", "SELECT dept, COUNT(*) as tag, sum(wage) from " + tb +
                     " GROUP BY dept ORDER BY COUNT(*) DESC");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 3, 60} , {2, 2, 90}};
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             cr = client.callProcedure("@AdHoc", "SELECT dept, COUNT(*), sum(wage) from " + tb +
                     " GROUP BY dept ORDER BY COUNT(*) DESC");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 3, 60} , {2, 2, 90}};
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
             cr = client.callProcedure("@AdHoc", "SELECT dept, COUNT(*) as tag, sum(wage) - 1 from " + tb +
                     " GROUP BY dept ORDER BY COUNT(*) DESC");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 3, 59} , {2, 2, 89}};
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
 
         }
     }
@@ -878,7 +846,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
                 assertEquals(ClientResponse.SUCCESS, cr.getStatus());
                 vt = cr.getResults()[0];
                 expected = new long[][] { {1, 20, 60} , {2, 45, 90}};
-                compareTable(vt, expected);
+                validateTableOfLongs(vt, expected);
             } catch (ProcCallException e) {
                 ex = e;
             } finally {
@@ -893,7 +861,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
                 assertEquals(ClientResponse.SUCCESS, cr.getStatus());
                 vt = cr.getResults()[0];
                 expected = new long[][] { {1, 3} , {2, 2}};
-                compareTable(vt, expected);
+                validateTableOfLongs(vt, expected);
             } catch (ProcCallException e) {
                 ex = e;
             } finally {
@@ -908,7 +876,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
                 assertEquals(ClientResponse.SUCCESS, cr.getStatus());
                 vt = cr.getResults()[0];
                 expected = new long[][] { {20, 60} , {45, 90}};
-                compareTable(vt, expected);
+                validateTableOfLongs(vt, expected);
             } catch (ProcCallException e) {
                 ex = e;
             } finally {
@@ -923,7 +891,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
                 assertEquals(ClientResponse.SUCCESS, cr.getStatus());
                 vt = cr.getResults()[0];
                 expected = new long[][] { {1, 20, 59} , {2, 45, 89}};
-                compareTable(vt, expected);
+                validateTableOfLongs(vt, expected);
             } catch (ProcCallException e) {
                 ex = e;
             } finally {
@@ -938,7 +906,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
                 assertEquals(ClientResponse.SUCCESS, cr.getStatus());
                 vt = cr.getResults()[0];
                 expected = new long[][] { {20, 59} , {45, 89}};
-                compareTable(vt, expected);
+                validateTableOfLongs(vt, expected);
             } catch (ProcCallException e) {
                 ex = e;
             } finally {
@@ -953,7 +921,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
                 assertEquals(ClientResponse.SUCCESS, cr.getStatus());
                 vt = cr.getResults()[0];
                 expected = new long[][] { {3, 6, 20}, {4, 22, 35} };
-                compareTable(vt, expected);
+                validateTableOfLongs(vt, expected);
             } catch (ProcCallException e) {
                 ex = e;
             } finally {
@@ -982,13 +950,14 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
         final String literalSchema =
                 "CREATE TABLE R1 ( " +
-                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
                 "WAGE INTEGER, " +
                 "DEPT INTEGER, " +
                 "TM TIMESTAMP DEFAULT NULL, " +
                 "PRIMARY KEY (ID) );" +
+
                 "CREATE TABLE P1 ( " +
-                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
                 "WAGE INTEGER NOT NULL, " +
                 "DEPT INTEGER NOT NULL, " +
                 "TM TIMESTAMP DEFAULT NULL, " +
@@ -996,19 +965,19 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
                 "PARTITION TABLE P1 ON COLUMN ID;" +
 
                 "CREATE TABLE P2 ( " +
-                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "ID INTEGER DEFAULT 0 NOT NULL ASSUMEUNIQUE, " +
                 "WAGE INTEGER NOT NULL, " +
                 "DEPT INTEGER NOT NULL, " +
                 "TM TIMESTAMP DEFAULT NULL, " +
-                "PRIMARY KEY (ID) );" +
+                "PRIMARY KEY (ID, DEPT) );" +
                 "PARTITION TABLE P2 ON COLUMN DEPT;" +
 
                 "CREATE TABLE P3 ( " +
-                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "ID INTEGER DEFAULT 0 NOT NULL ASSUMEUNIQUE, " +
                 "WAGE INTEGER NOT NULL, " +
                 "DEPT INTEGER NOT NULL, " +
                 "TM TIMESTAMP DEFAULT NULL, " +
-                "PRIMARY KEY (ID) );" +
+                "PRIMARY KEY (ID, WAGE) );" +
                 "PARTITION TABLE P3 ON COLUMN WAGE;"
                 ;
         try {

@@ -159,8 +159,8 @@ public class ValidatePartitioning extends VoltSystemProcedure {
             retval = performValidatePartitioningWork( type, config );
         } else {
             retval = performValidatePartitioningWork(
-                    TheHashinator.getCurrentConfig().getFirst().typeId(),
-                    TheHashinator.getCurrentConfig().getSecond());
+                    TheHashinator.getCurrentConfig().type.typeId(),
+                    TheHashinator.getCurrentConfig().configBytes);
         }
         final long endTime = System.currentTimeMillis();
         final long duration = endTime -startTime;

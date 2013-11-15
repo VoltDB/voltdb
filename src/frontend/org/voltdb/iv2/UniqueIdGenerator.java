@@ -45,6 +45,8 @@ public class UniqueIdGenerator {
     static final long COUNTER_BITS = 9;
     static final long PARTITIONID_BITS = 14;
 
+    // EE datefunction.h file defines these constant values also.
+
     // VOLT_EPOCH holds the time in millis since 1/1/2008 at 12am.
     // The current time - VOLT_EPOCH should fit nicely in 40 bits
     // of memory.

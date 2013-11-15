@@ -54,7 +54,6 @@ public class CompleteTransactionTask extends TransactionTask
             // eventual encapsulation.
             siteConnection.truncateUndoLog(m_completeMsg.isRollback(),
                     m_txnState.getBeginUndoToken(),
-                    m_txnState.txnId,
                     m_txnState.m_spHandle,
                     m_txnState.getUndoLog());
         }
@@ -80,13 +79,34 @@ public class CompleteTransactionTask extends TransactionTask
     public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
     throws IOException
     {
+        if (!m_txnState.isReadOnly() && !m_completeMsg.isRollback()) {
+            // ENG-5276: Need to set the last committed spHandle so that the rejoining site gets the accurate
+            // per-partition txnId set for the next snapshot. Normally, this is done through undo log truncation.
+            // Since the task is not run here, we need to set the last committed spHandle explicitly.
+            //
+            // How does this work?
+            // - Blocking rejoin with idle cluster: The spHandle is updated here with the spHandle of the stream
+            //   snapshot that transfers the rejoin data. So the snapshot right after rejoin should have the spHandle
+            //   passed here.
+            // - Live rejoin with idle cluster: Same as blocking rejoin.
+            // - Live rejoin with workload: Transactions will be logged and replayed afterward. The spHandle will be
+            //   updated when they commit and truncate undo logs. So at the end of replay,
+            //   the spHandle should have the latest value. If all replayed transactions rolled back,
+            //   the spHandle is still guaranteed to be the spHandle of the stream snapshot that transfered the
+            //   rejoin data, which is the correct value.
+            siteConnection.setSpHandleForSnapshotDigest(m_txnState.m_spHandle);
+        }
+
         if (!m_completeMsg.isRestart()) {
             // future: offer to siteConnection.IBS for replay.
             doCommonSPICompleteActions();
         }
-        // We need to log the restarting message to the task log so we'll replay the whole
-        // stream faithfully
-        taskLog.logTask(m_completeMsg);
+
+        if (!m_txnState.isReadOnly()) {
+            // We need to log the restarting message to the task log so we'll replay the whole
+            // stream faithfully
+            taskLog.logTask(m_completeMsg);
+        }
     }
 
     @Override
@@ -105,7 +125,6 @@ public class CompleteTransactionTask extends TransactionTask
             // eventual encapsulation.
             siteConnection.truncateUndoLog(m_completeMsg.isRollback(),
                     m_txnState.getBeginUndoToken(),
-                    m_txnState.txnId,
                     m_txnState.m_spHandle,
                     m_txnState.getUndoLog());
         }

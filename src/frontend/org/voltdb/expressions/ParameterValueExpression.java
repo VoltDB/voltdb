@@ -24,7 +24,6 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Database;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -98,7 +97,8 @@ public class ParameterValueExpression extends AbstractValueExpression {
     }
 
     @Override
-    public void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {
+    public void loadFromJSONObject(JSONObject obj) throws JSONException
+    {
         assert ! obj.isNull(Members.PARAM_IDX.name());
         m_paramIndex = obj.getInt(Members.PARAM_IDX.name());
         if (!obj.isNull(Members.PARAM_IS_VECTOR.name())) {

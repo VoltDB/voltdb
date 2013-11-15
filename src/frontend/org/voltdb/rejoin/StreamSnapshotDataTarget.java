@@ -32,8 +32,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.SettableFuture;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
@@ -44,8 +42,10 @@ import org.voltdb.SnapshotFormat;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.CompressionService;
 
+import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 
 /**
  * A stream snapshot target for sending snapshot data directly to a rejoining
@@ -302,6 +302,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         private final AtomicInteger m_expectedEOFs;
 
         final Map<Long, AtomicLong> m_bytesSent;
+        final Map<Long, AtomicLong> m_worksSent;
         volatile Exception m_lastException = null;
 
         public SnapshotSender(Mailbox mb)
@@ -317,12 +318,14 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             m_workQueue = new LinkedBlockingQueue<SendWork>();
             m_expectedEOFs = new AtomicInteger();
             m_bytesSent = Collections.synchronizedMap(new HashMap<Long, AtomicLong>());
+            m_worksSent = Collections.synchronizedMap(new HashMap<Long, AtomicLong>());
         }
 
         public void registerDataTarget(long targetId)
         {
             m_expectedEOFs.incrementAndGet();
             m_bytesSent.put(targetId, new AtomicLong());
+            m_worksSent.put(targetId, new AtomicLong());
         }
 
         public void offer(SendWork work)
@@ -357,6 +360,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                     }
 
                     m_bytesSent.get(work.m_targetId).addAndGet(work.doWork(m_mb, m_msgFactory));
+                    m_worksSent.get(work.m_targetId).incrementAndGet();
                 }
                 catch (Exception e) {
                     m_lastException = e;
@@ -536,6 +540,11 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         return m_sender.m_bytesSent.get(m_targetId).get();
     }
 
+    public long getWorksWritten()
+    {
+        return m_sender.m_worksSent.get(m_targetId).get();
+    }
+
     @Override
     public void setOnCloseHandler(Runnable onClose) {
         m_onCloseHandler.set(onClose);
@@ -557,5 +566,21 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     @Override
     public SnapshotFormat getFormat() {
         return SnapshotFormat.STREAM;
+    }
+
+    /**
+     * Get the row count if any, of the content wrapped in the given {@link BBContainer}
+     * @param tupleData
+     * @return the numbers of tuple data rows contained within a container
+     */
+    @Override
+    public int getInContainerRowCount(BBContainer tupleData) {
+        // according to TableOutputStream.cpp:TupleOutputStream::endRows() the row count is
+        // at offset 4 (second integer)
+        ByteBuffer bb = tupleData.b.duplicate();
+        bb.position(getHeaderSize());
+        bb.getInt(); // skip first four (partition id)
+
+        return bb.getInt();
     }
 }

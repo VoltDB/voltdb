@@ -16,13 +16,15 @@
  */
 package org.voltdb;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
+import static org.voltdb.TheHashinator.valueToBytes;
 
 public class LegacyHashinator extends TheHashinator {
     private final int catalogPartitionCount;
@@ -69,24 +71,24 @@ public class LegacyHashinator extends TheHashinator {
     }
 
     @Override
-    protected Pair<HashinatorType, byte[]> pGetCurrentConfig() {
-        return Pair.of(HashinatorType.LEGACY, m_configBytes);
+    protected HashinatorConfig pGetCurrentConfig() {
+        return new HashinatorConfig(HashinatorType.LEGACY, m_configBytes, 0, 0);
     }
 
     @Override
-    public Map<Long, Integer> pPredecessors(int partition)
+    public Map<Integer, Integer> pPredecessors(int partition)
     {
         throw new RuntimeException("Legacy hashinator doesn't support predecessors");
     }
 
     @Override
-    public Pair<Long, Integer> pPredecessor(int partition, long token)
+    public Pair<Integer, Integer> pPredecessor(int partition, int token)
     {
         throw new RuntimeException("Legacy hashinator doesn't support predecessors");
     }
 
     @Override
-    public Map<Long, Long> pGetRanges(int partition)
+    public Map<Integer, Integer> pGetRanges(int partition)
     {
         throw new RuntimeException("Getting ranges is not supported in the legacy hashinator");
     }
@@ -105,5 +107,44 @@ public class LegacyHashinator extends TheHashinator {
     public byte[] getConfigBytes()
     {
         return m_configBytes;
+    }
+
+    @Override
+    public HashinatorType getConfigurationType() {
+        return TheHashinator.HashinatorType.LEGACY;
+    }
+
+    @Override
+    public int pHashToPartition(VoltType type, Object obj) {
+        // Annoying, legacy hashes numbers and bytes differently, need to preserve that.
+        if (obj == null || VoltType.isNullVoltType(obj)) {
+            return 0;
+        } else if (obj instanceof Long) {
+            long value = ((Long) obj).longValue();
+            return pHashinateLong(value);
+        } else if (obj instanceof Integer) {
+            long value = ((Integer) obj).intValue();
+            return pHashinateLong(value);
+        } else if (obj instanceof Short) {
+            long value = ((Short) obj).shortValue();
+            return pHashinateLong(value);
+        } else if (obj instanceof Byte) {
+            long value = ((Byte) obj).byteValue();
+            return pHashinateLong(value);
+        } else if (obj.getClass() == byte[].class) {
+            obj = bytesToValue(type, (byte[]) obj);
+            return pHashinateBytes(valueToBytes(obj));
+        }
+
+        return pHashinateBytes(valueToBytes(obj));
+    }
+
+    @Override
+    protected Set<Integer> pGetPartitions() {
+        Set<Integer> set = new HashSet<Integer>();
+        for (int ii = 0; ii < catalogPartitionCount; ii++) {
+            set.add(ii);
+        }
+        return set;
     }
 }

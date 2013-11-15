@@ -63,8 +63,7 @@ function server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE host $HOST
+    $VOLTDB create -d deployment.xml -l $LICENSE -H localhost $APPNAME.jar
 }
 
 function benchmark-help() {
@@ -74,7 +73,7 @@ function benchmark-help() {
 function benchmark() {
     # requires python --version > 2.6
     mkdir -p /tmp/csvbenchmark
-    VOLTDB_HOME=$VOLTDB_BIN/.. $PYTHON $APPNAME.py -v --servers=$SERVERS --rows=1000 --tries=1 /tmp/csvbenchmark
+    PYTHONPATH=$VOLTDB_LIB/python VOLTDB_HOME=$VOLTDB_BIN/.. $PYTHON $APPNAME.py -v --servers=$SERVERS --rows=1000 --tries=1 /tmp/csvbenchmark
 }
 
 function help() {

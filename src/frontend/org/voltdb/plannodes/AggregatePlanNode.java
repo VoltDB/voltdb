@@ -141,6 +141,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
         m_postPredicate = predicate;
     }
 
+    public AbstractExpression getPostPredicate() {
+        return m_postPredicate;
+    }
+
     // for single min() / max(), return the single aggregate expression
     public AbstractExpression getFirstAggregateExpression() {
         return m_aggregateExpressions.get(0);
@@ -188,7 +192,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
         for (TupleValueExpression tve : output_tves)
         {
-            int index = input_schema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
             if (index == -1)
             {
                 // check to see if this TVE is the aggregate output
@@ -216,7 +220,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
         for (TupleValueExpression tve : agg_tves)
         {
-            int index = input_schema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
             tve.setColumnIndex(index);
         }
 
@@ -229,7 +233,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
         for (TupleValueExpression tve : group_tves)
         {
-            int index = input_schema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
             tve.setColumnIndex(index);
         }
 
@@ -365,24 +369,12 @@ public class AggregatePlanNode extends AbstractPlanNode {
             }
             else {
                 m_aggregateExpressions.add(
-                        AbstractExpression.fromJSONObject(
-                                tempObj.getJSONObject( Members.AGGREGATE_EXPRESSION.name() ),
-                                db) );
+                    AbstractExpression.fromJSONChild(tempObj, Members.AGGREGATE_EXPRESSION.name()));
             }
         }
-        if ( ! jobj.isNull(Members.GROUPBY_EXPRESSIONS.name()) ) {
-            jarray = jobj.getJSONArray( Members.GROUPBY_EXPRESSIONS.name() );
-            size = jarray.length();
-            for( int i = 0; i < size; i++ ) {
-                m_groupByExpressions.add(
-                        AbstractExpression.fromJSONObject( jarray.getJSONObject(i), db));
-            }
-        }
-        if(!jobj.isNull(Members.PRE_PREDICATE.name())) {
-            m_prePredicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.PRE_PREDICATE.name()), db);
-        }
-        if(!jobj.isNull(Members.POST_PREDICATE.name())) {
-            m_postPredicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.POST_PREDICATE.name()), db);
-        }
+        AbstractExpression.loadFromJSONArrayChild(m_groupByExpressions, jobj,
+                                                  Members.GROUPBY_EXPRESSIONS.name());
+        m_prePredicate = AbstractExpression.fromJSONChild(jobj, Members.PRE_PREDICATE.name());
+        m_postPredicate = AbstractExpression.fromJSONChild(jobj, Members.POST_PREDICATE.name());
     }
 }

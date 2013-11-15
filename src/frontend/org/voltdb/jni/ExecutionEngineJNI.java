@@ -29,12 +29,11 @@ import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
-import org.voltdb.TheHashinator;
+import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
-import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FastSerializer.BufferGrowCallback;
@@ -98,8 +97,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int hostId,
             final String hostname,
             final int tempTableMemory,
-            final TheHashinator.HashinatorType hashinatorType,
-            final byte hashinatorConfig[])
+            final HashinatorConfig hashinatorConfig)
     {
         // base class loads the volt shared library.
         super(siteId, partitionId);
@@ -123,8 +121,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     partitionId,
                     hostId,
                     getStringBytes(hostname),
-                    tempTableMemory * 1024 * 1024,
-                    hashinatorType.typeId(), hashinatorConfig);
+                    tempTableMemory * 1024 * 1024);
         checkErrorCode(errorCode);
         fsForParameterSet = new FastSerializer(true, new BufferGrowCallback() {
             @Override
@@ -144,6 +141,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 deserializer.buffer(), deserializer.buffer().capacity(),
                 exceptionBuffer, exceptionBuffer.capacity());
         checkErrorCode(errorCode);
+        updateHashinator(hashinatorConfig);
         //LOG.info("Initialized Execution Engine");
     }
 
@@ -502,19 +500,18 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * data is returned in the usual results buffer, length preceded as usual.
      */
     @Override
-    public ExportProtoMessage exportAction(boolean syncAction,
+    public void exportAction(boolean syncAction,
             long ackTxnId, long seqNo, int partitionId, String tableSignature)
     {
         //Clear is destructive, do it before the native call
         deserializer.clear();
-        ExportProtoMessage result = null;
         long retval = nativeExportAction(pointer,
                                          syncAction, ackTxnId, seqNo, getStringBytes(tableSignature));
         if (retval < 0) {
-            result = new ExportProtoMessage( 0, partitionId, tableSignature);
-            result.error();
+            LOG.info("exportAction failed.  syncAction: " + syncAction + ", ackTxnId: " +
+                    ackTxnId + ", seqNo: " + seqNo + ", partitionId: " + partitionId +
+                    ", tableSignature: " + tableSignature);
         }
-        return result;
     }
 
     @Override
@@ -533,9 +530,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public int hashinate(Object value, TheHashinator.HashinatorType hashinatorType, byte hashinatorConfig[])
+    public int hashinate(
+            Object value,
+            HashinatorConfig config)
     {
-        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(value, hashinatorType.typeId(), hashinatorConfig);
+        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(value, config.type.typeId(), config.configBytes);
 
         // serialize the param set
         fsForParameterSet.clear();
@@ -545,23 +544,29 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             throw new RuntimeException(exception); // can't happen
         }
 
-        return nativeHashinate(pointer);
+        return nativeHashinate(pointer, config.configPtr, config.numTokens);
     }
 
+    //Store a reference to the config to prevent it from being GCed while the EE
+    //is retaining a reference to it the native hash data
+    private HashinatorConfig m_configRef;
     @Override
-    public void updateHashinator(TheHashinator.HashinatorType type, byte[] config)
+    public void updateHashinator(HashinatorConfig config)
     {
-        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(type.typeId(), config);
+        m_configRef = config;
+        if (config.configPtr == 0) {
+            ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(config.configBytes);
 
-        // serialize the param set
-        fsForParameterSet.clear();
-        try {
-            parameterSet.writeExternal(fsForParameterSet);
-        } catch (final IOException exception) {
-            throw new RuntimeException(exception); // can't happen
+            // serialize the param set
+            fsForParameterSet.clear();
+            try {
+                parameterSet.writeExternal(fsForParameterSet);
+            } catch (final IOException exception) {
+                throw new RuntimeException(exception); // can't happen
+            }
         }
 
-        nativeUpdateHashinator(pointer);
+        nativeUpdateHashinator(pointer, config.type.typeId(), config.configPtr, config.numTokens);
     }
 
     @Override

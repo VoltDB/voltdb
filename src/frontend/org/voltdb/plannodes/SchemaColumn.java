@@ -21,7 +21,6 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 
@@ -42,6 +41,7 @@ public class SchemaColumn
      * @param tableName  The name of the table where this column originated,
      *        if any.  Currently, internally created columns will be assigned
      *        the table name "VOLT_TEMP_TABLE" for disambiguation.
+     * @param tableAlias  The alias assigned to this table, if any
      * @param columnName  The name of this column, if any
      * @param columnAlias  The alias assigned to this column, if any
      * @param expression  The input expression which generates this
@@ -50,16 +50,18 @@ public class SchemaColumn
      *        without affecting other nodes/columns/plan iterations, so
      *        it clones this expression.
      */
-    SchemaColumn(String tableName, String columnName, String columnAlias) {
+    SchemaColumn(String tableName, String tableAlias, String columnName, String columnAlias) {
         m_tableName = tableName;
+        m_tableAlias = tableAlias;
         m_columnName = columnName;
         m_columnAlias = columnAlias;
     }
 
-    public SchemaColumn(String tableName, String columnName,
+    public SchemaColumn(String tableName, String tableAlias, String columnName,
                         String columnAlias, AbstractExpression expression)
     {
         m_tableName = tableName;
+        m_tableAlias = tableAlias;
         m_columnName = columnName;
         m_columnAlias = columnAlias;
         if (expression != null) {
@@ -73,7 +75,7 @@ public class SchemaColumn
     @Override
     protected SchemaColumn clone()
     {
-        return new SchemaColumn(m_tableName, m_columnName, m_columnAlias,
+        return new SchemaColumn(m_tableName, m_tableAlias, m_columnName, m_columnAlias,
                                 m_expression);
     }
 
@@ -90,7 +92,17 @@ public class SchemaColumn
 
         SchemaColumn sc = (SchemaColumn) obj;
         String tableName = sc.getTableName();
-        if (m_tableName.equals(tableName)) {
+        String tableAlias = sc.getTableAlias();
+        boolean sameTable = false;
+
+        if (tableAlias != null) {
+            if (tableAlias.equals(m_tableAlias)) {
+                sameTable = true;
+            }
+        } else  if (m_tableName.equals(tableName)) {
+            sameTable = true;
+        }
+        if (sameTable == true) {
             String columnName = sc.getColumnName();
             String columnAlias = sc.getColumnAlias();
 
@@ -137,21 +149,23 @@ public class SchemaColumn
         }
         else
         {
-            new_exp = new TupleValueExpression();
+            new_exp = new TupleValueExpression(m_tableName, m_tableAlias, m_columnName, m_columnAlias);
             // XXX not sure this is right
-            new_exp.setTableName(m_tableName);
-            new_exp.setColumnName(m_columnName);
-            new_exp.setColumnAlias(m_columnAlias);
             new_exp.setValueType(m_expression.getValueType());
             new_exp.setValueSize(m_expression.getValueSize());
         }
-        return new SchemaColumn(m_tableName, m_columnName, m_columnAlias,
+        return new SchemaColumn(m_tableName, m_tableAlias, m_columnName, m_columnAlias,
                                 new_exp);
     }
 
     public String getTableName()
     {
         return m_tableName;
+    }
+
+    public String getTableAlias()
+    {
+        return m_tableAlias;
     }
 
     public String getColumnName()
@@ -185,6 +199,7 @@ public class SchemaColumn
         StringBuilder sb = new StringBuilder();
         sb.append("SchemaColumn:\n");
         sb.append("\tTable Name: ").append(m_tableName).append("\n");
+        sb.append("\tTable Alias: ").append(m_tableAlias).append("\n");
         sb.append("\tColumn Name: ").append(m_columnName).append("\n");
         sb.append("\tColumn Alias: ").append(m_columnAlias).append("\n");
         sb.append("\tColumn Type: ").append(getType()).append("\n");
@@ -227,21 +242,22 @@ public class SchemaColumn
         stringer.endObject();
     }
 
-    public static SchemaColumn fromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+    public static SchemaColumn fromJSONObject(JSONObject jobj) throws JSONException
+    {
         String tableName = "";
+        String tableAlias = "";
         String columnName = "";
         String columnAlias = "";
         AbstractExpression expression = null;
         if( !jobj.isNull( Members.COLUMN_NAME.name() ) ){
             columnName = jobj.getString( Members.COLUMN_NAME.name() );
         }
-        if( !jobj.isNull( Members.EXPRESSION.name() ) ) {
-            expression = AbstractExpression.fromJSONObject( jobj.getJSONObject( Members.EXPRESSION.name() ), db);
-        }
-        return new SchemaColumn( tableName, columnName, columnAlias, expression );
+        expression = AbstractExpression.fromJSONChild(jobj, Members.EXPRESSION.name());
+        return new SchemaColumn( tableName, tableAlias, columnName, columnAlias, expression );
     }
 
     private String m_tableName;
+    private String m_tableAlias;
     private String m_columnName;
     private String m_columnAlias;
     private AbstractExpression m_expression;

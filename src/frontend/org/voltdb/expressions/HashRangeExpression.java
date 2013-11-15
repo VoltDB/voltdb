@@ -24,7 +24,6 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Database;
 import org.voltdb.types.ExpressionType;
 
 import com.google.common.collect.ImmutableSortedMap;
@@ -41,7 +40,7 @@ public class HashRangeExpression extends AbstractValueExpression {
         RANGE_END
     }
 
-    protected ImmutableSortedMap<Long, Long> m_ranges;
+    protected ImmutableSortedMap<Integer, Integer> m_ranges;
     protected int m_hashColumn = Integer.MIN_VALUE;
 
     public HashRangeExpression() {
@@ -90,14 +89,14 @@ public class HashRangeExpression extends AbstractValueExpression {
     /**
      * @return the ranges
      */
-    public Map<Long, Long> getRanges() {
+    public Map<Integer, Integer> getRanges() {
         return m_ranges;
     }
 
     /**
      * @param ranges the column_alias to set
      */
-    public void setRanges(Map<Long, Long> ranges) {
+    public void setRanges(Map<Integer, Integer> ranges) {
         m_ranges = ImmutableSortedMap.copyOf(ranges);
     }
 
@@ -146,23 +145,23 @@ public class HashRangeExpression extends AbstractValueExpression {
         super.toJSONString(stringer);
         stringer.key(Members.HASH_COLUMN.name()).value(m_hashColumn);
         stringer.key(Members.RANGES.name()).array();
-        for (Map.Entry<Long, Long> e : m_ranges.entrySet()) {
+        for (Map.Entry<Integer, Integer> e : m_ranges.entrySet()) {
             stringer.object();
-            stringer.key(Members.RANGE_START.name()).value(e.getKey());
-            stringer.key(Members.RANGE_END.name()).value(e.getValue());
+            stringer.key(Members.RANGE_START.name()).value(e.getKey().intValue());
+            stringer.key(Members.RANGE_END.name()).value(e.getValue().intValue());
             stringer.endObject();
         }
         stringer.endArray();
     }
 
     @Override
-    protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {
+    protected void loadFromJSONObject(JSONObject obj) throws JSONException {
         m_hashColumn = obj.getInt(Members.HASH_COLUMN.name());
         JSONArray array = obj.getJSONArray(Members.RANGES.name());
-        ImmutableSortedMap.Builder<Long, Long> b = ImmutableSortedMap.naturalOrder();
+        ImmutableSortedMap.Builder<Integer, Integer> b = ImmutableSortedMap.naturalOrder();
         for (int ii = 0; ii < array.length(); ii++) {
             JSONObject range = array.getJSONObject(ii);
-            b.put(range.getLong(Members.RANGE_START.name()), range.getLong(Members.RANGE_END.name()));
+            b.put(range.getInt(Members.RANGE_START.name()), range.getInt(Members.RANGE_END.name()));
         }
         m_ranges = b.build();
     }

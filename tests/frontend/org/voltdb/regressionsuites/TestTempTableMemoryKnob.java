@@ -103,10 +103,6 @@ public class TestTempTableMemoryKnob extends RegressionSuite {
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(FetchTooMuch.class.getResource("failures-ddl.sql"));
-        project.addPartitionInfo("NEW_ORDER", "NO_W_ID");
-        project.addPartitionInfo("FIVEK_STRING", "P");
-        project.addPartitionInfo("FIVEK_STRING_WITH_INDEX", "ID");
-        project.addPartitionInfo("WIDE", "P");
         project.addProcedures(PROCEDURES);
         // Give ourselves a little leeway for slop over 300 MB
         project.setMaxTempTableMemory(320);

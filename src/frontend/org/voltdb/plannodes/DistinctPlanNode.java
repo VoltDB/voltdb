@@ -88,7 +88,7 @@ public class DistinctPlanNode extends AbstractPlanNode {
             // At this point, they'd better all be TVEs.
             assert(col.getExpression() instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = input_schema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
             tve.setColumnIndex(index);
         }
         m_outputSchema.sortByTveIndex();
@@ -98,7 +98,7 @@ public class DistinctPlanNode extends AbstractPlanNode {
             ExpressionUtil.getTupleValueExpressions(m_distinctExpression);
         for (TupleValueExpression tve : distinct_tves)
         {
-            int index = input_schema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
             tve.setColumnIndex(index);
         }
     }
@@ -120,9 +120,7 @@ public class DistinctPlanNode extends AbstractPlanNode {
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
-        if( !jobj.isNull( Members.DISTINCT_EXPRESSION.name() ) ) {
-            m_distinctExpression = AbstractExpression.fromJSONObject( jobj.getJSONObject(Members.DISTINCT_EXPRESSION.name()), db);
-        }
+        m_distinctExpression = AbstractExpression.fromJSONChild(jobj, Members.DISTINCT_EXPRESSION.name());
     }
     @Override
     protected String explainPlanForNode(String indent) {

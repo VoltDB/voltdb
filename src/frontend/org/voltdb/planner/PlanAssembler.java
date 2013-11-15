@@ -38,11 +38,11 @@ import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
+import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
-import org.voltdb.planner.ParsedSelectStmt.MVFixInfo;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -54,6 +54,7 @@ import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.MaterializePlanNode;
+import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
@@ -266,7 +267,7 @@ public class PlanAssembler {
                 // per-join-order basis, and so, so must this analysis.
                 HashMap<AbstractExpression, Set<AbstractExpression>>
                     valueEquivalence = parsedStmt.analyzeValueEquivalence();
-                m_partitioning.analyzeForMultiPartitionAccess(parsedStmt.tableList, valueEquivalence);
+                m_partitioning.analyzeForMultiPartitionAccess(parsedStmt.stmtCache, valueEquivalence);
             }
             subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
         }
@@ -494,12 +495,14 @@ public class PlanAssembler {
         assert (subAssembler != null);
 
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
+
         if (subSelectRoot == null) {
             m_recentErrorMsg = subAssembler.m_recentErrorMsg;
             return null;
         }
         AbstractPlanNode root = subSelectRoot;
 
+        boolean mvFixNeedsProjection = false;
         /*
          * If the access plan for the table in the join order was for a
          * distributed table scan there must be a send/receive pair at the top
@@ -510,6 +513,9 @@ public class PlanAssembler {
          * inner side of a NestLoop join.
          */
         if (m_partitioning.requiresTwoFragments()) {
+            boolean mvFixInfoCoordinatorNeeded = true;
+            boolean mvFixInfoEdgeCaseOuterJoin = false;
+
             ArrayList<AbstractPlanNode> receivers = root.findAllNodesOfType(PlanNodeType.RECEIVE);
             if (receivers.size() == 1) {
                 // The subplan SHOULD be good to go, but just make sure that it doesn't
@@ -524,50 +530,66 @@ public class PlanAssembler {
                                 "an inner partitioned table is too complex and is not supported.");
                     }
                 }
-            }
-            else if (receivers.size() > 0) {
+
+                // Edge cases: left outer join with replicated table.
+                if (m_parsedSelect.mvFixInfo.needed()) {
+                    mvFixInfoCoordinatorNeeded = false;
+                    AbstractPlanNode receiveNode = receivers.get(0);
+                    if (receiveNode.getParent(0) instanceof NestLoopPlanNode) {
+                        if (subSelectRoot.hasInlinedIndexScanOfTable(m_parsedSelect.mvFixInfo.getMVTableName())) {
+                            return getNextSelectPlan();
+                        }
+                        List<AbstractPlanNode> nljs = receiveNode.findAllNodesOfType(PlanNodeType.NESTLOOP);
+                        List<AbstractPlanNode> nlijs = receiveNode.findAllNodesOfType(PlanNodeType.NESTLOOPINDEX);
+
+                        // outer join edge case does not have any join plan node under receive node.
+                        // This is like a single table case.
+                        if (nljs.size() + nlijs.size() == 0) {
+                            mvFixInfoEdgeCaseOuterJoin = true;
+                        }
+                        root = handleMVBasedMultiPartQuery(root, mvFixInfoEdgeCaseOuterJoin);
+                    }
+                }
+            } else if (receivers.size() > 0) {
                 throw new PlanningErrorException(
                         "This special case join between an outer replicated table and " +
                         "an inner partitioned table is too complex and is not supported.");
-            }
-            else {
+            } else {
                 root = subAssembler.addSendReceivePair(root);
+                // Root is a receive node here.
+                assert(root instanceof ReceivePlanNode);
+
+                if (m_parsedSelect.mayNeedAvgPushdown()) {
+                    m_parsedSelect.switchOptimalSuiteForAvgPushdown();
+                }
+                if (m_parsedSelect.tableList.size() > 1 && m_parsedSelect.mvFixInfo.needed()
+                        && subSelectRoot.hasInlinedIndexScanOfTable(m_parsedSelect.mvFixInfo.getMVTableName())) {
+                    // MV partitioned joined query needs reAggregation work on coordinator.
+                    // Index scan on MV table can not be supported.
+                    // So, in-lined index scan of Nested loop index join can not be possible.
+                    return getNextSelectPlan();
+                }
             }
-        }
 
-        if (root instanceof ReceivePlanNode) {
-            if (m_parsedSelect.mayNeedAvgPushdown()) {
-                m_parsedSelect.switchOptimalSuiteForAvgPushdown();
-            }
+            root = handleAggregationOperators(root);
 
-            if (m_parsedSelect.mvFixInfo.needed) {
-                // Guard to prevent wrong answer queries.
-                // Continue give wrong answers possibly for joined query on MV.
-//                if (m_parsedSelect.tableList.size() != 1) {
-//                    String errorMsg = String.format("Unsupported query joined with materialized table %s",
-//                            m_parsedSelect.mvFixInfo.mvTable.getTypeName());
-//                    throw new PlanningErrorException(errorMsg);
-//                }
-
+            // Process the re-aggregate plan node and insert it into the plan.
+            if (m_parsedSelect.mvFixInfo.needed() && mvFixInfoCoordinatorNeeded) {
+                AbstractPlanNode tmpRoot = root;
+                root = handleMVBasedMultiPartQuery(root, mvFixInfoEdgeCaseOuterJoin);
+                if (root != tmpRoot) {
+                    mvFixNeedsProjection = true;
+                }
             }
         } else {
-            m_parsedSelect.mvFixInfo.needed = false;
-        }
+            /*
+             * There is no receive node and root is a single partition plan.
+             */
 
-
-        /*
-         * Establish the output columns for the sub select plan.
-         */
-        root = handleAggregationOperators(root);
-
-        // Process the re-aggregate plan node and insert it into the plan.
-        boolean mvFixNeedsProjection = false;
-        if (m_parsedSelect.mvFixInfo.needed) {
-            AbstractPlanNode tmpRoot = root;
-            root = handleMVBasedMultiPartQuery(root);
-            if (root != tmpRoot) {
-                mvFixNeedsProjection = true;
-            }
+            // If there is no receive plan node and no distributed plan has been generated,
+            // the fix set for MV is not needed.
+            m_parsedSelect.mvFixInfo.setNeeded(false);
+            root = handleAggregationOperators(root);
         }
 
         if (m_parsedSelect.hasComplexAgg()) {
@@ -652,6 +674,7 @@ public class PlanAssembler {
         NodeSchema proj_schema = new NodeSchema();
         // This planner-created column is magic.
         proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
+                                               "VOLT_TEMP_TABLE",
                                                "tuple_address",
                                                "tuple_address",
                                                addressExpr));
@@ -715,6 +738,7 @@ public class PlanAssembler {
         NodeSchema proj_schema = new NodeSchema();
         // This planner-generated column is magic.
         proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
+                                               "VOLT_TEMP_TABLE",
                                                "tuple_address",
                                                "tuple_address",
                                                tae));
@@ -731,6 +755,7 @@ public class PlanAssembler {
         // to avoid any false schema/column matches with the actual table.
         for (Entry<Column, AbstractExpression> col : m_parsedUpdate.columns.entrySet()) {
             proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
+                                                   "VOLT_TEMP_TABLE",
                                                    col.getKey().getTypeName(),
                                                    col.getKey().getTypeName(),
                                                    col.getValue()));
@@ -808,23 +833,54 @@ public class PlanAssembler {
             // some supported default value
             if (expr == null) {
                 // if it's not nullable or defaulted we have a problem
-                if (column.getNullable() == false && column.getDefaulttype() == 0)
-                {
+                if (column.getNullable() == false && column.getDefaulttype() == 0) {
                     throw new PlanningErrorException("Column " + column.getName()
                             + " has no default and is not nullable.");
                 }
-                ConstantValueExpression const_expr =
-                    new ConstantValueExpression();
-                expr = const_expr;
-                if (column.getDefaulttype() != 0)
-                {
-                    const_expr.setValue(column.getDefaultvalue());
-                    const_expr.refineValueType(VoltType.get((byte) column.getDefaulttype()), column.getSize());
+
+
+                boolean isConstantValue = true;
+                if (column.getDefaulttype() == VoltType.TIMESTAMP.getValue()) {
+
+                    boolean isFunctionFormat = true;
+                    String timeValue = column.getDefaultvalue();
+                    try {
+                        Long.parseLong(timeValue);
+                        isFunctionFormat = false;
+                    } catch (NumberFormatException  e) {}
+                    if (isFunctionFormat) {
+                        try {
+                            java.sql.Timestamp.valueOf(timeValue);
+                            isFunctionFormat = false;
+                        } catch (IllegalArgumentException e) {}
+                    }
+
+                    if (isFunctionFormat) {
+                        String name = timeValue.split(":")[0];
+                        int id = Integer.parseInt(timeValue.split(":")[1]);
+
+                        FunctionExpression funcExpr = new FunctionExpression();
+                        funcExpr.setAttributes(name, name , id);
+
+                        funcExpr.setValueType(VoltType.TIMESTAMP);
+                        funcExpr.setValueSize(VoltType.TIMESTAMP.getMaxLengthInBytes());
+
+                        expr = funcExpr;
+                        isConstantValue = false;
+                    }
                 }
-                else
-                {
-                    const_expr.setValue(null);
-                    const_expr.refineValueType(VoltType.get((byte) column.getType()), column.getSize());
+                if (isConstantValue) {
+                    // Not Default sql function.
+                    ConstantValueExpression const_expr = new ConstantValueExpression();
+                    expr = const_expr;
+                    if (column.getDefaulttype() != 0) {
+                        const_expr.setValue(column.getDefaultvalue());
+                        const_expr.refineValueType(VoltType.get((byte) column.getDefaulttype()), column.getSize());
+                    }
+                    else {
+                        const_expr.setValue(null);
+                        const_expr.refineValueType(VoltType.get((byte) column.getType()), column.getSize());
+                    }
                 }
             }
 
@@ -838,6 +894,7 @@ public class PlanAssembler {
             // add column to the materialize node.
             // This table name is magic.
             mat_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
+                                                  "VOLT_TEMP_TABLE",
                                                   column.getTypeName(),
                                                   column.getTypeName(),
                                                   expr));
@@ -894,28 +951,23 @@ public class PlanAssembler {
             // Create a TVE that should match the tuple count input column
             // This TVE is magic.
             // really really need to make this less hard-wired
-            TupleValueExpression count_tve = new TupleValueExpression();
+            TupleValueExpression count_tve = new TupleValueExpression(
+                    "VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "modified_tuples", "modified_tuples", 0);
             count_tve.setValueType(VoltType.BIGINT);
             count_tve.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
-            count_tve.setColumnIndex(0);
-            count_tve.setColumnName("modified_tuples");
-            count_tve.setColumnAlias("modified_tuples");
-            count_tve.setTableName("VOLT_TEMP_TABLE");
             countNode.addAggregate(ExpressionType.AGGREGATE_SUM, false, 0, count_tve);
 
             // The output column. Not really based on a TVE (it is really the
             // count expression represented by the count configured above). But
             // this is sufficient for now.  This looks identical to the above
             // TVE but it's logically different so we'll create a fresh one.
-            TupleValueExpression tve = new TupleValueExpression();
+            TupleValueExpression tve = new TupleValueExpression(
+                    "VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "modified_tuples", "modified_tuples", 0);
             tve.setValueType(VoltType.BIGINT);
             tve.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
-            tve.setColumnIndex(0);
-            tve.setColumnName("modified_tuples");
-            tve.setColumnAlias("modified_tuples");
-            tve.setTableName("VOLT_TEMP_TABLE");
             NodeSchema count_schema = new NodeSchema();
             SchemaColumn col = new SchemaColumn("VOLT_TEMP_TABLE",
+                    "VOLT_TEMP_TABLE",
                     "modified_tuples",
                     "modified_tuples",
                     tve);
@@ -1046,12 +1098,10 @@ public class PlanAssembler {
                 if (jsonExpr.isEmpty()) {
                     for (ColumnRef cref : index.getColumns()) {
                         Column col = cref.getColumn();
-                        TupleValueExpression tve = new TupleValueExpression();
-                        tve.setColumnIndex(col.getIndex());
-                        tve.setColumnName(col.getName());
-                        tve.setExpressionType(ExpressionType.VALUE_TUPLE);
-                        tve.setHasAggregate(false);
-                        tve.setTableName(table.getTypeName());
+                        // Can not set table Alias here, only table name
+                        TupleValueExpression tve = new TupleValueExpression(table.getTypeName(),
+                                                                            col.getName(),
+                                                                            col.getIndex());
                         tve.setValueSize(col.getSize());
                         tve.setValueType(VoltType.get((byte) col.getType()));
                         indexExpressions.add(tve);
@@ -1060,7 +1110,7 @@ public class PlanAssembler {
                 // if this is a fancy expression-based index...
                 else {
                     try {
-                        indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, null);
+                        indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr);
                     } catch (JSONException e) {
                         e.printStackTrace(); // danger will robinson
                         assert(false);
@@ -1133,7 +1183,7 @@ public class PlanAssembler {
             }
         }
 
-        if (m_parsedSelect.mvFixInfo.needed) {
+        if (m_parsedSelect.mvFixInfo.needed()) {
             // Do not push down limit for mv based distributed query.
             canPushDown = false;
         }
@@ -1203,42 +1253,68 @@ public class PlanAssembler {
         }
     }
 
-    AbstractPlanNode handleMVBasedMultiPartQuery (AbstractPlanNode root) {
-        MVFixInfo mvFixInfo = m_parsedSelect.mvFixInfo;
 
-        HashAggregatePlanNode reAggNode = new HashAggregatePlanNode(mvFixInfo.reAggNode);
+    AbstractPlanNode handleMVBasedMultiPartQuery (AbstractPlanNode root, boolean edgeCaseOuterJoin) {
+        MaterializedViewFixInfo mvFixInfo = m_parsedSelect.mvFixInfo;
+
+        HashAggregatePlanNode reAggNode = new HashAggregatePlanNode(mvFixInfo.getReAggregationPlanNode());
         reAggNode.clearChildren();
         reAggNode.clearParents();
 
         AbstractPlanNode receiveNode = root;
+        AbstractPlanNode reAggParent = null;
         // Find receive plan node and insert the constructed re-aggregation plan node.
         if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
-            reAggNode.addAndLinkChild(root);
             root = reAggNode;
         } else {
             List<AbstractPlanNode> recList = root.findAllNodesOfType(PlanNodeType.RECEIVE);
             assert(recList.size() == 1);
             receiveNode = recList.get(0);
 
-            AbstractPlanNode parent = receiveNode.getParent(0);
-            receiveNode.clearParents();
-            parent.clearChildren();
-            reAggNode.addAndLinkChild(receiveNode);
-            parent.addAndLinkChild(reAggNode);
+            reAggParent = receiveNode.getParent(0);
+            boolean result = reAggParent.replaceChild(receiveNode, reAggNode);
+            assert(result);
         }
+        reAggNode.addAndLinkChild(receiveNode);
 
-        // Set up the scan plan node's scan columns
-        // Add inline projection node for scan node.
         assert(receiveNode instanceof ReceivePlanNode);
         AbstractPlanNode sendNode = receiveNode.getChild(0);
         assert(sendNode instanceof SendPlanNode);
         AbstractPlanNode sendNodeChild = sendNode.getChild(0);
-        List<AbstractScanPlanNode> scanList = sendNodeChild.getScanNodeList();
-        assert(scanList.size() == 1);
-        AbstractScanPlanNode scanNode = scanList.get(0);
-        assert(scanNode.getTargetTableName().equals(mvFixInfo.mvTable.getTypeName()));
 
-        scanNode.addInlinePlanNode(mvFixInfo.scanInlinedProjectionNode);
+        HashAggregatePlanNode reAggNodeForReplace = null;
+        if (m_parsedSelect.tableList.size() > 1 && !edgeCaseOuterJoin) {
+            reAggNodeForReplace = reAggNode;
+        }
+        boolean find = mvFixInfo.processScanNodeWithReAggNode(sendNode, reAggNodeForReplace);
+        assert(find);
+
+        // If it is normal joined query, replace the node under receive node with materialized view scan node.
+        if (m_parsedSelect.tableList.size() > 1 && !edgeCaseOuterJoin) {
+            AbstractPlanNode joinNode = sendNodeChild;
+            // No agg, limit pushed down at this point.
+            assert(joinNode instanceof AbstractJoinPlanNode);
+
+            // Fix the node after Re-aggregation node.
+            joinNode.clearParents();
+
+            assert(mvFixInfo.m_scanNode != null);
+            mvFixInfo.m_scanNode.clearParents();
+
+            // replace joinNode with MV scan node on each partition.
+            sendNode.clearChildren();
+            sendNode.addAndLinkChild(mvFixInfo.m_scanNode);
+
+            // If reAggNode has parent node before we put it under join node,
+            // its parent will be the parent of the new join node. Update the root node.
+            if (reAggParent != null) {
+                reAggParent.replaceChild(reAggNode, joinNode);
+                root = reAggParent;
+            } else {
+                root = joinNode;
+            }
+        }
+
         return root;
     }
 
@@ -1293,12 +1369,12 @@ public class PlanAssembler {
                 (root.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
                  ((IndexScanPlanNode) root).getSortDirection() == SortDirectionType.INVALID)) {
                 aggNode = new HashAggregatePlanNode();
-                if (!m_parsedSelect.mvFixInfo.needed) {
+                if (!m_parsedSelect.mvFixInfo.needed()) {
                     topAggNode = new HashAggregatePlanNode();
                 }
             } else {
                 aggNode = new AggregatePlanNode();
-                if (!m_parsedSelect.mvFixInfo.needed) {
+                if (!m_parsedSelect.mvFixInfo.needed()) {
                     topAggNode = new AggregatePlanNode();
                 }
             }
@@ -1324,17 +1400,14 @@ public class PlanAssembler {
                     // and the offset into the output table schema for the
                     // aggregate node that we're computing.
                     // Oh, oh, it's magic, you know..
-                    TupleValueExpression tve = new TupleValueExpression();
+                    TupleValueExpression tve = new TupleValueExpression(
+                            "VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "", col.alias, outputColumnIndex);
                     tve.setValueType(rootExpr.getValueType());
                     tve.setValueSize(rootExpr.getValueSize());
-                    tve.setColumnIndex(outputColumnIndex);
-                    tve.setColumnName("");
-                    tve.setColumnAlias(col.alias);
-                    tve.setTableName("VOLT_TEMP_TABLE");
                     boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
                     aggNode.addAggregate(agg_expression_type, is_distinct, outputColumnIndex, agg_input_expr);
-                    schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "", col.alias, tve);
-                    top_schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "", col.alias, tve);
+                    schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "", col.alias, tve);
+                    top_schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "", col.alias, tve);
 
                     /*
                      * Special case count(*), count(), sum(), min() and max() to
@@ -1408,14 +1481,14 @@ public class PlanAssembler {
                      * MUST already exist in the child node's output. Find them and
                      * add them to the aggregate's output.
                      */
-                    schema_col = new SchemaColumn(col.tableName, col.columnName, col.alias, col.expression);
+                    schema_col = new SchemaColumn(col.tableName, col.tableAlias, col.columnName, col.alias, col.expression);
                     AbstractExpression topExpr = null;
                     if (col.groupBy) {
                         topExpr = m_parsedSelect.groupByExpressions.get(col.alias);
                     } else {
                         topExpr = col.expression;
                     }
-                    top_schema_col = new SchemaColumn(col.tableName, col.columnName, col.alias, topExpr);
+                    top_schema_col = new SchemaColumn(col.tableName, col.tableAlias, col.columnName, col.alias, topExpr);
                 }
 
                 agg_schema.addColumn(schema_col);
@@ -1506,7 +1579,7 @@ public class PlanAssembler {
                     // either pure expression index or mix of expressions and simple columns
                     List<AbstractExpression> indexedExprs = null;
                     try {
-                        indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, null);
+                        indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson);
                     } catch (JSONException e) {
                         e.printStackTrace();
                         assert(false);
@@ -1730,7 +1803,7 @@ public class PlanAssembler {
     {
         assert(root != null);
         AbstractPlanNode accessPlanTemp = root;
-        if (root instanceof ReceivePlanNode) {
+        if (root instanceof ReceivePlanNode && !m_parsedSelect.mvFixInfo.needed()) {
             // Temporarily strip send/receive pair
             accessPlanTemp = root.getChild(0).getChild(0);
             accessPlanTemp.clearParents();

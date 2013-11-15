@@ -10,11 +10,12 @@
 {@comparablevalue = "_numericvalue"}
 {@dmlcolumnpredicate = "_variable[numeric] _cmp _value[int16]"}
 {@dmltable = "_table"}
-{@from_tables = "_table"}
+{@fromtables = "_table"}
 {@idcol = "ID"}
 
 
 {@insertvals = "_id, _value[decimal], _value[decimal], _value[float]"}
+{@onefun = "ABS"}
 {@optionalfn = "_numfun"}
 {@updatecolumn = "CASH"}
 {@updatesource = "ID"}

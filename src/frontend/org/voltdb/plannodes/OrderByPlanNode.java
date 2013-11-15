@@ -145,7 +145,7 @@ public class OrderByPlanNode extends AbstractPlanNode {
             // At this point, they'd better all be TVEs.
             assert(col.getExpression() instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = input_schema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
             tve.setColumnIndex(index);
         }
         m_outputSchema.sortByTveIndex();
@@ -160,7 +160,7 @@ public class OrderByPlanNode extends AbstractPlanNode {
         }
         for (TupleValueExpression tve : sort_tves)
         {
-            int index = input_schema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
             tve.setColumnIndex(index);
         }
     }
@@ -215,7 +215,7 @@ public class OrderByPlanNode extends AbstractPlanNode {
         for( int i = 0; i < size; i++ ) {
             JSONObject tempObj = jarray.getJSONObject(i);
             m_sortDirections.add( SortDirectionType.get(tempObj.getString( Members.SORT_DIRECTION.name())) );
-            m_sortExpressions.add( AbstractExpression.fromJSONObject( tempObj.getJSONObject( Members.SORT_EXPRESSION.name()), db) );
+            m_sortExpressions.add( AbstractExpression.fromJSONChild(tempObj, Members.SORT_EXPRESSION.name()) );
         }
     }
 

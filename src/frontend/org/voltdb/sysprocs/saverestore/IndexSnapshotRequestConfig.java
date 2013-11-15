@@ -23,9 +23,11 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
 
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
 
@@ -36,13 +38,13 @@ import java.util.SortedMap;
 public class IndexSnapshotRequestConfig extends SnapshotRequestConfig {
     public static class PartitionRanges {
         public final int partitionId;
-        public final SortedMap<Long, Long> ranges;
+        public final SortedMap<Integer, Integer> ranges;
 
         /**
          * @param partitionId    The partition that currently owns the ranges
          * @param ranges         The ranges to index on this partition
          */
-        public PartitionRanges(int partitionId, Map<Long, Long> ranges)
+        public PartitionRanges(int partitionId, Map<Integer, Integer> ranges)
         {
             this.partitionId = partitionId;
             this.ranges = ImmutableSortedMap.copyOf(ranges);
@@ -51,9 +53,9 @@ public class IndexSnapshotRequestConfig extends SnapshotRequestConfig {
 
     public final Collection<PartitionRanges> partitionRanges;
 
-    public IndexSnapshotRequestConfig(Collection<PartitionRanges> partitionRanges)
+    public IndexSnapshotRequestConfig(List<Table> tables, Collection<PartitionRanges> partitionRanges)
     {
-        super(null); // all partitioned tables will be included
+        super(tables);
         this.partitionRanges = ImmutableList.copyOf(partitionRanges);
     }
 
@@ -79,12 +81,12 @@ public class IndexSnapshotRequestConfig extends SnapshotRequestConfig {
                     JSONObject rangeObj = partitionObj.getJSONObject(pidStr);
                     Iterator rangeKey = rangeObj.keys();
 
-                    ImmutableSortedMap.Builder<Long, Long> rangeBuilder =
+                    ImmutableSortedMap.Builder<Integer, Integer> rangeBuilder =
                         ImmutableSortedMap.naturalOrder();
                     while (rangeKey.hasNext()) {
                         String rangeStartStr = (String) rangeKey.next();
-                        long rangeStart = Long.parseLong(rangeStartStr);
-                        long rangeEnd = rangeObj.getLong(rangeStartStr);
+                        int rangeStart = Integer.parseInt(rangeStartStr);
+                        int rangeEnd = rangeObj.getInt(rangeStartStr);
                         rangeBuilder.put(rangeStart, rangeEnd);
                     }
 
@@ -112,7 +114,7 @@ public class IndexSnapshotRequestConfig extends SnapshotRequestConfig {
         for (PartitionRanges partitionRange : partitionRanges) {
             stringer.key(Integer.toString(partitionRange.partitionId)).object();
 
-            for (Map.Entry<Long, Long> rangeEntry : partitionRange.ranges.entrySet()) {
+            for (Map.Entry<Integer, Integer> rangeEntry : partitionRange.ranges.entrySet()) {
                 stringer.key(rangeEntry.getKey().toString()).value(rangeEntry.getValue());
             }
 

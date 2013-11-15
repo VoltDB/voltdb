@@ -455,7 +455,7 @@ public abstract class CatalogUtil {
             } else {
                 List<AbstractExpression> indexedExprs = null;
                 try {
-                    indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring, null);
+                    indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring);
                 } catch (JSONException e) {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
@@ -544,20 +544,22 @@ public abstract class CatalogUtil {
         return true;
     }
 
-    public static long compileDeploymentAndGetCRC(Catalog catalog, String deploymentURL, boolean crashOnFailedValidation) {
+    public static long compileDeploymentAndGetCRC(Catalog catalog, String deploymentURL,
+            boolean crashOnFailedValidation, boolean isPlaceHolderCatalog) {
         DeploymentType deployment = CatalogUtil.parseDeployment(deploymentURL);
         if (deployment == null) {
             return -1;
         }
-        return compileDeploymentAndGetCRC(catalog, deployment, crashOnFailedValidation);
+        return compileDeploymentAndGetCRC(catalog, deployment, crashOnFailedValidation, isPlaceHolderCatalog);
     }
 
-    public static long compileDeploymentStringAndGetCRC(Catalog catalog, String deploymentString, boolean crashOnFailedValidation) {
+    public static long compileDeploymentStringAndGetCRC(Catalog catalog, String deploymentString,
+            boolean crashOnFailedValidation, boolean isPlaceHolderCatalog) {
         DeploymentType deployment = CatalogUtil.parseDeploymentFromString(deploymentString);
         if (deployment == null) {
             return -1;
         }
-        return compileDeploymentAndGetCRC(catalog, deployment, crashOnFailedValidation);
+        return compileDeploymentAndGetCRC(catalog, deployment, crashOnFailedValidation, isPlaceHolderCatalog);
     }
 
     /**
@@ -565,13 +567,12 @@ public abstract class CatalogUtil {
      * @param catalog Catalog to be updated.
      * @param deployment Parsed representation of the deployment.xml file.
      * @param crashOnFailedValidation
-     * @param printLog Whether or not to print the cluster configuration.
+     * @param isPlaceHolderCatalog if the catalog is isPlaceHolderCatalog and we are verifying only deployment xml.
      * @return CRC of the deployment contents (>0) or -1 on failure.
      */
     public static long compileDeploymentAndGetCRC(Catalog catalog,
                                                   DeploymentType deployment,
-                                                  boolean crashOnFailedValidation)
-    {
+            boolean crashOnFailedValidation, boolean isPlaceHolderCatalog)    {
 
         if (!validateDeployment(catalog, deployment)) {
             return -1;
@@ -602,7 +603,9 @@ public abstract class CatalogUtil {
         // set the HTTPD info
         setHTTPDInfo(catalog, deployment.getHttpd());
 
-        setExportInfo( catalog, deployment.getExport());
+        if (!isPlaceHolderCatalog) {
+            setExportInfo(catalog, deployment.getExport());
+        }
 
         setCommandLogInfo( catalog, deployment.getCommandlog());
 
@@ -958,16 +961,11 @@ public abstract class CatalogUtil {
                 }
             }
             else {
-                // Default partition detection on for IV2
-                if (VoltDB.instance().isIV2Enabled()) {
-                    catCluster.setNetworkpartition(true);
-                    CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
-                    SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
-                    sched.setPrefix(defaultPPDPrefix);
-                }
-                else {
-                    catCluster.setNetworkpartition(false);
-                }
+                // Default partition detection on
+                catCluster.setNetworkpartition(true);
+                CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
+                SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
+                sched.setPrefix(defaultPPDPrefix);
             }
 
             // copy admin mode configuration from xml to catalog
@@ -1060,8 +1058,6 @@ public abstract class CatalogUtil {
         }
 
         boolean adminstate = exportType.isEnabled();
-        // on-server export always uses the gues processor
-        String connector = "org.voltdb.export.processors.GuestProcessor";
 
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
         org.voltdb.catalog.Connector catconn = db.getConnectors().get("0");
@@ -1073,6 +1069,8 @@ public abstract class CatalogUtil {
             return;
         }
 
+        // on-server export always uses the guest processor
+        String connector = "org.voltdb.export.processors.GuestProcessor";
         catconn.setLoaderclass(connector);
         catconn.setEnabled(adminstate);
 
@@ -1103,7 +1101,9 @@ public abstract class CatalogUtil {
         if (exportClientClassName != null && exportClientClassName.trim().length() > 0) {
             ConnectorProperty prop = catconn.getConfig().add(ExportDataProcessor.EXPORT_TO_TYPE);
             prop.setName(ExportDataProcessor.EXPORT_TO_TYPE);
-            prop.setValue(exportClientClassName);
+            //Override for tests
+            String dexportClientClassName = System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE, exportClientClassName);
+            prop.setValue(dexportClientClassName);
         }
 
         ExportConfigurationType exportConfiguration = exportType.getConfiguration();
@@ -1123,6 +1123,16 @@ public abstract class CatalogUtil {
         if (!adminstate) {
             hostLog.info("Export configuration is present and is " +
                "configured to be disabled. Export will be disabled.");
+        } else {
+            hostLog.info("Export is configured and enabled with type=" + exportType.getTarget());
+            if (exportConfiguration != null && exportConfiguration.getProperty() != null) {
+                hostLog.info("Export configuration properties are: ");
+                for (PropertyType configProp : exportConfiguration.getProperty()) {
+                    if (!configProp.getName().equalsIgnoreCase("password")) {
+                        hostLog.info("Export Configuration Property NAME=" + configProp.getName() + " VALUE=" + configProp.getValue());
+                    }
+                }
+            }
         }
     }
 
@@ -1681,7 +1691,7 @@ public abstract class CatalogUtil {
             indexSize = getSortedCatalogItems(index.getColumns(), "index").size();
         } else {
             try {
-                indexSize = AbstractExpression.fromJSONArrayString(jsonstring, null).size();
+                indexSize = AbstractExpression.fromJSONArrayString(jsonstring).size();
             } catch (JSONException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();

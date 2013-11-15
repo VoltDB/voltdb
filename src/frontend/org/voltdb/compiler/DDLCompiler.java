@@ -73,7 +73,7 @@ import org.voltdb.utils.VoltTypeUtil;
  */
 public class DDLCompiler {
 
-    static final int MAX_COLUMNS = 1024;
+    static final int MAX_COLUMNS = 1024; // KEEP THIS < MAX_PARAM_COUNT to enable default CRUD update.
     static final int MAX_ROW_SIZE = 1024 * 1024 * 2;
 
     /**
@@ -1284,8 +1284,7 @@ public class DDLCompiler {
         String defaultvalue = null;
         String defaulttype = null;
 
-        // throws an exception if string isn't an int (i think)
-        Integer.parseInt(sizeString);
+        int defaultFuncID = -1;
 
         // Default Value
         for (VoltXMLElement child : node.children) {
@@ -1295,6 +1294,12 @@ public class DDLCompiler {
                     if (inner_child.name.equals("value")) {
                         assert(defaulttype == null); // There should be only one default value/type.
                         defaultvalue = inner_child.attributes.get("value");
+                        defaulttype = inner_child.attributes.get("valuetype");
+                        assert(defaulttype != null);
+                    } else if (inner_child.name.equals("function")) {
+                        assert(defaulttype == null); // There should be only one default value/type.
+                        defaultFuncID = Integer.parseInt(inner_child.attributes.get("function_id"));
+                        defaultvalue = inner_child.attributes.get("name");
                         defaulttype = inner_child.attributes.get("valuetype");
                         assert(defaulttype != null);
                     }
@@ -1315,12 +1320,17 @@ public class DDLCompiler {
         // fyi: Historically, VoltType class initialization errors get reported on this line (?).
         VoltType type = VoltType.typeFromString(typename);
         columnTypes.add(type);
-        if (defaultvalue != null && (type == VoltType.DECIMAL || type == VoltType.NUMERIC))
-        {
-            // Until we support deserializing scientific notation in the EE, we'll
-            // coerce default values to plain notation here.  See ENG-952 for more info.
-            BigDecimal temp = new BigDecimal(defaultvalue);
-            defaultvalue = temp.toPlainString();
+        if (defaultFuncID == -1) {
+            if (defaultvalue != null && (type == VoltType.DECIMAL || type == VoltType.NUMERIC)) {
+                // Until we support deserializing scientific notation in the EE, we'll
+                // coerce default values to plain notation here.  See ENG-952 for more info.
+                BigDecimal temp = new BigDecimal(defaultvalue);
+                defaultvalue = temp.toPlainString();
+            }
+        } else {
+            // Concat function name and function id, format: NAME:ID
+            // Used by PlanAssembler:getNextInsertPlan().
+            defaultvalue = defaultvalue + ":" + String.valueOf(defaultFuncID);
         }
 
         Column column = table.getColumns().add(name);
@@ -1333,10 +1343,34 @@ public class DDLCompiler {
         int size = type.getMaxLengthInBytes();
         // Require a valid length if variable length is supported for a type
         if (type == VoltType.STRING || type == VoltType.VARBINARY) {
-            size = Integer.parseInt(sizeString);
-            if ((size == 0) || (size > VoltType.MAX_VALUE_LENGTH)) {
-                String msg = type.toSQLString() + " column " + name + " in table " + table.getTypeName() + " has unsupported length " + sizeString;
-                throw m_compiler.new VoltCompilerException(msg);
+            if (sizeString == null) {
+                // An unspecified size for a VARCHAR/VARBINARY column should be
+                // for a materialized view column whose type is derived from a
+                // function or expression of variable-length type.
+                // Defaulting these to MAX_VALUE_LENGTH tends to cause them to overflow the
+                // allowed MAX_ROW_SIZE when there are more than one in a view.
+                // It's not clear what benefit, if any, we derive from limiting MAX_ROW_SIZE
+                // based on worst-case length for variable fields, but we comply for now by
+                // arbitrarily limiting these matview column sizes such that
+                // the max number of columns of this size would still fit.
+                size = MAX_ROW_SIZE / MAX_COLUMNS;
+            } else {
+                int userSpecifiedSize = Integer.parseInt(sizeString);
+                if (userSpecifiedSize < 0 || userSpecifiedSize > VoltType.MAX_VALUE_LENGTH) {
+                    String msg = type.toSQLString() + " column " + name +
+                        " in table " + table.getTypeName() + " has unsupported length " + sizeString;
+                    throw m_compiler.new VoltCompilerException(msg);
+                }
+                if (userSpecifiedSize > 0) {
+                    size = userSpecifiedSize;
+                } else {
+                    // A 0 from the user was already caught
+                    // -- so any 0 at this point was NOT user-specified.
+                    // It must have been generated by mistake.
+                    // We should just stop doing that. It's just noise.
+                    // Treating it as a synonym for sizeString == null.
+                    size = MAX_ROW_SIZE / MAX_COLUMNS;
+                }
             }
         }
         column.setSize(size);
@@ -1360,6 +1394,9 @@ public class DDLCompiler {
             return false;
         }
         if (idx1.getUnique() != idx2.getUnique()) {
+            return false;
+        }
+        if (idx1.getAssumeunique() != idx2.getAssumeunique()) {
             return false;
         }
 
@@ -1407,6 +1444,8 @@ public class DDLCompiler {
 
         String name = node.attributes.get("name");
         boolean unique = Boolean.parseBoolean(node.attributes.get("unique"));
+        boolean assumeUnique = Boolean.parseBoolean(node.attributes.get("assumeunique"));
+
         AbstractParsedStmt dummy = new ParsedSelectStmt(null, db);
         dummy.setTable(table);
 
@@ -1517,6 +1556,10 @@ public class DDLCompiler {
         }
 
         index.setUnique(unique);
+        if (assumeUnique) {
+            index.setUnique(true);
+        }
+        index.setAssumeunique(assumeUnique);
 
         // check if an existing index duplicates another index (if so, drop it)
         // note that this is an exact dup... uniqueness, counting-ness and type
@@ -1581,6 +1624,7 @@ public class DDLCompiler {
         String name = node.attributes.get("name");
         String typeName = node.attributes.get("constrainttype");
         ConstraintType type = ConstraintType.valueOf(typeName);
+
         if (type == ConstraintType.CHECK) {
             String msg = "VoltDB does not enforce check constraints. ";
             msg += "Constraint on table " + table.getTypeName() + " will be ignored.";
@@ -1621,6 +1665,8 @@ public class DDLCompiler {
 
         Index catalog_index = indexMap.get(indexName);
 
+        // TODO(xin): It seems that indexes have already been set up well, the next whole block is redundant.
+        // Remove them?
         if (catalog_index != null) {
             // if the constraint name contains index type hints, exercise them (giant hack)
             String constraintNameNoCase = name.toLowerCase();
@@ -1631,6 +1677,9 @@ public class DDLCompiler {
 
             catalog_const.setIndex(catalog_index);
             catalog_index.setUnique(true);
+
+            boolean assumeUnique = Boolean.parseBoolean(node.attributes.get("assumeunique"));
+            catalog_index.setAssumeunique(assumeUnique);
         }
         catalog_const.setType(type.getValue());
     }
@@ -1671,9 +1720,9 @@ public class DDLCompiler {
             // Allow only non-unique indexes other than the primary key index.
             // The primary key index is yet to be defined (below).
             for (Index destIndex : destTable.getIndexes()) {
-                if (destIndex.getUnique()) {
-                    String msg = "A UNIQUE index is not allowed on a materialized view. " +
-                            "Remove the qualifier \"UNIQUE\" from the index " + destIndex.getTypeName() +
+                if (destIndex.getUnique() || destIndex.getAssumeunique()) {
+                    String msg = "A UNIQUE or ASSUMEUNIQUE index is not allowed on a materialized view. " +
+                            "Remove the qualifier from the index " + destIndex.getTypeName() +
                             "defined on the materialized view \"" + viewName + "\".";
                     throw m_compiler.new VoltCompilerException(msg);
                 }
@@ -1844,7 +1893,7 @@ public class DDLCompiler {
             // complex group by exprs
             if (groupbyExprs != null) {
                 try {
-                    indexedExprs = AbstractExpression.fromJSONArrayString(expressionjson, null);
+                    indexedExprs = AbstractExpression.fromJSONArrayString(expressionjson);
                 } catch (JSONException e) {
                     e.printStackTrace();
                     assert(false);

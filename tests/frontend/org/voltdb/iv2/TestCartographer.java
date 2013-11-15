@@ -96,7 +96,7 @@ public class TestCartographer extends ZKTestBase {
         int sitesPerHost = 3;
 
         List<Integer> firstRejoin =
-            Cartographer.computeReplacementPartitions(repsPerPart, kfactor, sitesPerHost, numberOfPartitions);
+            Cartographer.computeReplacementPartitions(repsPerPart, kfactor, sitesPerHost);
         assertEquals(3, firstRejoin.size());
         assertEquals((Integer)4, firstRejoin.get(0));
         assertEquals((Integer)0, firstRejoin.get(1));
@@ -108,7 +108,7 @@ public class TestCartographer extends ZKTestBase {
 
         // now do it again and make sure we fully replicate
         List<Integer> secondRejoin =
-            Cartographer.computeReplacementPartitions(repsPerPart, kfactor, sitesPerHost, numberOfPartitions);
+            Cartographer.computeReplacementPartitions(repsPerPart, kfactor, sitesPerHost);
         assertEquals(3, secondRejoin.size());
         assertEquals((Integer)2, secondRejoin.get(0));
         assertEquals((Integer)3, secondRejoin.get(1));
@@ -133,7 +133,7 @@ public class TestCartographer extends ZKTestBase {
         repsPerPart.put(4, 1);
 
         List<Integer> firstRejoin =
-            Cartographer.computeReplacementPartitions(repsPerPart, kfactor, sitesPerHost, numberOfPartitions);
+            Cartographer.computeReplacementPartitions(repsPerPart, kfactor, sitesPerHost);
         assertEquals(1, firstRejoin.size());
         assertEquals((Integer)4, firstRejoin.get(0));
     }

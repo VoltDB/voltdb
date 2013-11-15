@@ -46,8 +46,11 @@
 #ifndef VOLTDBNODEABSTRACTEXECUTOR_H
 #define VOLTDBNODEABSTRACTEXECUTOR_H
 
+#include "common/InterruptException.h"
+#include "execution/VoltDBEngine.h"
 #include "plannodes/abstractplannode.h"
 #include "storage/temptable.h"
+
 #include <cassert>
 
 namespace voltdb {
@@ -85,6 +88,7 @@ class AbstractExecutor {
     AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode) {
         m_abstractNode = abstractNode;
         m_tmpOutputTable = NULL;
+        m_engine = engine;
     }
 
     /** Concrete executor classes implement initialization in p_init() */
@@ -121,6 +125,12 @@ class AbstractExecutor {
 
     // cache to avoid runtime virtual function call
     bool needs_outputtable_clear_cached;
+
+    /** reference to the engine to call up to the top end */
+    VoltDBEngine* m_engine;
+
+    // useful for debugging/logging/progress reporting
+    std::string m_planNodeName;
 };
 
 inline bool AbstractExecutor::execute(const NValueArray& params)
@@ -128,6 +138,9 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
     assert(m_abstractNode);
     VOLT_TRACE("Starting execution of plannode(id=%d)...",
                m_abstractNode->getPlanNodeId());
+
+    // useful for debugging/logging/progress reporting
+    m_engine->setLastAccessedPlanNodeName(&m_planNodeName);
 
     if (m_tmpOutputTable)
     {

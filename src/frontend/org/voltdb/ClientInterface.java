@@ -63,6 +63,7 @@ import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.ReverseDNSPolicy;
 import org.voltcore.network.VoltNetworkPool;
+import org.voltcore.network.VoltPort;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
@@ -144,8 +145,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final ClientAcceptor m_acceptor;
     private ClientAcceptor m_adminAcceptor;
 
-    private final ConcurrentHashMap<Connection, Object> m_connections =
-            new ConcurrentHashMap<Connection, Object>(10240, .75f, 128);
     private final SnapshotDaemon m_snapshotDaemon = new SnapshotDaemon();
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
 
@@ -168,7 +167,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * lookup.
      */
     private final ConcurrentHashMap<Long, ClientInterfaceHandleManager> m_cihm =
-            new ConcurrentHashMap<Long, ClientInterfaceHandleManager>(10240, .75f, 128);
+            new ConcurrentHashMap<Long, ClientInterfaceHandleManager>(2048, .75f, 128);
     private final Cartographer m_cartographer;
 
     /**
@@ -618,8 +617,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return null;
             }
 
-            AuthSystem.AuthUser user = context.authSystem.getUser(username);
-
             /*
              * Create an input handler.
              */
@@ -631,60 +628,31 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             m_isAdmin);
             }
             else {
-                String strUser = "ANONYMOUS";
-                if ((username != null) && (username.length() > 0)) strUser = username;
-
-                // If no processor can handle this service, null is returned.
-                String connectorClassName = ExportManager.instance().getConnectorForService(service);
-                if (connectorClassName == null) {
-                    //Send negative response
-                    responseBuffer.put(EXPORT_DISABLED_REJECTION).flip();
-                    socket.write(responseBuffer);
-                    socket.close();
-                    authLog.warn("Rejected user " + strUser +
-                                 " attempting to use disabled or unconfigured service " +
-                                 service + ".");
-                    return null;
-                }
-                if (!user.authorizeConnector(connectorClassName)) {
-                    //Send negative response
-                    responseBuffer.put(AUTHENTICATION_FAILURE).flip();
-                    socket.write(responseBuffer);
-                    socket.close();
-                    authLog.warn("Failure to authorize user " + strUser + " for service " + service + ".");
-                    return null;
-                }
-
-                handler = ExportManager.instance().createInputHandler(service, m_isAdmin);
-            }
-
-            if (handler != null) {
-                byte buildString[] = VoltDB.instance().getBuildString().getBytes("UTF-8");
-                responseBuffer = ByteBuffer.allocate(34 + buildString.length);
-                responseBuffer.putInt(30 + buildString.length);//message length
-                responseBuffer.put((byte)0);//version
-
-                //Send positive response
-                responseBuffer.put((byte)0);
-                responseBuffer.putInt(VoltDB.instance().getHostMessenger().getHostId());
-                responseBuffer.putLong(handler.connectionId());
-                responseBuffer.putLong(VoltDB.instance().getHostMessenger().getInstanceId().getTimestamp());
-                responseBuffer.putInt(VoltDB.instance().getHostMessenger().getInstanceId().getCoord());
-                responseBuffer.putInt(buildString.length);
-                responseBuffer.put(buildString).flip();
-                socket.write(responseBuffer);
-
-            }
-            else {
-                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                             "): user " + username + " failed authentication.");
-                // Send negative response
-                responseBuffer.put(AUTHENTICATION_FAILURE).flip();
+                //Send negative response
+                responseBuffer.put(EXPORT_DISABLED_REJECTION).flip();
                 socket.write(responseBuffer);
                 socket.close();
+                authLog.warn("Rejected user " + username +
+                        " attempting to use disabled or unconfigured service " +
+                        service + ".");
+                authLog.warn("VoltDB Export services are no longer available through clients.");
                 return null;
-
             }
+
+            byte buildString[] = VoltDB.instance().getBuildString().getBytes("UTF-8");
+            responseBuffer = ByteBuffer.allocate(34 + buildString.length);
+            responseBuffer.putInt(30 + buildString.length);//message length
+            responseBuffer.put((byte)0);//version
+
+            //Send positive response
+            responseBuffer.put((byte)0);
+            responseBuffer.putInt(VoltDB.instance().getHostMessenger().getHostId());
+            responseBuffer.putLong(handler.connectionId());
+            responseBuffer.putLong(VoltDB.instance().getHostMessenger().getInstanceId().getTimestamp());
+            responseBuffer.putInt(VoltDB.instance().getHostMessenger().getInstanceId().getCoord());
+            responseBuffer.putInt(buildString.length);
+            responseBuffer.put(buildString).flip();
+            socket.write(responseBuffer);
             return handler;
         }
     }
@@ -748,12 +716,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (!m_acg.get().hasBackPressure()) {
                 c.enableReadSelection();
             }
-            m_connections.put(c, "");
-        }
-
-        @Override
-        public void stopping(Connection c) {
-            m_connections.remove(c);
         }
 
         @Override
@@ -1150,15 +1112,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             JSONObject jsObj = new JSONObject(new String(message.m_payload, "UTF-8"));
             final int partitionId = jsObj.getInt(Cartographer.JSON_PARTITION_ID);
             final long initiatorHSId = jsObj.getLong(Cartographer.JSON_INITIATOR_HSID);
-            for (final Connection c : m_connections.keySet()) {
-                c.queueTask(new Runnable() {
-                    @Override
-                    public void run() {
-                        failOverConnection(partitionId, initiatorHSId, c);
-                    }
-                });
+            for (final ClientInterfaceHandleManager cihm : m_cihm.values()) {
+                try {
+                    cihm.connection.queueTask(new Runnable() {
+                        @Override
+                        public void run() {
+                            failOverConnection(partitionId, initiatorHSId, cihm.connection);
+                        }
+                    });
+                } catch (UnsupportedOperationException ignore) {
+                    // In case some internal connections don't implement queueTask()
+                    failOverConnection(partitionId, initiatorHSId, cihm.connection);
+                }
             }
-            failOverConnection(partitionId, initiatorHSId, m_snapshotDaemonAdapter);
         } catch (Exception e) {
             hostLog.warn("Error handling partition fail over at ClientInterface, continuing anyways", e);
         }
@@ -1697,8 +1663,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         // ping just responds as fast as possible to show the connection is alive
         // nb: ping is not a real procedure, so this is checked before other "sysprocs"
-        if (task.procName.equals("@Ping")) {
-            return new ClientResponseImpl(ClientResponseImpl.SUCCESS, new VoltTable[0], "", task.clientHandle);
+        if (task.procName.startsWith("@")) {
+            if (task.procName.equals("@Ping")) {
+                return new ClientResponseImpl(ClientResponseImpl.SUCCESS, new VoltTable[0], "", task.clientHandle);
+            }
+            if (task.procName.equals("@GetPartitionKeys")) {
+                return dispatchGetPartitionKeys(task);
+            }
         }
 
         // Deserialize the client's request and map to a catalog stored procedure
@@ -1778,8 +1749,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                  * but doesn't initiate the invocation. It will fall through to
                  * the shared dispatch of sysprocs.
                  */
-                if (VoltDB.instance().isIV2Enabled() &&
-                        task.getType() == ProcedureInvocationType.REPLICATED) {
+                if (task.getType() == ProcedureInvocationType.REPLICATED) {
                     sendSentinelsToAllPartitions(task.getOriginalTxnId());
                 }
             } else if (task.procName.equals("@LoadSinglepartitionTable")) {
@@ -1881,6 +1851,48 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return null;
     }
 
+    private ClientResponseImpl dispatchGetPartitionKeys(StoredProcedureInvocation task) {
+        Object params[] = task.getParams().toArray();
+        String typeString = "the type of partition key to return and can be one of " +
+                            "INTEGER, STRING or VARCHAR (equivalent), or VARBINARY";
+        if (params.length != 1 || params[0] == null) {
+            return new ClientResponseImpl(
+                    ClientResponse.GRACEFUL_FAILURE,
+                    new VoltTable[0],
+                    "GetPartitionKeys must have one string parameter specifying " + typeString,
+                    task.clientHandle);
+        }
+        if (!(params[0] instanceof String)) {
+            return new ClientResponseImpl(
+                    ClientResponse.GRACEFUL_FAILURE,
+                    new VoltTable[0],
+                    "GetPartitionKeys must have one string parameter specifying " + typeString +
+                    " provided type was " + params[0].getClass().getName(),
+                    task.clientHandle);
+        }
+        VoltType voltType = null;
+        String typeStr = ((String)params[0]).trim().toUpperCase();
+        if (typeStr.equals("INTEGER")) voltType = VoltType.INTEGER;
+        else if (typeStr.equals("STRING") || typeStr.equals("VARCHAR")) voltType = VoltType.STRING;
+        else if (typeStr.equals("VARBINARY")) voltType = VoltType.VARBINARY;
+        else {
+            return new ClientResponseImpl(
+                    ClientResponse.GRACEFUL_FAILURE,
+                    new VoltTable[0],
+                    "Type " + typeStr + " is not a supported type of partition key, " + typeString,
+                    task.clientHandle);
+        }
+        VoltTable partitionKeys = TheHashinator.getPartitionKeys(voltType);
+        if (partitionKeys == null) {
+            return new ClientResponseImpl(
+                    ClientResponse.GRACEFUL_FAILURE,
+                    new VoltTable[0],
+                    "Type " + typeStr + " is not a supported type of partition key, " + typeString,
+                    task.clientHandle);
+        }
+        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[] { partitionKeys }, null, task.clientHandle);
+    }
+
     void createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch)
             throws VoltTypeException
     {
@@ -1950,18 +1962,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         /*
          * Round trip the invocation to initialize it for command logging
          */
-        FastSerializer fs = new FastSerializer();
-        int serializedSize = 0;
         try {
-            fs.writeObject(task);
-            ByteBuffer source = fs.getBuffer();
-            ByteBuffer copy = ByteBuffer.allocate(source.remaining());
-            serializedSize = copy.capacity();
-            copy.put(source);
-            copy.flip();
-            FastDeserializer fds = new FastDeserializer(copy);
-            task = new StoredProcedureInvocation();
-            task.readExternal(fds);
+            task = MiscUtils.roundTripForCL(task);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
@@ -1970,7 +1972,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         createTransaction(plannedStmtBatch.connectionId, task,
                 plannedStmtBatch.isReadOnly(), isSinglePartition, false,
                 partition,
-                serializedSize, EstTime.currentTimeMillis());
+                task.getSerializedSize(), EstTime.currentTimeMillis());
     }
 
     /*
@@ -2173,10 +2175,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     private final void checkForDeadConnections(final long now) {
         final ArrayList<Connection> connectionsToRemove = new ArrayList<Connection>();
-        for (final Connection c : m_connections.keySet()) {
-            final int delta = c.writeStream().calculatePendingWriteDelta(now);
-            if (delta > 4000) {
-                connectionsToRemove.add(c);
+        for (final ClientInterfaceHandleManager cihm : m_cihm.values()) {
+            // Internal connections don't implement calculatePendingWriteDelta(), so check for real connection first
+            if (VoltPort.class == cihm.connection.getClass()) {
+                final int delta = cihm.connection.writeStream().calculatePendingWriteDelta(now);
+                if (delta > 4000) {
+                    connectionsToRemove.add(cihm.connection);
+                }
             }
         }
 
@@ -2439,7 +2444,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         @Override
         public void queueTask(Runnable r) {
-            throw new UnsupportedOperationException();
+            // Called when node failure happens
+            r.run();
         }
     }
 

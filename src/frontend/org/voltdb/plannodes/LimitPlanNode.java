@@ -51,7 +51,7 @@ public class LimitPlanNode extends AbstractPlanNode {
     public LimitPlanNode(LimitPlanNode limit) {
         super();
         m_offset = limit.getOffset();
-        m_limit =limit.getLimit();
+        m_limit = limit.getLimit();
         m_limitParameterId = limit.m_limitParameterId;
         m_offsetParameterId = limit.m_offsetParameterId;
         if (limit.getLimitExpression() != null) {
@@ -159,7 +159,7 @@ public class LimitPlanNode extends AbstractPlanNode {
             // At this point, they'd better all be TVEs.
             assert(col.getExpression() instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = input_schema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
             tve.setColumnIndex(index);
         }
         m_outputSchema.sortByTveIndex();
@@ -172,9 +172,7 @@ public class LimitPlanNode extends AbstractPlanNode {
         m_limit = jobj.getInt( Members.LIMIT.name() );
         m_limitParameterId = jobj.getLong( Members.LIMIT_PARAM_IDX.name() );
         m_offsetParameterId = jobj.getLong( Members.OFFSET_PARAM_IDX.name() );
-        if( !jobj.isNull(Members.LIMIT_EXPRESSION.name()) ) {
-            m_limitExpression = AbstractExpression.fromJSONObject( jobj.getJSONObject(Members.LIMIT_EXPRESSION.name()), db);
-        }
+        m_limitExpression = AbstractExpression.fromJSONChild(jobj, Members.LIMIT_EXPRESSION.name());
     }
 
     @Override

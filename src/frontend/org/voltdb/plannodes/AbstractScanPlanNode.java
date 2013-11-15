@@ -39,7 +39,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
     public enum Members {
         PREDICATE,
-        TARGET_TABLE_NAME;
+        TARGET_TABLE_NAME,
+        TARGET_TABLE_ALIAS;
     }
 
     // Store the columns from the table as an internal NodeSchema
@@ -73,6 +74,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         //
         if (m_targetTableName == null) {
             throw new Exception("ERROR: TargetTableName is null for PlanNode '" + toString() + "'");
+        }
+        if (m_targetTableAlias == null) {
+            throw new Exception("ERROR: TargetTableAlias is null for PlanNode '" + toString() + "'");
         }
         //
         // Filter Expression
@@ -160,7 +164,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
     }
 
-    public void setScanColumns(ArrayList<SchemaColumn> scanColumns)
+    public void setScanColumns(Collection<SchemaColumn> scanColumns)
     {
         if (scanColumns != null)
         {
@@ -189,14 +193,12 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             for (Column col : CatalogUtil.getSortedCatalogItems(cols, "index"))
             {
                 // must produce a tuple value expression for this column.
-                TupleValueExpression tve = new TupleValueExpression();
+                TupleValueExpression tve = new TupleValueExpression(
+                        m_targetTableName, m_targetTableAlias, col.getTypeName(), col.getTypeName(), col.getIndex());
                 tve.setValueType(VoltType.get((byte)col.getType()));
                 tve.setValueSize(col.getSize());
-                tve.setColumnIndex(col.getIndex());
-                tve.setTableName(m_targetTableName);
-                tve.setColumnAlias(col.getTypeName());
-                tve.setColumnName(col.getTypeName());
                 m_tableSchema.addColumn(new SchemaColumn(m_targetTableName,
+                                                         m_targetTableAlias,
                                                          col.getTypeName(),
                                                          col.getTypeName(),
                                                          tve));
@@ -245,7 +247,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 // and update their indexes against the table schema
                 for (TupleValueExpression tve : scan_tves)
                 {
-                    int index = m_tableSchema.getIndexOfTve(tve);
+                    int index = tve.resolveColumnIndexesUsingSchema(m_tableSchema);
                     tve.setColumnIndex(index);
                 }
                 m_tableScanSchema.sortByTveIndex();
@@ -277,7 +279,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             ExpressionUtil.getTupleValueExpressions(m_predicate);
         for (TupleValueExpression tve : predicate_tves)
         {
-            int index = m_tableSchema.getIndexOfTve(tve);
+            int index = tve.resolveColumnIndexesUsingSchema(m_tableSchema);
             tve.setColumnIndex(index);
         }
 
@@ -302,7 +304,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 // At this point, they'd better all be TVEs.
                 assert(col.getExpression() instanceof TupleValueExpression);
                 TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-                int index = m_tableSchema.getIndexOfTve(tve);
+                int index = tve.resolveColumnIndexesUsingSchema(m_tableSchema);
                 tve.setColumnIndex(index);
             }
             m_outputSchema.sortByTveIndex();
@@ -334,16 +336,15 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         stringer.key(Members.PREDICATE.name());
         stringer.value(m_predicate);
         stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_targetTableName);
+        stringer.key(Members.TARGET_TABLE_ALIAS.name()).value(m_targetTableAlias);
     }
 
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
-
-        if(!jobj.isNull(Members.PREDICATE.name())) {
-            m_predicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.PREDICATE.name()), db);
-        }
-        this.m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
+        m_predicate = AbstractExpression.fromJSONChild(jobj, Members.PREDICATE.name());
+        m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
+        m_targetTableAlias = jobj.getString( Members.TARGET_TABLE_ALIAS.name() );
 
     }
 

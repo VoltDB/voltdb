@@ -27,7 +27,6 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
-import org.voltdb.types.JoinType;
 
 public class PushdownLimits extends MicroOptimization {
 
@@ -64,11 +63,14 @@ public class PushdownLimits extends MicroOptimization {
             plan.addAndLinkChild(child);
         }
 
-        if ((plan instanceof LimitPlanNode) == false)
+        if ( ! (plan instanceof LimitPlanNode)) {
             return plan;
+        }
 
-        if (plan.getChildCount() != 1)
+        if (plan.getChildCount() != 1) {
+            assert(plan.getChildCount() == 1);
             return plan;
+        }
 
         AbstractPlanNode child = plan.getChild(0);
 
@@ -77,10 +79,13 @@ public class PushdownLimits extends MicroOptimization {
             plan.clearChildren();
             child.clearParents();
             child.addInlinePlanNode(plan);
-            return recursivelyApply(child);
+            return child;
         }
 
-        // push down to Projection
+        // push down through Projection
+        // Replace the chain plan/limit . child/projection . leaf/whatever
+        // with recursivelyApply(child/projection . plan/limit . leaf/whatever)
+        // == child/projection . recursivelyApply(plan/limit . leaf/whatever)
         if (child instanceof ProjectionPlanNode) {
             assert (child.getChildCount() == 1);
             AbstractPlanNode leaf = child.getChild(0);
@@ -98,17 +103,19 @@ public class PushdownLimits extends MicroOptimization {
             plan.clearChildren();
             child.clearParents();
             child.addInlinePlanNode(plan);
-            if (((AbstractJoinPlanNode)child).getJoinType() == JoinType.LEFT) {
-                // for LEFT OUTER, also need to push down to the left child (OUTER table)
-                AbstractPlanNode leaf = child.getChild(0);
-                LimitPlanNode copy = new LimitPlanNode((LimitPlanNode)plan);
-                leaf.clearChildren();
-                leaf.clearParents();
-                copy.addAndLinkChild(leaf);
-                child.setAndLinkChild(0, copy);
-                // push down further in the left child if it's a Scan or a JOIN
-                child = recursivelyApply(child);
-            }
+            // TODO: ENG-5399 for LEFT OUTER join with no post-filter, can also push a modified
+            // preliminary pushdown-style limit+offset limit node to the left child.
+            // AbstractJoinPlanNode ajpn = (AbstractJoinPlanNode)child;
+            // if (ajpn.getWherePredicate() == null && ajpn.getJoinType() == JoinType.LEFT) {
+            //     AbstractPlanNode leaf = ajpn.getChild(0);
+            //     leaf.clearParents();
+            //     LimitPlanNode copy = new LimitPlanNode();
+            //     copy.set... (See ParsedSelectStmt as an example).
+            //     copy.addAndLinkChild(leaf);
+            //     // push down further in the left child if it's a scan or a join
+            //     AbstractPlanNode limited = recursivelyApply(copy);
+            //     ajpn.replaceChild(leaf, limited);
+            // }
             return child;
         }
 

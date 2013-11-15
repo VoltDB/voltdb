@@ -33,6 +33,7 @@ package org.hsqldb_voltpatches;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -44,6 +45,7 @@ import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultMetaData;
+import org.hsqldb_voltpatches.types.Type;
 
 /**
  * Implementation of Statement for query expressions.<p>
@@ -230,7 +232,7 @@ public class StatementQuery extends StatementDMQL {
             }
             return unionExpr;
         } else {
-            throw new HSQLParseException(queryExpression.operatorName() + "  tuple set operator is not supported.");
+            throw new HSQLParseException(queryExpr.operatorName() + "  tuple set operator is not supported.");
         }
     }
 
@@ -250,34 +252,36 @@ public class StatementQuery extends StatementDMQL {
             }
             try {
                 // read offset. it may be a parameter token.
+                VoltXMLElement offset = new VoltXMLElement("offset");
                 if (limitCondition.nodes[0].isParam == false) {
-                    Integer offset = (Integer)limitCondition.nodes[0].getValue(session);
-                    if (offset > 0) {
-                        query.attributes.put("offset", offset.toString());
+                    Integer offsetValue = (Integer)limitCondition.nodes[0].getValue(session);
+                    if (offsetValue > 0) {
+                        Expression expr = new ExpressionValue(offsetValue, Type.SQL_BIGINT);
+                        offset.children.add(expr.voltGetXML(session));
+                        offset.attributes.put("offset", offsetValue.toString());
                     }
+                } else {
+                    offset.attributes.put("offset_paramid", limitCondition.nodes[0].getUniqueId(session));
                 }
-                else {
-                    query.attributes.put("offset_paramid", limitCondition.nodes[0].getUniqueId(session));
-                }
+                query.children.add(offset);
 
                 // read limit. it may be a parameter token.
+                VoltXMLElement limit = new VoltXMLElement("limit");
                 if (limitCondition.nodes[1].isParam == false) {
-                    Integer limit = (Integer)limitCondition.nodes[1].getValue(session);
-                    query.attributes.put("limit", limit.toString());
+                    Integer limitValue = (Integer)limitCondition.nodes[1].getValue(session);
+                    Expression expr = new ExpressionValue(limitValue, Type.SQL_BIGINT);
+                    limit.children.add(expr.voltGetXML(session));
+                    limit.attributes.put("limit", limitValue.toString());
+                } else {
+                    limit.attributes.put("limit_paramid", limitCondition.nodes[1].getUniqueId(session));
                 }
-                else {
-                    query.attributes.put("limit_paramid", limitCondition.nodes[1].getUniqueId(session));
-                }
+                query.children.add(limit);
+
             } catch (HsqlException ex) {
                 // XXX really?
                 ex.printStackTrace();
             }
         }
-
-        // columns that need to be output by the scans
-        VoltXMLElement scanCols = new VoltXMLElement("scan_columns");
-        query.children.add(scanCols);
-        assert(scanCols != null);
 
         // Just gather a mish-mash of every possible relevant expression
         // and uniq them later
@@ -317,21 +321,6 @@ public class StatementQuery extends StatementDMQL {
                                                  Expression.emptyExpressionSet);
 
             }
-        }
-        HsqlList uniq_col_list = new HsqlArrayList();
-        for (int i = 0; i < col_list.size(); i++)
-        {
-            Expression orig = (Expression)col_list.get(i);
-            if (!uniq_col_list.contains(orig))
-            {
-                uniq_col_list.add(orig);
-            }
-        }
-        for (int i = 0; i < uniq_col_list.size(); i++)
-        {
-            VoltXMLElement xml = ((Expression)uniq_col_list.get(i)).voltGetXML(session);
-            scanCols.children.add(xml);
-            assert(xml != null);
         }
 
         // columns
@@ -448,11 +437,6 @@ public class StatementQuery extends StatementDMQL {
             scans.children.add(rangeVariable.voltGetRangeVariableXML(session));
         }
 
-        // Columns from USING expression in join are not qualified.
-        // if join is INNER then the column from USING expression can be from any table
-        // participating in join. In case of OUTER join, it must be the outer column
-        resolveUsingColumns(cols, select.rangeVariables);
-
         // having
         if (select.havingCondition != null) {
             throw new HSQLParseException("VoltDB does not support the HAVING clause");
@@ -481,30 +465,46 @@ public class StatementQuery extends StatementDMQL {
             }
         }
 
+        // Columns from USING expression in join are not qualified.
+        // if join is INNER then the column from USING expression can be from any table
+        // participating in join. In case of OUTER join, it must be the outer column
+        List<VoltXMLElement> exprCols = new ArrayList<VoltXMLElement>();
+        extractColumnReferences(query, exprCols);
+        resolveUsingColumns(exprCols, select.rangeVariables);
+
         return query;
+    }
+    
+    /**
+     * Extract columnref elements from the input element.
+     * @param element
+     * @param cols - output collection containing the column references 
+     */
+    protected void extractColumnReferences(VoltXMLElement element, List<VoltXMLElement> cols) {
+        if ("columnref".equalsIgnoreCase(element.name)) {
+            cols.add(element);
+        } else {
+            for (VoltXMLElement child : element.children) {
+                extractColumnReferences(child, cols);
+            }
+        }
     }
 
     /**
      * Columns from USING expression are unqualified. In case of INNER join, it doesn't matter
      * we can pick the first table which contains the input column. In case of OUTER joins, we must
      * the OUTER table - if it's a null-able column the outer join must return them.
-     * @param columnName
-     * @return table name this column belongs to
+     * @param columns list of columns to resolve
+     * @return rvs list of range variables
      */
-    protected void resolveUsingColumns(VoltXMLElement columns, RangeVariable[] rvs) throws HSQLParseException {
+    protected void resolveUsingColumns(List<VoltXMLElement> columns, RangeVariable[] rvs) throws HSQLParseException {
         // Only one OUTER join for a whole select is supported so far
-        for (VoltXMLElement columnElmt : columns.children) {
-            boolean innerJoin = true;
+        for (VoltXMLElement columnElmt : columns) {
             String table = null;
+            String tableAlias = null;
             if (columnElmt.attributes.get("table") == null) {
+                columnElmt.attributes.put("using", "true");
                 for (RangeVariable rv : rvs) {
-                    if (rv.isLeftJoin || rv.isRightJoin) {
-                        if (innerJoin == false) {
-                            throw new HSQLParseException("VoltDB does not support outer joins with more than two tables involved");
-                        }
-                        innerJoin = false;
-                    }
-
                     if (!rv.getTable().columnList.containsKey(columnElmt.attributes.get("column"))) {
                         // The column is not from this table. Skip it
                         continue;
@@ -514,15 +514,28 @@ public class StatementQuery extends StatementDMQL {
                     if (rv.isRightJoin == true) {
                         // this is the outer table. no need to search further.
                         table = rv.getTable().getName().name;
+                        if (rv.tableAlias != null) {
+                            tableAlias = rv.tableAlias.name;
+                        } else {
+                            tableAlias = null;
+                        }
                         break;
                     } else if (rv.isLeftJoin == false) {
                         // it's the inner join. we found the table but still need to iterate
                         // just in case there is an outer table we haven't seen yet.
                         table = rv.getTable().getName().name;
+                        if (rv.tableAlias != null) {
+                            tableAlias = rv.tableAlias.name;
+                        } else {
+                            tableAlias = null;
+                        }
                     }
                 }
                 if (table != null) {
                     columnElmt.attributes.put("table", table);
+                }
+                if (tableAlias != null) {
+                    columnElmt.attributes.put("tablealias", tableAlias);
                 }
             }
         }

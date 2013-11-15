@@ -57,27 +57,6 @@ public class VoltDB {
     public static final int SITES_TO_HOST_DIVISOR = 100;
     public static final int MAX_SITES_PER_HOST = 128;
 
-    // Utility to calculate whether Iv2 is enabled or not for test cases.
-    // There are several ways to enable Iv2, of course. Ideally, use a cluster
-    // command line flag (enableiv2). Second best, use the VOLT_ENABLEIV2
-    // environment variable.
-    //
-    // IMPORTANT: To determine if Iv2 is enabled at runtime,
-    // call RealVoltDB.isIV2Enabled();
-    public static boolean checkTestEnvForIv2()
-    {
-        String iv2 = System.getenv().get("VOLT_ENABLEIV2");
-        if (iv2 == null) {
-            iv2 = System.getProperty("VOLT_ENABLEIV2");
-        }
-        if (iv2 != null && iv2.equalsIgnoreCase("false")) {
-            return false;
-        }
-        else {
-            return true;
-        }
-    }
-
     // Utility to try to figure out if this is a test case.  Various junit targets in
     // build.xml set this environment variable to give us a hint
     public static boolean isThisATest()
@@ -141,6 +120,7 @@ public class VoltDB {
 
         /** name of the deployment file */
         public String m_pathToDeployment = null;
+        public boolean m_deploymentDefault = false;
 
         /** name of the license file, for commercial editions */
         public String m_pathToLicense = "license.xml";
@@ -212,16 +192,12 @@ public class VoltDB {
         /** true if we're running the rejoin tests. Not used in production. */
         public boolean m_isRejoinTest = false;
 
-        /** set to true to run with iv2 initiation. Good Luck! */
-        public boolean m_enableIV2 = true;
-
         public final Queue<String> m_networkCoreBindings = new ArrayDeque<String>();
         public final Queue<String> m_computationCoreBindings = new ArrayDeque<String>();
         public final Queue<String> m_executionCoreBindings = new ArrayDeque<String>();
         public String m_commandLogBinding = null;
 
         public Configuration() {
-            m_enableIV2 = VoltDB.checkTestEnvForIv2();
             // Set start action create.  The cmd line validates that an action is specified, however,
             // defaulting it to create for local cluster test scripts
             m_startAction = StartAction.CREATE;
@@ -237,7 +213,6 @@ public class VoltDB {
         public Configuration(PortGenerator ports) {
             // Default iv2 configuration to the environment settings.
             // Let explicit command line override the environment.
-            m_enableIV2 = VoltDB.checkTestEnvForIv2();
             m_port = ports.nextClient();
             m_adminPort = ports.nextAdmin();
             m_internalPort = ports.next();
@@ -249,9 +224,6 @@ public class VoltDB {
 
         public Configuration(String args[]) {
             String arg;
-
-            // let the command line override the environment setting for enable iv2.
-            m_enableIV2 = VoltDB.checkTestEnvForIv2();
 
             for (int i=0; i < args.length; ++i) {
                 arg = args[i];
@@ -426,8 +398,6 @@ public class VoltDB {
                 } else if (arg.equalsIgnoreCase("ipcport")) {
                     String portStr = args[++i];
                     m_ipcPort = Integer.valueOf(portStr);
-                } else if (arg.equals("enableiv2")) {
-                    m_enableIV2 = true;
                 } else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     usage();
@@ -532,18 +502,18 @@ public class VoltDB {
             // GettingStarted.pdf).
             String message = "";
             if (org.voltdb.utils.MiscUtils.isPro()) {
-                message = "Usage: voltdb create catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
-                        + "       voltdb replica catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml> \n"
-                        + "       voltdb recover [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
-                        + "       voltdb [live] rejoin host <hostname>\n"
-                        + "       voltdb add host <hostname>\n";
+                message = "Usage: voltdb3 create catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
+                        + "       voltdb3 replica catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml> \n"
+                        + "       voltdb3 recover [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
+                        + "       voltdb3 [live] rejoin host <hostname>\n"
+                        + "       voltdb3 add host <hostname>\n";
             } else {
-                message = "Usage: voltdb create  catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>]\n"
-                        + "       voltdb recover [host <hostname>] [deployment <deployment.xml>]\n"
-                        + "       voltdb rejoin host <hostname>\n";
+                message = "Usage: voltdb3 create  catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>]\n"
+                        + "       voltdb3 recover [host <hostname>] [deployment <deployment.xml>]\n"
+                        + "       voltdb3 rejoin host <hostname>\n";
             }
-            message += "       voltdb collect [<option> ...] <path-to-voltdbroot> (run voltdb collect -h for more details)\n";
-            message += "       voltdb compile [<option> ...] [<ddl-file> ...]  (run voltdb compile -h for more details)\n";
+            message += "       voltdb3 collect [<option> ...] <path-to-voltdbroot> (run voltdb3 collect -h for more details)\n";
+            message += "       voltdb3 compile [<option> ...] [<ddl-file> ...]  (run voltdb3 compile -h for more details)\n";
             os.print(message);
             // Log it to log4j as well, which will capture the output to a file for (hopefully never) cases where VEM has issues (it generates command lines).
             hostLog.info(message);

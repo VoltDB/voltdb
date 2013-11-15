@@ -28,8 +28,6 @@ import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltTable;
 
-@ProcInfo(partitionInfo = "cache.Key: 0", singlePartition = true)
-
 public class Prepend extends VoltCacheProcBase
 {
     private final SQLStmt check  = new SQLStmt("SELECT Key, Value FROM cache WHERE Key = ? AND Expires > ? AND CASVersion > -1;");

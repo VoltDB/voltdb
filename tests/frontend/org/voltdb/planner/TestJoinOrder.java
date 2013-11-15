@@ -63,6 +63,23 @@ public class TestJoinOrder extends PlannerTestCase {
         }
     }
 
+    public void testAliasJoinOrder() {
+        AbstractPlanNode pn = compileWithJoinOrder("select * from P1 X, P2 Y where A=B", "X,Y");
+        AbstractPlanNode n = pn.getChild(0).getChild(0);
+        assertEquals("P1", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
+        assertEquals("P2", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
+
+        pn = compileWithJoinOrder("select * from P1, P2 Y where A=B", "P1,Y");
+        n = pn.getChild(0).getChild(0);
+        assertEquals("P1", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
+        assertEquals("P2", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
+
+        pn = compileWithJoinOrder("select * from P1 , P1 Y where P1.A=Y.A", "P1,Y");
+        n = pn.getChild(0).getChild(0);
+        assertEquals("P1", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
+        assertEquals("P1", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
+    }
+
     public void testOuterJoinOrder() {
         AbstractPlanNode pn = compileWithJoinOrder("select * FROM T1 LEFT JOIN T2 ON T1.A = T2.B", "T1, T2");
         AbstractPlanNode n = pn.getChild(0).getChild(0);
@@ -85,7 +102,6 @@ public class TestJoinOrder extends PlannerTestCase {
     }
 
     public void testInnerOuterJoinOrder() {
-//      @TODO ENG_3038 Commented out until 2 table restriction for outer joins is there
         AbstractPlanNode pn = compileWithJoinOrder(
                 "select * FROM T1, T2, T3 LEFT JOIN T4 ON T3.C = T4.D LEFT JOIN T5 ON T3.C = T5.E, T6,T7",
                 "T2, T1, T3, T4, T5, T7, T6");
@@ -105,6 +121,37 @@ public class TestJoinOrder extends PlannerTestCase {
             assertTrue(joinOrder[i].equals(s.getTargetTableName()));
         }
 
+        try {
+            compileWithInvalidJoinOrder("select * FROM T1, T2, T3 LEFT JOIN T4 ON T3.C = T4.D LEFT JOIN T5 ON T3.C = T5.E, T6,T7",
+                    "T2, T6, T3, T4, T5, T7, T1");
+            fail();
+        } catch (Exception ex) {
+            assertTrue("The specified join order is invalid for the given query".equals(ex.getMessage()));
+        }
+
+        try {
+            compileWithInvalidJoinOrder("select * FROM T1, T2, T3 LEFT JOIN T4 ON T3.C = T4.D LEFT JOIN T5 ON T3.C = T5.E, T6,T7",
+                    "T1, T2, T4, T3, T5, T7, T6");
+            fail();
+        } catch (Exception ex) {
+            assertTrue("The specified join order is invalid for the given query".equals(ex.getMessage()));
+        }
+
+        try {
+            compileWithInvalidJoinOrder("select * FROM T1, T2, T3 LEFT JOIN T4 ON T3.C = T4.D LEFT JOIN T5 ON T3.C = T5.E, T6,T7",
+                    "T1, T2, T3, T4, T5, T7");
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().indexOf("does not contain the correct number of tables") != -1);
+        }
+
+        try {
+            compileWithInvalidJoinOrder("select * FROM T1, T2, T3 LEFT JOIN T4 ON T3.C = T4.D LEFT JOIN T5 ON T3.C = T5.E, T6,T7",
+                    "T1, T2, T3, T4, T5, T7, T6, T8");
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().indexOf("does not contain the correct number of tables") != -1);
+        }
     }
 
     @Override

@@ -19,6 +19,7 @@ package org.voltdb.planner;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
@@ -42,6 +43,7 @@ import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.MaterializedScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
+import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ExpressionType;
@@ -113,10 +115,12 @@ public abstract class SubPlanAssembler {
      * @param postExprs post expressions this table is part of
      * @return List of valid access paths
      */
-    protected ArrayList<AccessPath> getRelevantAccessPathsForTable(Table table,
+    protected ArrayList<AccessPath> getRelevantAccessPathsForTable(int tableAliasIdx,
                                                                    List<AbstractExpression> joinExprs,
                                                                    List<AbstractExpression> filterExprs,
                                                                    List<AbstractExpression> postExprs) {
+        assert(tableAliasIdx != StmtTableScan.NULL_ALIAS_INDEX);
+        Table table = m_parsedStmt.stmtCache.get(tableAliasIdx).m_table;
         ArrayList<AccessPath> paths = new ArrayList<AccessPath>();
         List<AbstractExpression> allJoinExprs = new ArrayList<AbstractExpression>();
         List<AbstractExpression> allExprs = new ArrayList<AbstractExpression>();
@@ -248,7 +252,7 @@ public abstract class SubPlanAssembler {
             try {
                 // This MAY want to happen once when the plan is loaded from the catalog
                 // and cached in a sticky cached index-to-expressions map?
-                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, null);
+                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson);
                 keyComponentCount = indexedExprs.size();
             } catch (JSONException e) {
                 e.printStackTrace();
@@ -478,13 +482,13 @@ public abstract class SubPlanAssembler {
         }
 
         if (startingBoundExpr != null) {
-            AbstractExpression comparator = startingBoundExpr.getFilter();
-            retval.indexExprs.add(comparator);
+            AbstractExpression lowerBoundExpr = startingBoundExpr.getFilter();
+            retval.indexExprs.add(lowerBoundExpr);
             retval.bindings.addAll(startingBoundExpr.getBindings());
-            if (comparator.getExpressionType() == ExpressionType.COMPARE_GREATERTHAN) {
+            if (lowerBoundExpr.getExpressionType() == ExpressionType.COMPARE_GREATERTHAN) {
                 retval.lookupType = IndexLookupType.GT;
             } else {
-                assert(comparator.getExpressionType() == ExpressionType.COMPARE_GREATERTHANOREQUALTO);
+                assert(lowerBoundExpr.getExpressionType() == ExpressionType.COMPARE_GREATERTHANOREQUALTO);
                 retval.lookupType = IndexLookupType.GTE;
             }
             retval.use = IndexUseType.INDEX_SCAN;
@@ -492,20 +496,69 @@ public abstract class SubPlanAssembler {
 
         if (endingBoundExpr == null) {
             if (retval.sortDirection == SortDirectionType.DESC) {
+                // Optimizable to use reverse scan.
                 if (retval.endExprs.size() == 0) { // no prefix equality filters
                     if (startingBoundExpr != null) {
                         retval.indexExprs.clear();
                         AbstractExpression comparator = startingBoundExpr.getFilter();
                         retval.endExprs.add(comparator);
+
+                        retval.initialExpr.addAll(retval.indexExprs);
+                        // Look up type here does not matter in EE, because the # of active search keys is 0.
+                        // EE use m_index->moveToEnd(false) to get END, setting scan to reverse scan.
+                        // retval.lookupType = IndexLookupType.LTE;
                     }
                 }
-                else { // there are prefix equality filters -- settle for a forward scan?
+                else {
+                    // there are prefix equality filters -- possible for a reverse scan?
+
+                    // set forward scan.
                     retval.sortDirection = SortDirectionType.INVALID;
+
+                    // Turn this part on when we have EE support for reverse scan with query GT and GTE.
+                    /*
+                    boolean isReverseScanPossible = true;
+                    if (filtersToCover.size() > 0) {
+                        // Look forward to see the remainning filters.
+                        for (int ii = coveredCount + 1; ii < keyComponentCount; ++ii) {
+                            if (indexedExprs == null) {
+                                coveringColId = indexedColIds[ii];
+                            } else {
+                                coveringExpr = indexedExprs.get(ii);
+                            }
+                            // Equality filters get first priority.
+                            boolean allowIndexedJoinFilters = (inListExpr == null);
+                            IndexableExpression eqExpr = getIndexableExpressionFromFilters(
+                                ExpressionType.COMPARE_EQUAL, ExpressionType.COMPARE_EQUAL,
+                                coveringExpr, coveringColId, table, filtersToCover,
+                                allowIndexedJoinFilters, KEEP_IN_POST_FILTERS);
+                            if (eqExpr == null) {
+                                isReverseScanPossible = false;
+                            }
+                        }
+                    }
+                    if (isReverseScanPossible) {
+                        if (startingBoundExpr != null) {
+                            int lastIdx = retval.indexExprs.size() -1;
+                            retval.indexExprs.remove(lastIdx);
+
+                            AbstractExpression comparator = startingBoundExpr.getFilter();
+                            retval.endExprs.add(comparator);
+                            retval.initialExpr.addAll(retval.indexExprs);
+
+                            retval.lookupType = IndexLookupType.LTE;
+                        }
+
+                    } else {
+                        // set forward scan.
+                        retval.sortDirection = SortDirectionType.INVALID;
+                    }
+                    */
                 }
             }
         }
         else {
-            AbstractExpression comparator = endingBoundExpr.getFilter();
+            AbstractExpression upperBoundComparator = endingBoundExpr.getFilter();
             retval.use = IndexUseType.INDEX_SCAN;
             retval.bindings.addAll(endingBoundExpr.getBindings());
 
@@ -513,24 +566,19 @@ public abstract class SubPlanAssembler {
             // do not do the reverse scan optimization
             if (retval.sortDirection != SortDirectionType.DESC &&
                 (startingBoundExpr != null || retval.sortDirection == SortDirectionType.ASC)) {
-                retval.endExprs.add(comparator);
+                retval.endExprs.add(upperBoundComparator);
                 if (retval.lookupType == IndexLookupType.EQ) {
                     retval.lookupType = IndexLookupType.GTE;
                 }
             } else {
-                // only do reverse scan optimization when no startingBoundExpr and lookup type is
-                // either < or <=, so do not optimize BETWEEN.
-                if (comparator.getExpressionType() == ExpressionType.COMPARE_LESSTHAN) {
+                // Optimizable to use reverse scan.
+                // only do reverse scan optimization when no lowerBoundExpr and lookup type is either < or <=.
+                if (upperBoundComparator.getExpressionType() == ExpressionType.COMPARE_LESSTHAN) {
                     retval.lookupType = IndexLookupType.LT;
                 } else {
-                    assert comparator.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO;
+                    assert upperBoundComparator.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO;
                     retval.lookupType = IndexLookupType.LTE;
                 }
-                // optimizable
-                // add to indexExprs because it will be used as part of searchKey
-                retval.indexExprs.add(comparator);
-                // put it to post-filter as well
-                retval.otherExprs.add(comparator);
                 // Unlike a lower bound, an upper bound does not automatically filter out nulls
                 // as required by the comparison filter, so construct a NOT NULL comparator and
                 // add to post-filter
@@ -539,14 +587,19 @@ public abstract class SubPlanAssembler {
                 if (startingBoundExpr == null) {
                     AbstractExpression newComparator = new OperatorExpression(ExpressionType.OPERATOR_NOT,
                             new OperatorExpression(ExpressionType.OPERATOR_IS_NULL), null);
-                    newComparator.getLeft().setLeft(comparator.getLeft());
+                    newComparator.getLeft().setLeft(upperBoundComparator.getLeft());
                     newComparator.finalizeValueTypes();
                     retval.otherExprs.add(newComparator);
                 } else {
-                    AbstractExpression startComparator = startingBoundExpr.getFilter();
-                    retval.endExprs.add(startComparator);
+                    int lastIdx = retval.indexExprs.size() -1;
+                    retval.indexExprs.remove(lastIdx);
+
+                    AbstractExpression lowerBoundComparator = startingBoundExpr.getFilter();
+                    retval.endExprs.add(lowerBoundComparator);
                 }
 
+                // add to indexExprs because it will be used as part of searchKey
+                retval.indexExprs.add(upperBoundComparator);
                 // initialExpr is set for both cases
                 // but will be used for LTE and only when overflow case of LT
                 retval.initialExpr.addAll(retval.indexExprs);
@@ -756,11 +809,7 @@ public abstract class SubPlanAssembler {
                         // to match them with the query's "ORDER BY" expressions.
                         if (indexedExprs == null) {
                             ColumnRef nextColRef = indexedColRefs.get(jj);
-                            //TODO: match the TVE attributes as they may potentially be more
-                            // reliable than these colInfo attributes?
                             if (colInfo.expression instanceof TupleValueExpression &&
-                                //TODO: match the TVE attributes as they may potentially be more
-                                // reliable than these colInfo attributes?
                                 colInfo.tableName.equals(table.getTypeName()) &&
                                 colInfo.columnName.equals(nextColRef.getColumn().getTypeName())) {
                                 break;
@@ -1126,19 +1175,19 @@ public abstract class SubPlanAssembler {
      * @param path The access path to access the data in the table (index/scan/etc).
      * @return The root of a plan graph to get the data.
      */
-    protected AbstractPlanNode getAccessPlanForTable(Table table, AccessPath path) {
-        assert(table != null);
+    protected AbstractPlanNode getAccessPlanForTable(int tableAliasIdx, AccessPath path) {
+        assert(tableAliasIdx != StmtTableScan.NULL_ALIAS_INDEX);
         assert(path != null);
 
         AbstractPlanNode scanNode = null;
         // if no path is a sequential scan, call a subroutine for that
         if (path.index == null)
         {
-            scanNode = getScanAccessPlanForTable(table, path.otherExprs);
+            scanNode = getScanAccessPlanForTable(tableAliasIdx, path.otherExprs);
         }
         else
         {
-            scanNode = getIndexAccessPlanForTable(table, path);
+            scanNode = getIndexAccessPlanForTable(tableAliasIdx, path);
         }
         return scanNode;
     }
@@ -1152,15 +1201,20 @@ public abstract class SubPlanAssembler {
      * @return A scan plan node
      */
     protected AbstractScanPlanNode
-    getScanAccessPlanForTable(Table table, ArrayList<AbstractExpression> exprs)
+    getScanAccessPlanForTable(int tableAliasIdx, ArrayList<AbstractExpression> exprs)
     {
+        assert(tableAliasIdx != StmtTableScan.NULL_ALIAS_INDEX);
+        assert(tableAliasIdx < m_parsedStmt.stmtCache.size());
         // build the scan node
         SeqScanPlanNode scanNode = new SeqScanPlanNode();
-        scanNode.setTargetTableName(table.getTypeName());
+        StmtTableScan tableCache = m_parsedStmt.stmtCache.get(tableAliasIdx);
+        scanNode.setTargetTableName(tableCache.m_table.getTypeName());
+        scanNode.setTargetTableAlias(tableCache.m_tableAlias);
         //TODO: push scan column identification into "setTargetTableName"
         // (on the way to enabling it for DML plans).
-        if (m_parsedStmt.scanColumns != null) {
-            scanNode.setScanColumns(m_parsedStmt.scanColumns.get(table.getTypeName()));
+        Set<SchemaColumn> scanColumns = m_parsedStmt.stmtCache.get(tableAliasIdx).m_scanColumns;
+        if (scanColumns != null) {
+            scanNode.setScanColumns(scanColumns);
         }
 
         // build the predicate
@@ -1178,17 +1232,20 @@ public abstract class SubPlanAssembler {
      * Get a index scan access plan for a table. For multi-site plans/tables,
      * scans at all partitions and sends to one partition.
      *
-     * @param table The table to get data from.
+     * @param tableAliasIndex The table to get data from.
      * @param path The access path to access the data in the table (index/scan/etc).
      * @return An index scan plan node OR,
                in one edge case, an NLIJ of a MaterializedScan and an index scan plan node.
      */
-    protected AbstractPlanNode getIndexAccessPlanForTable(Table table, AccessPath path)
+    protected AbstractPlanNode getIndexAccessPlanForTable(int tableAliasIdx, AccessPath path)
     {
         // now assume this will be an index scan and get the relevant index
         Index index = path.index;
         IndexScanPlanNode scanNode = new IndexScanPlanNode();
         AbstractPlanNode resultNode = scanNode;
+        assert(tableAliasIdx != StmtTableScan.NULL_ALIAS_INDEX);
+        assert(tableAliasIdx < m_parsedStmt.stmtCache.size());
+        StmtTableScan tableCache = m_parsedStmt.stmtCache.get(tableAliasIdx);
 
         // set sortDirection here becase it might be used for IN list
         scanNode.setSortDirection(path.sortDirection);
@@ -1203,6 +1260,7 @@ public abstract class SubPlanAssembler {
                 // Extract a TVE from the LHS MaterializedScan for use by the IndexScan in its new role.
                 MaterializedScanPlanNode matscan = (MaterializedScanPlanNode)resultNode.getChild(0);
                 AbstractExpression elemExpr = matscan.getOutputExpression();
+                assert(elemExpr != null);
                 // Replace the IN LIST condition in the end expression referencing all the list elements
                 // with a more efficient equality filter referencing the TVE for each element in turn.
                 replaceInListFilterWithEqualityFilter(path.endExprs, expr2, elemExpr);
@@ -1219,13 +1277,15 @@ public abstract class SubPlanAssembler {
         scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
         scanNode.setPredicate(ExpressionUtil.combine(path.otherExprs));
         scanNode.setInitialExpression(ExpressionUtil.combine(path.initialExpr));
-        scanNode.setTargetTableName(table.getTypeName());
+        scanNode.setTargetTableName(tableCache.m_table.getTypeName());
+        scanNode.setTargetTableAlias(tableCache.m_tableAlias);
         //TODO: push scan column identification into "setTargetTableName"
         // (on the way to enabling it for DML plans).
-        if (m_parsedStmt.scanColumns != null) {
-            scanNode.setScanColumns(m_parsedStmt.scanColumns.get(table.getTypeName()));
+        Set<SchemaColumn> scanColumns = m_parsedStmt.stmtCache.get(tableAliasIdx).m_scanColumns;
+        if (scanColumns != null) {
+            scanNode.setScanColumns(scanColumns);
         }
-        scanNode.setTargetTableAlias(table.getTypeName());
+        scanNode.setTargetTableAlias(tableCache.m_tableAlias);
         scanNode.setTargetIndexName(index.getTypeName());
         return resultNode;
     }

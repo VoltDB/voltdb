@@ -115,7 +115,6 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
     : m_currentUndoQuantum(NULL),
       m_hashinator(NULL),
       m_staticParams(MAX_PARAM_COUNT),
-      m_currentOutputDepId(-1),
       m_currentInputDepId(-1),
       m_isELEnabled(false),
       m_stringPool(16777216, 2),
@@ -161,9 +160,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          int32_t partitionId,
                          int32_t hostId,
                          string hostname,
-                         int64_t tempTableMemoryLimit,
-                         HashinatorType hashinatorType,
-                         char *hashinatorConfig)
+                         int64_t tempTableMemoryLimit)
 {
     // Be explicit about running in the standard C locale for now.
     locale::global(locale("C"));
@@ -213,18 +210,6 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_isELEnabled,
                                             hostname,
                                             hostId);
-
-    switch (hashinatorType) {
-    case HASHINATOR_LEGACY:
-        m_hashinator.reset(LegacyHashinator::newInstance(hashinatorConfig));
-        break;
-    case HASHINATOR_ELASTIC:
-        m_hashinator.reset(ElasticHashinator::newInstance(hashinatorConfig));
-        break;
-    default:
-        throwFatalException("Unknown hashinator type %d", hashinatorType);
-        break;
-    }
 
     return true;
 }
@@ -299,19 +284,73 @@ bool VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput* out) const {
 // ------------------------------------------------------------------
 // EXECUTION FUNCTIONS
 // ------------------------------------------------------------------
-int VoltDBEngine::executeQuery(int64_t planfragmentId,
-                               int32_t outputDependencyId,
-                               int32_t inputDependencyId,
-                               const NValueArray &params,
-                               int64_t spHandle, int64_t lastCommittedSpHandle,
-                               int64_t uniqueId,
-                               bool first, bool last)
+
+int VoltDBEngine::executePlanFragments(int32_t numFragments,
+                                       int64_t planfragmentIds[],
+                                       int64_t intputDependencyIds[],
+                                       ReferenceSerializeInput &serialize_in,
+                                       int64_t spHandle,
+                                       int64_t lastCommittedSpHandle,
+                                       int64_t uniqueId,
+                                       int64_t undoToken)
+{
+    // count failures
+    int failures = 0;
+
+    setUndoToken(undoToken);
+
+    // reset these at the start of each batch
+    m_tuplesProcessedInBatch = 0;
+    m_tuplesProcessedInFragment = 0;
+
+    for (m_currentIndexInBatch = 0; m_currentIndexInBatch < numFragments; ++m_currentIndexInBatch) {
+
+        m_usedParamcnt = serialize_in.readShort();
+        if (m_usedParamcnt < 0) {
+            throwFatalException("parameter count is negative: %d", m_usedParamcnt);
+        }
+        assert (m_usedParamcnt < MAX_PARAM_COUNT);
+
+        for (int j = 0; j < m_usedParamcnt; ++j) {
+            m_staticParams[j].deserializeFromAllocateForStorage(serialize_in, &m_stringPool);
+        }
+
+        // success is 0 and error is 1.
+        if (executePlanFragment(planfragmentIds[m_currentIndexInBatch],
+                                intputDependencyIds ? intputDependencyIds[m_currentIndexInBatch] : -1,
+                                m_staticParams,
+                                spHandle,
+                                lastCommittedSpHandle,
+                                uniqueId,
+                                m_currentIndexInBatch == 0,
+                                m_currentIndexInBatch == (numFragments - 1)))
+        {
+            ++failures;
+        }
+
+        // at the end of each frag, rollup and reset counters
+        m_tuplesProcessedInBatch += m_tuplesProcessedInFragment;
+        m_tuplesProcessedInFragment = 0;
+    }
+
+    m_stringPool.purge();
+
+    return failures;
+}
+
+int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
+                                      int64_t inputDependencyId,
+                                      const NValueArray &params,
+                                      int64_t spHandle,
+                                      int64_t lastCommittedSpHandle,
+                                      int64_t uniqueId,
+                                      bool first,
+                                      bool last)
 {
     assert(planfragmentId != 0);
 
     Table *cleanUpTable = NULL;
-    m_currentOutputDepId = outputDependencyId;
-    m_currentInputDepId = inputDependencyId;
+    m_currentInputDepId = static_cast<int32_t>(inputDependencyId);
 
     /*
      * Reserve space in the result output buffer for the number of
@@ -355,8 +394,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
         resetReusedResultOutputBuffer();
         e.serialize(getExceptionOutputSerializer());
 
-        // set these back to -1 for error handling
-        m_currentOutputDepId = -1;
+        // set this back to -1 for error handling
         m_currentInputDepId = -1;
         return ENGINE_ERRORCODE_ERROR;
     }
@@ -367,6 +405,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
     // children are positioned before it in this list, therefore
     // dependency tracking is not needed here.
     size_t ttl = execsForFrag->list.size();
+
     for (int ctr = 0; ctr < ttl; ++ctr) {
         AbstractExecutor *executor = execsForFrag->list[ctr];
         assert (executor);
@@ -384,8 +423,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
                            ctr, (intmax_t)planfragmentId);
                 if (cleanUpTable != NULL)
                     cleanUpTable->deleteAllTuples(false);
-                // set these back to -1 for error handling
-                m_currentOutputDepId = -1;
+                // set this back to -1 for error handling
                 m_currentInputDepId = -1;
                 return ENGINE_ERRORCODE_ERROR;
             }
@@ -398,8 +436,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
             resetReusedResultOutputBuffer();
             e.serialize(getExceptionOutputSerializer());
 
-            // set these back to -1 for error handling
-            m_currentOutputDepId = -1;
+            // set this back to -1 for error handling
             m_currentInputDepId = -1;
             return ENGINE_ERRORCODE_ERROR;
         }
@@ -431,8 +468,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
         m_resultOutput.writeBoolAt(m_startOfResultBuffer + sizeof(int32_t), m_dirtyFragmentBatch);
     }
 
-    // set these back to -1 for error handling
-    m_currentOutputDepId = -1;
+    // set this back to -1 for error handling
     m_currentInputDepId = -1;
 
     VOLT_DEBUG("Finished executing.");
@@ -443,8 +479,8 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
 // RESULT FUNCTIONS
 // -------------------------------------------------
 bool VoltDBEngine::send(Table* dependency) {
-    VOLT_DEBUG("Sending Dependency '%d' from C++", m_currentOutputDepId);
-    m_resultOutput.writeInt(m_currentOutputDepId);
+    VOLT_DEBUG("Sending Dependency from C++");
+    m_resultOutput.writeInt(-1); // legacy placeholder for old output id
     if (!dependency->serializeTo(m_resultOutput))
         return false;
     m_numResultDependencies++;
@@ -930,7 +966,7 @@ VoltDBEngine::loadTable(int32_t tableId,
     }
 
     try {
-        table->loadTuplesFrom(serializeIn, NULL, returnUniqueViolations ? getResultOutputSerializer() : NULL);
+        table->loadTuplesFrom(serializeIn, NULL, returnUniqueViolations ? &m_resultOutput : NULL);
     } catch (const SerializableEEException &e) {
         throwFatalException("%s", e.message().c_str());
     }
@@ -1581,13 +1617,13 @@ size_t VoltDBEngine::tableHashCode(int32_t tableId) {
     return table->hashCode();
 }
 
-void VoltDBEngine::updateHashinator(HashinatorType type, const char *config) {
+void VoltDBEngine::updateHashinator(HashinatorType type, const char *config, int32_t *configPtr, uint32_t numTokens) {
     switch (type) {
     case HASHINATOR_LEGACY:
         m_hashinator.reset(LegacyHashinator::newInstance(config));
         break;
     case HASHINATOR_ELASTIC:
-        m_hashinator.reset(ElasticHashinator::newInstance(config));
+        m_hashinator.reset(ElasticHashinator::newInstance(config, configPtr, numTokens));
         break;
     default:
         throwFatalException("Unknown hashinator type %d", type);
@@ -1611,7 +1647,7 @@ void VoltDBEngine::dispatchValidatePartitioningTask(const char *taskParams) {
             hashinator.reset(LegacyHashinator::newInstance(config));
             break;
         case HASHINATOR_ELASTIC:
-            hashinator.reset(ElasticHashinator::newInstance(config));
+            hashinator.reset(ElasticHashinator::newInstance(config, NULL, 0));
             break;
         default:
             throwFatalException("Unknown hashinator type %d", type);
@@ -1629,11 +1665,10 @@ void VoltDBEngine::dispatchValidatePartitioningTask(const char *taskParams) {
         }
     }
 
-    ReferenceSerializeOutput *output = getResultOutputSerializer();
-    output->writeInt(static_cast<int32_t>(sizeof(int64_t) * numTables));
+    m_resultOutput.writeInt(static_cast<int32_t>(sizeof(int64_t) * numTables));
 
     BOOST_FOREACH( int64_t mispartitionedRowCount, mispartitionedRowCounts) {
-        output->writeLong(mispartitionedRowCount);
+        m_resultOutput.writeLong(mispartitionedRowCount);
     }
 }
 
@@ -1647,5 +1682,26 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
     }
 }
 
+void VoltDBEngine::reportProgessToTopend() {
+    std::string tableName;
+    int64_t tableSize;
+    if (m_lastAccessedTable == NULL) {
+        tableName = "None";
+        tableSize = 0;
+    }
+    else {
+        tableName = m_lastAccessedTable->name();
+        tableSize = m_lastAccessedTable->activeTupleCount();
+    }
+    //Update stats in java and let java determine if we should cancel this query.
+    if(m_topend->fragmentProgressUpdate(m_currentIndexInBatch,
+                                        *m_lastAccessedPlanNodeName,
+                                        tableName,
+                                        tableSize,
+                                        m_tuplesProcessedInBatch + m_tuplesProcessedInFragment)){
+        VOLT_DEBUG("Interrupt query.");
+        throw InterruptException("Query interrupted.");
+    }
+}
 
 }
