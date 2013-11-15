@@ -560,7 +560,7 @@ public class JdbcDatabaseMetaDataGenerator
     private Integer[] getParamPrecisionAndRadix(ProcParameter param)
     {
         VoltType type = VoltType.get((byte) param.getType());
-        return VoltType.getTypePrecisionAndRadix(type);
+        return type.getTypePrecisionAndRadix();
     }
 
     private int getParamLength(ProcParameter param)
@@ -640,7 +640,7 @@ public class JdbcDatabaseMetaDataGenerator
                 }
                 results.addRow(type.toSQLString().toUpperCase(),
                         type.getJdbcSqlType(),
-                        VoltType.getTypePrecisionAndRadix(type)[0],
+                        type.getTypePrecisionAndRadix()[0],
                         type.getLiteralPrefix(),
                         type.getLiteralSuffix(),
                         type.getCreateParams(),
@@ -655,7 +655,7 @@ public class JdbcDatabaseMetaDataGenerator
                         type.getMaximumScale(),
                         null,
                         null,
-                        VoltType.getTypePrecisionAndRadix(type)[1]
+                        type.getTypePrecisionAndRadix()[1]
                         );
             }
         }
