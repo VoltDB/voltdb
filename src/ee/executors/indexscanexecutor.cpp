@@ -192,7 +192,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     VOLT_DEBUG("IndexScan: %s.%s\n", m_targetTable->name().c_str(),
                m_index->getName().c_str());
 
-    bool searchKeyUnderflow = false;
     int activeNumOfSearchKeys = m_numOfSearchkeys;
     IndexLookupType localLookupType = m_lookupType;
     SortDirectionType localSortDirection = m_sortDirection;
@@ -269,7 +268,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                     else {
                         // don't allow GTE because it breaks null handling
                         localLookupType = INDEX_LOOKUP_TYPE_GT;
-                        searchKeyUnderflow = true;
                     }
                 }
 
@@ -385,10 +383,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     } else {
         bool toStartActually = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
         m_index->moveToEnd(toStartActually);
-    }
-
-    if (!searchKeyUnderflow) {
-        countNULLExpr = NULL;
     }
 
     int tuple_ctr = 0;

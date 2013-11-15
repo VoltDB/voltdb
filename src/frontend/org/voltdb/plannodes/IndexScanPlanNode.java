@@ -131,6 +131,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             m_skip_null_predicate = null;
             return;
         }
+
+        if (m_searchkeyExpressions.size() < ExpressionUtil.uncombine((AbstractExpression) m_endExpression.clone()).size()) {
+            nextKeyIndex = m_searchkeyExpressions.size();
+        }
         List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
 
         String exprsjson = m_catalogIndex.getExpressionsjson();
