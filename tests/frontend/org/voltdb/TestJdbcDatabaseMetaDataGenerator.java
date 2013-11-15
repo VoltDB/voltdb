@@ -232,8 +232,8 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                                                 null,
                                                 3,
                                                 "NO"});
-        refcolumns.put("Column6", new Object[] {java.sql.Types.DOUBLE,
-                                                "DOUBLE",
+        refcolumns.put("Column6", new Object[] {java.sql.Types.FLOAT,
+                                                "FLOAT",
                                                 53,
                                                 null,
                                                 2,

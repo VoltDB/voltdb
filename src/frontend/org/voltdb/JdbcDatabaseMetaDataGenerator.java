@@ -258,40 +258,11 @@ public class JdbcDatabaseMetaDataGenerator
 
     private String getColumnSqlTypeName(VoltType type)
     {
-        String jdbc_sql_typename = "OTHER";
-        switch(type)
-        {
-        case TINYINT:
-            jdbc_sql_typename = "TINYINT";
-            break;
-        case SMALLINT:
-            jdbc_sql_typename = "SMALLINT";
-            break;
-        case INTEGER:
-            jdbc_sql_typename = "INTEGER";
-            break;
-        case BIGINT:
-            jdbc_sql_typename = "BIGINT";
-            break;
-        case FLOAT:
-            jdbc_sql_typename = "DOUBLE";
-            break;
-        case TIMESTAMP:
-            jdbc_sql_typename = "TIMESTAMP";
-            break;
-        case STRING:
-            jdbc_sql_typename = "VARCHAR";
-            break;
-        case DECIMAL:
-            jdbc_sql_typename = "DECIMAL";
-            break;
-        case VARBINARY:
-            jdbc_sql_typename = "VARBINARY";
-            break;
-        default:
-            // XXX What's the right behavior here?
+        String jdbc_sql_typename = type.toSQLString();
+        if (jdbc_sql_typename == null) {
+            jdbc_sql_typename = "OTHER";
         }
-        return jdbc_sql_typename;
+        return jdbc_sql_typename.toUpperCase();
     }
 
     // Integer[0] is the column size and Integer[1] is the radix

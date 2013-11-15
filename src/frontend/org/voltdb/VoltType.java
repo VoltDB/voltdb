@@ -127,7 +127,7 @@ public enum VoltType {
      */
     FLOAT     ((byte)8, 8, "float",
             new Class[] {double.class, Double.class, float.class, Float.class}, double[].class, 'f',
-            java.sql.Types.DOUBLE,  // java.sql.Types DATA_TYPE
+            java.sql.Types.FLOAT,  // java.sql.Types DATA_TYPE
             null, // prefix to specify a literal
             null, // suffix to specify a literal
             null, // necessary params to create
