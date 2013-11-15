@@ -861,7 +861,7 @@ public class VoltCompiler {
             return;
         }
 
-        boolean contain = false;
+        boolean containsPartitionColumn = false;
         String jsonExpr = index.getExpressionsjson();
         // if this is a pure-column index...
         if (jsonExpr.isEmpty()) {
@@ -869,7 +869,7 @@ public class VoltCompiler {
                 Column col = cref.getColumn();
                 // unique index contains partitioned column
                 if (col.equals(partitionCol)) {
-                    contain = true;
+                    containsPartitionColumn = true;
                     break;
                 }
             }
@@ -881,7 +881,7 @@ public class VoltCompiler {
                 for (AbstractExpression expr: indexExpressions) {
                     if (expr instanceof TupleValueExpression &&
                             ((TupleValueExpression) expr).getColumnName().equals(partitionCol.getName()) ) {
-                        contain = true;
+                        containsPartitionColumn = true;
                         break;
                     }
                 }
@@ -891,11 +891,14 @@ public class VoltCompiler {
             }
         }
 
-        if (contain && index.getAssumeunique()) {
-            String exceptionMsg = String.format("ASSUMEUNIQUE is not required " +
-            "if the index includes the partitioning column. Use UNIQUE instead.");
-            throw new VoltCompilerException(exceptionMsg);
-        } else if (!contain && !index.getAssumeunique()) {
+        if (containsPartitionColumn) {
+            if (index.getAssumeunique()) {
+                String exceptionMsg = String.format("ASSUMEUNIQUE is not valid " +
+                "for an index that includes the partitioning column. Please use UNIQUE instead.");
+                throw new VoltCompilerException(exceptionMsg);
+            }
+        }
+        else if ( ! index.getAssumeunique()) {
             // Throw compiler exception.
             String indexName = index.getTypeName();
             String keyword = "";
@@ -907,10 +910,10 @@ public class VoltCompiler {
                 keyword = "UNIQUE";
             }
 
-            String exceptionMsg = String.format("Invalid use of %s. " +
-                    "%s indexes on partitioned table %s must include the partitioning column %s.  " +
-                    "Add the partitioning column %s to the %s or remove the %s keyword.",
-                    indexName, keyword, tableName, partitionCol.getName(), partitionCol.getName(), indexName, keyword);
+            String exceptionMsg = "Invalid use of " + keyword +
+                    ". The " + indexName + " on the partitioned table " + tableName +
+                    " does not include the partitioning column " + partitionCol.getName() +
+                    ". See the documentation for the 'CREATE TABLE' and 'CREATE INDEX' commands and the 'ASSUMEUNIQUE' keyword.";
             throw new VoltCompilerException(exceptionMsg);
         }
 
