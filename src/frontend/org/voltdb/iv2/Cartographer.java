@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.TreeSet;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -379,7 +378,7 @@ public class Cartographer extends StatsSource
      * Break this method out to be static and testable independent of ZK, JSON, other ugh.
      */
     static public List<Integer> computeReplacementPartitions(Map<Integer, Integer> repsPerPart, int kfactor,
-            int sitesPerHost, int numberOfPartitions)
+                                                             int sitesPerHost)
     {
         List<Integer> partitions = new ArrayList<Integer>();
         List<Integer> partSortedByRep = sortKeysByValue(repsPerPart);
@@ -404,7 +403,7 @@ public class Cartographer extends StatsSource
             repsPerPart.put(i, getReplicaCountForPartition(i));
         }
         List<Integer> partitions = computeReplacementPartitions(repsPerPart, clusterConfig.getReplicationFactor(),
-                clusterConfig.getSitesPerHost(), clusterConfig.getPartitionCount());
+                clusterConfig.getSitesPerHost());
         hostLog.info("IV2 Sites will replicate the following partitions: " + partitions);
         return partitions;
     }
