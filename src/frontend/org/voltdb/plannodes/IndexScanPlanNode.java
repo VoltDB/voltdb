@@ -128,7 +128,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     // In future, use static function and replace that function in IndexCountPlanNode.java also
     public void setCountNULLExpresson(int numOfKeysToSetup) {
-        assert(m_searchkeyExpressions.size() > 0);
+        if (numOfKeysToSetup < 0) {
+            return;
+        }
         List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
 
         String exprsjson = m_catalogIndex.getExpressionsjson();
