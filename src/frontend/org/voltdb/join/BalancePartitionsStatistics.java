@@ -193,7 +193,7 @@ public class BalancePartitionsStatistics extends StatsSource {
     @Override
     protected void updateStatsRow(Object rowKey, Object[] rowValues)
     {
-        StatsPoint point = statsPoint;
+        final StatsPoint point = statsPoint;
 
         rowValues[columnNameToIndex.get(Constants.TOTAL_RANGES)] = point.getTotalRanges();
         rowValues[columnNameToIndex.get(Constants.PERCENTAGE_MOVED)] = point.getPercentageMoved();
