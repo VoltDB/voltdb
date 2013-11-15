@@ -209,6 +209,7 @@ class Distributer {
                             CallbackBookeeping cb = e.getValue();
 
                             // if the timeout is expired, call the callback and remove the
+                            // if query came with timeout use that value or use client global.
                             // bookeeping data
                             long expiredin = ((cb.expired != 0) ? cb.expired : m_procedureCallTimeoutMS);
                             if ((now - cb.timestamp) > expiredin) {
