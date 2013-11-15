@@ -96,6 +96,8 @@ class IndexScanPlanNode : public AbstractScanPlanNode {
 
         AbstractExpression* getInitialExpression() const;
 
+        AbstractExpression* getCountNULLExpression() const;
+
         std::string debugInfo(const std::string &spacer) const;
 
     protected:
@@ -127,6 +129,10 @@ class IndexScanPlanNode : public AbstractScanPlanNode {
         // Sorting Direction
         //
         SortDirectionType sort_direction;
+        //
+        // count null row expression for underflow edge case
+        //
+        AbstractExpression* count_null_expression;
 };
 
 }

@@ -1238,6 +1238,64 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
     }
 
+    // Ticket: ENG-5486
+    public void testNULLcomparison() throws IOException, ProcCallException {
+        System.out.println("STARTING default null test...");
+        Client client = getClient();
+        VoltTable result = null;
+/**
+            CREATE TABLE DEFAULT_NULL (
+              ID INTEGER NOT NULL,
+              num1 INTEGER DEFAULT NULL,
+              num2 INTEGER ,
+              ratio FLOAT DEFAULT NULL,
+              num3 INTEGER DEFAULT NULL,
+              desc VARCHAR(300) DEFAULT NULL,
+              PRIMARY KEY (ID)
+            );
+            create index idx_num3 on DEFAULT_NULL (num3);
+ */
+        result = client.callProcedure("@AdHoc",
+                " INSERT INTO DEFAULT_NULL(id) VALUES (1);").getResults()[0];
+        validateTableOfScalarLongs(result, new long[]{1});
+
+        // Test null column comparison
+        result = client.callProcedure("@AdHoc",
+                " select count(*), count(num1) from DEFAULT_NULL where num1 < 3;").getResults()[0];
+        validateTableOfLongs(result, new long[][]{{0, 0}});
+
+        result = client.callProcedure("@AdHoc",
+                " select count(*), count(num1) from DEFAULT_NULL where num1 <= 3;").getResults()[0];
+        validateTableOfLongs(result, new long[][]{{0, 0}});
+
+        result = client.callProcedure("@AdHoc",
+                " select count(*), count(num1) from DEFAULT_NULL where num1 > 3;").getResults()[0];
+        validateTableOfLongs(result, new long[][]{{0, 0}});
+
+        // Test null column comparison with index
+        result = client.callProcedure("@AdHoc",
+                " select count(*), count(num3) from DEFAULT_NULL where num3 > 3;").getResults()[0];
+        validateTableOfLongs(result, new long[][]{{0, 0}});
+
+        result = client.callProcedure("@AdHoc",
+                " select count(*), count(num3) from DEFAULT_NULL where num3 < 3;").getResults()[0];
+        validateTableOfLongs(result, new long[][]{{0, 0}});
+
+        result = client.callProcedure("@AdHoc",
+                " select count(*), count(num3) from DEFAULT_NULL where num3 <= 3;").getResults()[0];
+        validateTableOfLongs(result, new long[][]{{0, 0}});
+
+        result = client.callProcedure("@Explain",
+                " select count(*) from DEFAULT_NULL where num3 < 3;").getResults()[0];
+        System.out.println(result);
+
+        // Reverse scan, count(*)
+        result = client.callProcedure("@AdHoc",
+                " select count(*) from DEFAULT_NULL where num3 < 3;").getResults()[0];
+        validateTableOfScalarLongs(result, new long[]{0});
+    }
+
+
     public void testENG4146() throws IOException, ProcCallException {
         System.out.println("STARTING insert no json string...");
         Client client = getClient();

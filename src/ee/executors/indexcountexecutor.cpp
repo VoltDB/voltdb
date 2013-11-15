@@ -138,6 +138,14 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
         m_endType = m_node->getEndType();
     }
 
+    if (m_node->getCountNULLExpression() != NULL)
+    {
+        m_needsSubstituteCountNullExpression =
+                m_node->getCountNULLExpression()->hasParameter();
+
+        m_tuple = TableTuple(m_targetTable->schema());
+    }
+
     // Need to move GTE to find (x,_) when doing a partial covering search.
     // The planner sometimes used to lie in this case: index_lookup_type_eq is incorrect.
     // Index_lookup_type_gte is necessary.
@@ -218,9 +226,8 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 break;
             }
         }
+        VOLT_TRACE("Search key after substitutions: '%s'", m_searchKey.debugNoHeader().c_str());
     }
-
-    VOLT_TRACE("Search key after substitutions: '%s'", m_searchKey.debugNoHeader().c_str());
 
     if (m_numOfEndkeys != 0) {
         //
@@ -284,14 +291,34 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     assert (m_index == m_targetTable->index(m_node->getTargetIndexName()));
     assert (m_index->isCountableIndex());
 
+    //
+    // COUNT NULL EXPRESSION
+    //
+    AbstractExpression* countNULLExpr = m_node->getCountNULLExpression();
+    // For reverse scan edge case NULL values and forward scan underflow case.
+    if (countNULLExpr != NULL) {
+        if (m_needsSubstituteCountNullExpression) {
+            countNULLExpr->substitute(params);
+        }
+        VOLT_DEBUG("COUNT NULL Expression:\n%s", countNULLExpr->debug(true).c_str());
+    }
+
+    bool reverseScanNullEdgeCase = false;
+    bool reverseScanMovedIndexToScan = false;
+    if (m_numOfSearchkeys < m_numOfEndkeys && (m_endType == INDEX_LOOKUP_TYPE_LT || m_endType == INDEX_LOOKUP_TYPE_LTE)) {
+        reverseScanNullEdgeCase = true;
+        VOLT_DEBUG("Index count: reverse scan edge null case." );
+    }
+
+
     // An index count has two cases: unique and non-unique
     int64_t rkStart = 0, rkEnd = 0, rkRes = 0;
     int leftIncluded = 0, rightIncluded = 0;
 
-    // Deal with multi-map
-    VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
-               localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
     if (m_numOfSearchkeys != 0) {
+        // Deal with multi-map
+        VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
+                   localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
         if (searchKeyUnderflow == false) {
             if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
                 rkStart = m_index->getCounterLET(&m_searchKey, true);
@@ -300,11 +327,34 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 if (m_index->hasKey(&m_searchKey)) {
                     leftIncluded = 1;
                     rkStart = m_index->getCounterLET(&m_searchKey, false);
+
+                    if (reverseScanNullEdgeCase) {
+                        m_index->moveToKeyOrGreater(&m_searchKey);
+                        reverseScanMovedIndexToScan = true;
+                    }
                 } else {
                     rkStart = m_index->getCounterLET(&m_searchKey, true);
                 }
             }
+        } else {
+            // Do not count null row or columns
+            m_index->moveToKeyOrGreater(&m_searchKey);
+            assert(countNULLExpr);
+            long numNULLs = p_countNulls(countNULLExpr);
+            rkStart += numNULLs;
+            VOLT_DEBUG("Index count[underflow case]: find out %ld null rows or columns are not counted in.", numNULLs);
+
         }
+    }
+    if (reverseScanNullEdgeCase) {
+        // reverse scan case
+        if (!reverseScanMovedIndexToScan && localLookupType != INDEX_LOOKUP_TYPE_GT) {
+            m_index->moveToEnd(true);
+        }
+        assert(countNULLExpr);
+        long numNULLs = p_countNulls(countNULLExpr);
+        rkStart += numNULLs;
+        VOLT_DEBUG("Index count[reverse case]: find out %ld null rows or columns are not counted in.", numNULLs);
     }
 
     if (m_numOfEndkeys != 0) {
@@ -335,6 +385,20 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     VOLT_DEBUG ("Index Count :\n %s", m_outputTable->debug().c_str());
     return true;
 }
+
+
+long IndexCountExecutor::p_countNulls(AbstractExpression * countNULLExpr) {
+    long numNULLs = 0;
+    if (countNULLExpr == NULL) {
+        return numNULLs;
+    }
+    size_t size = m_index->getSize();
+    while ( numNULLs < size && countNULLExpr->eval(&(m_tuple = m_index->nextValue()), NULL).isTrue()) {
+        numNULLs++;
+    }
+    return numNULLs;
+}
+
 
 IndexCountExecutor::~IndexCountExecutor() {
     if (m_numOfSearchkeys != 0) {

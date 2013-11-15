@@ -101,6 +101,7 @@ private:
     bool m_needsSubstitutePostExpression;
     bool m_needsSubstituteEndExpression;
     bool m_needsSubstituteInitialExpression;
+    bool m_needsSubstituteCountNullExpression;
 
     IndexLookupType m_lookupType;
     SortDirectionType m_sortDirection;

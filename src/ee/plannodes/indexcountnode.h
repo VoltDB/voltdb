@@ -65,6 +65,8 @@ class IndexCountPlanNode : public AbstractScanPlanNode {
         std::vector<AbstractExpression*>& getEndKeyExpressions();
         const std::vector<AbstractExpression*>& getEndKeyExpressions() const;
 
+        AbstractExpression* getCountNULLExpression() const;
+
         std::string debugInfo(const std::string &spacer) const;
 
     protected:
@@ -94,6 +96,10 @@ class IndexCountPlanNode : public AbstractScanPlanNode {
         // Index Lookup End Type
         //
         IndexLookupType end_type;
+        //
+        // count null row expression for edge cases: reverse scan or underflow case
+        //
+        AbstractExpression* count_null_expression;
 };
 
 }

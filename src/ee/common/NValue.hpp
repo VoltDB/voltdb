@@ -302,6 +302,7 @@ class NValue {
     /* For boolean NValues, convert to bool */
     bool isTrue() const;
     bool isFalse() const;
+    bool isBooleanNULL() const;
 
     /* For number values, check the number line. */
     bool isZero() const;
@@ -2102,6 +2103,9 @@ inline NValue NValue::getFalse() {
  */
 inline NValue NValue::op_negate() const {
     assert(getValueType() == VALUE_TYPE_BOOLEAN);
+    if (isBooleanNULL()) {
+        return getNullValue(VALUE_TYPE_BOOLEAN);
+    }
     NValue retval(VALUE_TYPE_BOOLEAN);
     retval.getBoolean() = !getBoolean();
     return retval;
@@ -2109,9 +2113,13 @@ inline NValue NValue::op_negate() const {
 
 /**
  * Returns C++ true if this NValue is a boolean and is true
+ * If it is NULL, return false.
  */
 inline bool NValue::isTrue() const {
     assert(getValueType() == VALUE_TYPE_BOOLEAN);
+    if (isBooleanNULL()) {
+        return false;
+    }
     return getBoolean();
 }
 
@@ -2123,10 +2131,22 @@ inline bool NValue::isFalse() const {
     return !getBoolean();
 }
 
+inline bool NValue::isBooleanNULL() const {
+    assert(getValueType() == VALUE_TYPE_BOOLEAN);
+    return *reinterpret_cast<const int8_t*>(m_data) == BOOL_NULL;
+}
+
 /**
  * Logical and operation for NValues
  */
 inline NValue NValue::op_and(const NValue rhs) const {
+    if (isBooleanNULL() && (rhs.isBooleanNULL() || rhs.getBoolean() == true)) {
+        return getNullValue(VALUE_TYPE_BOOLEAN);
+    }
+    if (isBooleanNULL() && rhs.getBoolean() == false) {
+        return getFalse();
+    }
+    // Not null boolean operation any more
     if (getBoolean() && rhs.getBoolean()) {
         return getTrue();
     }
@@ -2137,6 +2157,13 @@ inline NValue NValue::op_and(const NValue rhs) const {
  * Logical or operation for NValues
  */
 inline NValue NValue::op_or(const NValue rhs) const {
+    if (isBooleanNULL() && (rhs.isBooleanNULL() || rhs.getBoolean() == false)) {
+        return getNullValue(VALUE_TYPE_BOOLEAN);
+    }
+    if (isBooleanNULL() && rhs.getBoolean() == true) {
+        return getTrue();
+    }
+    // Not null boolean operation any more
     if(getBoolean() || rhs.getBoolean()) {
         return getTrue();
     }
@@ -2216,10 +2243,10 @@ inline uint16_t NValue::getTupleStorageSize(const ValueType type) {
  */
 inline int NValue::compare(const NValue rhs) const {
     switch (getValueType()) {
-      case VALUE_TYPE_TINYINT:
-      case VALUE_TYPE_SMALLINT:
-      case VALUE_TYPE_INTEGER:
-      case VALUE_TYPE_BIGINT:
+    case VALUE_TYPE_TINYINT:
+    case VALUE_TYPE_SMALLINT:
+    case VALUE_TYPE_INTEGER:
+    case VALUE_TYPE_BIGINT:
         if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
             return castAsDouble().compareDoubleValue(rhs);
         } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
@@ -2227,26 +2254,26 @@ inline int NValue::compare(const NValue rhs) const {
         } else {
             return compareAnyIntegerValue(rhs);
         }
-      case VALUE_TYPE_TIMESTAMP:
+    case VALUE_TYPE_TIMESTAMP:
         if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
             return castAsDouble().compareDoubleValue(rhs);
         } else {
             return compareAnyIntegerValue(rhs);
         }
-      case VALUE_TYPE_DOUBLE:
+    case VALUE_TYPE_DOUBLE:
         return compareDoubleValue(rhs);
-      case VALUE_TYPE_VARCHAR:
+    case VALUE_TYPE_VARCHAR:
         return compareStringValue(rhs);
-      case VALUE_TYPE_VARBINARY:
+    case VALUE_TYPE_VARBINARY:
         return compareBinaryValue(rhs);
-      case VALUE_TYPE_DECIMAL:
+    case VALUE_TYPE_DECIMAL:
         return compareDecimalValue(rhs);
-      default: {
-          throwDynamicSQLException(
-                  "non comparable types lhs '%s' rhs '%s'",
-                  getValueTypeString().c_str(),
-                  rhs.getValueTypeString().c_str());
-      }
+    default: {
+        throwDynamicSQLException(
+                "non comparable types lhs '%s' rhs '%s'",
+                getValueTypeString().c_str(),
+                rhs.getValueTypeString().c_str());
+    }
     }
 }
 
@@ -2254,38 +2281,43 @@ inline int NValue::compare(const NValue rhs) const {
  * Set this NValue to null.
  */
 inline void NValue::setNull() {
-    switch (getValueType()) {
-      case VALUE_TYPE_NULL:
-      case VALUE_TYPE_INVALID:
+    switch (getValueType())
+    {
+    case VALUE_TYPE_BOOLEAN:
+        // HACK BOOL NULL
+        *reinterpret_cast<int8_t*>(m_data) = BOOL_NULL;
+        break;
+    case VALUE_TYPE_NULL:
+    case VALUE_TYPE_INVALID:
         return;
-      case VALUE_TYPE_TINYINT:
+    case VALUE_TYPE_TINYINT:
         getTinyInt() = INT8_NULL;
         break;
-      case VALUE_TYPE_SMALLINT:
+    case VALUE_TYPE_SMALLINT:
         getSmallInt() = INT16_NULL;
         break;
-      case VALUE_TYPE_INTEGER:
+    case VALUE_TYPE_INTEGER:
         getInteger() = INT32_NULL;
         break;
-      case VALUE_TYPE_TIMESTAMP:
+    case VALUE_TYPE_TIMESTAMP:
         getTimestamp() = INT64_NULL;
         break;
-      case VALUE_TYPE_BIGINT:
+    case VALUE_TYPE_BIGINT:
         getBigInt() = INT64_NULL;
         break;
-      case VALUE_TYPE_DOUBLE:
+    case VALUE_TYPE_DOUBLE:
         getDouble() = DOUBLE_MIN;
         break;
-      case VALUE_TYPE_VARCHAR:
-      case VALUE_TYPE_VARBINARY:
+    case VALUE_TYPE_VARCHAR:
+    case VALUE_TYPE_VARBINARY:
         *reinterpret_cast<void**>(m_data) = NULL;
         break;
-      case VALUE_TYPE_DECIMAL:
+    case VALUE_TYPE_DECIMAL:
         getDecimal().SetMin();
         break;
-      default: {
-          throwDynamicSQLException("NValue::setNull() called with unsupported ValueType '%d'", getValueType());
-      }
+    default: {
+        throwDynamicSQLException("NValue::setNull() called with unsupported ValueType '%d'", getValueType());
+    }
     }
 }
 
@@ -2805,6 +2837,8 @@ inline bool NValue::isNull() const {
         case VALUE_TYPE_NULL:
         case VALUE_TYPE_INVALID:
             return true;
+        case VALUE_TYPE_BOOLEAN:
+            return *reinterpret_cast<const int8_t*>(m_data) == BOOL_NULL;
         case VALUE_TYPE_TINYINT:
             return getTinyInt() == INT8_NULL;
         case VALUE_TYPE_SMALLINT:

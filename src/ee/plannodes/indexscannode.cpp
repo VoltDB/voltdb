@@ -63,6 +63,7 @@ IndexScanPlanNode::~IndexScanPlanNode() {
     }
     delete end_expression;
     delete initial_expression;
+    delete count_null_expression;
     delete getOutputTable();
     setOutputTable(NULL);
 }
@@ -122,6 +123,10 @@ AbstractExpression* IndexScanPlanNode::getInitialExpression() const {
     return (this->initial_expression);
 }
 
+AbstractExpression* IndexScanPlanNode::getCountNULLExpression() const {
+    return (this->count_null_expression);
+}
+
 std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;
     buffer << this->AbstractScanPlanNode::debugInfo(spacer);
@@ -177,6 +182,13 @@ void IndexScanPlanNode::loadFromJSONObject(PlannerDomValue obj) {
         initial_expression = AbstractExpression::buildExpressionTree(exprValue);
     } else {
         initial_expression = NULL;
+    }
+
+    if (obj.hasNonNullKey("COUNT_NULL_EXPRESSION")) {
+        PlannerDomValue exprValue = obj.valueForKey("COUNT_NULL_EXPRESSION");
+        count_null_expression = AbstractExpression::buildExpressionTree(exprValue);
+    } else {
+        count_null_expression = NULL;
     }
 
     PlannerDomValue searchKeyExprArray = obj.valueForKey("SEARCHKEY_EXPRESSIONS");
