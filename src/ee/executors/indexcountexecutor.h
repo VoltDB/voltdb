@@ -46,12 +46,11 @@ public:
     }
     ~IndexCountExecutor();
 
-protected:
-    bool p_init(AbstractPlanNode*,
-            TempTableLimits* limits);
+private:
+    bool p_init(AbstractPlanNode*, TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
 
-    long p_countNulls(AbstractExpression * nextSearchkeyExpr);
+    long countNulls(AbstractExpression * countNullExpr);
 
     // Data in this class is arranged roughly in the order it is read for
     // p_execute(). Please don't reshuffle it only in the name of beauty.
@@ -64,11 +63,8 @@ protected:
     // Search key
     TableTuple m_searchKey;
     TableTuple m_endKey;
-    // search_key_beforesubstitute_array_ptr[]
-    AbstractExpression** m_searchKeyBeforeSubstituteArray;
-    bool* m_needsSubstituteSearchKey; // needs_substitute_search_key_ptr[]
-    AbstractExpression** m_endKeyBeforeSubstituteArray;
-    bool* m_needsSubstituteEndKey;
+    AbstractExpression** m_searchKeyArray;
+    AbstractExpression** m_endKeyArray;
 
     IndexLookupType m_lookupType;
     IndexLookupType m_endType;
@@ -77,18 +73,11 @@ protected:
     TempTable* m_outputTable;
     PersistentTable* m_targetTable;
     TableIndex *m_index;
-    TableTuple m_tuple;
-
-    bool m_needsSubstituteCountNullExpression;
 
     // arrange the memory mgmt aids at the bottom to try to maximize
     // cache hits (by keeping them out of the way of useful runtime data)
-    boost::shared_array<bool> m_needsSubstituteSearchKeyPtr;
-    boost::shared_array<AbstractExpression*>
-        m_searchKeyBeforeSubstituteArrayPtr;
-    boost::shared_array<bool> m_needsSubstituteEndKeyPtr;
-    boost::shared_array<AbstractExpression*>
-            m_endKeyBeforeSubstituteArrayPtr;
+    boost::shared_array<AbstractExpression*> m_searchKeyArrayPtr;
+    boost::shared_array<AbstractExpression*> m_endKeyArrayPtr;
 
     // So Valgrind doesn't complain:
     char* m_searchKeyBackingStore;
