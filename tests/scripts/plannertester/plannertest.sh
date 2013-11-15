@@ -3,7 +3,7 @@
 export VOLTDB_HOME=../../..
 
 
-VOLTDBJAR=`ls $VOLTDB_HOME/voltdb/voltdb-[23].*.jar | grep -v "doc.jar" | head -1`
+VOLTDBJAR=`ls $VOLTDB_HOME/voltdb/voltdb-[234].*.jar | grep -v "doc.jar" | head -1`
 if [ -n "${VOLTDBJAR}" ]; then
   CLASSPATH=$VOLTDBJAR
 else
