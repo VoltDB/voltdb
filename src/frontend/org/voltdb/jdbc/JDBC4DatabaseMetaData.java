@@ -1023,7 +1023,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public boolean storesUpperCaseIdentifiers() throws SQLException
     {
         checkClosed();
-        return false; // Note: Proc names are sensitive, but not tables/columns!
+        return true; // Note: Proc names are sensitive, but not tables/columns!
     }
 
     // Retrieves whether this database treats mixed case quoted SQL identifiers as case insensitive and stores them in upper case.
@@ -1031,7 +1031,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public boolean storesUpperCaseQuotedIdentifiers() throws SQLException
     {
         checkClosed();
-        return false; // Note: Proc names are sensitive, but not tables/columns!
+        return true; // Note: Proc names are sensitive, but not tables/columns!
     }
 
     // Retrieves whether this database supports ALTER TABLE with add column.
