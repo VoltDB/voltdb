@@ -464,6 +464,7 @@ public class CoreUtils {
     }
 
     public static final class RetryException extends RuntimeException {
+        public RetryException() {};
         public RetryException(Throwable cause) {
             super(cause);
         }
