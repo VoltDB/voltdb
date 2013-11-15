@@ -855,6 +855,8 @@ public enum VoltType {
     }
 
     // Integer[0] is the column size and Integer[1] is the radix
+    // I'd love to get this magic into the type construction, but
+    // not happening this go-round.  --izzy
     public Integer[] getTypePrecisionAndRadix()
     {
         Integer[] col_size_radix = {null, null};

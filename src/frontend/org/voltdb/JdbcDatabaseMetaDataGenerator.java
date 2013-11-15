@@ -269,6 +269,9 @@ public class JdbcDatabaseMetaDataGenerator
     private Integer[] getColumnSizeAndRadix(Column column)
     {
         Integer[] col_size_radix = {null, null};
+        // This looks similar to VoltType.getTypePrecisionAndRadix.  However,
+        // the String/VARBINARY values depend on the schema, not an intrinsic property
+        // of the type, so it stays here for now.
         VoltType type = VoltType.get((byte) column.getType());
         switch(type)
         {
@@ -305,6 +308,7 @@ public class JdbcDatabaseMetaDataGenerator
 
     private Integer getColumnDecimalDigits(VoltType type)
     {
+        // Would be nice to push this into VoltType someday
         Integer num_dec_digits = null;
         switch(type)
         {
@@ -572,6 +576,7 @@ public class JdbcDatabaseMetaDataGenerator
     private Integer getParamCharOctetLength(ProcParameter param)
     {
         Integer length = null;
+        // Would be nice to push this type-dependent stuff to VoltType someday.
         VoltType type = VoltType.get((byte) param.getType());
         switch(type)
         {
