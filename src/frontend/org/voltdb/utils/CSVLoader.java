@@ -300,7 +300,7 @@ public class CSVLoader {
             }
             m_log.debug("Max Number of batches per partition processor: " + numBatchesInQueuePerPartition);
             for (long i = 0; i < CSVPartitionProcessor.m_numProcessors; i++) {
-                //Keep only 1000 batches worth data in queue.
+                //Keep only numBatchesInQueuePerPartition batches worth data in queue.
                 LinkedBlockingQueue<CSVLineWithMetaData> partitionQueue
                         = new LinkedBlockingQueue<CSVLineWithMetaData>(config.batch * numBatchesInQueuePerPartition);
                 lineq.put(i, partitionQueue);
