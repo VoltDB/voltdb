@@ -103,7 +103,9 @@ public class BabySitter
     /**
      * Create a new BabySitter and block on reading the initial children list.
      * Use the provided ExecutorService to queue events to, rather than
-     * creating a private ExecutorService.
+     * creating a private ExecutorService. The initial set of children will be retrieved
+     * in the current thread and not the ExecutorService because it is assumed
+     * this is being called from the ExecutorService
      */
     public static Pair<BabySitter, List<String>> blockingFactory(ZooKeeper zk, String dir, Callback cb,
             ExecutorService es)

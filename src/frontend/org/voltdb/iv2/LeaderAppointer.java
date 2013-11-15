@@ -387,7 +387,8 @@ public class LeaderAppointer implements Promotable
                 VoltDB.crashLocalVoltDB("Failed to get partition count on startup", true, e);
             }
 
-            //Asynchronously wait for this to finish
+            //Asynchronously wait for this to finish otherwise it deadlocks
+            //on task that need to run on this thread
             m_startupLatch.addListener(new Runnable() {
                     @Override
                     public void run() {
