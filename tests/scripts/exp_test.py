@@ -220,11 +220,12 @@ def stopPS(ps):
     ps.kill()
 
 # To return a voltDB client
-def getQueryClient():
+def getQueryClient(timeout=60):
     host = defaultHost
     port = defaultPort
     client = None
-    for i in xrange(25):
+    endtime = time.time() + timeout
+    while (time.time() < endtime):
         try:
             client = VoltQueryClient(host, port)
             client.set_quiet(True)
@@ -234,7 +235,7 @@ def getQueryClient():
             time.sleep(1)
 
     if client == None:
-        print >> sys.stderr, "Unable to connect python client to server"
+        print >> sys.stderr, "Unable to connect python client to server after %d seconds" % timeout
         sys.stderr.flush()
         return None
 
@@ -269,11 +270,11 @@ def execThisService(service, logS, logC):
     cmd = service + " > " + logS + " 2>&1"
     print "   Server - Exec CMD: '%s'" % cmd
     service_ps = subprocess.Popen(cmd, shell=True)
-    time.sleep(2)
-    client = getQueryClient()
-    if not client:
-        print "    Couldn't connect to server. Killing and giving up"
+    client = getQueryClient(timeout=90)
+    service_ps.poll()
+    if service_ps.returncode or not client:
         #TODO - write something in log
+        print "   Server returned an error"
         stopPS(service_ps)
         return
     cmd = service + " client > " + logC + " 2>&1"

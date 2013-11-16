@@ -26,9 +26,12 @@ package org.voltdb.utils;
 import com.google.common.collect.Multimap;
 import com.google.common.primitives.Ints;
 import org.junit.Test;
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.CoreUtils.RetryException;
 
 import java.util.Collection;
 import java.util.Map;
+import java.util.concurrent.*;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -75,6 +78,30 @@ public class TestMiscUtils {
     {
         zipKeysAndValuesAndCheck(new int[] {},
                                  new int[] {});
+    }
+
+    @Test
+    public void testRetryHelper() throws Exception
+    {
+        ScheduledExecutorService stpe = Executors.newScheduledThreadPool(1);
+        ExecutorService es = Executors.newFixedThreadPool(1);
+        final Semaphore sem = new Semaphore(0);
+        Callable<Object> c = new Callable<Object>() {
+            private int count = 0;
+            public Object call() throws Exception {
+                count++;
+                if (count > 5) {
+                    sem.release();
+                    return null;
+                }
+                System.out.println(count);
+                throw new RetryException();
+            }
+        };
+        CoreUtils.retryHelper(stpe, es, c, null, 1, TimeUnit.MILLISECONDS, 10, TimeUnit.MILLISECONDS);
+        sem.acquire();
+        stpe.shutdown();
+        es.shutdown();
     }
 
     private static void zipKeysAndValuesAndCheck(int[] keys, int[] values)
