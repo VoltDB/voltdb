@@ -709,6 +709,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     @Override
     public String getHostnameForHostID(int hostId) {
+        if (hostId == m_localHostId) {
+            return CoreUtils.getHostnameOrAddress();
+        }
         ForeignHost fh = m_foreignHosts.get(hostId);
         return fh == null ? "UNKNOWN" : fh.hostname();
     }
