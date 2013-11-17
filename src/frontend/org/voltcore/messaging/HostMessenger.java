@@ -22,6 +22,7 @@ import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -956,7 +957,12 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     }
 
     public void sendPoisonPill(String err) {
-        for (ForeignHost fh : m_foreignHosts.values()) {
+        sendPoisonPill(m_foreignHosts.keySet(), err);
+    }
+
+    public void sendPoisonPill(Collection<Integer> hostIds, String err) {
+        for (int hostId : hostIds) {
+            ForeignHost fh = m_foreignHosts.get(hostId);
             if (fh != null && fh.isUp()) {
                 fh.sendPoisonPill(err);
             }
