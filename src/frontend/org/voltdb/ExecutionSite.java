@@ -54,6 +54,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
+import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
@@ -79,6 +80,7 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.rejoin.StreamSnapshotSink;
+import org.voltdb.rejoin.StreamSnapshotSink.RestoreWork;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
@@ -1692,6 +1694,11 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     @Override
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds, boolean skipMultipart) {
         //A noop pre-IV2
+    }
+
+    @Override
+    public void updateHashinator(HashinatorConfig config) {
+
     }
 
     @Override

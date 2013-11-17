@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.concurrent.Future;
 
 import org.voltcore.utils.Pair;
+import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
@@ -176,5 +177,6 @@ public interface SiteProcedureConnection {
     public Future<?> doSnapshotWork();
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds, boolean skipMultiPart);
 
+    public void updateHashinator(HashinatorConfig config);
     public long[] validatePartitioning(long tableIds[], int hashinatorType, byte hashinatorConfig[]);
 }
