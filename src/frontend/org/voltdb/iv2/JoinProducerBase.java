@@ -32,6 +32,7 @@ import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.RejoinMessage;
+import org.voltdb.rejoin.StreamSnapshotSink.RestoreWork;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.CachedByteBufferAllocator;
 import org.voltdb.utils.MiscUtils;
@@ -148,20 +149,10 @@ public abstract class JoinProducerBase extends SiteTasker {
     }
 
     // Received a datablock. Reset the watchdog timer and hand the block to the Site.
-    protected void restoreBlock(Pair<Integer, ByteBuffer> rejoinWork,
-                      SiteProcedureConnection siteConnection)
+    protected void restoreBlock(RestoreWork rejoinWork, SiteProcedureConnection siteConnection)
     {
         kickWatchdog(true);
-
-        int tableId = rejoinWork.getFirst();
-        ByteBuffer buffer = rejoinWork.getSecond();
-        VoltTable table = PrivateVoltTableFactory.createVoltTableFromBuffer(
-                buffer.duplicate(), true);
-
-        // Currently, only export cares about this TXN ID.  Since we don't have one handy, and IV2
-        // doesn't yet care about export, just use Long.MIN_VALUE.
-
-        siteConnection.loadTable(Long.MIN_VALUE, tableId, table, false, false);
+        rejoinWork.restore(siteConnection);
     }
 
     // Completed all criteria: Kill the watchdog and inform the site.

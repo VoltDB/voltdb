@@ -900,17 +900,9 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
      */
     private boolean restoreSnapshotForRejoin() {
         boolean doneWork = false;
-        Pair<Integer, ByteBuffer> rejoinWork = m_rejoinSnapshotProcessor.poll(new CachedByteBufferAllocator());
+        RestoreWork rejoinWork = m_rejoinSnapshotProcessor.poll(new CachedByteBufferAllocator());
         if (rejoinWork != null) {
-            int tableId = rejoinWork.getFirst();
-            ByteBuffer buffer = rejoinWork.getSecond();
-            VoltTable table =
-                    PrivateVoltTableFactory.createVoltTableFromBuffer(buffer.duplicate(),
-                                                                      true);
-            // m_recoveryLog.info("table " + tableId + ": " + table.toString());
-
-            // Long.MAX_VALUE is a no-op don't track undo token
-            loadTable(m_rejoinSnapshotTxnId, tableId, table, false, false);
+            rejoinWork.restore(this);
             doneWork = true;
         } else if (m_rejoinSnapshotProcessor.isEOF()) {
             m_rejoinLog.debug("Rejoin snapshot transfer is finished");
