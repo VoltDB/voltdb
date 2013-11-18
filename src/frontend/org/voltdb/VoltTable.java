@@ -1631,4 +1631,14 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         dup.get(retvalBytes);
         return retvalBytes;
     }
+
+    public ColumnInfo[] getTableSchema()
+    {
+        ColumnInfo[] schema = new ColumnInfo[m_colCount];
+        for (int i = 0; i < m_colCount; i++) {
+            ColumnInfo col = new ColumnInfo(getColumnName(i), getColumnType(i));
+            schema[i] = col;
+        }
+        return schema;
+    }
 }
