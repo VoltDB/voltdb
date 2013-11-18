@@ -107,7 +107,7 @@ class Distributer {
     private final Map<String, Procedure> m_procedureInfo = new HashMap<String, Procedure>();
     //This is the instance of the Hashinator we picked from TOPO used only for client affinity.
     private TheHashinator m_hashinator = null;
-    // timeout for individual procedure calls
+    // timeoutMS for individual procedure calls
     private final long m_procedureCallTimeoutMS;
     private static final long MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
     private final long m_connectionResponseTimeoutMS;
@@ -188,7 +188,7 @@ class Distributer {
                         // check for connection age
                         long sinceLastResponse = now - c.m_lastResponseTime;
 
-                        // if outstanding ping and timeout, close the connection
+                        // if outstanding ping and timeoutMS, close the connection
                         if (c.m_outstandingPing && (sinceLastResponse > m_connectionResponseTimeoutMS)) {
                             // memoize why it's closing
                             c.m_closeCause = DisconnectCause.TIMEOUT;
@@ -196,7 +196,7 @@ class Distributer {
                             c.m_connection.unregister();
                         }
 
-                        // if 1/3 of the timeout since last response, send a ping
+                        // if 1/3 of the timeoutMS since last response, send a ping
                         if ((!c.m_outstandingPing) && (sinceLastResponse > (m_connectionResponseTimeoutMS / 3))) {
                             c.sendPing();
                         }
@@ -208,15 +208,15 @@ class Distributer {
                             long handle = e.getKey();
                             CallbackBookeeping cb = e.getValue();
 
-                            // if the timeout is expired, call the callback and remove the
-                            // if query came with timeout use that value or use client global.
+                            // if the timeoutMS is timeoutMS, call the callback and remove the
+                            // if query came with timeoutMS use that value or use client global.
                             // bookeeping data
-                            long expiredin = ((cb.expired != 0) ? cb.expired : m_procedureCallTimeoutMS);
-                            if ((now - cb.timestamp) > expiredin) {
+                            long timeoutMS = ((cb.procedureTimeoutMS != 0) ? cb.procedureTimeoutMS : m_procedureCallTimeoutMS);
+                            if ((now - cb.timestamp) > timeoutMS) {
 
-                                // make the minimum timeout for certain long running system procedures
+                                // make the minimum timeoutMS for certain long running system procedures
                                 //  higher than the default 2m.
-                                // you can still set the default timeout higher than even this value
+                                // you can still set the default timeoutMS higher than even this value
                                 boolean isLongOp = false;
                                 // this form allows you to list ops to treat specially
                                 isLongOp |= cb.name.equals("@UpdateApplicationCatalog");
@@ -231,7 +231,7 @@ class Distributer {
                                         "",
                                         new VoltTable[0],
                                         String.format("No response received in the allotted time (set to %d ms).",
-                                                expiredin));
+                                                timeoutMS));
                                 r.setClientHandle(handle);
                                 r.setClientRoundtrip((int) (now - cb.timestamp));
                                 r.setClusterRoundtrip((int) (now - cb.timestamp));
@@ -262,11 +262,12 @@ class Distributer {
             this.callback = callback;
             this.name = name;
             if (timeout > 0) {
-                expired = timeout * 1000L;
+                this.procedureTimeoutMS = timeout * 1000L;
             }
         }
         long timestamp;
-        long expired = 0;
+        //Timeout in ms 0 means use conenction specified procedure timeoutMS.
+        long procedureTimeoutMS = 0;
         ProcedureCallback callback;
         String name;
     }
