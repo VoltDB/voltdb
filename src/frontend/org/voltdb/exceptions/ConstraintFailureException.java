@@ -21,7 +21,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.logging.Logger;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.PrivateVoltTableFactory;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.FastDeserializer;
@@ -35,12 +37,26 @@ public class ConstraintFailureException extends SQLException {
 
     protected static final Logger LOG = Logger.getLogger(ConstraintFailureException.class.getName());
 
+    private static final VoltLogger debug = new VoltLogger("ELASTICDBG");
+
     /**
      * Constructor for deserializing an exception returned from the EE.
      * @param exceptionBuffer
      */
     public ConstraintFailureException(ByteBuffer exceptionBuffer) {
         super(exceptionBuffer);
+        if (debug.isDebugEnabled()) {
+            if (VoltDB.instance() != null && VoltDB.instance().getHostMessenger() != null) {
+                VoltDB.instance().getHostMessenger().sendPoisonPill("doDump");
+                ByteBuffer buf = ByteBuffer.wrap(TheHashinator.getCurrentConfig().configBytes);
+                int count = buf.getInt();
+                StringBuilder sb = new StringBuilder();
+                for (int ii = 0; ii < count; ii++) {
+                    sb.append(buf.getInt() + " - " + buf.getInt() + ", ");
+                }
+                debug.debug(sb);
+            }
+        }
         type = ConstraintType.get(exceptionBuffer.getInt());
         try {
             tableName = FastDeserializer.readString(exceptionBuffer);
