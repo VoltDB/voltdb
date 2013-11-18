@@ -418,7 +418,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         //
         // First check whether the end_expression is now false
         //
-        if (end_expression != NULL && end_expression->eval(&tuple, NULL).isFalse()) {
+        if (end_expression != NULL && !end_expression->eval(&tuple, NULL).isTrue()) {
             VOLT_TRACE("End Expression evaluated to false, stopping scan");
             break;
         }

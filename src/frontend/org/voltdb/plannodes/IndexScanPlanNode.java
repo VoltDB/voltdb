@@ -132,7 +132,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             return;
         }
 
-        if (m_searchkeyExpressions.size() < ExpressionUtil.uncombine((AbstractExpression) m_endExpression.clone()).size()) {
+        if (m_endExpression != null &&
+                m_searchkeyExpressions.size() < ExpressionUtil.uncombine((AbstractExpression) m_endExpression.clone()).size()) {
             nextKeyIndex = m_searchkeyExpressions.size();
         }
         List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
