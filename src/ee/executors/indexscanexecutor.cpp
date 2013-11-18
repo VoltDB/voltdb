@@ -317,13 +317,13 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     }
 
     //
-    // COUNT NULL EXPRESSION
+    // SKIP NULL EXPRESSION
     //
-    AbstractExpression* countNULLExpr = m_node->getSkipNullPredicate();
+    AbstractExpression* skipNullExpr = m_node->getSkipNullPredicate();
     // For reverse scan edge case NULL values and forward scan underflow case.
-    if (countNULLExpr != NULL) {
-        countNULLExpr->substitute(params);
-        VOLT_DEBUG("COUNT NULL Expression:\n%s", countNULLExpr->debug(true).c_str());
+    if (skipNullExpr != NULL) {
+        skipNullExpr->substitute(params);
+        VOLT_DEBUG("COUNT NULL Expression:\n%s", skipNullExpr->debug(true).c_str());
     }
 
     Table* targetTable = m_targetTable;
@@ -366,7 +366,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             } else {
                 while (!(tuple = m_index->nextValue()).isNullTuple()) {
                     m_engine->noteTuplesProcessedForProgressMonitoring(1);
-                    if (initial_expression != NULL && initial_expression->eval(&tuple, NULL).isFalse()) {
+                    if (initial_expression != NULL && !initial_expression->eval(&tuple, NULL).isTrue()) {
                         // just passed the first failed entry, so move 2 backward
                         m_index->moveToBeforePriorEntry();
                         break;
@@ -407,12 +407,12 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         //
         // First check to eliminate the null index rows for UNDERFLOW case only
         //
-        if (countNULLExpr != NULL) {
-            if (countNULLExpr->eval(&tuple, NULL).isTrue()) {
+        if (skipNullExpr != NULL) {
+            if (skipNullExpr->eval(&tuple, NULL).isTrue()) {
                 VOLT_DEBUG("Index scan: find out null rows or columns.");
                 continue;
             } else {
-                countNULLExpr = NULL;
+                skipNullExpr = NULL;
             }
         }
         //
