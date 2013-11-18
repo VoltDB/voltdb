@@ -45,28 +45,58 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
-import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
-import org.voltdb.benchmark.tpcc.procedures.InsertNewOrder;
-import org.voltdb.utils.BuildDirectoryUtils;
-import org.voltdb_testprocs.regressionsuites.multipartitionprocs.MultiSiteSelect;
+import org.voltdb.VoltDB.Configuration;
+import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.MiscUtils;
 
 public class TestJDBCDriver {
     static String testjar;
     static ServerThread server;
     static Connection conn;
-    static TPCCProjectBuilder pb;
+    static VoltProjectBuilder pb;
 
     @BeforeClass
-    public static void setUp() throws ClassNotFoundException, SQLException {
-        testjar = BuildDirectoryUtils.getBuildDirectoryPath() + File.separator
-                + "jdbcdrivertest.jar";
+    public static void setUp() throws Exception {
+        // Fake out the constraints that were previously written against the
+        // TPCC schema
+        String ddl =
+            "CREATE TABLE TT(A1 INTEGER NOT NULL, A2_ID INTEGER, PRIMARY KEY(A1));" +
+            "CREATE TABLE ORDERS(A1 INTEGER NOT NULL, A2_ID INTEGER, PRIMARY KEY(A1));" +
+            "CREATE TABLE ORDER_THIS(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1));" +
+            "CREATE TABLE LAST(A1 INTEGER NOT NULL, A2_ID INTEGER, PRIMARY KEY(A1));" +
+            "CREATE TABLE STEAL_THIS_TABLE(A1 INTEGER NOT NULL, A2_ID INTEGER, PRIMARY KEY(A1));" +
+            "CREATE TABLE BLAST_IT(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1));" +
+            "CREATE TABLE ROBBIE_MUSTOE(A1 INTEGER NOT NULL, A2_ID INTEGER, PRIMARY KEY(A1));" +
+            "CREATE TABLE CUSTOMER(A1 INTEGER NOT NULL, A2_ID INTEGER, A3 INTEGER, A4 INTEGER, " +
+                             "A5_0 INTEGER, A6 INTEGER, A7_ID INTEGER, A8 INTEGER, A9 INTEGER, " +
+                             "A10 INTEGER, A11 INTEGER, A12_ID INTEGER, A13 INTEGER, A14 INTEGER, " +
+                             "A15 INTEGER, A16 INTEGER, A17_ID INTEGER, A18 INTEGER, A19 INTEGER, " +
+                             "A20 INTEGER, A21 INTEGER, A22_ID INTEGER, A23 INTEGER, A24_ID INTEGER, " +
+                             "A25 INTEGER, A26_MIDDLE INTEGER, " +
+                             "PRIMARY KEY(A1));" +
+            "CREATE TABLE NUMBER_NINE(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1));" +
+            "CREATE TABLE WAREHOUSE(A1 INTEGER NOT NULL, A2 INTEGER, A3 INTEGER, A4_ID INTEGER, " +
+                             "A5 INTEGER, A6 INTEGER, A7 INTEGER, A8 INTEGER, W_ID INTEGER, " +
+                             "PRIMARY KEY(A1));" +
+            "CREATE UNIQUE INDEX UNIQUE_ORDERS_HASH ON ORDERS (A1, A2_ID); " +
+            "CREATE INDEX IDX_ORDERS_HASH ON ORDERS (A2_ID);";
 
-        // compile a catalog
-        pb = new TPCCProjectBuilder();
-        pb.addDefaultSchema();
-        pb.addDefaultPartitioning();
-        pb.addProcedures(MultiSiteSelect.class, InsertNewOrder.class);
-        pb.compile(testjar, 2, 0);
+
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        pb.addPartitionInfo("TT", "A1");
+        pb.addPartitionInfo("ORDERS", "A1");
+        pb.addPartitionInfo("LAST", "A1");
+        pb.addPartitionInfo("BLAST_IT", "A1");
+        pb.addPartitionInfo("ROBBIE_MUSTOE", "A1");
+        pb.addPartitionInfo("CUSTOMER", "A1");
+        pb.addPartitionInfo("NUMBER_NINE", "A1");
+        pb.addStmtProcedure("InsertA", "INSERT INTO TT VALUES(?,?);", "TT.A1: 0");
+        pb.addStmtProcedure("SelectB", "SELECT * FROM CUSTOMER;");
+        boolean success = pb.compile(Configuration.getPathToCatalogForTest("jdbcdrivertest.jar"), 3, 1, 0);
+        assert(success);
+        MiscUtils.copyFile(pb.getPathToDeployment(), Configuration.getPathToCatalogForTest("jdbcdrivertest.xml"));
+        testjar = Configuration.getPathToCatalogForTest("jdbcdrivertest.jar");
 
         // Set up ServerThread and Connection
         startServer();
@@ -157,17 +187,17 @@ public class TestJDBCDriver {
 
     @Test
     public void testFilterTableByName() throws SQLException {
-        // TPCC has 1 "ORDERS" tables
+        // schema has 1 "ORDERS" tables
         tableTest(null, "ORDERS", 1);
-         // TPCC has 1 "ORDER_" table
+         // schema has 1 "ORDER_" table
         tableTest(null, "ORDER_", 1);
-         // TPCC has 2 tables that start with "O"
+         // schema has 2 tables that start with "O"
         tableTest(null, "O%", 2);
-         // TPCC has 5 tables with names containing "ST"
+         // schema has 5 tables with names containing "ST"
         tableTest(null, "%ST%", 5);
-        // TPCC has 10 tables
+        // schema has 10 tables
         tableTest(null, "", 10);
-        // TPCC has 10 tables, but won't match the types array
+        // schema has 10 tables, but won't match the types array
         tableTest(new String[] {""}, "", 0);
     }
 
@@ -217,9 +247,9 @@ public class TestJDBCDriver {
         tableColumnTest("CUSTOMER%", "", 26);
         tableColumnTest("CUSTOMER%", "%MIDDLE", 1);
         tableColumnTest("CUSTOMER", "____", 1);
-        tableColumnTest("%", "%ID", 32);
-        tableColumnTest(null, "%ID", 32);
-        tableColumnTest(null, "", 97);
+        tableColumnTest("%", "%ID", 13);
+        tableColumnTest(null, "%ID", 13);
+        tableColumnTest(null, "", 51);
     }
 
     /**
@@ -251,12 +281,12 @@ public class TestJDBCDriver {
 
     @Test
     public void testAllIndexes() throws SQLException {
-        indexInfoTest("ORDERS", false, 10);
+        indexInfoTest("ORDERS", false, 4);
     }
 
     @Test
     public void testFilterIndexByUnique() throws SQLException {
-        indexInfoTest("ORDERS", true, 7);
+        indexInfoTest("ORDERS", true, 3);
     }
 
     @Test
@@ -268,7 +298,7 @@ public class TestJDBCDriver {
             assertEquals("ORDERS", keys.getString("TABLE_NAME"));
             count++;
         }
-        assertEquals(3, count);
+        assertEquals(1, count);
     }
 
     @Test
@@ -276,8 +306,8 @@ public class TestJDBCDriver {
         ResultSet procedures =
                 conn.getMetaData().getProcedures("blah", "blah", "%");
         int count = 0;
-        List<String> names = Arrays.asList(new String[] {"MultiSiteSelect",
-                                                         "InsertNewOrder"});
+        List<String> names = Arrays.asList(new String[] {"InsertA",
+                                                         "SelectB"});
         while (procedures.next()) {
             String procedure = procedures.getString("PROCEDURE_NAME");
             if (procedure.contains(".")) {
@@ -288,8 +318,8 @@ public class TestJDBCDriver {
             count++;
         }
         // 7 tables * 4 CRUD/table + 2 procedures +
-        // 3 for replicated crud and 2 for insert where partition key !in primary
-        assertEquals(7 * 4 + 2 + 3 + 2, count);
+        // 3 tables * 3 for replicated crud
+        assertEquals(7 * 4 + 2 + 3 * 3, count);
     }
 
     @Test
@@ -327,8 +357,8 @@ public class TestJDBCDriver {
 
     @Test
     public void testAllProcedureColumns() throws SQLException {
-        procedureColumnTest("InsertNewOrder", null, 3);
-        procedureColumnTest("InsertNewOrder", "%", 3);
+        procedureColumnTest("InsertA", null, 2);
+        procedureColumnTest("InsertA", "%", 2);
     }
 
     @Test
@@ -352,7 +382,7 @@ public class TestJDBCDriver {
                 count++;
             }
         }
-        assertEquals(3, count);
+        assertEquals(2, count);
     }
 
     @Test
@@ -385,15 +415,13 @@ public class TestJDBCDriver {
     @Test
     public void testDoubleInsert() throws SQLException {
         // long i_id, long i_im_id, String i_name, double i_price, String i_data
-        CallableStatement cs = conn.prepareCall("{call InsertNewOrder(?, ?, ?)}");
+        CallableStatement cs = conn.prepareCall("{call InsertA(?, ?)}");
         cs.setInt(1, 55);
         cs.setInt(2, 66);
-        cs.setInt(3, 77);
         cs.execute();
         try {
             cs.setInt(1, 55);
             cs.setInt(2, 66);
-            cs.setInt(3, 77);
             cs.execute();
         } catch (SQLException e) {
             // Since it's a GENERAL_ERROR we need to look for a string by pattern.
