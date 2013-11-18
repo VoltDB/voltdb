@@ -144,7 +144,7 @@ public class JDBC4Statement implements java.sql.Statement
             return this.sql[0];
         }
 
-        public VoltSQL getExecutableQuery(long timeout, Object... params) throws SQLException {
+        public VoltSQL getExecutableQuery(Object... params) throws SQLException {
             if (params.length != this.parameterCount)
                 throw SQLError.get(SQLError.ILLEGAL_ARGUMENT);
 

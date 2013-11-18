@@ -107,7 +107,7 @@ class Distributer {
     private final Map<String, Procedure> m_procedureInfo = new HashMap<String, Procedure>();
     //This is the instance of the Hashinator we picked from TOPO used only for client affinity.
     private TheHashinator m_hashinator = null;
-    // timeoutMS for individual procedure calls
+    // timeout for procedure calls. This is global timeout and not per procedure timeout.
     private final long m_procedureCallTimeoutMS;
     private static final long MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
     private final long m_connectionResponseTimeoutMS;

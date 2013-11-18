@@ -91,7 +91,7 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
         checkClosed();
         if (!this.Query.isOfType(VoltSQL.TYPE_EXEC,VoltSQL.TYPE_INSERT,VoltSQL.TYPE_UPDATE,VoltSQL.TYPE_DELETE))
             throw SQLError.get(SQLError.ILLEGAL_STATEMENT, this.Query.toSqlString());
-        this.addBatch(this.Query.getExecutableQuery(getQueryTimeout(), this.parameters));
+        this.addBatch(this.Query.getExecutableQuery(this.parameters));
         this.parameters = this.Query.getParameterArray();
     }
 
@@ -106,7 +106,7 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
     public boolean execute() throws SQLException
     {
         checkClosed();
-        boolean result = this.execute(this.Query.getExecutableQuery(getQueryTimeout(), this.parameters));
+        boolean result = this.execute(this.Query.getExecutableQuery(this.parameters));
         this.parameters = this.Query.getParameterArray();
         return result;
     }
@@ -117,7 +117,7 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
         checkClosed();
         if (!this.Query.isOfType(VoltSQL.TYPE_EXEC,VoltSQL.TYPE_SELECT))
             throw SQLError.get(SQLError.ILLEGAL_STATEMENT, this.Query.toSqlString());
-        ResultSet result = this.executeQuery(this.Query.getExecutableQuery(getQueryTimeout(), this.parameters));
+        ResultSet result = this.executeQuery(this.Query.getExecutableQuery(this.parameters));
         this.parameters = this.Query.getParameterArray();
         return result;
     }
@@ -128,7 +128,7 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
         checkClosed();
         if (!this.Query.isOfType(VoltSQL.TYPE_EXEC,VoltSQL.TYPE_INSERT,VoltSQL.TYPE_UPDATE,VoltSQL.TYPE_DELETE))
             throw SQLError.get(SQLError.ILLEGAL_STATEMENT, this.Query.toSqlString());
-        int result = this.executeUpdate(this.Query.getExecutableQuery(getQueryTimeout(), this.parameters));
+        int result = this.executeUpdate(this.Query.getExecutableQuery(this.parameters));
         this.parameters = this.Query.getParameterArray();
         return result;
     }
