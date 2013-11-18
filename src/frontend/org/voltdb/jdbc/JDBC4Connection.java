@@ -523,13 +523,11 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
         throw SQLError.noSupport();
     }
 
-    @Override
     public void setNetworkTimeout(Executor executor, int milliseconds)
             throws SQLException {
         throw SQLError.noSupport();
     }
 
-    @Override
     public int getNetworkTimeout() throws SQLException {
         throw SQLError.noSupport();
     }
