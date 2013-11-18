@@ -68,10 +68,6 @@
         <level value="INFO"/>
     </logger>
 
-    <logger name="ELASTICDBG">
-        <level value="TRACE"/>
-    </logger>
-
     <root>
         <priority value="info" />
         <appender-ref ref="file" />
