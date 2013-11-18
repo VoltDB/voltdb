@@ -193,7 +193,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      * @param procName class name (not qualified by package) of the procedure to execute.
      * @param timeout timeout for the procedure in seconds.
      * @param parameters vararg list of procedure's parameter values.
-     * @return array of VoltTable results.
+     * @return ClientResponse for execution.
      * @throws org.voltdb.client.ProcCallException
      * @throws NoConnectionsException
      */
@@ -203,7 +203,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         cb.setArgs(parameters);
         final ProcedureInvocation invocation
                 = new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
-        return callProcedure(cb, invocation, timeout);
+        return callProcedure(cb, timeout, invocation);
     }
 
     /**
@@ -223,10 +223,10 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             new ProcedureInvocation(originalTxnId, originalUniqueId,
                                     m_handle.getAndIncrement(),
                                     procName, parameters);
-        return callProcedure(cb, invocation, 0);
+        return callProcedure(cb, 0, invocation);
     }
 
-    private final ClientResponse callProcedure(SyncCallback cb, ProcedureInvocation invocation, long timeout)
+    private final ClientResponse callProcedure(SyncCallback cb, long timeout, ProcedureInvocation invocation)
             throws IOException, NoConnectionsException, ProcCallException
     {
         if (m_isShutdown) {

@@ -57,14 +57,16 @@ public class JDBC4Statement implements java.sql.Statement
         private final byte type;
         private final Object[] parameters;
 
-        private VoltSQL(String[] sql, int parameterCount, byte type) {
+        private VoltSQL(String[] sql, int parameterCount, byte type)
+        {
             this.sql = sql;
             this.parameterCount = parameterCount;
             this.type = type;
             this.parameters = null;
         }
 
-        private VoltSQL(String[] sql, int parameterCount, byte type, Object[] parameters) {
+        private VoltSQL(String[] sql, int parameterCount, byte type, Object[] parameters)
+        {
             this.sql = sql;
             this.parameterCount = parameterCount;
             this.type = type;
@@ -144,7 +146,8 @@ public class JDBC4Statement implements java.sql.Statement
             return this.sql[0];
         }
 
-        public VoltSQL getExecutableQuery(Object... params) throws SQLException {
+        public VoltSQL getExecutableQuery(Object... params) throws SQLException
+        {
             if (params.length != this.parameterCount)
                 throw SQLError.get(SQLError.ILLEGAL_ARGUMENT);
 
@@ -228,7 +231,8 @@ public class JDBC4Statement implements java.sql.Statement
         private static final Pattern IsInsert = Pattern.compile("^insert\\s.+", Pattern.CASE_INSENSITIVE);
         private static final Pattern IsUpdate = Pattern.compile("^update\\s.+", Pattern.CASE_INSENSITIVE);
         private static final Pattern IsDelete = Pattern.compile("^delete\\s.+", Pattern.CASE_INSENSITIVE);
-        public static VoltSQL parseSQL(String queryIn) throws SQLException        {
+        public static VoltSQL parseSQL(String queryIn) throws SQLException
+        {
             if (queryIn == null || queryIn.length() == 0)
                 throw SQLError.get(SQLError.ILLEGAL_STATEMENT);
 

@@ -107,7 +107,7 @@ class Distributer {
     private final Map<String, Procedure> m_procedureInfo = new HashMap<String, Procedure>();
     //This is the instance of the Hashinator we picked from TOPO used only for client affinity.
     private TheHashinator m_hashinator = null;
-    // timeout for procedure calls. This is global timeout and not per procedure timeout.
+    //This is a global timeout that will be used if a per-procedure timeout is not provided with the procedure call.
     private final long m_procedureCallTimeoutMS;
     private static final long MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
     private final long m_connectionResponseTimeoutMS;
@@ -208,11 +208,9 @@ class Distributer {
                             long handle = e.getKey();
                             CallbackBookeeping cb = e.getValue();
 
-                            // if the timeoutMS is timeoutMS, call the callback and remove the
-                            // if query came with timeoutMS use that value or use client global.
+                            // if the timeout is expired, call the callback and remove the
                             // bookeeping data
-                            long timeoutMS = ((cb.procedureTimeoutMS != 0) ? cb.procedureTimeoutMS : m_procedureCallTimeoutMS);
-                            if ((now - cb.timestamp) > timeoutMS) {
+                            if ((now - cb.timestamp) > cb.m_procedureTimeoutMS) {
 
                                 // make the minimum timeoutMS for certain long running system procedures
                                 //  higher than the default 2m.
@@ -231,7 +229,7 @@ class Distributer {
                                         "",
                                         new VoltTable[0],
                                         String.format("No response received in the allotted time (set to %d ms).",
-                                                timeoutMS));
+                                                cb.m_procedureTimeoutMS));
                                 r.setClientHandle(handle);
                                 r.setClientRoundtrip((int) (now - cb.timestamp));
                                 r.setClusterRoundtrip((int) (now - cb.timestamp));
@@ -261,13 +259,11 @@ class Distributer {
             this.timestamp = timestamp;
             this.callback = callback;
             this.name = name;
-            if (timeout > 0) {
-                this.procedureTimeoutMS = timeout * 1000L;
-            }
+            this.m_procedureTimeoutMS = (timeout <= 0) ? m_procedureCallTimeoutMS : (timeout * 1000L);
         }
         long timestamp;
         //Timeout in ms 0 means use conenction specified procedure timeoutMS.
-        long procedureTimeoutMS = 0;
+        final long m_procedureTimeoutMS;
         ProcedureCallback callback;
         String name;
     }

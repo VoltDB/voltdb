@@ -200,6 +200,7 @@ public class TestClientFeatures extends TestCase {
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         boolean exceptionCalled = false;
         try {
+            // Query timeout is in seconds second arg.
             ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 3, 6000);
         } catch (ProcCallException ex) {
             assertEquals(ClientResponse.CONNECTION_TIMEOUT, ex.m_response.getStatus());
@@ -210,6 +211,7 @@ public class TestClientFeatures extends TestCase {
         //larger timeout than proc wait duration
         exceptionCalled = false;
         try {
+            // Query timeout is in seconds second arg.
             ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 30, 6000);
         } catch (ProcCallException ex) {
             exceptionCalled = true;
@@ -218,6 +220,7 @@ public class TestClientFeatures extends TestCase {
 
         //no timeout of 0
         try {
+            // Query timeout is in seconds second arg.
             ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 0, 2000);
         } catch (ProcCallException ex) {
             exceptionCalled = true;
@@ -234,6 +237,7 @@ public class TestClientFeatures extends TestCase {
             }
 
         }
+        // Query timeout is in seconds third arg.
         //Async versions
         ((ClientImpl) client).callProcedureWithTimeout(new MyCallback(), "ArbitraryDurationProc", 3, 6000);
         try {
@@ -254,6 +258,7 @@ public class TestClientFeatures extends TestCase {
             }
 
         }
+        // Query timeout is in seconds third arg.
         ((ClientImpl) client).callProcedureWithTimeout(new MyCallback2(), "ArbitraryDurationProc", 30, 6000);
         try {
             latch2.await();
@@ -273,6 +278,7 @@ public class TestClientFeatures extends TestCase {
             }
 
         }
+        // Query timeout is in seconds third arg.
         ((ClientImpl) client).callProcedureWithTimeout(new MyCallback3(), "ArbitraryDurationProc", 0, 6000);
         try {
             latch3.await();
