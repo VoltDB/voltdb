@@ -105,7 +105,7 @@ public class ReportMaker {
         } else if (index.getUnique()) {
             tag(sb, "important", "Unique");
         } else {
-            tag(sb, "info", "Multikey");
+            tag(sb, "info", "Nonunique");
         }
         sb.append("</td>");
 
