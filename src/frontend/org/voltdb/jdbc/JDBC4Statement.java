@@ -57,14 +57,14 @@ public class JDBC4Statement implements java.sql.Statement
         private final byte type;
         private final Object[] parameters;
 
-        private VoltSQL(String[] sql, int parameterCount, byte type)        {
+        private VoltSQL(String[] sql, int parameterCount, byte type) {
             this.sql = sql;
             this.parameterCount = parameterCount;
             this.type = type;
             this.parameters = null;
         }
 
-        private VoltSQL(String[] sql, int parameterCount, byte type, Object[] parameters)        {
+        private VoltSQL(String[] sql, int parameterCount, byte type, Object[] parameters) {
             this.sql = sql;
             this.parameterCount = parameterCount;
             this.type = type;
