@@ -265,7 +265,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     @Override
     public final boolean callProcedure(ProcedureCallback callback, String procName, Object... parameters)
     throws IOException, NoConnectionsException {
-        return callProcedureWithTimeout(callback, procName, 0, parameters);
+        return callProcedureWithTimeout(callback, procName, Distributer.USE_DEFAULT_TIMEOUT, parameters);
     }
 
     /**
