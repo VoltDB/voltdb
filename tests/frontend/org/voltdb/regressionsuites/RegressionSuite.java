@@ -34,11 +34,13 @@ import junit.framework.TestCase;
 
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientConfigForTest;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ConnectionUtil;
+import org.voltdb.client.ProcCallException;
 
 /**
  * Base class for a set of JUnit tests that perform regression tests
@@ -268,6 +270,13 @@ public class RegressionSuite extends TestCase {
         return isLocalCluster() ? ((LocalCluster)m_config).internalPort(hostId) : VoltDB.DEFAULT_INTERNAL_PORT+hostId;
     }
 
+    static public void validateTableOfLongs(Client c, String sql, long[][] expected)
+            throws Exception, IOException, ProcCallException {
+        assertNotNull(expected);
+        VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfLongs(vt, expected);
+    }
+
     static public void validateTableOfScalarLongs(VoltTable vt, long[] expected) {
         assertNotNull(expected);
         assertEquals(expected.length, vt.getRowCount());
@@ -313,7 +322,12 @@ public class RegressionSuite extends TestCase {
                     }
                 }
             }
-            assertEquals(expected[i], actual);
+            if (expected[i] != Long.MIN_VALUE) {
+                assertEquals(expected[i], actual);
+            } else {
+                VoltType type = vt.getColumnType(i);
+                assertEquals(new Long(type.getNullValue().toString()).longValue(), actual);
+            }
         }
     }
 }

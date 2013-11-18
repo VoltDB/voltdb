@@ -1712,8 +1712,16 @@ public class Expression {
             exp.attributes.put("valuetype", dataType.getNameString());
             return exp;
 
-        case OpTypes.CASEWHEN:
         case OpTypes.ALTERNATIVE:
+            assert(nodes.length == 2);
+            // If with ELSE clause, pad NULL with it.
+            if (nodes[RIGHT] instanceof ExpressionValue) {
+                ExpressionValue val = (ExpressionValue) nodes[RIGHT];
+                if (val.valueData == null && val.dataType == Type.SQL_ALL_TYPES) {
+                    exp.children.get(RIGHT).attributes.put("valuetype", dataType.getNameString());
+                }
+            }
+        case OpTypes.CASEWHEN:
             // Hsql has check dataType can not be null.
             assert(dataType != null);
             exp.attributes.put("valuetype", dataType.getNameString());
