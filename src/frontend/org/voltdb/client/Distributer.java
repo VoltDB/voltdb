@@ -107,7 +107,7 @@ class Distributer {
     private final Map<String, Procedure> m_procedureInfo = new HashMap<String, Procedure>();
     //This is the instance of the Hashinator we picked from TOPO used only for client affinity.
     private TheHashinator m_hashinator = null;
-    // timeout for individual procedure calls
+    // timeout for procedure calls. This is global timeout and not per procedure timeout.
     private final long m_procedureCallTimeoutMS;
     private static final long MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
     private final long m_connectionResponseTimeoutMS;
@@ -188,7 +188,7 @@ class Distributer {
                         // check for connection age
                         long sinceLastResponse = now - c.m_lastResponseTime;
 
-                        // if outstanding ping and timeout, close the connection
+                        // if outstanding ping and timeoutMS, close the connection
                         if (c.m_outstandingPing && (sinceLastResponse > m_connectionResponseTimeoutMS)) {
                             // memoize why it's closing
                             c.m_closeCause = DisconnectCause.TIMEOUT;
@@ -196,7 +196,7 @@ class Distributer {
                             c.m_connection.unregister();
                         }
 
-                        // if 1/3 of the timeout since last response, send a ping
+                        // if 1/3 of the timeoutMS since last response, send a ping
                         if ((!c.m_outstandingPing) && (sinceLastResponse > (m_connectionResponseTimeoutMS / 3))) {
                             c.sendPing();
                         }
@@ -208,13 +208,15 @@ class Distributer {
                             long handle = e.getKey();
                             CallbackBookeeping cb = e.getValue();
 
-                            // if the timeout is expired, call the callback and remove the
+                            // if the timeoutMS is timeoutMS, call the callback and remove the
+                            // if query came with timeoutMS use that value or use client global.
                             // bookeeping data
-                            if ((now - cb.timestamp) > m_procedureCallTimeoutMS) {
+                            long timeoutMS = ((cb.procedureTimeoutMS != 0) ? cb.procedureTimeoutMS : m_procedureCallTimeoutMS);
+                            if ((now - cb.timestamp) > timeoutMS) {
 
-                                // make the minimum timeout for certain long running system procedures
+                                // make the minimum timeoutMS for certain long running system procedures
                                 //  higher than the default 2m.
-                                // you can still set the default timeout higher than even this value
+                                // you can still set the default timeoutMS higher than even this value
                                 boolean isLongOp = false;
                                 // this form allows you to list ops to treat specially
                                 isLongOp |= cb.name.equals("@UpdateApplicationCatalog");
@@ -229,7 +231,7 @@ class Distributer {
                                         "",
                                         new VoltTable[0],
                                         String.format("No response received in the allotted time (set to %d ms).",
-                                                m_procedureCallTimeoutMS));
+                                                timeoutMS));
                                 r.setClientHandle(handle);
                                 r.setClientRoundtrip((int) (now - cb.timestamp));
                                 r.setClusterRoundtrip((int) (now - cb.timestamp));
@@ -254,13 +256,18 @@ class Distributer {
     }
 
     class CallbackBookeeping {
-        public CallbackBookeeping(long timestamp, ProcedureCallback callback, String name) {
+        public CallbackBookeeping(long timestamp, ProcedureCallback callback, String name, long timeout) {
             assert(callback != null);
             this.timestamp = timestamp;
             this.callback = callback;
             this.name = name;
+            if (timeout > 0) {
+                this.procedureTimeoutMS = timeout * 1000L;
+            }
         }
         long timestamp;
+        //Timeout in ms 0 means use conenction specified procedure timeoutMS.
+        long procedureTimeoutMS = 0;
         ProcedureCallback callback;
         String name;
     }
@@ -281,7 +288,7 @@ class Distributer {
         }
 
         public void createWork(long handle, String name, ByteBuffer c,
-                ProcedureCallback callback, boolean ignoreBackpressure) {
+                ProcedureCallback callback, boolean ignoreBackpressure, long timeout) {
             assert(callback != null);
             long now = System.currentTimeMillis();
             now = m_rateLimiter.sendTxnWithOptionalBlockAndReturnCurrentTime(
@@ -303,7 +310,7 @@ class Distributer {
                 }
 
                 assert(m_callbacks.containsKey(handle) == false);
-                m_callbacks.put(handle, new CallbackBookeeping(now, callback, name));
+                m_callbacks.put(handle, new CallbackBookeeping(now, callback, name, timeout));
                 m_callbacksToInvoke.incrementAndGet();
             }
             m_connection.writeStream().enqueue(c);
@@ -655,11 +662,11 @@ class Distributer {
 
             ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
             //The handle is specific to topology updates and has special cased handling
-            queue(spi, new TopoUpdateCallback(), true);
+            queue(spi, new TopoUpdateCallback(), true, 0);
 
             spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@SystemCatalog", "PROCEDURES");
             //The handle is specific to procedure updates and has special cased handling
-            queue(spi, new ProcUpdateCallback(), true);
+            queue(spi, new ProcUpdateCallback(), true, 0);
         }
     }
 
@@ -675,8 +682,8 @@ class Distributer {
     boolean queue(
             ProcedureInvocation invocation,
             ProcedureCallback cb,
-            final boolean ignoreBackpressure)
-    throws NoConnectionsException {
+            final boolean ignoreBackpressure, final long timeout)
+            throws NoConnectionsException {
         assert(invocation != null);
         assert(cb != null);
 
@@ -778,7 +785,7 @@ class Distributer {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            cxn.createWork(invocation.getHandle(), invocation.getProcName(), buf, cb, ignoreBackpressure);
+            cxn.createWork(invocation.getHandle(), invocation.getProcName(), buf, cb, ignoreBackpressure, timeout);
         }
 
         return !backpressure;

@@ -179,6 +179,7 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
             ProcedureCallback callback,
             int expectedSerializedSize,
             String procName,
+            long timeout,
             Object... parameters)
             throws NoConnectionsException {
         // TODO Auto-generated method stub
@@ -249,10 +250,8 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     @Override
     public boolean callProcedure(long originalTxnId,
                                  long originalTimestamp,
-                                 ProcedureCallback callback,
-                                 String procName,
-                                 Object... parameters) throws IOException,
-                                                      NoConnectionsException {
+            ProcedureCallback callback, String procName, long timeout,
+            Object... parameters) throws IOException, NoConnectionsException {
         numCalls += 1;
         calledName = procName;
         calledParameters = parameters;
@@ -287,8 +286,8 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
 
     @Override
     public ClientResponse callProcedure(long originalTxnId, long originalTimestamp,
-                                        String procName, Object... parameters)
-    throws IOException, NoConnectionsException, ProcCallException
+            String procName, long timeout, Object... parameters)
+            throws IOException, NoConnectionsException, ProcCallException
     {
         numCalls += 1;
         calledName = procName;

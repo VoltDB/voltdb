@@ -37,6 +37,7 @@ public interface ReplicaProcCaller {
             long originalTimestamp,
             ProcedureCallback callback,
             String procName,
+            long timeout,
             Object... parameters)
             throws IOException, NoConnectionsException;
 
@@ -55,6 +56,7 @@ public interface ReplicaProcCaller {
             long originalTxnId,
             long originalTimestamp,
             String procName,
+            long timeout,
             Object... parameters)
             throws IOException, NoConnectionsException, ProcCallException;
 }
