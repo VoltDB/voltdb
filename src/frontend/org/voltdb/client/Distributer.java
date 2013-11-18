@@ -260,7 +260,7 @@ class Distributer {
             this.timestamp = timestamp;
             this.callback = callback;
             this.name = name;
-            this.m_procedureTimeoutMS = (timeout <= 0) ? m_procedureCallTimeoutMS : (timeout * 1000L);
+            this.m_procedureTimeoutMS = (timeout == Distributer.USE_DEFAULT_TIMEOUT) ? m_procedureCallTimeoutMS : (timeout * 1000L);
         }
         long timestamp;
         //Timeout in ms 0 means use conenction specified procedure timeoutMS.
