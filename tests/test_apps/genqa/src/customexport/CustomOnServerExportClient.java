@@ -50,7 +50,7 @@ public class CustomOnServerExportClient extends ExportClientBase {
     @Override
     public void configure(Properties config) throws Exception {
         m_props = config;
-        System.out.println("Custom OnServer Export client is configured: " + this.getClass().getName());
+        System.out.println("Custom Export client is configured: " + this.getClass().getName());
     }
 
 

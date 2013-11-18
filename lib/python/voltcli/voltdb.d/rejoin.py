@@ -27,7 +27,7 @@
 
 @VOLT.Command(
     bundles = VOLT.ServerBundle('rejoin', False, True, False),
-    description = 'Rejoin host to the VoltDB cluster.'
+    description = 'Rejoin the current node to a VoltDB cluster.'
 )
 def rejoin(runner):
     runner.go()
