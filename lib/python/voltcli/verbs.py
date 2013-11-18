@@ -367,7 +367,7 @@ class JavaBundle(object):
            cli.StringOption(None, '--client', 'clientport', 'specify the client port number'),
            cli.StringOption(None, '--internal', 'internalport', 'specify the internal port number used to communicate between cluster nodes'),
            cli.StringOption(None, '--zookeeper', 'zkport', 'specify the zookeeper port number'),
-           cli.StringOption(None, '--replication', 'replicationport', 'specify the replication port number'),
+           cli.StringOption(None, '--replication', 'replicationport', 'specify the replication port number (1st of 3 sequential ports)'),
            cli.StringOption(None, '--admin', 'adminport', 'specify the admin port number'),
            cli.StringOption(None, '--internalinterface', 'internalinterface', 'specify the network interface to use for internal communication, such as the internal and zookeeper ports'),
            cli.StringOption(None, '--externalinterface', 'externalinterface', 'specify the network interface to use for external ports, such as the admin and client ports'))
