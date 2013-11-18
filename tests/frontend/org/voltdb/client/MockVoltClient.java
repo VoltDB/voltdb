@@ -179,7 +179,6 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
             ProcedureCallback callback,
             int expectedSerializedSize,
             String procName,
-            long timeout,
             Object... parameters)
             throws NoConnectionsException {
         // TODO Auto-generated method stub

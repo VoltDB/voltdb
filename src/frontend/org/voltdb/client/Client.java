@@ -145,7 +145,6 @@ public interface Client {
             ProcedureCallback callback,
             int expectedSerializedSize,
             String procName,
-            long timeout,
             Object... parameters)
     throws IOException, NoConnectionsException;
 

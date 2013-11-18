@@ -337,7 +337,6 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
            ProcedureCallback callback,
            int expectedSerializedSize,
             String procName,
-            long timeout,
             Object... parameters)
            throws NoConnectionsException, IOException {
         if (callback instanceof ProcedureArgumentCacher) {
@@ -345,7 +344,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         }
         ProcedureInvocation invocation =
             new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
-        return private_callProcedure(callback, expectedSerializedSize, invocation, timeout);
+        return private_callProcedure(callback, expectedSerializedSize, invocation, 0);
     }
 
     private final boolean private_callProcedure(
