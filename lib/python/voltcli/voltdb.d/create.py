@@ -31,7 +31,7 @@
         # Hidden option to restore the hashinator in addition to the tables.
         VOLT.BooleanOption('-r', '--replica', 'replica', 'start replica cluster', default = False),
     ),
-    description = 'Start the VoltDB server and create the database.'
+    description = 'Start a new, empty database.'
 )
 def create(runner):
     runner.go()

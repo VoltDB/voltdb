@@ -95,10 +95,12 @@ import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Initiator;
+import org.voltdb.iv2.KSafetyStats;
 import org.voltdb.iv2.LeaderAppointer;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SpInitiator;
 import org.voltdb.iv2.TxnEgo;
+import org.voltdb.join.BalancePartitionsStatistics;
 import org.voltdb.join.ElasticJoinService;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
@@ -437,9 +439,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
              * by host messenger and the k-factor/host count/sites per host. This starting state
              * is published to ZK as the topology metadata node.
              *
-             * On rejoin the rejoining node has to inspect the topology meta node to find out what is missing
-             * and then update the topology listing itself as a replacement for one of the missing host ids.
+             * On join and rejoin the node has to inspect the topology meta node to find out what is missing
+             * and then update the topology listing itself as the replica for those partitions.
              * Then it does a compare and set of the topology.
+             *
+             * Ning: topology may not reflect the true partitions in the cluster during join. So if another node
+             * is trying to rejoin, it should rely on the cartographer's view to pick the partitions to replace.
              */
             JSONObject topo = getTopology(config.m_startAction, m_joinCoordinator);
             m_partitionsToSitesAtStartupForExportInit = new ArrayList<Pair<Integer, Long>>();
@@ -449,9 +454,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 ClusterConfig clusterConfig = new ClusterConfig(topo);
                 List<Integer> partitions = null;
                 if (isRejoin) {
-                    partitions = m_cartographer.getIv2PartitionsToReplace(topo);
                     m_configuredNumberOfPartitions = m_cartographer.getPartitionCount();
                     m_configuredReplicationFactor = clusterConfig.getReplicationFactor();
+                    partitions = m_cartographer.getIv2PartitionsToReplace(m_configuredReplicationFactor,
+                                                                          clusterConfig.getSitesPerHost());
                     if (partitions.size() == 0) {
                         VoltDB.crashLocalVoltDB("The VoltDB cluster already has enough nodes to satisfy " +
                                 "the requested k-safety factor of " +
@@ -558,6 +564,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             getStatsAgent().registerStatsSource(StatsSelector.LIVECLIENTS, 0, m_liveClientsStats);
             m_latencyStats = new LatencyStats(m_myHostId);
 
+            BalancePartitionsStatistics rebalanceStats = new BalancePartitionsStatistics();
+            getStatsAgent().registerStatsSource(StatsSelector.REBALANCE, 0, rebalanceStats);
+
+            KSafetyStats kSafetyStats = new KSafetyStats();
+            getStatsAgent().registerStatsSource(StatsSelector.KSAFETY, 0, kSafetyStats);
+
             /*
              * Initialize the command log on rejoin and join before configuring the IV2
              * initiators.  This will prevent them from receiving transactions
@@ -597,7 +609,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         m_catalogContext.cluster.getNetworkpartition(),
                         m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"),
                         usingCommandLog,
-                        topo, m_MPI);
+                        topo, m_MPI, kSafetyStats);
                 m_globalServiceElector.registerService(m_leaderAppointer);
 
                 for (Initiator iv2init : m_iv2Initiators) {
@@ -774,12 +786,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         elasticServiceClass.getConstructor(HostMessenger.class,
                                                            ClientInterface.class,
                                                            Cartographer.class,
+                                                           BalancePartitionsStatistics.class,
                                                            String.class,
                                                            int.class);
                     m_elasticJoinService =
                         (ElasticJoinService) constructor.newInstance(m_messenger,
                                                                      m_clientInterfaces.get(0),
                                                                      m_cartographer,
+                                                                     rebalanceStats,
                                                                      clSnapshotPath,
                                                                      m_deployment.getCluster().getKfactor());
                 }

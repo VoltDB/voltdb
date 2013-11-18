@@ -54,6 +54,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
+import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
@@ -79,6 +80,7 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.rejoin.StreamSnapshotSink;
+import org.voltdb.rejoin.StreamSnapshotSink.RestoreWork;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
@@ -898,17 +900,9 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
      */
     private boolean restoreSnapshotForRejoin() {
         boolean doneWork = false;
-        Pair<Integer, ByteBuffer> rejoinWork = m_rejoinSnapshotProcessor.poll(new CachedByteBufferAllocator());
+        RestoreWork rejoinWork = m_rejoinSnapshotProcessor.poll(new CachedByteBufferAllocator());
         if (rejoinWork != null) {
-            int tableId = rejoinWork.getFirst();
-            ByteBuffer buffer = rejoinWork.getSecond();
-            VoltTable table =
-                    PrivateVoltTableFactory.createVoltTableFromBuffer(buffer.duplicate(),
-                                                                      true);
-            // m_recoveryLog.info("table " + tableId + ": " + table.toString());
-
-            // Long.MAX_VALUE is a no-op don't track undo token
-            loadTable(m_rejoinSnapshotTxnId, tableId, table, false, false);
+            rejoinWork.restore(this);
             doneWork = true;
         } else if (m_rejoinSnapshotProcessor.isEOF()) {
             m_rejoinLog.debug("Rejoin snapshot transfer is finished");
@@ -1692,6 +1686,11 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     @Override
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds, boolean skipMultipart) {
         //A noop pre-IV2
+    }
+
+    @Override
+    public void updateHashinator(HashinatorConfig config) {
+
     }
 
     @Override

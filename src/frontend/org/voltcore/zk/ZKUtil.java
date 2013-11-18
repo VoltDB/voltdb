@@ -504,10 +504,12 @@ public class ZKUtil {
 
     public static void deleteRecursively(ZooKeeper zk, String dir) throws KeeperException, InterruptedException
     {
-        List<String> children = zk.getChildren(dir, false);
-        for (String child : children) {
-            deleteRecursively(zk, joinZKPath(dir, child));
-        }
-        zk.delete(dir, -1);
+        try {
+            List<String> children = zk.getChildren(dir, false);
+            for (String child : children) {
+                deleteRecursively(zk, joinZKPath(dir, child));
+            }
+            zk.delete(dir, -1);
+        } catch (KeeperException.NoNodeException ignore) {}
     }
 }
