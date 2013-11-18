@@ -48,7 +48,7 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
     JDBC4PreparedStatement(JDBC4Connection connection, String sql) throws SQLException
     {
         super(connection);
-        VoltSQL query = VoltSQL.parseSQL(sql, getQueryTimeout());
+        VoltSQL query = VoltSQL.parseSQL(sql);
         // You must have one or more parameters (otherwise just use a regular statement)
         if (/*!query.hasParameters() || */!query.isOfType(VoltSQL.TYPE_SELECT,VoltSQL.TYPE_INSERT,VoltSQL.TYPE_UPDATE,VoltSQL.TYPE_DELETE))
             throw SQLError.get(SQLError.ILLEGAL_STATEMENT, sql);
@@ -63,13 +63,13 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
         VoltSQL query = null;
         if (isCallableStatement)
         {
-            query = VoltSQL.parseCall(sql, getQueryTimeout());
+            query = VoltSQL.parseCall(sql);
             if (!query.isOfType(VoltSQL.TYPE_EXEC))
                 throw SQLError.get(SQLError.ILLEGAL_STATEMENT, sql);
         }
         else
         {
-            query = VoltSQL.parseSQL(sql, getQueryTimeout());
+            query = VoltSQL.parseSQL(sql);
             if (/*!query.hasParameters() || */!query.isOfType(VoltSQL.TYPE_SELECT,VoltSQL.TYPE_INSERT,VoltSQL.TYPE_UPDATE,VoltSQL.TYPE_DELETE))
                 throw SQLError.get(SQLError.ILLEGAL_STATEMENT, sql);
         }

@@ -41,7 +41,9 @@ import org.voltdb.client.ProcCallException;
 
 public class JDBC4Statement implements java.sql.Statement
 {
-    protected int m_timeout = 0;
+
+    //Timeout for statement. This is used for execute* methods. batch add dont have timeout.
+    private int m_timeout = 0;
     static class VoltSQL
     {
         public static final byte TYPE_SELECT = 1;
@@ -54,22 +56,19 @@ public class JDBC4Statement implements java.sql.Statement
         private final int parameterCount;
         private final byte type;
         private final Object[] parameters;
-        private final long timeout;
 
-        private VoltSQL(String[] sql, int parameterCount, byte type, long timeout)        {
+        private VoltSQL(String[] sql, int parameterCount, byte type)        {
             this.sql = sql;
             this.parameterCount = parameterCount;
             this.type = type;
             this.parameters = null;
-            this.timeout = timeout;
         }
 
-        private VoltSQL(String[] sql, int parameterCount, byte type, Object[] parameters, long timeout)        {
+        private VoltSQL(String[] sql, int parameterCount, byte type, Object[] parameters)        {
             this.sql = sql;
             this.parameterCount = parameterCount;
             this.type = type;
             this.parameters = parameters;
-            this.timeout = timeout;
         }
 
         public boolean hasParameters()
@@ -95,8 +94,7 @@ public class JDBC4Statement implements java.sql.Statement
             return false;
         }
 
-        protected VoltTable[] execute(JDBC4ClientConnection connection) throws SQLException
-        {
+        protected VoltTable[] execute(JDBC4ClientConnection connection, long timeout) throws SQLException {
             try
             {
                 if (this.type == TYPE_EXEC)
@@ -151,9 +149,9 @@ public class JDBC4Statement implements java.sql.Statement
                 throw SQLError.get(SQLError.ILLEGAL_ARGUMENT);
 
             if (this.type == TYPE_EXEC)
-                return new VoltSQL(this.sql, this.parameterCount, this.type, params, this.timeout);
+                return new VoltSQL(this.sql, this.parameterCount, this.type, params);
             else if (this.parameterCount == 0)
-                return new VoltSQL(this.sql, 0, this.type, this.timeout);
+                return new VoltSQL(this.sql, 0, this.type);
             else
             {
                 StringBuilder query = new StringBuilder();
@@ -198,7 +196,7 @@ public class JDBC4Statement implements java.sql.Statement
                 }
                 if (this.sql.length > this.parameterCount)
                     query.append(this.sql[this.sql.length-1]);
-                return new VoltSQL(new String[]{query.toString()}, 0, this.type, timeout);
+                return new VoltSQL(new String[]{query.toString()}, 0, this.type);
             }
         }
 
@@ -206,16 +204,16 @@ public class JDBC4Statement implements java.sql.Statement
         private static final Pattern ExtractParameterizedCall = Pattern.compile("^\\s*\\{\\s*call\\s+([^\\s()]+)\\s*\\(([?,\\s]+)\\)\\s*\\}\\s*$", Pattern.CASE_INSENSITIVE);
         private static final Pattern ExtractNoParameterCall = Pattern.compile("^\\s*\\{\\s*call\\s+([^\\s()]+)\\s*\\}\\s*$", Pattern.CASE_INSENSITIVE);
         private static final Pattern CleanCallParameters = Pattern.compile("[\\s,]+");
-        public static VoltSQL parseCall(String jdbcCall, long timeout) throws SQLException        {
+        public static VoltSQL parseCall(String jdbcCall) throws SQLException        {
             Matcher m = ExtractParameterizedCall.matcher(jdbcCall);
             if (m.matches())
                 return new VoltSQL(new String[]{m.group(1)},
-                        CleanCallParameters.matcher(m.group(2)).replaceAll("").length(), TYPE_EXEC, timeout);
+                        CleanCallParameters.matcher(m.group(2)).replaceAll("").length(), TYPE_EXEC);
             else
             {
                 m = ExtractNoParameterCall.matcher(jdbcCall);
                 if (m.matches())
-                    return new VoltSQL(new String[]{m.group(1)}, 0, TYPE_EXEC, timeout);
+                    return new VoltSQL(new String[]{m.group(1)}, 0, TYPE_EXEC);
             }
             throw SQLError.get(SQLError.ILLEGAL_STATEMENT);
         }
@@ -230,7 +228,7 @@ public class JDBC4Statement implements java.sql.Statement
         private static final Pattern IsInsert = Pattern.compile("^insert\\s.+", Pattern.CASE_INSENSITIVE);
         private static final Pattern IsUpdate = Pattern.compile("^update\\s.+", Pattern.CASE_INSENSITIVE);
         private static final Pattern IsDelete = Pattern.compile("^delete\\s.+", Pattern.CASE_INSENSITIVE);
-        public static VoltSQL parseSQL(String queryIn, long timeout) throws SQLException        {
+        public static VoltSQL parseSQL(String queryIn) throws SQLException        {
             if (queryIn == null || queryIn.length() == 0)
                 throw SQLError.get(SQLError.ILLEGAL_STATEMENT);
 
@@ -295,7 +293,7 @@ public class JDBC4Statement implements java.sql.Statement
                 if (queryParts[l].indexOf("\r") > -1 || queryParts[l].indexOf("\n") > -1)
                     throw SQLError.get(SQLError.QUERY_PARSING_ERROR);
 
-            return new VoltSQL(queryParts, parameterCount, type, timeout);
+            return new VoltSQL(queryParts, parameterCount, type);
         }
     }
 
@@ -376,7 +374,7 @@ public class JDBC4Statement implements java.sql.Statement
     public void addBatch(String sql) throws SQLException
     {
         checkClosed();
-        VoltSQL query = VoltSQL.parseSQL(sql, this.m_timeout);
+        VoltSQL query = VoltSQL.parseSQL(sql);
         if (query.hasParameters() || !query.isOfType(VoltSQL.TYPE_INSERT,VoltSQL.TYPE_UPDATE,VoltSQL.TYPE_DELETE))
             throw SQLError.get(SQLError.ILLEGAL_STATEMENT, sql);
         this.addBatch(query);
@@ -419,12 +417,12 @@ public class JDBC4Statement implements java.sql.Statement
         checkClosed();
         if (query.isOfType(VoltSQL.TYPE_SELECT,VoltSQL.TYPE_EXEC))
         {
-            setCurrentResult(query.execute(this.sourceConnection.NativeConnection), -1);
+            setCurrentResult(query.execute(this.sourceConnection.NativeConnection, this.m_timeout), -1);
             return true;
         }
         else
         {
-            setCurrentResult(null, (int)query.execute(this.sourceConnection.NativeConnection)[0].fetchRow(0).getLong(0));
+            setCurrentResult(null, (int) query.execute(this.sourceConnection.NativeConnection, this.m_timeout)[0].fetchRow(0).getLong(0));
             return false;
         }
     }
@@ -434,7 +432,7 @@ public class JDBC4Statement implements java.sql.Statement
     public boolean execute(String sql) throws SQLException
     {
         checkClosed();
-        VoltSQL query = VoltSQL.parseSQL(sql, this.m_timeout);
+        VoltSQL query = VoltSQL.parseSQL(sql);
         if (query.hasParameters() || !query.isOfType(VoltSQL.TYPE_SELECT,VoltSQL.TYPE_INSERT,VoltSQL.TYPE_UPDATE,VoltSQL.TYPE_DELETE))
             throw SQLError.get(SQLError.ILLEGAL_STATEMENT, sql);
 
@@ -478,7 +476,8 @@ public class JDBC4Statement implements java.sql.Statement
         {
             try
             {
-                setCurrentResult(null, (int)batch.get(i).execute(sourceConnection.NativeConnection)[0].fetchRow(0).getLong(0));
+                setCurrentResult(null, (int) batch.get(i).execute(sourceConnection.NativeConnection,
+                        this.m_timeout)[0].fetchRow(0).getLong(0));
                 updateCounts[i] = this.lastUpdateCount;
             }
             catch(SQLException x)
@@ -492,7 +491,7 @@ public class JDBC4Statement implements java.sql.Statement
 
     protected ResultSet executeQuery(VoltSQL query) throws SQLException
     {
-        setCurrentResult(query.execute(this.sourceConnection.NativeConnection), -1);
+        setCurrentResult(query.execute(this.sourceConnection.NativeConnection, this.m_timeout), -1);
         return this.result;
     }
 
@@ -501,7 +500,7 @@ public class JDBC4Statement implements java.sql.Statement
     public ResultSet executeQuery(String sql) throws SQLException
     {
         checkClosed();
-        VoltSQL query = VoltSQL.parseSQL(sql, this.m_timeout);
+        VoltSQL query = VoltSQL.parseSQL(sql);
         if (query.hasParameters() || !query.isOfType(VoltSQL.TYPE_SELECT))
             throw SQLError.get(SQLError.ILLEGAL_STATEMENT, sql);
         return this.executeQuery(query);
@@ -509,7 +508,7 @@ public class JDBC4Statement implements java.sql.Statement
 
     protected int executeUpdate(VoltSQL query) throws SQLException
     {
-        setCurrentResult(null, (int)query.execute(this.sourceConnection.NativeConnection)[0].fetchRow(0).getLong(0));
+        setCurrentResult(null, (int) query.execute(this.sourceConnection.NativeConnection, this.m_timeout)[0].fetchRow(0).getLong(0));
         return this.lastUpdateCount;
     }
 
@@ -518,7 +517,7 @@ public class JDBC4Statement implements java.sql.Statement
     public int executeUpdate(String sql) throws SQLException
     {
         checkClosed();
-        VoltSQL query = VoltSQL.parseSQL(sql, this.m_timeout);
+        VoltSQL query = VoltSQL.parseSQL(sql);
         if (query.hasParameters() || !query.isOfType(VoltSQL.TYPE_INSERT,VoltSQL.TYPE_UPDATE,VoltSQL.TYPE_DELETE))
             throw SQLError.get(SQLError.ILLEGAL_STATEMENT, sql);
         return this.executeUpdate(query);
