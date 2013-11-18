@@ -214,7 +214,6 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             long originalTxnId,
             long originalUniqueId,
             String procName,
-            long timeout,
             Object... parameters)
             throws IOException, NoConnectionsException, ProcCallException
     {
@@ -224,7 +223,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             new ProcedureInvocation(originalTxnId, originalUniqueId,
                                     m_handle.getAndIncrement(),
                                     procName, parameters);
-        return callProcedure(cb, invocation, timeout);
+        return callProcedure(cb, invocation, 0);
     }
 
     private final ClientResponse callProcedure(SyncCallback cb, ProcedureInvocation invocation, long timeout)
@@ -311,7 +310,6 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             long originalUniqueId,
             ProcedureCallback callback,
             String procName,
-            long timeout,
             Object... parameters)
             throws IOException, NoConnectionsException {
         if (callback instanceof ProcedureArgumentCacher) {
@@ -321,7 +319,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             new ProcedureInvocation(originalTxnId, originalUniqueId,
                                     m_handle.getAndIncrement(),
                                     procName, parameters);
-        return private_callProcedure(callback, 0, invocation, timeout);
+        return private_callProcedure(callback, 0, invocation, 0);
     }
 
     @Override
