@@ -65,6 +65,7 @@ import org.voltdb.iv2.MpInitiator;
 class Distributer {
 
     static final long PING_HANDLE = Long.MAX_VALUE;
+    static final long USE_DEFAULT_TIMEOUT = 0;
 
     // handles used internally are negative and decrement for each call
     public final AtomicLong m_sysHandle = new AtomicLong(-1);
@@ -658,11 +659,11 @@ class Distributer {
 
             ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
             //The handle is specific to topology updates and has special cased handling
-            queue(spi, new TopoUpdateCallback(), true, 0);
+            queue(spi, new TopoUpdateCallback(), true, USE_DEFAULT_TIMEOUT);
 
             spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@SystemCatalog", "PROCEDURES");
             //The handle is specific to procedure updates and has special cased handling
-            queue(spi, new ProcUpdateCallback(), true, 0);
+            queue(spi, new ProcUpdateCallback(), true, USE_DEFAULT_TIMEOUT);
         }
     }
 

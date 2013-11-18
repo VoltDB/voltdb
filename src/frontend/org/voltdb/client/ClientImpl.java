@@ -184,7 +184,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     public final ClientResponse callProcedure(String procName, Object... parameters)
         throws IOException, NoConnectionsException, ProcCallException
     {
-        return callProcedureWithTimeout(procName, 0, parameters);
+        return callProcedureWithTimeout(procName, Distributer.USE_DEFAULT_TIMEOUT, parameters);
     }
 
     /**
@@ -223,7 +223,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             new ProcedureInvocation(originalTxnId, originalUniqueId,
                                     m_handle.getAndIncrement(),
                                     procName, parameters);
-        return callProcedure(cb, 0, invocation);
+        return callProcedure(cb, Distributer.USE_DEFAULT_TIMEOUT, invocation);
     }
 
     private final ClientResponse callProcedure(SyncCallback cb, long timeout, ProcedureInvocation invocation)
@@ -319,7 +319,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             new ProcedureInvocation(originalTxnId, originalUniqueId,
                                     m_handle.getAndIncrement(),
                                     procName, parameters);
-        return private_callProcedure(callback, 0, invocation, 0);
+        return private_callProcedure(callback, 0, invocation, Distributer.USE_DEFAULT_TIMEOUT);
     }
 
     @Override
