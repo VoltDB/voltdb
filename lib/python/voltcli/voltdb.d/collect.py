@@ -26,7 +26,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 @VOLT.Command(
-    description = 'Collect logs for problem analysis.',
+    description = 'Collect logs on the current node for problem analysis.',
     options = (
         VOLT.StringOption (None, '--prefix', 'prefix',
                            'file name prefix for uniquely identifying collection',

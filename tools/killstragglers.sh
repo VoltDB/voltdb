@@ -21,7 +21,7 @@ if [ $USER = "test" ]; then
 fi
 for P in `$SUDO netstat -tnlp | egrep 'LISTEN.*/java' | tr -s \  | cut -d\  -f7 | cut -d\/ -f1 | sort | uniq`
 do
-    logger -isp user.notice -t TESTKILL "$BUILD_TAG Killing `$SUDO ps --no-headers -p $P -o user,command`"
+    logger -sp user.notice -t TESTKILL "User $USER $BUILD_TAG Killing `$SUDO ps --no-headers -p $P -o pid,user,command`"
     $SUDO kill -9 $P
 done
 exit 0

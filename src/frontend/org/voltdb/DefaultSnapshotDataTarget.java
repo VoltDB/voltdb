@@ -458,6 +458,16 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         return SnapshotFormat.NATIVE;
     }
 
+    /**
+     * Get the row count if any, of the content wrapped in the given {@link BBContainer}
+     * @param tupleData
+     * @return the numbers of tuple data rows contained within a container
+     */
+    @Override
+    public int getInContainerRowCount(BBContainer tupleData) {
+        return SnapshotDataTarget.ROW_COUNT_UNSUPPORTED;
+    }
+
     @Override
     public String toString() {
         return m_file.toString();

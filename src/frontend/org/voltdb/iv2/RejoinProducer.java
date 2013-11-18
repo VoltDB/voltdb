@@ -18,7 +18,6 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -28,7 +27,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 import org.voltdb.SnapshotSaveAPI;
@@ -36,6 +34,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.rejoin.StreamSnapshotSink;
+import org.voltdb.rejoin.StreamSnapshotSink.RestoreWork;
 import org.voltdb.rejoin.TaskLog;
 
 import com.google.common.base.Preconditions;
@@ -306,7 +305,7 @@ public class RejoinProducer extends JoinProducerBase {
      */
     void runForLiveRejoin(SiteProcedureConnection siteConnection)
     {
-        Pair<Integer, ByteBuffer> rejoinWork = m_rejoinSiteProcessor.poll(m_snapshotBufferAllocator);
+        RestoreWork rejoinWork = m_rejoinSiteProcessor.poll(m_snapshotBufferAllocator);
         if (rejoinWork != null) {
             restoreBlock(rejoinWork, siteConnection);
         }
@@ -364,7 +363,7 @@ public class RejoinProducer extends JoinProducerBase {
      */
     void runForCommunityRejoin(SiteProcedureConnection siteConnection)
     {
-        Pair<Integer, ByteBuffer> rejoinWork = m_rejoinSiteProcessor.poll(m_snapshotBufferAllocator);
+        RestoreWork rejoinWork = m_rejoinSiteProcessor.poll(m_snapshotBufferAllocator);
         // poll() could return null if the source indicated enf of stream,
         // need to check on that before retry
         if (rejoinWork == null && !m_rejoinSiteProcessor.isEOF()) {

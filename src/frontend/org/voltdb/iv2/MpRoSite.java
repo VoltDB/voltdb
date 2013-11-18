@@ -39,6 +39,7 @@ import org.voltdb.StatsSelector;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
+import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
@@ -467,6 +468,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
     @Override
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds, boolean skipMultipart) {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
+    public void updateHashinator(HashinatorConfig config) {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 

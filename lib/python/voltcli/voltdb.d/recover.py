@@ -28,7 +28,7 @@
 @VOLT.Command(
     # Uses all default except last is safemode switch availability
     bundles = VOLT.ServerBundle('recover', False, False, True, True),
-    description = 'Start the VoltDB server and recover the previous database state.'
+    description = 'Start the database and recover the previous state.'
 )
 def recover(runner):
     runner.go()
