@@ -140,6 +140,8 @@ int64_t ElasticIndexReadContext::handleStreamMore(
                 if (!tuple.isPendingDelete()) {
                     // Write the tuple.
                     yield = outputStreams.writeRow(getSerializer(), tuple);
+                } else {
+                    throwFatalException("Materializing a deleted tuple from the elastic context.");
                 }
 
                 if (!yield) {
