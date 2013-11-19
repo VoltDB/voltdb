@@ -352,11 +352,12 @@ public class CSVLoader {
             m_log.info("Read " + insertCount + " rows from file and successfully inserted "
                     + ackCount + " rows (final)");
             produceFiles(ackCount, insertCount);
+            boolean noerrors = CSVFileReader.m_errorInfo.isEmpty();
+            cleanup();
             //In test junit mode we let it continue for reuse
             if (!CSVLoader.testMode) {
-                System.exit(CSVFileReader.m_errorInfo.isEmpty() ? 0 : 1);
+                System.exit(noerrors ? 0 : 1);
             }
-            cleanup();
         } catch (Exception ex) {
             m_log.error("Exception Happened while loading CSV data: " + ex);
             System.exit(1);
@@ -487,11 +488,6 @@ public class CSVLoader {
             out_logfile.flush();
             out_reportfile.flush();
 
-            //Close files.
-            out_invaliderowfile.close();
-            out_logfile.close();
-            out_reportfile.close();
-
         } catch (FileNotFoundException e) {
             m_log.error("CSV report directory '" + config.reportdir
                     + "' does not exist.");
@@ -513,5 +509,9 @@ public class CSVLoader {
         CSVFileReader.m_totalRowCount = new AtomicLong(0);
 
         CSVPartitionProcessor.m_partitionAcknowledgedCount = new AtomicLong(0);
+        out_invaliderowfile.close();
+        out_logfile.close();
+        out_reportfile.close();
+
     }
 }
