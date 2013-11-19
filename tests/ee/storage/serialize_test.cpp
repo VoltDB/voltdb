@@ -202,8 +202,8 @@ TEST_F(TableSerializeTest, NullStrings) {
         EXPECT_EQ(VALUE_TYPE_VARCHAR, t.getType(0));
         EXPECT_TRUE(tuple.getNValue(0).isNull());
         EXPECT_TRUE(t.getNValue(0).isNull());
-        EXPECT_TRUE(ValueFactory::getNullStringValue().op_equals(tuple.getNValue(0)).isTrue());
-        EXPECT_TRUE(ValueFactory::getNullStringValue().op_equals(t.getNValue(0)).isTrue());
+        EXPECT_EQ(0, ValueFactory::getNullStringValue().compare(tuple.getNValue(0)));
+        EXPECT_EQ(0, ValueFactory::getNullStringValue().compare(t.getNValue(0)));
         count += 1;
     }
     EXPECT_EQ(1, count);

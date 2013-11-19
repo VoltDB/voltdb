@@ -447,10 +447,7 @@ bool NValue::inList(const NValue& rhs) const
 {
     //TODO: research: does the SQL standard allow a null to match a null list element
     // vs. returning FALSE or NULL?
-    const bool lhsIsNull = isNull();
-    if (lhsIsNull) {
-        return false;
-    }
+    assert ( ! isNull());
 
     const ValueType rhsType = rhs.getValueType();
     if (rhsType != VALUE_TYPE_ARRAY) {

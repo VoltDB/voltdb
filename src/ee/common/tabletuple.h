@@ -301,7 +301,6 @@ public:
     void setAllNulls();
 
     bool equals(const TableTuple &other) const;
-    bool equalsNoSchemaCheck(const TableTuple &other) const;
 
     int compare(const TableTuple &other) const;
 
@@ -750,19 +749,9 @@ inline bool TableTuple::equals(const TableTuple &other) const {
     if (!m_schema->equals(other.m_schema)) {
         return false;
     }
-    return equalsNoSchemaCheck(other);
+    return compare(other) == 0;
 }
 
-inline bool TableTuple::equalsNoSchemaCheck(const TableTuple &other) const {
-    for (int ii = 0; ii < m_schema->columnCount(); ii++) {
-        const NValue lhs = getNValue(ii);
-        const NValue rhs = other.getNValue(ii);
-        if (lhs.op_notEquals(rhs).isTrue()) {
-            return false;
-        }
-    }
-    return true;
-}
 
 inline void TableTuple::setAllNulls() {
     assert(m_schema);
@@ -828,12 +817,12 @@ struct TableTupleHasher : std::unary_function<TableTuple, std::size_t>
 };
 
 /**
- * Equality operator for use with boost::unrodered_map and similar
+ * Equality operator for use with boost::unordered_map and similar
  */
 class TableTupleEqualityChecker {
 public:
     inline bool operator()(const TableTuple lhs, const TableTuple rhs) const {
-        return lhs.equalsNoSchemaCheck(rhs);
+        return lhs.compare(rhs) == 0;
     }
 };
 

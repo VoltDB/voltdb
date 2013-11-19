@@ -76,12 +76,12 @@ public:
         if (operand.isTrue()) {
             return NValue::getFalse();
         }
-        // NOT FALSE is TRUE
-        if (operand.isFalse()) {
-            return NValue::getTrue();
-        }
         // NOT NULL is NULL
-        return operand;
+        if (operand.isNull()) {
+            return operand;
+        }
+        // NOT FALSE is TRUE
+        return NValue::getTrue();
     }
 
     std::string debugInfo(const std::string &spacer) const {
