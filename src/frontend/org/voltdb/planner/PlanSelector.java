@@ -101,7 +101,7 @@ public class PlanSelector implements Cloneable {
         m_costModel = costModel;
         m_paramHints = paramHints;
         m_detMode = detMode;
-        m_quietPlanner = false;
+        m_quietPlanner = quietPlanner;
     }
 
     /**

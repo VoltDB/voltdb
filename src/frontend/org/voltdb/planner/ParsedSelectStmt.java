@@ -37,6 +37,7 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
@@ -265,7 +266,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         for (StmtTableScan mvTableScan: stmtCache) {
             Set<SchemaColumn> mvNewScanColumns = new HashSet<SchemaColumn>();
 
-            HashSet<SchemaColumn> columns = mvTableScan.m_scanColumns;
+            Set<SchemaColumn> columns = mvTableScan.getScanColumns();
             // For a COUNT(*)-only scan, a table may have no scan columns.
             // For a joined query without processed columns from table TB, TB has no scan columns
             if (columns != null) {
@@ -589,7 +590,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
             ExpressionUtil.finalizeValueTypes(col.expression);
 
-            col.alias = child.attributes.get("alias");
             if (child.name.equals("columnref")) {
                 col.columnName = child.attributes.get("column");
                 col.tableName = child.attributes.get("table");
@@ -605,7 +605,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 col.tableAlias = "VOLT_TEMP_TABLE";
                 col.columnName = "";
             }
-            // This index calculation is only used for sanity checking
+            col.alias = child.attributes.get("alias");
+            if (col.alias == null) {
+                col.alias = col.columnName;
+            }
+           // This index calculation is only used for sanity checking
             // materialized views (which use the parsed select statement but
             // don't go through the planner pass that does more involved
             // column index resolution).

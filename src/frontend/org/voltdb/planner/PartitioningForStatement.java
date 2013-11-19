@@ -30,6 +30,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.parseinfo.StmtTableScan;
 
 /**
  * Represents the partitioning of the data underlying a statement.
@@ -330,7 +331,7 @@ public class PartitioningForStatement implements Cloneable{
      *         -- partitioned tables that aren't joined or filtered by the same value.
      *         The caller can raise an alarm if there is more than one.
      */
-    public int analyzeForMultiPartitionAccess(List<StmtTableScan> tableAliasList,
+    public int analyzeForMultiPartitionAccess(List<StmtTableScan> tableCacheList,
             HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence)
     {
         TupleValueExpression tokenPartitionKey = null;
@@ -338,14 +339,14 @@ public class PartitioningForStatement implements Cloneable{
         int unfilteredPartitionKeyCount = 0;
 
         // Iterate over the tables to collect partition columns.
-        for (StmtTableScan tableAlias : tableAliasList) {
+        for (StmtTableScan tableCache : tableCacheList) {
             // Replicated tables don't need filter coverage.
-            if (tableAlias.m_table == null || tableAlias.m_table.getIsreplicated()) {
+            if (tableCache.getIsreplicated()) {
                 continue;
             }
 
-            String partitionedTableAlias = tableAlias.m_tableAlias;
-            String partitionedTable = tableAlias.m_table.getTypeName();
+            String partitionedTableAlias = tableCache.getTableAlias();
+            String partitionedTable = tableCache.getTableName();
             String columnNeedingCoverage = m_partitionColumnByTable.get(partitionedTable);
             boolean unfiltered = true;
 

@@ -15,25 +15,57 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.planner;
+package org.voltdb.planner.parseinfo;
 
 import java.util.HashSet;
+import java.util.Set;
 
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.SchemaColumn;
 
 /**
- * StmtTableScan caches data related to a given instance of a table within the statement scope
+ * StmtTableScan caches data related to a given instance of a table or a sub-query
+ * within the statement scope
  */
-public class StmtTableScan {
+public abstract class StmtTableScan {
 
     public static final int NULL_ALIAS_INDEX = -1;
-    // Catalog table
-    public Table m_table = null;
-    // Sub-Query
-    public TableDerived m_tableDerived = null;
+
+    public enum TABLE_SCAN_TYPE {
+        TARGET_TABLE_SCAN,
+        TEMP_TABLE_SCAN
+    }
+
+    protected StmtTableScan(String tableAlias) {
+        m_tableAlias = tableAlias;
+    }
+
+    abstract public TABLE_SCAN_TYPE getScanType();
+
+    abstract public String getTableName();
+
+    abstract public boolean getIsreplicated();
+
+    public String getTableAlias() {
+        return m_tableAlias;
+    }
+
+    public Set<SchemaColumn> getScanColumns() {
+        return m_scanColumns;
+    }
+
+    public Table getTargetTable() {
+        return null;
+    }
+
+    public TempTable getTempTable() {
+        return null;
+    }
+
+
+
     // table alias
-    public String m_tableAlias = null;
+    protected String m_tableAlias = null;
     // Store a unique list of the columns actually used by this table instance.
-    public HashSet<SchemaColumn> m_scanColumns = null ;
+    protected Set<SchemaColumn> m_scanColumns = new  HashSet<SchemaColumn>();
 }

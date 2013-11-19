@@ -43,6 +43,8 @@ import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
+import org.voltdb.planner.parseinfo.JoinNode;
+import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -315,7 +317,7 @@ public class PlanAssembler {
         }
 
         CompiledPlan retval = m_planSelector.m_bestPlan;
-        if (subQueryResult != null) {
+        if (subQueryResult != null && retval != null) {
             // Decide whether parent statement' partitioning is compatible with children.
             getCommonPartitioning(m_partitioning, subQueryResult.m_commonPartitioning);
 
@@ -359,17 +361,17 @@ public class PlanAssembler {
 
         ChildPlanResult parseResult = new ChildPlanResult();
         for (JoinNode subQueryNode : subQueryNodes) {
-            assert(subQueryNode.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX);
-            StmtTableScan tableCache = parsedStmt.stmtCache.get(subQueryNode.m_tableAliasIndex);
-            assert(tableCache.m_tableDerived != null);
-            AbstractParsedStmt subQuery = tableCache.m_tableDerived.getSubQuery();
+            assert(subQueryNode.getTableAliasIndex() != StmtTableScan.NULL_ALIAS_INDEX);
+            StmtTableScan tableCache = parsedStmt.stmtCache.get(subQueryNode.getTableAliasIndex());
+            assert(tableCache.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TEMP_TABLE_SCAN);
+            AbstractParsedStmt subQuery = tableCache.getTempTable().getSubQuery();
             assert(subQuery != null);
 
             planForChildStmt(subQuery, parseResult);
             if (parseResult.m_compiledPlan == null) {
                 return parseResult;
             }
-            tableCache.m_tableDerived.setBetsCostPlan(parseResult.m_compiledPlan);
+            tableCache.getTempTable().setBetsCostPlan(parseResult.m_compiledPlan);
         }
 
         // need to reset plan id for the entire UNION
@@ -583,8 +585,10 @@ public class PlanAssembler {
                 assert (subAssembler.m_parsedStmt.tableAliasIndexMap.containsKey(tableAlias));
                 int tableIdx = subAssembler.m_parsedStmt.tableAliasIndexMap.get(tableAlias);
                 StmtTableScan tableCache = subAssembler.m_parsedStmt.stmtCache.get(tableIdx);
-                assert (tableCache.m_tableDerived != null);
-                AbstractPlanNode subQueryRoot = tableCache.m_tableDerived.getBetsCostPlan().rootPlanGraph;
+                assert (tableCache.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TEMP_TABLE_SCAN);
+                CompiledPlan betsCostPlan = tableCache.getTempTable().getBetsCostPlan();
+                assert (betsCostPlan != null);
+                AbstractPlanNode subQueryRoot = betsCostPlan.rootPlanGraph;
                 subQueryRoot.disconnectParents();
                 scanNode.addAndLinkChild(subQueryRoot);
             }

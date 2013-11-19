@@ -34,8 +34,8 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         EXCEPT
     };
 
-    ArrayList<AbstractParsedStmt> m_children = new ArrayList<AbstractParsedStmt>();
-    UnionType m_unionType = UnionType.NOUNION;
+    public ArrayList<AbstractParsedStmt> m_children = new ArrayList<AbstractParsedStmt>();
+    public UnionType m_unionType = UnionType.NOUNION;
 
     /**
     * Class constructor

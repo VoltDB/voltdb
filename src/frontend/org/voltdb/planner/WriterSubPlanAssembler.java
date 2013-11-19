@@ -21,6 +21,8 @@ import java.util.ArrayDeque;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.planner.parseinfo.JoinNode;
+import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 
 /**
@@ -76,8 +78,8 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
             // into the WHERE list.
             tableNode.m_whereInnerList.addAll(tableNode.m_joinInnerList);
             tableNode.m_joinInnerList.clear();
-            assert (tableNode.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX);
-            tableNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(tableNode.m_tableAliasIndex,
+            assert (tableNode.getTableAliasIndex() != StmtTableScan.NULL_ALIAS_INDEX);
+            tableNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(tableNode.getTableAliasIndex(),
                     null,
                     tableNode.m_whereInnerList,
                     null));
@@ -85,7 +87,7 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
             for (AccessPath path : tableNode.m_accessPaths) {
                 tableNode.m_currentAccessPath = path;
 
-                AbstractPlanNode plan = getAccessPlanForTable(tableNode.m_tableAliasIndex, tableNode.m_currentAccessPath);
+                AbstractPlanNode plan = getAccessPlanForTable(tableNode.getTableAliasIndex(), tableNode.m_currentAccessPath);
                 m_plans.add(plan);
             }
 

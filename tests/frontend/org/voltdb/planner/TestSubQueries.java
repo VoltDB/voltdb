@@ -28,6 +28,7 @@ import java.util.List;
 import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
@@ -76,6 +77,29 @@ public class TestSubQueries   extends PlannerTestCase {
         }
     }
 
+    public void testParameters() {
+        AbstractPlanNode pn = compile("select A1 FROM (SELECT A A1 FROM R1 WHERE A>?) TEMP WHERE A1<?");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof SeqScanPlanNode);
+        AbstractExpression p = ((SeqScanPlanNode) pn).getPredicate();
+        assertTrue(p != null);
+        assertTrue(p instanceof ComparisonExpression);
+        AbstractExpression cp = p.getLeft();
+        assertTrue(cp instanceof TupleValueExpression);
+        cp = p.getRight();
+        assertTrue(cp instanceof ParameterValueExpression);
+        assertEquals(1, ((ParameterValueExpression)cp).getParameterIndex().intValue());
+        assertTrue(pn.getChildCount() == 1);
+        assertTrue(pn.getChild(0) instanceof SeqScanPlanNode);
+        SeqScanPlanNode sc = (SeqScanPlanNode) pn.getChild(0);
+        assertTrue(sc.getPredicate() != null);
+        p = sc.getPredicate();
+        assertTrue(p instanceof ComparisonExpression);
+        cp = p.getRight();
+        assertTrue(cp instanceof ParameterValueExpression);
+        assertEquals(0, ((ParameterValueExpression)cp).getParameterIndex().intValue());
+    }
+
     public void testDistributedSubQuery() {
         {
             // Partitioned sub-query
@@ -109,6 +133,7 @@ public class TestSubQueries   extends PlannerTestCase {
             failToCompile("select A, C FROM (SELECT A FROM P1) TEMP1, (SELECT C FROM P2) TEMP2 WHERE TEMP1.A = TEMP2.C ",
                     "Statements are too complex in set operation or sub-query using multiple partitioned");
         }
+
         {
             // Join of two single partitioned sub-queries. Should compile
             List<AbstractPlanNode> lpn = compileToFragments("select D1, D2 FROM (SELECT D D1 FROM P1 WHERE A=1) TEMP1, (SELECT D D2 FROM P2 WHERE A=1) TEMP2 WHERE TEMP1.D1 = TEMP2.D2 ");
@@ -122,6 +147,7 @@ public class TestSubQueries   extends PlannerTestCase {
             assertTrue(c instanceof SeqScanPlanNode);
             assertEquals("TEMP2", ((SeqScanPlanNode) c).getTargetTableAlias());
         }
+
         {
             // Join of two multi-partitioned sub-queries on the partition column. Should compile ?
             List<AbstractPlanNode> lpn = compileToFragments("select A1, A2 FROM (SELECT A A1 FROM P1) TEMP1, (SELECT A A2 FROM P2) TEMP2 WHERE TEMP1.A1 = TEMP2.A2 ");

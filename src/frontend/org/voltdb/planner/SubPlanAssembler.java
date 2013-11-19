@@ -37,6 +37,8 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
+import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
@@ -138,11 +140,13 @@ public abstract class SubPlanAssembler {
         AccessPath naivePath = getRelevantNaivePath(allJoinExprs, filterExprs);
         paths.add(naivePath);
 
-        Table table = m_parsedStmt.stmtCache.get(tableAliasIdx).m_table;
-        if (table == null) {
+        StmtTableScan tableCache = m_parsedStmt.stmtCache.get(tableAliasIdx);
+        if (tableCache.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TEMP_TABLE_SCAN) {
             // This is a sub-query
             return paths;
         }
+        assert(tableCache.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TARGET_TABLE_SCAN);
+        Table table = tableCache.getTargetTable();
 
         CatalogMap<Index> indexes = table.getIndexes();
 
@@ -1213,17 +1217,15 @@ public abstract class SubPlanAssembler {
         // build the scan node
         SeqScanPlanNode scanNode = new SeqScanPlanNode();
         StmtTableScan tableCache = m_parsedStmt.stmtCache.get(tableAliasIdx);
-        if (tableCache.m_table != null) {
-            scanNode.setTargetTableName(tableCache.m_table.getTypeName());
-        } else {
-            scanNode.setTargetTableName(tableCache.m_tableDerived.getTableName());
+        scanNode.setTargetTableName(tableCache.getTableName());
+        if (tableCache.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TEMP_TABLE_SCAN) {
             scanNode.setSubQuery(true);
         }
-        scanNode.setTargetTableAlias(tableCache.m_tableAlias);
+        scanNode.setTargetTableAlias(tableCache.getTableAlias());
         //TODO: push scan column identification into "setTargetTableName"
         // (on the way to enabling it for DML plans).
-        Set<SchemaColumn> scanColumns = m_parsedStmt.stmtCache.get(tableAliasIdx).m_scanColumns;
-        if (scanColumns != null) {
+        Set<SchemaColumn> scanColumns = m_parsedStmt.stmtCache.get(tableAliasIdx).getScanColumns();
+        if (scanColumns != null && scanColumns.isEmpty() == false) {
             scanNode.setScanColumns(scanColumns);
         }
 
@@ -1287,15 +1289,15 @@ public abstract class SubPlanAssembler {
         scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
         scanNode.setPredicate(ExpressionUtil.combine(path.otherExprs));
         scanNode.setInitialExpression(ExpressionUtil.combine(path.initialExpr));
-        scanNode.setTargetTableName(tableCache.m_table.getTypeName());
-        scanNode.setTargetTableAlias(tableCache.m_tableAlias);
+        scanNode.setTargetTableName(tableCache.getTableName());
+        scanNode.setTargetTableAlias(tableCache.getTableAlias());
         //TODO: push scan column identification into "setTargetTableName"
         // (on the way to enabling it for DML plans).
-        Set<SchemaColumn> scanColumns = m_parsedStmt.stmtCache.get(tableAliasIdx).m_scanColumns;
-        if (scanColumns != null) {
+        Set<SchemaColumn> scanColumns = m_parsedStmt.stmtCache.get(tableAliasIdx).getScanColumns();
+        if (scanColumns != null && scanColumns.isEmpty() == false) {
             scanNode.setScanColumns(scanColumns);
         }
-        scanNode.setTargetTableAlias(tableCache.m_tableAlias);
+        scanNode.setTargetTableAlias(tableCache.getTableAlias());
         scanNode.setTargetIndexName(index.getTypeName());
         return resultNode;
     }

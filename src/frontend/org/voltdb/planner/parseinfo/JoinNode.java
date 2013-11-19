@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.planner;
+package org.voltdb.planner.parseinfo;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -26,6 +26,7 @@ import java.util.Set;
 
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.planner.AccessPath;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 
@@ -35,7 +36,7 @@ import org.voltdb.types.JoinType;
  * or a node representing the actual join (m_leftNode!=0 and m_rightNode!=0)
  * filter expressions
  */
-public class JoinNode implements Cloneable {
+public abstract class JoinNode implements Cloneable {
 
     public enum NodeType {
         JOIN,
@@ -44,21 +45,21 @@ public class JoinNode implements Cloneable {
     }
 
     // Node Type
-    public NodeType m_nodeType = null;
-    // Left child
-    public JoinNode m_leftNode = null;
-    // Right child
-    public JoinNode m_rightNode = null;
-    // index into the query catalog cache for a table alias
-    public int m_tableAliasIndex = StmtTableScan.NULL_ALIAS_INDEX;
+    final private NodeType m_nodeType;
     // Join type
-    public JoinType m_joinType = JoinType.INNER;
-    // Join expression associated with this node
-    public AbstractExpression m_joinExpr = null;
-    // Additional filter expression (WHERE) associated with this node
-    public AbstractExpression m_whereExpr = null;
+    protected JoinType m_joinType;
     // Node id. Must be unique within a given tree
-    public int m_id = 0;
+    protected int m_id;
+    // Left child
+    protected JoinNode m_leftNode = null;
+    // Right child
+    protected JoinNode m_rightNode = null;
+    // index into the query catalog cache for a table alias
+    protected int m_tableAliasIndex = StmtTableScan.NULL_ALIAS_INDEX;
+    // Join expression associated with this node
+    protected AbstractExpression m_joinExpr = null;
+    // Additional filter expression (WHERE) associated with this node
+    protected AbstractExpression m_whereExpr = null;
 
     // Buckets for children expression classification
     public final ArrayList<AbstractExpression> m_joinOuterList = new ArrayList<AbstractExpression>();
@@ -69,69 +70,72 @@ public class JoinNode implements Cloneable {
     public final ArrayList<AbstractExpression> m_whereInnerOuterList = new ArrayList<AbstractExpression>();
 
     // All possible access paths for this node
-    List<AccessPath> m_accessPaths = new ArrayList<AccessPath>();
+    public List<AccessPath> m_accessPaths = new ArrayList<AccessPath>();
     // Access path under the evaluation
-    AccessPath m_currentAccessPath = null;
-
-    /**
-     * Construct a leaf node
-     * @param id - node unique id
-     * @param nodeType - node type
-     * @param joinType - join type
-     * @param table - join table index
-     * @param joinExpr - join expression
-     * @param whereExpr - filter expression
-     * @param id - node id
-     */
-    JoinNode(int id, NodeType nodeType, JoinType joinType, int tableAliasIdx, AbstractExpression joinExpr, AbstractExpression  whereExpr) {
-        this(id, joinType, nodeType);
-        m_tableAliasIndex = tableAliasIdx;
-        m_joinExpr = joinExpr;
-        m_whereExpr = whereExpr;
-    }
-
-    /**
-     * Construct a join node
-     * @param id - node unique id
-     * @param joinType - join type
-     * @param leftNode - left node
-     * @param rightNode - right node
-     */
-    JoinNode(int id, JoinType joinType, JoinNode leftNode, JoinNode rightNode) {
-        this(id, joinType, NodeType.JOIN);
-        m_leftNode = leftNode;
-        m_rightNode = rightNode;
-    }
+    public AccessPath m_currentAccessPath = null;
 
     /**
      * Construct an empty join node
      */
-    private JoinNode(int id, JoinType joinType, NodeType nodeType) {
+    protected JoinNode(int id, JoinType joinType, NodeType nodeType) {
         m_id = id;
         m_joinType = joinType;
         m_nodeType = nodeType;
+        m_tableAliasIndex = StmtTableScan.NULL_ALIAS_INDEX;
     }
 
     /**
      * Deep clone
      */
     @Override
-    public Object clone() {
-        JoinNode newNode = new JoinNode(m_id, m_joinType, m_nodeType);
-        if (m_joinExpr != null) {
-            newNode.m_joinExpr = (AbstractExpression) m_joinExpr.clone();
-        }
-        if (m_whereExpr != null) {
-            newNode.m_whereExpr = (AbstractExpression) m_whereExpr.clone();
-        }
-        if (m_tableAliasIndex == StmtTableScan.NULL_ALIAS_INDEX) {
-            assert(m_leftNode != null && m_rightNode != null);
-            newNode.m_leftNode = (JoinNode) m_leftNode.clone();
-            newNode.m_rightNode = (JoinNode) m_rightNode.clone();
-        } else {
-            newNode.m_tableAliasIndex = m_tableAliasIndex;
-        }
-        return newNode;
+    abstract public Object clone();
+
+    public int getId() {
+        return m_id;
+    }
+
+    public void setId(int id) {
+        m_id = id;
+    }
+
+    public NodeType getNodeType() {
+        return m_nodeType;
+    }
+
+    public JoinType getJoinType() {
+        return m_joinType;
+    }
+
+    public void setJoinType(JoinType joinType) {
+        m_joinType = joinType;
+    }
+
+    public int getTableAliasIndex() {
+        return StmtTableScan.NULL_ALIAS_INDEX;
+    }
+
+    public JoinNode getLeftNode() {
+        return null;
+    }
+
+    public JoinNode getRightNode() {
+        return null;
+    }
+
+    public AbstractExpression getJoinExpression() {
+        return m_joinExpr;
+    }
+
+    public void setJoinExpression(AbstractExpression expr) {
+        m_joinExpr = expr;
+    }
+
+    public AbstractExpression getWhereExpression() {
+        return m_whereExpr;
+    }
+
+    public void setWhereExpression(AbstractExpression expr) {
+        m_whereExpr = expr;
     }
 
     /// For debug purposes:
@@ -210,7 +214,7 @@ public class JoinNode implements Cloneable {
      * So ALL manner of where clause but ONLY inner-outer column=column JOIN clauses can
      * influence partitioning.
      */
-    HashMap<AbstractExpression, Set<AbstractExpression> > getAllEquivalenceFilters()
+    public HashMap<AbstractExpression, Set<AbstractExpression> > getAllEquivalenceFilters()
     {
         HashMap<AbstractExpression, Set<AbstractExpression> > equivalenceSet =
                 new HashMap<AbstractExpression, Set<AbstractExpression> >();
@@ -274,7 +278,7 @@ public class JoinNode implements Cloneable {
     /**
      * Collect all JOIN and WHERE expressions combined with AND for the entire tree.
      */
-    AbstractExpression getAllInnerJoinFilters() {
+    public AbstractExpression getAllInnerJoinFilters() {
         assert(m_joinType == JoinType.INNER);
         ArrayDeque<JoinNode> joinNodes = new ArrayDeque<JoinNode>();
         ArrayDeque<AbstractExpression> in = new ArrayDeque<AbstractExpression>();
@@ -315,7 +319,7 @@ public class JoinNode implements Cloneable {
     /**
      * Get the WHERE expression for a single-table statement.
      */
-    AbstractExpression getSimpleFilterExpression()
+    public AbstractExpression getSimpleFilterExpression()
     {
         assert(m_leftNode == null);
         assert(m_rightNode == null);
@@ -331,7 +335,7 @@ public class JoinNode implements Cloneable {
     /**
      * Transform all RIGHT joins from the tree into the LEFT ones by swapping the nodes and their join types
      */
-    void toLeftJoin() {
+    public void toLeftJoin() {
         assert((m_leftNode != null && m_rightNode != null) || (m_leftNode == null && m_rightNode == null));
         if (m_leftNode == null && m_rightNode == null) {
             // End of recursion
@@ -353,7 +357,7 @@ public class JoinNode implements Cloneable {
     /**
      * Returns tables in the order they are joined in the tree by iterating the tree depth-first
      */
-    List<JoinNode> generateLeafNodesJoinOrder() {
+    public List<JoinNode> generateLeafNodesJoinOrder() {
         ArrayList<JoinNode> leafNodes = new ArrayList<JoinNode>();
         generateLeafNodesJoinOrderRecursive(this, leafNodes);
         return leafNodes;
@@ -376,7 +380,7 @@ public class JoinNode implements Cloneable {
     /**
      * Returns tables in the order they are joined in the tree by iterating the tree depth-first
      */
-    List<Integer> generateTableJoinOrder() {
+    public List<Integer> generateTableJoinOrder() {
         List<JoinNode> leafNodes = generateLeafNodesJoinOrder();
         ArrayList<Integer> tables = new ArrayList<Integer>();
         for (JoinNode node : leafNodes) {
@@ -388,7 +392,7 @@ public class JoinNode implements Cloneable {
     /**
      * Returns nodes in the order they are joined in the tree by iterating the tree depth-first
      */
-    List<JoinNode> generateAllNodesJoinOrder() {
+    public List<JoinNode> generateAllNodesJoinOrder() {
         ArrayList<JoinNode> nodes = new ArrayList<JoinNode>();
         generateAllNodesJoinOrderRecursive(this, nodes);
         return nodes;
@@ -409,7 +413,7 @@ public class JoinNode implements Cloneable {
     /**
      * Returns true if one of the tree nodes has outer join
      */
-    boolean hasOuterJoin() {
+    public boolean hasOuterJoin() {
         if (m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX) {
             return false;
         }
@@ -497,8 +501,8 @@ public class JoinNode implements Cloneable {
                 // that a node represent either a table (m_tableAliasIndex != StmtCatalogCache.NULL_ALIAS_INDEX) or
                 // a join of two nodes m_leftNode != null && m_rightNode != null
                 int tempAliasIdx = StmtTableScan.NULL_ALIAS_INDEX - 1 - child.m_id;
-                JoinNode tempNode = new JoinNode(
-                        -child.m_id, child.m_nodeType, child.m_joinType, tempAliasIdx, child.m_joinExpr, child.m_whereExpr);
+                JoinNode tempNode = new TableLeafNode(
+                        -child.m_id, tempAliasIdx, child.m_joinExpr, child.m_whereExpr);
                 if (child == m_leftNode) {
                     m_leftNode = tempNode;
                 } else {
@@ -517,15 +521,21 @@ public class JoinNode implements Cloneable {
     public static JoinNode reconstructJoinTreeFromTableNodes(List<JoinNode> tableNodes) {
         JoinNode root = null;
         for (JoinNode leafNode : tableNodes) {
-            assert(leafNode.m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX);
-            JoinNode node = new JoinNode(leafNode.m_id, leafNode.m_nodeType, leafNode.m_joinType, leafNode.m_tableAliasIndex, null, null);
+            JoinNode node = null;
+            if (leafNode.getNodeType() == JoinNode.NodeType.LEAF) {
+                node = new TableLeafNode(leafNode.m_id, leafNode.m_tableAliasIndex, null, null);
+            } else if (leafNode.getNodeType() == JoinNode.NodeType.SUBQUERY) {
+                node = new SubqueryLeafNode(leafNode.m_id, leafNode.m_tableAliasIndex, null, null);
+            } else {
+                assert(false);
+            }
             if (root == null) {
                 root = node;
             } else {
                 // We only care about the root node id to be able to reconnect the sub-trees
                 // The intermediate node id can be anything. For the final root node its id
                 // will be set later to the original tree's root id
-                root = new JoinNode(-node.m_id, JoinType.INNER, root, node);
+                root = new BranchNode(-node.m_id, JoinType.INNER, root, node);
             }
         }
         return root;
