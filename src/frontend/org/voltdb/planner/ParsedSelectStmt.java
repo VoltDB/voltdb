@@ -141,7 +141,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if ((node = stmtNode.attributes.get("distinct")) != null)
             distinct = Boolean.parseBoolean(node);
 
-        VoltXMLElement limitElement = null, offsetElement = null;
+        VoltXMLElement limitElement = null, offsetElement = null, havingElement = null;
         VoltXMLElement displayElement = null, orderbyElement = null, groupbyElement = null;
         for (VoltXMLElement child : stmtNode.children) {
             if (child.name.equalsIgnoreCase("limit")) {
@@ -154,6 +154,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 orderbyElement = child;
             } else if (child.name.equalsIgnoreCase("groupcolumns")) {
                 groupbyElement = child;
+            } else if (child.name.equalsIgnoreCase("having")) {
+                havingElement = child;
             }
         }
         parseLimitAndOffset(limitElement, offsetElement);
@@ -175,6 +177,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (orderbyElement != null && !guaranteesUniqueRow()) {
             parseOrderColumns(orderbyElement, false);
         }
+
+        if (havingElement != null) {
+            parseHavingExpression(havingElement, false);
+        }
         // At this point, we have collected all aggregations in the select statement.
         // We do not need aggregationList container in parseXMLtree
         // Make it null to prevent others adding elements to it when parsing the tree
@@ -189,14 +195,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         // Prepare for the AVG push-down optimization only if it might be required.
         if (mayNeedAvgPushdown()) {
-            processAvgPushdownOptimization(displayElement, orderbyElement, groupbyElement);
+            processAvgPushdownOptimization(displayElement, orderbyElement, groupbyElement, havingElement);
         }
 
         prepareMVBasedQueryFix();
     }
 
     private void processAvgPushdownOptimization (VoltXMLElement displayElement,
-            VoltXMLElement orderbyElement, VoltXMLElement groupbyElement) {
+            VoltXMLElement orderbyElement, VoltXMLElement groupbyElement, VoltXMLElement havingElement) {
 
         ArrayList<ParsedColInfo> tmpDisplayColumns = displayColumns;
         displayColumns = new ArrayList<ParsedColInfo>();
@@ -220,6 +226,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         if (orderbyElement != null) {
             parseOrderColumns(orderbyElement, true);
+        }
+        if (havingElement != null) {
+            parseHavingExpression(havingElement, true);
         }
         aggregationList = null;
         fillUpAggResultColumns();
@@ -409,6 +418,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             AbstractExpression expr = groupbyCol.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
             groupByExpressions.put(groupbyCol.alias,expr);
         }
+
+        if (having != null) {
+            having = having.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
+            ExpressionUtil.finalizeValueTypes(having);
+        }
+
     }
 
     /**
@@ -764,6 +779,40 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         findAllTVEs(order_col.expression, tveList);
         insertTVEsToAggResultColumns(tveList);
         orderColumns.add(order_col);
+    }
+
+    private void parseHavingExpression(VoltXMLElement havingNode, boolean isDistributed) {
+        aggregationList.clear();
+        assert(havingNode.children.size() == 1);
+        having = parseExpressionTree(havingNode.children.get(0));
+        assert(having != null);
+        if (isDistributed) {
+            having = having.replaceAVG();
+            updateAvgExpresions();
+        }
+        if (aggregationList.size() >= 1) {
+            hasAggregateExpression = true;
+        }
+
+        for (AbstractExpression expr: aggregationList) {
+            ParsedColInfo col = new ParsedColInfo();
+            col.expression = (AbstractExpression) expr.clone();
+            assert(col.expression instanceof AggregateExpression);
+            if (col.expression.getExpressionType() == ExpressionType.AGGREGATE_AVG) {
+                hasAverage = true;
+            }
+
+            col.tableName = "VOLT_TEMP_TABLE";
+            col.tableAlias = "VOLT_TEMP_TABLE";
+            col.columnName = "";
+
+            if (!aggResultColumns.contains(col)) {
+                // Try to check complexAggs earlier
+                hasComplexAgg = true;
+                aggResultColumns.add(col);
+                ExpressionUtil.finalizeValueTypes(expr);
+            }
+        }
     }
 
     @Override

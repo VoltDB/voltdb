@@ -930,6 +930,70 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         }
     }
 
+    public void testHavingClause() throws IOException, ProcCallException {
+        loadData();
+
+        Client client = this.getClient();
+        ClientResponse cr;
+        VoltTable vt;
+        long[][] expected;
+
+        for (String tb: tbs) {
+
+            // Test normal group by with expressions, addition, division for avg.
+            cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage), count(wage)+5, " +
+                    "sum(wage)/count(wage) from " + tb + " GROUP BY dept ORDER BY dept DESC;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] {{2, 90, 7, 45}, {1, 60, 8, 20} };
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, expected);
+
+            // Test having
+            cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage) from " + tb +
+                    " GROUP BY dept HAVING sum(wage) > 60 ORDER BY dept DESC;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] {{2, 90}};
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, expected);
+
+
+            cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage), count(wage)+5 from " + tb +
+                    " GROUP BY dept HAVING count(wage)+5 <> 7 ORDER BY dept DESC;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] {{1, 60, 8}};
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, expected);
+
+
+            // Test having clause not in display list
+            cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage) from " + tb +
+                    " GROUP BY dept HAVING count(wage)+5 <> 7 ORDER BY dept DESC;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] {{1, 60}};
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, expected);
+
+
+            // Test normal group by with expressions, addition, division for avg.
+            cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage), count(wage)+5, " +
+                    "sum(wage)/count(wage) from " + tb + " GROUP BY dept HAVING  sum(wage) < 80 ORDER BY dept DESC;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] {{1, 60, 8, 20} };
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, expected);
+
+            // Test Having with AVG
+            // TODO(xin)
+        }
+
+    }
+
+
     //
     // Suite builder boilerplate
     //
