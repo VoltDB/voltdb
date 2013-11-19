@@ -1392,15 +1392,14 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * @return
      */
     private void processScanResponse(ClientResponse response) {
+        setState(State.WAITING);
         if (response.getStatus() != ClientResponse.SUCCESS) {
-            setState(State.WAITING);
             logFailureResponse("Initial snapshot scan failed", response);
             return;
         }
 
         final VoltTable results[] = response.getResults();
         if (results.length == 1) {
-            setState(State.WAITING);
             final VoltTable result = results[0];
             boolean advanced = result.advanceRow();
             assert(advanced);
