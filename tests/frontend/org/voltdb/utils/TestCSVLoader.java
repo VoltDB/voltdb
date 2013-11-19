@@ -74,6 +74,8 @@ public class TestCSVLoader extends TestCase {
     @Override
     protected void setUp() throws Exception
     {
+        //Put in test mode
+        CSVLoader.testMode = true;
         super.setUp();
     }
 

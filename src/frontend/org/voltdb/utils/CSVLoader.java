@@ -112,6 +112,10 @@ public class CSVLoader {
     public static final long DEFAULT_COLUMN_LIMIT_SIZE = 16777216;
 
     /**
+     * Used for testing only.
+     */
+    public static boolean testMode = false;
+    /**
      * Configuration options.
      */
     public static class CSVConfig extends CLIConfig {
@@ -276,14 +280,12 @@ public class CSVLoader {
         } catch (Exception e) {
             m_log.error("Error connecting to the servers: "
                     + config.servers);
-            close_cleanup();
             System.exit(-1);
         }
         assert (csvClient != null);
 
         try {
             if (!CSVPartitionProcessor.initializeProcessorInformation(config, csvClient)) {
-                close_cleanup();
                 System.exit(-1);
             }
 
@@ -350,7 +352,11 @@ public class CSVLoader {
             m_log.info("Read " + insertCount + " rows from file and successfully inserted "
                     + ackCount + " rows (final)");
             produceFiles(ackCount, insertCount);
-            close_cleanup();
+            //In test junit mode we let it continue for reuse
+            if (!CSVLoader.testMode) {
+                System.exit(CSVFileReader.m_errorInfo.isEmpty() ? 0 : 1);
+            }
+            cleanup();
         } catch (Exception ex) {
             m_log.error("Exception Happened while loading CSV data: " + ex);
             System.exit(1);
@@ -480,6 +486,12 @@ public class CSVLoader {
             out_invaliderowfile.flush();
             out_logfile.flush();
             out_reportfile.flush();
+
+            //Close files.
+            out_invaliderowfile.close();
+            out_logfile.close();
+            out_reportfile.close();
+
         } catch (FileNotFoundException e) {
             m_log.error("CSV report directory '" + config.reportdir
                     + "' does not exist.");
@@ -489,7 +501,8 @@ public class CSVLoader {
 
     }
 
-    private static void close_cleanup() throws IOException,
+    //Resets variables for junit rerun.
+    private static void cleanup() throws IOException,
             InterruptedException {
         //Reset all this for tests which uses main to load csv data.
         CSVFileReader.m_errorInfo.clear();
@@ -500,8 +513,5 @@ public class CSVLoader {
         CSVFileReader.m_totalRowCount = new AtomicLong(0);
 
         CSVPartitionProcessor.m_partitionAcknowledgedCount = new AtomicLong(0);
-        out_invaliderowfile.close();
-        out_logfile.close();
-        out_reportfile.close();
     }
 }
