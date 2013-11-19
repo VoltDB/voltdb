@@ -1334,7 +1334,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
 
         if (response.getStatus() != ClientResponse.SUCCESS){
-            setState(State.FAILURE);
             logFailureResponse("Snapshot failed", response);
             return;
         }
@@ -1379,10 +1378,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         //Continue snapshotting even if a delete fails.
         setState(State.WAITING);
         if (response.getStatus() != ClientResponse.SUCCESS){
-            /*
-             * The delete may fail but the procedure should at least return success...
-             */
-            setState(State.FAILURE);
             logFailureResponse("Delete of snapshots failed", response);
             return;
         }
@@ -1410,7 +1405,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      */
     private void processScanResponse(ClientResponse response) {
         if (response.getStatus() != ClientResponse.SUCCESS){
-            setState(State.FAILURE);
             logFailureResponse("Initial snapshot scan failed", response);
             return;
         }
