@@ -103,8 +103,9 @@ public:
 
     /**
      * Optional tuple delete handler.
+     * returns true meaning that the tuple can be freed
      */
-    virtual bool notifyTupleDelete(TableTuple &tuple) {return false;}
+    virtual bool notifyTupleDelete(TableTuple &tuple) {return true;}
 
     /**
      * Optional block compaction handler.
@@ -116,11 +117,6 @@ public:
      */
     virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
                                      TableTuple &sourceTuple, TableTuple &targetTuple) {}
-
-    /**
-     * Optional tuple freeing check handler.
-     */
-    virtual bool canSafelyFreeTuple(TableTuple tuple) {return true;}
 
     /**
      * Table accessor.
