@@ -339,14 +339,14 @@ public class JDBC4Statement implements java.sql.Statement
     private JDBC4ResultSet createTrimmedResultSet(VoltTable input) throws SQLException
     {
         VoltTable result = input;
-        if (input.getRowCount() > maxRows) {
-            VoltTable clone = new VoltTable(input.getTableSchema());
+        if (maxRows > 0 && input.getRowCount() > maxRows) {
+            VoltTable trimmed = new VoltTable(input.getTableSchema());
             input.resetRowPosition();
             for (int i = 0; i < maxRows; i++) {
                 input.advanceRow();
-                clone.add(input.cloneRow());
+                trimmed.add(input.cloneRow());
             }
-            result = clone;
+            result = trimmed;
         }
         return new JDBC4ResultSet(this, result);
     }

@@ -482,6 +482,16 @@ public class TestJDBCDriver {
         }
         assertEquals(5, count);
 
+        // Verify 0 gets us everything again
+        cs.setMaxRows(0);
+        assertEquals(0, cs.getMaxRows());
+        rs = cs.executeQuery();
+        count = 0;
+        while (rs.next()) {
+            count++;
+        }
+        assertEquals(10, count);
+
         // Go for spot-on
         cs.setMaxRows(10);
         assertEquals(10, cs.getMaxRows());
