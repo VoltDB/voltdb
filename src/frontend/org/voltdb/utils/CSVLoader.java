@@ -353,7 +353,7 @@ public class CSVLoader {
                     + ackCount + " rows (final)");
             produceFiles(ackCount, insertCount);
             boolean noerrors = CSVFileReader.m_errorInfo.isEmpty();
-            cleanup();
+            close_cleanup();
             //In test junit mode we let it continue for reuse
             if (!CSVLoader.testMode) {
                 System.exit(noerrors ? 0 : 1);
@@ -487,7 +487,6 @@ public class CSVLoader {
             out_invaliderowfile.flush();
             out_logfile.flush();
             out_reportfile.flush();
-
         } catch (FileNotFoundException e) {
             m_log.error("CSV report directory '" + config.reportdir
                     + "' does not exist.");
@@ -497,8 +496,7 @@ public class CSVLoader {
 
     }
 
-    //Resets variables for junit rerun.
-    private static void cleanup() throws IOException,
+    private static void close_cleanup() throws IOException,
             InterruptedException {
         //Reset all this for tests which uses main to load csv data.
         CSVFileReader.m_errorInfo.clear();
