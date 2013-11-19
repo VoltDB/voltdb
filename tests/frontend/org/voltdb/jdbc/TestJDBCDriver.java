@@ -32,6 +32,7 @@ import java.io.File;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
@@ -92,7 +93,7 @@ public class TestJDBCDriver {
         pb.addPartitionInfo("CUSTOMER", "A1");
         pb.addPartitionInfo("NUMBER_NINE", "A1");
         pb.addStmtProcedure("InsertA", "INSERT INTO TT VALUES(?,?);", "TT.A1: 0");
-        pb.addStmtProcedure("SelectB", "SELECT * FROM CUSTOMER;");
+        pb.addStmtProcedure("SelectB", "SELECT * FROM TT;");
         boolean success = pb.compile(Configuration.getPathToCatalogForTest("jdbcdrivertest.jar"), 3, 1, 0);
         assert(success);
         MiscUtils.copyFile(pb.getPathToDeployment(), Configuration.getPathToCatalogForTest("jdbcdrivertest.xml"));
@@ -325,7 +326,7 @@ public class TestJDBCDriver {
     @Test
     public void testFilterProcedureByName() {
         try {
-            conn.getMetaData().getProcedures("blah", "blah", "InsertNewOrder");
+            conn.getMetaData().getProcedures("blah", "blah", "InsertA");
         } catch (SQLException e) {
             return;
         }
@@ -450,5 +451,45 @@ public class TestJDBCDriver {
         }
         // Restore a working connection for any remaining tests
         startServer();
+    }
+
+    @Test
+    public void testSetMaxRows() throws SQLException    {
+        // Add 10 rows
+        PreparedStatement ins = conn.prepareCall("{call InsertA(?, ?)}");
+        for (int i = 0; i < 10; i++) {
+            ins.setInt(1, i);
+            ins.setInt(2, i + 50);
+            ins.execute();
+        }
+
+        // check for our 10 rows
+        PreparedStatement cs = conn.prepareCall("{call SelectB}");
+        ResultSet rs = cs.executeQuery();
+        int count = 0;
+        while (rs.next()) {
+            count++;
+        }
+        assertEquals(10, count);
+
+        // constrain to 5 and try again.
+        cs.setMaxRows(5);
+        assertEquals(5, cs.getMaxRows());
+        rs = cs.executeQuery();
+        count = 0;
+        while (rs.next()) {
+            count++;
+        }
+        assertEquals(5, count);
+
+        // Go for spot-on
+        cs.setMaxRows(10);
+        assertEquals(10, cs.getMaxRows());
+        rs = cs.executeQuery();
+        count = 0;
+        while (rs.next()) {
+            count++;
+        }
+        assertEquals(10, count);
     }
 }
