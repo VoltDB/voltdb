@@ -356,7 +356,7 @@ public class CSVLoader {
             close_cleanup();
             //In test junit mode we let it continue for reuse
             if (!CSVLoader.testMode) {
-                System.exit(noerrors ? 0 : 1);
+                System.exit(noerrors ? 0 : -1);
             }
         } catch (Exception ex) {
             m_log.error("Exception Happened while loading CSV data: " + ex);
