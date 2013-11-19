@@ -338,6 +338,8 @@ public abstract class TheHashinator {
         return hashToPartition(this, partitionParamType, partitionValue);
     }
 
+    private static final VoltLogger debug = new VoltLogger("ELASTICDBG");
+
     /**
      * Update the hashinator in a thread safe manner with a newer version of the hash function.
      * A version number must be provided and the new config will only be used if it is greater than
@@ -366,6 +368,7 @@ public abstract class TheHashinator {
 
                         @Override
                         public void undo() {
+                            debug.info("Rolling back java hashinator");
                             boolean rolledBack = instance.compareAndSet(update, snapshot);
                             if (!rolledBack) {
                                 hostLogger.info(

@@ -36,6 +36,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 
 public class ForeignHost {
@@ -288,6 +289,9 @@ public class ForeignHost {
         mailbox.deliver(message);
     }
 
+    private static final VoltLogger debug = new VoltLogger("ELASTICDBG");
+
+
     /** Read data from the network. Runs in the context of Port when
      * data is available.
      * @throws IOException
@@ -303,6 +307,17 @@ public class ForeignHost {
             byte messageBytes[] = new byte[in.getInt()];
             in.get(messageBytes);
             String message = new String(messageBytes, "UTF-8");
+            if (message.equals("doDump")) {
+                if (!debug.isDebugEnabled()) return;
+                ByteBuffer buf = ByteBuffer.wrap(TheHashinator.getCurrentConfig().configBytes);
+                int count = buf.getInt();
+                StringBuilder sb = new StringBuilder();
+                for (int ii = 0; ii < count; ii++) {
+                    sb.append(buf.getInt() + " - " + buf.getInt() + ", ");
+                }
+                debug.debug(sb);
+                return;
+            }
             message = String.format("Fatal error from id,hostname(%d,%s): %s",
                     m_hostId, hostnameAndIPAndPort(), message);
             org.voltdb.VoltDB.crashLocalVoltDB(message, false, null);
