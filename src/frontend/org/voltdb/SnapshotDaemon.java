@@ -1334,7 +1334,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             assert(advanced);
             assert(result.getColumnCount() == 1);
             assert(result.getColumnType(0) == VoltType.STRING);
-            SNAP_LOG.error("Snapshot failed with failure response: " + result.getString(0));
+            SNAP_LOG.warn("Snapshot failed with failure response: " + result.getString(0));
             m_snapshots.removeLast();
             return;
         }
@@ -1378,7 +1378,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             assert(advanced);
             assert(result.getColumnCount() == 1);
             assert(result.getColumnType(0) == VoltType.STRING);
-            SNAP_LOG.error("Snapshot delete failed with failure response: " + result.getString("ERR_MSG"));
+            SNAP_LOG.warn("Snapshot delete failed with failure response: " + result.getString("ERR_MSG"));
             return;
         }
     }
@@ -1405,7 +1405,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             assert(advanced);
             assert(result.getColumnCount() == 1);
             assert(result.getColumnType(0) == VoltType.STRING);
-            SNAP_LOG.error("Initial snapshot scan failed with failure response: " + result.getString("ERR_MSG"));
+            SNAP_LOG.warn("Initial snapshot scan failed with failure response: " + result.getString("ERR_MSG"));
             return;
         }
         assert(results.length == 3);
@@ -1470,9 +1470,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     }
 
     private void logFailureResponse(String message, ClientResponse response) {
-        SNAP_LOG.error(message, response.getException());
+        SNAP_LOG.warn(message, response.getException());
         if (response.getStatusString() != null) {
-            SNAP_LOG.error(response.getStatusString());
+            SNAP_LOG.warn(response.getStatusString());
         }
     }
 
