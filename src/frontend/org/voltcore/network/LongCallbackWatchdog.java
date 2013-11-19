@@ -31,10 +31,9 @@ public class LongCallbackWatchdog {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
-    public static final long TIMEOUT_NANOS = 100000000;
-
-    //public static final boolean ENABLED = System.getProperties().contains("networkwatchdog");
     public static final boolean ENABLED = System.getenv().containsKey("NETWORKWATCHDOG");
+    public static final long TIMEOUT_NANOS = ENABLED ? Long.valueOf(System.getenv("NETWORKWATCHDOG")) * 1000 * 1000 : 0;
+    public static final long SLEEP_MILLIS = 100;
 
     private static boolean m_watchDogStarted = false;
 
@@ -88,7 +87,7 @@ public class LongCallbackWatchdog {
                 try {
                     // loop forever, as this is a daemon thread
                     while (true) {
-                        try { Thread.sleep(100); } catch (InterruptedException e1) {}
+                        try { Thread.sleep(SLEEP_MILLIS); } catch (InterruptedException e1) {}
 
                         long now = System.nanoTime();
 
