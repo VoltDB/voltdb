@@ -405,7 +405,7 @@ public abstract class AbstractParsedStmt {
         }
         expr.setExpressionType(exprType);
 
-        if (exprType == ExpressionType.CASEWHEN || exprType == ExpressionType.ALTERNATIVE) {
+        if (exprType == ExpressionType.OPERATOR_CASE_WHEN || exprType == ExpressionType.OPERATOR_ALTERNATIVE) {
             String valueType = exprNode.attributes.get("valuetype");
             expr.setValueType(VoltType.typeFromString(valueType));
         }

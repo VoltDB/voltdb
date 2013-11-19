@@ -123,7 +123,7 @@ public class OperatorExpression extends AbstractExpression {
             }
             return;
         }
-        if (type == ExpressionType.CASEWHEN || type == ExpressionType.ALTERNATIVE) {
+        if (type == ExpressionType.OPERATOR_CASE_WHEN || type == ExpressionType.OPERATOR_ALTERNATIVE) {
             assert(m_valueType != null);
             m_valueSize = m_valueType.getMaxLengthInBytes();
             return;

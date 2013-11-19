@@ -2315,6 +2315,10 @@ public class TestFunctionsSuite extends RegressionSuite {
                 // Test generalized expression index with a constant argument.
                 "CREATE INDEX R1_ABS_ID_SCALED ON R1 ( ID / 3 ); " +
 
+                //Test generalized expression index with case when.
+                "CREATE INDEX R1_CASEWHEN ON R1 (CASE WHEN num < 3 THEN num/2 ELSE num + 10 END); " +
+
+
                 "CREATE TABLE R2 ( " +
                 "ID INTEGER DEFAULT 0 NOT NULL, " +
                 "DESC VARCHAR(300), " +

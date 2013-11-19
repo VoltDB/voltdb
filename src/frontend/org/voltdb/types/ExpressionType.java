@@ -124,8 +124,8 @@ public enum ExpressionType {
     // -----------------------------
     // Internals added for CASE WHEN expression.
     // -----------------------------
-    CASEWHEN       (OperatorExpression.class,  300, "CASEWHEN"),
-    ALTERNATIVE    (OperatorExpression.class,  301, "ALTERNATIVE")
+    OPERATOR_CASE_WHEN       (OperatorExpression.class,  300, "CASEWHEN"),
+    OPERATOR_ALTERNATIVE     (OperatorExpression.class,  301, "ALTERNATIVE")
     ;
 
     private final int m_value;
@@ -152,6 +152,13 @@ public enum ExpressionType {
         for (ExpressionType vt : EnumSet.allOf(ExpressionType.class)) {
             ExpressionType.idx_lookup.put(vt.m_value, vt);
             String name = vt.name().toLowerCase();
+            if (name.equals("operator_case_when")) {
+                name = "casewhen"; // Hsql's expression type name
+            }
+            if (name.equals("operator_alternative")) {
+                name = "alternative"; // Hsql's expression type name
+            }
+
             ExpressionType.name_lookup.put(name, vt);
             //
             // Also store the name of the operation without the prefix

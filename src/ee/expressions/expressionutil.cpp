@@ -482,10 +482,10 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     case (EXPRESSION_TYPE_HASH_RANGE):
         ret = hashRangeFactory(obj);
         break;
-    case (EXPRESSION_TYPE_CASE_WHEN):
+    case (EXPRESSION_TYPE_OPERATOR_CASE_WHEN):
         ret = caseWhenFactory(vt, lc, rc);
         break;
-    case (EXPRESSION_TYPE_ALTERNATIVE):
+    case (EXPRESSION_TYPE_OPERATOR_ALTERNATIVE):
         ret = new OperatorAlternativeExpression(lc, rc);
         break;
         // must handle all known expressions in this factory

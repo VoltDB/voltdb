@@ -542,11 +542,11 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_HASH_RANGE: {
         return "HASH_RANGE";
     }
-    case EXPRESSION_TYPE_CASE_WHEN: {
-        return "CASE_WHEN";
+    case EXPRESSION_TYPE_OPERATOR_CASE_WHEN: {
+        return "OPERATOR_CASE_WHEN";
     }
-    case EXPRESSION_TYPE_ALTERNATIVE: {
-        return "CASE_WHEN_ALTERNATIVE";
+    case EXPRESSION_TYPE_OPERATOR_ALTERNATIVE: {
+        return "OPERATOR_ALTERNATIVE";
     }
     }
     return "INVALID";
@@ -622,10 +622,10 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_VALUE_VECTOR;
     } else if (str == "HASH_RANGE") {
         return EXPRESSION_TYPE_HASH_RANGE;
-    } else if (str == "CASEWHEN") {
-        return EXPRESSION_TYPE_CASE_WHEN;
-    } else if (str == "ALTERNATIVE") {
-        return EXPRESSION_TYPE_ALTERNATIVE;
+    } else if (str == "OPERATOR_CASE_WHEN") {
+        return EXPRESSION_TYPE_OPERATOR_CASE_WHEN;
+    } else if (str == "OPERATOR_ALTERNATIVE") {
+        return EXPRESSION_TYPE_OPERATOR_ALTERNATIVE;
     }
 
     return EXPRESSION_TYPE_INVALID;

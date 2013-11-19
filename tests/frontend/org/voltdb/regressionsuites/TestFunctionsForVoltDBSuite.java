@@ -250,15 +250,15 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
     }
 
     public void testDECODE() throws NoConnectionsException, IOException, ProcCallException {
-        DECODE();
-        DECODENoDefault();
-        DECODEVeryLong();
-        DECODEInlineVarcharColumn_ENG5078();
-        DECODEAsInput();
-        DECODEWithNULL();
+        subtestDECODE();
+        subtestDECODENoDefault();
+        subtestDECODEVeryLong();
+        subtestDECODEInlineVarcharColumn_ENG5078();
+        subtestDECODEAsInput();
+        subtestDECODEWithNULL();
     }
 
-    private void DECODE() throws NoConnectionsException, IOException, ProcCallException {
+    private void subtestDECODE() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING DECODE");
         Client client = getClient();
         ClientResponse cr;
@@ -355,7 +355,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
-    private void DECODENoDefault() throws NoConnectionsException, IOException, ProcCallException {
+    private void subtestDECODENoDefault() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING DECODE No Default");
         Client client = getClient();
         ClientResponse cr;
@@ -376,7 +376,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(null,result.getString(1));
     }
 
-    private void DECODEVeryLong() throws NoConnectionsException, IOException, ProcCallException {
+    private void subtestDECODEVeryLong() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING DECODE Exceed Limit");
         Client client = getClient();
         ClientResponse cr;
@@ -397,7 +397,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals("where",result.getString(1));
     }
 
-    private void DECODEInlineVarcharColumn_ENG5078()
+    private void subtestDECODEInlineVarcharColumn_ENG5078()
     throws NoConnectionsException, IOException, ProcCallException
     {
         System.out.println("STARTING DECODE inline varchar column pass-through");
@@ -424,7 +424,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
-    private void DECODEAsInput() throws NoConnectionsException, IOException, ProcCallException {
+    private void subtestDECODEAsInput() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING DECODE No Default");
         Client client = getClient();
         ClientResponse cr;
@@ -499,7 +499,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
-    private void DECODEWithNULL() throws NoConnectionsException, IOException, ProcCallException {
+    private void subtestDECODEWithNULL() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING DECODE with NULL");
         Client client = getClient();
         ClientResponse cr;

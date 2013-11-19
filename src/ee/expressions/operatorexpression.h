@@ -127,61 +127,44 @@ private:
 class OperatorAlternativeExpression : public AbstractExpression {
 public:
     OperatorAlternativeExpression(AbstractExpression *left, AbstractExpression *right)
-        : AbstractExpression(EXPRESSION_TYPE_ALTERNATIVE, left, right)
+        : AbstractExpression(EXPRESSION_TYPE_OPERATOR_ALTERNATIVE, left, right)
     {
-        m_left = left;
-        m_right = right;
+        assert (m_left);
+        assert (m_right);
     };
 
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
-        assert (m_left);
-
-        if (m_caseThen) {
-            return m_left->eval(tuple1, tuple2);
-        } else {
-            return m_right->eval(tuple1, tuple2);
-        }
+        throwFatalException("OperatorAlternativeExpression::eval function has no implementation.");
     }
 
     std::string debugInfo(const std::string &spacer) const {
-        return (spacer + "Case When alternative Expression");
+        return (spacer + "Operator ALTERNATIVE Expression");
     }
 
-    void setCaseThen(bool thenClause) {
-        m_caseThen = thenClause;
-    }
-private:
-    bool m_caseThen;
 };
 
 class OperatorCaseWhenExpression : public AbstractExpression {
 public:
     OperatorCaseWhenExpression(ValueType vt, AbstractExpression *left, OperatorAlternativeExpression *right)
-        : AbstractExpression(EXPRESSION_TYPE_CASE_WHEN, left, right)
+        : AbstractExpression(EXPRESSION_TYPE_OPERATOR_CASE_WHEN, left, right)
         , m_returnType(vt)
     {
-        m_left = left;
-        m_right = right;
     };
 
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
         assert (m_left);
         assert (m_right);
-
         NValue thenClause = m_left->eval(tuple1, tuple2);
-        OperatorAlternativeExpression* alternative = dynamic_cast<OperatorAlternativeExpression*> (m_right);
-        assert(alternative);
-        bool thenCaseBool = true;
-        if (thenClause.isFalse()) {
-            thenCaseBool = false;
-        }
-        alternative->setCaseThen(thenCaseBool);
 
-        return m_right->eval(tuple1, tuple2).castAs(m_returnType);
+        if (thenClause.isTrue()) {
+            return m_right->getLeft()->eval(tuple1, tuple2).castAs(m_returnType);
+        } else {
+            return m_right->getRight()->eval(tuple1, tuple2).castAs(m_returnType);
+        }
     }
 
     std::string debugInfo(const std::string &spacer) const {
-        return (spacer + "Case When Expression");
+        return (spacer + "Operator CASE WHEN Expression");
     }
 private:
     ValueType m_returnType;
