@@ -29,7 +29,6 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -38,7 +37,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledFuture;
@@ -63,13 +61,10 @@ import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.ReverseDNSPolicy;
 import org.voltcore.network.VoltNetworkPool;
-import org.voltcore.network.VoltPort;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
-import org.voltcore.utils.EstTime;
-import org.voltcore.utils.Pair;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.ClientInterfaceHandleManager.Iv2InFlight;
 import org.voltdb.SystemProcedureCatalog.Config;
@@ -88,21 +83,14 @@ import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
 import org.voltdb.compiler.AsyncCompilerResult;
 import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
-import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
-import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
-import org.voltdb.dtxn.LatencyStats.LatencyInfo;
-import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.InitiateResponseMessage;
-import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.LocalMailbox;
-import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -114,6 +102,17 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
 import com.google.common.util.concurrent.MoreExecutors;
+import java.util.Iterator;
+import java.util.concurrent.FutureTask;
+import org.voltcore.network.VoltPort;
+import org.voltcore.utils.EstTime;
+import org.voltcore.utils.Pair;
+import org.voltdb.compiler.CatalogChangeResult;
+import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
+import org.voltdb.dtxn.LatencyStats.LatencyInfo;
+import org.voltdb.messaging.FastSerializer;
+import org.voltdb.messaging.Iv2EndOfLogMessage;
+import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -1804,29 +1803,21 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         int partition = -1;
         if (catProc.getSinglepartition()) {
             // break out the Hashinator and calculate the appropriate partition
+            Object invocationParameter = null;
             try {
-                partition =
-                        getPartitionForProcedure(
-                                catProc.getPartitionparameter(),
-                                catProc.getPartitioncolumn().getType(),
-                                task);
-            }
-            catch (RuntimeException e) {
+                invocationParameter = task.getParameterAtIndex(catProc.getPartitionparameter());
+                partition = TheHashinator.getPartitionForParameter(catProc.getPartitioncolumn().getType(),
+                        invocationParameter);
+            } catch (Exception e) {
                 // unable to hash to a site, return an error
                 String errorMessage = "Error sending procedure "
                         + task.procName + " to the correct partition. Make sure parameter values are correct.";
                 authLog.l7dlog( Level.WARN,
                         LogKeys.host_ClientInterface_unableToRouteSinglePartitionInvocation.name(),
-                        new Object[] { task.procName }, null);
+                        new Object[]{task.procName, invocationParameter,
+                            catProc.getPartitioncolumn().getName(), catProc.getPartitioncolumn().getType()}, null);
                 return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                         new VoltTable[0], errorMessage, task.clientHandle);
-            }
-            catch (Exception e) {
-                authLog.l7dlog( Level.WARN,
-                        LogKeys.host_ClientInterface_unableToRouteSinglePartitionInvocation.name(),
-                        new Object[] { task.procName }, null);
-                return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                        new VoltTable[0], e.getMessage(), task.clientHandle);
             }
         }
         boolean success =
