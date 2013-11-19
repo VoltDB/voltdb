@@ -396,18 +396,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return m_es.submit(new Callable<Long>() {
                 @Override
                 public Long call() throws Exception {
-                    return m_committedBuffers.sizeInBytes();
+                    return m_committedBuffers.sizeInBytes() + m_polledBlockSize;
                 }
             }).get();
         } catch (Throwable t) {
             Throwables.propagate(t);
             return 0;
         }
-    }
-
-    //In flight bytes pulled but not processed.
-    public long sizeInFlightBytes() {
-        return m_polledBlockSize;
     }
 
     private void pushExportBufferImpl(

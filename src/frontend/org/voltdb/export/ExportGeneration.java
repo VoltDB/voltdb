@@ -580,7 +580,7 @@ public class ExportGeneration {
             //        " signature " + signature);
             return 0;
         }
-        return source.sizeInBytes() + source.sizeInFlightBytes();
+        return source.sizeInBytes();
     }
 
     /*
