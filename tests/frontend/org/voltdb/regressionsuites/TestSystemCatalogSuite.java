@@ -105,6 +105,16 @@ public class TestSystemCatalogSuite extends RegressionSuite {
         System.out.println(results[0]);
     }
 
+    public void testTypeInfoSelector() throws IOException, ProcCallException
+    {
+        Client client = getClient();
+        VoltTable[] results = client.callProcedure("@SystemCatalog", "TYPEINFO").getResults();
+        assertEquals(9, results[0].getRowCount()); // Will break if we add a type, hopefully gets
+                                                   // type-adder to double-check they've got things right
+        assertEquals(18, results[0].getColumnCount());
+        System.out.println(results[0]);
+    }
+
     public void testJdbcAccess() throws IOException, ProcCallException, ClassNotFoundException, SQLException
     {
         String url = String.format("jdbc:voltdb://localhost:%d", port(0));
@@ -151,6 +161,11 @@ public class TestSystemCatalogSuite extends RegressionSuite {
         {
             System.out.println(blah.getString(3));
             System.out.println(blah.getString(4));
+        }
+        blah.close();
+        blah = huh.getMetaData().getTypeInfo();
+        while (blah.next()) {
+            assertTrue(blah.getString("TYPE_NAME") != null);
         }
         blah.close();
     }
