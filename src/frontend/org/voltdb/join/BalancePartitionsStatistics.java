@@ -24,7 +24,6 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import java.io.Serializable;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -35,7 +34,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.StatsSource;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-import org.voltdb.utils.MiscUtils;
 
 import com.google.common.collect.Maps;
 
@@ -77,7 +75,7 @@ public class BalancePartitionsStatistics extends StatsSource {
         this.overallStats = new StatsPoint("Overall", totalRangeSize);
 
         this.totalRangeSize = totalRangeSize;
-        this.lastReportTime = (long)overallStats.getStartTimeNanos();
+        this.lastReportTime = overallStats.getStartTimeNanos();
         this.lastBalanceDuration = 0;
         this.balanceStart = 0;
 
@@ -157,6 +155,18 @@ public class BalancePartitionsStatistics extends StatsSource {
         }
         // Immediately start the next interval.
         this.startInterval();
+    }
+
+    // Mainly for testing.
+    public StatsPoint getOverallStats()
+    {
+        return this.overallStats;
+    }
+
+    // Mainly for testing.
+    public StatsPoint getIntervalStats()
+    {
+        return this.intervalStats;
     }
 
     private void markStatsPoint()
@@ -403,7 +413,7 @@ public class BalancePartitionsStatistics extends StatsSource {
 
         public double getMegabytesPerSecond()
         {
-            return ((double)movedBytes / (1024.0 * 1024.0)) / (getDurationMillis() / 1000.0);
+            return (movedBytes / (1024.0 * 1024.0)) / (getDurationMillis() / 1000.0);
         }
 
         public double getInvocationsPerSecond()
