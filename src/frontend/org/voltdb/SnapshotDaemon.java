@@ -174,13 +174,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
          * when it completes.
          */
         SNAPSHOTTING,
-
-        /*
-         * Failure state. This state is entered when a sysproc
-         * fails and the snapshot Daemon can't recover. An error is logged
-         * and the Daemon stops working
-         */
-        FAILURE;
     }
 
     private State m_state = State.STARTUP;
@@ -290,7 +283,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
                 final VoltTable results[] = clientResponse.getResults();
                 if (results.length == 1) {
-                    setState(State.FAILURE);
                     final VoltTable result = results[0];
                     boolean advanced = result.advanceRow();
                     assert(advanced);
@@ -1179,8 +1171,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             initiateSnapshotScan();
         } else if (m_state == State.SCANNING) {
             return;
-        } else if (m_state == State.FAILURE) {
-            return;
         } else if (m_state == State.WAITING){
             processWaitingPeriodicWork(now);
         } else if (m_state == State.SNAPSHOTTING) {
@@ -1310,8 +1300,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             throw new RuntimeException("SnapshotDaemon received a response in the startup state");
         } else if (m_state == State.SCANNING) {
             processScanResponse(response);
-        } else if (m_state == State.FAILURE) {
-            return;
         } else if (m_state == State.DELETING){
             processDeleteResponse(response);
             return;
@@ -1404,14 +1392,15 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * @return
      */
     private void processScanResponse(ClientResponse response) {
-        if (response.getStatus() != ClientResponse.SUCCESS){
+        if (response.getStatus() != ClientResponse.SUCCESS) {
+            setState(State.WAITING);
             logFailureResponse("Initial snapshot scan failed", response);
             return;
         }
 
         final VoltTable results[] = response.getResults();
         if (results.length == 1) {
-            setState(State.FAILURE);
+            setState(State.WAITING);
             final VoltTable result = results[0];
             boolean advanced = result.advanceRow();
             assert(advanced);
