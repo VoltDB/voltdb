@@ -307,7 +307,7 @@ public class JDBC4Statement implements java.sql.Statement
     private int fetchDirection = ResultSet.FETCH_FORWARD;
     private int fetchSize = 0;
     private final int maxFieldSize = VoltType.MAX_VALUE_LENGTH;
-    private final int maxRows = VoltTable.MAX_SERIALIZED_TABLE_LENGTH/2; // Not exactly true, but best type of estimate we can give...
+    private int maxRows = VoltTable.MAX_SERIALIZED_TABLE_LENGTH/2; // Not exactly true, but best type of estimate we can give...
     protected JDBC4Connection sourceConnection;
     private boolean isPoolable = false;
 
@@ -335,6 +335,22 @@ public class JDBC4Statement implements java.sql.Statement
             this.result.close();
         this.result = null;
     }
+
+    private JDBC4ResultSet createTrimmedResultSet(VoltTable input) throws SQLException
+    {
+        VoltTable result = input;
+        if (maxRows > 0 && input.getRowCount() > maxRows) {
+            VoltTable trimmed = new VoltTable(input.getTableSchema());
+            input.resetRowPosition();
+            for (int i = 0; i < maxRows; i++) {
+                input.advanceRow();
+                trimmed.add(input.cloneRow());
+            }
+            result = trimmed;
+        }
+        return new JDBC4ResultSet(this, result);
+    }
+
     private void setCurrentResult(VoltTable[] tables, int updateCount) throws SQLException
     {
         this.tableResults = tables;
@@ -345,7 +361,7 @@ public class JDBC4Statement implements java.sql.Statement
         if (this.tableResults == null || this.tableResults.length == 0)
             return;
         this.tableResultIndex = 0;
-        this.result = new JDBC4ResultSet(this, this.tableResults[this.tableResultIndex]);
+        this.result = createTrimmedResultSet(this.tableResults[this.tableResultIndex]);
     }
 
     private void closeAllOpenResults() throws SQLException
@@ -638,7 +654,7 @@ public class JDBC4Statement implements java.sql.Statement
                     this.lastUpdateCount = (int)table.fetchRow(0).getLong(0);
                 else
                 {
-                    this.result = new JDBC4ResultSet(this, table);
+                    this.result = createTrimmedResultSet(table);
                     return true;
                 }
             }
@@ -770,7 +786,7 @@ public class JDBC4Statement implements java.sql.Statement
         checkClosed();
         if (max < 0)
             throw SQLError.get(SQLError.ILLEGAL_ARGUMENT, max);
-        throw SQLError.noSupport(); // Not supported by provider - could hack around with limit/top injection, but it gets ugly of the submitted statement also contains this... What we'd need for this feature is cursor/streamed data retrieval from the provider.
+        this.maxRows = max;
     }
 
     // Requests that a Statement be pooled or not pooled.
