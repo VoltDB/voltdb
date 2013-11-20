@@ -22,6 +22,8 @@ import java.util.List;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -30,6 +32,7 @@ import org.voltdb.plannodes.IndexCountPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.TableCountPlanNode;
+import org.voltdb.types.ExpressionType;
 
 public class ReplaceWithIndexCounter extends MicroOptimization {
 
@@ -86,6 +89,21 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
         if (child instanceof SeqScanPlanNode) {
             if (((SeqScanPlanNode)child).getPredicate() != null) {
                 return plan;
+            }
+            if (aggplan.getPostPredicate() != null) {
+                AbstractExpression postPredicate = aggplan.getPostPredicate();
+                List<AbstractExpression> aggList = postPredicate.findAllSubexpressionsOfClass(AggregateExpression.class);
+
+                boolean allCountStar = true;
+                for (AbstractExpression expr: aggList) {
+                    if (expr.getExpressionType() != ExpressionType.AGGREGATE_COUNT_STAR) {
+                        allCountStar = false;
+                        break;
+                    }
+                }
+                if (allCountStar) {
+                    return plan;
+                }
             }
             return new TableCountPlanNode((AbstractScanPlanNode)child, aggplan);
         }

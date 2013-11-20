@@ -28,3 +28,7 @@ INSERT INTO @dmltable VALUES (_id, _value[int16], _value[int16], _value[int16], 
 <basic-select.sql>
 
 
+--- test HAVING
+SELECT _variable[#grouped], COUNT(*) AS FOO FROM @fromtables GROUP BY __[#grouped] HAVING @agg(_variable[@comparabletype]) _cmp @comparableconstant
+SELECT _variable[#grouped], COUNT(*) AS FOO FROM @fromtables GROUP BY __[#grouped] HAVING @agg(_variable[@comparabletype]) _cmp @comparableconstant ORDER BY 2, 1 _optionallimitoffset 
+

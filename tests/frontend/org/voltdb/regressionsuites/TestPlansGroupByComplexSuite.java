@@ -939,7 +939,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         long[][] expected;
 
         for (String tb: tbs) {
-
             // Test normal group by with expressions, addition, division for avg.
             cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage), count(wage)+5, " +
                     "sum(wage)/count(wage) from " + tb + " GROUP BY dept ORDER BY dept DESC;");
@@ -987,10 +986,22 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
-            // Test Having with AVG
-            // TODO(xin)
-        }
+            // Test Having with COUNT(*)
+            cr = client.callProcedure("@AdHoc", "SELECT count(*) from " + tb +
+                    " HAVING count(*) > 60 " +
+                    " ORDER BY 1 DESC;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            assertTrue(vt.getRowCount() == 0);
 
+            // Test Having with AVG
+            cr = client.callProcedure("@AdHoc", "SELECT AVG(wage) from " + tb +
+                    " HAVING SUM(id) > 20 " +
+                    " ORDER BY 1 DESC;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            assertTrue(vt.getRowCount() == 0);
+        }
     }
 
 

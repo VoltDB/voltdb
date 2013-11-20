@@ -40,10 +40,14 @@ SELECT DISTINCT _variable[@comparabletype] FROM @fromtables
 SELECT ALL _variable[@comparabletype] FROM @fromtables
 --- test aggregate functions (COUNT, SUM, MAX, MIN, AVG)
 SELECT @agg(_variable[@comparabletype]) FROM @fromtables
+--- test having
+SELECT @agg(_variable[@comparabletype]) FROM @fromtables HAVING @agg(_variable[@comparabletype]) _cmp @comparableconstant
 
 --- count(*), baby
 -- TODO: migrate cases like this that are not columntype/comparabletype-specific to their own template/suite
 SELECT COUNT(*) FROM @fromtables
+SELECT COUNT(*) FROM @fromtables HAVING @agg(_variable[@comparabletype]) _cmp @comparableconstant
+SELECT COUNT(*) FROM @fromtables HAVING COUNT(*) _cmp @comparableconstant
 
 -- test where expressions
 --- test comparison operators (<, <=, =, >=, >)
@@ -68,6 +72,7 @@ SELECT _variable[#order], _variable FROM @fromtables ORDER BY __[#order] _sortor
 SELECT _variable[#grouped], COUNT(*) AS FOO FROM @fromtables GROUP BY __[#grouped]
 -- test GROUP BY ORDER BY COUNT(*) with optional LIMIT/OFFSET
 SELECT _variable[#grouped], COUNT(*) AS FOO FROM @fromtables GROUP BY __[#grouped] ORDER BY 2, 1 _optionallimitoffset
+
 -- test INNER JOIN (we'll do more two-table join fun separately, this just checks syntax)
 SELECT * FROM @fromtables LHS INNER JOIN @fromtables RHS ON LHS.@idcol = RHS.@idcol
 -- TODO: If the intent is to support a schema with multiple id-partitioned tables,

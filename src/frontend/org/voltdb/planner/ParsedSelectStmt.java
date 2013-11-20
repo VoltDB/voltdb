@@ -112,6 +112,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private ArrayList<ParsedColInfo> avgPushdownDisplayColumns = null;
     private ArrayList<ParsedColInfo> avgPushdownAggResultColumns = null;
     private ArrayList<ParsedColInfo> avgPushdownOrderColumns = null;
+    private AbstractExpression avgPushdownHaving = null;
     private NodeSchema avgPushdownNewAggSchema;
 
     public long limit = -1;
@@ -210,6 +211,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         aggResultColumns = new ArrayList<ParsedColInfo>();
         ArrayList<ParsedColInfo> tmpOrderColumns = orderColumns;
         orderColumns = new ArrayList<ParsedColInfo>();
+        AbstractExpression tmpHaving = having;
+
 
         boolean tmpHasComplexAgg = hasComplexAgg();
         NodeSchema tmpNodeSchema = projectSchema;
@@ -239,12 +242,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         avgPushdownAggResultColumns = aggResultColumns;
         avgPushdownOrderColumns = orderColumns;
         avgPushdownNewAggSchema = projectSchema;
+        avgPushdownHaving = having;
 
         displayColumns = tmpDisplayColumns;
         aggResultColumns = tmpAggResultColumns;
         orderColumns = tmpOrderColumns;
         projectSchema = tmpNodeSchema;
         hasComplexAgg = tmpHasComplexAgg;
+        having = tmpHaving;
     }
 
     /**
@@ -256,6 +261,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         orderColumns = avgPushdownOrderColumns;
         projectSchema = avgPushdownNewAggSchema;
         hasComplexAgg = true;
+        having = avgPushdownHaving;
     }
 
     /**
@@ -421,7 +427,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         if (having != null) {
             having = having.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
-            ExpressionUtil.finalizeValueTypes(having);
         }
 
     }

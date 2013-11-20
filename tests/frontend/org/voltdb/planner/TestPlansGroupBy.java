@@ -815,13 +815,15 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         String sql = "";
 
-        sql = "select V_A1, count(v_cnt) from v_r1 group by v_a1 having count(v_cnt) > 1; ";
-//        sql = "select V_A1 + 1 from v_r1 ; ";
+        failToCompile("select sum(V_A1) from v_r1 having v_cnt > 3", "invalid HAVING expression");
+        failToCompile("select sum(V_A1) from v_r1 having 3 > 3", "does not support HAVING clause without aggregation");
 
+        sql = "select V_A1, count(v_cnt) from v_r1 group by v_a1 having count(v_cnt) > 1; ";
         checkHavingClause(sql, "count ((VOLT_TEMP_TABLE. > 1))");
-        // TODO(xin):
 //        checkHavingClause(sql, "count ((V_R1.V_CNT > 1))");
 
+        sql = "select sum(V_A1) from v_r1 having avg(v_cnt) > 3; ";
+        checkHavingClause(sql, "avg ((VOLT_TEMP_TABLE. > 3))");
     }
 
     private void checkHavingClause(String sql, Object aggPostFilters) {
