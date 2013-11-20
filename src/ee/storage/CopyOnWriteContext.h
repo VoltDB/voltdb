@@ -82,10 +82,9 @@ public:
     virtual bool notifyTupleUpdate(TableTuple &tuple);
 
     /**
-     * Optional tuple freeing check handler.
+     * Optional tuple delete handler.
      */
-    virtual bool canSafelyFreeTuple(TableTuple tuple);
-
+    virtual bool notifyTupleDelete(TableTuple &tuple);
 
 private:
 
