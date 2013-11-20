@@ -208,26 +208,6 @@ std::string TupleSchema::debug() const {
     return ret;
 }
 
-bool TupleSchema::equals(const TupleSchema *other) const {
-    if (other->m_columnCount != m_columnCount ||
-        other->m_uninlinedObjectColumnCount != m_uninlinedObjectColumnCount ||
-        other->m_allowInlinedObjects != m_allowInlinedObjects) {
-        return false;
-    }
-
-    for (int ii = 0; ii < m_columnCount; ii++) {
-        const ColumnInfo *columnInfo = getColumnInfo(ii);
-        const ColumnInfo *ocolumnInfo = other->getColumnInfo(ii);
-        if (columnInfo->allowNull != ocolumnInfo->allowNull ||
-                columnInfo->offset != ocolumnInfo->offset ||
-                columnInfo->type != ocolumnInfo->type) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 /*
  * Returns the number of string columns that can't be inlined.
  */

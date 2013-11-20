@@ -62,36 +62,35 @@ namespace voltdb {
 
 class CmpEq {
 public:
-    inline NValue cmp(NValue l, NValue r) const { return l.op_equals(r);}
+    inline static bool cmp(const NValue& l, const NValue& r) { return l.compareNonNull(r) == 0;}
 };
 class CmpNe {
 public:
-    inline NValue cmp(NValue l, NValue r) const { return l.op_notEquals(r);}
+    inline static bool cmp(const NValue& l, const NValue& r) { return l.compareNonNull(r) != 0;}
 };
 class CmpLt {
 public:
-    inline NValue cmp(NValue l, NValue r) const { return l.op_lessThan(r);}
+    inline static bool cmp(const NValue& l, const NValue& r) { return l.compareNonNull(r) < 0;}
 };
 class CmpGt {
 public:
-    inline NValue cmp(NValue l, NValue r) const { return l.op_greaterThan(r);}
+    inline static bool cmp(const NValue& l, const NValue& r) { return l.compareNonNull(r) > 0;}
 };
 class CmpLte {
 public:
-    inline NValue cmp(NValue l, NValue r) const { return l.op_lessThanOrEqual(r);}
+    inline static bool cmp(const NValue& l, const NValue& r) { return l.compareNonNull(r) <= 0;}
 };
 class CmpGte {
 public:
-    inline NValue cmp(NValue l, NValue r) const { return l.op_greaterThanOrEqual(r);}
+    inline static bool cmp(const NValue& l, const NValue& r) { return l.compareNonNull(r) >= 0;}
 };
 class CmpLike {
 public:
-    inline NValue cmp(NValue l, NValue r) const { return l.like(r);}
+    inline static bool cmp(const NValue& l, const NValue& r) { return l.like(r);}
 };
 class CmpIn {
 public:
-    inline NValue cmp(NValue l, NValue r) const
-    { return l.inList(r) ? NValue::getTrue() : NValue::getFalse(); }
+    inline static bool cmp(const NValue& l, const NValue& r) { return l.inList(r); }
 };
 
 template <typename C>
@@ -107,18 +106,20 @@ public:
     };
 
     inline NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
-        VOLT_TRACE("eval %s. left %s, right %s. ret=%s",
-                   typeid(compare).name(), typeid(*(m_left)).name(),
-                   typeid(*(m_right)).name(),
-                   compare.cmp(m_left->eval(tuple1, tuple2),
-                               m_right->eval(tuple1, tuple2)).isTrue()
-                   ? "TRUE" : "FALSE");
-
         assert(m_left != NULL);
         assert(m_right != NULL);
 
         NValue lnv = m_left->eval(tuple1, tuple2);
+
+        if (lnv.isNull()) {
+            return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+        }
+
         NValue rnv = m_right->eval(tuple1, tuple2);
+
+        if (rnv.isNull()) {
+            return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+        }
 
         // comparisons with null or NaN are always false
         // [This code is commented out because doing the right thing breaks voltdb atm.
@@ -128,11 +129,12 @@ public:
             return NValue::getFalse();
         }*/
 
-        if (lnv.isNull() || rnv.isNull()) {
-            return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
-        }
+        VOLT_TRACE("eval %s. left %s, right %s. ret=%s",
+                   typeid(compare).name(), typeid(*(m_left)).name(),
+                   typeid(*(m_right)).name(),
+                   C::cmp(lnv, rnv) ? "TRUE" : "FALSE");
 
-        return compare.cmp(lnv, rnv);
+        return C::cmp(lnv, rnv) ? NValue::getTrue() : NValue::getFalse();
     }
 
     std::string debugInfo(const std::string &spacer) const {
@@ -145,50 +147,19 @@ private:
     C compare;
 };
 
+// This is currently a trivial pass-through derived class because the specialized implementation
+// that was here prior to v4.0 simply replicated code for no actual "inlining" benefit.
+// Some day, we will bring this back to actually bypass or inline the isNull and eval methods
+// on each L and R type.
 template <typename C, typename L, typename R>
-class InlinedComparisonExpression : public AbstractExpression {
+class InlinedComparisonExpression : public ComparisonExpression<C> {
 public:
     InlinedComparisonExpression(ExpressionType type,
                                          AbstractExpression *left,
                                          AbstractExpression *right)
-        : AbstractExpression(type, left, right)
+        : ComparisonExpression<C>(type, left, right)
     {
-        m_left = left;
-        m_leftTyped = dynamic_cast<L*>(left);
-        m_right = right;
-        m_rightTyped = dynamic_cast<R*>(right);
-
-        assert (m_leftTyped != NULL);
-        assert (m_rightTyped != NULL);
     };
-
-    inline NValue eval(const TableTuple *tuple1, const TableTuple *tuple2 ) const {
-        NValue lnv = m_left->eval(tuple1, tuple2);
-        NValue rnv = m_right->eval(tuple1, tuple2);
-
-        // Comparisons with null or NaN are always false
-        // [This code is commented out because doing the right thing breaks voltdb atm.
-        // We need to re-enable after we can verify that all plans in all configs give the
-        // same answer.]
-        /*if (lnv.isNull() || lnv.isNaN() || rnv.isNull() || rnv.isNaN()) {
-            return NValue::getFalse();
-        }*/
-
-        if (lnv.isNull() || rnv.isNull()) {
-            return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
-        }
-
-        return compare.cmp(lnv, rnv);
-    }
-
-    std::string debugInfo(const std::string &spacer) const {
-        return (spacer + "OptimizedInlinedComparisonExpression\n");
-    }
-
-  private:
-    L *m_leftTyped;
-    R *m_rightTyped;
-    C compare;
 };
 
 }

@@ -286,7 +286,7 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple
     while (!(tuple = m_indexForMinMax->nextValueAtKey()).isNullTuple()) {
         // skip the oldTuple and apply post filter
         if (tuple.equals(oldTuple) ||
-            (m_filterPredicate && m_filterPredicate->eval(&tuple, NULL).isFalse())) {
+            (m_filterPredicate &&  ! m_filterPredicate->eval(&tuple, NULL).isTrue())) {
             continue;
         }
         VOLT_TRACE("Scanning tuple: %s\n", tuple.debugNoHeader().c_str());
@@ -330,7 +330,7 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueSequential(const TableTu
     while (iterator.next(tuple)) {
         // apply post filter
         VOLT_TRACE("Checking tuple: %s\n", tuple.debugNoHeader().c_str());
-        if (m_filterPredicate && m_filterPredicate->eval(&tuple, NULL).isFalse()) {
+        if (m_filterPredicate && ! m_filterPredicate->eval(&tuple, NULL).isTrue()) {
             continue;
         }
         VOLT_TRACE("passed 1\n");
@@ -373,8 +373,7 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueSequential(const TableTu
 void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bool fallible)
 {
     // don't change the view if this tuple doesn't match the predicate
-    if (m_filterPredicate
-        && (m_filterPredicate->eval(&newTuple, NULL).isFalse())) {
+    if (m_filterPredicate && ! m_filterPredicate->eval(&newTuple, NULL).isTrue()) {
         return;
     }
     bool exists = findExistingTuple(newTuple);
@@ -403,7 +402,7 @@ void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bo
     if (exists) {
         // increment the next column, which is a count(*)
         m_updatedTuple.setNValue((int)m_groupByColumnCount,
-                                 m_existingTuple.getNValue((int)m_groupByColumnCount).op_increment());
+                                 m_existingTuple.getNValue((int)m_groupByColumnCount).incrementBigInt());
 
         for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
             NValue existingValue = m_existingTuple.getNValue(aggOffset+aggIndex);
@@ -416,7 +415,7 @@ void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bo
                     newValue = existingValue.op_add(newValue);
                     break;
                 case EXPRESSION_TYPE_AGGREGATE_COUNT:
-                    newValue = existingValue.op_increment();
+                    newValue = existingValue.incrementBigInt();
                     break;
                 case EXPRESSION_TYPE_AGGREGATE_MIN:
                     // ignore any new value that is not strictly an improvement
@@ -447,15 +446,21 @@ void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bo
         m_updatedTuple.setNValue((int)m_groupByColumnCount, ValueFactory::getBigIntValue(1));
 
         // A new group row gets its initial agg values copied directly from the first source row
-        // except for user-defined COUNTs which get set to 0 or 1 depending on whether the
-        // source column value is null.
+        // except for SUMs which get set to 0 and user-defined COUNTs
+        // which get set to 0 or 1 depending on whether the source column value is null.
         for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
             NValue newValue = getAggInputFromSrcTuple(aggIndex, newTuple);
-            if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
+            ExpressionType aggType = m_aggTypes[aggIndex];
+            if (aggType == EXPRESSION_TYPE_AGGREGATE_COUNT) {
                 if (newValue.isNull()) {
                     newValue = ValueFactory::getBigIntValue(0);
                 } else {
                     newValue = ValueFactory::getBigIntValue(1);
+                }
+            }
+            else if (aggType == EXPRESSION_TYPE_AGGREGATE_SUM) {
+                if (newValue.isNull()) {
+                    newValue = ValueFactory::getBigIntValue(0);
                 }
             }
             m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
@@ -467,8 +472,9 @@ void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bo
 void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bool fallible)
 {
     // don't change the view if this tuple doesn't match the predicate
-    if (m_filterPredicate && (m_filterPredicate->eval(&oldTuple, NULL).isFalse()))
+    if (m_filterPredicate && ! m_filterPredicate->eval(&oldTuple, NULL).isTrue()) {
         return;
+    }
 
     if ( ! findExistingTuple(oldTuple)) {
         std::string name = m_target->name();
@@ -484,7 +490,7 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
     //fflush(stdout);
 
     // set up the first column, which is a count
-    NValue count = m_existingTuple.getNValue((int)m_groupByColumnCount).op_decrement();
+    NValue count = m_existingTuple.getNValue((int)m_groupByColumnCount).decrementBigInt();
 
     //printf("  Count is: %ld.\n", (long)(count.getBigInt()));
     //fflush(stdout);
@@ -520,7 +526,7 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
                 newValue = existingValue.op_subtract(oldValue);
                 break;
             case EXPRESSION_TYPE_AGGREGATE_COUNT:
-                newValue = oldValue.isNull() ? existingValue : existingValue.op_decrement();
+                newValue = oldValue.isNull() ? existingValue : existingValue.decrementBigInt();
                 break;
             case EXPRESSION_TYPE_AGGREGATE_MIN:
                 reversedForMin = -1;

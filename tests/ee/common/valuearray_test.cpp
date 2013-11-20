@@ -75,28 +75,26 @@ TEST_F(ValueArrayTest, BasicTest) {
     EXPECT_EQ(3, array1.size());
     array1[0] = ValueFactory::getBigIntValue(10);
     EXPECT_EQ(VALUE_TYPE_BIGINT, ValuePeeker::peekValueType(array1[0]));
-    EXPECT_TRUE(ValueFactory::getBigIntValue(10).op_equals(array1[0]).isTrue());
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(10).compare(array1[0]));
     array2[0] = array1[0];
     EXPECT_EQ(VALUE_TYPE_BIGINT, ValuePeeker::peekValueType(array2[0]));
-    EXPECT_TRUE(ValueFactory::getBigIntValue(10).op_equals(array2[0]).isTrue());
-    EXPECT_TRUE(array1[0].op_equals(array2[0]).isTrue());
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(10).compare(array2[0]));
+    EXPECT_EQ(0, array1[0].compare(array2[0]));
 
     cachedStringValues.push_back(ValueFactory::getStringValue("str1"));
     array1[1] = cachedStringValues.back();
     EXPECT_EQ(VALUE_TYPE_VARCHAR, ValuePeeker::peekValueType(array1[1]));
     cachedStringValues.push_back(ValueFactory::getStringValue("str1"));
-    EXPECT_TRUE(cachedStringValues.back().op_equals(array1[1]).isTrue());
+    EXPECT_EQ(0, cachedStringValues.back().compare(array1[1]));
     cachedStringValues.push_back(ValueFactory::getStringValue("str2"));
     array2[1] = cachedStringValues.back();
-    EXPECT_TRUE(array1[1].op_notEquals(array2[1]).isTrue());
+    EXPECT_TRUE(0 != array1[1].compare(array2[1]));
     cachedStringValues.push_back(ValueFactory::getStringValue("str2"));
-    EXPECT_TRUE(cachedStringValues.back().op_equals(array2[1]).isTrue());
+    EXPECT_EQ(0, cachedStringValues.back().compare(array2[1]));
 
     array1[2] = ValueFactory::getDoubleValue(0.01f);
     array2[2] = ValueFactory::getDoubleValue(0.02f);
-    EXPECT_TRUE(array1[2].op_lessThan(array2[2]).isTrue());
-    EXPECT_FALSE(array1[2].op_greaterThan(array2[2]).isTrue());
-    EXPECT_FALSE(array1[2].op_equals(array2[2]).isTrue());
+    EXPECT_TRUE(array1[2].compare(array2[2]) < 0);
 
     EXPECT_TRUE(array1 < array2);
     EXPECT_FALSE(array1 > array2);

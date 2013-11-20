@@ -1144,37 +1144,9 @@ TEST_F(NValueTest, TestDoubleOpDivideOverflow) {
 
 TEST_F(NValueTest, TestOpIncrementOverflow) {
     NValue bigIntValue = ValueFactory::getBigIntValue(INT64_MAX);
-    NValue integerValue = ValueFactory::getIntegerValue(INT32_MAX);
-    NValue smallIntValue = ValueFactory::getSmallIntValue(INT16_MAX);
-    NValue tinyIntValue = ValueFactory::getTinyIntValue(INT8_MAX);
-
     bool caught = false;
     try {
-        bigIntValue.op_increment();
-    } catch (SQLException& ex) {
-        caught = true;
-    }
-    EXPECT_TRUE(caught);
-
-    caught = false;
-    try {
-        integerValue.op_increment();
-    } catch (SQLException& ex) {
-        caught = true;
-    }
-    EXPECT_TRUE(caught);
-
-    caught = false;
-    try {
-        smallIntValue.op_increment();
-    } catch (SQLException& ex) {
-        caught = true;
-    }
-    EXPECT_TRUE(caught);
-
-    caught = false;
-    try {
-        tinyIntValue.op_increment();
+        bigIntValue.incrementBigInt();
     } catch (SQLException& ex) {
         caught = true;
     }
@@ -1182,38 +1154,10 @@ TEST_F(NValueTest, TestOpIncrementOverflow) {
 }
 
 TEST_F(NValueTest, TestOpDecrementOverflow) {
-    NValue bigIntValue = ValueFactory::getBigIntValue(VOLT_INT64_MIN);
-    NValue integerValue = ValueFactory::getIntegerValue(VOLT_INT32_MIN);
-    NValue smallIntValue = ValueFactory::getSmallIntValue(VOLT_INT16_MIN);
-    NValue tinyIntValue = ValueFactory::getTinyIntValue(VOLT_INT8_MIN);
-
+    NValue bigIntValue = ValueFactory::getBigIntValue(INT64_MIN+1);
     bool caught = false;
     try {
-        bigIntValue.op_decrement();
-    } catch (SQLException& ex) {
-        caught = true;
-    }
-    EXPECT_TRUE(caught);
-
-    caught = false;
-    try {
-        integerValue.op_decrement();
-    } catch (SQLException& ex) {
-        caught = true;
-    }
-    EXPECT_TRUE(caught);
-
-    caught = false;
-    try {
-        smallIntValue.op_decrement();
-    } catch (SQLException& ex) {
-        caught = true;
-    }
-    EXPECT_TRUE(caught);
-
-    caught = false;
-    try {
-        tinyIntValue.op_decrement();
+        bigIntValue.decrementBigInt();
     } catch (SQLException& ex) {
         caught = true;
     }
@@ -1265,8 +1209,25 @@ TEST_F(NValueTest, TestComparisonOps)
 
 TEST_F(NValueTest, TestNullHandling)
 {
-    NValue nullTinyInt = ValueFactory::getTinyIntValue(INT8_NULL);
-    EXPECT_TRUE(nullTinyInt.isNull());
+    ValueType types[] = {
+    VALUE_TYPE_TINYINT      ,    // 1 byte int
+    VALUE_TYPE_SMALLINT     ,    // 2 bytes int
+    VALUE_TYPE_INTEGER      ,    // 4 bytes int
+    VALUE_TYPE_BIGINT       ,    // 8 bytes int
+    VALUE_TYPE_DOUBLE       ,    // 8 bytes floating, called FLOAT in java
+    VALUE_TYPE_VARCHAR      ,    // variable length chars
+    VALUE_TYPE_TIMESTAMP    ,   // 8 bytes int
+    VALUE_TYPE_DECIMAL      ,   // decimal(p,s)
+    VALUE_TYPE_BOOLEAN      ,   // only used in the EE
+    VALUE_TYPE_VARBINARY    ,   // variable length bytes
+};
+    for (int ii = 0; ii < sizeof(types)/sizeof(ValueType); ++ii) {
+        NValue nullValue = NValue::getNullValue(types[ii]);
+        if ( ! nullValue.isNull()) {
+            printf("Failed to recognize null of type %s\n", getTypeName(types[ii]).c_str());
+        }
+        EXPECT_TRUE(nullValue.isNull());
+    }
 }
 
 TEST_F(NValueTest, TestDivideByZero)
@@ -2036,7 +1997,7 @@ TEST_F(NValueTest, TestLike)
             const char *testDatum = testData[jj];
             NValue testString = voltdb::ValueFactory::getStringValue(testDatum);
 
-            if (testString.like(pattern).isTrue()) {
+            if (testString.like(pattern)) {
                 foundMatches++;
             }
             testString.free();
@@ -2055,8 +2016,8 @@ TEST_F(NValueTest, TestLike)
     NValue value = voltdb::ValueFactory::getStringValue("XY");
     NValue pattern1 = voltdb::ValueFactory::getStringValue("X%_");
     NValue pattern2 = voltdb::ValueFactory::getStringValue("X%%");
-    EXPECT_TRUE(value.like(pattern1).isTrue());
-    EXPECT_TRUE(value.like(pattern2).isTrue());
+    EXPECT_TRUE(value.like(pattern1));
+    EXPECT_TRUE(value.like(pattern2));
     pattern2.free();
     pattern1.free();
     value.free();
@@ -2552,6 +2513,12 @@ bool checkValueVector(vector<NValue> &values) {
     // this checks order and the lack of duplicates
     for (int j = 0; j < (values.size() - 1); j++) {
         if (values[j].compare(values[j+1]) >= 0) {
+            std::cout << "ERROR unexpected: vector value[" << j << "] (" << values[j].debug() <<
+                ") >= value[" << j+1 << "] (" << values[j+1].debug() << ") \n Context: {";
+            for (int k = 0; k < (values.size() - 1); k++) {
+                std::cout << values[k].debug() << ", ";
+            }
+            std::cout << "}";
             return false;
         }
     }

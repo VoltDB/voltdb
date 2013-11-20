@@ -749,7 +749,7 @@ public:
             bool isAccepted = true;
             for (StreamPredicateList::iterator ipred = predicates.begin();
                  ipred != predicates.end(); ++ipred) {
-                if (ipred->eval(&tuple).isFalse()) {
+                if ( ! ipred->eval(&tuple).isTrue()) {
                     isAccepted = false;
                     break;
                 }
