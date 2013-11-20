@@ -55,9 +55,9 @@ public class BalancePartitionsStatistics extends StatsSource {
     long throughput = 0;
     long lastTransferTimeMS = 0;
 
-    private volatile ImmutableStatsPoint statsPoint;
-    private MutableStatsPoint intervalStats;
-    private MutableStatsPoint overallStats;
+    private volatile StatsPoint statsPoint;
+    private StatsPoint intervalStats;
+    private StatsPoint overallStats;
 
     public BalancePartitionsStatistics()
     {
@@ -72,7 +72,7 @@ public class BalancePartitionsStatistics extends StatsSource {
 
     public void initialize(long totalRangeSize)
     {
-        this.overallStats = new MutableStatsPoint("Overall", totalRangeSize);
+        this.overallStats = new StatsPoint("Overall", totalRangeSize);
 
         this.totalRangeSize = totalRangeSize;
         this.lastReportTime = overallStats.getStartTimeNanos();
@@ -81,7 +81,7 @@ public class BalancePartitionsStatistics extends StatsSource {
 
         startInterval();
 
-        this.statsPoint = new ImmutableStatsPoint("Point", totalRangeSize);
+        this.statsPoint = new StatsPoint("Point", totalRangeSize);
 
         this.bytesTransferredInLastSec.clear();
     }
@@ -110,8 +110,10 @@ public class BalancePartitionsStatistics extends StatsSource {
 
         lastTransferTimeMS = transferTimeMS;
 
-        overallStats.update(balanceEnd, lastBalanceDuration, rangeSizeMoved, rowsTransferred, bytesTransferred, 1);
-        intervalStats.update(balanceEnd, lastBalanceDuration, rangeSizeMoved, rowsTransferred, bytesTransferred, 1);
+        overallStats = overallStats.update(balanceEnd, lastBalanceDuration, rangeSizeMoved,
+                                           rowsTransferred, bytesTransferred, 1);
+        intervalStats = intervalStats.update(balanceEnd, lastBalanceDuration, rangeSizeMoved,
+                                             rowsTransferred, bytesTransferred, 1);
 
         markStatsPoint();
 
@@ -129,7 +131,7 @@ public class BalancePartitionsStatistics extends StatsSource {
 
     private void startInterval()
     {
-        this.intervalStats = new MutableStatsPoint("Interval", totalRangeSize);
+        this.intervalStats = new StatsPoint("Interval", totalRangeSize);
     }
 
     private void endInterval()
@@ -232,28 +234,28 @@ public class BalancePartitionsStatistics extends StatsSource {
         }
     }
 
-    public static abstract class StatsPoint implements Serializable
+    public static class StatsPoint implements Serializable
     {
         private static final long serialVersionUID = 2635982992941464809L;
 
         /// Name for logging, etc..
-        protected final String name;
+        private final String name;
         /// Start time in nanoseconds.
-        protected final long startTimeNanos;
+        private final long startTimeNanos;
         /// # of ranges to move.
-        protected final long totalRanges;
+        private final long totalRanges;
         /// End time in nanoseconds.
-        protected long endTimeNanos;
+        private final long endTimeNanos;
         /// # of ranges transferred.
-        protected long movedRanges;
+        private final long movedRanges;
         /// # of rows transferred.
-        protected long movedRows;
+        private final long movedRows;
         /// # of bytes transferred.
-        protected long movedBytes;
+        private final long movedBytes;
         /// # of calls.
-        protected long invocationCount;
+        private final long invocationCount;
         /// Milliseconds spent inside sysproc call.
-        protected long invocationTime;
+        private final long invocationTime;
 
         /**
          * Scratch constructor.
@@ -445,6 +447,57 @@ public class BalancePartitionsStatistics extends StatsSource {
             }
         }
 
+        /**
+         * Update statistics.
+         * @param lastTimeNanos         time in nanoseconds
+         * @param lastInvocationTime    time spent while invoking the sysproc
+         * @param lastMovedRanges       moved range count
+         * @param lastMovedRows         moved row count
+         * @param lastMovedBytes        moved byte count
+         * @param lastInvocationCount   invocation count
+         */
+        public StatsPoint update(
+                Long lastTimeNanos,
+                long lastInvocationTime,
+                long lastMovedRanges,
+                long lastMovedRows,
+                long lastMovedBytes,
+                long lastInvocationCount)
+        {
+            return new StatsPoint(
+                    this.name,
+                    this.startTimeNanos,
+                    lastTimeNanos != null ? lastTimeNanos : System.nanoTime(),
+                    this.totalRanges,
+                    this.movedRanges + lastMovedRanges,
+                    this.movedRows + lastMovedRows,
+                    this.movedBytes + lastMovedBytes,
+                    this.invocationCount + lastInvocationCount,
+                    this.invocationTime + lastInvocationTime);
+        }
+
+        /**
+         * Capture a copy of the current stats plus an end time and a recent throughput.
+         * @param name          stats point name
+         * @param endTimeNanos  end time in nanoseconds
+         * @param throughput    throughput of recent balance operations
+         * @return  immutable snapshot of stats point
+         */
+        public StatsPoint capture(String name, long endTimeNanos, long throughput)
+        {
+            return new StatsPoint(
+                    name,
+                    getStartTimeNanos(),
+                    endTimeNanos,
+                    totalRanges,
+                    getMovedRanges(),
+                    getMovedRows(),
+                    throughput,
+                    getInvocationCount(),
+                    getInvocationTime());
+
+        }
+
         @Override
         public String toString()
         {
@@ -475,153 +528,6 @@ public class BalancePartitionsStatistics extends StatsSource {
                     getRangesPerSecond(),
                     getMegabytesPerSecond(),
                     getAverageInvocationTime());
-        }
-    }
-
-    public static class ImmutableStatsPoint extends StatsPoint
-    {
-        private static final long serialVersionUID = 6053164633352642078L;
-
-        /**
-         * Scratch constructor.
-         * Default to the current time for start/end. Clear raw statistics.
-         * @param name          stats point name
-         * @param totalRanges   total ranges to move
-         */
-       public ImmutableStatsPoint(String name, long totalRanges)
-        {
-            super(name, totalRanges);
-        }
-
-        /**
-         * Full constructor.
-         * @param name              stat point name
-         * @param startTimeNanos    start time in nanoseconds
-         * @param endTimeNanos      end time in nanoseconds
-         * @param totalRanges       total ranges to move
-         * @param movedRanges       moved range count
-         * @param movedRows         moved row count
-         * @param movedBytes        moved byte count
-         * @param invocationCount   invocation count
-         * @param invocationTime    time spent in sysproc
-         */
-       public ImmutableStatsPoint(
-                String name,
-                Long startTimeNanos,    // can be null
-                Long endTimeNanos,      // can be null
-                long totalRanges,
-                long movedRanges,
-                long movedRows,
-                long movedBytes,
-                long invocationCount,
-                long invocationTime)
-        {
-            super(name,
-                  startTimeNanos,
-                  endTimeNanos,
-                  totalRanges,
-                  movedRanges,
-                  movedRows,
-                  movedBytes,
-                  invocationCount,
-                  invocationTime);
-        }
-    }
-
-    public static class MutableStatsPoint extends StatsPoint
-    {
-        private static final long serialVersionUID = 6053164633352642078L;
-
-        /**
-         * Scratch constructor.
-         * Default to the current time for start/end. Clear raw statistics.
-         * @param name          stats point name
-         * @param totalRanges   total ranges to move
-         */
-        public MutableStatsPoint(String name, long totalRanges)
-        {
-            super(name, totalRanges);
-        }
-
-        /**
-         * Full constructor.
-         * @param name              stat point name
-         * @param startTimeNanos    start time in nanoseconds
-         * @param endTimeNanos      end time in nanoseconds
-         * @param totalRanges       total ranges to move
-         * @param movedRanges       moved range count
-         * @param movedRows         moved row count
-         * @param movedBytes        moved byte count
-         * @param invocationCount   invocation count
-         * @param invocationTime    time spent in sysproc
-         */
-        public MutableStatsPoint(
-                String name,
-                Long startTimeNanos,    // can be null
-                Long endTimeNanos,      // can be null
-                long totalRanges,
-                long movedRanges,
-                long movedRows,
-                long movedBytes,
-                long invocationCount,
-                long invocationTime)
-        {
-            super(name,
-                  startTimeNanos,
-                  endTimeNanos,
-                  totalRanges,
-                  movedRanges,
-                  movedRows,
-                  movedBytes,
-                  invocationCount,
-                  invocationTime);
-        }
-
-        /**
-         * Update statistics.
-         * @param lastTimeNanos         time in nanoseconds
-         * @param lastInvocationTime    time spent while invoking the sysproc
-         * @param lastMovedRanges       moved range count
-         * @param lastMovedRows         moved row count
-         * @param lastMovedBytes        moved byte count
-         * @param lastInvocationCount   invocation count
-         */
-        public void update(
-                Long lastTimeNanos,
-                long lastInvocationTime,
-                long lastMovedRanges,
-                long lastMovedRows,
-                long lastMovedBytes,
-                long lastInvocationCount)
-        {
-            this.endTimeNanos = lastTimeNanos != null ? lastTimeNanos : System.nanoTime();
-            this.invocationTime += lastInvocationTime;
-            this.movedRanges += lastMovedRanges;
-            this.movedRows += lastMovedRows;
-            this.movedBytes += lastMovedBytes;
-            this.invocationCount += lastInvocationCount;
-        }
-
-        /**
-         * Capture a copy of the current stats plus an end time and a recent throughput.
-         * @param name          stats point name
-         * @param endTimeNanos  end time in nanoseconds
-         * @param throughput    throughput of recent balance operations
-         * @return  immutable snapshot of stats point
-         */
-        public ImmutableStatsPoint capture(String name, long endTimeNanos, long throughput)
-        {
-            return new ImmutableStatsPoint(
-                    name,
-                    getStartTimeNanos(),
-                    endTimeNanos,
-                    totalRanges,
-                    getMovedRanges(),
-                    getMovedRows(),
-                    throughput,
-                    getInvocationCount(),
-                    getInvocationTime());
-
         }
     }
 }
