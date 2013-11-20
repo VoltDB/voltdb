@@ -77,7 +77,7 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
     private Map<Long, Callback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, Callback>());
     private final String m_name;
     public static volatile AtomicLong m_testConnectionIdGenerator;
-
+    private final boolean m_leaveCallback;
 
     /**
      * @param connectionId    The connection ID for this adapter, needs to be unique for this
@@ -85,12 +85,24 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
      * @param name            Human readable name identifying the adapter, will stand in for hostname
      */
     public SimpleClientResponseAdapter(long connectionId, String name) {
+        this(connectionId, name, false);
+    }
+
+
+    /**
+     * @param connectionId    The connection ID for this adapter, needs to be unique for this
+     *                        node.
+     * @param name            Human readable name identifying the adapter, will stand in for hostname
+     * @param leaveCallback   Don't remove callbacks when invoking them, they are reused
+     */
+    public SimpleClientResponseAdapter(long connectionId, String name, boolean leaveCallback) {
         if (m_testConnectionIdGenerator != null) {
             m_connectionId = m_testConnectionIdGenerator.incrementAndGet();
         } else {
             m_connectionId = connectionId;
         }
         m_name = name;
+        m_leaveCallback = leaveCallback;
     }
 
     public void registerCallback(long handle, Callback c) {
@@ -152,7 +164,12 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
             b.position(4);
             resp.initFromBuffer(b);
 
-            Callback callback = m_callbacks.remove(resp.getClientHandle());
+            Callback callback = null;
+            if (m_leaveCallback) {
+                m_callbacks.get(resp.getClientHandle());
+            } else {
+                m_callbacks.remove(resp.getClientHandle());
+            }
             if (callback != null) {
                 callback.handleResponse(resp);
             }
