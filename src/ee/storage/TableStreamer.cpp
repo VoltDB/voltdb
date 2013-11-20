@@ -174,22 +174,4 @@ int64_t TableStreamer::streamMore(TupleOutputStreamProcessor &outputStreams,
     return remaining;
 }
 
-/**
- * Return true if a tuple can be freed safely.
- */
-bool TableStreamer::canSafelyFreeTuple(TableTuple &tuple) const
-{
-    bool freeable = true;
-
-    // Any active stream can reject freeing the tuple.
-    BOOST_FOREACH(StreamPtr streamPtr, m_streams) {
-        freeable = streamPtr->m_context->canSafelyFreeTuple(tuple);
-        if (!freeable) {
-            break;
-        }
-    }
-
-    return freeable;
-}
-
 } // namespace voltdb
