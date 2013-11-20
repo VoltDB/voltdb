@@ -134,8 +134,16 @@ int64_t ElasticIndexReadContext::handleStreamMore(
             // or the byte count threshold is hit.
             bool yield = false;
             while (!yield) {
-                // Write the tuple.
-                yield = outputStreams.writeRow(getSerializer(), tuple);
+                // If the tuple is pending delete, it's held on by COW but
+                // shouldn't be accessable anymore. So don't write it to the
+                // output.
+                if (!tuple.isPendingDelete()) {
+                    // Write the tuple.
+                    yield = outputStreams.writeRow(getSerializer(), tuple);
+                } else {
+                    throwFatalException("Materializing a deleted tuple from the elastic context.");
+                }
+
                 if (!yield) {
                     if (!m_iter->next(tuple)) {
                         yield = true;
