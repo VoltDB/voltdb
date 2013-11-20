@@ -166,9 +166,9 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
 
             Callback callback = null;
             if (m_leaveCallback) {
-                m_callbacks.get(resp.getClientHandle());
+                callback = m_callbacks.get(resp.getClientHandle());
             } else {
-                m_callbacks.remove(resp.getClientHandle());
+                callback = m_callbacks.remove(resp.getClientHandle());
             }
             if (callback != null) {
                 callback.handleResponse(resp);
