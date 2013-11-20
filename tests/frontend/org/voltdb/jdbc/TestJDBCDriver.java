@@ -23,8 +23,6 @@
 
 package org.voltdb.jdbc;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -40,13 +38,17 @@ import java.sql.Types;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
+import static junit.framework.Assert.assertFalse;
 
 import org.junit.AfterClass;
+import static org.junit.Assert.assertEquals;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.client.ArbitraryDurationProc;
+import org.voltdb.client.TestClientFeatures;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
 
@@ -85,6 +87,8 @@ public class TestJDBCDriver {
 
         pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
+        pb.addSchema(TestClientFeatures.class.getResource("clientfeatures.sql"));
+        pb.addProcedures(ArbitraryDurationProc.class);
         pb.addPartitionInfo("TT", "A1");
         pb.addPartitionInfo("ORDERS", "A1");
         pb.addPartitionInfo("LAST", "A1");
@@ -171,7 +175,7 @@ public class TestJDBCDriver {
     @Test
     public void testAllTables() throws SQLException {
         // TPCC has 10 tables
-        tableTest(null, "%", 10);
+        tableTest(null, "%", 12);
     }
 
     @Test
@@ -180,7 +184,7 @@ public class TestJDBCDriver {
             int expected = 0;
             // TPCC has 10 tables and no views
             if (type.equals("TABLE")) {
-                expected = 10;
+                expected = 12;
             }
             tableTest(new String[] {type}, "%", expected);
         }
@@ -197,7 +201,7 @@ public class TestJDBCDriver {
          // schema has 5 tables with names containing "ST"
         tableTest(null, "%ST%", 5);
         // schema has 10 tables
-        tableTest(null, "", 10);
+        tableTest(null, "", 12);
         // schema has 10 tables, but won't match the types array
         tableTest(new String[] {""}, "", 0);
     }
@@ -250,7 +254,7 @@ public class TestJDBCDriver {
         tableColumnTest("CUSTOMER", "____", 1);
         tableColumnTest("%", "%ID", 13);
         tableColumnTest(null, "%ID", 13);
-        tableColumnTest(null, "", 51);
+        tableColumnTest(null, "", 63);
     }
 
     /**
@@ -308,7 +312,7 @@ public class TestJDBCDriver {
                 conn.getMetaData().getProcedures("blah", "blah", "%");
         int count = 0;
         List<String> names = Arrays.asList(new String[] {"InsertA",
-                                                         "SelectB"});
+            "SelectB", "ArbitraryDurationProc"});
         while (procedures.next()) {
             String procedure = procedures.getString("PROCEDURE_NAME");
             if (procedure.contains(".")) {
@@ -318,9 +322,10 @@ public class TestJDBCDriver {
             }
             count++;
         }
-        // 7 tables * 4 CRUD/table + 2 procedures +
-        // 3 tables * 3 for replicated crud
-        assertEquals(7 * 4 + 2 + 3 * 3, count);
+        System.out.println("Procedure count is: " + count);
+        // 8 tables * 4 CRUD/table + 3 procedures +
+        // 4 tables * 3 for replicated crud
+        assertEquals(8 * 4 + 3 + 4 * 3, count);
     }
 
     @Test
@@ -383,7 +388,7 @@ public class TestJDBCDriver {
                 count++;
             }
         }
-        assertEquals(2, count);
+        assertEquals(3, count);
     }
 
     @Test
@@ -501,5 +506,54 @@ public class TestJDBCDriver {
             count++;
         }
         assertEquals(10, count);
+    }
+
+    //Test to check Query Timeout
+    @Test
+    public void testQueryTimeout() throws SQLException {
+        //Use no timeout so default timeout of 2 min and thus no exception should be thrown.
+        PreparedStatement stmt = conn.prepareCall("{call ArbitraryDurationProc(?)}");
+        stmt.setLong(1, 6000);
+        boolean exceptionCalled = false;
+        try {
+            stmt.execute();
+        } catch (SQLException ex) {
+            System.out.println("Query threw exception when not expected to: " + ex.getSQLState());
+            exceptionCalled = true;
+        }
+        assertFalse(exceptionCalled);
+
+        //Now make it timeout
+        stmt.setQueryTimeout(1);
+        stmt.setLong(1, 6000);
+        try {
+            stmt.execute();
+        } catch (SQLException ex) {
+            System.out.println("Query timed out: " + ex.getSQLState());
+            exceptionCalled = true;
+        }
+        assertTrue(exceptionCalled);
+
+        //redo statement with long timeout should not timeout
+        stmt.setQueryTimeout(30);
+        stmt.setLong(1, 6000);
+        exceptionCalled = false;
+        try {
+            stmt.execute();
+        } catch (SQLException ex) {
+            System.out.println("Query threw exception when not expected to: " + ex.getSQLState());
+            exceptionCalled = true;
+        }
+        assertFalse(exceptionCalled);
+
+        //Check -ve value
+        try {
+            stmt.setQueryTimeout(-1);
+        } catch (SQLException ex) {
+            //Bad value
+            exceptionCalled = true;
+        }
+        assertTrue(exceptionCalled);
+
     }
 }
