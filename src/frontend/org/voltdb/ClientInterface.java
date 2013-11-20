@@ -902,10 +902,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             now);
                     return true;
                 } catch (Exception e) {
+                    // unable to hash to a site, return an error
                     assert(clientResponse == null);
-                    clientResponse = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
-                            new VoltTable[]{},
-                            "Fail to get the partition for a restarted transaction" + e.getMessage());
+                    clientResponse = getMispartitionedErrorResponse(response.getInvocation(), catProc, e);
                 }
             }
 
@@ -1811,17 +1810,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
             catch (Exception e) {
                 // unable to hash to a site, return an error
-                Object invocationParameter = task.getParameterAtIndex(catProc.getPartitionparameter());
-                String errorMessage = "Error sending procedure " + task.procName
-                        + "  to the correct partition. Make sure parameter values are correct."
-                        + " Parameter value " + invocationParameter
-                        + ", partition column " + catProc.getPartitioncolumn().getName()
-                        + " type " + catProc.getPartitioncolumn().getType()
-                        + " Message: " + e.getMessage();
-                // unable to hash to a site, return an error
-                authLog.warn(errorMessage);
-                return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                        new VoltTable[0], errorMessage, task.clientHandle);
+                return getMispartitionedErrorResponse(task, catProc, e);
             }
         }
         boolean success =
@@ -2524,5 +2513,25 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             latencyStats.add(acg.getLatencyInfo());
         }
         return latencyStats;
+    }
+
+    //Generate a mispartitioned response also log the message.
+    private ClientResponseImpl getMispartitionedErrorResponse(StoredProcedureInvocation task,
+            Procedure catProc, Exception ex) {
+        Object invocationParameter = task.getParameterAtIndex(catProc.getPartitionparameter());
+        String exMsg = "Unknown";
+        if (ex != null) {
+            exMsg = ex.getMessage();
+        }
+        String errorMessage = "Error sending procedure " + task.procName
+                + "  to the correct partition. Make sure parameter values are correct."
+                + " Parameter value " + invocationParameter
+                + ", partition column " + catProc.getPartitioncolumn().getName()
+                + " type " + catProc.getPartitioncolumn().getType()
+                + " Message: " + exMsg;
+        authLog.warn(errorMessage);
+        ClientResponseImpl clientResponse = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
+                new VoltTable[]{}, errorMessage);
+        return clientResponse;
     }
 }
