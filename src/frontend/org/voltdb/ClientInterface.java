@@ -106,7 +106,6 @@ import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.Encoder;
-import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 
 import com.google.common.collect.ImmutableMap;
@@ -1803,19 +1802,23 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         int partition = -1;
         if (catProc.getSinglepartition()) {
             // break out the Hashinator and calculate the appropriate partition
-            Object invocationParameter = null;
             try {
-                invocationParameter = task.getParameterAtIndex(catProc.getPartitionparameter());
-                partition = TheHashinator.getPartitionForParameter(catProc.getPartitioncolumn().getType(),
-                        invocationParameter);
-            } catch (Exception e) {
+                partition =
+                        getPartitionForProcedure(
+                                catProc.getPartitionparameter(),
+                                catProc.getPartitioncolumn().getType(),
+                                task);
+            }
+            catch (Exception e) {
                 // unable to hash to a site, return an error
-                String errorMessage = "Error sending procedure "
-                        + task.procName + " to the correct partition. Make sure parameter values are correct.";
-                authLog.l7dlog( Level.WARN,
-                        LogKeys.host_ClientInterface_unableToRouteSinglePartitionInvocation.name(),
-                        new Object[]{task.procName, invocationParameter,
-                            catProc.getPartitioncolumn().getName(), catProc.getPartitioncolumn().getType()}, e);
+                Object invocationParameter = task.getParameterAtIndex(catProc.getPartitionparameter());
+                String errorMessage = "Failed to route single partition procedure " + task.procName
+                        + " , based on parameter " + invocationParameter
+                        + ", partition column " + catProc.getPartitioncolumn().getName()
+                        + " of type " + catProc.getPartitioncolumn().getType()
+                        + " Message: " + e.getMessage();
+                // unable to hash to a site, return an error
+                authLog.warn(errorMessage);
                 return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                         new VoltTable[0], errorMessage, task.clientHandle);
             }
