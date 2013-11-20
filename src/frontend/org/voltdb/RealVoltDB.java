@@ -158,7 +158,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private static final String m_defaultVersionString = "4.0";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
-    final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
+    final List<ClientInterface> m_clientInterfaces = new CopyOnWriteArrayList<ClientInterface>();
     HTTPAdminListener m_adminListener;
     private OpsRegistrar m_opsRegistrar = new OpsRegistrar();
 
@@ -1961,7 +1961,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     @Override
-    public ArrayList<ClientInterface> getClientInterfaces() {
+    public List<ClientInterface> getClientInterfaces() {
         return m_clientInterfaces;
     }
 
