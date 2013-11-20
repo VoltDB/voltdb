@@ -34,7 +34,7 @@ VoltCompiler = 'org.voltdb.compiler.VoltCompiler'
 # Command meta-data.
 @VOLT.Command(
     # Descriptions for help screen.
-    description  = 'Compile schema and stored procs to build a catalog.',
+    description  = 'Compile schema and stored procedures to build an application catalog.',
     description2 = 'At least one DDL file is required unless a project file is provided.',
 
     # Command line options.

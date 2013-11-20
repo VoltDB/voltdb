@@ -26,7 +26,6 @@ import filecmp
 import fnmatch
 import getpass
 import os.path
-import re
 import shutil
 import socket
 import subprocess
@@ -60,17 +59,39 @@ suiteDict = {'helloworld': 'HelloWorld',
              'voltcache': 'Voltcache',
              'voltkv': 'Voltkv',
              'voter': 'Voter',
-             'json-sessions': 'Json-sessions',
-             }
+             'all': 'HelloWorld, Voter, Voltcache, Voltkv'}
 tail = "tar.gz"
 # http://volt0/kits/candidate/LINUX-voltdb-2.8.1.tar.gz
 # http://volt0/kits/candidate/LINUX-voltdb-ent-2.8.1.tar.gz
 root = "http://volt0/kits/branch/"
 testname = os.path.basename(os.path.abspath(__file__)).replace(".py", "")
+elem2Test = {'helloworld':'./run.sh', 'voltcache':'./run.sh', 'voltkv':'./run.sh', 'voter':'./run.sh'}
 defaultHost = "localhost"
 defaultPort = 21212
 sectionBreak="====================================================="
 
+# To parse the output of './examples/voter/run.sh client' and get a specific portion
+# of the output. A sample value would be like the one below:
+'''
+ Voting Results
+ --------------------------------------------------------------------------------
+
+ A total of 8166781 votes were received...
+  - 7,816,923 Accepted
+   -    79,031 Rejected (Invalid Contestant)
+     -        12 Rejected (Maximum Vote Count Reached)
+     -         0 Failed (Transaction Error)
+
+    Contestant Name     Votes Received
+    Edwina Burnam            2,156,993
+    Jessie Eichman           1,652,654
+    Alana Bregman            1,189,909
+    Kelly Clauss             1,084,995
+    Jessie Alloway           1,060,892
+    Tabatha Gehling            939,604
+
+    The Winner is: Edwina Burnam
+'''
 def findSectionInFile(srce, start, end):
     flag = 0
     status = False
@@ -175,15 +196,20 @@ def getEnterpriseLicense(workDir, release):
 # key: voter,       val: /tmp/<user_name>_exp_test/voltdb-2.8.1/examples/voter
 # key: voltkv,      val: /tmp/<user_name>_exp_test/voltdb-2.8.1/examples/voltkv
 # key: helloworld', val: /tmp/<user_name>_exp_test/voltdb-2.8.1/doc/tutorials/helloworld
-def setTestSuite(dname, suites):
+def setTestSuite(dname, suite):
     testSuiteList = {}
-    #Find all the run.sh in the kit
-    for root, dirs, files in os.walk(dname):
-        for filename in fnmatch.filter(files,'run.sh'):
-            path  = os.path.join(root, filename)
-            appdir = os.path.split(os.path.dirname(path))[1]
-            if appdir in suites:
-                testSuiteList[appdir] = os.path.dirname(path)
+    for dirname, dirnames, filenames in os.walk(dname):
+        for subdirname in dirnames:
+            if subdirname in elem2Test.keys():
+                path = os.path.join(dirname, subdirname)
+                run_sh = path + "/" + elem2Test[subdirname]
+                if(os.access(run_sh, os.X_OK)):
+                    if(suite != "all"):
+                        if(path.find(suite) > -1):
+                            testSuiteList[suite] = path
+                    else:
+                        if(path.find(subdirname) > -1):
+                            testSuiteList[subdirname] = path
     return testSuiteList
 
 def stopPS(ps):
@@ -261,10 +287,7 @@ def execThisService(service, logS, logC):
 # Further assertion is required
 # We want to make sure that logFileC contains several key strings
 # which is defined in 'staticKeyStr'
-def assertvoltcache(mod, logC):
-    return assertvoltkv(mod, logC)
-
-def assertvoltkv(mod, logC):
+def assertVoltkv_Voltcache(mod, logC):
     staticKeyStr = {
 "Command Line Configuration":1,
 "Setup & Initialization":1,
@@ -292,17 +315,16 @@ def assertvoltkv(mod, logC):
         keys = staticKeyStr
         result = True
     else:
-        result = False
         msg = "The client output does not have all the expected key words"
         for key in staticKeyStr:
             if key not in dynamicKeyStr.keys():
                 keys[key] = key
 
-    return (result, msg)
+    return (result, msg, keys)
 
 # We want to make sure that logFileC contains this KEY string:
 # The Winner is: Edwina Burnam
-def assertvoter(mod, logC):
+def assertVoter(mod, logC):
     result = False
     aStr = "Voting Results"
     expected = "The Winner is: Edwina Burnam"
@@ -319,43 +341,9 @@ def assertvoter(mod, logC):
     # that calls findSectionInFile()
     return (result, expected)
 
-# We want to make sure that logFileC contains this KEY string:
-# The Winner is: Edwina Burnam
-def assertjson(mod, logC):
-    #Ordered list of things to find - make sure all queries found results
-    patterns = [
-        'A total of \d+ login requests were received',
-        'SELECT username, json_data FROM user_session_table ORDER BY username LIMIT 10',
-        'user-0      {"role":"\w+","site":"\w+","props":{"last-login":"\d+"}}'
-        'SELECT username, json_data FROM user_session_table ORDER BY username LIMIT 10',
-        'SELECT username, json_data FROM user_session_table WHERE field(json_data, \'site\')=\'VoltDB Forum\' ORDER BY username LIMIT 10',
-        'SELECT username, json_data FROM user_session_table WHERE field(json_data, \'site\')=\'VoltDB Forum\' AND field(json_data, \'moderator\')=\'true\' ORDER BY username LIMIT 10;',
-        'SELECT username, json_data FROM user_session_table WHERE field(field(json_data, \'props\'), \'download_version\')=\'v3.0\' and field(field(json_data, \'props\'), \'client_language\')=\'Java\' ORDER BY username LIMIT 10',
-        'SELECT username, json_data FROM user_session_table WHERE field(field(json_data, \'props\'), \'download_version\') LIKE \'v2%\' ORDER BY username LIMIT 10',
-        'SELECT json_data FROM user_session_table WHERE username=\'voltdb\'',
-        'SELECT json_data FROM user_session_table WHERE username=\'voltdb\'',
-        ]
-
-    match_ct = 0
-    with open (logC,'r') as f:
-        for line in f:
-            if re.match(patterns[match_ct]):
-                match_ct += 1
-                print "Found match %d" % match_ct
-            if match_ct > len(patterns):
-                break
-
-    print "Found match %d" % match_ct
-
-
-
-    # It could return 'section' in some other implementation
-    # that calls findSectionInFile()
-    return (result, expected)
-
 # To make sure that we see the key string 'Hola, Mundo!'
-def asserthelloworld(modulename, logC):
-ls -l    expected = "Hola, Mundo!"
+def assertHelloWorld(modulename, logC):
+    expected = "Hola, Mundo!"
     buf = readFileIntoArray(logC)
     for line in buf:
         if(expected == line.rstrip()):
@@ -363,7 +351,7 @@ ls -l    expected = "Hola, Mundo!"
             result = True
             break
     else:
-        msg = "Expected '%s' for module '%s'. Actually returned: '%s'" % (expected, modulename, buf)
+        msg = "Expected '%s' for module '%s'. Actually returned: '%s'" % (expected, modulename, actual)
         result = False
     return (result, msg)
 
@@ -402,18 +390,31 @@ def startTest(testSuiteList):
     # by design.
     for (suiteName, path) in testSuiteList.iteritems():
         keyStrSet = None
-        os.chdir(path)
-        currDir = os.getcwd()
-        service = './run.sh'
-        print ">>> Test: %s" % suiteName
-        print "   Current Directory: '%s'" % currDir
-        logFileS = os.path.join(logDir, suiteName + "_server")
-        logFileC = os.path.join(logDir,suiteName + "_client")
-        print "   Log File for VoltDB Server: '%s'" % logFileS
-        print "   Log File for VoltDB Client: '%s'" % logFileC
-        execThisService(service, logFileS, logFileC)
-        #Check the results
-        (result,msg) = globals()["assert" + suiteName.split('-')[0]](suiteName, logFileC)
+        if suiteName in elem2Test.keys():
+            # Could be an overkill
+            #currDir = os.path.join(logDir, suiteName + "_logs")
+            os.chdir(path)
+            currDir = os.getcwd()
+            service = elem2Test[suiteName]
+            print ">>> Test: %s" % suiteName
+            print "   Current Directory: '%s'" % currDir
+            logFileS = os.path.join(logDir, suiteName + "_server")
+            logFileC = os.path.join(logDir,suiteName + "_client")
+            print "   Log File for VoltDB Server: '%s'" % logFileS
+            print "   Log File for VoltDB Client: '%s'" % logFileC
+            execThisService(service, logFileS, logFileC)
+
+            if(suiteName == "helloworld"):
+                (result, msg) = assertHelloWorld(suiteName, logFileC)
+            elif(suiteName == "voter"):
+                (result, msg) = assertVoter(suiteName, logFileC)
+            elif(suiteName == "voltkv" or suiteName == "voltcache"):
+                (result, msg, keyStrSet) = assertVoltkv_Voltcache(suiteName, logFileC)
+        else:
+            # Should never fall into this block
+            msg = "Unknown Suite Name: '%s'. To be implemented. Exit with an error..." % suiteName
+            print "==-->> %s" % msg
+            exit(1)
 
         statusBySuite[suiteName] = result
         msgBySuite[suiteName] = msg
@@ -513,10 +514,11 @@ if __name__ == "__main__":
     if not os.path.exists(logDir):
         os.makedirs(logDir)
 
-    if options.suite == 'all':
-        suites = suiteDict.keys()
-    else:
-        suites = options.suite
+    suite = options.suite
+    if suite not in elem2Test.keys() and suite != "all":
+        print "Warning: unknown suite name - '%s'" % suite
+        suite = "all"
+        print "Info: So we're going to cover all test suites '%s' in this run" % suiteDict[suite]
 
     origDir = os.getcwd()
 
@@ -561,8 +563,8 @@ if __name__ == "__main__":
         if not ret["ok"]:
             print "Error!! %s" % ret["err"]
             exit(1)
-        print suites
-        testSuiteList = setTestSuite(ret["workDir"], suites)
+
+        testSuiteList = setTestSuite(ret["workDir"], suite)
 
         (tf, msg, keys) = startTest(testSuiteList)
         tfD[p] = tf
