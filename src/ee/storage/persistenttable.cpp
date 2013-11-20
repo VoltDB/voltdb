@@ -649,7 +649,7 @@ void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
     assert(target.isActive());
 
     deleteFromAllIndexes(&target);
-    deleteTupleStorage(target); // also frees object columns
+    deleteTupleFinalize(target); // also frees object columns
 }
 
 TableTuple PersistentTable::lookupTuple(TableTuple tuple) {
