@@ -1812,10 +1812,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             catch (Exception e) {
                 // unable to hash to a site, return an error
                 Object invocationParameter = task.getParameterAtIndex(catProc.getPartitionparameter());
-                String errorMessage = "Failed to route single partition procedure " + task.procName
-                        + " , based on parameter " + invocationParameter
+                String errorMessage = "Error sending procedure " + task.procName
+                        + "  to the correct partition. Make sure parameter values are correct."
+                        + " Parameter value " + invocationParameter
                         + ", partition column " + catProc.getPartitioncolumn().getName()
-                        + " of type " + catProc.getPartitioncolumn().getType()
+                        + " type " + catProc.getPartitioncolumn().getType()
                         + " Message: " + e.getMessage();
                 // unable to hash to a site, return an error
                 authLog.warn(errorMessage);
