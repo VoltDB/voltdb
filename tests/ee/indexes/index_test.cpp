@@ -345,44 +345,44 @@ public:
 
     void verifyWideRow(TableTuple &tuple, int64_t row) {
         for (int i = 0; i < 10; i++)
-            EXPECT_TRUE(ValueFactory::getBigIntValue(static_cast<int64_t>((row << 32) + i))
-                        .op_equals(tuple.getNValue(i)).isTrue());
+            EXPECT_EQ(0, ValueFactory::getBigIntValue(static_cast<int64_t>((row << 32) + i))
+                        .compare(tuple.getNValue(i)));
 
         for (int i = 10; i < 20; i++)
-            EXPECT_TRUE(ValueFactory::getBigIntValue(static_cast<int64_t>(i + (row % 2)))
-                        .op_equals(tuple.getNValue(i)).isTrue());
+            EXPECT_EQ(0, ValueFactory::getBigIntValue(static_cast<int64_t>(i + (row % 2)))
+                        .compare(tuple.getNValue(i)));
 
         for (int i = 20; i < 30; i++)
-            EXPECT_TRUE(ValueFactory::getBigIntValue(static_cast<int64_t>(i + (row % 3)))
-                        .op_equals(tuple.getNValue(i)).isTrue());
+            EXPECT_EQ(0, ValueFactory::getBigIntValue(static_cast<int64_t>(i + (row % 3)))
+                        .compare(tuple.getNValue(i)));
 
         for (int i = 30; i < 40; i++)
-            EXPECT_TRUE(ValueFactory::getBigIntValue(static_cast<int64_t>(i + (row % 4)))
-                        .op_equals(tuple.getNValue(i)).isTrue());
+            EXPECT_EQ(0, ValueFactory::getBigIntValue(static_cast<int64_t>(i + (row % 4)))
+                        .compare(tuple.getNValue(i)));
 
         for (int i = 40; i < 50; i++)
-            EXPECT_TRUE(ValueFactory::getBigIntValue(static_cast<int64_t>(i + (row % 5)))
-                        .op_equals(tuple.getNValue(i)).isTrue());
+            EXPECT_EQ(0, ValueFactory::getBigIntValue(static_cast<int64_t>(i + (row % 5)))
+                        .compare(tuple.getNValue(i)));
 
         for (int i = 50; i < 60; i++)
-            EXPECT_TRUE(ValueFactory::getBigIntValue(static_cast<int64_t>(i + (row % 6)))
-                        .op_equals(tuple.getNValue(i)).isTrue());
+            EXPECT_EQ(0, ValueFactory::getBigIntValue(static_cast<int64_t>(i + (row % 6)))
+                        .compare(tuple.getNValue(i)));
 
         for (int i = 60; i < 70; i++)
-            EXPECT_TRUE(ValueFactory::getBigIntValue(static_cast<int64_t>(i + (row % 7)))
-                        .op_equals(tuple.getNValue(i)).isTrue());
+            EXPECT_EQ(0, ValueFactory::getBigIntValue(static_cast<int64_t>(i + (row % 7)))
+                        .compare(tuple.getNValue(i)));
 
         for (int i = 70; i < 80; i++)
-            EXPECT_TRUE(ValueFactory::getBigIntValue(static_cast<int64_t>(i + (row % 8)))
-                        .op_equals(tuple.getNValue(i)).isTrue());
+            EXPECT_EQ(0, ValueFactory::getBigIntValue(static_cast<int64_t>(i + (row % 8)))
+                        .compare(tuple.getNValue(i)));
 
         for (int i = 80; i < 90; i++)
-            EXPECT_TRUE(ValueFactory::getBigIntValue(static_cast<int64_t>(i + (row % 9)))
-                        .op_equals(tuple.getNValue(i)).isTrue());
+            EXPECT_EQ(0, ValueFactory::getBigIntValue(static_cast<int64_t>(i + (row % 9)))
+                        .compare(tuple.getNValue(i)));
 
         for (int i = 90; i < 100; i++)
-            EXPECT_TRUE(ValueFactory::getBigIntValue(static_cast<int64_t>(i + (row % 10)))
-                        .op_equals(tuple.getNValue(i)).isTrue());
+            EXPECT_EQ(0, ValueFactory::getBigIntValue(static_cast<int64_t>(i + (row % 10)))
+                        .compare(tuple.getNValue(i)));
     }
 
 protected:
@@ -464,11 +464,11 @@ TEST_F(IndexTest, IntsUnique) {
 
     tuple = index->nextValueAtKey();
     EXPECT_FALSE(tuple.isNullTuple());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50).op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 2).op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 3).op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 + 20).op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 * 11).op_equals(tuple.getNValue(4)).isTrue());
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(50).compare(tuple.getNValue(0)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(50 % 2).compare(tuple.getNValue(1)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(50 % 3).compare(tuple.getNValue(2)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(50 + 20).compare(tuple.getNValue(3)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(50 * 11).compare(tuple.getNValue(4)));
 
     tuple = index->nextValueAtKey();
     EXPECT_TRUE(tuple.isNullTuple());
@@ -486,27 +486,17 @@ TEST_F(IndexTest, IntsUnique) {
         setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(-10000000)));
     index->moveToKeyOrGreater(&searchkey);
     EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40).
-                op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40 % 2).
-                op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40 % 3).
-                op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40 + 20).
-                op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40 * 11).
-                op_equals(tuple.getNValue(4)).isTrue());
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(40).compare(tuple.getNValue(0)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(40 % 2).compare(tuple.getNValue(1)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(40 % 3).compare(tuple.getNValue(2)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(40 + 20).compare(tuple.getNValue(3)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(40 * 11).compare(tuple.getNValue(4)));
     EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41).
-                op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 % 2).
-                op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 % 3).
-                op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 + 20).
-                op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 * 11).
-                op_equals(tuple.getNValue(4)).isTrue());
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(41).compare(tuple.getNValue(0)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(41 % 2).compare(tuple.getNValue(1)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(41 % 3).compare(tuple.getNValue(2)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(41 + 20).compare(tuple.getNValue(3)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(41 * 11).compare(tuple.getNValue(4)));
 
     searchkey.
         setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(440)));
@@ -514,27 +504,17 @@ TEST_F(IndexTest, IntsUnique) {
         setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(10000000)));
     index->moveToKeyOrGreater(&searchkey);
     EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41).
-                op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 % 2).
-                op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 % 3).
-                op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 + 20).
-                op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 * 11).
-                op_equals(tuple.getNValue(4)).isTrue());
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(41).compare(tuple.getNValue(0)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(41 % 2).compare(tuple.getNValue(1)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(41 % 3).compare(tuple.getNValue(2)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(41 + 20).compare(tuple.getNValue(3)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(41 * 11).compare(tuple.getNValue(4)));
     EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(42).
-                op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(42 % 2).
-                op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(42 % 3).
-                op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(42 + 20).
-                op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(42 * 11).
-                op_equals(tuple.getNValue(4)).isTrue());
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(42).compare(tuple.getNValue(0)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(42 % 2).compare(tuple.getNValue(1)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(42 % 3).compare(tuple.getNValue(2)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(42 + 20).compare(tuple.getNValue(3)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(42 * 11).compare(tuple.getNValue(4)));
 
     // moveToGreaterThanKey test
     searchkey.
@@ -543,16 +523,11 @@ TEST_F(IndexTest, IntsUnique) {
         setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(30%3)));
     index->moveToGreaterThanKey(&searchkey);
     EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(31).
-                op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(31 % 2).
-                op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(31 % 3).
-                op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(31 + 20).
-                op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(31 * 11).
-                op_equals(tuple.getNValue(4)).isTrue());
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(31).compare(tuple.getNValue(0)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(31 % 2).compare(tuple.getNValue(1)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(31 % 3).compare(tuple.getNValue(2)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(31 + 20).compare(tuple.getNValue(3)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(31 * 11).compare(tuple.getNValue(4)));
 
     TableTuple &tmptuple = table->tempTuple();
     tmptuple.
@@ -626,11 +601,11 @@ TEST_F(IndexTest, IntsMulti) {
 
     tuple = index->nextValueAtKey();
     EXPECT_FALSE(tuple.isNullTuple());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50).op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 2).op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 3).op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 + 20).op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 * 11).op_equals(tuple.getNValue(4)).isTrue());
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(50).compare(tuple.getNValue(0)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(50 % 2).compare(tuple.getNValue(1)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(50 % 3).compare(tuple.getNValue(2)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(50 + 20).compare(tuple.getNValue(3)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(50 * 11).compare(tuple.getNValue(4)));
 
     tuple = index->nextValueAtKey();
     EXPECT_TRUE(tuple.isNullTuple());
@@ -649,27 +624,17 @@ TEST_F(IndexTest, IntsMulti) {
 
     index->moveToKeyOrGreater(&searchkey);
     EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40).
-                op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40 % 2).
-                op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40 % 3).
-                op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40 + 20).
-                op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40 * 11).
-                op_equals(tuple.getNValue(4)).isTrue());
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(40).compare(tuple.getNValue(0)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(40 % 2).compare(tuple.getNValue(1)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(40 % 3).compare(tuple.getNValue(2)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(40 + 20).compare(tuple.getNValue(3)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(40 * 11).compare(tuple.getNValue(4)));
     EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41).
-                op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 % 2).
-                op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 % 3).
-                op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 + 20).
-                op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 * 11).
-                op_equals(tuple.getNValue(4)).isTrue());
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(41).compare(tuple.getNValue(0)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(41 % 2).compare(tuple.getNValue(1)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(41 % 3).compare(tuple.getNValue(2)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(41 + 20).compare(tuple.getNValue(3)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(41 * 11).compare(tuple.getNValue(4)));
 
     searchkey.
         setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(440)));
@@ -677,27 +642,17 @@ TEST_F(IndexTest, IntsMulti) {
         setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(10000000)));
     index->moveToKeyOrGreater(&searchkey);
     EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41).
-                op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 % 2).
-                op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 % 3).
-                op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 + 20).
-                op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 * 11).
-                op_equals(tuple.getNValue(4)).isTrue());
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(41).compare(tuple.getNValue(0)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(41 % 2).compare(tuple.getNValue(1)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(41 % 3).compare(tuple.getNValue(2)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(41 + 20).compare(tuple.getNValue(3)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(41 * 11).compare(tuple.getNValue(4)));
     EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(42).
-                op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(42 % 2).
-                op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(42 % 3).
-                op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(42 + 20).
-                op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(42 * 11).
-                op_equals(tuple.getNValue(4)).isTrue());
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(42).compare(tuple.getNValue(0)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(42 % 2).compare(tuple.getNValue(1)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(42 % 3).compare(tuple.getNValue(2)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(42 + 20).compare(tuple.getNValue(3)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(42 * 11).compare(tuple.getNValue(4)));
 
     // moveToGreaterThanKey test
     searchkey.
@@ -707,16 +662,11 @@ TEST_F(IndexTest, IntsMulti) {
 
     index->moveToGreaterThanKey(&searchkey);
     EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(31).
-                op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(31 % 2).
-                op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(31 % 3).
-                op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(31 + 20).
-                op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(31 * 11).
-                op_equals(tuple.getNValue(4)).isTrue());
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(31).compare(tuple.getNValue(0)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(31 % 2).compare(tuple.getNValue(1)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(31 % 3).compare(tuple.getNValue(2)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(31 + 20).compare(tuple.getNValue(3)));
+    EXPECT_EQ(0, ValueFactory::getBigIntValue(31 * 11).compare(tuple.getNValue(4)));
 
     TableTuple& tmptuple = table->tempTuple();
     tmptuple.

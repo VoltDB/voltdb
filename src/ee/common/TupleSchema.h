@@ -239,6 +239,31 @@ inline uint16_t TupleSchema::getUninlinedObjectColumnInfoIndex(const int objectC
 inline void TupleSchema::setUninlinedObjectColumnInfoIndex(uint16_t objectColumnIndex, uint16_t objectColumnInfoIndex) {
     reinterpret_cast<uint16_t*>(m_data)[objectColumnIndex] = objectColumnInfoIndex;
 }
+
+inline bool TupleSchema::equals(const TupleSchema *other) const {
+    if (this == other) {
+        return true;
+    }
+    if (other->m_columnCount != m_columnCount ||
+        other->m_uninlinedObjectColumnCount != m_uninlinedObjectColumnCount ||
+        other->m_allowInlinedObjects != m_allowInlinedObjects) {
+        return false;
+    }
+
+    for (int ii = 0; ii < m_columnCount; ii++) {
+        const ColumnInfo *columnInfo = getColumnInfo(ii);
+        const ColumnInfo *ocolumnInfo = other->getColumnInfo(ii);
+        if (columnInfo->allowNull != ocolumnInfo->allowNull ||
+                columnInfo->offset != ocolumnInfo->offset ||
+                columnInfo->type != ocolumnInfo->type) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
 } // namespace voltdb
 
 #endif // TUPLESCHEMA_H_

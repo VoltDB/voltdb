@@ -415,9 +415,8 @@ TEST_F(IndexKeyTest, Int64Packing2Int32sWithSecondNull) {
 
     voltdb::TableTuple firstTuple(keySchema);
     firstTuple.move(new char[firstTuple.tupleLength()]);
-
     firstTuple.setNValue(0, ValueFactory::getIntegerValue(0));
-    firstTuple.setNValue(1, ValueFactory::getIntegerValue(INT32_NULL));
+    firstTuple.setNValue(1, NValue::getNullValue(VALUE_TYPE_INTEGER));
 
     voltdb::TableTuple secondTuple(keySchema);
     secondTuple.move(new char[secondTuple.tupleLength()]);
@@ -433,6 +432,15 @@ TEST_F(IndexKeyTest, Int64Packing2Int32sWithSecondNull) {
     voltdb::IntsKey<1>  firstKey(&firstTuple);
     voltdb::IntsKey<1>  secondKey(&secondTuple);
     voltdb::IntsKey<1>  thirdKey(&thirdTuple);
+
+    if (-1 != comparator.operator()(firstKey, thirdKey)) {
+        printf("DEBUG: tuples out of order %s for %s compare %s for %s = %d\n",
+               firstTuple.debug("").c_str(),
+               firstKey.debug(keySchema).c_str(),
+               thirdTuple.debug("").c_str(),
+               thirdKey.debug(keySchema).c_str(),
+               comparator.operator()(firstKey, thirdKey));
+    }
 
     EXPECT_EQ(-1, comparator.operator()(firstKey, thirdKey));
     EXPECT_EQ(-1, comparator.operator()(firstKey, secondKey));

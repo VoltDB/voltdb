@@ -43,7 +43,6 @@
 #include "common/debuglog.h"
 #include "common/serializeio.h"
 #include "common/types.h"
-#include "common/value_defs.h"
 #include "utf8.h"
 #include "murmur3/MurmurHash3.h"
 
@@ -59,6 +58,10 @@ namespace voltdb {
 #define OBJECT_NULL_BIT static_cast<char>(1 << 6)
 #define OBJECT_CONTINUATION_BIT static_cast<char>(1 << 7)
 #define OBJECT_MAX_LENGTH_SHORT_LENGTH 63
+#define VALUE_COMPARE_LESSTHAN -1
+#define VALUE_COMPARE_EQUAL 0
+#define VALUE_COMPARE_GREATERTHAN 1
+
 
 //The int used for storage and return values
 typedef ttmath::Int<2> TTInt;
@@ -301,39 +304,20 @@ class NValue {
 
     /* For boolean NValues, convert to bool */
     bool isTrue() const;
-    bool isFalse() const;
 
     /* For number values, check the number line. */
     bool isZero() const;
-
-    /* For boolean NValues only, logical operators */
-    NValue op_negate() const;
-    NValue op_and(const NValue rhs) const;
-    NValue op_or(const NValue rhs) const;
 
     /* Evaluate the ordering relation against two NValues. Promotes
        exact types to allow disparate type comparison. See also the
        op_ functions which return boolean NValues.
      */
-    int compare(const NValue rhs) const;
-
-    /* Return a boolean NValue with the comparison result */
-    NValue op_equals(const NValue rhs) const;
-    NValue op_notEquals(const NValue rhs) const;
-    NValue op_lessThan(const NValue rhs) const;
-    NValue op_lessThanOrEqual(const NValue rhs) const;
-    NValue op_greaterThan(const NValue rhs) const;
-    NValue op_greaterThanOrEqual(const NValue rhs) const;
-
-    /* Return a copy of MAX(this, rhs) */
-    NValue op_max(const NValue rhs) const;
-
-    /* Return a copy of MIN(this, rhs) */
-    NValue op_min(const NValue rhs) const;
+    int compare(const NValue& rhs) const;
+    int compareNonNull(const NValue& rhs) const;
 
     /* For number NValues, compute new NValues for arithmetic operators */
-    NValue op_increment() const;
-    NValue op_decrement() const;
+    NValue incrementBigInt() const;
+    NValue decrementBigInt() const;
     NValue op_subtract(const NValue rhs) const;
     NValue op_add(const NValue rhs) const;
     NValue op_multiply(const NValue rhs) const;
@@ -342,7 +326,7 @@ class NValue {
      * This NValue must be VARCHAR and the rhs must be VARCHAR.
      * This NValue is the value and the rhs is the pattern
      */
-    NValue like(const NValue rhs) const;
+    bool like(const NValue& rhs) const;
 
     //TODO: passing NValue arguments by const reference SHOULD be standard practice
     // for the dozens of NValue "operator" functions. It saves on needless NValue copies.
@@ -487,13 +471,6 @@ class NValue {
     /* For boost hashing */
     void hashCombine(std::size_t &seed) const;
 
-    /* Functor comparator for use with std::set */
-    struct ltNValue {
-        bool operator()(const NValue v1, const NValue v2) const {
-            return v1.compare(v2) < 0;
-        }
-    };
-
     /* Functor equality predicate for use with boost unordered */
     struct equal_to : std::binary_function<NValue, NValue, bool>
     {
@@ -572,6 +549,29 @@ class NValue {
     static int64_t parseTimestampString(const char* str);
 
   private:
+    // Minimum value user can represent that is not null
+    static const int8_t  VOLT_INT8_MIN  = -0x7F;
+    static const int16_t VOLT_INT16_MIN = -0x7FFF;
+    static const int32_t VOLT_INT32_MIN = -0x7FFFFFFF;
+    static const int64_t VOLT_INT64_MIN = -0x7FFFFFFFFFFFFFFF;
+
+    static const int8_t INT8_BOOLEAN_FALSE = 0;
+    static const int8_t INT8_BOOLEAN_TRUE = 1;
+    static const int8_t  INT8_NULL  = VOLT_INT8_MIN  - 1;
+    static const int16_t INT16_NULL = VOLT_INT16_MIN - 1;
+    static const int32_t INT32_NULL = VOLT_INT32_MIN - 1;
+    static const int64_t INT64_NULL = VOLT_INT64_MIN - 1;
+
+
+    // float/double less than these values are null
+    static const double DOUBLE_NULL = -1.7E+308;
+
+    // values to be substituted as null
+    static const double DOUBLE_MIN = -1.7976931348623157E+308;
+
+    // objects (i.e., varchar) with length prefix of -1 are null
+    static const int OBJECTLENGTH_NULL = -1;
+
     /*
      * Private methods are private for a reason. Don't expose the raw
      * data so that it can be operated on directly.
@@ -886,17 +886,15 @@ class NValue {
         return *reinterpret_cast<TTInt*>(retval);
     }
 
-    const bool& getBoolean() const {
+    const int8_t& getBoolean() const {
         assert(getValueType() == VALUE_TYPE_BOOLEAN);
-        return *reinterpret_cast<const bool*>(m_data);
+        return *reinterpret_cast<const int8_t*>(m_data);
     }
 
-    bool& getBoolean() {
+    int8_t& getBoolean() {
         assert(getValueType() == VALUE_TYPE_BOOLEAN);
-        return *reinterpret_cast<bool*>(m_data);
+        return *reinterpret_cast<int8_t*>(m_data);
     }
-
-    bool isBooleanNULL() const ;
 
     std::size_t getAllocationSizeForObject() const;
     static std::size_t getAllocationSizeForObject(int32_t length);
@@ -1539,7 +1537,7 @@ class NValue {
 
     }
 
-    int compareAnyIntegerValue (const NValue rhs) const {
+    int compareAnyIntegerValue (const NValue& rhs) const {
         int64_t lhsValue, rhsValue;
 
         // get the right hand side as a bigint
@@ -1573,7 +1571,7 @@ class NValue {
         }
     }
 
-    int compareDoubleValue (const NValue rhs) const {
+    int compareDoubleValue (const NValue& rhs) const {
         const double lhsValue = getDouble();
         double rhsValue;
 
@@ -1604,16 +1602,9 @@ class NValue {
                 return 0;
         }
 
-        // Add null type comparison
-        if (isNull()) {
-            return rhs.isNull() ? VALUE_COMPARE_EQUAL : VALUE_COMPARE_LESSTHAN;
-        }
-        else if (rhs.isNull()) {
-            return VALUE_COMPARE_GREATERTHAN;
-        }
         // Treat NaN values as equals and also make them smaller than neagtive infinity.
         // This breaks IEEE754 for expressions slightly.
-        else if (std::isnan(lhsValue)) {
+        if (std::isnan(lhsValue)) {
             return std::isnan(rhsValue) ? VALUE_COMPARE_EQUAL : VALUE_COMPARE_LESSTHAN;
         }
         else if (std::isnan(rhsValue)) {
@@ -1630,7 +1621,7 @@ class NValue {
         }
     }
 
-    int compareStringValue (const NValue rhs) const {
+    int compareStringValue (const NValue& rhs) const {
         if ((rhs.getValueType() != VALUE_TYPE_VARCHAR) && (rhs.getValueType() != VALUE_TYPE_VARBINARY)) {
             char message[128];
             snprintf(message, 128,
@@ -1643,15 +1634,6 @@ class NValue {
         }
         const char* left = reinterpret_cast<const char*>(getObjectValue());
         const char* right = reinterpret_cast<const char*>(rhs.getObjectValue());
-        if (isNull()) {
-            if (rhs.isNull()) {
-                return VALUE_COMPARE_EQUAL;
-            } else {
-                return VALUE_COMPARE_LESSTHAN;
-            }
-        } else if (rhs.isNull()) {
-            return VALUE_COMPARE_GREATERTHAN;
-        }
         const int32_t leftLength = getObjectLength();
         const int32_t rightLength = rhs.getObjectLength();
         const int result = ::strncmp(left, right, std::min(leftLength, rightLength));
@@ -1672,7 +1654,7 @@ class NValue {
         return VALUE_COMPARE_EQUAL;
     }
 
-    int compareBinaryValue (const NValue rhs) const {
+    int compareBinaryValue (const NValue& rhs) const {
         if (rhs.getValueType() != VALUE_TYPE_VARBINARY) {
             char message[128];
             snprintf(message, 128,
@@ -1685,15 +1667,6 @@ class NValue {
         }
         const char* left = reinterpret_cast<const char*>(getObjectValue());
         const char* right = reinterpret_cast<const char*>(rhs.getObjectValue());
-        if (isNull()) {
-            if (rhs.isNull()) {
-                return VALUE_COMPARE_EQUAL;
-            } else {
-                return VALUE_COMPARE_LESSTHAN;
-            }
-        } else if (rhs.isNull()) {
-            return VALUE_COMPARE_GREATERTHAN;
-        }
         const int32_t leftLength = getObjectLength();
         const int32_t rightLength = rhs.getObjectLength();
         const int result = ::memcmp(left, right, std::min(leftLength, rightLength));
@@ -1714,7 +1687,7 @@ class NValue {
         return VALUE_COMPARE_EQUAL;
     }
 
-    int compareDecimalValue(const NValue rhs) const {
+    int compareDecimalValue(const NValue& rhs) const {
         switch (rhs.getValueType()) {
           // create the equivalent decimal value
           case VALUE_TYPE_TINYINT:
@@ -2085,7 +2058,7 @@ inline NValue::NValue() {
  */
 inline NValue NValue::getTrue() {
     NValue retval(VALUE_TYPE_BOOLEAN);
-    retval.getBoolean() = true;
+    retval.getBoolean() = INT8_BOOLEAN_TRUE;
     return retval;
 }
 
@@ -2094,7 +2067,7 @@ inline NValue NValue::getTrue() {
  */
 inline NValue NValue::getFalse() {
     NValue retval(VALUE_TYPE_BOOLEAN);
-    retval.getBoolean() = false;
+    retval.getBoolean() = INT8_BOOLEAN_FALSE;
     return retval;
 }
 
@@ -2103,26 +2076,8 @@ inline NValue NValue::getFalse() {
  * If it is NULL, return false.
  */
 inline bool NValue::isTrue() const {
-    if (isBooleanNULL()) {
-        return false;
-    }
-    return getBoolean();
-}
-
-/**
- * Returns C++ false if this NValue is a boolean and is true
- * If it is NULL, return false.
- */
-inline bool NValue::isFalse() const {
-    if (isBooleanNULL()) {
-        return false;
-    }
-    return !getBoolean();
-}
-
-inline bool NValue::isBooleanNULL() const {
     assert(getValueType() == VALUE_TYPE_BOOLEAN);
-    return *reinterpret_cast<const int8_t*>(m_data) == INT8_NULL;
+    return getBoolean() == INT8_BOOLEAN_TRUE;
 }
 
 /**
@@ -2193,10 +2148,9 @@ inline uint16_t NValue::getTupleStorageSize(const ValueType type) {
 
 /**
  * Compare any two NValues. Comparison is not guaranteed to
- * succeed if the values are incompatible.  Avoid use of
- * comparison in favor of op_*.
+ * succeed if the values are incompatible.
  */
-inline int NValue::compare(const NValue rhs) const {
+inline int NValue::compareNonNull(const NValue& rhs) const {
     switch (getValueType()) {
     case VALUE_TYPE_TINYINT:
     case VALUE_TYPE_SMALLINT:
@@ -2230,6 +2184,24 @@ inline int NValue::compare(const NValue rhs) const {
                 rhs.getValueTypeString().c_str());
     }
     }
+}
+
+/**
+ * Compare any two NValues. Comparison is not guaranteed to
+ * succeed if the values are incompatible.
+ */
+inline int NValue::compare(const NValue& rhs) const {
+    if (isNull()) {
+        if (rhs.isNull()) {
+            return VALUE_COMPARE_EQUAL;
+        } else {
+            return VALUE_COMPARE_LESSTHAN;
+        }
+    }
+    if (rhs.isNull()) {
+        return VALUE_COMPARE_GREATERTHAN;
+    }
+    return compareNonNull(rhs);
 }
 
 /**
@@ -2793,7 +2765,7 @@ inline bool NValue::isNull() const {
         case VALUE_TYPE_INVALID:
             return true;
         case VALUE_TYPE_BOOLEAN:
-            return *reinterpret_cast<const int8_t*>(m_data) == INT8_NULL;
+            return getBoolean() == INT8_NULL;
         case VALUE_TYPE_TINYINT:
             return getTinyInt() == INT8_NULL;
         case VALUE_TYPE_SMALLINT:
@@ -2830,48 +2802,6 @@ inline bool NValue::isNaN() const {
         return std::isnan(getDouble());
     }
     return false;
-}
-
-inline NValue NValue::op_equals(const NValue rhs) const {
-    return compare(rhs) == 0 ? getTrue() : getFalse();
-}
-
-inline NValue NValue::op_notEquals(const NValue rhs) const {
-    return compare(rhs) != 0 ? getTrue() : getFalse();
-}
-
-inline NValue NValue::op_lessThan(const NValue rhs) const {
-    return compare(rhs) < 0 ? getTrue() : getFalse();
-}
-
-inline NValue NValue::op_lessThanOrEqual(const NValue rhs) const {
-    return compare(rhs) <= 0 ? getTrue() : getFalse();
-}
-
-inline NValue NValue::op_greaterThan(const NValue rhs) const {
-    return compare(rhs) > 0 ? getTrue() : getFalse();
-}
-
-inline NValue NValue::op_greaterThanOrEqual(const NValue rhs) const {
-    return compare(rhs) >= 0 ? getTrue() : getFalse();
-}
-
-inline NValue NValue::op_max(const NValue rhs) const {
-    const int value = compare(rhs);
-    if (value > 0) {
-        return *this;
-    } else {
-        return rhs;
-        }
-}
-
-inline NValue NValue::op_min(const NValue rhs) const {
-    const int value = compare(rhs);
-    if (value < 0) {
-        return *this;
-    } else {
-        return rhs;
-        }
 }
 
 inline NValue NValue::getNullValue(ValueType type) {
@@ -2989,81 +2919,27 @@ inline void* NValue::castAsAddress() const {
     }
 }
 
-inline NValue NValue::op_increment() const {
-        const ValueType type = getValueType();
-        NValue retval(type);
-        switch(type) {
-        case VALUE_TYPE_TINYINT:
-            if (getTinyInt() == INT8_MAX) {
-                throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                        "Incrementing this TinyInt results in a value out of range");
-            }
-            retval.getTinyInt() = static_cast<int8_t>(getTinyInt() + 1); break;
-        case VALUE_TYPE_SMALLINT:
-            if (getSmallInt() == INT16_MAX) {
-                throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                        "Incrementing this SmallInt results in a value out of range");
-            }
-            retval.getSmallInt() = static_cast<int16_t>(getSmallInt() + 1); break;
-        case VALUE_TYPE_INTEGER:
-            if (getInteger() == INT32_MAX) {
-                throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                        "Incrementing this Integer results in a value out of range");
-            }
-            retval.getInteger() = getInteger() + 1; break;
-        case VALUE_TYPE_BIGINT:
-        case VALUE_TYPE_TIMESTAMP:
-            if (getBigInt() == INT64_MAX) {
-                throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                        "Incrementing this BigInt/Timestamp results in a value out of range");
-            }
-            retval.getBigInt() = getBigInt() + 1; break;
-        case VALUE_TYPE_DOUBLE:
-            retval.getDouble() = getDouble() + 1; break;
-        default:
-            throwDynamicSQLException( "type %s is not incrementable", getValueTypeString().c_str());
-            break;
-        }
-        return retval;
+inline NValue NValue::incrementBigInt() const {
+    assert(VALUE_TYPE_BIGINT == getValueType());
+    NValue retval(VALUE_TYPE_BIGINT);
+    if (getBigInt() == INT64_MAX) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                "Incrementing this BigInt/Timestamp results in a value out of range");
     }
+    retval.getBigInt() = getBigInt() + 1;
+    return retval;
+}
 
-inline NValue NValue::op_decrement() const {
-        const ValueType type = getValueType();
-        NValue retval(type);
-        switch(type) {
-        case VALUE_TYPE_TINYINT:
-            if (getTinyInt() == VOLT_INT8_MIN) {
-                throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                        "Decrementing this TinyInt results in a value out of range");
-            }
-            retval.getTinyInt() = static_cast<int8_t>(getTinyInt() - 1); break;
-        case VALUE_TYPE_SMALLINT:
-            if (getSmallInt() == VOLT_INT16_MIN) {
-                throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                        "Decrementing this SmallInt results in a value out of range");
-            }
-            retval.getSmallInt() = static_cast<int16_t>(getSmallInt() - 1); break;
-        case VALUE_TYPE_INTEGER:
-            if (getInteger() == VOLT_INT32_MIN) {
-                throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                        "Decrementing this Integer results in a value out of range");
-            }
-            retval.getInteger() = getInteger() - 1; break;
-        case VALUE_TYPE_BIGINT:
-        case VALUE_TYPE_TIMESTAMP:
-            if (getBigInt() == VOLT_INT64_MIN) {
-                throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                        "Decrementing this BigInt/Timestamp results in a value out of range");
-            }
-            retval.getBigInt() = getBigInt() - 1; break;
-        case VALUE_TYPE_DOUBLE:
-            retval.getDouble() = getDouble() - 1; break;
-        default:
-            throwDynamicSQLException( "type %s is not decrementable", getValueTypeString().c_str());
-            break;
-        }
-        return retval;
+inline NValue NValue::decrementBigInt() const {
+    assert(VALUE_TYPE_BIGINT == getValueType());
+    NValue retval(VALUE_TYPE_BIGINT);
+    if (getBigInt() == VOLT_INT64_MIN) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                "Decrementing this BigInt/Timestamp results in a value out of range");
     }
+    retval.getBigInt() = getBigInt() - 1;
+    return retval;
+}
 
 inline bool NValue::isZero() const {
     const ValueType type = getValueType();
@@ -3220,12 +3096,9 @@ inline int32_t NValue::murmurHash3() const {
  * and the RHS should always be the LIKE expression. The planner or EE
  * needs to enforce this.
  */
-inline NValue NValue::like(const NValue rhs) const {
-    const bool lhsIsNull = isNull();
-    const bool rhsIsNull = rhs.isNull();
-    if (lhsIsNull || rhsIsNull) {
-        return getFalse();
-    }
+inline bool NValue::like(const NValue& rhs) const {
+    assert( ! isNull());
+    assert( ! rhs.isNull());
 
     /*
      * Validate that all params are VARCHAR
@@ -3250,11 +3123,7 @@ inline NValue NValue::like(const NValue rhs) const {
     const int32_t patternUTF8Length = rhs.getObjectLength();
 
     if (0 == patternUTF8Length) {
-        if (0 == valueUTF8Length) {
-            return getTrue();
-        } else {
-            return getFalse();
-        }
+        return (0 == valueUTF8Length);
     }
 
     char *valueChars = reinterpret_cast<char*>(getObjectValue());
@@ -3354,7 +3223,7 @@ inline NValue NValue::like(const NValue rhs) const {
 
     Liker liker(valueChars, patternChars, valueUTF8Length, patternUTF8Length);
 
-    return liker.like() ? getTrue() : getFalse();
+    return liker.like();
 }
 
 } // namespace voltdb

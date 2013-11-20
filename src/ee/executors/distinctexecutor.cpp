@@ -48,6 +48,7 @@
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
+#include "common/StlFriendlyNValue.h"
 #include "plannodes/distinctnode.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
@@ -98,12 +99,13 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
     AbstractExpression *distinctExpression = node->getDistinctExpression();
     distinctExpression->substitute(params);
 
-    std::set<NValue, NValue::ltNValue> found_values;
+    std::set<StlFriendlyNValue> found_values;
+    StlFriendlyNValue tuple_value;
     while (iterator.next(tuple)) {
         //
         // Check whether this value already exists in our list
         //
-        NValue tuple_value = distinctExpression->eval(&tuple, NULL);
+        tuple_value = distinctExpression->eval(&tuple, NULL);
         if (found_values.find(tuple_value) == found_values.end()) {
             found_values.insert(tuple_value);
             if (!output_table->insertTuple(tuple)) {

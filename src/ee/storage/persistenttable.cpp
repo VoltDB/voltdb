@@ -664,7 +664,7 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple) {
         TableIterator ti(this, m_data.begin());
         while (ti.hasNext()) {
             ti.next(tableTuple);
-            if (tableTuple.equalsNoSchemaCheck(tuple)) {
+            if (tableTuple.compare(tuple) == 0) {
                 return tableTuple;
             }
         }

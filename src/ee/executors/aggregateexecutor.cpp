@@ -276,19 +276,11 @@ public:
 
     virtual void advance(const NValue& val)
     {
-        if (val.isNull())
-        {
+        if (val.isNull() || (m_haveAdvanced && (m_value.compare(val) >= 0))) {
             return;
         }
-        if (!m_haveAdvanced)
-        {
-            m_value = val;
-            m_haveAdvanced = true;
-        }
-        else
-        {
-            m_value = m_value.op_max(val);
-        }
+        m_value = val;
+        m_haveAdvanced = true;
     }
 };
 
@@ -299,19 +291,11 @@ public:
 
     virtual void advance(const NValue& val)
     {
-        if (val.isNull())
-        {
+        if (val.isNull() || (m_haveAdvanced && (m_value.compare(val) <= 0))) {
             return;
         }
-        if (!m_haveAdvanced)
-        {
-            m_value = val;
-            m_haveAdvanced = true;
-        }
-        else
-        {
-            m_value = m_value.op_min(val);
-        }
+        m_value = val;
+        m_haveAdvanced = true;
     }
 };
 

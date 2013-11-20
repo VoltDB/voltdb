@@ -191,6 +191,12 @@ struct IntsKey
 
     std::string debug( const voltdb::TupleSchema *keySchema) const {
         std::ostringstream buffer;
+        buffer << "Raw value ";
+        for (unsigned int ii = 0; ii < keySize; ii++) {
+            buffer << (void*)data[ii];
+        }
+        buffer << " for ";
+
         int keyOffset = 0;
         int intraKeyOffset = sizeof(uint64_t) - 1;
         const int columnCount = keySchema->columnCount();
@@ -362,8 +368,13 @@ struct IntsComparator
         for (unsigned int ii = 0; ii < keySize; ii++) {
             const uint64_t *lvalue = &lhs.data[ii];
             const uint64_t *rvalue = &rhs.data[ii];
-            if (*lvalue < *rvalue)  return -1;
-            else if (*lvalue > *rvalue) return 1;
+
+            if (*lvalue < *rvalue) {
+                return -1;
+            }
+            if (*lvalue > *rvalue) {
+                return 1;
+            }
         }
         return 0;
     }
@@ -612,7 +623,7 @@ struct GenericEqualityChecker
     inline bool operator()(const GenericKey<keySize> &lhs, const GenericKey<keySize> &rhs) const {
         TableTuple lhTuple(m_keySchema); lhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&lhs));
         TableTuple rhTuple(m_keySchema); rhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&rhs));
-        return lhTuple.equalsNoSchemaCheck(rhTuple);
+        return lhTuple.compare(rhTuple) == 0;
     }
 private:
     const TupleSchema *m_keySchema;
@@ -739,7 +750,7 @@ struct TupleKeyComparator
 {
     TupleKeyComparator(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
 
-    // return -1/0/1 if lhs </==/> rhs
+    // return negative/0/positive if lhs </==/> rhs
     inline int operator()(const TupleKey &lhs, const TupleKey &rhs) const {
         TableTuple lhTuple = lhs.getTupleForComparison();
         TableTuple rhTuple = rhs.getTupleForComparison();
@@ -752,8 +763,9 @@ struct TupleKeyComparator
 
             int comparison = lhValue.compare(rhValue);
 
-            if (comparison == VALUE_COMPARE_LESSTHAN) return -1;
-            else if (comparison == VALUE_COMPARE_GREATERTHAN) return 1;
+            if (comparison != 0) {
+                return comparison;
+            }
         }
         return 0;
     }

@@ -183,7 +183,7 @@ TEST_F(TableTest, TupleInsert) {
     ASSERT_EQ(true, iterator.next(tuple));
     for (int col_ctr = 0, col_cnt = NUM_OF_COLUMNS; col_ctr < col_cnt; col_ctr++) {
         EXPECT_EQ(COLUMN_TYPES[col_ctr], tuple.getType(col_ctr));
-        EXPECT_TRUE(temp_tuple.getNValue(col_ctr).op_equals(tuple.getNValue(col_ctr)).isTrue());
+        EXPECT_TRUE(temp_tuple.getNValue(col_ctr).compare(tuple.getNValue(col_ctr)) == 0);
     }
 }
 

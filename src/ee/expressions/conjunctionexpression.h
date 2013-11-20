@@ -87,23 +87,28 @@ ConjunctionExpression<ConjunctionAnd>::eval(const TableTuple *tuple1,
                                             const TableTuple *tuple2) const
 {
     NValue leftBool = m_left->eval(tuple1, tuple2);
-    // False False -> False
-    // False True  -> False
-    // False NULL  -> False
-    if (leftBool.isFalse()) {
-        return leftBool;
-    }
-    NValue rightBool = m_right->eval(tuple1, tuple2);
-    // True  False -> False
     // True  True  -> True
     // True  NULL  -> NULL
-    // NULL  False -> False
-    if (leftBool.isTrue() || rightBool.isFalse()) {
+    // True  False -> False
+    if (leftBool.isTrue()) {
+        return m_right->eval(tuple1, tuple2);
+    }
+
+    if (leftBool.isNull()) {
+        NValue rightBool = m_right->eval(tuple1, tuple2);
+        // NULL  True  -> NULL
+        if (rightBool.isTrue()) {
+            return rightBool;
+        }
+        // NULL  NULL  -> NULL
+        // NULL  False -> False
         return rightBool;
     }
-    // NULL  True  -> NULL
-    // NULL  NULL  -> NULL
-    return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+
+    // False True  -> False
+    // False NULL  -> False
+    // False False -> False
+    return leftBool;
 }
 
 template<> inline NValue
@@ -122,12 +127,12 @@ ConjunctionExpression<ConjunctionOr>::eval(const TableTuple *tuple1,
     // False False -> False
     // False NULL  -> NULL
     // NULL  True  -> True
-    if (leftBool.isFalse() || rightBool.isTrue()) {
+    if (rightBool.isTrue() || ! leftBool.isNull()) {
         return rightBool;
     }
     // NULL  False -> NULL
     // NULL  NULL  -> NULL
-    return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+    return leftBool;
 }
 
 }
