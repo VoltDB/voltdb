@@ -44,11 +44,13 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     protected final JDBC4ClientConnection NativeConnection;
     protected final String User;
     private boolean isClosed = false;
+    private Properties props;
 
-    public JDBC4Connection(JDBC4ClientConnection connection, String user)
+    public JDBC4Connection(JDBC4ClientConnection connection, Properties props)
     {
         this.NativeConnection = connection;
-        this.User = user;
+        this.props = props;
+        this.User = this.props.getProperty("user", "");
     }
 
     private void checkClosed() throws SQLException
@@ -244,7 +246,7 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     @Override
     public boolean isClosed() throws SQLException
     {
-        return isClosed; // TODO: This is retarded: the native VoltDB.Client does not have such a status - we should have this so we can appropriately deal with connection failures!
+        return isClosed;
     }
 
     // Retrieves whether this Connection object is in read-only mode.
@@ -259,7 +261,7 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     @Override
     public boolean isValid(int timeout) throws SQLException
     {
-        return isClosed; // TODO: This is retarded: the native VoltDB.Client does not have such a status - we should have this so we can appropriately deal with connection failures!
+        return isClosed;
     }
 
     // Converts the given SQL statement into the system's native SQL grammar.

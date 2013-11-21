@@ -88,7 +88,7 @@ public class Driver implements java.sql.Driver
                 }
 
                 // Return JDBC connection wrapper for the client
-                return new JDBC4Connection(JDBC4ClientConnectionPool.get(servers,user,password,heavyweight,maxoutstandingtxns), user);
+                return new JDBC4Connection(JDBC4ClientConnectionPool.get(servers,user,password,heavyweight,maxoutstandingtxns), info);
             }
             catch(Exception x)
             {
