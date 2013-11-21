@@ -823,7 +823,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
 //        checkHavingClause(sql, "count ((V_R1.V_CNT > 1))");
 
         sql = "select sum(V_A1) from v_r1 having avg(v_cnt) > 3; ";
-        checkHavingClause(sql, "avg ((VOLT_TEMP_TABLE. > 3))");
+        checkHavingClause(sql, "avg (( > 3))");
     }
 
     private void checkHavingClause(String sql, Object aggPostFilters) {

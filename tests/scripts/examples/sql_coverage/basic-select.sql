@@ -40,14 +40,10 @@ SELECT DISTINCT _variable[@comparabletype] FROM @fromtables
 SELECT ALL _variable[@comparabletype] FROM @fromtables
 --- test aggregate functions (COUNT, SUM, MAX, MIN, AVG)
 SELECT @agg(_variable[@comparabletype]) FROM @fromtables
---- test having
-SELECT @agg(_variable[@comparabletype]) FROM @fromtables HAVING @agg(_variable[@comparabletype]) _cmp @comparableconstant
 
 --- count(*), baby
 -- TODO: migrate cases like this that are not columntype/comparabletype-specific to their own template/suite
 SELECT COUNT(*) FROM @fromtables
-SELECT COUNT(*) FROM @fromtables HAVING @agg(_variable[@comparabletype]) _cmp @comparableconstant
-SELECT COUNT(*) FROM @fromtables HAVING COUNT(*) _cmp @comparableconstant
 
 -- test where expressions
 --- test comparison operators (<, <=, =, >=, >)

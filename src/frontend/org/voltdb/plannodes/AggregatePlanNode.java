@@ -348,7 +348,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
             sb.append(" (" + m_prePredicate.explain(m_outputSchema.getColumns().get(0).getTableName()) + ")");
         }
         if (m_postPredicate != null) {
-            sb.append(" (" + m_postPredicate.explain("") + ")");
+            sb.append(" (" + m_postPredicate.explain(m_outputSchema.getColumns().get(0).getTableName()) + ")");
         }
         return sb.toString();
     }

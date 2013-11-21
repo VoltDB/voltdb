@@ -795,6 +795,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             having = having.replaceAVG();
             updateAvgExpresions();
         }
+        ExpressionUtil.finalizeValueTypes(having);
         if (aggregationList.size() >= 1) {
             hasAggregateExpression = true;
         }

@@ -619,7 +619,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 env.m_client.callProcedure("@AdHoc", adHocQuery);
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("not support the HAVING clause") > 0);
+                fail();
             }
         }
         finally {
