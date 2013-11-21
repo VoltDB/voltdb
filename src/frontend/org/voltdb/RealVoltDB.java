@@ -158,7 +158,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private static final String m_defaultVersionString = "4.0";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
-    final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
+    final List<ClientInterface> m_clientInterfaces = new CopyOnWriteArrayList<ClientInterface>();
     HTTPAdminListener m_adminListener;
     private OpsRegistrar m_opsRegistrar = new OpsRegistrar();
 
@@ -1961,7 +1961,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     @Override
-    public ArrayList<ClientInterface> getClientInterfaces() {
+    public List<ClientInterface> getClientInterfaces() {
         return m_clientInterfaces;
     }
 
@@ -2084,9 +2084,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // so there is no need to wait for the truncation snapshot requested
             // above to finish.
             if (logRecoveryCompleted || m_joining) {
+                String actionName = m_joining ? "join" : "rejoin";
                 m_rejoining = false;
                 m_joining = false;
-                consoleLog.info("Node rejoin completed");
+                consoleLog.info(String.format("Node %s completed", actionName));
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to log host rejoin completion to ZK", true, e);
@@ -2232,7 +2233,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
         if (m_rejoining) {
             if (requestId.equals(m_rejoinTruncationReqId)) {
-                consoleLog.info("Node rejoin completed");
+                String actionName = m_joining ? "join" : "rejoin";
+                consoleLog.info(String.format("Node %s completed", actionName));
                 m_rejoinTruncationReqId = null;
                 m_rejoining = false;
             }

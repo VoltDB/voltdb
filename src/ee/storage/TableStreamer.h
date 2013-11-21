@@ -106,13 +106,13 @@ public:
      * Return true if it was handled by the COW context.
      */
     virtual bool notifyTupleDelete(TableTuple &tuple) {
-        bool handled = false;
-        // If any context handles the notification, it's "handled".
+        bool freeable = true;
+        // Any active stream can reject freeing the tuple.
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
             assert(streamPtr != NULL);
-            handled |= streamPtr->m_context->notifyTupleDelete(tuple);
+            freeable &= streamPtr->m_context->notifyTupleDelete(tuple);
         }
-        return handled;
+        return freeable;
     }
 
     /**
@@ -142,11 +142,6 @@ public:
     virtual int32_t getPartitionID() const {
         return m_partitionId;
     }
-
-    /**
-     * Return true if a tuple can be freed safely.
-     */
-    virtual bool canSafelyFreeTuple(TableTuple &tuple) const;
 
     /**
      * Return context or null for specified type.

@@ -253,7 +253,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
     return retValue;
 }
 
-bool CopyOnWriteContext::canSafelyFreeTuple(TableTuple tuple) {
+bool CopyOnWriteContext::notifyTupleDelete(TableTuple &tuple) {
     assert(m_iterator != NULL);
 
     if (tuple.isDirty() || m_finishedTableScan) {
