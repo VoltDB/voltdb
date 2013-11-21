@@ -27,23 +27,23 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
-
-import org.voltdb.VoltDB;
-
-import org.voltdb.iv2.MpInitiator;
-import org.voltdb_testprocs.regressionsuites.SaveRestoreBase;
 
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.iv2.TxnEgo;
+import org.voltdb.iv2.MpInitiator;
+import org.voltdb.join.BalancePartitionsStatistics;
+import org.voltdb.join.BalancePartitionsStatistics.StatsPoint;
+import org.voltdb_testprocs.regressionsuites.SaveRestoreBase;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestStatisticsSuite extends SaveRestoreBase {
@@ -947,6 +947,61 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         assertEquals(7, results.length);
     }
 
+    public void testRebalanceStats() throws Exception {
+        // Test constants
+        final int DURATION_SECONDS = 10;
+        final int INVOCATION_SLEEP_MILLIS = 500;
+        final int IDLE_SLEEP_MILLIS = 200;
+        final int RANGES_TO_MOVE = Integer.MAX_VALUE;
+        final int BYTES_TO_MOVE = 10000000;
+        final int ROWS_TO_MOVE = 1000000;
+        final double FUZZ_FACTOR = .1;
+
+        BalancePartitionsStatistics bps = new BalancePartitionsStatistics(RANGES_TO_MOVE);
+        Random r = new Random(2222);
+        long rangesMoved = 0;
+        long bytesMoved = 0;
+        long rowsMoved = 0;
+        long invocations = 0;
+        long totalInvTimeMS = 0;
+        long tStartMS = System.currentTimeMillis();
+        // Random numbers are between zero and the constant, so everything will average out
+        // to half the time and quantities. Nothing will be exhausted by the test.
+        final int loopCount = (DURATION_SECONDS * 1000) / (INVOCATION_SLEEP_MILLIS + IDLE_SLEEP_MILLIS);
+        for (int i = 0; i < loopCount; i++) {
+            bps.logBalanceStarts();
+            int invocationTimeMS = r.nextInt(INVOCATION_SLEEP_MILLIS);
+            Thread.sleep(invocationTimeMS);
+            totalInvTimeMS += invocationTimeMS;
+            int ranges = r.nextInt(RANGES_TO_MOVE / loopCount);
+            int bytes = r.nextInt(BYTES_TO_MOVE / loopCount);
+            int rows = r.nextInt(ROWS_TO_MOVE / loopCount);
+            rangesMoved += ranges;
+            bytesMoved += bytes;
+            rowsMoved += rows;
+            invocations++;
+            bps.logBalanceEnds(ranges, bytes, invocationTimeMS, rows);
+            int idleTimeMS = r.nextInt(IDLE_SLEEP_MILLIS);
+            Thread.sleep(idleTimeMS);
+        }
+        double totalTimeS = (System.currentTimeMillis() - tStartMS) / 1000.0;
+
+        // Check the results with fuzzing to avoid rounding errors.
+        StatsPoint stats = bps.getOverallStats();
+        double statsRangesMoved1 = (stats.getPercentageMoved() / 100.0) * RANGES_TO_MOVE;
+        assertTrue(Math.abs((rangesMoved - statsRangesMoved1) / rangesMoved) <= FUZZ_FACTOR);
+        double statsRangesMoved2 = stats.getRangesPerSecond() * totalTimeS;
+        assertTrue(Math.abs((rangesMoved - statsRangesMoved2) / rangesMoved) <= FUZZ_FACTOR);
+        double statsBytesMoved = stats.getMegabytesPerSecond() * 1000000.0 * totalTimeS;
+        assertTrue(Math.abs((bytesMoved - statsBytesMoved) / bytesMoved) <= FUZZ_FACTOR);
+        double statsRowsMoved = stats.getRowsPerSecond() * totalTimeS;
+        assertTrue(Math.abs((rowsMoved - statsRowsMoved) / rowsMoved) <= FUZZ_FACTOR);
+        double statsInvocations = stats.getInvocationsPerSecond() * totalTimeS;
+        assertTrue(Math.abs((invocations - statsInvocations) / invocations) <= FUZZ_FACTOR);
+        double statsInvTimeMS = stats.getAverageInvocationTime() * invocations;
+        assertTrue(Math.abs((totalInvTimeMS - statsInvTimeMS) / totalInvTimeMS) <= FUZZ_FACTOR);
+    }
+
     //
     // Build a list of the tests to be run. Use the regression suite
     // helpers to allow multiple backends.
@@ -1005,5 +1060,3 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         return builder;
     }
 }
-
-
