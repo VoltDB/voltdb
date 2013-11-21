@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import org.voltdb.ParameterConverter;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
@@ -79,9 +80,11 @@ public abstract class SavedTableConverter
                 if (column_copy_index_map.containsKey(i))
                 {
                     int orig_column_index = column_copy_index_map.get(i);
-                    coerced_values[i] =
-                        inputTable.get(orig_column_index,
-                                inputTable.getColumnType(orig_column_index));
+                    // For each expected type take values and try and make compatible.
+                    coerced_values[i] = ParameterConverter.tryToMakeCompatible(
+                            new_table.getColumnType(i).classFromType(),
+                            inputTable.get(orig_column_index,
+                                    inputTable.getColumnType(orig_column_index)));
                 }
                 else
                 {
