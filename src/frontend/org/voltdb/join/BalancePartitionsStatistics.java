@@ -303,9 +303,9 @@ public class BalancePartitionsStatistics extends StatsSource {
             this.invocationTimeNanos = invocationTimeNanos;
         }
 
-        double getStartTimeMillis()
+        long getStartTimeMillis()
         {
-            return startTimeNanos / (double)TimeUnit.MILLISECONDS.toNanos(1);
+            return startTimeNanos / TimeUnit.MILLISECONDS.toNanos(1);
         }
 
         long getStartTimeNanos()
@@ -313,9 +313,9 @@ public class BalancePartitionsStatistics extends StatsSource {
             return startTimeNanos;
         }
 
-        double getEndTimeMillis()
+        long getEndTimeMillis()
         {
-            return endTimeNanos / (double)TimeUnit.MILLISECONDS.toNanos(1);
+            return endTimeNanos / TimeUnit.MILLISECONDS.toNanos(1);
         }
 
         long getEndTimeNanos()
@@ -344,7 +344,7 @@ public class BalancePartitionsStatistics extends StatsSource {
         }
 
         // Derive duration from start/end times.
-        double getDurationMillis()
+        long getDurationMillis()
         {
             return getEndTimeMillis() - getStartTimeMillis();
         }
@@ -429,31 +429,25 @@ public class BalancePartitionsStatistics extends StatsSource {
 
         public final static String formatTimeInterval(double dms)
         {
-            try {
-                if (dms < 0.0) {
-                    throw new RuntimeException("Bad dms argument");
-                }
-                final long day = MILLISECONDS.toDays((long)dms);
-                final long hr  = MILLISECONDS.toHours(  (long)dms
-                                                      - DAYS.toMillis(day));
-                final long min = MILLISECONDS.toMinutes(  (long)dms
-                                                        - DAYS.toMillis(day)
-                                                        - HOURS.toMillis(hr));
-                final long sec = MILLISECONDS.toSeconds(  (long)dms
-                                                        - DAYS.toMillis(day)
-                                                        - HOURS.toMillis(hr)
-                                                        - MINUTES.toMillis(min));
-                final long ms  = MILLISECONDS.toMillis(  (long)dms
-                                                       - DAYS.toMillis(day)
-                                                       - HOURS.toMillis(hr)
-                                                       - MINUTES.toMillis(min)
-                                                       - SECONDS.toMillis(sec));
-                return String.format("%d %02d:%02d:%02d.%03d", day, hr, min, sec, ms);
-            }
-            catch (Exception e) {
-                e.printStackTrace();
-                return String.format("???%f???", dms);
-            }
+            long ldms = (long)dms;
+            if (ldms < 0) ldms = 0;
+
+            final long day = MILLISECONDS.toDays(ldms);
+            final long hr  = MILLISECONDS.toHours(  ldms
+                                                  - DAYS.toMillis(day));
+            final long min = MILLISECONDS.toMinutes(  ldms
+                                                    - DAYS.toMillis(day)
+                                                    - HOURS.toMillis(hr));
+            final long sec = MILLISECONDS.toSeconds(  ldms
+                                                    - DAYS.toMillis(day)
+                                                    - HOURS.toMillis(hr)
+                                                    - MINUTES.toMillis(min));
+            final long ms  = MILLISECONDS.toMillis(  ldms
+                                                    - DAYS.toMillis(day)
+                                                    - HOURS.toMillis(hr)
+                                                    - MINUTES.toMillis(min)
+                                                    - SECONDS.toMillis(sec));
+            return String.format("%d %02d:%02d:%02d.%03d", day, hr, min, sec, ms);
         }
 
         /**
