@@ -399,7 +399,7 @@ public class BalancePartitionsStatistics extends StatsSource {
         public double getEstimatedRemaining() {
             double estimatedRemaining = -1.0;
             if (movedRanges > 0) {
-                estimatedRemaining = (totalRanges * getDurationMillis()) / movedRanges;
+                estimatedRemaining = ((totalRanges * getDurationMillis()) / movedRanges) - getDurationMillis();
             }
             return estimatedRemaining;
         }
