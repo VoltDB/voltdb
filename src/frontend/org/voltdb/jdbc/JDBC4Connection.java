@@ -41,6 +41,9 @@ import org.voltdb.client.ClientStatsContext;
 
 public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
 {
+    public static final String COMMIT_THROW_EXCEPTION = "commitThrowException";
+    public static final String ROLLBACK_THROW_EXCEPTION = "rollbackThrowException";
+
     protected final JDBC4ClientConnection NativeConnection;
     protected final String User;
     private boolean isClosed = false;
@@ -86,7 +89,9 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     public void commit() throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();
+        if (props.getProperty(COMMIT_THROW_EXCEPTION, "true").equalsIgnoreCase("true")) {
+            throw SQLError.noSupport();
+        }
     }
 
     // Factory method for creating Array objects.
@@ -361,7 +366,9 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     public void rollback() throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();
+        if (props.getProperty(ROLLBACK_THROW_EXCEPTION, "true").equalsIgnoreCase("true")) {
+            throw SQLError.noSupport();
+        }
     }
 
     // Undoes all changes made after the given Savepoint object was set.
@@ -377,8 +384,10 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     public void setAutoCommit(boolean autoCommit) throws SQLException
     {
         checkClosed();
-        if (!autoCommit) // Always true - error out only if the client is trying to set somethign else
+        // Always true - error out only if the client is trying to set somethign else
+        if (!autoCommit && (props.getProperty(COMMIT_THROW_EXCEPTION, "true").equalsIgnoreCase("true"))) {
             throw SQLError.noSupport();
+        }
     }
 
     // Sets the given catalog name in order to select a subspace of this Connection object's database in which to work.

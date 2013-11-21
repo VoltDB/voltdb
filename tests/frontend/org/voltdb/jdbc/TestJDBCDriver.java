@@ -37,6 +37,7 @@ import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Properties;
 import java.util.regex.Pattern;
 import static junit.framework.Assert.assertFalse;
 
@@ -56,6 +57,7 @@ public class TestJDBCDriver {
     static String testjar;
     static ServerThread server;
     static Connection conn;
+    static Connection myconn;
     static VoltProjectBuilder pb;
 
     @BeforeClass
@@ -122,12 +124,23 @@ public class TestJDBCDriver {
 
         Class.forName("org.voltdb.jdbc.Driver");
         conn = DriverManager.getConnection("jdbc:voltdb://localhost:21212");
+        myconn = null;
+    }
+
+    private static Connection getJdbcConnection(Properties props) throws Exception
+    {
+        Class.forName("org.voltdb.jdbc.Driver");
+        return DriverManager.getConnection("jdbc:voltdb://localhost:21212", props);
     }
 
     private static void stopServer() throws SQLException {
         if (conn != null) {
             conn.close();
             conn = null;
+        }
+        if (myconn != null) {
+            myconn.close();
+            myconn = null;
         }
         if (server != null) {
             try { server.shutdown(); } catch (InterruptedException e) { /*empty*/ }
@@ -555,5 +568,124 @@ public class TestJDBCDriver {
         }
         assertTrue(exceptionCalled);
 
+    }
+
+    @Test
+    public void testSafetyOffThroughProperties() throws Exception
+    {
+        Properties props = new Properties();
+        // Check default behavior
+        myconn = getJdbcConnection(props);
+        boolean threw = false;
+        try {
+            myconn.commit();
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertTrue(threw);
+        threw = false;
+        // autocommit true should never throw
+        try {
+            myconn.setAutoCommit(true);
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertFalse(threw);
+        threw = false;
+        try {
+            myconn.setAutoCommit(false);
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertTrue(threw);
+        threw = false;
+        try {
+            myconn.rollback();
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertTrue(threw);
+        myconn.close();
+
+        // Check commit and setAutoCommit
+        props.setProperty(JDBC4Connection.COMMIT_THROW_EXCEPTION, "true");
+        props.setProperty(JDBC4Connection.ROLLBACK_THROW_EXCEPTION, "true");
+        myconn = getJdbcConnection(props);
+        threw = false;
+        try {
+            myconn.commit();
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertTrue(threw);
+        threw = false;
+        // autocommit true should never throw
+        try {
+            myconn.setAutoCommit(true);
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertFalse(threw);
+        threw = false;
+        try {
+            myconn.setAutoCommit(false);
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertTrue(threw);
+        threw = false;
+        try {
+            myconn.rollback();
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertTrue(threw);
+        myconn.close();
+
+        props.setProperty(JDBC4Connection.COMMIT_THROW_EXCEPTION, "false");
+        props.setProperty(JDBC4Connection.ROLLBACK_THROW_EXCEPTION, "false");
+        myconn = getJdbcConnection(props);
+        threw = false;
+        try {
+            myconn.commit();
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertFalse(threw);
+        threw = false;
+        // autocommit true should never throw
+        try {
+            myconn.setAutoCommit(true);
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertFalse(threw);
+        threw = false;
+        try {
+            myconn.setAutoCommit(false);
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertFalse(threw);
+        threw = false;
+        try {
+            myconn.rollback();
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertFalse(threw);
+        myconn.close();
     }
 }
