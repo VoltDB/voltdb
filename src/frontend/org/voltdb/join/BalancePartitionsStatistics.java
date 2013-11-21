@@ -175,7 +175,7 @@ public class BalancePartitionsStatistics extends StatsSource {
         if (!bytesTransferredInLastSec.isEmpty()) {
             statsPoint = overallStats.capture(
                     "Point",
-                    bytesTransferredInLastSec.lastKey(),
+                    TimeUnit.MILLISECONDS.toNanos(bytesTransferredInLastSec.lastKey()),
                     throughput);
         }
     }
