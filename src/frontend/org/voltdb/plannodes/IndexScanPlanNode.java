@@ -80,7 +80,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // at runtime in the lookup on the index
     protected final List<AbstractExpression> m_searchkeyExpressions = new ArrayList<AbstractExpression>();
 
-    // for reverse scan LTE only. used to do forward scan to find the correct starting point
+    // for reverse scan LTE only.
+    // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
+    // iteration after it had to initially settle for starting at "greater than a prefix key".
     protected AbstractExpression m_initialExpression;
 
     private AbstractExpression m_skip_null_predicate;
@@ -126,29 +128,18 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     public void setSkipNullPredicate() {
-        int nextKeyIndex = m_searchkeyExpressions.size() - 1;
-        if (nextKeyIndex < 0 || isReverseScan()) {
+        int searchKeySize = m_searchkeyExpressions.size();
+        if (m_lookupType == IndexLookupType.EQ || searchKeySize == 0 || isReverseScan()) {
             m_skip_null_predicate = null;
             return;
         }
-        int searchKeySize = m_searchkeyExpressions.size();
 
+        int nextKeyIndex;
         if (m_endExpression != null &&
-                m_searchkeyExpressions.size() < ExpressionUtil.uncombine((AbstractExpression) m_endExpression.clone()).size()) {
+                searchKeySize < ExpressionUtil.uncombine(m_endExpression).size()) {
             nextKeyIndex = searchKeySize;
-        }
-
-        if (searchKeySize > 0) {
-            AbstractExpression lastSearchKey = m_searchkeyExpressions.get(searchKeySize - 1);
-            if (lastSearchKey instanceof TupleValueExpression) {
-                TupleValueExpression tve = (TupleValueExpression) lastSearchKey;
-                if (tve.getTableName().equalsIgnoreCase("materialized_temp_table")) {
-                    // This is for SQL-IN-LIST inner-joined with NLIJ
-                    // Do not pass skip null expression for SQL-IN-LIST
-                    m_skip_null_predicate = null;
-                    return ;
-                }
-            }
+        } else {
+            nextKeyIndex = searchKeySize - 1;
         }
 
         List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
