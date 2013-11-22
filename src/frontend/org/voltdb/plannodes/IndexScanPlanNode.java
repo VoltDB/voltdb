@@ -157,7 +157,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                         col.getTypeName(), col.getTypeName());
                 tve.setValueType(VoltType.get((byte)col.getType()));
                 tve.setValueSize(col.getSize());
-                tve.resolveForTable((Table)m_catalogIndex.getParent());
                 indexedExprs.add(tve);
             }
         } else {
@@ -181,7 +180,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         exprs.add(expr);
         m_skip_null_predicate = ExpressionUtil.combine(exprs);
         m_skip_null_predicate.finalizeValueTypes();
-
     }
 
     @Override
@@ -398,6 +396,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         return m_initialExpression;
     }
 
+    public AbstractExpression getSkipNullPredicate() {
+        return m_skip_null_predicate;
+    }
+
     public boolean isReverseScan() {
         return m_sortDirection == SortDirectionType.DESC ||
                 m_lookupType == IndexLookupType.LT || m_lookupType == IndexLookupType.LTE;
@@ -415,6 +417,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         List<TupleValueExpression> index_tves =
             new ArrayList<TupleValueExpression>();
         index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_endExpression));
+        index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_initialExpression));
+        index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_skip_null_predicate));
         for (AbstractExpression search_exp : m_searchkeyExpressions)
         {
             index_tves.addAll(ExpressionUtil.getTupleValueExpressions(search_exp));

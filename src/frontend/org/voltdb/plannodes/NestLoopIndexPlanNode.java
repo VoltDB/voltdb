@@ -132,6 +132,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
             new ArrayList<TupleValueExpression>();
         index_tves.addAll(ExpressionUtil.getTupleValueExpressions(inline_scan.getEndExpression()));
         index_tves.addAll(ExpressionUtil.getTupleValueExpressions(inline_scan.getInitialExpression()));
+        index_tves.addAll(ExpressionUtil.getTupleValueExpressions(inline_scan.getSkipNullPredicate()));
         for (AbstractExpression search_exp : inline_scan.getSearchKeyExpressions())
         {
             index_tves.addAll(ExpressionUtil.getTupleValueExpressions(search_exp));
