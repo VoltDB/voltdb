@@ -34,10 +34,10 @@
 # Template "DELETE FROM _table WHERE (_variable _cmp _variable) _logic (_variable _cmp _value[int64])" failed to yield SQL statements
 # because there are insufficient columns of the same type to satisfy all the _variables
 # given how the generator works.
-#    "basic-ints": {"schema": "int-schema.py",
-#                   "ddl": "int-DDL.sql",
-#                   "template": "basic-ints.sql",
-#                   "normalizer": "normalizer.py"},
+    "basic-ints": {"schema": "int-schema.py",
+                   "ddl": "int-DDL.sql",
+                   "template": "basic-ints.sql",
+                   "normalizer": "normalizer.py"},
 # HSQL SEEMS TO HAVE A BAD DEFAULT PRECISION, DISABLING
 #    "basic-decimal": {"schema": "decimal-schema.py",
 #                      "ddl": "DDL.sql",

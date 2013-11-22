@@ -26,6 +26,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
@@ -35,7 +36,9 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
@@ -51,6 +54,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         END_EXPRESSION,
         SEARCHKEY_EXPRESSIONS,
         INITIAL_EXPRESSION,
+        SKIP_NULL_PREDICATE,
         KEY_ITERATE,
         LOOKUP_TYPE,
         DETERMINISM_ONLY,
@@ -78,6 +82,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     // for reverse scan LTE only. used to do forward scan to find the correct starting point
     protected AbstractExpression m_initialExpression;
+
+    private AbstractExpression m_skip_null_predicate;
 
     // ???
     protected Boolean m_keyIterate = false;
@@ -117,6 +123,74 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         if (apn != null) {
             m_outputSchema = apn.m_outputSchema.clone();
         }
+    }
+
+    public void setSkipNullPredicate() {
+        int nextKeyIndex = m_searchkeyExpressions.size() - 1;
+        if (nextKeyIndex < 0 || isReverseScan()) {
+            m_skip_null_predicate = null;
+            return;
+        }
+        int searchKeySize = m_searchkeyExpressions.size();
+
+        if (m_endExpression != null &&
+                m_searchkeyExpressions.size() < ExpressionUtil.uncombine((AbstractExpression) m_endExpression.clone()).size()) {
+            nextKeyIndex = searchKeySize;
+        }
+
+        if (searchKeySize > 0) {
+            AbstractExpression lastSearchKey = m_searchkeyExpressions.get(searchKeySize - 1);
+            if (lastSearchKey instanceof TupleValueExpression) {
+                TupleValueExpression tve = (TupleValueExpression) lastSearchKey;
+                if (tve.getTableName().equalsIgnoreCase("materialized_temp_table")) {
+                    // This is for SQL-IN-LIST inner-joined with NLIJ
+                    // Do not pass skip null expression for SQL-IN-LIST
+                    m_skip_null_predicate = null;
+                    return ;
+                }
+            }
+        }
+
+        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+
+        String exprsjson = m_catalogIndex.getExpressionsjson();
+        List<AbstractExpression> indexedExprs = null;
+        if (exprsjson.isEmpty()) {
+            indexedExprs = new ArrayList<AbstractExpression>();
+
+            List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(m_catalogIndex.getColumns(), "index");
+            for (int i = 0; i <= nextKeyIndex; i++) {
+                ColumnRef colRef = indexedColRefs.get(i);
+                Column col = colRef.getColumn();
+                TupleValueExpression tve = new TupleValueExpression(m_targetTableName, m_targetTableAlias,
+                        col.getTypeName(), col.getTypeName());
+                tve.setValueType(VoltType.get((byte)col.getType()));
+                tve.setValueSize(col.getSize());
+                tve.resolveForTable((Table)m_catalogIndex.getParent());
+                indexedExprs.add(tve);
+            }
+        } else {
+            try {
+                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson);
+            } catch (JSONException e) {
+                e.printStackTrace();
+                assert(false);
+            }
+
+        }
+        AbstractExpression expr;
+        for (int i = 0; i < nextKeyIndex; i++) {
+            AbstractExpression idxExpr = indexedExprs.get(i);
+            expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
+                    idxExpr, (AbstractExpression) m_searchkeyExpressions.get(i).clone());
+            exprs.add(expr);
+        }
+        AbstractExpression nullExpr = indexedExprs.get(nextKeyIndex);
+        expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
+        exprs.add(expr);
+        m_skip_null_predicate = ExpressionUtil.combine(exprs);
+        m_skip_null_predicate.finalizeValueTypes();
+
     }
 
     @Override
@@ -499,6 +573,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             stringer.key(Members.INITIAL_EXPRESSION.name()).value(m_initialExpression);
         }
 
+        if (m_skip_null_predicate != null) {
+            stringer.key(Members.SKIP_NULL_PREDICATE.name()).value(m_skip_null_predicate);
+        }
+
         stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array();
         for (AbstractExpression ae : m_searchkeyExpressions) {
             assert (ae instanceof JSONString);
@@ -524,6 +602,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         //load searchkey_expressions
         AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
                 Members.SEARCHKEY_EXPRESSIONS.name());
+        m_skip_null_predicate = AbstractExpression.fromJSONChild(jobj, Members.SKIP_NULL_PREDICATE.name());
     }
 
     @Override

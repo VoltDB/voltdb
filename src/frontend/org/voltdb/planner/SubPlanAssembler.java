@@ -1287,6 +1287,8 @@ public abstract class SubPlanAssembler {
         }
         scanNode.setTargetTableAlias(tableCache.m_tableAlias);
         scanNode.setTargetIndexName(index.getTypeName());
+
+        scanNode.setSkipNullPredicate();
         return resultNode;
     }
 
