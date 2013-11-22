@@ -338,11 +338,13 @@ public abstract class SubPlanAssembler {
                     if (inListExpr != null) {
                         // Make sure all prior key component equality filters
                         // were based on constants and/or parameters.
-                        for (AbstractExpression comparator : retval.indexExprs) {
-                            AbstractExpression otherExpr = comparator.getRight();
+                        for (AbstractExpression eq_comparator : retval.indexExprs) {
+                            AbstractExpression otherExpr = eq_comparator.getRight();
                             if (otherExpr.hasAnySubexpressionOfType(ExpressionType.VALUE_TUPLE)) {
                                 // Can't index this IN LIST filter without some kind of three-way NLIJ,
-                                // so pass it by.
+                                // so, add it to the post-filters.
+                                AbstractExpression in_list_comparator = inListExpr.getOriginalFilter();
+                                retval.otherExprs.add(in_list_comparator);
                                 inListExpr = null;
                                 break;
                             }

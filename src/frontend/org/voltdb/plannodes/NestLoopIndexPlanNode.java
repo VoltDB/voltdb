@@ -119,7 +119,9 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
                 if (index == -1)
                 {
                     throw new RuntimeException("Unable to find index for nestloopindexscan TVE: " +
-                                               tve.toString());
+                                               tve.toString() + " in NodeSchemas " +
+                                               outer_schema.toString() + "\nand\n" +
+                                               index_schema.toString());
                 }
                 tableIdx = 1;   // 1 for inner table
             }
