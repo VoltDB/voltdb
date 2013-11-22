@@ -453,6 +453,9 @@ public class SnapshotSiteProcessor {
     {
         final int desired = tableTasks.size();
         int available = m_availableSnapshotBuffers.get();
+
+        //Limit the number of buffers used concurrently
+        if (desired > available) return null;
         if (!m_availableSnapshotBuffers.compareAndSet(available, available - desired)) return null;
 
         List<BBContainer> outputBuffers = new ArrayList<BBContainer>(tableTasks.size());
