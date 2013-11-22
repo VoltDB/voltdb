@@ -192,9 +192,8 @@ public class SysprocFragmentTask extends TransactionTask
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 break;
             } catch (final VoltAbortException e) {
-                hostLog.warn("Error running system procedure plan fragment", e);
                 currentFragResponse.setStatus(
-                        FragmentResponseMessage.UNEXPECTED_ERROR,
+                        FragmentResponseMessage.USER_ERROR,
                         new SerializableException(CoreUtils.throwableToString(e)));
                 break;
             }
