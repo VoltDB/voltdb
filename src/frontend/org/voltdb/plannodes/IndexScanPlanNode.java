@@ -131,11 +131,26 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             m_skip_null_predicate = null;
             return;
         }
+        int searchKeySize = m_searchkeyExpressions.size();
 
         if (m_endExpression != null &&
                 m_searchkeyExpressions.size() < ExpressionUtil.uncombine((AbstractExpression) m_endExpression.clone()).size()) {
-            nextKeyIndex = m_searchkeyExpressions.size();
+            nextKeyIndex = searchKeySize;
         }
+
+        if (searchKeySize > 0) {
+            AbstractExpression lastSearchKey = m_searchkeyExpressions.get(searchKeySize - 1);
+            if (lastSearchKey instanceof TupleValueExpression) {
+                TupleValueExpression tve = (TupleValueExpression) lastSearchKey;
+                if (tve.getTableName().equalsIgnoreCase("materialized_temp_table")) {
+                    // This is for SQL-IN-LIST inner-joined with NLIJ
+                    // Do not pass skip null expression for SQL-IN-LIST
+                    m_skip_null_predicate = null;
+                    return ;
+                }
+            }
+        }
+
         List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
 
         String exprsjson = m_catalogIndex.getExpressionsjson();
@@ -175,6 +190,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         exprs.add(expr);
         m_skip_null_predicate = ExpressionUtil.combine(exprs);
         m_skip_null_predicate.finalizeValueTypes();
+
     }
 
     @Override

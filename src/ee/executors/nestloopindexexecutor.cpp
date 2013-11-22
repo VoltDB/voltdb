@@ -233,7 +233,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     // For reverse scan edge case NULL values and forward scan underflow case.
     if (skipNullExpr != NULL) {
         skipNullExpr->substitute(params);
-        VOLT_DEBUG("COUNT NULL Expression:\n%s", skipNullExpr->debug(true).c_str());
+        VOLT_DEBUG("Skip NULL Expression:\n%s", skipNullExpr->debug(true).c_str());
     }
 
     LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
