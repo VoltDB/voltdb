@@ -170,6 +170,11 @@ public class BalancePartitionsStatistics extends StatsSource {
         return this.intervalStats;
     }
 
+    public StatsPoint getLastStatsPoint()
+    {
+        return this.statsPoint;
+    }
+
     private void markStatsPoint()
     {
         if (!bytesTransferredInLastSec.isEmpty()) {
@@ -423,7 +428,7 @@ public class BalancePartitionsStatistics extends StatsSource {
         public double getAverageInvocationTime()
         {
             //Convert to floating point millis
-            return getInvocationTimeMillis() / (double)invocationCount;
+            return getInvocationTimeMillis() / invocationCount;
         }
 
         public final static String formatTimeInterval(double dms)
