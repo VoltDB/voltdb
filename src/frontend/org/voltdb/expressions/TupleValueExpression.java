@@ -24,6 +24,8 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.planner.AbstractParsedStmt;
+import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
@@ -300,6 +302,14 @@ public class TupleValueExpression extends AbstractValueExpression {
         m_columnIndex = column.getIndex();
         setValueType(VoltType.get((byte)column.getType()));
         setValueSize(column.getSize());
+    }
+
+    @Override
+    public void resolveForStmt(Database db, AbstractParsedStmt stmt) {
+        assert (m_tableAlias != null);
+        assert (stmt.tableAliasIndexMap.containsKey(m_tableAlias));
+        StmtTableScan tableCache = stmt.stmtCache.get(stmt.tableAliasIndexMap.get(m_tableAlias));
+        tableCache.resolveTVEForDB(db, this);
     }
 
     /**

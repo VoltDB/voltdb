@@ -82,13 +82,14 @@ import org.voltdb.utils.CatalogUtil;
  */
 public class PlanAssembler {
 
-    // The convinience struct to be able to return multiple variables from a function call
-    private class ChildPlanResult {
+    // The convinience struct to accumulate results after pasring multiple statements
+    private class ParsedResultAccumulator {
         public boolean m_contentIsDeterministic = true;
         public boolean m_orderIsDeterministic = true;
         public CompiledPlan m_compiledPlan;
         public int m_planId = 0;
         public PartitioningForStatement m_commonPartitioning = null;
+        public PartitioningForStatement m_currentPartitioning = null;
     }
 
     /** convenience pointer to the cluster object in the catalog */
@@ -296,7 +297,7 @@ public class PlanAssembler {
         setupForNewPlans(parsedStmt);
 
         // Get the best plans for the sub-queries first
-        ChildPlanResult subQueryResult = getBestCostPlanForSubQueries(parsedStmt);
+        ParsedResultAccumulator subQueryResult = getBestCostPlanForSubQueries(parsedStmt);
         if (subQueryResult != null && subQueryResult.m_compiledPlan == null){
             // There was at least one sub-query and we should have a compiled plan for it
             return null;
@@ -319,7 +320,7 @@ public class PlanAssembler {
         CompiledPlan retval = m_planSelector.m_bestPlan;
         if (subQueryResult != null && retval != null) {
             // Decide whether parent statement' partitioning is compatible with children.
-            getCommonPartitioning(m_partitioning, subQueryResult.m_commonPartitioning);
+            subQueryResult = setCommonPartitioning(m_partitioning, subQueryResult);
 
             boolean contentIsDeterministic =
                     subQueryResult.m_contentIsDeterministic && retval.isContentDeterministic();
@@ -349,7 +350,7 @@ public class PlanAssembler {
      * @param parsedStmt - SQL context containing sub queries
      * @return ChildPlanResult
      */
-    private ChildPlanResult getBestCostPlanForSubQueries(AbstractParsedStmt parsedStmt) {
+    private ParsedResultAccumulator getBestCostPlanForSubQueries(AbstractParsedStmt parsedStmt) {
         List<JoinNode> subQueryNodes = null;
         if (parsedStmt.joinTree == null) {
             return null;
@@ -359,7 +360,7 @@ public class PlanAssembler {
             return null;
         }
 
-        ChildPlanResult parseResult = new ChildPlanResult();
+        ParsedResultAccumulator parsedResult = new ParsedResultAccumulator();
         for (JoinNode subQueryNode : subQueryNodes) {
             assert(subQueryNode.getTableAliasIndex() != StmtTableScan.NULL_ALIAS_INDEX);
             StmtTableScan tableCache = parsedStmt.stmtCache.get(subQueryNode.getTableAliasIndex());
@@ -367,17 +368,18 @@ public class PlanAssembler {
             AbstractParsedStmt subQuery = tableCache.getTempTable().getSubQuery();
             assert(subQuery != null);
 
-            planForChildStmt(subQuery, parseResult);
-            if (parseResult.m_compiledPlan == null) {
-                return parseResult;
+            parsedResult = planForParsedStmt(subQuery, parsedResult);
+            tableCache.setPartitioning(parsedResult.m_currentPartitioning);
+            if (parsedResult.m_compiledPlan == null) {
+                return parsedResult;
             }
-            tableCache.getTempTable().setBetsCostPlan(parseResult.m_compiledPlan);
+            tableCache.getTempTable().setBetsCostPlan(parsedResult.m_compiledPlan);
         }
 
-        // need to reset plan id for the entire UNION
-        m_planSelector.m_planId = parseResult.m_planId;
+        // need to reset plan id for the entire SQL
+        m_planSelector.m_planId = parsedResult.m_planId;
 
-        return parseResult;
+        return parsedResult;
     }
 
     /**
@@ -467,21 +469,21 @@ public class PlanAssembler {
         boolean contentIsDeterministic = true;
 
         // Build best plans for the children first
-        ChildPlanResult parseResult = new ChildPlanResult();
+        ParsedResultAccumulator parsedResult = new ParsedResultAccumulator();
         for (AbstractParsedStmt parsedChildStmt : m_parsedUnion.m_children) {
-            planForChildStmt(parsedChildStmt, parseResult);
-            if (parseResult.m_compiledPlan == null) {
+            parsedResult = planForParsedStmt(parsedChildStmt, parsedResult);
+            if (parsedResult.m_compiledPlan == null) {
                 return null;
             }
-            childrenPlans.add(parseResult.m_compiledPlan);
+            childrenPlans.add(parsedResult.m_compiledPlan);
         }
 
-        if (parseResult.m_commonPartitioning != null) {
-            m_partitioning = (PartitioningForStatement)parseResult.m_commonPartitioning.clone();
+        if (parsedResult.m_commonPartitioning != null) {
+            m_partitioning = (PartitioningForStatement)parsedResult.m_commonPartitioning.clone();
         }
 
         // need to reset plan id for the entire UNION
-        m_planSelector.m_planId = parseResult.m_planId;
+        m_planSelector.m_planId = parsedResult.m_planId;
 
         // Add and link children plans
         for (CompiledPlan selectPlan : childrenPlans) {
@@ -502,43 +504,56 @@ public class PlanAssembler {
         return retval;
     }
 
-    private void planForChildStmt(AbstractParsedStmt parsedChildStmt, ChildPlanResult parseResult) {
+    private ParsedResultAccumulator planForParsedStmt(AbstractParsedStmt parsedStmt, ParsedResultAccumulator parsedResult) {
 
         PartitioningForStatement partitioning = (PartitioningForStatement)m_partitioning.clone();
         PlanSelector selector = (PlanSelector) m_planSelector.clone();
-        selector.m_planId = parseResult.m_planId;
+        selector.m_planId = parsedResult.m_planId;
         PlanAssembler assembler = new PlanAssembler(
                 m_catalogCluster, m_catalogDb, partitioning, selector);
-        parseResult.m_compiledPlan = assembler.getBestCostPlan(parsedChildStmt);
+        parsedResult.m_compiledPlan = assembler.getBestCostPlan(parsedStmt);
         // make sure we got a winner
-        if (parseResult.m_compiledPlan == null) {
+        if (parsedResult.m_compiledPlan == null) {
             if (m_recentErrorMsg == null) {
                 m_recentErrorMsg = "Unable to plan for statement. Error unknown.";
             }
-            return;
+            return parsedResult;
         }
 
-        parseResult.m_orderIsDeterministic = parseResult.m_orderIsDeterministic &&
-                parseResult.m_compiledPlan.isOrderDeterministic();
-        parseResult.m_contentIsDeterministic = parseResult.m_contentIsDeterministic &&
-                parseResult.m_compiledPlan.isContentDeterministic();
+        parsedResult.m_orderIsDeterministic = parsedResult.m_orderIsDeterministic &&
+                parsedResult.m_compiledPlan.isOrderDeterministic();
+        parsedResult.m_contentIsDeterministic = parsedResult.m_contentIsDeterministic &&
+                parsedResult.m_compiledPlan.isContentDeterministic();
 
         // Make sure that next child's plans won't override current ones.
-        parseResult.m_planId = selector.m_planId;
+        parsedResult.m_planId = selector.m_planId;
 
-        // Decide whether child statements' partitioning is compatible.
-        parseResult.m_commonPartitioning = getCommonPartitioning(partitioning, parseResult.m_commonPartitioning);
+        parsedResult = setCommonPartitioning(partitioning, parsedResult);
+        return parsedResult;
     }
 
-    private PartitioningForStatement getCommonPartitioning(PartitioningForStatement partitioning,
-            PartitioningForStatement commonPartitioning) {
+    /**
+     * Pick a new common partitioning given the existing common partitioning and the new one.
+     * An exception is thrown if they are not compatible
+     *
+     * @param partitioning new partitioning
+     * @param parsedResult with the current common partitioning
+     * @return updated parsedResult
+     */
+    private ParsedResultAccumulator setCommonPartitioning(PartitioningForStatement partitioning,
+            ParsedResultAccumulator parsedResult) {
+        assert (parsedResult!= null);
+        assert (partitioning != null);
+
+        parsedResult.m_currentPartitioning = partitioning;
         // Decide whether child statements' partitioning is compatible.
-        if (commonPartitioning == null) {
-            return partitioning;
+        if (parsedResult.m_commonPartitioning == null) {
+            parsedResult.m_commonPartitioning = partitioning;
+            return parsedResult;
         }
 
         AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpression();
-        if (commonPartitioning.requiresTwoFragments()) {
+        if (parsedResult.m_commonPartitioning.requiresTwoFragments()) {
             if (partitioning.requiresTwoFragments() || statementPartitionExpression != null) {
                 // If two child statements need to use a second fragment,
                 // it can't currently be a two-fragment plan.
@@ -547,36 +562,42 @@ public class PlanAssembler {
                 // target a particular partition, so neither can the union of the coordinator
                 // and a statement that wants to run single-partition.
                 throw new PlanningErrorException(
-                        "Statements are too complex in set operation or sub-query using multiple partitioned tables.");
+                        "Statements are too complex in set operation or statement with sub-query using multiple partitioned tables.");
             }
             // the new statement is apparently a replicated read and has no effect on partitioning
-            return commonPartitioning;
+            return parsedResult;
         }
         AbstractExpression
-        commonPartitionExpression = commonPartitioning.singlePartitioningExpression();
+        commonPartitionExpression = parsedResult.m_commonPartitioning.singlePartitioningExpression();
         if (commonPartitionExpression == null) {
             // the prior statement(s) were apparently replicated reads
             // and have no effect on partitioning
-            return partitioning;
+            parsedResult.m_commonPartitioning = partitioning;
+            return parsedResult;
         }
         if (partitioning.requiresTwoFragments()) {
             // Again, currently the coordinator of a two-fragment plan is not allowed to
             // target a particular partition, so neither can the union of the coordinator
             // and a statement that wants to run single-partition.
             throw new PlanningErrorException(
-                    "Statements are too complex in set operation or sub-query using multiple partitioned tables.");
+                    "Statements are too complex in set operation or statement with sub-query using multiple partitioned tables.");
         }
         if (statementPartitionExpression == null) {
             // the new statement is apparently a replicated read and has no effect on partitioning
-            return commonPartitioning;
+            return parsedResult;
         }
         if ( ! commonPartitionExpression.equals(statementPartitionExpression)) {
             throw new PlanningErrorException(
                     "Statements use conflicting partitioned table filters in set operation or sub-query.");
         }
-        return commonPartitioning;
+        return parsedResult;
     }
 
+    /**
+     * For each Subquery node in the plan tree attach the subquery plan to the parent node.
+     * @param initial plan
+     * @return A complete plan tree for the entire SQl.
+     */
     private AbstractPlanNode connectChildrenBestPlans(AbstractPlanNode parentPlan) {
         if (parentPlan instanceof AbstractScanPlanNode) {
             AbstractScanPlanNode scanNode = (AbstractScanPlanNode) parentPlan;

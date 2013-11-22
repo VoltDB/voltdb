@@ -17,7 +17,10 @@
 
 package org.voltdb.planner.parseinfo;
 
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.expressions.TupleValueExpression;
 
 /**
  * StmtTableScan caches data related to a given instance of a table within the statement scope
@@ -49,6 +52,22 @@ public class StmtTargetTableScan extends StmtTableScan {
     @Override
     public boolean getIsreplicated() {
         return m_table.getIsreplicated();
+    }
+
+    @Override
+    public boolean isPartitioningColumn(String columnName) {
+        Column partitionColumn = m_table.getPartitioncolumn();
+        if (partitionColumn != null) {
+            return partitionColumn.getTypeName().equals(columnName);
+        } else {
+            return false;
+        }
+    }
+
+    @Override
+    public TupleValueExpression resolveTVEForDB(Database db, TupleValueExpression tve) {
+        tve.resolveForDB(db);
+        return tve;
     }
 
     // Catalog table

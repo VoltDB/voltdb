@@ -47,33 +47,18 @@ public class TempTable {
         m_tableAlias = tableAlias;
         m_subQuery = subQuery;
         if (m_subQuery instanceof ParsedSelectStmt) {
-            m_derivedSchema = generateOutputSchema(tableName, tableAlias, ((ParsedSelectStmt) m_subQuery).displayColumns());
+            m_origSchema = ((ParsedSelectStmt) m_subQuery).displayColumns();
         } else if (m_subQuery instanceof ParsedUnionStmt) {
             ParsedUnionStmt unionStmt = (ParsedUnionStmt) m_subQuery;
             assert(!unionStmt.m_children.isEmpty());
             AbstractParsedStmt selectStmt = unionStmt.m_children.get(0);
             // Can we have UNION of UNIONS?
             assert (selectStmt instanceof ParsedSelectStmt);
-            m_derivedSchema = generateOutputSchema(tableName, tableAlias, ((ParsedSelectStmt) selectStmt).displayColumns());
+            m_origSchema = ((ParsedSelectStmt) selectStmt).displayColumns();
         } else {
-            m_derivedSchema = null;
+            m_origSchema = null;
         }
-        assert(m_derivedSchema != null);
-    }
-
-    private List<ParsedColInfo> generateOutputSchema(String tableName, String tableAlias, List<ParsedColInfo> subQuerySchema) {
-        List<ParsedColInfo> derivedSchema = new ArrayList<ParsedColInfo>();
-        for (ParsedColInfo col : subQuerySchema) {
-            ParsedColInfo newCol = col.clone();
-            newCol.tableName = tableName;
-            newCol.tableAlias = tableAlias;
-            // The column name is the column alias of the corresponding column from the subquery
-            if (col.alias != null) {
-                newCol.columnName = col.alias;
-            }
-            derivedSchema.add(newCol);
-        }
-        return derivedSchema;
+        assert(m_origSchema != null);
     }
 
     public String getTableName() {
@@ -88,8 +73,8 @@ public class TempTable {
         return m_subQuery;
     }
 
-    public List<ParsedColInfo> getDerivedSchema() {
-        return m_derivedSchema;
+    public List<ParsedColInfo> getOrigSchema() {
+        return m_origSchema;
     }
 
     public CompiledPlan getBetsCostPlan() {
@@ -119,6 +104,6 @@ public class TempTable {
     private final String m_tableName;
     private final String m_tableAlias;
     private final AbstractParsedStmt m_subQuery;
-    private final List<ParsedColInfo> m_derivedSchema;
+    private final List<ParsedColInfo> m_origSchema;
     private CompiledPlan m_bestCostPlan = null;
 }

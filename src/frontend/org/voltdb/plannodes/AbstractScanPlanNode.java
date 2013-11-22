@@ -19,10 +19,8 @@ package org.voltdb.plannodes;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -273,32 +271,6 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 m_hasSignificantOutputSchema = true;
             }
         }
-        if (m_isSubQuery) {
-            // The TVE for the sub-query columns need their type and size to be set
-            Map<String, SchemaColumn> colMap = new HashMap<String, SchemaColumn>();
-            for (SchemaColumn col : this.m_tableSchema.getColumns()) {
-                colMap.put(col.getColumnName(), col);
-            }
-            // Set the tve size and type for the output schema
-            if (m_tableScanSchema != null) {
-                for (SchemaColumn scanCol : m_tableScanSchema.getColumns()) {
-                    assert(colMap.containsKey(scanCol.getColumnName()) == true);
-                    SchemaColumn tableCol = colMap.get(scanCol.getColumnName());
-                    scanCol.getExpression().setValueType(tableCol.getExpression().getValueType());
-                    scanCol.getExpression().setValueSize(tableCol.getExpression().getValueSize());
-                }
-            }
-            if (m_outputSchema != null) {
-                for (SchemaColumn outputCol : m_outputSchema.getColumns()) {
-                    assert(colMap.containsKey(outputCol.getColumnName()) == true);
-                    SchemaColumn tableCol = colMap.get(outputCol.getColumnName());
-                    outputCol.getExpression().setValueType(tableCol.getExpression().getValueType());
-                    outputCol.getExpression().setValueSize(tableCol.getExpression().getValueSize());
-                }
-            }
-
-        }
-
     }
 
     @Override

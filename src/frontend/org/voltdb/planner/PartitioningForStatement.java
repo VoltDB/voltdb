@@ -315,6 +315,10 @@ public class PartitioningForStatement implements Cloneable{
         return m_partitionCol;
     }
 
+    public boolean isPartitionColumnByAnyTable(String column) {
+        return m_partitionColumnByTable.containsValue(column);
+    }
+
     /**
      * Given the query's list of tables and its collection(s) of equality-filtered columns and their equivalents,
      * determine whether all joins involving partitioned tables can be executed locally on a single partition.
@@ -359,9 +363,19 @@ public class PartitioningForStatement implements Cloneable{
                 if ( ! candidatePartitionKey.getTableAlias().equals(partitionedTableAlias)) {
                     continue;
                 }
-                if ( ! candidatePartitionKey.getColumnName().equals(columnNeedingCoverage)) {
-                    continue;
+                String candidateColumnName = candidatePartitionKey.getColumnName();
+                if (tableCache.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TARGET_TABLE_SCAN) {
+                    if ( ! candidateColumnName.equals(columnNeedingCoverage)) {
+                        continue;
+                    }
+                } else if (tableCache.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TEMP_TABLE_SCAN){
+                    if ( ! tableCache.isPartitioningColumn(candidateColumnName)) {
+                        continue;
+                    }
+                } else {
+                    assert(false);
                 }
+
                 unfiltered = false;
                 if (tokenPartitionKey == null) {
                     tokenPartitionKey = candidatePartitionKey;

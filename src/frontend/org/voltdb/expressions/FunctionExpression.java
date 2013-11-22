@@ -23,6 +23,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.types.ExpressionType;
 
 public class FunctionExpression extends AbstractExpression {
@@ -289,6 +290,18 @@ public class FunctionExpression extends AbstractExpression {
     @Override
     public void resolveForTable(Table table) {
         resolveChildrenForTable(table);
+        if (m_parameterArg == NOT_PARAMETERIZED) {
+            // Non-parameterized functions should have a fixed SPECIFIC type.
+            // Further refinement should be useless/un-possible.
+            return;
+        }
+        // resolving a child column has type implications for parameterized functions
+        negotiateInitialValueTypes();
+    }
+
+    @Override
+    public void resolveForStmt(Database db, AbstractParsedStmt stmt) {
+        resolveChildrenForStmt(db, stmt);
         if (m_parameterArg == NOT_PARAMETERIZED) {
             // Non-parameterized functions should have a fixed SPECIFIC type.
             // Further refinement should be useless/un-possible.

@@ -37,7 +37,6 @@ import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
-import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
@@ -389,37 +388,13 @@ public abstract class AbstractParsedStmt {
 
         StmtTableScan tableCache = stmtCache.get(tableCacheIdx);
         // Resolve the tve before adding it to the cache
-        if (tableCache.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TARGET_TABLE_SCAN) {
-            tveColumn.resolveForDB(m_db);
-        } else if (tableCache.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TEMP_TABLE_SCAN) {
-            resolveTableForColumn(tveColumn, tableCache.getTempTable());
-        } else {
-            assert (false);
-        }
+        tableCache.resolveTVEForDB(m_db, tveColumn);
         SchemaColumn col = new SchemaColumn(tveColumn.getTableName(),
                 tveColumn.getTableAlias(),
                 tveColumn.getColumnName(),
                 tveColumn.getColumnAlias(),
                 tveColumn);
         tableCache.getScanColumns().add(col);
-    }
-
-    /**
-     * Resolve TVE column from a temp table by finding the first matching
-     * column in the table schema. Unfortunately, at this moment
-     * the column's type and size are not resolved yet.
-     * They will be resolved during the final call to generate the output schemas.
-     *
-     */
-    private void resolveTableForColumn(TupleValueExpression tveColumn, TempTable tempTable) {
-        assert (tempTable != null);
-        String columnName = tveColumn.getColumnName();
-        for (ParsedColInfo colInfo : tempTable.getDerivedSchema()) {
-            if (columnName.equals(colInfo.columnName)) {
-                tveColumn.setColumnIndex(colInfo.index);
-            }
-        }
-        assert (tveColumn.getColumnIndex() != -1);
     }
 
     /**
@@ -435,9 +410,14 @@ public abstract class AbstractParsedStmt {
         if (!tableAliasIndexMap.containsKey(tableAlias)) {
             int nextIndex = stmtCache.size();
             tableAliasIndexMap.put(tableAlias, nextIndex);
-            StmtTableScan tableCache = (subQuery == null) ?
-                new StmtTargetTableScan(getTableFromDB(tableName), tableAlias) :
-                new StmtSubqueryScan(new TempTable(tableName, tableAlias, subQuery), tableAlias);
+            StmtTableScan tableCache = null;
+            if (subQuery == null) {
+                tableCache = new StmtTargetTableScan(getTableFromDB(tableName), tableAlias);
+            } else {
+                // Temp table always have name SYSTEM_SUBQUERY.
+                // Need to use its alias to uniquely identify the sub-query
+                tableCache = new StmtSubqueryScan(new TempTable(tableAlias, tableAlias, subQuery), tableAlias);
+            }
             stmtCache.add(tableCache);
             tableAliasIndexMap.put(tableAlias, nextIndex);
         }
@@ -615,7 +595,7 @@ public abstract class AbstractParsedStmt {
             expr.setParameterArg(parameter_idx);
         }
 
-        expr.resolveForDB(m_db);
+        expr.resolveForStmt(m_db, this);
         return expr;
     }
 

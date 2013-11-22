@@ -28,6 +28,7 @@ import java.util.List;
 import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
+import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -75,6 +76,23 @@ public class TestSubQueries   extends PlannerTestCase {
             assertTrue(pn instanceof NestLoopPlanNode);
             verifyOutputSchema(pn, "A", "C");
         }
+
+        {
+            // Function expression  for the temp table
+            AbstractPlanNode pn = compile("select ABS(C1) FROM (SELECT A A1, C C1 FROM R1) TEMP WHERE ABS(TEMP.A1) > 3");
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof SeqScanPlanNode);
+            SchemaColumn col = pn.getOutputSchema().getColumns().get(0);
+            assertEquals(4, col.getSize());
+            assertEquals(VoltType.INTEGER, col.getType());
+            verifyFunctionExpr(col.getExpression());
+            AbstractExpression p = ((SeqScanPlanNode) pn).getPredicate();
+            assertTrue(p != null);
+            assertTrue(p instanceof ComparisonExpression);
+            p = p.getLeft();
+            verifyFunctionExpr(p);
+        }
+
     }
 
     public void testParameters() {
@@ -107,7 +125,7 @@ public class TestSubQueries   extends PlannerTestCase {
             assertTrue(lpn.size() == 2);
             AbstractPlanNode n = lpn.get(0).getChild(0);
             assertTrue(n instanceof SeqScanPlanNode);
-            assertEquals("SYSTEM_SUBQUERY", ((SeqScanPlanNode) n).getTargetTableName());
+            assertEquals("TEMP", ((SeqScanPlanNode) n).getTargetTableName());
             n = lpn.get(1).getChild(0);
             assertTrue(n instanceof IndexScanPlanNode);
         }
@@ -131,27 +149,39 @@ public class TestSubQueries   extends PlannerTestCase {
         {
             // Join of two multi-partitioned sub-queries on non-partition column. Should fail
             failToCompile("select A, C FROM (SELECT A FROM P1) TEMP1, (SELECT C FROM P2) TEMP2 WHERE TEMP1.A = TEMP2.C ",
-                    "Statements are too complex in set operation or sub-query using multiple partitioned");
+                    "Statements are too complex in set operation or statement with sub-query using multiple partitioned");
         }
 
         {
-            // Join of two single partitioned sub-queries. Should compile
-            List<AbstractPlanNode> lpn = compileToFragments("select D1, D2 FROM (SELECT D D1 FROM P1 WHERE A=1) TEMP1, (SELECT D D2 FROM P2 WHERE A=1) TEMP2 WHERE TEMP1.D1 = TEMP2.D2 ");
+            // Join of a single partitioned sub-query and a table. The partition is the same for
+            // the table and sub-query
+            List<AbstractPlanNode> lpn = compileToFragments("select D1, P2.D FROM (SELECT A, D D1 FROM P1 WHERE A=1) TEMP1, P2 WHERE TEMP1.A = P2.A AND P2.A = 1");
             assertTrue(lpn.size() == 1);
             AbstractPlanNode n = lpn.get(0).getChild(0).getChild(0);
             assertTrue(n instanceof NestLoopPlanNode);
             AbstractPlanNode c = n.getChild(0);
             assertTrue(c instanceof SeqScanPlanNode);
             assertEquals("TEMP1", ((SeqScanPlanNode) c).getTargetTableAlias());
-            c = n.getChild(1);
-            assertTrue(c instanceof SeqScanPlanNode);
-            assertEquals("TEMP2", ((SeqScanPlanNode) c).getTargetTableAlias());
         }
 
         {
-            // Join of two multi-partitioned sub-queries on the partition column. Should compile ?
-            List<AbstractPlanNode> lpn = compileToFragments("select A1, A2 FROM (SELECT A A1 FROM P1) TEMP1, (SELECT A A2 FROM P2) TEMP2 WHERE TEMP1.A1 = TEMP2.A2 ");
-            assertTrue(lpn.size() == 2);
+            // Join of a single partitioned sub-query and a table. The partitions are different
+            failToCompile("select D1, P2.D FROM (SELECT A, D D1 FROM P1 WHERE A=2) TEMP1, P2 WHERE TEMP1.A = P2.A AND P2.A = 1",
+            "Statements use conflicting partitioned table filters in set operation or sub-query.");
+        }
+    }
+
+    public void testDistributedSubQueryMultiPartition() {
+        {
+            // Join of a single partitioned sub-query and a table on the partitioning column.
+            failToCompile("select D1, P2.D FROM (SELECT A, D D1 FROM P1 WHERE A=1) TEMP1, P2 WHERE TEMP1.A = P2.A ",
+                    "Statements are too complex in set operation or statement with sub-query using multiple partitioned tables.");
+        }
+
+        {
+            // Join of two multi-partitioned sub-queries on the partition column.
+            failToCompile("select A1, A2 FROM (SELECT A A1 FROM P1) TEMP1, (SELECT A A2 FROM P2) TEMP2 WHERE TEMP1.A1 = TEMP2.A2 ",
+                    "Statements are too complex in set operation or statement with sub-query using multiple partitioned tables.");
         }
     }
 
@@ -168,35 +198,17 @@ public class TestSubQueries   extends PlannerTestCase {
         }
     }
 
-    // params
-    // update
-    // delete
-
-//    adHocQuery = "  UPDATE STAFF \n" +
-//            "          SET GRADE=10*STAFF.GRADE \n" +
-//            "          WHERE STAFF.EMPNUM NOT IN \n" +
-//            "                (SELECT WORKS.EMPNUM \n" +
-//            "                      FROM WORKS \n" +
-//            "                      WHERE STAFF.EMPNUM = WORKS.EMPNUM);";
-//    adHocQuery = "     SELECT 'ZZ', EMPNUM, EMPNAME, -99 \n" +
-//            "           FROM STAFF \n" +
-//            "           WHERE NOT EXISTS (SELECT * FROM WORKS \n" +
-//            "                WHERE WORKS.EMPNUM = STAFF.EMPNUM) \n" +
-//            "                ORDER BY EMPNUM;";
-//    adHocQuery = "   SELECT STAFF.EMPNAME \n" +
-//            "          FROM STAFF \n" +
-//            "          WHERE STAFF.EMPNUM IN \n" +
-//            "                  (SELECT WORKS.EMPNUM \n" +
-//            "                        FROM WORKS \n" +
-//            "                        WHERE WORKS.PNUM IN \n" +
-//            "                              (SELECT PROJ.PNUM \n" +
-//            "                                    FROM PROJ \n" +
-//            "                                    WHERE PROJ.CITY='Tampa')); \n" +
-//            "";
-
-
-    //failToCompile("select * from new_order where no_w_id in (select w_id from warehouse);",
-    //        "VoltDB does not support subqueries");
+    private void verifyFunctionExpr(AbstractExpression expr) {
+        assertTrue( expr != null);
+        assertTrue( expr instanceof FunctionExpression);
+        FunctionExpression f = (FunctionExpression) expr;
+        List<AbstractExpression> args = f.getArgs();
+        assertEquals(1, args.size());
+        assertTrue(args.get(0) instanceof TupleValueExpression);
+        TupleValueExpression tve = (TupleValueExpression) args.get(0);
+        assertEquals(4, tve.getValueSize());
+        assertEquals(VoltType.INTEGER, tve.getValueType());
+    }
 
     @Override
     protected void setUp() throws Exception {

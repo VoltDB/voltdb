@@ -20,7 +20,10 @@ package org.voltdb.planner.parseinfo;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.plannodes.SchemaColumn;
 
 /**
@@ -46,6 +49,10 @@ public abstract class StmtTableScan {
 
     abstract public boolean getIsreplicated();
 
+    abstract public boolean isPartitioningColumn(String columnName);
+
+    abstract public TupleValueExpression resolveTVEForDB(Database db, TupleValueExpression tve);
+
     public String getTableAlias() {
         return m_tableAlias;
     }
@@ -62,7 +69,8 @@ public abstract class StmtTableScan {
         return null;
     }
 
-
+    public void setPartitioning(PartitioningForStatement partitioning) {
+    }
 
     // table alias
     protected String m_tableAlias = null;
