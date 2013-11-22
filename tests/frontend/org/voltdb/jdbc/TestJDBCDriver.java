@@ -37,6 +37,7 @@ import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Pattern;
 import static junit.framework.Assert.assertFalse;
@@ -127,10 +128,10 @@ public class TestJDBCDriver {
         myconn = null;
     }
 
-    private static Connection getJdbcConnection(Properties props) throws Exception
+    private static Connection getJdbcConnection(String url, Properties props) throws Exception
     {
         Class.forName("org.voltdb.jdbc.Driver");
-        return DriverManager.getConnection("jdbc:voltdb://localhost:21212", props);
+        return DriverManager.getConnection(url, props);
     }
 
     private static void stopServer() throws SQLException {
@@ -146,6 +147,19 @@ public class TestJDBCDriver {
             try { server.shutdown(); } catch (InterruptedException e) { /*empty*/ }
             server = null;
         }
+    }
+
+    @Test
+    public void testURLParsing() throws Exception
+    {
+        String url = "jdbc:voltdb://server1:21212,server2?prop1=true&prop2=false";
+        String[] servers = Driver.getServersFromURL(url);
+        assertEquals("server1:21212", servers[0]);
+        assertEquals("server2", servers[1]);
+        Map<String, String> props = Driver.getPropsFromURL(url);
+        assertEquals(2, props.size());
+        assertEquals("true", props.get("prop1"));
+        assertEquals("false", props.get("prop2"));
     }
 
     @Test
@@ -570,12 +584,8 @@ public class TestJDBCDriver {
 
     }
 
-    @Test
-    public void testSafetyOffThroughProperties() throws Exception
+    private void checkSafeMode(Connection myconn)
     {
-        Properties props = new Properties();
-        // Check default behavior
-        myconn = getJdbcConnection(props);
         boolean threw = false;
         try {
             myconn.commit();
@@ -609,83 +619,88 @@ public class TestJDBCDriver {
             threw = true;
         }
         assertTrue(threw);
+    }
+
+    private void checkCarlosDanger(Connection myconn)
+    {
+        boolean threw = false;
+        try {
+            myconn.commit();
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertFalse(threw);
+        threw = false;
+        // autocommit true should never throw
+        try {
+            myconn.setAutoCommit(true);
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertFalse(threw);
+        threw = false;
+        try {
+            myconn.setAutoCommit(false);
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertFalse(threw);
+        threw = false;
+        try {
+            myconn.rollback();
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertFalse(threw);
+    }
+
+    @Test
+    public void testSafetyOffThroughProperties() throws Exception
+    {
+        Properties props = new Properties();
+        // Check default behavior
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        checkSafeMode(myconn);
         myconn.close();
 
         // Check commit and setAutoCommit
         props.setProperty(JDBC4Connection.COMMIT_THROW_EXCEPTION, "true");
         props.setProperty(JDBC4Connection.ROLLBACK_THROW_EXCEPTION, "true");
-        myconn = getJdbcConnection(props);
-        threw = false;
-        try {
-            myconn.commit();
-        }
-        catch (SQLException bleh) {
-            threw = true;
-        }
-        assertTrue(threw);
-        threw = false;
-        // autocommit true should never throw
-        try {
-            myconn.setAutoCommit(true);
-        }
-        catch (SQLException bleh) {
-            threw = true;
-        }
-        assertFalse(threw);
-        threw = false;
-        try {
-            myconn.setAutoCommit(false);
-        }
-        catch (SQLException bleh) {
-            threw = true;
-        }
-        assertTrue(threw);
-        threw = false;
-        try {
-            myconn.rollback();
-        }
-        catch (SQLException bleh) {
-            threw = true;
-        }
-        assertTrue(threw);
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        checkSafeMode(myconn);
         myconn.close();
 
         props.setProperty(JDBC4Connection.COMMIT_THROW_EXCEPTION, "false");
         props.setProperty(JDBC4Connection.ROLLBACK_THROW_EXCEPTION, "false");
-        myconn = getJdbcConnection(props);
-        threw = false;
-        try {
-            myconn.commit();
-        }
-        catch (SQLException bleh) {
-            threw = true;
-        }
-        assertFalse(threw);
-        threw = false;
-        // autocommit true should never throw
-        try {
-            myconn.setAutoCommit(true);
-        }
-        catch (SQLException bleh) {
-            threw = true;
-        }
-        assertFalse(threw);
-        threw = false;
-        try {
-            myconn.setAutoCommit(false);
-        }
-        catch (SQLException bleh) {
-            threw = true;
-        }
-        assertFalse(threw);
-        threw = false;
-        try {
-            myconn.rollback();
-        }
-        catch (SQLException bleh) {
-            threw = true;
-        }
-        assertFalse(threw);
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        checkCarlosDanger(myconn);
+        myconn.close();
+    }
+
+    @Test
+    public void testSafetyOffThroughURL() throws Exception
+    {
+        Properties props = new Properties();
+        // Check default behavior
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        checkSafeMode(myconn);
+        myconn.close();
+
+        // Check commit and setAutoCommit
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212?" +
+                JDBC4Connection.COMMIT_THROW_EXCEPTION + "=true" + "&" +
+                JDBC4Connection.ROLLBACK_THROW_EXCEPTION + "=true", props);
+        checkSafeMode(myconn);
+        myconn.close();
+
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212?" +
+                JDBC4Connection.COMMIT_THROW_EXCEPTION + "=false" + "&" +
+                JDBC4Connection.ROLLBACK_THROW_EXCEPTION + "=false", props);
+        checkCarlosDanger(myconn);
         myconn.close();
     }
 }
