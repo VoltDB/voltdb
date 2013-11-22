@@ -426,6 +426,8 @@ public class LeaderAppointer implements Promotable
             }
             // just go ahead and promote our MPI
             m_MPI.acceptPromotion();
+            // set up a watcher on the partitions dir so that new partitions will be picked up
+            m_zk.getChildren(VoltZK.leaders_initiators, m_partitionCallback);
             blocker.set(null);
         }
     }
