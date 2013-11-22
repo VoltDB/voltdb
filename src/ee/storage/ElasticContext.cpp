@@ -227,10 +227,10 @@ void ElasticContext::updatePredicates(const std::vector<std::string> &predicateS
                     PlannerDomValue arrayObject = rangesArray.valueAtIndex(ii);
                     PlannerDomValue rangeStartValue = arrayObject.valueForKey("RANGE_START");
                     PlannerDomValue rangeEndValue = arrayObject.valueForKey("RANGE_END");
-                    if (expression->binarySearch(rangeStartValue.asInt()).isFalse()) {
+                    if (! expression->binarySearch(rangeStartValue.asInt()).isTrue()) {
                         throwFatalException("ElasticContext activate failed because a context already existed with conflicting ranges, conflicting range start is %d", rangeStartValue.asInt());
                     }
-                    if (expression->binarySearch(rangeEndValue.asInt()).isFalse()) {
+                    if (! expression->binarySearch(rangeEndValue.asInt()).isTrue()) {
                         throwFatalException("ElasticContext activate failed because a context already existed with conflicting ranges, conflicting range end is %d", rangeStartValue.asInt());
                     }
                 }

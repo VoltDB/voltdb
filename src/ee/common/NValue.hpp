@@ -2112,6 +2112,9 @@ inline bool NValue::isTrue() const {
 /**
  * Returns C++ false if this NValue is a boolean and is true
  * If it is NULL, return false.
+ *
+ * It is not the exact opposite of function isTrue().
+ * Boolean Expression eval should not use this function.
  */
 inline bool NValue::isFalse() const {
     if (isBooleanNULL()) {
