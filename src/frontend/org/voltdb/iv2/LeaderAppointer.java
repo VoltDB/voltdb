@@ -25,11 +25,13 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google.common.util.concurrent.SettableFuture;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
@@ -58,7 +60,8 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSortedMap;
+import com.google.common.collect.ImmutableSortedSet;
+import com.google.common.util.concurrent.SettableFuture;
 
 /**
  * LeaderAppointer handles centralized appointment of partition leaders across
@@ -654,8 +657,8 @@ public class LeaderAppointer implements Promotable
         boolean retval = true;
         List<String> partitionDirs = null;
 
-        ImmutableSortedMap.Builder<Integer,Integer> lackingReplication =
-                ImmutableSortedMap.naturalOrder();
+        ImmutableSortedSet.Builder<KSafetyStats.StatsPoint> lackingReplication =
+                ImmutableSortedSet.naturalOrder();
 
         try {
             partitionDirs = m_zk.getChildren(VoltZK.leaders_initiators, null);
@@ -679,7 +682,7 @@ public class LeaderAppointer implements Promotable
                 VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
             }
         }
-
+        final long statTs = System.currentTimeMillis();
         for (String partitionDir : partitionDirs) {
             int pid = LeaderElector.getPartitionFromElectionDir(partitionDir);
 
@@ -715,15 +718,17 @@ public class LeaderAppointer implements Promotable
                         hostsOnRing.add(hostId);
                     }
                 }
-                if (!isInitializing && replicas.size() <= m_kfactor && !partitionNotOnHashRing) {
-                    lackingReplication.put(pid, m_kfactor + 1 - replicas.size());
+                if (!isInitializing && !partitionNotOnHashRing) {
+                    lackingReplication.add(
+                            new KSafetyStats.StatsPoint(statTs, pid, m_kfactor + 1 - replicas.size())
+                            );
                 }
             }
             catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
             }
         }
-        m_stats.setSafetyMap(lackingReplication.build());
+        m_stats.setSafetySet(lackingReplication.build());
 
         return retval;
     }

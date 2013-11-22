@@ -29,7 +29,7 @@ public enum StartAction {
     SAFE_RECOVER("recover safemode"),
     REJOIN("rejoin"),
     LIVE_REJOIN("live rejoin"),
-    JOIN("join");
+    JOIN("add");
 
     final static Pattern spaces = Pattern.compile("\\s+");
 
