@@ -45,11 +45,7 @@ public class FixedDBBPool {
 
     public void allocate(int bufLenInBytes, int capacity)
     {
-        Semaphore permits = m_permits.get(bufLenInBytes);
-        if (permits == null) {
-            permits = new Semaphore(capacity);
-            m_permits.putIfAbsent(bufLenInBytes, permits);
-        }
+        m_permits.putIfAbsent(bufLenInBytes, new Semaphore(capacity));
     }
 
     public BlockingQueue<DBBPool.BBContainer> getQueue(final int bufLenInBytes)
@@ -98,9 +94,16 @@ public class FixedDBBPool {
 
             @Override
             public BBContainer take() throws InterruptedException {
-                Semaphore permits = m_permits.get(bufLenInBytes);
+                final Semaphore permits = m_permits.get(bufLenInBytes);
                 permits.acquire();
-                return DBBPool.allocateDirectAndPool(bufLenInBytes);
+                final BBContainer origin = DBBPool.allocateDirectAndPool(bufLenInBytes);
+                return new BBContainer(origin.b, origin.address) {
+                    @Override
+                    public void discard() {
+                        permits.release();
+                        origin.discard();
+                    }
+                };
             }
 
             @Override

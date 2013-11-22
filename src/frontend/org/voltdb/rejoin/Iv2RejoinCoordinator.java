@@ -101,11 +101,21 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             // clear overflow dir in case there are files left from previous runs
             clearOverflowDir(voltroot);
 
+            // The buffer pool capacity is min(numOfSites to rejoin times 3, 16)
+            // or any user specified value.
+            Integer userPoolSize = Integer.getInteger("REJOIN_RECEIVE_BUFFER_POOL_SIZE");
+            int poolSize = 0;
+            if (userPoolSize != null) {
+                poolSize = userPoolSize;
+            } else {
+                poolSize = 3;
+            }
+
             m_snapshotBufPool = new FixedDBBPool();
             // Create a buffer pool for uncompressed stream snapshot data
-            m_snapshotBufPool.allocate(SnapshotSiteProcessor.m_snapshotBufferLength, 3);
+            m_snapshotBufPool.allocate(SnapshotSiteProcessor.m_snapshotBufferLength, poolSize);
             // Create a buffer pool for compressed stream snapshot data
-            m_snapshotBufPool.allocate(SnapshotSiteProcessor.m_snapshotBufferCompressedLen, 3);
+            m_snapshotBufPool.allocate(SnapshotSiteProcessor.m_snapshotBufferCompressedLen, poolSize);
         }
     }
 
