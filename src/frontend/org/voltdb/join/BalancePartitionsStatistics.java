@@ -175,8 +175,7 @@ public class BalancePartitionsStatistics extends StatsSource {
         if (!bytesTransferredInLastSec.isEmpty()) {
             statsPoint = overallStats.capture(
                     "Point",
-                    TimeUnit.MILLISECONDS.toNanos(bytesTransferredInLastSec.lastKey()),
-                    throughput);
+                    bytesTransferredInLastSec.lastKey());
         }
     }
 
@@ -483,10 +482,9 @@ public class BalancePartitionsStatistics extends StatsSource {
          * Capture a copy of the current stats plus an end time and a recent throughput.
          * @param name          stats point name
          * @param endTimeNanos  end time in nanoseconds
-         * @param throughput    throughput of recent balance operations
          * @return  immutable snapshot of stats point
          */
-        public StatsPoint capture(String name, long endTimeNanos, long throughput)
+        public StatsPoint capture(String name, long endTimeNanos)
         {
             return new StatsPoint(
                     name,
@@ -495,7 +493,7 @@ public class BalancePartitionsStatistics extends StatsSource {
                     totalRanges,
                     movedRanges,
                     movedRows,
-                    throughput,
+                    movedBytes,
                     invocationCount,
                     invocationTimeNanos);
 
