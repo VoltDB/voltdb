@@ -427,6 +427,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         if (having != null) {
             having = having.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
+            ExpressionUtil.finalizeValueTypes(having);
         }
 
     }
@@ -815,8 +816,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (!aggResultColumns.contains(col)) {
                 // Try to check complexAggs earlier
                 hasComplexAgg = true;
+                ExpressionUtil.finalizeValueTypes(col.expression);
                 aggResultColumns.add(col);
-                ExpressionUtil.finalizeValueTypes(expr);
             }
         }
     }
