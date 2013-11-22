@@ -503,7 +503,7 @@ public class BalancePartitionsStatistics extends StatsSource {
         public String toString()
         {
             return String.format("StatsPoint(%s): "
-                    +   "duration=%.2f ms"
+                    +   "duration=%.2f s"
                     + ", percent=%.2f%% (%s)"
                     + ", rows=%d @ %.2f rows/second"
                     + ", bytes=%d @ %.2f MB/second"
