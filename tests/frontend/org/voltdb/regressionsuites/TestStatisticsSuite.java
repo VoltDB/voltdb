@@ -144,7 +144,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         assertEquals(PARTITIONS, partsSeen.size());
     }
 
-    public void xestInvalidCalls() throws Exception {
+    public void testInvalidCalls() throws Exception {
         System.out.println("\n\nTESTING INVALID CALLS\n\n\n");
         Client client = getFullyConnectedClient();
         //
@@ -181,7 +181,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
 
     }
 
-    public void xestLatencyStatistics() throws Exception {
+    public void testLatencyStatistics() throws Exception {
         System.out.println("\n\nTESTING LATENCY STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
@@ -221,7 +221,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         assertTrue(invocations > 0);
     }
 
-    public void xestInitiatorStatistics() throws Exception {
+    public void testInitiatorStatistics() throws Exception {
         System.out.println("\n\nTESTING INITIATOR STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
@@ -274,7 +274,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         validateRowSeenAtAllHosts(results[0], "PROCEDURE_NAME", "NEW_ORDER.insert", true);
     }
 
-    public void xestPartitionCount() throws Exception {
+    public void testPartitionCount() throws Exception {
         System.out.println("\n\nTESTING PARTITION COUNT\n\n\n");
         Client client  = getFullyConnectedClient();
 
@@ -297,7 +297,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         assertEquals(PARTITIONS, partCount);
     }
 
-    public void xestTableStatistics() throws Exception {
+    public void testTableStatistics() throws Exception {
         System.out.println("\n\nTESTING TABLE STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
@@ -331,7 +331,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         validateRowSeenAtAllSites(results[0], "TABLE_NAME", "ITEM", true);
     }
 
-    public void xestIndexStatistics() throws Exception {
+    public void testIndexStatistics() throws Exception {
         System.out.println("\n\nTESTING INDEX STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
@@ -360,7 +360,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         validateRowSeenAtAllSites(results[0], "INDEX_NAME", "SYS_IDX_I_PK_TREE_10020", true);
     }
 
-    public void xestMemoryStatistics() throws Exception {
+    public void testMemoryStatistics() throws Exception {
         System.out.println("\n\nTESTING MEMORY STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
@@ -397,7 +397,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), true);
     }
 
-    public void xestProcedureStatistics() throws Exception {
+    public void testProcedureStatistics() throws Exception {
         System.out.println("\n\nTESTING PROCEDURE STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
@@ -529,7 +529,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
                 2, results[0].getRowCount());
     }
 
-    public void xestIOStatistics() throws Exception {
+    public void testIOStatistics() throws Exception {
         System.out.println("\n\nTESTING IO STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
@@ -559,7 +559,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         validateSchema(results[0], expectedTable);
     }
 
-    public void xestTopoStatistics() throws Exception {
+    public void testTopoStatistics() throws Exception {
         System.out.println("\n\nTESTING TOPO STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
@@ -604,7 +604,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
     //
     // planner statistics
     //
-    public void xestPlannerStatistics() throws Exception {
+    public void testPlannerStatistics() throws Exception {
         System.out.println("\n\nTESTING PLANNER STATS\n\n\n");
         Client client  = getClient();
 
@@ -703,7 +703,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         assertTrue("Failed total FAILURES == 0, value was: " + failures, failures == 0);
     }
 
-    public void xestDRNodeStatistics() throws Exception {
+    public void testDRNodeStatistics() throws Exception {
         if (!VoltDB.instance().getConfig().m_isEnterprise) {
             System.out.println("SKIPPING DRNODE STATS TESTS FOR COMMUNITY VERSION");
             return;
@@ -735,7 +735,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), true);
     }
 
-    public void xestDRPartitionStatistics() throws Exception {
+    public void testDRPartitionStatistics() throws Exception {
         if (!VoltDB.instance().getConfig().m_isEnterprise) {
             System.out.println("SKIPPING DRPARTITION STATS TESTS FOR COMMUNITY VERSION");
             return;
@@ -774,7 +774,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         validateRowSeenAtAllPartitions(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), false);
     }
 
-    public void xestDRStatistics() throws Exception {
+    public void testDRStatistics() throws Exception {
         if (!VoltDB.instance().getConfig().m_isEnterprise) {
             System.out.println("SKIPPING DR STATS TESTS FOR COMMUNITY VERSION");
             return;
@@ -828,7 +828,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         validateRowSeenAtAllHosts(results[1], "HOSTNAME", results[1].getString("HOSTNAME"), true);
     }
 
-    public void xestLiveClientsStatistics() throws Exception {
+    public void testLiveClientsStatistics() throws Exception {
         System.out.println("\n\nTESTING LIVECLIENTS STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
@@ -859,7 +859,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), true);
     }
 
-    public void xestStarvationStatistics() throws Exception {
+    public void testStarvationStatistics() throws Exception {
         System.out.println("\n\nTESTING STARVATION STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
@@ -893,7 +893,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), false);
     }
 
-    public void xestSnapshotStatus() throws Exception {
+    public void testSnapshotStatus() throws Exception {
         System.out.println("\n\nTESTING SNAPSHOTSTATUS\n\n\n");
         Client client  = getFullyConnectedClient();
 
@@ -932,7 +932,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         validateRowSeenAtAllHosts(results[0], "TABLE", "ITEM", true);
     }
 
-    public void xestManagementStats() throws Exception {
+    public void testManagementStats() throws Exception {
         System.out.println("\n\nTESTING MANAGEMENT STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
@@ -1090,8 +1090,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         ((LocalCluster) config).setHasLocalServer(hasLocalServer);
         boolean success = config.compile(project);
         assertTrue(success);
-        success = builder.addServerConfig(config);
-        assertTrue(success);
+        builder.addServerConfig(config);
 
         return builder;
     }
