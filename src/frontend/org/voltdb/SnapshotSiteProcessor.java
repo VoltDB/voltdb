@@ -257,9 +257,9 @@ public class SnapshotSiteProcessor {
         }
     }
 
-    private BBContainer createNewBuffer(final BBContainer origin, final long snapshotBufferAddress)
+    private BBContainer createNewBuffer(final BBContainer origin)
     {
-        return new BBContainer(origin.b, snapshotBufferAddress) {
+        return new BBContainer(origin.b, origin.address) {
             @Override
             public void discard() {
                 origin.discard();
@@ -452,13 +452,14 @@ public class SnapshotSiteProcessor {
     private List<BBContainer> getOutputBuffers(Collection<SnapshotTableTask> tableTasks)
     {
         final int desired = tableTasks.size();
-        int available = 0;
+        int available = m_availableSnapshotBuffers.get();
         if (!m_availableSnapshotBuffers.compareAndSet(available, available - desired)) return null;
 
         List<BBContainer> outputBuffers = new ArrayList<BBContainer>(tableTasks.size());
 
-        for (SnapshotTableTask tableTask : tableTasks) {
-            outputBuffers.add(DBBPool.allocateDirectAndPool(m_snapshotBufferLength));
+        for (int ii = 0; ii < tableTasks.size(); ii++) {
+            final BBContainer origin = DBBPool.allocateDirectAndPool(m_snapshotBufferLength);
+            outputBuffers.add(createNewBuffer(origin));
         }
 
         return outputBuffers;
