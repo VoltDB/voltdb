@@ -365,6 +365,64 @@ public class TestIndexesSuite extends RegressionSuite {
         Client client = getClient();
         String query;
         VoltTable[] results;
+
+        // Try to repro ENG-5537, the error found by a user query.
+        // We dropped an IN LIST filter when it was not a candidate for
+        // NestLoopIndexJoin optimization.
+        results = client.callProcedure("@AdHoc", "INSERT INTO tableX VALUES (1, 10, 1, 'one', 31, 41);").getResults();
+        assertEquals(1, results[0].asScalarLong());
+        results = client.callProcedure("@AdHoc", "INSERT INTO tableX VALUES (2, 20, 1, 'two', 32, 42);").getResults();
+        assertEquals(1, results[0].asScalarLong());
+        results = client.callProcedure("@AdHoc", "INSERT INTO tableX VALUES (3, 30, 1, 'three', 32, 42);").getResults();
+        assertEquals(1, results[0].asScalarLong());
+        results = client.callProcedure("@AdHoc", "INSERT INTO tableX VALUES (5, 50, 5, 'one', 35, 45);").getResults();
+        assertEquals(1, results[0].asScalarLong());
+
+        results = client.callProcedure("@AdHoc", "INSERT INTO tableY VALUES (1, 10, 1000, 10000);").getResults();
+        assertEquals(1, results[0].asScalarLong());
+        results = client.callProcedure("@AdHoc", "INSERT INTO tableY VALUES (2, 20, 2000, 20000);").getResults();
+        assertEquals(1, results[0].asScalarLong());
+        results = client.callProcedure("@AdHoc", "INSERT INTO tableY VALUES (3, 30, 3000, 30000);").getResults();
+        assertEquals(1, results[0].asScalarLong());
+        results = client.callProcedure("@AdHoc", "INSERT INTO tableY VALUES (5, 50, 1000, 10000);").getResults();
+        assertEquals(1, results[0].asScalarLong());
+
+        query = "SELECT amps.keyB " +
+                "   FROM tableX amps INNER JOIN tableY ohms " +
+                "     ON amps.keyA = ohms.keyA " +
+                "    AND amps.keyB = ohms.keyB " +
+                " WHERE " +
+                "     amps.keyC = 1 AND" +
+                "     amps.keyD IN ('one','two') AND" +
+                "     ohms.keyH IN (1000,3000) " +
+                " ORDER BY amps.sort1 DESC; " +
+                "";
+//DEBUG        results = client.callProcedure("@Explain", query).getResults();
+//DEBUG        System.out.println(results[0]);
+
+        results = client.callProcedure("@AdHoc", query).getResults();
+        System.out.println(results[0]);
+        try {
+            assertEquals(10, results[0].asScalarLong());
+        } catch (IllegalStateException not_one) {
+            fail("IN LIST test query rerurned wrong number of rows: " + not_one);
+        }
+/* TODO: enable and investigate:
+ queries like this were causing column index resolution errors.
+ @AdHoc (vs. just @Explain) may be required to repro?
+        query = "select * from R3, P3 where R3.NUM2 = P3.NUM2 " +
+            " and R3.NUM IN (200, 300)" +
+            " and P3.NUM IN (200, 300)" +
+            "";
+            results = client.callProcedure("@Explain", query).getResults();
+            System.out.println(results[0]);
+
+        query = "select * from R3, P3 where R3.NUM2 = P3.NUM2 " +
+            " and P3.NUM IN (200, 300)" +
+            "";
+            results = client.callProcedure("@Explain", query).getResults();
+            System.out.println(results[0]);
+*/
         for (String table : tables) {
             client.callProcedure("Insert", table, 1, "a", 100, 1, 14.5);
             client.callProcedure("Insert", table, 2, "b", 100, 2, 15.5);

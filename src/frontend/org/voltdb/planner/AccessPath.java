@@ -32,6 +32,9 @@ public class AccessPath {
     boolean keyIterate = false;
     IndexLookupType lookupType = IndexLookupType.EQ;
     SortDirectionType sortDirection = SortDirectionType.INVALID;
+    // The initial expression is needed to adjust (forward) the start of the reverse
+    // iteration when it had to initially settle for starting at
+    // "greater than a prefix key".
     final ArrayList<AbstractExpression> initialExpr = new ArrayList<AbstractExpression>();
     final ArrayList<AbstractExpression> indexExprs = new ArrayList<AbstractExpression>();
     final ArrayList<AbstractExpression> endExprs = new ArrayList<AbstractExpression>();

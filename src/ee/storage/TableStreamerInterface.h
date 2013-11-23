@@ -55,11 +55,6 @@ namespace voltdb
                                    std::vector<int> &retPositions) = 0;
 
         /**
-         * Return true if a tuple can be freed safely.
-         */
-        virtual bool canSafelyFreeTuple(TableTuple &tuple) const = 0;
-
-        /**
          * Return the partition ID.
          */
         virtual int32_t getPartitionID() const = 0;
@@ -78,7 +73,7 @@ namespace voltdb
 
         /**
          * Tuple delete hook.
-         * Return true if it was handled by the COW context.
+         * Return true if the tuple can be safely freed.
          */
         virtual bool notifyTupleDelete(TableTuple &tuple) = 0;
 

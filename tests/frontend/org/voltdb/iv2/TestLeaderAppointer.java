@@ -405,6 +405,12 @@ public class TestLeaderAppointer extends ZKTestBase {
             Thread.sleep(0);
         }
         assertEquals(1L, (long)m_cache.pointInTimeCache().get(0));
+
+        // Add a new partition with two replicas, see if the newly elected leader appointer picks up the new
+        // partition and elects a new leader
+        addReplica(2, 4L);
+        addReplica(2, 5L);
+        waitForAppointee(2);
     }
 
     @Test
