@@ -449,7 +449,7 @@ if __name__ == "__main__":
     if options.config != None:
         if options.config not in config_list.get_configs():
             print >> sys.stderr, \
-                "Selected config %s not present in config file" % options.config
+                "Selected config %s not present in config file %s" % (options.config, config_filename)
             sys.exit(3)
         else:
             configs_to_run.append(options.config)

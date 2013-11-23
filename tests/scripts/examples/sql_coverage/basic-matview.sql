@@ -24,7 +24,7 @@
 {@fromtables = "_fromviews"}
 
 {@idcol = "ID"}
-{@insertvals = "_id, _value[byte], _value[int16], _value[int64]"}
+{@insertvals = "_id, _value[byte], _value[int16 null20], _value[int64]"}
 {@optional_fn = "_numfun"}
 {@updatecolumn = "BIG"}
 {@updatesource = "ID"}

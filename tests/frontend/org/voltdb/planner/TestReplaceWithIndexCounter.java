@@ -243,6 +243,19 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
         checkIndexCounter(pn, false);
     }
 
+    // Not padding maximum value case.
+    public void testCountStar32() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT COUNT(*) FROM T2 WHERE ID = 1 AND USERNAME > ?");
+        checkIndexCounter(pn, false);
+    }
+
+    // Padding maximum value case.
+    public void testCountStar31() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T3 WHERE T3_NUM1 =1 AND T3_NUM2 >= ?");
+        checkIndexCounter(pn, true);
+    }
+
+
     /**
      * Check Whether or not the original plan is replaced with CountingIndexPlanNode.
      *

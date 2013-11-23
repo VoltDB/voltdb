@@ -286,7 +286,7 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple
     while (!(tuple = m_indexForMinMax->nextValueAtKey()).isNullTuple()) {
         // skip the oldTuple and apply post filter
         if (tuple.equals(oldTuple) ||
-            (m_filterPredicate && m_filterPredicate->eval(&tuple, NULL).isFalse())) {
+            (m_filterPredicate && !m_filterPredicate->eval(&tuple, NULL).isTrue())) {
             continue;
         }
         VOLT_TRACE("Scanning tuple: %s\n", tuple.debugNoHeader().c_str());
@@ -330,7 +330,7 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueSequential(const TableTu
     while (iterator.next(tuple)) {
         // apply post filter
         VOLT_TRACE("Checking tuple: %s\n", tuple.debugNoHeader().c_str());
-        if (m_filterPredicate && m_filterPredicate->eval(&tuple, NULL).isFalse()) {
+        if (m_filterPredicate && !m_filterPredicate->eval(&tuple, NULL).isTrue()) {
             continue;
         }
         VOLT_TRACE("passed 1\n");
@@ -373,8 +373,7 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueSequential(const TableTu
 void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bool fallible)
 {
     // don't change the view if this tuple doesn't match the predicate
-    if (m_filterPredicate
-        && (m_filterPredicate->eval(&newTuple, NULL).isFalse())) {
+    if (m_filterPredicate && !m_filterPredicate->eval(&newTuple, NULL).isTrue()) {
         return;
     }
     bool exists = findExistingTuple(newTuple);
@@ -413,20 +412,22 @@ void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bo
             } else {
                 switch(m_aggTypes[aggIndex]) {
                 case EXPRESSION_TYPE_AGGREGATE_SUM:
-                    newValue = existingValue.op_add(newValue);
+                    if (!existingValue.isNull()) {
+                        newValue = existingValue.op_add(newValue);
+                    }
                     break;
                 case EXPRESSION_TYPE_AGGREGATE_COUNT:
                     newValue = existingValue.op_increment();
                     break;
                 case EXPRESSION_TYPE_AGGREGATE_MIN:
                     // ignore any new value that is not strictly an improvement
-                    if (newValue.compare(existingValue) >= 0) {
+                    if (!existingValue.isNull() && newValue.compare(existingValue) >= 0) {
                         newValue = existingValue;
                     }
                     break;
                 case EXPRESSION_TYPE_AGGREGATE_MAX:
                     // ignore any new value that is not strictly an improvement
-                    if (newValue.compare(existingValue) <= 0) {
+                    if (!existingValue.isNull() && newValue.compare(existingValue) <= 0) {
                         newValue = existingValue;
                     }
                     break;
@@ -467,7 +468,7 @@ void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bo
 void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bool fallible)
 {
     // don't change the view if this tuple doesn't match the predicate
-    if (m_filterPredicate && (m_filterPredicate->eval(&oldTuple, NULL).isFalse()))
+    if (m_filterPredicate && !m_filterPredicate->eval(&oldTuple, NULL).isTrue())
         return;
 
     if ( ! findExistingTuple(oldTuple)) {

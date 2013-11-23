@@ -14,7 +14,7 @@
 {@idcol = "ID"}
 
 
-{@insertvals = "_id, _value[string], _value[string], _value[float]"}
+{@insertvals = "_id, _value[string], _value[string null30], _value[float]"}
 -- There are no unary string-to-string functions supported yet.
 {@onefun = ""}
 --{@onefun = "LOWER"}
