@@ -32,68 +32,58 @@ class AbstractExpression;
  */
 class IndexCountPlanNode : public AbstractScanPlanNode {
     public:
-        IndexCountPlanNode(CatalogId id) : AbstractScanPlanNode(id) {
-            this->key_iterate = false;
-            this->lookup_type = INDEX_LOOKUP_TYPE_EQ;
-            this->end_type = INDEX_LOOKUP_TYPE_EQ;
-        }
-        IndexCountPlanNode() : AbstractScanPlanNode() {
-            this->key_iterate = false;
-            this->lookup_type = INDEX_LOOKUP_TYPE_EQ;
-            this->end_type = INDEX_LOOKUP_TYPE_EQ;
-        }
+        IndexCountPlanNode(CatalogId id) : AbstractScanPlanNode(id)
+        , m_lookup_type(INDEX_LOOKUP_TYPE_EQ)
+        , m_end_type(INDEX_LOOKUP_TYPE_EQ)
+        , m_skip_null_predicate(NULL)
+        {}
+
+        IndexCountPlanNode() : AbstractScanPlanNode()
+        , m_lookup_type(INDEX_LOOKUP_TYPE_EQ)
+        , m_end_type(INDEX_LOOKUP_TYPE_EQ)
+        , m_skip_null_predicate(NULL)
+        {}
+
         ~IndexCountPlanNode();
         virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_INDEXCOUNT); }
 
-        void setKeyIterate(bool val);
-        bool getKeyIterate() const;
+        IndexLookupType getLookupType() const { return m_lookup_type; }
 
-        void setLookupType(IndexLookupType val);
-        IndexLookupType getLookupType() const;
+        IndexLookupType getEndType() const { return m_end_type; }
 
-        void setEndType(IndexLookupType val);
-        IndexLookupType getEndType() const;
+        const std::string& getTargetIndexName() const { return m_target_index_name; }
 
-        void setTargetIndexName(std::string name);
-        std::string getTargetIndexName() const;
+        const std::vector<AbstractExpression*>& getEndKeyExpressions() const
+        { return m_endkey_expressions; }
 
-        void setSearchKeyExpressions(std::vector<AbstractExpression*> &exps);
-        std::vector<AbstractExpression*>& getSearchKeyExpressions();
-        const std::vector<AbstractExpression*>& getSearchKeyExpressions() const;
+        const std::vector<AbstractExpression*>& getSearchKeyExpressions() const
+        { return m_searchkey_expressions; }
 
-        void setEndKeyEndExpressions(std::vector<AbstractExpression*> &exps);
-        std::vector<AbstractExpression*>& getEndKeyExpressions();
-        const std::vector<AbstractExpression*>& getEndKeyExpressions() const;
+        AbstractExpression* getSkipNullPredicate() const
+        { return m_skip_null_predicate; }
 
         std::string debugInfo(const std::string &spacer) const;
 
     protected:
         virtual void loadFromJSONObject(PlannerDomValue obj);
-        //
-        // This is the id of the index to reference during execution
-        //
-        std::string target_index_name;
 
-        //
+        // This is the id of the index to reference during execution
+        std::string m_target_index_name;
+
         // TODO: Document
-        //
-        std::vector<AbstractExpression*> searchkey_expressions;
-        //
+        std::vector<AbstractExpression*> m_searchkey_expressions;
+
         // TODO: Document
-        //
-        std::vector<AbstractExpression*> endkey_expressions;
-        //
-        // Enable Index Key Iteration
-        //
-        bool key_iterate;
-        //
+        std::vector<AbstractExpression*> m_endkey_expressions;
+
         // Index Lookup Type
-        //
-        IndexLookupType lookup_type;
-        //
+        IndexLookupType m_lookup_type;
+
         // Index Lookup End Type
-        //
-        IndexLookupType end_type;
+        IndexLookupType m_end_type;
+
+        // count null row predicate for edge cases: reverse scan or underflow case
+        AbstractExpression* m_skip_null_predicate;
 };
 
 }

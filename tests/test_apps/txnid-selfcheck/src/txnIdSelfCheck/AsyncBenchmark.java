@@ -150,7 +150,7 @@ public class AsyncBenchmark {
         boolean usecompression= false;
 
         @Option(desc = "Timeout that kills the client if progress is not made.")
-        int progresstimeout = 120;
+        int progresstimeout = 360;
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
