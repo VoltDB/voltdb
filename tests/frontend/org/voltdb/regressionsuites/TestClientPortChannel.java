@@ -31,6 +31,7 @@ import static junit.framework.Assert.assertTrue;
 import junit.framework.TestCase;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.client.ConnectionUtil;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestClientPortChannel extends TestCase {
@@ -94,10 +95,14 @@ public class TestClientPortChannel extends TestCase {
 
     public void testClientPortChannelBadLoginMessage() throws Exception {
         //Just connect and disconnect
-        channel.connect();
-        channel.close();
+        System.out.println("Testing Connect and Close");
+        for (int i = 0; i < 100; i++) {
+            channel.connect();
+            channel.close();
+        }
 
         //Bad +ve length
+        System.out.println("Testing bad login message");
         channel.connect();
         ByteBuffer buf = ByteBuffer.allocate(Integer.SIZE);
         buf.putInt(10);
@@ -106,12 +111,66 @@ public class TestClientPortChannel extends TestCase {
         channel.close();
 
         //Bad -ve length.
+        System.out.println("Testing negative length of message");
         channel.connect();
         buf = ByteBuffer.allocate(Integer.SIZE);
         buf.putInt(-1);
         buf.position(0);
         channel.write(buf);
         channel.close();
+
+        //Bad 0 length.
+        System.out.println("Testing zero length of message");
+        channel.connect();
+        buf = ByteBuffer.allocate(Integer.SIZE);
+        buf.putInt(0);
+        buf.position(0);
+        channel.write(buf);
+        channel.close();
+
+        //too big length
+        System.out.println("Testing too big length of message");
+        channel.connect();
+        buf = ByteBuffer.allocate(Integer.SIZE);
+        buf.putInt(Integer.MAX_VALUE);
+        buf.position(0);
+        channel.write(buf);
+        channel.close();
+
+        System.out.println("Testing valid login message");
+        channel.connect();
+        buf = ByteBuffer.allocate(43);
+        buf.putInt(36);
+        buf.put((byte) '0');
+        buf.putInt(8);
+        buf.put("database".getBytes());
+        buf.putInt(0);
+        buf.put("".getBytes());
+        buf.put(ConnectionUtil.getHashedPassword(""));
+
+        buf.position(0);
+        channel.write(buf);
+
+        ByteBuffer resp = ByteBuffer.allocate(4);
+        channel.read(buf, 4);
+        int length = resp.getInt();
+        resp = ByteBuffer.allocate(length);
+        channel.read(buf, length);
+        resp.flip();
+
+        byte code = resp.get();
+        assertEquals(code, 0);
+        resp.getInt();
+        resp.getLong();
+        resp.getLong();
+        resp.getInt();
+        int buildStringLength = resp.getInt();
+        byte buildStringBytes[] = new byte[buildStringLength];
+        resp.get(buildStringBytes);
+
+        System.out.println("Authenticated to server: " + buildStringBytes);
+        channel.close();
+
 
     }
 
