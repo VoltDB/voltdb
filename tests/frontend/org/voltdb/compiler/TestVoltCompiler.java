@@ -1781,6 +1781,12 @@ public class TestVoltCompiler extends TestCase {
         ddl = "create table t(id integer not null, tm timestamp);\n" +
                 "create view my_view as select tm, count(*), count(NOW)  from t group by tm;";
         checkDDLErrorMessage(ddl, errorMatviewMsg);
+
+        ddl = "create table t(id integer not null, tm timestamp);\n" +
+                "create view my_view as select tm, count(*) from t " +
+                "where since_epoch(second, CURRENT_TIMESTAMP) - since_epoch(second, tm) > 60 " +
+                "group by tm;";
+        checkDDLErrorMessage(ddl, errorMatviewMsg);
     }
 
 
@@ -1984,6 +1990,17 @@ public class TestVoltCompiler extends TestCase {
         checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
     }
 
+
+    public void testDDLCompilerMatView()
+    {
+        // Test MatView.
+        String ddl = "";
+        String errorMatviewHavingMsg = "Materialized view \"MY_VIEW\" with ORDER BY clause is not supported.";
+
+        ddl = "create table t(id integer not null, num integer);\n" +
+                "create view my_view as select num, count(*) from t group by num order by num;";
+        checkDDLErrorMessage(ddl, errorMatviewHavingMsg);
+    }
 
     public void testPartitionOnBadType() {
         final String simpleSchema =

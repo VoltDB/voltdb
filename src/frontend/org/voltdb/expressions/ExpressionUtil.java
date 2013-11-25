@@ -372,39 +372,4 @@ public abstract class ExpressionUtil {
         }
         return false;
     }
-
-    /**
-     * This function will recursively find any function expression with ID functionId.
-     * If found, return true. Else, return false.
-     * @param expr
-     * @param functionId
-     * @return
-     */
-    public static boolean containsFunctionExpression(AbstractExpression expr, int functionId) {
-        if (expr == null || expr instanceof TupleValueExpression) {
-            return false;
-        }
-        if (containsFunctionExpression(expr.getLeft(), functionId)) {
-            return true;
-        }
-        if (containsFunctionExpression(expr.getRight(), functionId)) {
-            return true;
-        }
-        if (expr.getArgs() != null) {
-            for (AbstractExpression argsExpr: expr.getArgs()) {
-                if (containsFunctionExpression(argsExpr, functionId)) {
-                    return true;
-                }
-            }
-        }
-
-        if (expr instanceof FunctionExpression) {
-            FunctionExpression funcExpr = (FunctionExpression) expr;
-            if (funcExpr.getFunctionId() == functionId) {
-                return true;
-            }
-        }
-
-        return false;
-    }
 }

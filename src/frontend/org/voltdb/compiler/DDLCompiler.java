@@ -54,7 +54,7 @@ import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
@@ -1281,6 +1281,30 @@ public class DDLCompiler {
         return Arrays.equals(idx1baseTableOrder, idx2baseTableOrder);
     }
 
+
+    /**
+     * This function will recursively find any function expression with ID functionId.
+     * If found, return true. Else, return false.
+     * @param expr
+     * @param functionId
+     * @return
+     */
+    public static boolean containsFunctionExpression(AbstractExpression expr, int functionId) {
+        if (expr == null || expr instanceof TupleValueExpression) {
+            return false;
+        }
+
+        List<AbstractExpression> functionsList = expr.findAllSubexpressionsOfClass(FunctionExpression.class);
+        for (AbstractExpression funcExpr: functionsList) {
+            assert(funcExpr instanceof FunctionExpression);
+            if (((FunctionExpression)funcExpr).getFunctionId() == functionId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     void addIndexToCatalog(Database db, Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
             throws VoltCompilerException
     {
@@ -1301,7 +1325,7 @@ public class DDLCompiler {
                 for (VoltXMLElement exprNode : subNode.children) {
                     AbstractExpression expr = dummy.parseExpressionTree(exprNode);
 
-                    if (ExpressionUtil.containsFunctionExpression(expr, FunctionSQL.voltGetCurrentTimestampId()) ) {
+                    if (containsFunctionExpression(expr, FunctionSQL.voltGetCurrentTimestampId()) ) {
                         String msg = String.format("Index %s cannot include the function NOW or CURRENT_TIMESTAMP.", name);
                         throw this.m_compiler.new VoltCompilerException(msg);
                     }
@@ -1834,6 +1858,11 @@ public class DDLCompiler {
             throw m_compiler.new VoltCompilerException(msg);
         }
 
+        if (stmt.orderByColumns().size() != 0) {
+            msg += "with ORDER BY clause is not supported.";
+            throw m_compiler.new VoltCompilerException(msg);
+        }
+
         if (displayColCount <= groupColCount) {
             msg += "has too few columns.";
             throw m_compiler.new VoltCompilerException(msg);
@@ -1872,13 +1901,11 @@ public class DDLCompiler {
         }
 
         // Check unsupported SQL functions like: NOW, CURRENT_TIMESTAMP
-        for (ParsedSelectStmt.ParsedColInfo orderCol: stmt.orderByColumns()) {
-            checkExpressions.add(orderCol.expression);
-        }
-        checkExpressions.add(stmt.having);
+        AbstractExpression where = stmt.getSingleTableFilterExpression();
+        checkExpressions.add(where);
 
         for (AbstractExpression expr: checkExpressions) {
-            if (ExpressionUtil.containsFunctionExpression(expr, FunctionSQL.voltGetCurrentTimestampId())) {
+            if (containsFunctionExpression(expr, FunctionSQL.voltGetCurrentTimestampId())) {
                 msg += "cannot include the function NOW or CURRENT_TIMESTAMP.";
                 throw m_compiler.new VoltCompilerException(msg);
             }
