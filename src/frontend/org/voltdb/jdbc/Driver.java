@@ -73,21 +73,26 @@ public class Driver implements java.sql.Driver {
     private static final int MAJOR_VERSION = 1;
     private static final int MINOR_VERSION = 0;
 
-    static {
-        try {
+    static
+    {
+        try
+        {
             DriverManager.registerDriver(new Driver());
-        } catch (Exception e) {
-        }
+        } catch (Exception e)
+        {}
     }
 
-    public Driver() throws SQLException {
+    public Driver() throws SQLException
+    {
         // Required for Class.forName().newInstance()
     }
 
     @Override
     public Connection connect(String url, Properties props) throws SQLException {
-        if (acceptsURL(url)) {
-            try {
+        if (acceptsURL(url))
+        {
+            try
+            {
                 // Properties favored order:
                 // 1) property file specified by env variable
                 // 2) property file specified by system property
@@ -115,8 +120,8 @@ public class Driver implements java.sql.Driver {
                 }
 
                 // Favor the file-specified properties over the other props
-                for (Enumeration<?> e = fileprops.propertyNames(); e
-                        .hasMoreElements();) {
+                for (Enumeration<?> e = fileprops.propertyNames(); e.hasMoreElements();)
+                {
                     String key = (String) e.nextElement();
                     info.setProperty(key, fileprops.getProperty(key));
                 }
@@ -134,18 +139,17 @@ public class Driver implements java.sql.Driver {
                     else if (key.toLowerCase().equals("password"))
                         password = value;
                     else if (key.toLowerCase().equals("heavyweight"))
-                        heavyweight = (value.toLowerCase().equals("true")
-                                || value.toLowerCase().equals("yes") || value
-                                .toLowerCase().equals("1"));
+                        heavyweight = (value.toLowerCase().equals("true") || value.toLowerCase().equals("yes") ||
+                                value.toLowerCase().equals("1"));
                     else if (key.toLowerCase().equals("maxoutstandingtxns"))
                         maxoutstandingtxns = Integer.parseInt(value);
                     // else - unknown; ignore
                 }
 
                 // Return JDBC connection wrapper for the client
-                return new JDBC4Connection(JDBC4ClientConnectionPool.get(
-                        servers, user, password, heavyweight,
-                        maxoutstandingtxns), info);
+                return new JDBC4Connection(JDBC4ClientConnectionPool.get(servers, user, password,
+                            heavyweight, maxoutstandingtxns),
+                        info);
             } catch (Exception x) {
                 throw SQLError.get(x, SQLError.CONNECTION_UNSUCCESSFUL);
             }
@@ -154,29 +158,32 @@ public class Driver implements java.sql.Driver {
     }
 
     @Override
-    public boolean acceptsURL(String url) throws SQLException {
-        return Pattern.compile("^jdbc:voltdb://.+", Pattern.CASE_INSENSITIVE)
-                .matcher(url).matches();
+    public boolean acceptsURL(String url) throws SQLException
+    {
+        return Pattern.compile("^jdbc:voltdb://.+", Pattern.CASE_INSENSITIVE).matcher(url).matches();
     }
 
     @Override
-    public int getMajorVersion() {
+    public int getMajorVersion()
+    {
         return MAJOR_VERSION;
     }
 
     @Override
-    public int getMinorVersion() {
+    public int getMinorVersion()
+    {
         return MINOR_VERSION;
     }
 
     @Override
-    public DriverPropertyInfo[] getPropertyInfo(String url,
-            Properties loginProps) throws SQLException {
+    public DriverPropertyInfo[] getPropertyInfo(String url, Properties loginProps) throws SQLException
+    {
         return new DriverPropertyInfo[0];
     }
 
     @Override
-    public boolean jdbcCompliant() {
+    public boolean jdbcCompliant()
+    {
         return false;
     }
 
