@@ -21,6 +21,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.DriverPropertyInfo;
@@ -34,16 +36,15 @@ import java.util.Properties;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
-public class Driver implements java.sql.Driver
-{
-    public static final String JDBC_PROP_FILE_ENV = "JDBC_PROP_FILE";
+public class Driver implements java.sql.Driver {
+    public static final String JDBC_PROP_FILE_ENV = "VOLTDB_JDBC_PROPERTIES";
     public static final String JDBC_PROP_FILE_PROP = "voltdb.jdbcpropfile";
+    public static final String DEFAULT_PROP_FILENAME = "voltdb.properties";
     //Driver URL prefix.
     private static final String URL_PREFIX = "jdbc:voltdb:";
 
     // Static so it's unit-testable, yes, lazy me
-    static String[] getServersFromURL(String url)
-    {
+    static String[] getServersFromURL(String url) {
         // get everything between the prefix and the ?
         String prefix = URL_PREFIX + "//";
         int end = url.length();
@@ -54,8 +55,7 @@ public class Driver implements java.sql.Driver
         return servstring.split(",");
     }
 
-    static Map<String, String> getPropsFromURL(String url)
-    {
+    static Map<String, String> getPropsFromURL(String url) {
         Map<String, String> results = new HashMap<String, String>();
         if (url.indexOf("?") > 0) {
             String propstring = url.substring(url.indexOf("?") + 1);
@@ -73,28 +73,21 @@ public class Driver implements java.sql.Driver
     private static final int MAJOR_VERSION = 1;
     private static final int MINOR_VERSION = 0;
 
-    static
-    {
-        try
-        {
+    static {
+        try {
             DriverManager.registerDriver(new Driver());
+        } catch (Exception e) {
         }
-        catch(Exception e)
-        {}
     }
 
-    public Driver() throws SQLException
-    {
+    public Driver() throws SQLException {
         // Required for Class.forName().newInstance()
     }
 
     @Override
-    public Connection connect(String url, Properties props) throws SQLException
-    {
-        if(acceptsURL(url))
-        {
-            try
-            {
+    public Connection connect(String url, Properties props) throws SQLException {
+        if (acceptsURL(url)) {
+            try {
                 // Properties favored order:
                 // 1) property file specified by env variable
                 // 2) property file specified by system property
@@ -105,7 +98,7 @@ public class Driver implements java.sql.Driver
 
                 // Copy the provided properties so we don't muck with
                 // the object the caller gave us.
-                Properties info = (Properties)props.clone();
+                Properties info = (Properties) props.clone();
                 String prefix = URL_PREFIX + "//";
                 if (!url.startsWith(prefix)) {
                     throw SQLError.get(SQLError.ILLEGAL_ARGUMENT);
@@ -121,7 +114,8 @@ public class Driver implements java.sql.Driver
                 }
 
                 // Favor the file-specified properties over the other props
-                for (Enumeration<?> e = fileprops.propertyNames(); e.hasMoreElements();) {
+                for (Enumeration<?> e = fileprops.propertyNames(); e
+                        .hasMoreElements();) {
                     String key = (String) e.nextElement();
                     info.setProperty(key, fileprops.getProperty(key));
                 }
@@ -130,8 +124,8 @@ public class Driver implements java.sql.Driver
                 String password = "";
                 boolean heavyweight = false;
                 int maxoutstandingtxns = 0;
-                for (Enumeration<?> e = info.propertyNames(); e.hasMoreElements();)
-                {
+                for (Enumeration<?> e = info.propertyNames(); e
+                        .hasMoreElements();) {
                     String key = (String) e.nextElement();
                     String value = info.getProperty(key);
                     if (key.toLowerCase().equals("user"))
@@ -139,17 +133,19 @@ public class Driver implements java.sql.Driver
                     else if (key.toLowerCase().equals("password"))
                         password = value;
                     else if (key.toLowerCase().equals("heavyweight"))
-                        heavyweight = (value.toLowerCase().equals("true") || value.toLowerCase().equals("yes") || value.toLowerCase().equals("1"));
+                        heavyweight = (value.toLowerCase().equals("true")
+                                || value.toLowerCase().equals("yes") || value
+                                .toLowerCase().equals("1"));
                     else if (key.toLowerCase().equals("maxoutstandingtxns"))
                         maxoutstandingtxns = Integer.parseInt(value);
                     // else - unknown; ignore
                 }
 
                 // Return JDBC connection wrapper for the client
-                return new JDBC4Connection(JDBC4ClientConnectionPool.get(servers,user,password,heavyweight,maxoutstandingtxns), info);
-            }
-            catch(Exception x)
-            {
+                return new JDBC4Connection(JDBC4ClientConnectionPool.get(
+                        servers, user, password, heavyweight,
+                        maxoutstandingtxns), info);
+            } catch (Exception x) {
                 throw SQLError.get(x, SQLError.CONNECTION_UNSUCCESSFUL);
             }
         }
@@ -157,32 +153,29 @@ public class Driver implements java.sql.Driver
     }
 
     @Override
-    public boolean acceptsURL(String url) throws SQLException
-    {
-        return Pattern.compile("^jdbc:voltdb://.+", Pattern.CASE_INSENSITIVE).matcher(url).matches();
+    public boolean acceptsURL(String url) throws SQLException {
+        return Pattern.compile("^jdbc:voltdb://.+", Pattern.CASE_INSENSITIVE)
+                .matcher(url).matches();
     }
 
     @Override
-    public int getMajorVersion()
-    {
+    public int getMajorVersion() {
         return MAJOR_VERSION;
     }
 
     @Override
-    public int getMinorVersion()
-    {
+    public int getMinorVersion() {
         return MINOR_VERSION;
     }
 
     @Override
-    public DriverPropertyInfo[] getPropertyInfo(String url, Properties loginProps) throws SQLException
-    {
+    public DriverPropertyInfo[] getPropertyInfo(String url,
+            Properties loginProps) throws SQLException {
         return new DriverPropertyInfo[0];
     }
 
     @Override
-    public boolean jdbcCompliant()
-    {
+    public boolean jdbcCompliant() {
         return false;
     }
 
@@ -190,8 +183,7 @@ public class Driver implements java.sql.Driver
         throw new SQLFeatureNotSupportedException();
     }
 
-    private Properties tryToFindPropsFile()
-    {
+    private Properties tryToFindPropsFile() {
         Properties fileprops = new Properties();
         String filename = null;
         // Check the env first
@@ -199,7 +191,18 @@ public class Driver implements java.sql.Driver
         if (filename == null) {
             filename = System.getProperty(Driver.JDBC_PROP_FILE_PROP);
         }
-
+        if (filename == null) {
+            // see if we can find a file in the default location
+            URL pathToJar = this.getClass().getProtectionDomain()
+                    .getCodeSource().getLocation();
+            String tmp = null;
+            try {
+                tmp = new File(pathToJar.toURI()).getParent() + File.separator + DEFAULT_PROP_FILENAME;
+            } catch (URISyntaxException e) {
+                tmp = null;
+            }
+            filename = tmp;
+        }
         if (filename != null) {
             File propfile = new File(filename);
             if (propfile.exists() && propfile.isFile()) {
