@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
 
-import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertTrue;
 import junit.framework.TestCase;
 
@@ -37,8 +36,8 @@ import org.voltdb.compiler.VoltProjectBuilder;
 public class TestClientPortChannel extends TestCase {
 
     PortConnector channel;
-    PipeToFile pf;
     int rport;
+    LocalCluster m_config;
 
     public TestClientPortChannel(String name) {
         super(name);
@@ -59,20 +58,16 @@ public class TestClientPortChannel extends TestCase {
             builder.addLiteralSchema("");
             String catalogJar = "dummy.jar";
 
-            LocalCluster config = new LocalCluster(catalogJar, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            m_config = new LocalCluster(catalogJar, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
-            config.portGenerator.enablePortProvider();
-            config.portGenerator.pprovider.setNextClient(rport);
-            config.setHasLocalServer(false);
-            //We expect it to crash
-            config.setExpectedToCrash(true);
+            m_config.portGenerator.enablePortProvider();
+            m_config.portGenerator.pprovider.setNextClient(rport);
+            m_config.setHasLocalServer(true);
 
-            boolean success = config.compile(builder);
+            boolean success = m_config.compile(builder);
             assertTrue(success);
 
-            config.startUp();
-            pf = config.m_pipes.get(0);
-            assertNotNull(pf);
+            m_config.startUp();
 
             Thread.currentThread().sleep(10000);
         } catch (IOException ex) {
@@ -87,21 +82,37 @@ public class TestClientPortChannel extends TestCase {
      */
     @Override
     public void tearDown() throws Exception {
+
         if (channel != null) {
             channel.close();
         }
+        m_config.shutDown();
     }
 
     public void testClientPortChannel() throws Exception {
-        channel.connect();
-        channel.close();
     }
 
-    public void testClientPortChannelBadVersion() throws Exception {
+    public void testClientPortChannelBadLoginMessage() throws Exception {
+        //Just connect and disconnect
         channel.connect();
-        ByteBuffer buf = ByteBuffer.allocate(4);
+        channel.close();
+
+        //Bad +ve length
+        channel.connect();
+        ByteBuffer buf = ByteBuffer.allocate(Integer.SIZE);
+        buf.putInt(10);
+        buf.position(0);
         channel.write(buf);
         channel.close();
+
+        //Bad -ve length.
+        channel.connect();
+        buf = ByteBuffer.allocate(Integer.SIZE);
+        buf.putInt(-1);
+        buf.position(0);
+        channel.write(buf);
+        channel.close();
+
     }
 
 }

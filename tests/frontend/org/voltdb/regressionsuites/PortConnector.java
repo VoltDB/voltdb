@@ -55,10 +55,19 @@ public class PortConnector {
         }
 
     }
+
     public void write(ByteBuffer buf) throws IOException {
 
         while (buf.hasRemaining()) {
             m_socket.write(buf);
+        }
+    }
+
+    public void read(ByteBuffer buf, long sz) throws IOException {
+
+        buf.position(0);
+        while (buf.hasRemaining()) {
+            m_socket.read(buf);
         }
     }
 

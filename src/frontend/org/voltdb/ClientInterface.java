@@ -520,6 +520,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 //Send negative response
                 responseBuffer.put(WIRE_PROTOCOL_TIMEOUT_ERROR).flip();
                 socket.write(responseBuffer);
+                timeoutFuture.cancel(false);
                 socket.close();
                 return null;
             }
@@ -532,17 +533,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 //Send negative response
                 responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
                 socket.write(responseBuffer);
+                timeoutFuture.cancel(false);
                 socket.close();
                 return null;
             }
             if (messageLength > ((1024 * 1024) * 2)) {
-                  authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                               "): wire protocol violation (message length " + messageLength + " is too large).");
-                  //Send negative response
-                  responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
-                  socket.write(responseBuffer);
-                  socket.close();
-                  return null;
+                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
+                             "): wire protocol violation (message length " + messageLength + " is too large).");
+                //Send negative response
+                responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
+                socket.write(responseBuffer);
+                timeoutFuture.cancel(false);
+                socket.close();
+                return null;
               }
 
             final ByteBuffer message = ByteBuffer.allocate(messageLength);
@@ -582,6 +585,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final String service = fds.readString();
             final String username = fds.readString();
             final byte password[] = new byte[20];
+            //We should be left with SHA-1 bytes only.
+            if (message.remaining() != 20) {
+                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress()
+                        + "): user " + username + " failed authentication.");
+                //Send negative response
+                responseBuffer.put(AUTHENTICATION_FAILURE).flip();
+                socket.write(responseBuffer);
+                socket.close();
+                return null;
+            }
             message.get(password);
 
             CatalogContext context = m_catalogContext.get();
