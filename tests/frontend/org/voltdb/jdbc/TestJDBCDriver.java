@@ -27,6 +27,9 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -700,6 +703,41 @@ public class TestJDBCDriver {
         myconn = getJdbcConnection("jdbc:voltdb://localhost:21212?" +
                 JDBC4Connection.COMMIT_THROW_EXCEPTION + "=false" + "&" +
                 JDBC4Connection.ROLLBACK_THROW_EXCEPTION + "=false", props);
+        checkCarlosDanger(myconn);
+        myconn.close();
+    }
+
+    @Test
+    public void testSafetyOffThroughSystemProp() throws Exception {
+        String tmppath = "/tmp/" + System.getProperty("user.name");
+        String propfile = tmppath + "/voltdb.properties";
+        // start clean
+        File tmp = new File(propfile);
+        if (tmp.exists()) {
+            tmp.delete();
+        }
+        Properties props = new Properties();
+        props.setProperty(JDBC4Connection.COMMIT_THROW_EXCEPTION, "false");
+        props.setProperty(JDBC4Connection.ROLLBACK_THROW_EXCEPTION, "false");
+        FileOutputStream out = null;
+        try {
+            out = new FileOutputStream(propfile);
+            props.store(out, "");
+        } catch (FileNotFoundException e) {
+            fail();
+        } catch (IOException e) {
+            fail();
+        }        finally {
+            if (out != null) {
+                try {
+                    out.close();
+                } catch (IOException e) { }
+            }
+        }
+
+        System.setProperty(Driver.JDBC_PROP_FILE_PROP, propfile);
+        props = new Properties();
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
         checkCarlosDanger(myconn);
         myconn.close();
     }
