@@ -48,6 +48,7 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     protected final String User;
     private boolean isClosed = false;
     private Properties props;
+    private boolean autoCommit = true;
 
     public JDBC4Connection(JDBC4ClientConnection connection, Properties props)
     {
@@ -176,11 +177,12 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     }
 
     // Retrieves the current auto-commit mode for this Connection object.
+    // We are always auto-committing, but if let's be consistent with the lying.
     @Override
     public boolean getAutoCommit() throws SQLException
     {
         checkClosed();
-        return true; // supports only AutoCommit = true
+        return autoCommit;
     }
 
     // Retrieves this Connection object's current catalog name.
@@ -387,6 +389,9 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
         // Always true - error out only if the client is trying to set somethign else
         if (!autoCommit && (props.getProperty(COMMIT_THROW_EXCEPTION, "true").equalsIgnoreCase("true"))) {
             throw SQLError.noSupport();
+        }
+        else {
+            this.autoCommit = autoCommit;
         }
     }
 
