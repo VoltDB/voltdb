@@ -7,7 +7,7 @@ DELETE FROM _table
 INSERT INTO _table VALUES(-1,  'match',        88,            88.88);
 INSERT INTO _table VALUES(-2,  'match',        88,            88.88);
 
-INSERT INTO _table VALUES(_id, _value[string], _value[int16], _value[float]);
+INSERT INTO _table VALUES(_id, _value[string], _value[int16 null20], _value[float]);
 
 {_optionallimitoffset |= "limit 1"}
 {_optionallimitoffset |= "limit 1 offset 1"}

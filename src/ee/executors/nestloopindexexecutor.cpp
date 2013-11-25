@@ -228,6 +228,14 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
         VOLT_TRACE("Initial Expression:\n%s", initial_expression->debug(true).c_str());
     }
 
+    // SKIP NULL EXPRESSION
+    AbstractExpression* skipNullExpr = inline_node->getSkipNullPredicate();
+    // For reverse scan edge case NULL values and forward scan underflow case.
+    if (skipNullExpr != NULL) {
+        skipNullExpr->substitute(params);
+        VOLT_DEBUG("Skip NULL Expression:\n%s", skipNullExpr->debug(true).c_str());
+    }
+
     LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
     int tuple_ctr = 0;
     int tuple_skipped = 0;
@@ -397,7 +405,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                         } else {
                             while (!(inner_tuple = index->nextValue()).isNullTuple()) {
                                 m_engine->noteTuplesProcessedForProgressMonitoring(1);
-                                if (initial_expression != NULL && initial_expression->eval(&outer_tuple, &inner_tuple).isFalse()) {
+                                if (initial_expression != NULL && !initial_expression->eval(&outer_tuple, &inner_tuple).isTrue()) {
                                     // just passed the first failed entry, so move 2 backward
                                     index->moveToBeforePriorEntry();
                                     break;
@@ -416,6 +424,8 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                     index->moveToEnd(toStartActually);
                 }
 
+                AbstractExpression* skipNullExprIteration = skipNullExpr;
+
                 while ((limit == -1 || tuple_ctr < limit) &&
                        ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
                         !(inner_tuple = index->nextValueAtKey()).isNullTuple()) ||
@@ -425,11 +435,24 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                     VOLT_TRACE("inner_tuple:%s",
                                inner_tuple.debug(inner_table->name()).c_str());
                     m_engine->noteTuplesProcessedForProgressMonitoring(1);
+
+                    //
+                    // First check to eliminate the null index rows for UNDERFLOW case only
+                    //
+                    if (skipNullExprIteration != NULL) {
+                        if (skipNullExprIteration->eval(&outer_tuple, &inner_tuple).isTrue()) {
+                            VOLT_DEBUG("Index scan: find out null rows or columns.");
+                            continue;
+                        } else {
+                            skipNullExprIteration = NULL;
+                        }
+                    }
+
                     //
                     // First check whether the end_expression is now false
                     //
                     if (end_expression != NULL &&
-                        end_expression->eval(&outer_tuple, &inner_tuple).isFalse())
+                        !end_expression->eval(&outer_tuple, &inner_tuple).isTrue())
                     {
                         VOLT_TRACE("End Expression evaluated to false, stopping scan\n");
                         break;
