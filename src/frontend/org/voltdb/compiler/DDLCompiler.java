@@ -34,6 +34,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
+import org.hsqldb_voltpatches.FunctionSQL;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -53,6 +54,7 @@ import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
@@ -1297,9 +1299,16 @@ public class DDLCompiler {
             if (subNode.name.equals("exprs")) {
                 exprs = new ArrayList<AbstractExpression>();
                 for (VoltXMLElement exprNode : subNode.children) {
-                    exprs.add( dummy.parseExpressionTree(exprNode) );
-                    exprs.get(exprs.size()-1).resolveForTable(table);
-                    exprs.get(exprs.size()-1).finalizeValueTypes();
+                    AbstractExpression expr = dummy.parseExpressionTree(exprNode);
+
+                    if (ExpressionUtil.containsFunctionExpression(expr, FunctionSQL.voltGetCurrentTimestampId()) ) {
+                        String msg = String.format("Index %s cannot include the function NOW or CURRENT_TIMESTAMP.", name);
+                        throw this.m_compiler.new VoltCompilerException(msg);
+                    }
+
+                    expr.resolveForTable(table);
+                    expr.finalizeValueTypes();
+                    exprs.add(expr);
                 }
             }
         }
@@ -1830,6 +1839,8 @@ public class DDLCompiler {
             throw m_compiler.new VoltCompilerException(msg);
         }
 
+        List <AbstractExpression> checkExpressions = new ArrayList<AbstractExpression>();
+
         int i;
         for (i = 0; i < groupColCount; i++) {
             ParsedSelectStmt.ParsedColInfo gbcol = stmt.groupByColumns.get(i);
@@ -1839,6 +1850,7 @@ public class DDLCompiler {
                 msg += "must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.";
                 throw m_compiler.new VoltCompilerException(msg);
             }
+            checkExpressions.add(outcol.expression);
         }
 
         AbstractExpression coli = stmt.displayColumns.get(i).expression;
@@ -1856,8 +1868,22 @@ public class DDLCompiler {
                 msg += "must have non-group by columns aggregated by sum, count, min or max.";
                 throw m_compiler.new VoltCompilerException(msg);
             }
+            checkExpressions.add(outcol.expression);
         }
-    }
+
+        // Check unsupported SQL functions like: NOW, CURRENT_TIMESTAMP
+        for (ParsedSelectStmt.ParsedColInfo orderCol: stmt.orderByColumns()) {
+            checkExpressions.add(orderCol.expression);
+        }
+        checkExpressions.add(stmt.having);
+
+        for (AbstractExpression expr: checkExpressions) {
+            if (ExpressionUtil.containsFunctionExpression(expr, FunctionSQL.voltGetCurrentTimestampId())) {
+                msg += "cannot include the function NOW or CURRENT_TIMESTAMP.";
+                throw m_compiler.new VoltCompilerException(msg);
+            }
+        }
+     }
 
     void processMaterializedViewColumn(MaterializedViewInfo info, Table srcTable,
             Column destColumn, ExpressionType type, TupleValueExpression colExpr)
