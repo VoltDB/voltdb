@@ -254,6 +254,7 @@ public class InitiatorMailbox implements Mailbox
         boolean canDeliver = m_scheduler.sequenceForReplay(message);
         if (message instanceof DumpMessage) {
             hostLog.warn("Received DumpMessage at " + CoreUtils.hsIdToString(m_hsId));
+            m_scheduler.dump();
         }
         if (message instanceof Iv2RepairLogRequestMessage) {
             handleLogRequest(message);
