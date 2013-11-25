@@ -89,3 +89,31 @@ CREATE TABLE MANY_INTS (
   PRIMARY KEY (ID1, ID2, ID3, ID4)
 );
 CREATE INDEX IDX ON MANY_INTS (ID1, ID2, ID3, ID4, ID5);
+
+-- special compound index schema for ENG-5537
+CREATE TABLE tableX
+(
+    keyA INT NOT NULL,
+    keyB INT NOT NULL,
+    keyC SMALLINT DEFAULT '0',
+    keyD VARCHAR(20),
+    sort1 SMALLINT DEFAULT '3',
+    keyE INT NOT NULL,
+    PRIMARY KEY (keyA,keyB,keyD)
+);
+
+PARTITION TABLE tableX ON COLUMN keyA;
+
+CREATE INDEX idx_x ON tableX(keyA,keyC,keyD,keyE);
+
+CREATE TABLE tableY (
+    keyA INT NOT NULL,
+    keyB INT NOT NULL,
+    keyH INT NOT NULL,
+    keyI INT NOT NULL,
+    PRIMARY KEY (keyA,keyB,keyH,keyI)
+);
+
+PARTITION TABLE tableY ON COLUMN keyA;
+
+CREATE INDEX idx_y_keyI ON tableY(keyH,keyI);

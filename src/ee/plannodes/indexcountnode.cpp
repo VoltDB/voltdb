@@ -31,72 +31,31 @@
 namespace voltdb {
 
 IndexCountPlanNode::~IndexCountPlanNode() {
-    for (int ii = 0; ii < searchkey_expressions.size(); ii++) {
-        delete searchkey_expressions[ii];
+    for (int ii = 0; ii < m_searchkey_expressions.size(); ii++) {
+        delete m_searchkey_expressions[ii];
     }
-    for (int ii = 0; ii < endkey_expressions.size(); ii++) {
-        delete endkey_expressions[ii];
+    for (int ii = 0; ii < m_endkey_expressions.size(); ii++) {
+        delete m_endkey_expressions[ii];
     }
+    delete m_skip_null_predicate;
     delete getOutputTable();
     setOutputTable(NULL);
 }
 
-void IndexCountPlanNode::setLookupType(IndexLookupType lookup_type) {
-    this->lookup_type = lookup_type;
-}
-IndexLookupType IndexCountPlanNode::getLookupType() const {
-    return lookup_type;
-}
-
-void IndexCountPlanNode::setEndType(IndexLookupType end_type) {
-    this->end_type = end_type;
-}
-IndexLookupType IndexCountPlanNode::getEndType() const {
-    return end_type;
-}
-
-void IndexCountPlanNode::setTargetIndexName(std::string name) {
-    this->target_index_name = name;
-}
-std::string IndexCountPlanNode::getTargetIndexName() const {
-    return this->target_index_name;
-}
-
-void IndexCountPlanNode::setEndKeyEndExpressions(std::vector<AbstractExpression*> &exps) {
-    this->endkey_expressions = exps;
-}
-std::vector<AbstractExpression*>& IndexCountPlanNode::getEndKeyExpressions() {
-    return (this->endkey_expressions);
-}
-const std::vector<AbstractExpression*>& IndexCountPlanNode::getEndKeyExpressions() const {
-    return (this->endkey_expressions);
-}
-
-void IndexCountPlanNode::setSearchKeyExpressions(std::vector<AbstractExpression*> &exps) {
-    this->searchkey_expressions = exps;
-}
-std::vector<AbstractExpression*>& IndexCountPlanNode::getSearchKeyExpressions() {
-    return (this->searchkey_expressions);
-}
-const std::vector<AbstractExpression*>& IndexCountPlanNode::getSearchKeyExpressions() const {
-    return (this->searchkey_expressions);
-}
-
 std::string IndexCountPlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;
-    buffer << this->AbstractScanPlanNode::debugInfo(spacer);
-    buffer << spacer << "TargetIndexName[" << this->target_index_name << "]\n";
-    buffer << spacer << "EnableKeyIteration[" << std::boolalpha << this->key_iterate << "]\n";
-    buffer << spacer << "IndexLookupType[" << this->lookup_type << "]\n";
+    buffer << AbstractScanPlanNode::debugInfo(spacer);
+    buffer << spacer << "TargetIndexName[" << m_target_index_name << "]\n";
+    buffer << spacer << "IndexLookupType[" << m_lookup_type << "]\n";
 
     buffer << spacer << "SearchKey Expressions:\n";
-    for (int ctr = 0, cnt = (int)this->searchkey_expressions.size(); ctr < cnt; ctr++) {
-        buffer << this->searchkey_expressions[ctr]->debug(spacer);
+    for (int ctr = 0, cnt = (int)m_searchkey_expressions.size(); ctr < cnt; ctr++) {
+        buffer << m_searchkey_expressions[ctr]->debug(spacer);
     }
 
     buffer << spacer << "EndKey Expressions:\n";
-    for (int ctr = 0, cnt = (int)this->endkey_expressions.size(); ctr < cnt; ctr++) {
-        buffer << this->endkey_expressions[ctr]->debug(spacer);
+    for (int ctr = 0, cnt = (int)m_endkey_expressions.size(); ctr < cnt; ctr++) {
+        buffer << m_endkey_expressions[ctr]->debug(spacer);
     }
 
     buffer << spacer << "Post-Scan Expression: ";
@@ -111,31 +70,33 @@ std::string IndexCountPlanNode::debugInfo(const std::string &spacer) const {
 void IndexCountPlanNode::loadFromJSONObject(PlannerDomValue obj) {
     AbstractScanPlanNode::loadFromJSONObject(obj);
 
-    key_iterate = obj.valueForKey("KEY_ITERATE").asBool();
-
     std::string endTypeString = obj.valueForKey("END_TYPE").asStr();
-    end_type = stringToIndexLookup(endTypeString);
+    m_end_type = stringToIndexLookup(endTypeString);
 
     std::string lookupTypeString = obj.valueForKey("LOOKUP_TYPE").asStr();
-    lookup_type = stringToIndexLookup(lookupTypeString);
+    m_lookup_type = stringToIndexLookup(lookupTypeString);
 
-    target_index_name = obj.valueForKey("TARGET_INDEX_NAME").asStr();
+    m_target_index_name = obj.valueForKey("TARGET_INDEX_NAME").asStr();
 
     if (obj.hasNonNullKey("ENDKEY_EXPRESSIONS")) {
         PlannerDomValue endKeyExprArray = obj.valueForKey("ENDKEY_EXPRESSIONS");
         for (int i = 0; i < endKeyExprArray.arrayLen(); i++) {
-            AbstractExpression *expr = AbstractExpression::buildExpressionTree(endKeyExprArray.valueAtIndex(i));
-            endkey_expressions.push_back(expr);
+            AbstractExpression *expr =
+                AbstractExpression::buildExpressionTree(endKeyExprArray.valueAtIndex(i));
+            m_endkey_expressions.push_back(expr);
         }
-    }
-    else {
-        endkey_expressions.clear();
     }
 
     PlannerDomValue searchKeyExprArray = obj.valueForKey("SEARCHKEY_EXPRESSIONS");
     for (int i = 0; i < searchKeyExprArray.arrayLen(); i++) {
-        AbstractExpression *expr = AbstractExpression::buildExpressionTree(searchKeyExprArray.valueAtIndex(i));
-        searchkey_expressions.push_back(expr);
+        AbstractExpression *expr =
+            AbstractExpression::buildExpressionTree(searchKeyExprArray.valueAtIndex(i));
+        m_searchkey_expressions.push_back(expr);
+    }
+
+    if (obj.hasNonNullKey("SKIP_NULL_PREDICATE")) {
+        PlannerDomValue exprValue = obj.valueForKey("SKIP_NULL_PREDICATE");
+        m_skip_null_predicate = AbstractExpression::buildExpressionTree(exprValue);
     }
 }
 
