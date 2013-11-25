@@ -27,6 +27,9 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -37,6 +40,8 @@ import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 import java.util.regex.Pattern;
 import static junit.framework.Assert.assertFalse;
 
@@ -56,6 +61,7 @@ public class TestJDBCDriver {
     static String testjar;
     static ServerThread server;
     static Connection conn;
+    static Connection myconn;
     static VoltProjectBuilder pb;
 
     @BeforeClass
@@ -122,6 +128,13 @@ public class TestJDBCDriver {
 
         Class.forName("org.voltdb.jdbc.Driver");
         conn = DriverManager.getConnection("jdbc:voltdb://localhost:21212");
+        myconn = null;
+    }
+
+    private static Connection getJdbcConnection(String url, Properties props) throws Exception
+    {
+        Class.forName("org.voltdb.jdbc.Driver");
+        return DriverManager.getConnection(url, props);
     }
 
     private static void stopServer() throws SQLException {
@@ -129,10 +142,27 @@ public class TestJDBCDriver {
             conn.close();
             conn = null;
         }
+        if (myconn != null) {
+            myconn.close();
+            myconn = null;
+        }
         if (server != null) {
             try { server.shutdown(); } catch (InterruptedException e) { /*empty*/ }
             server = null;
         }
+    }
+
+    @Test
+    public void testURLParsing() throws Exception
+    {
+        String url = "jdbc:voltdb://server1:21212,server2?prop1=true&prop2=false";
+        String[] servers = Driver.getServersFromURL(url);
+        assertEquals("server1:21212", servers[0]);
+        assertEquals("server2", servers[1]);
+        Map<String, String> props = Driver.getPropsFromURL(url);
+        assertEquals(2, props.size());
+        assertEquals("true", props.get("prop1"));
+        assertEquals("false", props.get("prop2"));
     }
 
     @Test
@@ -555,5 +585,160 @@ public class TestJDBCDriver {
         }
         assertTrue(exceptionCalled);
 
+    }
+
+    private void checkSafeMode(Connection myconn)
+    {
+        boolean threw = false;
+        try {
+            myconn.commit();
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertTrue(threw);
+        threw = false;
+        // autocommit true should never throw
+        try {
+            myconn.setAutoCommit(true);
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertFalse(threw);
+        threw = false;
+        try {
+            myconn.setAutoCommit(false);
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertTrue(threw);
+        threw = false;
+        try {
+            myconn.rollback();
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertTrue(threw);
+    }
+
+    private void checkCarlosDanger(Connection myconn)
+    {
+        boolean threw = false;
+        try {
+            myconn.commit();
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertFalse(threw);
+        threw = false;
+        // autocommit true should never throw
+        try {
+            myconn.setAutoCommit(true);
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertFalse(threw);
+        threw = false;
+        try {
+            myconn.setAutoCommit(false);
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertFalse(threw);
+        threw = false;
+        try {
+            myconn.rollback();
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertFalse(threw);
+    }
+
+    @Test
+    public void testSafetyOffThroughProperties() throws Exception
+    {
+        Properties props = new Properties();
+        // Check default behavior
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        checkSafeMode(myconn);
+        myconn.close();
+
+        // Check commit and setAutoCommit
+        props.setProperty(JDBC4Connection.COMMIT_THROW_EXCEPTION, "true");
+        props.setProperty(JDBC4Connection.ROLLBACK_THROW_EXCEPTION, "true");
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        checkSafeMode(myconn);
+        myconn.close();
+
+        props.setProperty(JDBC4Connection.COMMIT_THROW_EXCEPTION, "false");
+        props.setProperty(JDBC4Connection.ROLLBACK_THROW_EXCEPTION, "false");
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        checkCarlosDanger(myconn);
+        myconn.close();
+    }
+
+    @Test
+    public void testSafetyOffThroughURL() throws Exception
+    {
+        Properties props = new Properties();
+        // Check default behavior
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        checkSafeMode(myconn);
+        myconn.close();
+
+        // Check commit and setAutoCommit
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212?" +
+                JDBC4Connection.COMMIT_THROW_EXCEPTION + "=true" + "&" +
+                JDBC4Connection.ROLLBACK_THROW_EXCEPTION + "=true", props);
+        checkSafeMode(myconn);
+        myconn.close();
+
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212?" +
+                JDBC4Connection.COMMIT_THROW_EXCEPTION + "=false" + "&" +
+                JDBC4Connection.ROLLBACK_THROW_EXCEPTION + "=false", props);
+        checkCarlosDanger(myconn);
+        myconn.close();
+    }
+
+    @Test
+    public void testSafetyOffThroughSystemProp() throws Exception {
+        String tmppath = "/tmp/" + System.getProperty("user.name");
+        String propfile = tmppath + "/voltdb.properties";
+        // start clean
+        File tmp = new File(propfile);
+        if (tmp.exists()) {
+            tmp.delete();
+        }
+        Properties props = new Properties();
+        props.setProperty(JDBC4Connection.COMMIT_THROW_EXCEPTION, "false");
+        props.setProperty(JDBC4Connection.ROLLBACK_THROW_EXCEPTION, "false");
+        FileOutputStream out = null;
+        try {
+            out = new FileOutputStream(propfile);
+            props.store(out, "");
+        } catch (FileNotFoundException e) {
+            fail();
+        } catch (IOException e) {
+            fail();
+        }        finally {
+            if (out != null) {
+                try {
+                    out.close();
+                } catch (IOException e) { }
+            }
+        }
+
+        System.setProperty(Driver.JDBC_PROP_FILE_PROP, propfile);
+        props = new Properties();
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        checkCarlosDanger(myconn);
+        myconn.close();
     }
 }
