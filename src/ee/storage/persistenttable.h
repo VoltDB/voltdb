@@ -349,10 +349,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return m_data.size();
     }
 
-    bool canSafelyFreeTuple(TableTuple &tuple) const {
-        return m_tableStreamer.get() != NULL && m_tableStreamer->canSafelyFreeTuple(tuple);
-    }
-
     // This is a testability feature not intended for use in product logic.
     int visibleTupleCount() const { return m_tupleCount - m_invisibleTuplesPendingDeleteCount; }
 
@@ -672,12 +668,6 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
 
     // The tempTuple is forever!
     assert(&tuple != &m_tempTuple);
-
-    // Let the context handle it as needed. Do this before freeing the memory
-    // of non-inlined columns
-    if (m_tableStreamer != NULL) {
-        m_tableStreamer->notifyTupleDelete(tuple);
-    }
 
     // This frees referenced strings -- when could possibly be a better time?
     if (m_schema->getUninlinedObjectColumnCount() != 0) {

@@ -148,9 +148,9 @@
     <include name='org/voltdb/regressionsuites/TestO*.class' />
     <include name='org/voltdb/regressionsuites/TestP*.class' />
     <!-- Exclude tests -->
-    <exclude name="**/*$*.class"/>
-    <exclude name="**/TestIV2BlacklistSaveRestoreSysprocSuite.class" />
-    <exclude name="**/TestMaliciousClientSuite.class" /> <!-- fails legacy -->
+    <exclude name="org/voltdb/regressionsuites/**/*$*.class"/>
+    <exclude name="org/voltdb/regressionsuites/TestIV2BlacklistSaveRestoreSysprocSuite.class" />
+    <exclude name="org/voltdb/regressionsuites/TestMaliciousClientSuite.class" /> <!-- fails legacy -->
 </patternset>
 
 <patternset id='junit.regression.h2.path'>
@@ -166,10 +166,10 @@
     <include name='org/voltdb/regressionsuites/TestY*.class' />
     <include name='org/voltdb/regressionsuites/TestZ*.class' />
     <!-- Exclude tests -->
-    <exclude name="**/*$*.class"/>
+    <exclude name="org/voltdb/regressionsuites/**/*$*.class"/>
 </patternset>
 
-<patternset id='junit.other.path'>
+<patternset id='junit.all.path'>
     <!-- Standard junit fileset -->
     <include name='org/hsqldb_voltpatches/**/Test*.class'/>
     <include name='org/voltcore/**/Test*.class' />
@@ -177,7 +177,6 @@
 
     <!-- Exclude nested classes -->
     <exclude name="**/*$*.class"/>
-    <exclude name="org/voltdb/regressionsuites/*.class"/>
     <exclude name="org/voltdb/quarantine/**/*.class"/>
     <exclude name="**/TestExportBase.class"/>
     <!-- Excluded pro tests -->
@@ -188,6 +187,10 @@
     <!-- Recorded as ENG-4423 -->
     <exclude name="**/TestRejoinFuzz.class" />
     <exclude name="**/TestRejoinFuzz2.class" />
+</patternset>
+
+<patternset id='junit.exclude.regression.path'>
+    <exclude name="org/voltdb/regressionsuites/*.class"/>
 </patternset>
 
 <!-- Workload Tracer Properties -->
@@ -1357,9 +1360,7 @@ TEST CASES
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
-                <patternset refid="junit.other.path" />
-                <patternset refid="junit.regression.h1.path" />
-                <patternset refid="junit.regression.h2.path" />
+                <patternset refid="junit.all.path" />
             </fileset>
         </tests>
     </run_junit>
@@ -1371,8 +1372,7 @@ TEST CASES
         <tests>
             <fileset dir='${build.test.dir}'>
                 <!-- Standard junit fileset -->
-                <include name='org/hsqldb_voltpatches/**/Test*.class'/>
-                <include name='org/voltdb/**/Test*.class'/>
+                <patternset refid="junit.all.path" />
                 <!-- Exclude many tests not directly related to sql functionality -->
                 <exclude name="**/*$*.class"/>
                 <exclude name='org/voltdb/client/TestClientFeatures.class'/>
@@ -1437,7 +1437,8 @@ TEST CASES
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
-                <patternset refid="junit.other.path" />
+                <patternset refid="junit.all.path" />
+                <patternset refid="junit.exclude.regression.path" />
             </fileset>
         </tests>
     </run_junit>

@@ -50,14 +50,21 @@ class IntValueGenerator:
     def __init__(self):
         self.__min = -maxint - 1
         self.__max = maxint
+        self.__nullpct = 0
 
     def set_min_max(self, min, max):
         self.__min = min
         self.__max = max
 
+    def set_nullpct(self, nullpct):
+        self.__nullpct = nullpct
+
     def generate_values(self, count):
         for i in xrange(count):
-            yield random.randint(self.__min, self.__max)
+            if self.__nullpct and (random.randint(0, 100) < self.__nullpct):
+                yield None
+            else:
+                yield random.randint(self.__min, self.__max)
 
 
 class ByteValueGenerator(IntValueGenerator):
@@ -97,11 +104,17 @@ class FloatValueGenerator:
     """
 
     def __init__(self):
-        pass
+        self.__nullpct = 0
+
+    def set_nullpct(self, nullpct):
+        self.__nullpct = nullpct
 
     def generate_values(self, count):
         for i in xrange(count):
-            yield random.random()
+            if self.__nullpct and (random.randint(0, 100) < self.__nullpct):
+                yield None
+            else:
+                yield random.random()
 
 
 class DecimalValueGenerator:
@@ -114,11 +127,18 @@ class DecimalValueGenerator:
         # to do exact math (multiplications) within 12 bits of precision.
         # Otherwise, it complains rather than rounding.
         decimal.getcontext().prec = 3
+        self.__nullpct = 0
+
+    def set_nullpct(self, nullpct):
+        self.__nullpct = nullpct
 
     def generate_values(self, count):
         for i in xrange(count):
             # we support 7 digits of scale, so magnify those tiny floats
-            yield decimal.Decimal(str(random.random() * 100.00))
+            if self.__nullpct and (random.randint(0, 100) < self.__nullpct):
+                yield None
+            else:
+                yield decimal.Decimal(str(random.random() * 100.00))
 
 
 class StringValueGenerator:
@@ -128,12 +148,18 @@ class StringValueGenerator:
     ALPHABET = u"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
     def __init__(self):
-        pass
+        self.__nullpct = 0
+
+    def set_nullpct(self, nullpct):
+        self.__nullpct = nullpct
 
     def generate_values(self, count, length = 17):
         for i in xrange(count):
             list = [random.choice(StringValueGenerator.ALPHABET) for y in xrange(length)]
-            yield u"".join(list)
+            if self.__nullpct and (random.randint(0, 100) < self.__nullpct):
+                yield None
+            else:
+                yield u"".join(list)
 
 
 class VarbinaryValueGenerator:
@@ -143,12 +169,18 @@ class VarbinaryValueGenerator:
     HEXDIGIT = u"0123456789ABCDEF"
 
     def __init__(self):
-        pass
+        self.__nullpct = 0
+
+    def set_nullpct(self, nullpct):
+        self.__nullpct = nullpct
 
     def generate_values(self, count, length = 17):
         for i in xrange(count):
             list = [random.choice(VarbinaryValueGenerator.HEXDIGIT) for y in xrange(length*2)] # length*2 hex digits gives whole bytes
-            yield u"".join(list)
+            if self.__nullpct and (random.randint(0, 100) < self.__nullpct):
+                yield None
+            else:
+                yield u"".join(list)
 
 
 class TimestampValueGenerator:
@@ -158,13 +190,19 @@ class TimestampValueGenerator:
     MAX_MILLIS_SINCE_EPOCH = 1999999999999
 
     def __init__(self):
-        pass
+        self.__nullpct = 0
+
+    def set_nullpct(self, nullpct):
+        self.__nullpct = nullpct
 
     def generate_values(self, count):
         for i in xrange(count):
             # HSQL doesn't support microsecond, generate a 13 digit number of milliseconds
             # this gets scaled to microseconds later for VoltDB backends
-            yield random.randint(0, TimestampValueGenerator.MAX_MILLIS_SINCE_EPOCH)
+            if self.__nullpct and (random.randint(0, 100) < self.__nullpct):
+                yield None
+            else:
+                yield random.randint(0, TimestampValueGenerator.MAX_MILLIS_SINCE_EPOCH)
 
 
 class BaseGenerator:
@@ -198,9 +236,11 @@ class BaseGenerator:
     LABEL_PATTERN_GROUP =                    "label" # optional label for variables
     #                   |       |             |
     __EXPR_TEMPLATE = r"%s" r"(\[\s*" r"(#(?P<label>\w+)\s*)?" \
-                      r"(?P<type>\w+)?\s*" r"(:(?P<min>(\d*)),(?P<max>(\d*)))?" r"\])?"
-    #                       |                      |              |                |
-    #                       |                      |              |                end of [] attribute section
+                      r"(?P<type>\w+)?\s*" r"(:(?P<min>(\d*)),(?P<max>(\d*)))?\s*" r"(null(?P<nullpct>(\d*)))?" r"\])?"
+    #                       |                      |              |                        |                   |
+    #                       |                      |              |                        |       end of [] attribute section
+    NULL_PCT_PATTERN_GROUP  =                                                             "nullpct" # optional null percentage
+    #                       |                      |              |
     MAX_VALUE_PATTERN_GROUP =                                    "max" # optional max (only for numeric values)
     #                       |                      |
     MIN_VALUE_PATTERN_GROUP =                     "min" # optional min (only for numeric values)
@@ -412,7 +452,9 @@ class ConstantGenerator(BaseGenerator):
 
     def prepare_params(self, attribute_groups):
         self.__type = attribute_groups[BaseGenerator.TYPE_PATTERN_GROUP]
-        assert self.__type
+        if not self.__type:
+            print "Generator parse error -- invalid type"
+            assert self.__type
 
         min = attribute_groups[BaseGenerator.MIN_VALUE_PATTERN_GROUP]
         max = attribute_groups[BaseGenerator.MAX_VALUE_PATTERN_GROUP]
@@ -422,9 +464,16 @@ class ConstantGenerator(BaseGenerator):
         if min != None and max != None:
             self.__value_generator.set_min_max(int(min), int(max))
 
+        nullpct = attribute_groups[BaseGenerator.NULL_PCT_PATTERN_GROUP]
+        if nullpct:
+            self.__value_generator.set_nullpct(int(nullpct))
+
+
     def next_param(self):
         for i in self.__value_generator.generate_values(COUNT):
-            if IS_VOLT and self.__type == "timestamp":
+            if i == None:
+                i = u"NULL"
+            elif IS_VOLT and self.__type == "timestamp":
                 # convert millis to micros when relying on VoltDB's int-to-timestamp conversion.
                 i = i * 1000
             elif isinstance(i, basestring):
