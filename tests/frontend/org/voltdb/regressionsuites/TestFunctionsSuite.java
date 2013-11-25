@@ -2155,12 +2155,21 @@ public class TestFunctionsSuite extends RegressionSuite {
         // Expected failed type cases:
         try {
             sql = "SELECT ID, CASE WHEN num > 0 AND num < 5 THEN NULL " +
-                    "WHEN num >=5 THEN NULL  ELSE NULL END FROM R1 ORDER BY 1;";
+                    "WHEN num >=5 THEN NULL ELSE NULL END FROM R1 ORDER BY 1;";
             vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
             fail();
         } catch (Exception ex) {
             assertNotNull(ex);
             assertTrue(ex.getMessage().contains("data type cast needed for parameter or null literal"));
+        }
+
+        try {
+            // Use String as the casted type
+            sql = "SELECT ID, CASE WHEN num > 0 AND num < 5 THEN NULL " +
+                    "WHEN num >=5 THEN NULL ELSE 'NULL' END FROM R1 ORDER BY 1;";
+            vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
+        } catch (Exception ex) {
+            fail();
         }
 
         try {
@@ -2234,7 +2243,15 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
 
         // Test NULL
-//      cr = client.callProcedure("R1.insert", 2, null, null, null, null);
+        cl.callProcedure("R1.insert", 4, "DB2",  null, null, new Timestamp(1000000000000L));
+        sql = "SELECT ID, CASE WHEN num < 3 THEN num/2 ELSE num + 10 END FROM R1 ORDER BY 1;";
+        vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(VoltType.INTEGER, vt.getColumnType(1));
+        if (isHSQL()) {
+            validateTableOfLongs(vt, new long[][] {{1, 0},{2, 15}, {3, 18}, {4, 0}});
+        } else {
+            validateTableOfLongs(vt, new long[][] {{1, 0},{2, 15}, {3, 18}, {4, Long.MIN_VALUE}});
+        }
 
     }
 
@@ -2259,7 +2276,13 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
 
         // Test NULL
-
+        cl.callProcedure("R1.insert", 3, "Oracle",  null, null, new Timestamp(1000000000000L));
+        sql = "SELECT ID, CASE num WHEN 5 THEN 50 ELSE num + 10 END FROM R1 ORDER BY 1;";
+        if (isHSQL()) {
+            validateTableOfLongs(cl, sql, new long[][] {{1, 11},{2, 50}, {3, 0}});
+        } else {
+            validateTableOfLongs(cl, sql, new long[][] {{1, 11},{2, 50}, {3, Long.MIN_VALUE}});
+        }
     }
 
     //
@@ -2306,7 +2329,7 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "DESC VARCHAR(300), " +
                 "NUM INTEGER, " +
                 "RATIO FLOAT, " +
-                "PAST TIMESTAMP DEFAULT NULL, " +
+                "PAST TIMESTAMP, " +
                 "PRIMARY KEY (ID) ); " +
 
                 // Test unique generalized index on a function of an already indexed column.

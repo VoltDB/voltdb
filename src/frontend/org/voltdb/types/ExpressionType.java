@@ -152,13 +152,6 @@ public enum ExpressionType {
         for (ExpressionType vt : EnumSet.allOf(ExpressionType.class)) {
             ExpressionType.idx_lookup.put(vt.m_value, vt);
             String name = vt.name().toLowerCase();
-            if (name.equals("operator_case_when")) {
-                name = "casewhen"; // Hsql's expression type name
-            }
-            if (name.equals("operator_alternative")) {
-                name = "alternative"; // Hsql's expression type name
-            }
-
             ExpressionType.name_lookup.put(name, vt);
             //
             // Also store the name of the operation without the prefix

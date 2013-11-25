@@ -326,7 +326,7 @@ public class RegressionSuite extends TestCase {
                 assertEquals(expected[i], actual);
             } else {
                 VoltType type = vt.getColumnType(i);
-                assertEquals(new Long(type.getNullValue().toString()).longValue(), actual);
+                assertEquals(Long.parseLong(type.getNullValue().toString()), actual);
             }
         }
     }

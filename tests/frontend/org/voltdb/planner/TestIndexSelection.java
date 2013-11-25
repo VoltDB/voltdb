@@ -117,5 +117,10 @@ public class TestIndexSelection extends PlannerTestCase {
         System.out.println(pn.toExplainPlanString());
         assertTrue(pn.toExplainPlanString().contains("CASEWHEN_IDX2"));
 
+        // Negative case
+        pn = compile("select * from l WHERE CASE WHEN a < 10 THEN a*2 ELSE a + 5 END > 2");
+        pn = pn.getChild(0);
+        System.out.println(pn.toExplainPlanString());
+        assertTrue(pn.toExplainPlanString().contains("using its primary key index (for deterministic order only)"));
     }
 }
