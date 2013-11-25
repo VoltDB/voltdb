@@ -36,7 +36,8 @@ import java.util.Properties;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
-public class Driver implements java.sql.Driver {
+public class Driver implements java.sql.Driver
+{
     public static final String JDBC_PROP_FILE_ENV = "VOLTDB_JDBC_PROPERTIES";
     public static final String JDBC_PROP_FILE_PROP = "voltdb.jdbcproperties";
     public static final String DEFAULT_PROP_FILENAME = "voltdb.properties";
@@ -78,7 +79,8 @@ public class Driver implements java.sql.Driver {
         try
         {
             DriverManager.registerDriver(new Driver());
-        } catch (Exception e)
+        }
+        catch (Exception e)
         {}
     }
 
@@ -88,7 +90,8 @@ public class Driver implements java.sql.Driver {
     }
 
     @Override
-    public Connection connect(String url, Properties props) throws SQLException {
+    public Connection connect(String url, Properties props) throws SQLException
+    {
         if (acceptsURL(url))
         {
             try
@@ -130,8 +133,8 @@ public class Driver implements java.sql.Driver {
                 String password = "";
                 boolean heavyweight = false;
                 int maxoutstandingtxns = 0;
-                for (Enumeration<?> e = info.propertyNames(); e
-                        .hasMoreElements();) {
+                for (Enumeration<?> e = info.propertyNames(); e.hasMoreElements();)
+                {
                     String key = (String) e.nextElement();
                     String value = info.getProperty(key);
                     if (key.toLowerCase().equals("user"))
