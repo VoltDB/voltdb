@@ -38,7 +38,7 @@ import java.util.regex.Pattern;
 
 public class Driver implements java.sql.Driver {
     public static final String JDBC_PROP_FILE_ENV = "VOLTDB_JDBC_PROPERTIES";
-    public static final String JDBC_PROP_FILE_PROP = "voltdb.jdbcpropfile";
+    public static final String JDBC_PROP_FILE_PROP = "voltdb.jdbcproperties";
     public static final String DEFAULT_PROP_FILENAME = "voltdb.properties";
     //Driver URL prefix.
     private static final String URL_PREFIX = "jdbc:voltdb:";

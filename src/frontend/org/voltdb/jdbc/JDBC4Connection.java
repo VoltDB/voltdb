@@ -41,8 +41,8 @@ import org.voltdb.client.ClientStatsContext;
 
 public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
 {
-    public static final String COMMIT_THROW_EXCEPTION = "voltdb.committhrowexception";
-    public static final String ROLLBACK_THROW_EXCEPTION = "voltdb.rollbackthrowexception";
+    public static final String COMMIT_THROW_EXCEPTION = "jdbc.committhrowexception";
+    public static final String ROLLBACK_THROW_EXCEPTION = "jdbc.rollbackthrowexception";
 
     protected final JDBC4ClientConnection NativeConnection;
     protected final String User;
