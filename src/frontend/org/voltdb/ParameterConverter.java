@@ -109,7 +109,8 @@ public class ParameterConverter {
      * Given a string, covert it to a primitive type or return null.
      */
     private static Object convertStringToPrimitive(String value, final Class<?> expectedClz)
-            throws VoltTypeException    {
+    throws VoltTypeException
+    {
         value = value.trim();
         // detect CSV null
         if (value.equals(VoltTable.CSV_NULL)) return nullValueForType(expectedClz);
@@ -151,7 +152,8 @@ public class ParameterConverter {
             final Class<?> expectedComponentClz,
             final Class<?> inputComponentClz,
             Object param)
-            throws VoltTypeException    {
+    throws VoltTypeException
+    {
         int inputLength = Array.getLength(param);
 
         if (inputComponentClz == expectedComponentClz) {
@@ -210,7 +212,8 @@ public class ParameterConverter {
      * @throws Exception with a message describing why the types are incompatible.
      */
     public static Object tryToMakeCompatible(final Class<?> expectedClz, final Object param)
-            throws VoltTypeException    {
+    throws VoltTypeException
+    {
         // uncomment for debugging
         /*System.err.printf("Converting %s of type %s to type %s\n",
                 String.valueOf(param),
@@ -441,7 +444,7 @@ public class ParameterConverter {
                 try {
                     return VoltDecimalHelper.deserializeBigDecimalFromString(String.format("%.12f", param));
                 } catch (IOException ex) {
-                    throw new VoltTypeException(String.format("deserialize BigDecimal from string failed. (%s to %s)",
+                    throw new VoltTypeException(String.format("deserialize Float from string failed. (%s to %s)",
                             inputClz.getName(), expectedClz.getName()));
                 }
             }
@@ -451,7 +454,7 @@ public class ParameterConverter {
                 throw new VoltTypeException(String.format("deserialize BigDecimal from string failed. (%s to %s)",
                         inputClz.getName(), expectedClz.getName()));
             }
-        }        else if (expectedClz == VoltTable.class && inputClz == VoltTable.class) {
+        } else if (expectedClz == VoltTable.class && inputClz == VoltTable.class) {
             return param;
         }
 
@@ -469,7 +472,7 @@ public class ParameterConverter {
      * @throws Exception if a parse error occurs (consistent with above).
      */
     public static Object stringToLong(Object param, Class<?> slot)
-        throws VoltTypeException
+    throws VoltTypeException
     {
         try {
             if (slot == byte.class ||
