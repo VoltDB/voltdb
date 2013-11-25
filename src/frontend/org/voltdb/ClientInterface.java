@@ -1807,8 +1807,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                 catProc.getPartitionparameter(),
                                 catProc.getPartitioncolumn().getType(),
                                 task);
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 // unable to hash to a site, return an error
                 return getMispartitionedErrorResponse(task, catProc, e);
             }
@@ -2518,7 +2517,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     //Generate a mispartitioned response also log the message.
     private ClientResponseImpl getMispartitionedErrorResponse(StoredProcedureInvocation task,
             Procedure catProc, Exception ex) {
-        Object invocationParameter = task.getParameterAtIndex(catProc.getPartitionparameter());
+        Object invocationParameter = null;
+        try {
+            invocationParameter = task.getParameterAtIndex(catProc.getPartitionparameter());
+        } catch (RuntimeException ex2) {
+        }
         String exMsg = "Unknown";
         if (ex != null) {
             exMsg = ex.getMessage();
