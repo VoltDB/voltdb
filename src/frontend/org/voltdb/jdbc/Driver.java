@@ -91,8 +91,9 @@ public class Driver implements java.sql.Driver {
                 // Properties favored order:
                 // 1) property file specified by env variable
                 // 2) property file specified by system property
-                // 3) Properties specified in the URL
-                // 4) Properties specified to getConnection() arg
+                // 3) property file with default name in same path as driver jar
+                // 4) Properties specified in the URL
+                // 5) Properties specified to getConnection() arg
                 //
                 Properties fileprops = tryToFindPropsFile();
 
