@@ -21,7 +21,7 @@ import java.util.Arrays;
 
 import org.voltdb.utils.Encoder;
 
-import com.google.common.primitives.Ints;
+import com.google_voltpatches.common.primitives.Ints;
 
 /**
  * Turns a 20-byte SHA-1 hash into something you can use in a tree or

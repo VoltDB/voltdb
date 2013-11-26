@@ -20,10 +20,10 @@ import java.util.Map;
 import java.util.NavigableMap;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ForwardingNavigableMap;
-import com.google.common.collect.ImmutableSortedMap;
-import com.google.common.collect.ImmutableSortedMap.Builder;
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.collect.ForwardingNavigableMap;
+import com.google_voltpatches.common.collect.ImmutableSortedMap;
+import com.google_voltpatches.common.collect.ImmutableSortedMap.Builder;
 
 /**
  * Key set, value set, and entry set are all immutable as are their iterators.

@@ -29,8 +29,8 @@ import java.util.List;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableMap.Builder;
+import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableMap.Builder;
 
 /**
  * This manages per-partition handles used to identify responses for

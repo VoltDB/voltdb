@@ -48,11 +48,11 @@ import org.voltdb.rejoin.StreamSnapshotDataTarget;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.utils.CatalogUtil;
 
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Multimap;
-import com.google.common.primitives.Longs;
+import com.google_voltpatches.common.collect.ArrayListMultimap;
+import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.Lists;
+import com.google_voltpatches.common.collect.Multimap;
+import com.google_voltpatches.common.primitives.Longs;
 
 /**
  * Create a snapshot write plan for snapshots streamed to other sites

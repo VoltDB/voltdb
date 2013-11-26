@@ -40,7 +40,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.export.ExportManager;
 
-import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  * Subclass of Initiator to manage single-partition operations.

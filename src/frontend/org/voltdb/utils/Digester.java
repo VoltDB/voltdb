@@ -20,9 +20,9 @@ package org.voltdb.utils;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
-import com.google.common.base.Charsets;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
+import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.base.Throwables;
 
 public class Digester {
 

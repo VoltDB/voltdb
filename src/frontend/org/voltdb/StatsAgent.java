@@ -26,9 +26,9 @@ import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 
-import com.google.common.base.Supplier;
-import com.google.common.base.Suppliers;
-import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.base.Suppliers;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  * Agent responsible for collecting stats on this host.

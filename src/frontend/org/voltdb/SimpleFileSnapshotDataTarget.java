@@ -26,9 +26,9 @@ import java.util.concurrent.TimeUnit;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
 
-import com.google.common.base.Throwables;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
     private final File m_tempFile;

@@ -45,7 +45,7 @@ import java.util.Set;
 
 import org.junit.Test;
 
-import com.google.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.ImmutableSet;
 import com.natpryce.makeiteasy.Maker;
 
 public class TestSiteFailureMessage {
