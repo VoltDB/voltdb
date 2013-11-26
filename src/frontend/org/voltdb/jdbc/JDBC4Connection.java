@@ -41,14 +41,20 @@ import org.voltdb.client.ClientStatsContext;
 
 public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
 {
+    public static final String COMMIT_THROW_EXCEPTION = "jdbc.committhrowexception";
+    public static final String ROLLBACK_THROW_EXCEPTION = "jdbc.rollbackthrowexception";
+
     protected final JDBC4ClientConnection NativeConnection;
     protected final String User;
     private boolean isClosed = false;
+    private Properties props;
+    private boolean autoCommit = true;
 
-    public JDBC4Connection(JDBC4ClientConnection connection, String user)
+    public JDBC4Connection(JDBC4ClientConnection connection, Properties props)
     {
         this.NativeConnection = connection;
-        this.User = user;
+        this.props = props;
+        this.User = this.props.getProperty("user", "");
     }
 
     private void checkClosed() throws SQLException
@@ -84,7 +90,9 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     public void commit() throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();
+        if (props.getProperty(COMMIT_THROW_EXCEPTION, "true").equalsIgnoreCase("true")) {
+            throw SQLError.noSupport();
+        }
     }
 
     // Factory method for creating Array objects.
@@ -169,11 +177,12 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     }
 
     // Retrieves the current auto-commit mode for this Connection object.
+    // We are always auto-committing, but if let's be consistent with the lying.
     @Override
     public boolean getAutoCommit() throws SQLException
     {
         checkClosed();
-        return true; // supports only AutoCommit = true
+        return autoCommit;
     }
 
     // Retrieves this Connection object's current catalog name.
@@ -244,7 +253,7 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     @Override
     public boolean isClosed() throws SQLException
     {
-        return isClosed; // TODO: This is retarded: the native VoltDB.Client does not have such a status - we should have this so we can appropriately deal with connection failures!
+        return isClosed;
     }
 
     // Retrieves whether this Connection object is in read-only mode.
@@ -259,7 +268,7 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     @Override
     public boolean isValid(int timeout) throws SQLException
     {
-        return isClosed; // TODO: This is retarded: the native VoltDB.Client does not have such a status - we should have this so we can appropriately deal with connection failures!
+        return isClosed;
     }
 
     // Converts the given SQL statement into the system's native SQL grammar.
@@ -359,7 +368,9 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     public void rollback() throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();
+        if (props.getProperty(ROLLBACK_THROW_EXCEPTION, "true").equalsIgnoreCase("true")) {
+            throw SQLError.noSupport();
+        }
     }
 
     // Undoes all changes made after the given Savepoint object was set.
@@ -375,8 +386,13 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     public void setAutoCommit(boolean autoCommit) throws SQLException
     {
         checkClosed();
-        if (!autoCommit) // Always true - error out only if the client is trying to set somethign else
+        // Always true - error out only if the client is trying to set somethign else
+        if (!autoCommit && (props.getProperty(COMMIT_THROW_EXCEPTION, "true").equalsIgnoreCase("true"))) {
             throw SQLError.noSupport();
+        }
+        else {
+            this.autoCommit = autoCommit;
+        }
     }
 
     // Sets the given catalog name in order to select a subspace of this Connection object's database in which to work.
