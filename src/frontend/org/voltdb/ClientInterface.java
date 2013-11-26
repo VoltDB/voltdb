@@ -2534,7 +2534,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 + " Message: " + exMsg;
         authLog.warn(errorMessage);
         ClientResponseImpl clientResponse = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
-                new VoltTable[0], ex.getMessage(), task.clientHandle);
+                new VoltTable[0], errorMessage, task.clientHandle);
         return clientResponse;
     }
 }
