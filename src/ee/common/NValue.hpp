@@ -2236,6 +2236,7 @@ inline int NValue::compare(const NValue rhs) const {
  * Set this NValue to null.
  */
 inline void NValue::setNull() {
+    m_data[8] = OBJECTLENGTH_NULL;
     switch (getValueType())
     {
     case VALUE_TYPE_BOOLEAN:
@@ -2788,41 +2789,7 @@ inline void NValue::allocateObjectFromInlinedValue(Pool* stringPool)
 }
 
 inline bool NValue::isNull() const {
-    switch (getValueType()) {
-        case VALUE_TYPE_NULL:
-        case VALUE_TYPE_INVALID:
-            return true;
-        case VALUE_TYPE_BOOLEAN:
-            return *reinterpret_cast<const int8_t*>(m_data) == INT8_NULL;
-        case VALUE_TYPE_TINYINT:
-            return getTinyInt() == INT8_NULL;
-        case VALUE_TYPE_SMALLINT:
-            return getSmallInt() == INT16_NULL;
-        case VALUE_TYPE_INTEGER:
-            return getInteger() == INT32_NULL;
-        case VALUE_TYPE_TIMESTAMP:
-        case VALUE_TYPE_BIGINT:
-            return getBigInt() == INT64_NULL;
-        case VALUE_TYPE_ADDRESS:
-            return *reinterpret_cast<void* const*>(m_data) == NULL;
-        case VALUE_TYPE_DOUBLE:
-            return getDouble() <= DOUBLE_NULL;
-        case VALUE_TYPE_VARCHAR:
-        case VALUE_TYPE_VARBINARY:
-            return *reinterpret_cast<void* const*>(m_data) == NULL ||
-            *reinterpret_cast<const int32_t*>(&m_data[8]) == OBJECTLENGTH_NULL;
-        case VALUE_TYPE_DECIMAL: {
-            TTInt min;
-            min.SetMin();
-            return getDecimal() == min;
-        }
-        case VALUE_TYPE_ARRAY:
-            return false;
-        default:
-            throwDynamicSQLException("NValue::isNull() called with unknown ValueType '%s'",
-                                     getValueTypeString().c_str());
-    }
-    return false;
+    return m_data[8] == OBJECTLENGTH_NULL;
 }
 
 inline bool NValue::isNaN() const {
