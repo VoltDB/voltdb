@@ -413,7 +413,7 @@ public class TestFailuresSuite extends RegressionSuite {
         Client client = getClient();
 
         try {
-            ClientResponse resp = client.callProcedure("TooFewParams", 1);
+            client.callProcedure("TooFewParams", 1);
             fail();
         } catch (ProcCallException e) {
             assertTrue(e.getMessage().startsWith("Error sending"));
