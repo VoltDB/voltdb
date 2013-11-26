@@ -38,7 +38,7 @@ import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.StreamSnapshotSink.RestoreWork;
 import org.voltdb.rejoin.TaskLog;
 
-import com.google.common.util.concurrent.SettableFuture;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     // true if the site has received the first fragment task message

@@ -46,8 +46,8 @@ import org.voltdb.catalog.Database;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltFile;
 
-import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.base.Throwables;
 
 /**
  * Bridges the connection to an OLAP system and the buffers passed

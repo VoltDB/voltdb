@@ -28,8 +28,8 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Multimap;
+import com.google_voltpatches.common.collect.ArrayListMultimap;
+import com.google_voltpatches.common.collect.Multimap;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
@@ -148,7 +148,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
                                               nonce,
                                               1, // 1 source per rejoining site
                                               m_snapshotBufPool);
-        send(com.google.common.primitives.Longs.toArray(HSIds), msg);
+        send(com.google_voltpatches.common.primitives.Longs.toArray(HSIds), msg);
 
         // For testing, exit if only one property is set...
         if (m_rejoinDeathTestMode && !m_rejoinDeathTestCancel &&

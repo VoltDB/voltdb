@@ -39,7 +39,7 @@ import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FastSerializer.BufferGrowCallback;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
-import com.google.common.base.Throwables;
+import com.google_voltpatches.common.base.Throwables;
 
 /**
  * Wrapper for native Execution Engine library.

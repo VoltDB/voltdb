@@ -149,7 +149,7 @@ public class SpPromoteAlgo implements RepairAlgo
                  + " Survivors: " + CoreUtils.hsIdCollectionToString(m_survivors));
         VoltMessage logRequest =
             new Iv2RepairLogRequestMessage(m_requestId, Iv2RepairLogRequestMessage.SPREQUEST);
-        m_mailbox.send(com.google.common.primitives.Longs.toArray(m_survivors), logRequest);
+        m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_survivors), logRequest);
     }
 
     /** Process a new repair log response */

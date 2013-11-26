@@ -40,7 +40,7 @@ import org.voltdb.iv2.MpTransactionState;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 
-import com.google.common.primitives.Longs;
+import com.google_voltpatches.common.primitives.Longs;
 
 /**
  * System procedures extend VoltSystemProcedure and use its utility methods to

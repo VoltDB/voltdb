@@ -26,7 +26,7 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
 
-import com.google.common.base.Charsets;
+import com.google_voltpatches.common.base.Charsets;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 

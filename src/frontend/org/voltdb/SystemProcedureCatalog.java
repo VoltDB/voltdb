@@ -20,7 +20,7 @@ package org.voltdb;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Procedure;
 
-import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 
 /**

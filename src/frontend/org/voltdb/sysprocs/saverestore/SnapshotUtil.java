@@ -78,9 +78,9 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
-import com.google.common.base.Throwables;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.SettableFuture;
+import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public class SnapshotUtil {
 

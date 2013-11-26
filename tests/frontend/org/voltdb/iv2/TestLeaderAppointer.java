@@ -52,7 +52,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.compiler.ClusterConfig;
 
-import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class TestLeaderAppointer extends ZKTestBase {
 
