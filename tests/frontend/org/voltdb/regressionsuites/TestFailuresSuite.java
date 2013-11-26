@@ -413,17 +413,18 @@ public class TestFailuresSuite extends RegressionSuite {
         Client client = getClient();
 
         try {
-            client.callProcedure("TooFewParams", 1);
+            ClientResponse resp = client.callProcedure("TooFewParams", 1);
+            System.out.println("Response is: " + resp.getStatusString());
             fail();
         } catch (ProcCallException e) {
-            assertTrue(e.getMessage().startsWith("Error sending"));
+            assertTrue(e.getMessage().startsWith("Invalid partitionIndex"));
         }
 
         try {
             client.callProcedure("TooFewParams");
             fail();
         } catch (ProcCallException e) {
-            assertTrue(e.getMessage().startsWith("Error sending"));
+            assertTrue(e.getMessage().startsWith("Invalid partitionIndex"));
         }
     }
 

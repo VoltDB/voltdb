@@ -2520,21 +2520,21 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         Object invocationParameter = null;
         try {
             invocationParameter = task.getParameterAtIndex(catProc.getPartitionparameter());
-        } catch (RuntimeException ex2) {
+        } catch (Exception ex2) {
         }
         String exMsg = "Unknown";
         if (ex != null) {
             exMsg = ex.getMessage();
         }
         String errorMessage = "Error sending procedure " + task.procName
-                + "  to the correct partition. Make sure parameter values are correct."
+                + " to the correct partition. Make sure parameter values are correct."
                 + " Parameter value " + invocationParameter
                 + ", partition column " + catProc.getPartitioncolumn().getName()
                 + " type " + catProc.getPartitioncolumn().getType()
                 + " Message: " + exMsg;
         authLog.warn(errorMessage);
         ClientResponseImpl clientResponse = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
-                new VoltTable[]{}, errorMessage);
+                new VoltTable[0], ex.getMessage(), task.clientHandle);
         return clientResponse;
     }
 }
