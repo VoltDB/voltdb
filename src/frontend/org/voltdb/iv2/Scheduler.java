@@ -191,6 +191,9 @@ abstract public class Scheduler implements InitiatorMessageHandler
         }
     }
 
+    // Dumps the content of the scheduler for debugging
+    public void dump() {}
+
     abstract public void shutdown();
 
     @Override
