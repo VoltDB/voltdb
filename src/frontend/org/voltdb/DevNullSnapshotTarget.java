@@ -81,4 +81,13 @@ public class DevNullSnapshotTarget implements SnapshotDataTarget {
         return SnapshotFormat.STREAM;
     }
 
+    /**
+     * Get the row count if any, of the content wrapped in the given {@link BBContainer}
+     * @param tupleData
+     * @return the numbers of tuple data rows contained within a container
+     */
+    @Override
+    public int getInContainerRowCount(BBContainer tupleData) {
+        return SnapshotDataTarget.ROW_COUNT_UNSUPPORTED;
+    }
 }

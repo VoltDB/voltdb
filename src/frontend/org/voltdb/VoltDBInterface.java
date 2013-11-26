@@ -17,6 +17,7 @@
 package org.voltdb;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -71,7 +72,7 @@ public interface VoltDBInterface
     public String getBuildString();
     public String getVersionString();
     public HostMessenger getHostMessenger();
-    public ArrayList<ClientInterface> getClientInterfaces();
+    public List<ClientInterface> getClientInterfaces();
     public OpsAgent getOpsAgent(OpsSelector selector);
     // Keep this method to centralize the cast to StatsAgent for
     // existing code

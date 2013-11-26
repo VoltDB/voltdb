@@ -463,7 +463,12 @@ public class CoreUtils {
         return Math.max(1, Runtime.getRuntime().availableProcessors());
     }
 
-    public static final class RetryException extends RuntimeException {}
+    public static final class RetryException extends RuntimeException {
+        public RetryException() {};
+        public RetryException(Throwable cause) {
+            super(cause);
+        }
+    }
 
     /*
      * A helper for retrying tasks asynchronously returns a settable future

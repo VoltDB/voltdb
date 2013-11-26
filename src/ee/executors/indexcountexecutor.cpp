@@ -50,37 +50,26 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     //
     m_numOfSearchkeys = (int)m_node->getSearchKeyExpressions().size();
     if (m_numOfSearchkeys != 0) {
-        m_searchKeyBeforeSubstituteArrayPtr =
+        m_searchKeyArrayPtr =
             boost::shared_array<AbstractExpression*>
-        (new AbstractExpression*[m_numOfSearchkeys]);
-        m_searchKeyBeforeSubstituteArray = m_searchKeyBeforeSubstituteArrayPtr.get();
-        m_needsSubstituteSearchKeyPtr =
-            boost::shared_array<bool>(new bool[m_numOfSearchkeys]);
-        m_needsSubstituteSearchKey = m_needsSubstituteSearchKeyPtr.get();
+            (new AbstractExpression*[m_numOfSearchkeys]);
+        m_searchKeyArray = m_searchKeyArrayPtr.get();
 
-        for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++)
-        {
-            if (m_node->getSearchKeyExpressions()[ctr] == NULL)
-            {
+        for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++) {
+            if (m_node->getSearchKeyExpressions()[ctr] == NULL) {
                 VOLT_ERROR("The search key expression at position '%d' is NULL for"
                     " PlanNode '%s'", ctr, m_node->debug().c_str());
                 return false;
             }
-            m_needsSubstituteSearchKeyPtr[ctr] =
-                m_node->getSearchKeyExpressions()[ctr]->hasParameter();
-            m_searchKeyBeforeSubstituteArrayPtr[ctr] =
-                m_node->getSearchKeyExpressions()[ctr];
+            m_searchKeyArrayPtr[ctr] = m_node->getSearchKeyExpressions()[ctr];
         }
     }
 
     m_numOfEndkeys = (int)m_node->getEndKeyExpressions().size();
     if (m_numOfEndkeys != 0) {
-        m_endKeyBeforeSubstituteArrayPtr =
+        m_endKeyArrayPtr =
             boost::shared_array<AbstractExpression*> (new AbstractExpression*[m_numOfEndkeys]);
-        m_endKeyBeforeSubstituteArray = m_endKeyBeforeSubstituteArrayPtr.get();
-        m_needsSubstituteEndKeyPtr =
-            boost::shared_array<bool>(new bool[m_numOfEndkeys]);
-        m_needsSubstituteEndKey = m_needsSubstituteEndKeyPtr.get();
+        m_endKeyArray = m_endKeyArrayPtr.get();
         for (int ctr = 0; ctr < m_numOfEndkeys; ctr++)
         {
             if (m_node->getEndKeyExpressions()[ctr] == NULL) {
@@ -88,10 +77,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
                     " PlanNode '%s'", ctr, m_node->debug().c_str());
                 return false;
             }
-            m_needsSubstituteEndKeyPtr[ctr] =
-                m_node->getEndKeyExpressions()[ctr]->hasParameter();
-            m_endKeyBeforeSubstituteArrayPtr[ctr] =
-                m_node->getEndKeyExpressions()[ctr];
+            m_endKeyArrayPtr[ctr] = m_node->getEndKeyExpressions()[ctr];
         }
     }
 
@@ -165,7 +151,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     // default 0 count as their result.
     TableTuple& tmptup = m_outputTable->tempTuple();
     tmptup.setNValue(0, ValueFactory::getBigIntValue( 0 ));
-    TableTuple m_dummy;
 
     //
     // SEARCH KEY
@@ -174,10 +159,8 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         m_searchKey.setAllNulls();
         VOLT_DEBUG("<Index Count>Initial (all null) search key: '%s'", m_searchKey.debugNoHeader().c_str());
         for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
-            if (m_needsSubstituteSearchKey[ctr]) {
-                m_searchKeyBeforeSubstituteArray[ctr]->substitute(params);
-            }
-            NValue candidateValue = m_searchKeyBeforeSubstituteArray[ctr]->eval(&m_dummy, NULL);
+            m_searchKeyArray[ctr]->substitute(params);
+            NValue candidateValue = m_searchKeyArray[ctr]->eval(NULL, NULL);
             try {
                 m_searchKey.setNValue(ctr, candidateValue);
             }
@@ -218,9 +201,8 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 break;
             }
         }
+        VOLT_TRACE("Search key after substitutions: '%s'", m_searchKey.debugNoHeader().c_str());
     }
-
-    VOLT_TRACE("Search key after substitutions: '%s'", m_searchKey.debugNoHeader().c_str());
 
     if (m_numOfEndkeys != 0) {
         //
@@ -229,10 +211,8 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         m_endKey.setAllNulls();
         VOLT_DEBUG("Initial (all null) end key: '%s'", m_endKey.debugNoHeader().c_str());
         for (int ctr = 0; ctr < m_numOfEndkeys; ctr++) {
-            if (m_needsSubstituteEndKey[ctr]) {
-                m_endKeyBeforeSubstituteArray[ctr]->substitute(params);
-            }
-            NValue endKeyValue = m_endKeyBeforeSubstituteArray[ctr]->eval(&m_dummy, NULL);
+            m_endKeyArray[ctr]->substitute(params);
+            NValue endKeyValue = m_endKeyArray[ctr]->eval(NULL, NULL);
             try {
                 m_endKey.setNValue(ctr, endKeyValue);
             }
@@ -284,14 +264,32 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     assert (m_index == m_targetTable->index(m_node->getTargetIndexName()));
     assert (m_index->isCountableIndex());
 
+    //
+    // COUNT NULL EXPRESSION
+    //
+    AbstractExpression* countNULLExpr = m_node->getSkipNullPredicate();
+    // For reverse scan edge case NULL values and forward scan underflow case.
+    if (countNULLExpr != NULL) {
+        countNULLExpr->substitute(params);
+        VOLT_DEBUG("COUNT NULL Expression:\n%s", countNULLExpr->debug(true).c_str());
+    }
+
+    bool reverseScanNullEdgeCase = false;
+    bool reverseScanMovedIndexToScan = false;
+    if (m_numOfSearchkeys < m_numOfEndkeys && (m_endType == INDEX_LOOKUP_TYPE_LT || m_endType == INDEX_LOOKUP_TYPE_LTE)) {
+        reverseScanNullEdgeCase = true;
+        VOLT_DEBUG("Index count: reverse scan edge null case." );
+    }
+
+
     // An index count has two cases: unique and non-unique
     int64_t rkStart = 0, rkEnd = 0, rkRes = 0;
     int leftIncluded = 0, rightIncluded = 0;
 
-    // Deal with multi-map
-    VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
-               localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
     if (m_numOfSearchkeys != 0) {
+        // Deal with multi-map
+        VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
+                   localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
         if (searchKeyUnderflow == false) {
             if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
                 rkStart = m_index->getCounterLET(&m_searchKey, true);
@@ -300,11 +298,34 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 if (m_index->hasKey(&m_searchKey)) {
                     leftIncluded = 1;
                     rkStart = m_index->getCounterLET(&m_searchKey, false);
+
+                    if (reverseScanNullEdgeCase) {
+                        m_index->moveToKeyOrGreater(&m_searchKey);
+                        reverseScanMovedIndexToScan = true;
+                    }
                 } else {
                     rkStart = m_index->getCounterLET(&m_searchKey, true);
                 }
             }
+        } else {
+            // Do not count null row or columns
+            m_index->moveToKeyOrGreater(&m_searchKey);
+            assert(countNULLExpr);
+            long numNULLs = countNulls(countNULLExpr);
+            rkStart += numNULLs;
+            VOLT_DEBUG("Index count[underflow case]: find out %ld null rows or columns are not counted in.", numNULLs);
+
         }
+    }
+    if (reverseScanNullEdgeCase) {
+        // reverse scan case
+        if (!reverseScanMovedIndexToScan && localLookupType != INDEX_LOOKUP_TYPE_GT) {
+            m_index->moveToEnd(true);
+        }
+        assert(countNULLExpr);
+        long numNULLs = countNulls(countNULLExpr);
+        rkStart += numNULLs;
+        VOLT_DEBUG("Index count[reverse case]: find out %ld null rows or columns are not counted in.", numNULLs);
     }
 
     if (m_numOfEndkeys != 0) {
@@ -335,6 +356,23 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     VOLT_DEBUG ("Index Count :\n %s", m_outputTable->debug().c_str());
     return true;
 }
+
+
+long IndexCountExecutor::countNulls(AbstractExpression * countNULLExpr) {
+    if (countNULLExpr == NULL) {
+        return 0;
+    }
+    long numNULLs = 0;
+    TableTuple tuple;
+    while ( ! (tuple = m_index->nextValue()).isNullTuple()) {
+         if ( ! countNULLExpr->eval(&tuple, NULL).isTrue()) {
+             break;
+         }
+        numNULLs++;
+    }
+    return numNULLs;
+}
+
 
 IndexCountExecutor::~IndexCountExecutor() {
     if (m_numOfSearchkeys != 0) {

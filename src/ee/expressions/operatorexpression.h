@@ -71,7 +71,17 @@ public:
 
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
         assert (m_left);
-        return m_left->eval(tuple1, tuple2).op_negate();
+        NValue operand = m_left->eval(tuple1, tuple2);
+        // NOT TRUE is FALSE
+        if (operand.isTrue()) {
+            return NValue::getFalse();
+        }
+        // NOT FALSE is TRUE
+        if (operand.isFalse()) {
+            return NValue::getTrue();
+        }
+        // NOT NULL is NULL
+        return operand;
     }
 
     std::string debugInfo(const std::string &spacer) const {

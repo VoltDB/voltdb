@@ -66,6 +66,7 @@ ElasticIndexReadContext::handleActivation(TableStreamType streamType)
         return ACTIVATION_FAILED;
     }
 
+    ElasticIndexHashRange range;
     if (!parseHashRange(m_predicateStrings, range)) {
         return ACTIVATION_FAILED;
     }
@@ -133,8 +134,16 @@ int64_t ElasticIndexReadContext::handleStreamMore(
             // or the byte count threshold is hit.
             bool yield = false;
             while (!yield) {
-                // Write the tuple.
-                yield = outputStreams.writeRow(getSerializer(), tuple);
+                // If the tuple is pending delete, it's held on by COW but
+                // shouldn't be accessable anymore. So don't write it to the
+                // output.
+                if (!tuple.isPendingDelete()) {
+                    // Write the tuple.
+                    yield = outputStreams.writeRow(getSerializer(), tuple);
+                } else {
+                    throwFatalException("Materializing a deleted tuple from the elastic context.");
+                }
+
                 if (!yield) {
                     if (!m_iter->next(tuple)) {
                         yield = true;
@@ -154,7 +163,6 @@ int64_t ElasticIndexReadContext::handleStreamMore(
         if (remaining <= 0) {
             m_materialized = true;
             deleteStreamedTuples();
-            scanAndCheck();
         }
     }
 
@@ -209,23 +217,6 @@ void ElasticIndexReadContext::deleteStreamedTuples()
     while (m_iter->next(tuple)) {
         if (!tuple.isPendingDelete()) {
             m_surgeon.deleteTuple(tuple);
-        }
-    }
-}
-
-void ElasticIndexReadContext::scanAndCheck()
-{
-    TableTuple tuple(getTable().schema());
-    boost::scoped_ptr<TableIterator> iter(getTable().makeIterator());
-    while(iter->next(tuple)) {
-        ElasticHash h = ElasticIndex::generateHash(getTable(), tuple);
-        if (range.getLowerBound() <= h && h <= range.getUpperBound()) {
-            char errMsg[1024 * 16];
-            snprintf(errMsg, 1024 * 16,
-                     "The following tuple with hash %d should be removed from the this partition "
-                     "because it falls into the range [%d, %d]: %s",
-                     h, range.getLowerBound(), range.getUpperBound(), tuple.debugNoHeader().c_str());
-            LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
         }
     }
 }

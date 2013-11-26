@@ -35,6 +35,7 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.rejoin.StreamSnapshotSink;
+import org.voltdb.rejoin.StreamSnapshotSink.RestoreWork;
 import org.voltdb.rejoin.TaskLog;
 
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
@@ -155,15 +156,9 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
      */
     private void runForBlockingDataTransfer(SiteProcedureConnection siteConnection)
     {
-        Pair<Integer, ByteBuffer> tableBlock = m_dataSink.poll(m_snapshotBufferAllocator);
-        if (tableBlock != null) {
-            if (JOINLOG.isTraceEnabled()) {
-                JOINLOG.trace(m_whoami + "restoring table " + tableBlock.getFirst() +
-                              " block of (" + tableBlock.getSecond().position() + "," +
-                              tableBlock.getSecond().limit() + ")");
-            }
-
-            restoreBlock(tableBlock, siteConnection);
+        RestoreWork restoreWork = m_dataSink.poll(m_snapshotBufferAllocator);
+        if (restoreWork != null) {
+            restoreBlock(restoreWork, siteConnection);
         }
 
         // The completion monitor may fire even if m_dataSink has not reached EOF in the case that there's no

@@ -1,6 +1,6 @@
 CREATE TABLE TU1 (
        ID INTEGER NOT NULL,
-       POINTS INTEGER NOT NULL,
+       POINTS INTEGER,
        PRIMARY KEY (ID)
 );
 partition table TU1 on column ID;
@@ -10,7 +10,7 @@ create assumeunique index idx3_U1_TREE on TU1 (POINTS + ID);
 
 CREATE TABLE TU2 (
        ID INTEGER NOT NULL ASSUMEUNIQUE,
-       POINTS INTEGER NOT NULL,
+       POINTS INTEGER,
        UNAME VARCHAR(10) NOT NULL,
        PRIMARY KEY (ID, UNAME)
 );
@@ -29,7 +29,7 @@ create index id2_T1_HASH on T1 (ID, POINTS);
 
 CREATE TABLE TU3 (
        ID INTEGER NOT NULL ASSUMEUNIQUE,
-       POINTS INTEGER NOT NULL,
+       POINTS INTEGER,
        TEL INTEGER NOT NULL,
        PRIMARY KEY (ID, TEL)
 );
@@ -39,7 +39,7 @@ create unique index idx2_U3_TREE on TU3 (POINTS + 100, TEL);
 
 CREATE TABLE TU4 (
        ID INTEGER NOT NULL ASSUMEUNIQUE,
-       POINTS INTEGER NOT NULL,
+       POINTS INTEGER,
        UNAME VARCHAR(10) NOT NULL,
        SEX TINYINT NOT NULL,
        PRIMARY KEY (ID, UNAME)
@@ -49,13 +49,13 @@ create unique index idx_U4_TREE on TU4 (UNAME,SEX,POINTS);
 
 CREATE TABLE TU5 (
         ID INTEGER NOT NULL,
-        POINTS FLOAT NOT NULL
+        POINTS FLOAT
 );
 create index idx_tu5_TREE on TU5 (ID, POINTS);
 
 CREATE TABLE TM1 (
        ID INTEGER NOT NULL,
-       POINTS INTEGER NOT NULL,
+       POINTS INTEGER,
        PRIMARY KEY (ID)
 );
 partition table TM1 on column ID;
@@ -63,7 +63,7 @@ create index idx_M1_TREE on TM1 (POINTS);
     
 CREATE TABLE TM2 (
        ID INTEGER NOT NULL ASSUMEUNIQUE,
-       POINTS INTEGER NOT NULL,
+       POINTS INTEGER,
        UNAME VARCHAR(10) NOT NULL,
        PRIMARY KEY (ID, UNAME)
 );

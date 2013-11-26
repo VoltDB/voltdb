@@ -22,16 +22,20 @@
  */
 package org.voltdb.iv2;
 
-import java.util.ArrayList;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -39,18 +43,14 @@ import org.json_voltpatches.JSONException;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
 import org.voltcore.messaging.HostMessenger;
-
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKTestBase;
 import org.voltcore.zk.ZKUtil;
-
 import org.voltdb.TheHashinator;
-import org.voltdb.compiler.ClusterConfig;
-
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.compiler.ClusterConfig;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -122,10 +122,11 @@ public class TestLeaderAppointer extends ZKTestBase {
 
     void createAppointer(boolean enablePPD) throws JSONException
     {
+        KSafetyStats stats = new KSafetyStats();
         m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
                 m_config.getReplicationFactor(), enablePPD,
                 null, false,
-                m_config.getTopology(m_hostIds), m_mpi);
+                m_config.getTopology(m_hostIds), m_mpi, stats);
         m_dut.onReplayCompletion();
     }
 
@@ -210,8 +211,10 @@ public class TestLeaderAppointer extends ZKTestBase {
         try {
             m_dut.acceptPromotion();
         }
-        catch (AssertionError ae) {
-            threw = true;
+        catch (ExecutionException e) {
+            if (e.getCause() instanceof AssertionError) {
+                threw = true;
+            }
         }
         assertTrue(threw);
         assertTrue(VoltDB.wasCrashCalled);
@@ -231,8 +234,10 @@ public class TestLeaderAppointer extends ZKTestBase {
         try {
             m_dut.acceptPromotion();
         }
-        catch (AssertionError ae) {
-            threw = true;
+        catch (ExecutionException e) {
+            if (e.getCause() instanceof AssertionError) {
+                threw = true;
+            }
         }
         assertTrue(threw);
         assertTrue(VoltDB.wasCrashCalled);
@@ -269,7 +274,8 @@ public class TestLeaderAppointer extends ZKTestBase {
         m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
                                     m_config.getReplicationFactor(), false,
                                     null, false,
-                                    m_config.getTopology(m_hostIds), m_mpi);
+                                    m_config.getTopology(m_hostIds), m_mpi,
+                                    new KSafetyStats());
         m_newAppointee.set(false);
         VoltDB.ignoreCrash = true;
         boolean threw = false;
@@ -399,6 +405,12 @@ public class TestLeaderAppointer extends ZKTestBase {
             Thread.sleep(0);
         }
         assertEquals(1L, (long)m_cache.pointInTimeCache().get(0));
+
+        // Add a new partition with two replicas, see if the newly elected leader appointer picks up the new
+        // partition and elects a new leader
+        addReplica(2, 4L);
+        addReplica(2, 5L);
+        waitForAppointee(2);
     }
 
     @Test
