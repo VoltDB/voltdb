@@ -30,6 +30,7 @@ import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
@@ -59,6 +60,8 @@ import com.google.common.primitives.Longs;
 
 public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 {
+    static final VoltLogger tmLog = new VoltLogger("TM");
+
     static class DuplicateCounterKey implements Comparable<DuplicateCounterKey>
     {
         private final long m_txnId;
@@ -1017,5 +1020,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
         }
         return new CountDownLatch(0);
+    }
+
+    @Override
+    public void dump()
+    {
+        m_replaySequencer.dump(m_mailbox.getHSId());
+        tmLog.info(String.format("%s: %s", CoreUtils.hsIdToString(m_mailbox.getHSId()), m_pendingTasks));
     }
 }
