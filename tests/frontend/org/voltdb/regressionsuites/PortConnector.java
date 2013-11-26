@@ -65,7 +65,6 @@ public class PortConnector {
 
     public void read(ByteBuffer buf, long sz) throws IOException {
 
-        buf.position(0);
         while (buf.hasRemaining()) {
             m_socket.read(buf);
         }

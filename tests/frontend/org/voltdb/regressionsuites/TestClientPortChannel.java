@@ -70,7 +70,7 @@ public class TestClientPortChannel extends TestCase {
 
             m_config.startUp();
 
-            Thread.currentThread().sleep(10000);
+            Thread.currentThread().sleep(5000);
         } catch (IOException ex) {
             fail(ex.getMessage());
         } finally {
@@ -83,7 +83,6 @@ public class TestClientPortChannel extends TestCase {
      */
     @Override
     public void tearDown() throws Exception {
-
         if (channel != null) {
             channel.close();
         }
@@ -91,6 +90,44 @@ public class TestClientPortChannel extends TestCase {
     }
 
     public void testClientPortChannel() throws Exception {
+    }
+
+    public void doLoginAndClose() throws Exception {
+        System.out.println("Testing valid login message");
+        channel.connect();
+        ByteBuffer buf = ByteBuffer.allocate(41);
+        buf.putInt(37);
+        buf.put((byte) '0');
+        buf.putInt(8);
+        buf.put("database".getBytes("UTF-8"));
+        buf.putInt(0);
+        buf.put("".getBytes("UTF-8"));
+        buf.put(ConnectionUtil.getHashedPassword(""));
+        buf.flip();
+        channel.write(buf);
+
+        ByteBuffer resp = ByteBuffer.allocate(4);
+        channel.read(resp, 4);
+        resp.flip();
+        int length = resp.getInt();
+        resp = ByteBuffer.allocate(length);
+        channel.read(resp, length);
+        resp.flip();
+
+        byte code = resp.get();
+        assertEquals(code, 0);
+        byte rcode = resp.get();
+        assertEquals(rcode, 0);
+        resp.getInt();
+        resp.getLong();
+        resp.getLong();
+        resp.getInt();
+        int buildStringLength = resp.getInt();
+        byte buildStringBytes[] = new byte[buildStringLength];
+        resp.get(buildStringBytes);
+
+        System.out.println("Authenticated to server: " + new String(buildStringBytes, "UTF-8"));
+        channel.close();
     }
 
     public void testClientPortChannelBadLoginMessage() throws Exception {
@@ -137,40 +174,32 @@ public class TestClientPortChannel extends TestCase {
         channel.write(buf);
         channel.close();
 
-        System.out.println("Testing valid login message");
+        //login message with bad service
         channel.connect();
-        buf = ByteBuffer.allocate(43);
-        buf.putInt(36);
+        buf = ByteBuffer.allocate(41);
+        buf.putInt(37);
         buf.put((byte) '0');
         buf.putInt(8);
-        buf.put("database".getBytes());
+        buf.put("datacase".getBytes("UTF-8"));
         buf.putInt(0);
-        buf.put("".getBytes());
+        buf.put("".getBytes("UTF-8"));
         buf.put(ConnectionUtil.getHashedPassword(""));
-
-        buf.position(0);
+        buf.flip();
         channel.write(buf);
 
         ByteBuffer resp = ByteBuffer.allocate(4);
-        channel.read(buf, 4);
-        int length = resp.getInt();
-        resp = ByteBuffer.allocate(length);
-        channel.read(buf, length);
-        resp.flip();
-
-        byte code = resp.get();
-        assertEquals(code, 0);
-        resp.getInt();
-        resp.getLong();
-        resp.getLong();
-        resp.getInt();
-        int buildStringLength = resp.getInt();
-        byte buildStringBytes[] = new byte[buildStringLength];
-        resp.get(buildStringBytes);
-
-        System.out.println("Authenticated to server: " + buildStringBytes);
+        boolean excalled = false;
+        try {
+            channel.read(resp, 4);
+        } catch (IOException ioex) {
+            //Should get called;
+            excalled = true;
+        }
+        assertTrue(excalled);
         channel.close();
 
+        //Make sure server is up and we can login/connect
+        doLoginAndClose();
 
     }
 
