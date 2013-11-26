@@ -338,8 +338,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         Future<BBContainer> compressionTask = null;
         if (prependLength) {
             BBContainer cont =
-                    DBBPool.allocateDirectAndPool(
-                            CompressionService.maxCompressedLength(SnapshotSiteProcessor.m_snapshotBufferLength));
+                    DBBPool.allocateDirectAndPool(SnapshotSiteProcessor.m_snapshotBufferCompressedLen);
             //Skip 4-bytes so the partition ID is not compressed
             //That way if we detect a corruption we know what partition is bad
             tupleData.b.position(tupleData.b.position() + 4);
