@@ -1289,7 +1289,7 @@ public class DDLCompiler {
      * @param functionId
      * @return
      */
-    public static boolean containsFunctionExpression(AbstractExpression expr, int functionId) {
+    public static boolean containsTimeSensitiveFunction(AbstractExpression expr, int functionId) {
         if (expr == null || expr instanceof TupleValueExpression) {
             return false;
         }
@@ -1325,7 +1325,7 @@ public class DDLCompiler {
                 for (VoltXMLElement exprNode : subNode.children) {
                     AbstractExpression expr = dummy.parseExpressionTree(exprNode);
 
-                    if (containsFunctionExpression(expr, FunctionSQL.voltGetCurrentTimestampId()) ) {
+                    if (containsTimeSensitiveFunction(expr, FunctionSQL.voltGetCurrentTimestampId()) ) {
                         String msg = String.format("Index %s cannot include the function NOW or CURRENT_TIMESTAMP.", name);
                         throw this.m_compiler.new VoltCompilerException(msg);
                     }
@@ -1905,7 +1905,7 @@ public class DDLCompiler {
         checkExpressions.add(where);
 
         for (AbstractExpression expr: checkExpressions) {
-            if (containsFunctionExpression(expr, FunctionSQL.voltGetCurrentTimestampId())) {
+            if (containsTimeSensitiveFunction(expr, FunctionSQL.voltGetCurrentTimestampId())) {
                 msg += "cannot include the function NOW or CURRENT_TIMESTAMP.";
                 throw m_compiler.new VoltCompilerException(msg);
             }

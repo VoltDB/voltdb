@@ -1995,11 +1995,11 @@ public class TestVoltCompiler extends TestCase {
     {
         // Test MatView.
         String ddl = "";
-        String errorMatviewHavingMsg = "Materialized view \"MY_VIEW\" with ORDER BY clause is not supported.";
+        String errorMatviewOrderByMsg = "Materialized view \"MY_VIEW\" with ORDER BY clause is not supported.";
 
         ddl = "create table t(id integer not null, num integer);\n" +
                 "create view my_view as select num, count(*) from t group by num order by num;";
-        checkDDLErrorMessage(ddl, errorMatviewHavingMsg);
+        checkDDLErrorMessage(ddl, errorMatviewOrderByMsg);
     }
 
     public void testPartitionOnBadType() {
