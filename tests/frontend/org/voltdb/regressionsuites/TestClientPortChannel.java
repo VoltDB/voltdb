@@ -36,7 +36,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestClientPortChannel extends TestCase {
 
-    PortConnector channel;
     int rport;
     LocalCluster m_config;
 
@@ -52,7 +51,6 @@ public class TestClientPortChannel extends TestCase {
     public void setUp() throws Exception {
         rport = SecureRandom.getInstance("SHA1PRNG").nextInt(2000) + 22000;
         System.out.println("Random Client port is: " + rport);
-        channel = new PortConnector("localhost", rport);
         try {
             //Build the catalog
             VoltProjectBuilder builder = new VoltProjectBuilder();
@@ -83,18 +81,13 @@ public class TestClientPortChannel extends TestCase {
      */
     @Override
     public void tearDown() throws Exception {
-        if (channel != null) {
-            channel.close();
-        }
         m_config.shutDown();
     }
 
     public void testClientPortChannel() throws Exception {
     }
 
-    public void doLoginAndClose() throws Exception {
-        System.out.println("Testing valid login message");
-        channel.connect();
+    public void login(PortConnector conn) throws Exception {
         ByteBuffer buf = ByteBuffer.allocate(41);
         buf.putInt(37);
         buf.put((byte) '0');
@@ -104,14 +97,14 @@ public class TestClientPortChannel extends TestCase {
         buf.put("".getBytes("UTF-8"));
         buf.put(ConnectionUtil.getHashedPassword(""));
         buf.flip();
-        channel.write(buf);
+        conn.write(buf);
 
         ByteBuffer resp = ByteBuffer.allocate(4);
-        channel.read(resp, 4);
+        conn.read(resp, 4);
         resp.flip();
         int length = resp.getInt();
         resp = ByteBuffer.allocate(length);
-        channel.read(resp, length);
+        conn.read(resp, length);
         resp.flip();
 
         byte code = resp.get();
@@ -127,11 +120,19 @@ public class TestClientPortChannel extends TestCase {
         resp.get(buildStringBytes);
 
         System.out.println("Authenticated to server: " + new String(buildStringBytes, "UTF-8"));
+    }
+
+    public void doLoginAndClose() throws Exception {
+        System.out.println("Testing valid login message");
+        PortConnector channel = new PortConnector("localhost", rport);
+        channel.connect();
+        login(channel);
         channel.close();
     }
 
     public void testClientPortChannelBadLoginMessage() throws Exception {
         //Just connect and disconnect
+        PortConnector channel = new PortConnector("localhost", rport);
         System.out.println("Testing Connect and Close");
         for (int i = 0; i < 100; i++) {
             channel.connect();
@@ -201,6 +202,42 @@ public class TestClientPortChannel extends TestCase {
         //Make sure server is up and we can login/connect
         doLoginAndClose();
 
+    }
+
+    public void testInvocation() throws Exception {
+        PortConnector channel = new PortConnector("localhost", rport);
+        channel.connect();
+
+        //Send invocation message before login.
+        login(channel);
+
+        //Now start testing combinations of invocation messages.
+        byte pingr[] = {'0', //Version
+            '0', '0', '0', '4', 'P', 'i', 'n', 'g', //proc string length and name
+            '0', '0', '0', '0', '0', '0', '0', '0', //Client Data
+            '0', '0'
+        };
+        ByteBuffer buf = ByteBuffer.allocate(pingr.length + 4);
+        buf.putInt(pingr.length);
+        buf.put(pingr);
+        buf.flip();
+
+        channel.write(buf);
+
+        ByteBuffer lenbuf = ByteBuffer.allocate(4);
+        channel.read(lenbuf, 4);
+        lenbuf.flip();
+        int len = lenbuf.getInt();
+        System.out.println("Response length is: " + len);
+
+        //Start with a good Ping procedure invocation.
+        //With bad message length of various shapes and sizes
+        //Bad protocol version
+        //Procedure name length mismatch
+        //Procedure name length toooooo long
+        //Client Data - Bad Data
+        //too big cient data
+        //Invalid invocation params.
     }
 
 }
