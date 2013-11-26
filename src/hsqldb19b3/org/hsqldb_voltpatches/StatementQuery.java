@@ -388,7 +388,7 @@ public class StatementQuery extends StatementDMQL {
                 orderByCols.add(expr);
             } else if (expr.equals(select.havingCondition)) {
                 // Having
-                if( (expr instanceof ExpressionLogical && expr.isAggregate && expr.alias == null) == false) {
+                if( !(expr instanceof ExpressionLogical && expr.isAggregate) ) {
                     throw new HSQLParseException("VoltDB does not support HAVING clause without aggregation. " +
                             "Consider using WHERE clause if possible");
                 }

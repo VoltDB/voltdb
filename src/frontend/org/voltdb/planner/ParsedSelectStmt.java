@@ -530,7 +530,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
-    private void updateAvgExpresions () {
+    private void updateAvgExpressions () {
         List<AbstractExpression> optimalAvgAggs = new ArrayList<AbstractExpression>();
         Iterator<AbstractExpression> itr = aggregationList.iterator();
         while(itr.hasNext()) {
@@ -605,7 +605,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             assert(col.expression != null);
             if (isDistributed) {
                 col.expression = col.expression.replaceAVG();
-                updateAvgExpresions();
+                updateAvgExpressions();
             }
             ExpressionUtil.finalizeValueTypes(col.expression);
 
@@ -720,7 +720,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         assert(order_exp != null);
         if (isDistributed) {
             order_exp = order_exp.replaceAVG();
-            updateAvgExpresions();
+            updateAvgExpressions();
         }
         order_col.expression = order_exp;
         ExpressionUtil.finalizeValueTypes(order_col.expression);
@@ -794,7 +794,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         assert(having != null);
         if (isDistributed) {
             having = having.replaceAVG();
-            updateAvgExpresions();
+            updateAvgExpressions();
         }
         ExpressionUtil.finalizeValueTypes(having);
         if (aggregationList.size() >= 1) {

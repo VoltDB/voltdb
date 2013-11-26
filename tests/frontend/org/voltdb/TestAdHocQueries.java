@@ -610,17 +610,6 @@ public class TestAdHocQueries extends AdHocQueryTester {
             catch (ProcCallException pcex) {
                 assertTrue(pcex.getMessage().indexOf("unexpected token: FROM") > 0);
             }
-            adHocQuery = "SELECT PNUM \n" +
-                    "          FROM WORKS \n" +
-                    "          WHERE PNUM > 'P1' \n" +
-                    "          GROUP BY PNUM \n" +
-                    "          HAVING COUNT(*) > 1;";
-            try {
-                env.m_client.callProcedure("@AdHoc", adHocQuery);
-            }
-            catch (ProcCallException pcex) {
-                fail();
-            }
         }
         finally {
             env.tearDown();

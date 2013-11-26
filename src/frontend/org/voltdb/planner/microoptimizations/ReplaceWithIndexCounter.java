@@ -90,8 +90,8 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
             if (((SeqScanPlanNode)child).getPredicate() != null) {
                 return plan;
             }
-            if (aggplan.getPostPredicate() != null) {
-                AbstractExpression postPredicate = aggplan.getPostPredicate();
+            AbstractExpression postPredicate = aggplan.getPostPredicate();
+            if (postPredicate != null) {
                 List<AbstractExpression> aggList = postPredicate.findAllSubexpressionsOfClass(AggregateExpression.class);
 
                 boolean allCountStar = true;
