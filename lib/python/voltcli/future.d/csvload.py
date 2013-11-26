@@ -27,4 +27,4 @@
 
 @VOLT.Command(description = 'Load CSV data. Run without arguments for usage.')
 def csvload(self, runner):
-    runner.java.execute('org.voltdb.utils.CSVLoader', None, *runner.args)
+    runner.java_execute('org.voltdb.utils.CSVLoader', None, *runner.args)

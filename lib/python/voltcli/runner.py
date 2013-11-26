@@ -119,6 +119,12 @@ class JavaRunner(object):
     def execute(self, java_class, java_opts_override, *args, **kwargs):
         """
         Run a Java command line with option overrides.
+        Supported keyword arguments:
+            classpath           Java classpath.
+            daemon              Run as background (daemon) process if True.
+            daemon_name         Daemon name.
+            daemon_description  Daemon description for messages.
+            daemon_output       Output directory for PID files and stdout/error capture.
         """
         self.initialize()
         classpath = self.classpath
@@ -135,7 +141,12 @@ class JavaRunner(object):
         for arg in args:
             if arg is not None:
                 java_args.append(arg)
-        return utility.run_cmd(*java_args)
+        daemonizer = utility.kwargs_get(kwargs, 'daemonizer')
+        if daemonizer:
+            # Does not return if successful.
+            daemonizer.start_daemon(*java_args)
+        else:
+            return utility.run_cmd(*java_args)
 
     def compile(self, outdir, *srcfiles):
         """
@@ -404,6 +415,46 @@ class VerbRunner(object):
         utility.verbose_info(response)
         return utility.VoltResponseWrapper(response)
 
+    def java_execute(self, java_class, java_opts_override, *args, **kwargs):
+        """
+        Execute a Java program.
+        """
+        if utility.kwargs_get_boolean(kwargs, 'daemon', default=False):
+            kwargs['daemonizer'] = self._get_daemonizer(**kwargs)
+        self.java.execute(java_class, java_opts_override, *args, **kwargs)
+
+    def setup_daemon_kwargs(self, kwargs, name=None, description=None, output=None):
+        """
+        Initialize daemon keyword arguments.
+        """
+        # Build the name, using the host option if available.
+        names = []
+        if name:
+            names.append(name)
+        if hasattr(self.opts, 'host'):
+            names.append(self.opts.host.replace(':', '_'))
+        if not names:
+            names.append('server')
+        daemon_name = ''.join(names)
+        # Default daemon output directory to the state directory, which is
+        # frequently set to ~/.<command_name>.
+        daemon_output = output
+        if daemon_output is None:
+            daemon_output = utility.get_state_directory()
+        # Provide a generic description if one wasn't provided.
+        daemon_description = description
+        if daemon_description is None:
+            daemon_description = "server"
+        kwargs['daemon'] = True
+        kwargs['daemon_name'] = daemon_name
+        kwargs['daemon_description'] = daemon_description
+        kwargs['daemon_output'] = daemon_output
+
+    def create_daemonizer(self, name=None, description=None, output=None):
+        kwargs = {}
+        self.setup_daemon_kwargs(kwargs, name=name, description=description, output=output)
+        return self._get_daemonizer(**kwargs)
+
     def _print_verb_help(self, verb_name):
         # Internal method to display help for a verb
         verb = self.verbspace.verbs[verb_name]
@@ -455,6 +506,16 @@ runner.main('%(name)s', '', '%(version)s', '%(description)s',
             if show_help:
                 self.help()
         sys.exit(1)
+
+    def _get_daemonizer(self, **kwargs):
+        """
+        Scan keyword arguments for daemon-related options (and strip them
+        out). Return a daemonizer.
+        """
+        name = utility.kwargs_get_string(kwargs, 'daemon_name', default=environment.command_name)
+        description = utility.kwargs_get_string(kwargs, 'daemon_description', default=False)
+        output = utility.kwargs_get_string(kwargs, 'daemon_output', default=environment.command_dir)
+        return utility.Daemonizer(name, description, output=output)
 
 #===============================================================================
 class VOLT(object):
@@ -591,9 +652,12 @@ def main(command_name, command_dir, version, description, *args, **kwargs):
     Called by running script to execute command with command line arguments.
     """
     # The "package" keyword flags when running from a package zip __main__.py.
-    package = utility.kwargs_get_boolean(kwargs, 'package', default = False)
+    package = utility.kwargs_get_boolean(kwargs, 'package', default=False)
     # The "standalone" keyword allows environment.py to skip the library search.
-    standalone = utility.kwargs_get_boolean(kwargs, 'standalone', default = False)
+    standalone = utility.kwargs_get_boolean(kwargs, 'standalone', default=False)
+    # The "state_directory" keyword overrides ~/.<command_name> as the
+    # directory used for runtime state files.
+    state_directory = utility.kwargs_get_string(kwargs, 'state_directory', default=None)
     try:
         # Pre-scan for verbose, debug, and dry-run options so that early code
         # can display verbose and debug messages, and obey dry-run.
@@ -608,6 +672,12 @@ def main(command_name, command_dir, version, description, *args, **kwargs):
 
         # Initialize the environment
         environment.initialize(standalone, command_name, command_dir, version)
+
+        # Initialize the state directory (for runtime state files).
+        if state_directory is None:
+            state_directory = '~/.%s' % environment.command_name
+        state_directory = os.path.expandvars(os.path.expanduser(state_directory))
+        utility.set_state_directory(state_directory)
 
         # Search for modules based on both this file's and the calling script's location.
         verbspace = load_verbspace(command_name, command_dir, config, version,

@@ -25,14 +25,17 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+import signal
+from voltcli import utility
+
 @VOLT.Command(
-    bundles = VOLT.ServerBundle('add',
-                                needs_catalog=False,
-                                supports_live=False,
-                                default_host=False,
-                                safemode_available=False,
-                                supports_daemon=True),
-    description = 'Add the current node to a VoltDB cluster.'
+    description = 'Stop a VoltDB server daemon.',
+    options = [
+        VOLT.StringOption('-H', '--host', 'host',
+            'HOST[:PORT] (default HOST=localhost, PORT=3021)',
+            default='localhost:3021'),
+    ]
 )
-def add(runner):
-    runner.go()
+def stop(runner):
+    daemonizer = runner.create_daemonizer(description="VoltDB server")
+    daemonizer.stop_daemon()
