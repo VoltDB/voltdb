@@ -662,6 +662,27 @@ public class TestVoltTable extends TestCase {
         item_data.addRow("asdfsdgfsdg", 123L, "a", 45.0d, 656.2d);
     }
 
+    public void testGetSchema() {
+        VoltTable item_data_template = new VoltTable(new ColumnInfo("i_name",
+                VoltType.STRING),
+                new ColumnInfo("s_quantity", VoltType.BIGINT), new ColumnInfo(
+                        "brand_generic", VoltType.STRING), new ColumnInfo(
+                        "i_price", VoltType.FLOAT), new ColumnInfo("ol_amount",
+                        VoltType.FLOAT));
+        ColumnInfo[] cols = item_data_template.getTableSchema();
+        assertEquals(5, cols.length);
+        assertEquals("i_name", cols[0].name);
+        assertEquals("s_quantity", cols[1].name);
+        assertEquals("brand_generic", cols[2].name);
+        assertEquals("i_price", cols[3].name);
+        assertEquals("ol_amount", cols[4].name);
+        assertEquals(VoltType.STRING, cols[0].type);
+        assertEquals(VoltType.BIGINT, cols[1].type);
+        assertEquals(VoltType.STRING, cols[2].type);
+        assertEquals(VoltType.FLOAT, cols[3].type);
+        assertEquals(VoltType.FLOAT, cols[4].type);
+    }
+
     public void testRowIterator() {
 
         // Test iteration of empty table

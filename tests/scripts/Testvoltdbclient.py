@@ -180,10 +180,6 @@ class TestFastSerializer(unittest.TestCase):
         for i in self.decimalArray:
             self.sendAndCompare(self.fs.VOLTTYPE_DECIMAL, i)
 
-    # def testDecimalString(self):
-    #     for i in self.decimalArray:
-    #         self.sendAndCompare(self.fs.VOLTTYPE_DECIMAL_STRING, i)
-
     def testArray(self):
         self.fs.writeByte(self.ARRAY_BEGIN)
         self.fs.prependLength()
@@ -196,8 +192,6 @@ class TestFastSerializer(unittest.TestCase):
         self.sendArrayAndCompare(self.fs.VOLTTYPE_STRING, self.stringArray)
         self.sendArrayAndCompare(self.fs.VOLTTYPE_TIMESTAMP, self.dateArray)
         self.sendArrayAndCompare(self.fs.VOLTTYPE_DECIMAL, self.decimalArray)
-        # self.sendArrayAndCompare(self.fs.VOLTTYPE_DECIMAL_STRING,
-        #                          self.decimalArray)
 
         self.fs.writeByte(self.ARRAY_END)
         self.fs.prependLength()
