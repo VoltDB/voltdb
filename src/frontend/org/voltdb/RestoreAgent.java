@@ -636,11 +636,11 @@ SnapshotCompletionInterest
                         for (Integer cmdpart : cmdlogmap.keySet()) {
                             Long snaptxnId = snapmap.get(cmdpart);
                             if (snaptxnId == null) {
-                                info = null;
                                 m_snapshotLogStr.append("\nRejected snapshot ")
                                                 .append(info.nonce)
                                                 .append(" due to missing partition: ")
                                                 .append(cmdpart);
+                                info = null;
                                 break;
                             }
                             else if (snaptxnId < cmdlogmap.get(cmdpart)) {
