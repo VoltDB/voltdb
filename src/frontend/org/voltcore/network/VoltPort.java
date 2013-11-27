@@ -19,20 +19,14 @@ package org.voltcore.network;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.CoreUtils;
-import org.voltcore.network.ReverseDNSCache;
 
 /** Encapsulates a socket registration for a VoltNetwork */
 public class VoltPort implements Connection
@@ -180,7 +174,19 @@ public class VoltPort implements Connection
                      * and pass them off to the input handler.
                      */
                     while ((message = m_handler.retrieveNextMessage( this )) != null) {
-                        m_handler.handleMessage( message, this);
+                        long callId = 0;
+                        try {
+                            if (LongCallbackWatchdog.ENABLED) {
+                                callId = LongCallbackWatchdog.startTiming();
+                            }
+
+                            m_handler.handleMessage( message, this);
+                        }
+                        finally {
+                            if (LongCallbackWatchdog.ENABLED) {
+                                LongCallbackWatchdog.stopTiming(callId);
+                            }
+                        }
                         m_messagesRead++;
                     }
                 }
