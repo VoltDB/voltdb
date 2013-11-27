@@ -703,12 +703,13 @@ public class TestFunctionsSuite extends RegressionSuite {
         Client client = getClient();
         ClientResponse cr = null;
         VoltTable vt = null;
-        Date time = null;
-        long epsilonMicros = 100 * 1000;
+        Date before = null;
+        Date after = null;
 
         // Test Default value with functions.
+        before = new Date();
         cr = client.callProcedure("@AdHoc", "Insert into R_TIME (ID) VALUES(1);");
-        time = new Date();
+        after = new Date();
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         vt = client.callProcedure("@AdHoc", "SELECT C1, T1, T2, T3 FROM R_TIME WHERE ID = 1;").getResults()[0];
         assertTrue(vt.advanceRow());
@@ -716,16 +717,17 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(2, vt.getLong(0));
         // Test NULL
 
-        assertTrue(time.getTime()*1000 - vt.getTimestampAsLong(2) >= 0);
-        assertTrue(time.getTime()*1000 - vt.getTimestampAsLong(2) < epsilonMicros);
+        assertTrue(after.getTime()*1000 >= vt.getTimestampAsLong(2));
+        assertTrue(before.getTime()*1000 <= vt.getTimestampAsLong(2));
         assertEquals(vt.getTimestampAsLong(2), vt.getTimestampAsLong(3));
 
+        before = new Date();
         vt = client.callProcedure("@AdHoc", "SELECT NOW, CURRENT_TIMESTAMP FROM R_TIME;").getResults()[0];
-        time = new Date();
+        after = new Date();
         assertTrue(vt.advanceRow());
 
-        assertTrue(time.getTime()*1000 - vt.getTimestampAsLong(0) >= 0);
-        assertTrue(time.getTime()*1000 - vt.getTimestampAsLong(0) < epsilonMicros);
+        assertTrue(after.getTime()*1000 >= vt.getTimestampAsLong(0));
+        assertTrue(before.getTime()*1000 <= vt.getTimestampAsLong(0));
         assertEquals(vt.getTimestampAsLong(0), vt.getTimestampAsLong(1));
     }
 

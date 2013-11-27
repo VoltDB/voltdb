@@ -569,20 +569,20 @@ void NValue::streamTimestamp(std::stringstream& value) const
     value << mbstr;
 }
 
-inline static void throwTimestampFormatError(const char* str)
+inline static void throwTimestampFormatError(const std::string &str)
 {
     char message[4096];
     // No space separator for between the date and time
     snprintf(message, 4096, "Attempted to cast \'%s\' to type %s failed. Supported format: \'YYYY-MM-DD HH:MM:SS.UUUUUU\'",
-             str, valueToString(VALUE_TYPE_TIMESTAMP).c_str());
+             str.c_str(), valueToString(VALUE_TYPE_TIMESTAMP).c_str());
     throw SQLException(SQLException::dynamic_sql_error, message);
 }
 
 
-int64_t NValue::parseTimestampString(const char* str)
+int64_t NValue::parseTimestampString(const std::string &str)
 {
     // date_str
-    std::string date_str = str;
+    std::string date_str(str);
     // This is the std:string API for "ltrim".
     date_str.erase(date_str.begin(), std::find_if(date_str.begin(), date_str.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
     std::size_t sep_pos = date_str.find(' ');
