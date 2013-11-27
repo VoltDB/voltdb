@@ -645,7 +645,7 @@ class NValue {
         m_sourceInlined = sourceInlined;
     }
 
-    void tagAsNull() { m_data[8] = OBJECTLENGTH_NULL; }
+    void tagAsNull() { m_data[13] = OBJECT_NULL_BIT; }
 
     /**
      * An Object is something like a String that has a variable length
@@ -747,23 +747,18 @@ class NValue {
      * Get a pointer to the value of an Object that lies beyond the storage of the length information
      */
     void* getObjectValue() const {
-        if (*reinterpret_cast<void* const*>(m_data) == NULL) {
+        if (isNull()) {
             return NULL;
-        } else if(*reinterpret_cast<const int32_t*>(&m_data[8]) == OBJECTLENGTH_NULL) {
-            return NULL;
-        } else {
-            void* value;
-            if (m_sourceInlined)
-            {
-                value = *reinterpret_cast<char* const*>(m_data) + getObjectLengthLength();
-            }
-            else
-            {
-                StringRef* sref = *reinterpret_cast<StringRef* const*>(m_data);
-                value = sref->get() + getObjectLengthLength();
-            }
-            return value;
         }
+        void* value;
+        if (m_sourceInlined) {
+            value = *reinterpret_cast<char* const*>(m_data) + getObjectLengthLength();
+        }
+        else {
+            StringRef* sref = *reinterpret_cast<StringRef* const*>(m_data);
+            value = sref->get() + getObjectLengthLength();
+        }
+        return value;
     }
 
     // getters
@@ -2612,6 +2607,9 @@ inline void NValue::deserializeFromAllocateForStorage(SerializeInput &input, Poo
 inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeInput &input, Pool *dataPool)
 {
     setValueType(type);
+    // Parameter array NValue elements are reused from one executor call to the next,
+    // so these NValues need to forget they were ever null.
+    m_data[13] = 0; // effectively, this is tagAsNonNull()
     switch (type) {
     case VALUE_TYPE_BIGINT:
         getBigInt() = input.readLong();
@@ -2804,14 +2802,7 @@ inline void NValue::allocateObjectFromInlinedValue(Pool* stringPool)
     assert(m_valueType == VALUE_TYPE_VARCHAR || m_valueType == VALUE_TYPE_VARBINARY);
     assert(m_sourceInlined);
 
-    // Not sure why there need to be two ways to signify NULL,
-    // maybe it simplifies value transfer from inline tuple storage
-    // to be able to use the second object-length-based form,
-    // but since this is how isNull works, do likewise.
-    if (*reinterpret_cast<void* const*>(m_data) == NULL ||
-        *reinterpret_cast<const int32_t*>(&m_data[8]) == OBJECTLENGTH_NULL) {
-        // Standardize on the more direct NULL representation.
-        // The object-length-based form of NULL appears to only be expected for inlined values.
+    if (isNull()) {
         *reinterpret_cast<void**>(m_data) = NULL;
         // serializeToTupleStorage fusses about this inline flag being set, even for NULLs
         setSourceInlined(false);
@@ -2840,7 +2831,7 @@ inline bool NValue::isNull() const {
         min.SetMin();
         return getDecimal() == min;
     }
-    return m_data[8] == OBJECTLENGTH_NULL;
+    return m_data[13] == OBJECT_NULL_BIT;
 }
 
 inline bool NValue::isNaN() const {
