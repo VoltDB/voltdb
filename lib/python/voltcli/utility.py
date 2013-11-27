@@ -448,8 +448,8 @@ class Daemonizer(daemon.Daemon):
 
     def __init__(self, name, description, output=None):
         """
-        Constructor. The optional 'output_dir' keyword specifies an override
-        to the default ~/.command_name output directory.
+        Constructor. The optional "output" keyword specifies an override to
+        the default ~/.command_name output directory.
         """
         self.name = name
         self.description = description
