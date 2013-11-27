@@ -459,12 +459,7 @@ class Daemonizer(daemon.Daemon):
         pid = os.path.join(self.output_dir, '%s.pid' % name)
         out = os.path.join(self.output_dir, '%s.out' % name)
         err = os.path.join(self.output_dir, '%s.err' % name)
-        for path in (out, err):
-            if os.path.exists(path):
-                try:
-                    os.remove(path)
-                except (IOError, OSError), e:
-                    abort('Unable to remove the existing output file "%s".' % path, e)
+        self.output_files = [out, err]
         daemon.Daemon.__init__(self, pid, stdout=out, stderr=err)
         # Clean up PID files of defunct processes.
         self.purge_defunct()
@@ -473,6 +468,13 @@ class Daemonizer(daemon.Daemon):
         """
         Start a daemon process.
         """
+        # Replace existing output files.
+        for path in self.output_files:
+            if os.path.exists(path):
+                try:
+                    os.remove(path)
+                except (IOError, OSError), e:
+                    abort('Unable to remove the existing output file "%s".' % path, e)
         try:
             info('Starting %s in the background...' % (self.description), [
                     'Output files are in "%s".' % self.output_dir
