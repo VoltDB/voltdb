@@ -854,6 +854,7 @@ JAR BUILDING
             <include name="org/json_voltpatches/**" />
             <include name="javax/annotation_voltpatches/**" />
             <include name="com/google_voltpatches/**" />
+            <include name="org/cliffc_voltpatches/**" />
             <include name="org/apache/hadoop_voltpatches/**" />
             <include name="org/apache/cassandra_voltpatches/MurmurHash3.class"/>
             <include name="vanilla/**" />
