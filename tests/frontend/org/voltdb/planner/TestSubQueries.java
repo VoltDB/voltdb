@@ -34,6 +34,7 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
+import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
@@ -131,7 +132,8 @@ public class TestSubQueries   extends PlannerTestCase {
             assertTrue(n instanceof SeqScanPlanNode);
             assertEquals("TEMP", ((SeqScanPlanNode) n).getTargetTableName());
             n = n.getChild(0);
-            assertTrue(n instanceof IndexScanPlanNode);
+            assertTrue(n instanceof ProjectionPlanNode);
+            assertTrue(n.getChild(0) instanceof IndexScanPlanNode);
         }
 
         {
@@ -208,7 +210,8 @@ public class TestSubQueries   extends PlannerTestCase {
             assertEquals("TEMP", ((SeqScanPlanNode) n).getTargetTableName());
             assertEquals(1, n.getChildCount());
             n = n.getChild(0);
-            assertTrue(n instanceof IndexScanPlanNode);
+            assertTrue(n instanceof ProjectionPlanNode);
+            assertTrue(n.getChild(0) instanceof IndexScanPlanNode);
         }
     }
 

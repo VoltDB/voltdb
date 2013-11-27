@@ -1998,22 +1998,41 @@ public class PlanAssembler {
      * @return the plan without the send/receive pair.
      */
     private AbstractPlanNode removeCoordinatorSendReceivePair(AbstractPlanNode root) {
-        if (root instanceof ReceivePlanNode) {
-            if (root.getChildCount() == 1) {
-                AbstractPlanNode child = root.getChild(0);
+        assert(root != null);
+        return removeCoordinatorSendReceivePairRecurcive(root, root);
+    }
+
+    private AbstractPlanNode removeCoordinatorSendReceivePairRecurcive(AbstractPlanNode root, AbstractPlanNode current) {
+        if (current instanceof ReceivePlanNode) {
+            if (current.getChildCount() == 1) {
+                AbstractPlanNode child = current.getChild(0);
                 if (child instanceof SendPlanNode) {
                     assert(child.getChildCount() == 1);
-                    root = child.getChild(0);
-                    root.clearParents();
+                    child = child.getChild(0);
+                    if (child instanceof ProjectionPlanNode) {
+                        assert(child.getChildCount() == 1);
+                        child = child.getChild(0);
+                    }
+                    child.clearParents();
+                    if (current.getParentCount() == 0) {
+                        return child;
+                    } else {
+                        assert(current.getParentCount() == 1);
+                        AbstractPlanNode parent = current.getParent(0);
+                        parent.unlinkChild(current);
+                        parent.addAndLinkChild(child);
+                        return root;
+                    }
                 }
             }
             return root;
-        } else if (root.getChildCount() == 1) {
+        } else if (current.getChildCount() == 1) {
             // This is still a coordinator node
-            return removeCoordinatorSendReceivePair(root.getChild(0));
+            return removeCoordinatorSendReceivePairRecurcive(root, current.getChild(0));
         } else {
             // We are about to branch and leave the coordinator
             return root;
         }
     }
+
 }
