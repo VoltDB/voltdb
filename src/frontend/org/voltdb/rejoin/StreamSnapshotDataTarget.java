@@ -42,10 +42,10 @@ import org.voltdb.SnapshotFormat;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.CompressionService;
 
-import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.SettableFuture;
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.util.concurrent.Futures;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 /**
  * A stream snapshot target for sending snapshot data directly to a rejoining

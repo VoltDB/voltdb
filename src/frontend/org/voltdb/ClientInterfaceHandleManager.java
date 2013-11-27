@@ -22,15 +22,16 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
+import org.voltdb.iv2.MpInitiator;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableMap.Builder;
+import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableMap.Builder;
 
 /**
  * This manages per-partition handles used to identify responses for
@@ -436,6 +437,25 @@ public class ClientInterfaceHandleManager
                 retval.add(entry);
                 m_outstandingTxns--;
                 m_acg.reduceBackpressure(entry.m_messageSize);
+            }
+        }
+
+        /*
+         * MP short circuit reads can be remote, which necessitate repair
+         */
+        if (partitionId == MpInitiator.MP_INIT_PID) {
+            Iterator<Map.Entry<Long, Iv2InFlight>> itr =
+                    m_shortCircuitReads.entrySet().iterator();
+            while (itr.hasNext()) {
+                Map.Entry<Long, Iv2InFlight> e = itr.next();
+                Iv2InFlight entry = e.getValue();
+
+                if (entry.m_initiatorHSId != initiatorHSId) {
+                    itr.remove();
+                    retval.add(entry);
+                    m_outstandingTxns--;
+                    m_acg.reduceBackpressure(entry.m_messageSize);
+                }
             }
         }
 

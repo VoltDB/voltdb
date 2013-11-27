@@ -37,8 +37,8 @@ import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.StreamSnapshotSink.RestoreWork;
 import org.voltdb.rejoin.TaskLog;
 
-import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.SettableFuture;
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 /**
  * Manages the lifecycle of snapshot serialization to a site

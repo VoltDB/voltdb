@@ -17,8 +17,8 @@
 
 package org.voltdb;
 
-import com.google.common.base.Supplier;
-import com.google.common.util.concurrent.SettableFuture;
+import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 import org.voltcore.network.Connection;
 import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.WriteStream;

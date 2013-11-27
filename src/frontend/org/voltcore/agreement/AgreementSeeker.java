@@ -17,8 +17,8 @@
 
 package org.voltcore.agreement;
 
-import static com.google.common.base.Predicates.in;
-import static com.google.common.base.Predicates.not;
+import static com.google_voltpatches.common.base.Predicates.in;
+import static com.google_voltpatches.common.base.Predicates.not;
 
 import java.util.Iterator;
 import java.util.Map;
@@ -30,14 +30,14 @@ import org.voltcore.messaging.SiteFailureMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 
-import com.google.common.base.Predicate;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.ImmutableSortedSet;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
-import com.google.common.collect.Sets;
-import com.google.common.collect.TreeMultimap;
+import com.google_voltpatches.common.base.Predicate;
+import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.ImmutableSortedSet;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Multimap;
+import com.google_voltpatches.common.collect.Multimaps;
+import com.google_voltpatches.common.collect.Sets;
+import com.google_voltpatches.common.collect.TreeMultimap;
 
 public class AgreementSeeker {
 

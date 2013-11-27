@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop_voltpatches.hbase.utils.DirectMemoryUtils;
+import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltDB;
 
@@ -33,6 +34,8 @@ import org.voltdb.VoltDB;
  * Arenas will shrink every 60 seconds if some of the memory isn't being used.
  */
 public final class DBBPool {
+
+    private static final VoltLogger TRACE = new VoltLogger("DBBPOOL");
 
     /**
      * Abstract base class for a ByteBuffer container. A container serves to hold a reference
@@ -169,11 +172,8 @@ public final class DBBPool {
         return new BBWrapperContainer(b);
     }
 
-    private final long bytesAllocatedLocally = 0;
-    private final long bytesLoanedLocally = 0;
-
-    private static final COWMap<Integer, ConcurrentLinkedQueue<BBContainer>> m_pooledBuffers =
-            new COWMap<Integer, ConcurrentLinkedQueue<BBContainer>>();
+    private static final NonBlockingHashMap<Integer, ConcurrentLinkedQueue<BBContainer>> m_pooledBuffers =
+            new NonBlockingHashMap<Integer, ConcurrentLinkedQueue<BBContainer>>();
 
     /*
      * Allocate a DirectByteBuffer from a global lock free pool
@@ -189,20 +189,7 @@ public final class DBBPool {
 
         BBContainer cont = pooledBuffers.poll();
         if (cont == null) {
-            //Create an origin container
-            ByteBuffer b = ByteBuffer.allocateDirect(capacity);
-            bytesAllocatedGlobally.getAndAdd(capacity);
-            cont = new BBContainer( b, DBBPool.getBufferAddress(b)) {
-                @Override
-                public void discard() {
-                    try {
-                        DirectMemoryUtils.destroyDirectByteBuffer(b);
-                        bytesAllocatedGlobally.addAndGet(-capacity);
-                    } catch (Throwable e) {
-                        VoltDB.crashLocalVoltDB("Failed to deallocate direct byte buffer", false, e);
-                    }
-                }
-            };
+            cont = allocateDirectWithAddress(capacity);
         }
         final BBContainer origin = cont;
         cont = new BBContainer(origin.b, origin.address) {
@@ -215,47 +202,99 @@ public final class DBBPool {
         return cont;
     }
 
+    //In OOM conditions try clearing the pool
+    private static void clear() {
+        long startingBytes = bytesAllocatedGlobally.get();
+        for (ConcurrentLinkedQueue<BBContainer> pool : m_pooledBuffers.values()) {
+            BBContainer cont = null;
+            while ((cont = pool.poll()) != null) {
+                cont.discard();
+            }
+        }
+        new VoltLogger("HOST").warn(
+                "Attempted to resolve DirectByteBuffer OOM by freeing pooled buffers. " +
+                "Starting bytes was " + startingBytes + " after clearing " +
+                 bytesAllocatedGlobally.get() + " change " + (startingBytes - bytesAllocatedGlobally.get()));
+    }
+
+    private static void logAllocation(int capacity) {
+        if (TRACE.isTraceEnabled()) {
+            String message =
+                    "Allocated DBB capacity " + capacity +
+                     " total allocated " + bytesAllocatedGlobally.get() +
+                     " from " + CoreUtils.throwableToString(new Throwable());
+            TRACE.trace(message);
+        }
+    }
+
+    private static void logDeallocation(int capacity) {
+        if (TRACE.isTraceEnabled()) {
+            String message =
+                    "Deallocated DBB capacity " + capacity +
+                    " total allocated " + bytesAllocatedGlobally.get() +
+                    " from " + CoreUtils.throwableToString(new Throwable());
+            TRACE.trace(message);
+        }
+    }
+
     /*
      * The only reason to not retrieve the address is that network code shared
      * with the java client shouldn't have a dependency on the native library
      */
     public static BBContainer allocateDirect(final int capacity) {
-        final ByteBuffer retval = ByteBuffer.allocateDirect(capacity);
-        bytesAllocatedGlobally.getAndAdd(capacity);
-
-        return new BBContainer(retval, 0) {
-
-            @Override
-            public void discard() {
-                try {
-                    DirectMemoryUtils.destroyDirectByteBuffer(retval);
-                    bytesAllocatedGlobally.getAndAdd(-capacity);
-                } catch (Throwable e) {
-                    VoltDB.crashLocalVoltDB("Failed to deallocate direct byte buffer", false, e);
-                }
+        ByteBuffer retval = null;
+        try {
+            retval = ByteBuffer.allocateDirect(capacity);
+        } catch (OutOfMemoryError e) {
+            if (e.getMessage().contains("Direct buffer memory")) {
+                clear();
+                retval = ByteBuffer.allocateDirect(capacity);
+            } else {
+                throw new Error(e);
             }
+        }
+        bytesAllocatedGlobally.getAndAdd(capacity);
+        logAllocation(capacity);
 
-        };
+        return new DeallocatingContainer(retval, 0);
     }
 
     public static BBContainer allocateDirectWithAddress(final int capacity) {
-        final ByteBuffer retval = ByteBuffer.allocateDirect(capacity);
-        bytesAllocatedGlobally.getAndAdd(capacity);
-
-        return new BBContainer(retval, DBBPool.getBufferAddress(retval)) {
-
-            @Override
-            public void discard() {
-                try {
-                    DirectMemoryUtils.destroyDirectByteBuffer(retval);
-                    bytesAllocatedGlobally.getAndAdd(-capacity);
-                } catch (Throwable e) {
-                    VoltDB.crashLocalVoltDB("Failed to deallocate direct byte buffer", false, e);
-                }
+        ByteBuffer retval = null;
+        try {
+            retval = ByteBuffer.allocateDirect(capacity);
+        } catch (OutOfMemoryError e) {
+            if (e.getMessage().contains("Direct buffer memory")) {
+                clear();
+                retval = ByteBuffer.allocateDirect(capacity);
+            } else {
+                throw new Error(e);
             }
 
-        };
+        }
+        bytesAllocatedGlobally.getAndAdd(capacity);
+        logAllocation(capacity);
+
+        return new DeallocatingContainer(retval, DBBPool.getBufferAddress(retval));
     }
+
+    private static class DeallocatingContainer extends BBContainer {
+        private DeallocatingContainer(ByteBuffer buf, long pointer) {
+            super(buf, pointer);
+        }
+
+        @Override
+        public void discard() {
+            try {
+                bytesAllocatedGlobally.getAndAdd(-b.capacity());
+                logDeallocation(b.capacity());
+                DirectMemoryUtils.destroyDirectByteBuffer(b);
+            } catch (Throwable e) {
+                VoltDB.crashLocalVoltDB("Failed to deallocate direct byte buffer", false, e);
+            }
+        }
+    }
+
 
     /*
      * Delete a char array that was allocated on the native heap

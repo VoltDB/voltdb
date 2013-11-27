@@ -17,8 +17,8 @@
 
 package org.voltcore.agreement;
 
-import static com.google.common.base.Predicates.equalTo;
-import static com.google.common.base.Predicates.not;
+import static com.google_voltpatches.common.base.Predicates.equalTo;
+import static com.google_voltpatches.common.base.Predicates.not;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -38,10 +38,10 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-import com.google.common.primitives.Longs;
+import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Sets;
+import com.google_voltpatches.common.primitives.Longs;
 
 public class MeshArbiter {
 

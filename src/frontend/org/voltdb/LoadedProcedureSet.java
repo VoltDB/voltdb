@@ -30,7 +30,7 @@ import org.voltdb.compiler.Language;
 import org.voltdb.groovy.GroovyScriptProcedureDelegate;
 import org.voltdb.utils.LogKeys;
 
-import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class LoadedProcedureSet {
 

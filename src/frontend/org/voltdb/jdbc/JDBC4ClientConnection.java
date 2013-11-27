@@ -28,6 +28,7 @@ import java.util.concurrent.Future;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
@@ -192,12 +193,12 @@ public class JDBC4ClientConnection implements Closeable {
      * @throws NoConnectionsException
      * @throws ProcCallException
      */
-    public ClientResponse execute(String procedure, Object... parameters)
+    public ClientResponse execute(String procedure, long timeout, Object... parameters)
             throws NoConnectionsException, IOException, ProcCallException {
         long start = System.currentTimeMillis();
         try {
             // If connections are lost try reconnecting.
-            ClientResponse response = this.client.callProcedure(procedure, parameters);
+            ClientResponse response = ((ClientImpl) client).callProcedureWithTimeout(procedure, timeout, parameters);
             this.statistics.update(procedure, response);
             return response;
         } catch (ProcCallException pce) {

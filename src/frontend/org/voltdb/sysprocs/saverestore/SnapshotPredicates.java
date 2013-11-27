@@ -27,7 +27,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 
-import com.google.common.base.Charsets;
+import com.google_voltpatches.common.base.Charsets;
 
 /**
  * A helper class to encapsulate the serialization of snapshot predicates.

@@ -28,7 +28,7 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.licensetool.LicenseApi;
 
-import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 public interface VoltDBInterface
 {

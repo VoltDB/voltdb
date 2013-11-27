@@ -58,7 +58,7 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
-import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class TestSpSchedulerDedupe extends TestCase
 {

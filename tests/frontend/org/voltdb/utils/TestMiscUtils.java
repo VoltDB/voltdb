@@ -23,8 +23,8 @@
 
 package org.voltdb.utils;
 
-import com.google.common.collect.Multimap;
-import com.google.common.primitives.Ints;
+import com.google_voltpatches.common.collect.Multimap;
+import com.google_voltpatches.common.primitives.Ints;
 import org.junit.Test;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.CoreUtils.RetryException;

@@ -16,7 +16,7 @@
  */
 package org.voltcore.zk;
 
-import com.google.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.List;
 import java.util.ListIterator;
@@ -27,7 +27,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google.common.collect.Sets;
+import com.google_voltpatches.common.collect.Sets;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;

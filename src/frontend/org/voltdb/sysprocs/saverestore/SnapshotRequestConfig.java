@@ -17,7 +17,7 @@
 
 package org.voltdb.sysprocs.saverestore;
 
-import com.google.common.base.Preconditions;
+import com.google_voltpatches.common.base.Preconditions;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
