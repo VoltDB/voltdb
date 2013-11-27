@@ -22,12 +22,13 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
+import org.voltdb.iv2.MpInitiator;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMap.Builder;
@@ -436,6 +437,22 @@ public class ClientInterfaceHandleManager
                 retval.add(entry);
                 m_outstandingTxns--;
                 m_acg.reduceBackpressure(entry.m_messageSize);
+            }
+        }
+
+        /*
+         * MP short circuit reads can be remote, which necessitate repair
+         */
+        if (partitionId == MpInitiator.MP_INIT_PID) {
+            i = m_shortCircuitReads.values().iterator();
+            while (i.hasNext()) {
+                Iv2InFlight entry = i.next();
+                if (entry.m_initiatorHSId != initiatorHSId) {
+                    i.remove();
+                    retval.add(entry);
+                    m_outstandingTxns--;
+                    m_acg.reduceBackpressure(entry.m_messageSize);
+                }
             }
         }
 
