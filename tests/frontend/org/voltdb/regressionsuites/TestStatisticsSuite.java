@@ -1027,7 +1027,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
             int ranges = r.nextInt(RANGES_TO_MOVE / loopCount);
             int bytes = r.nextInt(BYTES_TO_MOVE / loopCount);
             int rows = r.nextInt(ROWS_TO_MOVE / loopCount);
-            bps.logBalanceEnds(ranges, bytes, invocationTimeMS, rows);
+            bps.logBalanceEnds(ranges, bytes, invocationTimeMS, invocationTimeMS, rows);
             checker.update(ranges, bytes, rows);
             checker.check(bps.getLastStatsPoint());
             int idleTimeMS = r.nextInt(IDLE_SLEEP_MILLIS);
