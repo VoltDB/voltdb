@@ -382,11 +382,16 @@ public abstract class AbstractParsedStmt {
         int tableCacheIdx = StmtTableScan.NULL_ALIAS_INDEX;
         // The sub-query temp table should be already registered
         // during the parseTable and/or setTable calls
-        assert(tableAliasIndexMap.containsKey(tveColumn.getTableAlias()) == true);
-        tableCacheIdx = tableAliasIndexMap.get(tveColumn.getTableAlias());
+        String tableAlias = tveColumn.getTableAlias();
+        assert(tableAliasIndexMap.containsKey(tableAlias) == true);
+        tableCacheIdx = tableAliasIndexMap.get(tableAlias);
         assert(tableCacheIdx != StmtTableScan.NULL_ALIAS_INDEX);
 
         StmtTableScan tableCache = stmtCache.get(tableCacheIdx);
+        // For the subqueries replace table name with its alias.
+        if (tableCache.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TEMP_TABLE_SCAN) {
+            tveColumn.setTableName(tableAlias);
+        }
         // Resolve the tve before adding it to the cache
         tableCache.resolveTVEForDB(m_db, tveColumn);
         SchemaColumn col = new SchemaColumn(tveColumn.getTableName(),

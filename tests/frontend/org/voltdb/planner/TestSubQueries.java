@@ -34,9 +34,12 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
+import org.voltdb.plannodes.ReceivePlanNode;
+import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
+import org.voltdb.types.JoinType;
 
 public class TestSubQueries   extends PlannerTestCase {
 
@@ -123,10 +126,11 @@ public class TestSubQueries   extends PlannerTestCase {
             // Partitioned sub-query
             List<AbstractPlanNode> lpn = compileToFragments("select A, C FROM (SELECT A, C FROM P1) TEMP ");
             assertTrue(lpn.size() == 2);
-            AbstractPlanNode n = lpn.get(0).getChild(0);
+            AbstractPlanNode n = lpn.get(1);
+            n = n.getChild(0);
             assertTrue(n instanceof SeqScanPlanNode);
             assertEquals("TEMP", ((SeqScanPlanNode) n).getTargetTableName());
-            n = lpn.get(1).getChild(0);
+            n = n.getChild(0);
             assertTrue(n instanceof IndexScanPlanNode);
         }
 
@@ -134,7 +138,11 @@ public class TestSubQueries   extends PlannerTestCase {
             // Two sub-queries. One is partitioned and the other one is replicated
             List<AbstractPlanNode> lpn = compileToFragments("select A, C FROM (SELECT A FROM R1) TEMP1, (SELECT C FROM P2) TEMP2 WHERE TEMP1.A = TEMP2.C ");
             assertTrue(lpn.size() == 2);
-            AbstractPlanNode n = lpn.get(0).getChild(0).getChild(0);
+            AbstractPlanNode n = lpn.get(0);
+            assertTrue(n instanceof SendPlanNode);
+            n = lpn.get(1);
+            assertTrue(n instanceof SendPlanNode);
+            n = n.getChild(0);
             assertTrue(n instanceof NestLoopPlanNode);
             AbstractPlanNode c = n.getChild(0);
             assertTrue(c instanceof SeqScanPlanNode);
@@ -142,14 +150,12 @@ public class TestSubQueries   extends PlannerTestCase {
             c = n.getChild(1);
             assertTrue(c instanceof SeqScanPlanNode);
             assertEquals("TEMP2", ((SeqScanPlanNode) c).getTargetTableAlias());
-            n = lpn.get(1).getChild(0);
-            assertTrue(n instanceof IndexScanPlanNode);
         }
 
         {
             // Join of two multi-partitioned sub-queries on non-partition column. Should fail
             failToCompile("select A, C FROM (SELECT A FROM P1) TEMP1, (SELECT C FROM P2) TEMP2 WHERE TEMP1.A = TEMP2.C ",
-                    "Statements are too complex in set operation or statement with sub-query using multiple partitioned");
+                    "Join of multiple partitioned tables has insufficient join criteria.");
         }
 
         {
@@ -165,24 +171,54 @@ public class TestSubQueries   extends PlannerTestCase {
         }
 
         {
-            // Join of a single partitioned sub-query and a table. The partitions are different
-            failToCompile("select D1, P2.D FROM (SELECT A, D D1 FROM P1 WHERE A=2) TEMP1, P2 WHERE TEMP1.A = P2.A AND P2.A = 1",
-            "Statements use conflicting partitioned table filters in set operation or sub-query.");
+            // Join of two partitioned sub-queries on the partition column
+            List<AbstractPlanNode> lpn = compileToFragments("select D1, D2 FROM (SELECT A, D D1 FROM P1 ) TEMP1, (SELECT A, D D2 FROM P2 ) TEMP2 WHERE TEMP1.A = TEMP2.A");
+            assertTrue(lpn.size() == 2);
+            AbstractPlanNode n = lpn.get(1);
+            assertTrue(n instanceof SendPlanNode);
+            n = n.getChild(0);
+            assertTrue(n instanceof NestLoopPlanNode);
+        }
+
+        {
+            // Join of a single partitioned sub-queries. The partitions are different
+            failToCompile("select D1, D2 FROM (SELECT A, D D1 FROM P1 WHERE A=2) TEMP1, (SELECT A, D D2 FROM P2 WHERE A=2) TEMP2",
+            "Join of multiple partitioned tables has insufficient join criteria.");
+        }
+
+        {
+            // Join of a single partitioned sub-queries. The partitions are different
+            failToCompile("select D1, D2 FROM (SELECT A, D D1 FROM P1) TEMP1, (SELECT A, D D2 FROM P2) TEMP2 WHERE TEMP1.A = 1 AND TEMP2.A = 2",
+            "Join of multiple partitioned tables has insufficient join criteria.");
+        }
+     }
+
+    public void testOuterJoinSubQuery() {
+        {
+            List<AbstractPlanNode> lpn = compileToFragments("SELECT A, C FROM R1 LEFT JOIN (SELECT A, C FROM P1) TEMP ON TEMP.C = R1.C ");
+            assertTrue(lpn.size() == 2);
+            AbstractPlanNode n = lpn.get(0).getChild(0).getChild(0);
+            assertTrue(n instanceof NestLoopPlanNode);
+            assertEquals(JoinType.LEFT, ((NestLoopPlanNode) n).getJoinType());
+            n = n.getChild(0);
+            assertTrue(n instanceof SeqScanPlanNode);
+            assertEquals("R1", ((SeqScanPlanNode) n).getTargetTableName());
+            n = lpn.get(1).getChild(0);
+            assertTrue(n instanceof SeqScanPlanNode);
+            assertEquals("TEMP", ((SeqScanPlanNode) n).getTargetTableName());
+            assertEquals(1, n.getChildCount());
+            n = n.getChild(0);
+            assertTrue(n instanceof IndexScanPlanNode);
         }
     }
 
-    public void testDistributedSubQueryMultiPartition() {
+
+    public void testWhereSubquery() {
         {
-            // Join of a single partitioned sub-query and a table on the partitioning column.
-            failToCompile("select D1, P2.D FROM (SELECT A, D D1 FROM P1 WHERE A=1) TEMP1, P2 WHERE TEMP1.A = P2.A ",
-                    "Statements are too complex in set operation or statement with sub-query using multiple partitioned tables.");
+          AbstractPlanNode pn = compile("DELETE FROM R1 WHERE A IN (SELECT A A1 FROM R1 WHERE A>1)");
+          pn = pn.getChild(0);
         }
 
-        {
-            // Join of two multi-partitioned sub-queries on the partition column.
-            failToCompile("select A1, A2 FROM (SELECT A A1 FROM P1) TEMP1, (SELECT A A2 FROM P2) TEMP2 WHERE TEMP1.A1 = TEMP2.A2 ",
-                    "Statements are too complex in set operation or statement with sub-query using multiple partitioned tables.");
-        }
     }
 
     private void verifyOutputSchema(AbstractPlanNode pn, String... columns) {

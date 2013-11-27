@@ -66,8 +66,7 @@ public class TestScanPlanNode extends TestCase
     // a scan node is the schema of the table
     public void testOutputSchemaNoScanColumns()
     {
-        AbstractScanPlanNode dut = new SeqScanPlanNode();
-        dut.setTargetTableName(TABLE1);
+        AbstractScanPlanNode dut = new SeqScanPlanNode(TABLE1, TABLE1);
 
         dut.generateOutputSchema(m_voltdb.getDatabase());
         NodeSchema dut_schema = dut.getOutputSchema();
@@ -88,8 +87,7 @@ public class TestScanPlanNode extends TestCase
     // a scan node consists of those columns
     public void testOutputSchemaSomeScanColumns()
     {
-        AbstractScanPlanNode dut = new SeqScanPlanNode();
-        dut.setTargetTableName(TABLE1);
+        AbstractScanPlanNode dut = new SeqScanPlanNode(TABLE1, TABLE1);
 
         int[] scan_col_indexes = { 1, 3 };
         ArrayList<SchemaColumn> scanColumns = new ArrayList<SchemaColumn>();
@@ -130,8 +128,7 @@ public class TestScanPlanNode extends TestCase
     // before it attempts to update them
     public void testOutputSchemaOverriddenProjection()
     {
-        AbstractScanPlanNode dut = new SeqScanPlanNode();
-        dut.setTargetTableName(TABLE1);
+        AbstractScanPlanNode dut = new SeqScanPlanNode(TABLE1, TABLE1);
 
         // Create an output schema like we might see for an inlined projection
         // generated for update.  We'll have 4 output columns, the first will

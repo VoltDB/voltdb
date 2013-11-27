@@ -210,7 +210,7 @@ public class PlanAssembler {
      */
     void setupForNewPlans(AbstractParsedStmt parsedStmt) {
         m_bestAndOnlyPlanWasGenerated = false;
-        m_partitioning.analyzeTablePartitioning(parsedStmt.tableList);
+        m_partitioning.analyzeTablePartitioning(parsedStmt.stmtCache);
 
         if (parsedStmt instanceof ParsedUnionStmt) {
             m_parsedUnion = (ParsedUnionStmt) parsedStmt;
@@ -225,6 +225,9 @@ public class PlanAssembler {
             subAssembler = new SelectSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
             return;
         }
+
+// @TODO
+// Need to use StmtTableScan instead
         //TODO: eliminate this redundant "else after a return" and un-indent this block.
         else {
             // check that no modification happens to views
@@ -293,15 +296,15 @@ public class PlanAssembler {
      */
     public CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt) {
 
-        // set up the plan assembler for this statement
-        setupForNewPlans(parsedStmt);
-
         // Get the best plans for the sub-queries first
         ParsedResultAccumulator subQueryResult = getBestCostPlanForSubQueries(parsedStmt);
         if (subQueryResult != null && subQueryResult.m_compiledPlan == null){
             // There was at least one sub-query and we should have a compiled plan for it
             return null;
         }
+
+        // set up the plan assembler for this statement
+        setupForNewPlans(parsedStmt);
 
         // get ready to find the plan with minimal cost
         CompiledPlan rawplan = null;
@@ -318,10 +321,8 @@ public class PlanAssembler {
         }
 
         CompiledPlan retval = m_planSelector.m_bestPlan;
-        if (subQueryResult != null && retval != null) {
-            // Decide whether parent statement' partitioning is compatible with children.
-            subQueryResult = setCommonPartitioning(m_partitioning, subQueryResult);
 
+        if (subQueryResult != null && retval != null) {
             boolean contentIsDeterministic =
                     subQueryResult.m_contentIsDeterministic && retval.isContentDeterministic();
             boolean orderIsDeterministic =
@@ -369,6 +370,11 @@ public class PlanAssembler {
             assert(subQuery != null);
 
             parsedResult = planForParsedStmt(subQuery, parsedResult);
+            // Remove the coordinator send/receive pair. It will be added later
+            // for the whole plan
+            parsedResult.m_compiledPlan.rootPlanGraph =
+                    removeCoordinatorSendReceivePair(parsedResult.m_compiledPlan.rootPlanGraph);
+
             tableCache.setPartitioning(parsedResult.m_currentPartitioning);
             if (parsedResult.m_compiledPlan == null) {
                 return parsedResult;
@@ -472,6 +478,7 @@ public class PlanAssembler {
         ParsedResultAccumulator parsedResult = new ParsedResultAccumulator();
         for (AbstractParsedStmt parsedChildStmt : m_parsedUnion.m_children) {
             parsedResult = planForParsedStmt(parsedChildStmt, parsedResult);
+            parsedResult = setCommonPartitioning(parsedResult);
             if (parsedResult.m_compiledPlan == null) {
                 return null;
             }
@@ -506,11 +513,11 @@ public class PlanAssembler {
 
     private ParsedResultAccumulator planForParsedStmt(AbstractParsedStmt parsedStmt, ParsedResultAccumulator parsedResult) {
 
-        PartitioningForStatement partitioning = (PartitioningForStatement)m_partitioning.clone();
+        parsedResult.m_currentPartitioning = (PartitioningForStatement)m_partitioning.clone();
         PlanSelector selector = (PlanSelector) m_planSelector.clone();
         selector.m_planId = parsedResult.m_planId;
         PlanAssembler assembler = new PlanAssembler(
-                m_catalogCluster, m_catalogDb, partitioning, selector);
+                m_catalogCluster, m_catalogDb, parsedResult.m_currentPartitioning, selector);
         parsedResult.m_compiledPlan = assembler.getBestCostPlan(parsedStmt);
         // make sure we got a winner
         if (parsedResult.m_compiledPlan == null) {
@@ -528,7 +535,7 @@ public class PlanAssembler {
         // Make sure that next child's plans won't override current ones.
         parsedResult.m_planId = selector.m_planId;
 
-        parsedResult = setCommonPartitioning(partitioning, parsedResult);
+//        parsedResult = setCommonPartitioning(partitioning, parsedResult);
         return parsedResult;
     }
 
@@ -536,25 +543,22 @@ public class PlanAssembler {
      * Pick a new common partitioning given the existing common partitioning and the new one.
      * An exception is thrown if they are not compatible
      *
-     * @param partitioning new partitioning
-     * @param parsedResult with the current common partitioning
+     * @param parsedResult with the current partitioning
      * @return updated parsedResult
      */
-    private ParsedResultAccumulator setCommonPartitioning(PartitioningForStatement partitioning,
-            ParsedResultAccumulator parsedResult) {
+    private ParsedResultAccumulator setCommonPartitioning(ParsedResultAccumulator parsedResult) {
         assert (parsedResult!= null);
-        assert (partitioning != null);
+        assert (parsedResult.m_currentPartitioning != null);
 
-        parsedResult.m_currentPartitioning = partitioning;
-        // Decide whether child statements' partitioning is compatible.
+         // Decide whether child statements' partitioning is compatible.
         if (parsedResult.m_commonPartitioning == null) {
-            parsedResult.m_commonPartitioning = partitioning;
+            parsedResult.m_commonPartitioning = parsedResult.m_currentPartitioning;
             return parsedResult;
         }
 
-        AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpression();
+        AbstractExpression statementPartitionExpression = parsedResult.m_currentPartitioning.singlePartitioningExpression();
         if (parsedResult.m_commonPartitioning.requiresTwoFragments()) {
-            if (partitioning.requiresTwoFragments() || statementPartitionExpression != null) {
+            if (parsedResult.m_currentPartitioning.requiresTwoFragments() || statementPartitionExpression != null) {
                 // If two child statements need to use a second fragment,
                 // it can't currently be a two-fragment plan.
                 // The coordinator expects a single-table result from each partition.
@@ -562,7 +566,7 @@ public class PlanAssembler {
                 // target a particular partition, so neither can the union of the coordinator
                 // and a statement that wants to run single-partition.
                 throw new PlanningErrorException(
-                        "Statements are too complex in set operation or statement with sub-query using multiple partitioned tables.");
+                        "Statements are too complex in set operation using multiple partitioned tables.");
             }
             // the new statement is apparently a replicated read and has no effect on partitioning
             return parsedResult;
@@ -572,15 +576,15 @@ public class PlanAssembler {
         if (commonPartitionExpression == null) {
             // the prior statement(s) were apparently replicated reads
             // and have no effect on partitioning
-            parsedResult.m_commonPartitioning = partitioning;
+            parsedResult.m_commonPartitioning = parsedResult.m_currentPartitioning;
             return parsedResult;
         }
-        if (partitioning.requiresTwoFragments()) {
+        if (parsedResult.m_currentPartitioning.requiresTwoFragments()) {
             // Again, currently the coordinator of a two-fragment plan is not allowed to
             // target a particular partition, so neither can the union of the coordinator
             // and a statement that wants to run single-partition.
             throw new PlanningErrorException(
-                    "Statements are too complex in set operation or statement with sub-query using multiple partitioned tables.");
+                    "Statements are too complex in set operation using multiple partitioned tables.");
         }
         if (statementPartitionExpression == null) {
             // the new statement is apparently a replicated read and has no effect on partitioning
@@ -652,13 +656,10 @@ public class PlanAssembler {
                 // scan a partitioned table except under the ReceivePlanNode that was just found.
                 HashSet<String> tablesRead = new HashSet<String>();
                 root.getTablesReadByFragment(tablesRead);
-                for (String tableName : tablesRead) {
-                    Table table = m_parsedSelect.getTableFromDB(tableName);
-                    if ( ! table.getIsreplicated()) {
-                        throw new PlanningErrorException(
-                                "This special case join between an outer replicated table and " +
-                                "an inner partitioned table is too complex and is not supported.");
-                    }
+                if (! subAssembler.hasReplicatedResult(root)) {
+                    throw new PlanningErrorException(
+                            "This special case join between an outer replicated table and " +
+                            "an inner partitioned table is too complex and is not supported.");
                 }
 
                 // Edge cases: left outer join with replicated table.
@@ -1990,4 +1991,29 @@ public class PlanAssembler {
         return m_recentErrorMsg;
     }
 
+    /**
+     * Remove the coordinator send/receive pair if any from the graph.
+     *
+     * @param root the complete plan node.
+     * @return the plan without the send/receive pair.
+     */
+    private AbstractPlanNode removeCoordinatorSendReceivePair(AbstractPlanNode root) {
+        if (root instanceof ReceivePlanNode) {
+            if (root.getChildCount() == 1) {
+                AbstractPlanNode child = root.getChild(0);
+                if (child instanceof SendPlanNode) {
+                    assert(child.getChildCount() == 1);
+                    root = child.getChild(0);
+                    root.clearParents();
+                }
+            }
+            return root;
+        } else if (root.getChildCount() == 1) {
+            // This is still a coordinator node
+            return removeCoordinatorSendReceivePair(root.getChild(0));
+        } else {
+            // We are about to branch and leave the coordinator
+            return root;
+        }
+    }
 }

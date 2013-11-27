@@ -222,7 +222,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     /**
-     * Recursively build a set of tables read by the (sub)plan or (sub)plan fragment
+     * Recursively build a set of table aliases read by the (sub)plan or (sub)plan fragment
      * {@see AbstractPlanNode#getTablesAndIndexes(Collection, Collection, Collection, boolean)}
      *
      * @param tablesRead Set of tables read potentially added to at each recursive level.
@@ -234,7 +234,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     /**
      * Recursively build sets of read and updated tables, as well as used indexes.
      *
-     * @param tablesRead Set of tables read potentially added to at each recursive level.
+     * @param tablesRead Set of table aliases read potentially added to at each recursive level.
      * @param tablesUpdated Set of tables updated/inserted into/deleted
      * potentially added to at each recursive level.
      * @param indexes Set of indexes potentially added to at each recursive level.

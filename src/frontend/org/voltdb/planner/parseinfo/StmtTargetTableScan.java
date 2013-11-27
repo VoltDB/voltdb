@@ -65,6 +65,24 @@ public class StmtTargetTableScan extends StmtTableScan {
     }
 
     @Override
+    public String getPartitionColumnName() {
+        String colName = null;
+        if (getIsreplicated() == false) {
+            Column partitionCol = m_table.getPartitioncolumn();
+            // "(partitionCol != null)" tests around an obscure edge case.
+            // The table is declared non-replicated yet specifies no partitioning column.
+            // This can occur legitimately when views based on partitioned tables neglect to group by the partition column.
+            // The interpretation of this edge case is that the table has "randomly distributed data".
+            // In such a case, the table is valid for use by MP queries only and can only be joined with replicated tables
+            // because it has no recognized partitioning join key.
+            if (partitionCol != null) {
+                colName = partitionCol.getTypeName(); // Note getTypeName gets the column name -- go figure.
+            }
+        }
+        return colName;
+    }
+
+    @Override
     public TupleValueExpression resolveTVEForDB(Database db, TupleValueExpression tve) {
         tve.resolveForDB(db);
         return tve;

@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
@@ -866,20 +865,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         ajNode.setWherePredicate(ExpressionUtil.combine(whereClauses));
         ajNode.resolveSortDirection();
         return ajNode;
-    }
-
-    private boolean hasReplicatedResult(AbstractPlanNode plan)
-    {
-        HashSet<String> tablesRead = new HashSet<String>();
-        plan.getTablesReadByFragment(tablesRead);
-        for (String tableName : tablesRead) {
-            Table table = m_parsedStmt.getTableFromDB(tableName);
-            if ( ! table.getIsreplicated()) {
-                return false;
-            }
-
-        }
-        return true;
     }
 
     /**

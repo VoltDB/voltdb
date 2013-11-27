@@ -18,7 +18,7 @@
 
 package org.voltdb.planner;
 
-import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -26,7 +26,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.voltdb.catalog.Column;
-import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -315,8 +314,12 @@ public class PartitioningForStatement implements Cloneable{
         return m_partitionCol;
     }
 
-    public boolean isPartitionColumnByAnyTable(String column) {
+    public boolean isPartitionColumn(String column) {
         return m_partitionColumnByTable.containsValue(column);
+    }
+
+    public Collection<String> getPartitionColumns() {
+        return m_partitionColumnByTable.values();
     }
 
     /**
@@ -350,8 +353,7 @@ public class PartitioningForStatement implements Cloneable{
             }
 
             String partitionedTableAlias = tableCache.getTableAlias();
-            String partitionedTable = tableCache.getTableName();
-            String columnNeedingCoverage = m_partitionColumnByTable.get(partitionedTable);
+            String columnNeedingCoverage = m_partitionColumnByTable.get(partitionedTableAlias);
             boolean unfiltered = true;
 
             for (AbstractExpression candidateColumn : valueEquivalence.keySet()) {
@@ -408,33 +410,26 @@ public class PartitioningForStatement implements Cloneable{
     }
 
     /**
-     * @param parsedStmt
+     * @param tableCacheList
      * @throws PlanningErrorException
      */
-    void analyzeTablePartitioning(ArrayList<Table> tableList)
+    void analyzeTablePartitioning(List<StmtTableScan> tableCacheList)
             throws PlanningErrorException
     {
         // Do we have a need for a distributed scan at all?
         // Iterate over the tables to collect partition columns.
-        for (Table table : tableList) {
-            if (table.getIsreplicated()) {
+        for (StmtTableScan tableCache : tableCacheList) {
+            if (tableCache.getIsreplicated()) {
                 continue;
             }
-            String colName = null;
-            Column partitionCol = table.getPartitioncolumn();
-            // "(partitionCol != null)" tests around an obscure edge case.
+            // The partition column can be null in an obscure edge case.
             // The table is declared non-replicated yet specifies no partitioning column.
             // This can occur legitimately when views based on partitioned tables neglect to group by the partition column.
             // The interpretation of this edge case is that the table has "randomly distributed data".
             // In such a case, the table is valid for use by MP queries only and can only be joined with replicated tables
             // because it has no recognized partitioning join key.
-            if (partitionCol != null) {
-                colName = partitionCol.getTypeName(); // Note getTypeName gets the column name -- go figure.
-            }
-
-            //TODO: This map really wants to be indexed by table "alias" (the in-query table scan identifier)
-            // so self-joins can be supported without ambiguity.
-            String partitionedTable = table.getTypeName();
+            String colName = tableCache.getPartitionColumnName();
+            String partitionedTable = tableCache.getTableAlias();
             m_partitionColumnByTable.put(partitionedTable, colName);
         }
         m_countOfPartitionedTables = m_partitionColumnByTable.keySet().size();

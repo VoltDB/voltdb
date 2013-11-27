@@ -100,12 +100,15 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         super();
     }
 
+    public IndexScanPlanNode(String tableName, String tableAlias) {
+        super(tableName, tableAlias);
+        assert(tableName != null && tableAlias != null);
+    }
+
     public IndexScanPlanNode(AbstractScanPlanNode srcNode, AggregatePlanNode apn, Index index, SortDirectionType sortDirection) {
-        super();
+        super(srcNode.m_targetTableName, srcNode.m_targetTableAlias);
         m_tableSchema = srcNode.m_tableSchema;
         m_predicate = srcNode.m_predicate;
-        m_targetTableAlias = srcNode.m_targetTableAlias;
-        m_targetTableName = srcNode.m_targetTableName;
         m_tableScanSchema = srcNode.m_tableScanSchema.clone();
         for (AbstractPlanNode inlineChild : srcNode.getInlinePlanNodes().values()) {
             addInlinePlanNode(inlineChild);

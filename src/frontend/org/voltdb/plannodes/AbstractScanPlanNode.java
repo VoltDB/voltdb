@@ -62,12 +62,19 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         super();
     }
 
+
+    protected AbstractScanPlanNode(String tableName, String tableAlias) {
+        super();
+        m_targetTableName = tableName;
+        m_targetTableAlias = tableAlias;
+    }
+
     @Override
     public void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tableUpdated,
                                     Collection<String> indexes)
     {
-        assert(m_targetTableName.length() > 0);
-        tablesRead.add(m_targetTableName);
+        assert(m_targetTableAlias != null);
+        tablesRead.add(m_targetTableAlias);
     }
 
     @Override
@@ -121,6 +128,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
      * @return the target_table_name
      */
     public String getTargetTableName() {
+        assert(m_targetTableName != null);
         return m_targetTableName;
     }
 
@@ -128,6 +136,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
      * @param name
      */
     public void setTargetTableName(String name) {
+        assert(name != null);
         m_targetTableName = name;
     }
 
@@ -135,6 +144,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
      * @return the target_table_alias
      */
     public String getTargetTableAlias() {
+        assert(m_targetTableAlias != null);
         return m_targetTableAlias;
     }
 
@@ -142,6 +152,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
      * @param alias
      */
     public void setTargetTableAlias(String alias) {
+        assert(alias != null);
         m_targetTableAlias = alias;
     }
 
@@ -353,7 +364,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         m_predicate = AbstractExpression.fromJSONChild(jobj, Members.PREDICATE.name());
         m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
         m_targetTableAlias = jobj.getString( Members.TARGET_TABLE_ALIAS.name() );
-        m_isSubQuery = "TRUE".equalsIgnoreCase(jobj.getString( Members.SUBQUERY_INDICATOR.name() ));
+        if (jobj.has("SUBQUERY_INDICATOR")) {
+            m_isSubQuery = "TRUE".equalsIgnoreCase(jobj.getString( Members.SUBQUERY_INDICATOR.name() ));
+        }
     }
 
     @Override

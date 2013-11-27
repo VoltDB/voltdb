@@ -51,6 +51,8 @@ public abstract class StmtTableScan {
 
     abstract public boolean isPartitioningColumn(String columnName);
 
+    abstract public String getPartitionColumnName();
+
     abstract public TupleValueExpression resolveTVEForDB(Database db, TupleValueExpression tve);
 
     public String getTableAlias() {

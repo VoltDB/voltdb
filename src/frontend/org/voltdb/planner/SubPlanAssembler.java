@@ -18,6 +18,7 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -38,7 +39,6 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.planner.parseinfo.StmtTableScan;
-import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
@@ -1099,6 +1099,22 @@ public abstract class SubPlanAssembler {
         return new IndexableExpression(originalFilter, normalizedExpr, binding);
     }
 
+    protected boolean hasReplicatedResult(AbstractPlanNode plan)
+    {
+        HashSet<String> tablesRead = new HashSet<String>();
+        plan.getTablesReadByFragment(tablesRead);
+        for (String tableAliasName : tablesRead) {
+            Integer tableIdx = m_parsedStmt.tableAliasIndexMap.get(tableAliasName);
+            assert(tableIdx != null);
+            StmtTableScan tableCache = m_parsedStmt.stmtCache.get(tableIdx);
+            if ( ! tableCache.getIsreplicated()) {
+                return false;
+            }
+
+        }
+        return true;
+    }
+
     private boolean isOperandDependentOnTable(AbstractExpression expr, Table table) {
         for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(expr)) {
             //TODO: This clumsy testing of table names regardless of table aliases is
@@ -1214,14 +1230,12 @@ public abstract class SubPlanAssembler {
     {
         assert(tableAliasIdx != StmtTableScan.NULL_ALIAS_INDEX);
         assert(tableAliasIdx < m_parsedStmt.stmtCache.size());
-        // build the scan node
-        SeqScanPlanNode scanNode = new SeqScanPlanNode();
         StmtTableScan tableCache = m_parsedStmt.stmtCache.get(tableAliasIdx);
-        scanNode.setTargetTableName(tableCache.getTableName());
+        // build the scan node
+        SeqScanPlanNode scanNode = new SeqScanPlanNode(tableCache.getTableName(), tableCache.getTableAlias());
         if (tableCache.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TEMP_TABLE_SCAN) {
             scanNode.setSubQuery(true);
         }
-        scanNode.setTargetTableAlias(tableCache.getTableAlias());
         //TODO: push scan column identification into "setTargetTableName"
         // (on the way to enabling it for DML plans).
         Set<SchemaColumn> scanColumns = m_parsedStmt.stmtCache.get(tableAliasIdx).getScanColumns();
@@ -1253,12 +1267,12 @@ public abstract class SubPlanAssembler {
     {
         // now assume this will be an index scan and get the relevant index
         Index index = path.index;
-        IndexScanPlanNode scanNode = new IndexScanPlanNode();
-        AbstractPlanNode resultNode = scanNode;
         assert(tableAliasIdx != StmtTableScan.NULL_ALIAS_INDEX);
         assert(tableAliasIdx < m_parsedStmt.stmtCache.size());
         StmtTableScan tableCache = m_parsedStmt.stmtCache.get(tableAliasIdx);
 
+        IndexScanPlanNode scanNode = new IndexScanPlanNode(tableCache.getTableName(), tableCache.getTableAlias());
+        AbstractPlanNode resultNode = scanNode;
         // set sortDirection here becase it might be used for IN list
         scanNode.setSortDirection(path.sortDirection);
         // Build the list of search-keys for the index in question
@@ -1289,15 +1303,12 @@ public abstract class SubPlanAssembler {
         scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
         scanNode.setPredicate(ExpressionUtil.combine(path.otherExprs));
         scanNode.setInitialExpression(ExpressionUtil.combine(path.initialExpr));
-        scanNode.setTargetTableName(tableCache.getTableName());
-        scanNode.setTargetTableAlias(tableCache.getTableAlias());
         //TODO: push scan column identification into "setTargetTableName"
         // (on the way to enabling it for DML plans).
         Set<SchemaColumn> scanColumns = m_parsedStmt.stmtCache.get(tableAliasIdx).getScanColumns();
         if (scanColumns != null && scanColumns.isEmpty() == false) {
             scanNode.setScanColumns(scanColumns);
         }
-        scanNode.setTargetTableAlias(tableCache.getTableAlias());
         scanNode.setTargetIndexName(index.getTypeName());
         return resultNode;
     }

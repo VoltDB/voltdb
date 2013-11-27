@@ -17,6 +17,9 @@
 
 package org.voltdb.planner.parseinfo;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
@@ -63,7 +66,23 @@ public class StmtSubqueryScan extends StmtTableScan {
     @Override
     public boolean isPartitioningColumn(String columnName) {
         assert (m_partitioning != null);
-        return m_partitioning.isPartitionColumnByAnyTable(columnName);
+        // get the original column
+        ParsedColInfo origCol = m_columnMap.get(columnName);
+        assert(origCol != null);
+        return m_partitioning.isPartitionColumn(origCol.columnName);
+    }
+
+    @Override
+    public String getPartitionColumnName() {
+        if (getIsreplicated() == false) {
+            // Returns first not null partitioning column of the underline sub-query
+            for (String patitionCol : m_partitioning.getPartitionColumns()) {
+                if (patitionCol != null) {
+                    return patitionCol;
+                }
+            }
+        }
+        return null;
     }
 
     @Override
@@ -85,6 +104,8 @@ public class StmtSubqueryScan extends StmtTableScan {
                 tve.setTableName(getTableName());
                 tve.setColumnName(columnName);
                 tve.setColumnIndex(colInfo.index);
+
+                m_columnMap.put(columnName, colInfo);
             }
         }
         assert (tve.getColumnIndex() != -1);
@@ -95,5 +116,7 @@ public class StmtSubqueryScan extends StmtTableScan {
     private TempTable m_tempTable = null;
     // The partitioning object for that sub-query
     PartitioningForStatement m_partitioning = null;
+    // The mapping - the temp table column to the sub-query (column, table) pair
+    Map<String, ParsedColInfo> m_columnMap = new HashMap<String, ParsedColInfo>();
 
 }

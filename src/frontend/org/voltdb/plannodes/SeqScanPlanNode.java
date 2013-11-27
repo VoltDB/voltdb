@@ -31,6 +31,11 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
         super();
     }
 
+public SeqScanPlanNode(String tableName, String tableAlias) {
+        super(tableName, tableAlias);
+        assert(tableName != null && tableAlias != null);
+    }
+
     @Override
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.SEQSCAN;

@@ -85,10 +85,15 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         super();
     }
 
+    public IndexCountPlanNode(String tableName, String tableAlias) {
+        super(tableName, tableAlias);
+        assert(tableName != null && tableAlias != null);
+    }
+
     private IndexCountPlanNode(IndexScanPlanNode isp, AggregatePlanNode apn,
                                IndexLookupType endType, List<AbstractExpression> endKeys)
     {
-        super();
+        super(isp.m_targetTableName, isp.m_targetTableAlias);
 
         m_catalogIndex = isp.m_catalogIndex;
 
@@ -96,8 +101,6 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_tableSchema = isp.m_tableSchema;
         m_tableScanSchema = isp.m_tableScanSchema.clone();
 
-        m_targetTableAlias = isp.m_targetTableAlias;
-        m_targetTableName = isp.m_targetTableName;
         m_targetIndexName = isp.m_targetIndexName;
 
         m_predicate = null;
