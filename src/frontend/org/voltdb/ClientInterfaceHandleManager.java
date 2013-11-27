@@ -444,11 +444,14 @@ public class ClientInterfaceHandleManager
          * MP short circuit reads can be remote, which necessitate repair
          */
         if (partitionId == MpInitiator.MP_INIT_PID) {
-            i = m_shortCircuitReads.values().iterator();
-            while (i.hasNext()) {
-                Iv2InFlight entry = i.next();
+            Iterator<Map.Entry<Long, Iv2InFlight>> itr =
+                    m_shortCircuitReads.entrySet().iterator();
+            while (itr.hasNext()) {
+                Map.Entry<Long, Iv2InFlight> e = itr.next();
+                Iv2InFlight entry = e.getValue();
+
                 if (entry.m_initiatorHSId != initiatorHSId) {
-                    i.remove();
+                    itr.remove();
                     retval.add(entry);
                     m_outstandingTxns--;
                     m_acg.reduceBackpressure(entry.m_messageSize);
