@@ -133,7 +133,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                             tmLog.fatal("This node will fail.  Please contact VoltDB support with your cluster's " +
                                     "log files.");
                             m_initiatorMailbox.send(
-                                    com.google.common.primitives.Longs.toArray(m_term.getInterestingHSIds()),
+                                    com.google_voltpatches.common.primitives.Longs.toArray(m_term.getInterestingHSIds()),
                                     new DumpMessage());
                             throw new RuntimeException("Failing promoted MPI node with unresolvable repair condition.");
                         }

@@ -117,11 +117,11 @@ import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.VoltSampler;
 
-import com.google.common.base.Charsets;
-import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.SettableFuture;
+import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 /**
  * RealVoltDB initializes global server components, like the messaging

@@ -51,7 +51,7 @@ import org.voltdb.VoltZK;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.compiler.ClusterConfig;
 
-import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  * Cartographer provides answers to queries about the components in a cluster.

@@ -51,6 +51,7 @@ public class TestDistributer extends TestCase {
 
         volatile boolean gotPing = false;
         AtomicBoolean sendResponses = new AtomicBoolean(true);
+        AtomicBoolean sendProcTimeout = new AtomicBoolean(false);
 
         @Override
         public int getMaxRead() {
@@ -71,8 +72,14 @@ public class TestDistributer extends TestCase {
                     VoltTable vt[] = new VoltTable[1];
                     vt[0] = new VoltTable(new VoltTable.ColumnInfo("Foo", VoltType.BIGINT));
                     vt[0].addRow(1);
-                    ClientResponseImpl response =
-                        new ClientResponseImpl(ClientResponseImpl.SUCCESS, vt, "Extra String", spi.getClientHandle());
+                    ClientResponseImpl response;
+                    if (sendProcTimeout.get()) {
+                        response = new ClientResponseImpl(ClientResponseImpl.CONNECTION_TIMEOUT, vt,
+                                "Timeout String", spi.getClientHandle());
+                    } else {
+                        response = new ClientResponseImpl(ClientResponseImpl.SUCCESS, vt,
+                                "Extra String", spi.getClientHandle());
+                    }
                     ByteBuffer buf = ByteBuffer.allocate(4 + response.getSerializedSize());
                     buf.putInt(buf.capacity() - 4);
                     response.flattenToBuffer(buf);
@@ -336,14 +343,14 @@ public class TestDistributer extends TestCase {
             ProcedureInvocation pi5 = new ProcedureInvocation(++handle, "i1", new Integer(1));
             ProcedureInvocation pi6 = new ProcedureInvocation(++handle, "i1", new Integer(1));
 
-            dist.queue(pi1, new ThrowingCallback(), true);
+            dist.queue(pi1, new ThrowingCallback(), true, 0);
             dist.drain();
             assertTrue(csl.m_exceptionHandled);
-            dist.queue(pi2, new ProcCallback(), true);
-            dist.queue(pi3, new ProcCallback(), true);
-            dist.queue(pi4, new ProcCallback(),true);
-            dist.queue(pi5, new ProcCallback(), true);
-            dist.queue(pi6, new ProcCallback(), true);
+            dist.queue(pi2, new ProcCallback(), true, 0);
+            dist.queue(pi3, new ProcCallback(), true, 0);
+            dist.queue(pi4, new ProcCallback(), true, 0);
+            dist.queue(pi5, new ProcCallback(), true, 0);
+            dist.queue(pi6, new ProcCallback(), true, 0);
 
             dist.drain();
             System.err.println("Finished drain.");
@@ -424,9 +431,62 @@ public class TestDistributer extends TestCase {
         // this call should hang until the connection is closed,
         // then will be called with CONNECTION_LOST
         ProcedureInvocation invocation = new ProcedureInvocation(44, "@Ping");
-        dist.queue(invocation, new TimeoutMonitorPCB(), true);
+        dist.queue(invocation, new TimeoutMonitorPCB(), true, 0);
 
         // wait for both callbacks
+        latch.await();
+
+        // clean up
+        dist.shutdown();
+        volt.shutdown.set(true);
+        volt.join();
+    }
+
+    /**
+     * Test query timeouts. Create a fake voltdb that runs all happy for a while, but then can be told to shut up if it
+     * knows what's good for it. Wait for the query timeout.
+     */
+    @Test
+    public void testQueryTimeout() throws Exception {
+
+        final CountDownLatch latch = new CountDownLatch(1);
+
+        class QueryTimeoutMonitor implements ProcedureCallback {
+
+            @Override
+            public void clientCallback(ClientResponse clientResponse) throws Exception {
+                assert (clientResponse.getStatus() == ClientResponse.CONNECTION_TIMEOUT);
+                System.out.println("Query timeout called..: " + clientResponse.getStatusString());
+                latch.countDown();
+            }
+        }
+
+        // create a fake server and connect to it.
+        MockVolt volt = new MockVolt(20000);
+        volt.start();
+
+        // create distributer and connect it to the client
+        Distributer dist = new Distributer(false,
+                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
+                30000 /* thirty second connection timeout */,
+                false);
+        dist.createConnection("localhost", "", "", 20000);
+
+        // make sure it connected
+        assertTrue(volt.handler != null);
+
+        // run fine for long enough to send some pings
+        Thread.sleep(3000);
+
+        // tell the mock voltdb to stop responding
+        volt.handler.sendProcTimeout.set(true);
+
+        // this call should hang until the connection is closed,
+        // then will be called with CONNECTION_LOST
+        ProcedureInvocation invocation = new ProcedureInvocation(45, "@Ping");
+        dist.queue(invocation, new QueryTimeoutMonitor(), true, 10);
+
+        // wait for callback
         latch.await();
 
         // clean up

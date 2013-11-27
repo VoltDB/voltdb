@@ -30,6 +30,7 @@ import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
@@ -55,10 +56,12 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2LogFaultMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
-import com.google.common.primitives.Longs;
+import com.google_voltpatches.common.primitives.Longs;
 
 public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 {
+    static final VoltLogger tmLog = new VoltLogger("TM");
+
     static class DuplicateCounterKey implements Comparable<DuplicateCounterKey>
     {
         private final long m_txnId;
@@ -597,7 +600,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (!needsRepair.isEmpty()) {
             Iv2InitiateTaskMessage replmsg =
                 new Iv2InitiateTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
-            m_mailbox.send(com.google.common.primitives.Longs.toArray(needsRepair), replmsg);
+            m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(needsRepair), replmsg);
         }
     }
 
@@ -633,7 +636,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (!needsRepair.isEmpty()) {
             FragmentTaskMessage replmsg =
                 new FragmentTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
-            m_mailbox.send(com.google.common.primitives.Longs.toArray(needsRepair), replmsg);
+            m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(needsRepair), replmsg);
         }
     }
 
@@ -1017,5 +1020,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
         }
         return new CountDownLatch(0);
+    }
+
+    @Override
+    public void dump()
+    {
+        m_replaySequencer.dump(m_mailbox.getHSId());
+        tmLog.info(String.format("%s: %s", CoreUtils.hsIdToString(m_mailbox.getHSId()), m_pendingTasks));
     }
 }

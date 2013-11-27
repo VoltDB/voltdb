@@ -46,9 +46,9 @@ import org.junit.Before;
 import org.junit.Test;
 import org.voltcore.messaging.SiteFailureMessage;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.primitives.Longs;
+import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.primitives.Longs;
 import com.natpryce.makeiteasy.Maker;
 
 @SuppressWarnings("unchecked")

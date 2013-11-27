@@ -146,7 +146,7 @@ public class MpPromoteAlgo implements RepairAlgo
                  + " surviving leaders to repair. "
                  + " Survivors: " + CoreUtils.hsIdCollectionToString(m_survivors));
         VoltMessage logRequest = makeRepairLogRequestMessage(m_requestId);
-        m_mailbox.send(com.google.common.primitives.Longs.toArray(m_survivors), logRequest);
+        m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_survivors), logRequest);
         m_mailbox.send(m_mailbox.getHSId(), logRequest);
     }
 

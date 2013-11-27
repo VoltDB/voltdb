@@ -33,7 +33,7 @@ import javax.management.ObjectName;
 
 import org.voltcore.logging.VoltLogger;
 
-import com.google.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 public class GCInspector
 {

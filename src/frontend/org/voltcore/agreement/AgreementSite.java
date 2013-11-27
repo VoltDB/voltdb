@@ -56,7 +56,7 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 
-import com.google.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 /*
  * A wrapper around a single node ZK server. The server is a modified version of ZK that speaks the ZK

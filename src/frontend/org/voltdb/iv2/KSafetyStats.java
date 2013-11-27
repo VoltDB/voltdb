@@ -25,8 +25,8 @@ import org.voltdb.StatsSource;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSortedSet;
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.collect.ImmutableSortedSet;
 
 public class KSafetyStats extends StatsSource {
     private volatile NavigableSet<StatsPoint> m_kSafetySet;
