@@ -267,6 +267,37 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
+    private void initialLoad(Client client, String tableName) throws IOException, NoConnectionsException, InterruptedException {
+        ProcedureCallback callback = new ProcedureCallback() {
+            @Override
+            public void clientCallback(ClientResponse clientResponse) throws Exception {
+                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                    throw new RuntimeException("Failed with response: " + clientResponse.getStatusString());
+                }
+            }
+        };
+
+        /*
+        CREATE TABLE ??? (
+                ID INTEGER DEFAULT '0' NOT NULL,
+                DESC VARCHAR(300),
+                NUM INTEGER,
+                RATIO FLOAT,
+                PAST TIMESTAMP DEFAULT NULL,
+                PRIMARY KEY (ID)
+                );
+        */
+        for(int id=7; id < 15; id++) {
+            client.callProcedure(callback, tableName+".insert",
+                                 - id, // ID
+                                 "X"+String.valueOf(id)+paddedToNonInlineLength, // DESC
+                                  10, // NUM
+                                  1.1, // RATIO
+                                  new Timestamp(100000000L)); // PAST
+            client.drain();
+        }
+    }
+
     public void testAbs() throws Exception
     {
         System.out.println("STARTING testAbs");
@@ -2078,34 +2109,179 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals("Xin@VoltDB", result.getString(1));
     }
 
-    private void initialLoad(Client client, String tableName) throws IOException, NoConnectionsException, InterruptedException {
-        ProcedureCallback callback = new ProcedureCallback() {
-            @Override
-            public void clientCallback(ClientResponse clientResponse) throws Exception {
-                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                    throw new RuntimeException("Failed with response: " + clientResponse.getStatusString());
-                }
-            }
-        };
 
-        /*
-        CREATE TABLE ??? (
-                ID INTEGER DEFAULT '0' NOT NULL,
-                DESC VARCHAR(300),
-                NUM INTEGER,
-                RATIO FLOAT,
-                PAST TIMESTAMP DEFAULT NULL,
-                PRIMARY KEY (ID)
-                );
-        */
-        for(int id=7; id < 15; id++) {
-            client.callProcedure(callback, tableName+".insert",
-                                 - id, // ID
-                                 "X"+String.valueOf(id)+paddedToNonInlineLength, // DESC
-                                  10, // NUM
-                                  1.1, // RATIO
-                                  new Timestamp(100000000L)); // PAST
-            client.drain();
+    public void testCaseWhen() throws Exception {
+        System.out.println("STARTING test Case When...");
+        Client cl = getClient();
+        VoltTable vt;
+        String sql;
+
+        //                           ID, DESC,   NUM, FLOAT, TIMESTAMP
+        cl.callProcedure("R1.insert", 1, "VoltDB", 1, 1.0, new Timestamp(1000000000000L));
+        cl.callProcedure("R1.insert", 2, "Memsql",  5, 5.0, new Timestamp(1000000000000L));
+
+        sql = "SELECT ID, CASE WHEN num < 3 THEN 0 ELSE 8 END FROM R1 ORDER BY 1;";
+        validateTableOfLongs(cl, sql, new long[][] {{1, 0},{2, 8}});
+
+        sql = "SELECT ID, CASE WHEN num < 3 THEN num/2 ELSE num + 10 END FROM R1 ORDER BY 1;";
+        validateTableOfLongs(cl, sql, new long[][] {{1, 0},{2, 15}});
+
+        sql = "SELECT ID, CASE WHEN num > 0 AND num < 5 THEN num * 5 " +
+                "WHEN num >=5 THEN num * 10  ELSE num END FROM R1 ORDER BY 1;";
+        validateTableOfLongs(cl, sql, new long[][] {{1, 5},{2, 50}});
+
+
+        // (2) Test case when Types.
+        sql = "SELECT ID, CASE WHEN num > 0 AND num < 5 THEN NULL " +
+                "WHEN num >=5 THEN num * 10  ELSE num END FROM R1 ORDER BY 1;";
+        vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(VoltType.BIGINT, vt.getColumnType(1));
+        if (isHSQL()) {
+            validateTableOfLongs(vt, new long[][] {{1, 0},{2, 50}});
+        } else {
+            validateTableOfLongs(vt, new long[][] {{1, Long.MIN_VALUE},{2, 50}});
+        }
+
+        sql = "SELECT ID, CASE WHEN num > 0 AND num < 5 THEN NULL " +
+                "WHEN num >=5 THEN NULL  ELSE num END FROM R1 ORDER BY 1;";
+        vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(VoltType.INTEGER, vt.getColumnType(1));
+        if (isHSQL()) {
+            validateTableOfLongs(vt, new long[][] {{1, 0},{2, 0}});
+        } else {
+            validateTableOfLongs(vt, new long[][] {{1, Long.MIN_VALUE},{2, Long.MIN_VALUE}});
+        }
+
+        // Expected failed type cases:
+        try {
+            sql = "SELECT ID, CASE WHEN num > 0 AND num < 5 THEN NULL " +
+                    "WHEN num >=5 THEN NULL ELSE NULL END FROM R1 ORDER BY 1;";
+            vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
+            fail();
+        } catch (Exception ex) {
+            assertNotNull(ex);
+            assertTrue(ex.getMessage().contains("data type cast needed for parameter or null literal"));
+        }
+
+        try {
+            // Use String as the casted type
+            sql = "SELECT ID, CASE WHEN num > 0 AND num < 5 THEN NULL " +
+                    "WHEN num >=5 THEN NULL ELSE 'NULL' END FROM R1 ORDER BY 1;";
+            vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
+        } catch (Exception ex) {
+            fail();
+        }
+
+        try {
+            sql = "SELECT ID, CASE WHEN num > 0 AND num < 5 THEN NULL " +
+                    "WHEN num >=5 THEN 'I am null'  ELSE num END FROM R1 ORDER BY 1;";
+            vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
+            fail();
+        } catch (Exception ex) {
+            assertNotNull(ex);
+            assertTrue(ex.getMessage().contains("incompatible data types in combination"));
+        }
+
+        // Test string types
+        sql = "SELECT ID, CASE WHEN desc > 'Volt' THEN 'Good' ELSE 'Bad' END FROM R1 ORDER BY 1;";
+        vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(2, vt.getRowCount());
+        vt.advanceRow();
+        assertEquals(vt.getLong(0), 1);
+        assertTrue(vt.getString(1).equals("Good"));
+        vt.advanceRow();
+        assertEquals(vt.getLong(0), 2);
+        if (isHSQL()) {
+            assertTrue(vt.getString(1).contains("Bad"));
+        } else {
+            assertTrue(vt.getString(1).equals("Bad"));
+        }
+
+
+        // Test string concatenation
+        sql = "SELECT ID, desc || ':' ||  CASE WHEN desc > 'Volt' THEN 'Good' ELSE 'Bad' END FROM R1 ORDER BY 1;";
+        vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(2, vt.getRowCount());
+        vt.advanceRow();
+        assertEquals(vt.getLong(0), 1);
+        assertTrue(vt.getString(1).equals("VoltDB:Good"));
+        vt.advanceRow();
+        assertEquals(vt.getLong(0), 2);
+        if (isHSQL()) {
+            assertTrue(vt.getString(1).contains("Memsql:Bad"));
+        } else {
+            assertTrue(vt.getString(1).equals("Memsql:Bad"));
+        }
+
+        cl.callProcedure("R1.insert", 3, "ORACLE",  8, 8.0, new Timestamp(1000000000000L));
+        // Test nested case when
+        sql = "SELECT ID, CASE WHEN num < 5 THEN num * 5 " +
+                "WHEN num < 10 THEN CASE WHEN num > 7 THEN num * 10 ELSE num * 8 END " +
+                "END FROM R1 ORDER BY 1;";
+        validateTableOfLongs(cl, sql, new long[][] {{1, 5},{2, 40}, {3, 80}});
+
+
+        // Test case when without ELSE clause
+        sql = "SELECT ID, CASE WHEN num > 3 AND num < 5 THEN 4 " +
+                "WHEN num >=5 THEN num END FROM R1 ORDER BY 1;";
+        vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(VoltType.INTEGER, vt.getColumnType(1));
+        if (isHSQL()) {
+            validateTableOfLongs(vt, new long[][] {{1, 0},{2,5}, {3, 8}});
+        } else {
+            validateTableOfLongs(vt, new long[][] {{1, Long.MIN_VALUE},{2,5}, {3, 8}});
+        }
+
+        sql = "SELECT ID, CASE WHEN num > 3 AND num < 5 THEN 4 " +
+                "WHEN num >=5 THEN num*10 END FROM R1 ORDER BY 1;";
+        vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(VoltType.BIGINT, vt.getColumnType(1));
+        if (isHSQL()) {
+            validateTableOfLongs(vt, new long[][] {{1, 0},{2,50}, {3, 80}});
+        } else {
+            validateTableOfLongs(vt, new long[][] {{1, Long.MIN_VALUE},{2,50}, {3, 80}});
+        }
+
+        // Test NULL
+        cl.callProcedure("R1.insert", 4, "DB2",  null, null, new Timestamp(1000000000000L));
+        sql = "SELECT ID, CASE WHEN num < 3 THEN num/2 ELSE num + 10 END FROM R1 ORDER BY 1;";
+        vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(VoltType.INTEGER, vt.getColumnType(1));
+        if (isHSQL()) {
+            validateTableOfLongs(vt, new long[][] {{1, 0},{2, 15}, {3, 18}, {4, 0}});
+        } else {
+            validateTableOfLongs(vt, new long[][] {{1, 0},{2, 15}, {3, 18}, {4, Long.MIN_VALUE}});
+        }
+
+    }
+
+    public void testCaseWhenLikeDecodeFunction() throws Exception {
+        System.out.println("STARTING test Case When like decode function...");
+        Client cl = getClient();
+        String sql;
+
+        //      ID, DESC,   NUM, FLOAT, TIMESTAMP
+        cl.callProcedure("R1.insert", 1, "VoltDB", 1, 1.0, new Timestamp(1000000000000L));
+        cl.callProcedure("R1.insert", 2, "MySQL",  5, 5.0, new Timestamp(1000000000000L));
+
+        sql = "SELECT ID, CASE num WHEN 3 THEN 3*2 WHEN 1 THEN 0 ELSE 10 END FROM R1 ORDER BY 1;";
+        validateTableOfLongs(cl, sql, new long[][] {{1, 0},{2, 10}});
+
+        // No ELSE clause
+        sql = "SELECT ID, CASE num WHEN 1 THEN 10 WHEN 2 THEN 1 END FROM R1 ORDER BY 1;";
+        if (isHSQL()) {
+            validateTableOfLongs(cl, sql, new long[][] {{1, 10},{2, 0}});
+        } else {
+            validateTableOfLongs(cl, sql, new long[][] {{1, 10},{2, Long.MIN_VALUE}});
+        }
+
+        // Test NULL
+        cl.callProcedure("R1.insert", 3, "Oracle",  null, null, new Timestamp(1000000000000L));
+        sql = "SELECT ID, CASE num WHEN 5 THEN 50 ELSE num + 10 END FROM R1 ORDER BY 1;";
+        if (isHSQL()) {
+            validateTableOfLongs(cl, sql, new long[][] {{1, 11},{2, 50}, {3, 0}});
+        } else {
+            validateTableOfLongs(cl, sql, new long[][] {{1, 11},{2, 50}, {3, Long.MIN_VALUE}});
         }
     }
 
@@ -2153,7 +2329,7 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "DESC VARCHAR(300), " +
                 "NUM INTEGER, " +
                 "RATIO FLOAT, " +
-                "PAST TIMESTAMP DEFAULT NULL, " +
+                "PAST TIMESTAMP, " +
                 "PRIMARY KEY (ID) ); " +
 
                 // Test unique generalized index on a function of an already indexed column.
@@ -2161,6 +2337,10 @@ public class TestFunctionsSuite extends RegressionSuite {
 
                 // Test generalized expression index with a constant argument.
                 "CREATE INDEX R1_ABS_ID_SCALED ON R1 ( ID / 3 ); " +
+
+                //Test generalized expression index with case when.
+                "CREATE INDEX R1_CASEWHEN ON R1 (CASE WHEN num < 3 THEN num/2 ELSE num + 10 END); " +
+
 
                 "CREATE TABLE R2 ( " +
                 "ID INTEGER DEFAULT 0 NOT NULL, " +

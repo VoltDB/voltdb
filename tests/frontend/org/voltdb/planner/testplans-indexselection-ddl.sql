@@ -25,6 +25,9 @@ create index idx_c on l (lname, a, b, id);
 create index idx_b on l (lname, b, id);
 create index idx_a on l (lname, a, id);
 
+CREATE INDEX casewhen_idx1 ON l (CASE WHEN a > b THEN a ELSE b END);
+CREATE INDEX casewhen_idx2 ON l (CASE WHEN a < 10 THEN a*5 ELSE a + 5 END);
+
 CREATE TABLE a
 (
     id BIGINT NOT NULL,

@@ -119,7 +119,13 @@ public enum ExpressionType {
     // -----------------------------
     // Internals added for Elastic
     // -----------------------------
-    HASH_RANGE    (HashRangeExpression.class, 200, "#")
+    HASH_RANGE    (HashRangeExpression.class, 200, "#"),
+
+    // -----------------------------
+    // Internals added for CASE WHEN expression.
+    // -----------------------------
+    OPERATOR_CASE_WHEN       (OperatorExpression.class,  300, "CASEWHEN"),
+    OPERATOR_ALTERNATIVE     (OperatorExpression.class,  301, "ALTERNATIVE")
     ;
 
     private final int m_value;
@@ -146,23 +152,20 @@ public enum ExpressionType {
         for (ExpressionType vt : EnumSet.allOf(ExpressionType.class)) {
             ExpressionType.idx_lookup.put(vt.m_value, vt);
             String name = vt.name().toLowerCase();
-            ExpressionType.name_lookup.put(name.intern(), vt);
+            ExpressionType.name_lookup.put(name, vt);
             //
             // Also store the name of the operation without the prefix
             // This makes it easier to parse plans
             //
             String shortName = name.substring(name.indexOf("_") + 1);
-            ExpressionType.name_lookup.put(shortName.intern(), vt);
+            ExpressionType.name_lookup.put(shortName, vt);
         }
         //
         // Alternative Operation Names
         //
-        ExpressionType.name_lookup.put("add".intern(),
-                                       ExpressionType.OPERATOR_PLUS);
-        ExpressionType.name_lookup.put("sub".intern(),
-                                       ExpressionType.OPERATOR_MINUS);
-        ExpressionType.name_lookup.put("subtract".intern(),
-                                       ExpressionType.OPERATOR_MINUS);
+        ExpressionType.name_lookup.put("add", ExpressionType.OPERATOR_PLUS);
+        ExpressionType.name_lookup.put("sub", ExpressionType.OPERATOR_MINUS);
+        ExpressionType.name_lookup.put("subtract", ExpressionType.OPERATOR_MINUS);
     }
 
     public int getValue() {
@@ -175,9 +178,11 @@ public enum ExpressionType {
     }
 
     public static ExpressionType get(String name) {
-        // TODO(XIN): intern function seems to take up 1.5% CPU of Planner.
-        ExpressionType ret =
-            ExpressionType.name_lookup.get(name.toLowerCase().intern());
+        // interned strings can't be garbage collected, so it's a potential for a memory leak.
+        // See link: http://stackoverflow.com/questions/2431540/garbage-collection-behaviour-for-string-intern
+        // or link: http://stackoverflow.com/questions/1091045/is-it-good-practice-to-use-java-lang-string-intern
+
+        ExpressionType ret = ExpressionType.name_lookup.get(name.toLowerCase());
         return (ret == null ? ExpressionType.INVALID : ret);
     }
 
