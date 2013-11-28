@@ -386,6 +386,13 @@ public class StatementQuery extends StatementDMQL {
                 groupByCols.add(expr);
             } else if (expr.opType == OpTypes.ORDER_BY) {
                 orderByCols.add(expr);
+            } else if (expr.equals(select.havingCondition)) {
+                // Having
+                if( !(expr instanceof ExpressionLogical && expr.isAggregate) ) {
+                    throw new HSQLParseException("VoltDB does not support HAVING clause without aggregation. " +
+                            "Consider using WHERE clause if possible");
+                }
+
             } else if (expr.opType != OpTypes.SIMPLE_COLUMN || (expr.isAggregate && expr.alias != null)) {
                 // Add aggregate aliases to the display columns to maintain
                 // the output schema column ordering.
@@ -415,6 +422,14 @@ public class StatementQuery extends StatementDMQL {
          * Serialize the display columns in the exprColumn order.
          */
         Set<Integer> ignoredColsIndexes = new HashSet<Integer>();
+        // having
+        if (select.havingCondition != null) {
+            VoltXMLElement having = new VoltXMLElement("having");
+            query.children.add(having);
+            VoltXMLElement havingExpr = select.havingCondition.voltGetXML(session, displayCols, ignoredColsIndexes, 0);
+            having.children.add(havingExpr);
+        }
+
         for (int jj=0; jj < displayCols.size(); ++jj) {
             Expression expr = displayCols.get(jj);
             if (ignoredColsIndexes.contains(jj)) {
@@ -435,11 +450,6 @@ public class StatementQuery extends StatementDMQL {
 
         for (RangeVariable rangeVariable : select.rangeVariables) {
             scans.children.add(rangeVariable.voltGetRangeVariableXML(session));
-        }
-
-        // having
-        if (select.havingCondition != null) {
-            throw new HSQLParseException("VoltDB does not support the HAVING clause");
         }
 
         // groupby
@@ -474,11 +484,11 @@ public class StatementQuery extends StatementDMQL {
 
         return query;
     }
-    
+
     /**
      * Extract columnref elements from the input element.
      * @param element
-     * @param cols - output collection containing the column references 
+     * @param cols - output collection containing the column references
      */
     protected void extractColumnReferences(VoltXMLElement element, List<VoltXMLElement> cols) {
         if ("columnref".equalsIgnoreCase(element.name)) {
