@@ -427,18 +427,28 @@ public class LeaderAppointer implements Promotable
             Map<Integer, Long> masters = m_iv2masters.pointInTimeCache();
             tmLog.info("LeaderAppointer repairing with master set: " + CoreUtils.hsIdValueMapToString(masters));
 
+            //Setting the map to non-null causes the babysitters to populate it when cleaning up partitions
             m_removedPartitionsAtPromotionTime = new HashSet<Integer>();
             for (Entry<Integer, Long> master : masters.entrySet()) {
+
+                //Skip processing the partition if it was cleaned up by a babysitter that was previously
+                //instantiated
                 if (m_removedPartitionsAtPromotionTime.contains(master.getKey())) {
                     tmLog.info("During promotion partition " + master.getKey() + " was cleaned up. Skipping.");
                     continue;
                 }
+
                 int partId = master.getKey();
                 String dir = LeaderElector.electionDirForPartition(partId);
                 m_callbacks.put(partId, new PartitionCallback(partId, master.getValue()));
                 Pair<BabySitter, List<String>> sitterstuff =
                         BabySitter.blockingFactory(m_zk, dir, m_callbacks.get(partId), m_es);
-                m_partitionWatchers.put(partId, sitterstuff.getFirst());
+
+                //We could get this far and then find out that creating this particular
+                //babysitter triggered cleanup so we need to bail out here as well
+                if (!m_removedPartitionsAtPromotionTime.contains(master.getKey())) {
+                    m_partitionWatchers.put(partId, sitterstuff.getFirst());
+                }
             }
             m_removedPartitionsAtPromotionTime = null;
 
