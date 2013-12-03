@@ -1,8 +1,6 @@
-=======================================
- Welcome to the VoltDB Velocity Bridge
-=======================================
-
-Strap yourself in and prepare for acceleration!
+========================
+ VoltDB Velocity Bridge
+========================
 
 Configuration
 -------------
