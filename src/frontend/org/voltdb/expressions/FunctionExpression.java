@@ -58,6 +58,10 @@ public class FunctionExpression extends AbstractExpression {
         m_functionId = id;
     }
 
+    public int getFunctionId() {
+        return m_functionId;
+    }
+
     public void setParameterArg(int parameterArg) {
         m_parameterArg = parameterArg;
     }

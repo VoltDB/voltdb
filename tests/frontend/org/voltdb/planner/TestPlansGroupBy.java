@@ -808,6 +808,57 @@ public class TestPlansGroupBy extends PlannerTestCase {
 //        checkMVFixWithJoin_reAgg(sql, 2, 1, null, null);
     }
 
+    public void testENG389_Having() {
+        //      CREATE VIEW V_P1 (V_A1, V_B1, V_CNT, V_SUM_C1, V_SUM_D1)
+        //      AS SELECT A1, B1, COUNT(*), SUM(C1), COUNT(D1)
+        //      FROM P1  GROUP BY A1, B1;
+
+        String sql = "";
+
+        failToCompile("select sum(V_A1) from v_r1 having v_cnt > 3", "invalid HAVING expression");
+        failToCompile("select sum(V_A1) from v_r1 having 3 > 3", "does not support HAVING clause without aggregation");
+
+        sql = "select V_A1, count(v_cnt) from v_r1 group by v_a1 having count(v_cnt) > 1; ";
+        checkHavingClause(sql, "count ((VOLT_TEMP_TABLE. > 1))");
+//        checkHavingClause(sql, "count ((V_R1.V_CNT > 1))");
+
+        sql = "select sum(V_A1) from v_r1 having avg(v_cnt) > 3; ";
+        checkHavingClause(sql, "avg (( > 3))");
+    }
+
+    private void checkHavingClause(String sql, Object aggPostFilters) {
+        pns = compileToFragments(sql);
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
+
+        AbstractPlanNode p = pns.get(0);
+        AggregatePlanNode aggNode;
+
+        while (p instanceof AggregatePlanNode == false) {
+            p = p.getChild(0);
+        }
+        assertTrue(p instanceof AggregatePlanNode);
+        aggNode = (AggregatePlanNode) p;
+        String aggNodeStr = aggNode.toExplainPlanString().toLowerCase();
+
+        if (aggPostFilters != null) {
+            String[] aggFilterStrings = null;
+            if (aggPostFilters instanceof String) {
+                aggFilterStrings = new String[] { (String) aggPostFilters };
+            } else {
+                aggFilterStrings = (String[]) aggPostFilters;
+            }
+            for (String aggFilter : aggFilterStrings) {
+                System.out.println(aggNodeStr.contains(aggFilter
+                        .toLowerCase()));
+                assertTrue(aggNodeStr.contains(aggFilter.toLowerCase()));
+            }
+        } else {
+            assertNull(aggNode.getPostPredicate());
+        }
+    }
+
     private void checkMVFix_reAgg(
             String sql,
             int numGroupbyOfReaggNode, int numAggsOfReaggNode) {
