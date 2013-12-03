@@ -29,6 +29,7 @@ import org.voltdb.SQLStmtAdHocHelper;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
@@ -76,7 +77,9 @@ public abstract class AdHocBase extends VoltSystemProcedure {
 
         ByteBuffer buf = ByteBuffer.wrap(serializedBatchData);
         AdHocPlannedStatement[] statements = null;
+        Object[] userparams = null;
         try {
+            userparams = AdHocPlannedStmtBatch.userParamsFromBuffer(buf);
             statements = AdHocPlannedStmtBatch.planArrayFromBuffer(buf);
         }
         catch (IOException e) {
@@ -105,7 +108,14 @@ public abstract class AdHocBase extends VoltSystemProcedure {
                 collectorFragId = ActivePlanRepository.loadOrAddRefPlanFragment(
                         statement.core.collectorHash, statement.core.collectorFragment);
             }
-
+if (statement.core.parameterTypes == null) {
+System.out.println("DEBUG ad hoc core param types: NONE?");
+} else {
+System.out.println("DEBUG ad hoc core param types: " + statement.core.parameterTypes.length);
+for (VoltType vt : statement.core.parameterTypes) {
+System.out.println("DEBUG ad hoc core param type:  " + vt);
+}
+}
             SQLStmt stmt = SQLStmtAdHocHelper.createWithPlan(
                     statement.sql,
                     aggFragId,
@@ -119,7 +129,14 @@ public abstract class AdHocBase extends VoltSystemProcedure {
                     statement.core.parameterTypes,
                     m_site);
 
-            voltQueueSQL(stmt, statement.extractedParamValues.toArray());
+            // When there are no user-provided parameters, statements may have parameterized constants.
+            Object[] params;
+            if (userparams.length > 0) {
+                params = userparams;
+            } else {
+                params = statement.extractedParamArray();
+            }
+            voltQueueSQL(stmt, params);
         }
 
         return voltExecuteSQL(true);

@@ -171,4 +171,18 @@ class ParameterizationInfo {
         assert(ParameterConverter.verifyParameterConversion(retval, type.classFromType()));
         return retval;
     }
+
+    public Object[] extractedParamValues(VoltType[] parameterTypes) throws Exception {
+        assert(paramLiteralValues.length == parameterTypes.length);
+        Object[] params = new Object[paramLiteralValues.length];
+
+        // the extracted params are all strings at first.
+        // after the planner infers their types, fix them up
+        // the only exception is that nulls are Java NULL, and not the string "null".
+        for (int i = 0; i < paramLiteralValues.length; i++) {
+            params[i] = valueForStringWithType(paramLiteralValues[i], parameterTypes[i]);
+        }
+
+        return params;
+    }
 }

@@ -28,6 +28,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -47,8 +48,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.json_voltpatches.JSONArray;
-import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -82,8 +81,6 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
-import org.voltdb.common.Constants;
-import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
 import org.voltdb.compiler.AsyncCompilerResult;
@@ -102,8 +99,6 @@ import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
-import org.voltdb.plannodes.PlanNodeTree;
-import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
@@ -1163,6 +1158,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         registerPolicy(new ReplicaInvocationAcceptancePolicy(replicationRole == ReplicationRole.REPLICA));
 
         registerPolicy("@AdHoc", new AdHocAcceptancePolicy(true));
+        registerPolicy("@AdHocSpForTest", new AdHocAcceptancePolicy(true));
         registerPolicy("@UpdateApplicationCatalog", new UpdateCatalogAcceptancePolicy(true));
     }
 
@@ -1299,88 +1295,39 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     private void processExplainPlannedStmtBatch(  AdHocPlannedStmtBatch planBatch ) {
-            final Connection c = (Connection)planBatch.clientData;
-            Database db = m_catalogContext.get().database;
-            int size = planBatch.getPlannedStatementCount();
+        final Connection c = (Connection)planBatch.clientData;
+        Database db = m_catalogContext.get().database;
+        int size = planBatch.getPlannedStatementCount();
 
-            List<byte[]> aggByteArray = new ArrayList<byte[]>( size );
-            for (AdHocPlannedStatement plannedStatement : planBatch.plannedStatements ) {
-                aggByteArray.add(plannedStatement.core.aggregatorFragment);
-            }
-
-            List<byte[]> collByteArray = new ArrayList<byte[]>( size );
-            for (AdHocPlannedStatement plannedStatement : planBatch.plannedStatements ) {
-                collByteArray.add(plannedStatement.core.collectorFragment);
-            }
-
-            VoltTable[] vt = new VoltTable[ size ];
-
-            for( int i = 0; i<size; i++ ) {
-                byte[] aggByte = aggByteArray.get(i);
-                byte[] collByte = collByteArray.get(i);
-                if( collByte == null ) {
-                    //signle partition query plan
-                    String plan = new String( aggByte, Constants.UTF8ENCODING);
-                    PlanNodeTree pnt = new PlanNodeTree();
-                    try {
-                        JSONObject jobj = new JSONObject( plan );
-                        JSONArray jarray =  jobj.getJSONArray(PlanNodeTree.Members.PLAN_NODES.name());
-                        pnt.loadFromJSONArray(jarray, db);
-                        String str = pnt.getRootPlanNode().toExplainPlanString();
-                        vt[i] = new VoltTable(new VoltTable.ColumnInfo( "EXECUTION_PLAN", VoltType.STRING));
-                        vt[i].addRow(str);
-                    } catch (JSONException e) {
-                        System.out.println(e.getMessage());
-                    }
-                }
-                else {
-                    //multi-partition query plan
-                    String aggplan = new String( aggByte, Constants.UTF8ENCODING);
-                    String collplan = new String( collByte, Constants.UTF8ENCODING);
-                    PlanNodeTree pnt = new PlanNodeTree();
-                    PlanNodeTree collpnt = new PlanNodeTree();
-                    try {
-                        JSONObject jobj = new JSONObject( aggplan );
-                        JSONArray jarray =  jobj.getJSONArray(PlanNodeTree.Members.PLAN_NODES.name());
-                        pnt.loadFromJSONArray(jarray, db);
-                        //reattach plan fragments
-                        jobj = new JSONObject( collplan );
-                        jarray =  jobj.getJSONArray(PlanNodeTree.Members.PLAN_NODES.name());
-                        collpnt.loadFromJSONArray(jarray, db);
-                        assert( collpnt.getRootPlanNode() instanceof SendPlanNode);
-                        pnt.getRootPlanNode().reattachFragment( (SendPlanNode) collpnt.getRootPlanNode() );
-
-                        String str = pnt.getRootPlanNode().toExplainPlanString();
-                        vt[i] = new VoltTable(new VoltTable.ColumnInfo( "EXECUTION_PLAN", VoltType.STRING));
-                        vt[i].addRow(str);
-                    } catch (JSONException e) {
-                        System.out.println(e.getMessage());
-                    }
-                }
-            }
-
-            ClientResponseImpl response =
-                    new ClientResponseImpl(
-                            ClientResponseImpl.SUCCESS,
-                            ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
-                            null,
-                            vt,
-                            null);
-            response.setClientHandle( planBatch.clientHandle );
-            ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
-            buf.putInt(buf.capacity() - 4);
-            response.flattenToBuffer(buf);
-            buf.flip();
-            c.writeStream().enqueue(buf);
-
-         //do not cache the plans for explainAdhoc
-    //        planBatch.clientData = null;
-    //        for (int index = 0; index < planBatch.getPlannedStatementCount(); index++) {
-    //            m_adhocCache.put(planBatch.getPlannedStatement(index));
-    //        }
+        VoltTable[] vt = new VoltTable[ size ];
+        for (int i = 0; i < size; ++i) {
+            vt[i] = new VoltTable(new VoltTable.ColumnInfo("EXECUTION_PLAN", VoltType.STRING));
+            String str = planBatch.explainStatement(i, db);
+            vt[i].addRow(str);
         }
 
-    //go to catolog and fetch all explain plan of queries in the procedure
+        ClientResponseImpl response =
+                new ClientResponseImpl(
+                        ClientResponseImpl.SUCCESS,
+                        ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
+                        null,
+                        vt,
+                        null);
+        response.setClientHandle( planBatch.clientHandle );
+        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
+        buf.putInt(buf.capacity() - 4);
+        response.flattenToBuffer(buf);
+        buf.flip();
+        c.writeStream().enqueue(buf);
+
+        //do not cache the plans for explainAdhoc
+        //        planBatch.clientData = null;
+        //        for (int index = 0; index < planBatch.getPlannedStatementCount(); index++) {
+        //            m_adhocCache.put(planBatch.getPlannedStatement(index));
+        //        }
+    }
+
+    // Go to the catalog and fetch all the "explain plan" strings of the queries in the procedure.
     ClientResponseImpl dispatchExplainProcedure(StoredProcedureInvocation task, ClientInputHandler handler, Connection ccxn) {
         ParameterSet params = task.getParams();
         //String procs = (String) params.toArray()[0];
@@ -1424,40 +1371,54 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return null;
     }
 
-    ClientResponseImpl dispatchAdHoc(StoredProcedureInvocation task, ClientInputHandler handler, Connection ccxn, boolean isExplain) {
+    private final ClientResponseImpl dispatchAdHoc(StoredProcedureInvocation task,
+            ClientInputHandler handler, Connection ccxn, boolean isExplain) {
         ParameterSet params = task.getParams();
-        String sql = (String) params.toArray()[0];
-
-        // get the partition param if it exists
-        // null means MP-txn
-        Object partitionParam = null;
-        if (params.toArray().length > 1) {
-            if (params.toArray()[1] == null) {
-                // nulls map to zero
-                partitionParam = new Long(0);
-                // skip actual null value because it means MP txn
-            }
-            else {
-                partitionParam = params.toArray()[1];
-            }
+        Object[] paramArray = params.toArray();
+        String sql = (String) paramArray[0];
+        Object[] userParams = null;
+        if (params.size() > 1) {
+            userParams = Arrays.copyOfRange(paramArray, 1, paramArray.length);
         }
+        dispatchAdHocCommon(task, handler, ccxn, isExplain, sql, userParams, null);
+        return null;
+    }
 
+    private final ClientResponseImpl dispatchAdHocSpForTest(StoredProcedureInvocation task,
+            ClientInputHandler handler, Connection ccxn, boolean isExplain) {
+        ParameterSet params = task.getParams();
+        assert(params.size() > 1);
+        Object[] paramArray = params.toArray();
+        String sql = (String) paramArray[0];
+        // get the partition param which must exist
+        Object[] userPartitionKey = Arrays.copyOfRange(paramArray, 1, 2);
+        Object[] userParams = null;
+        // There's no reason (any more) that AdHocSP's can't have '?' parameters, but
+        // note that the explicit partition key argument is not considered one of them.
+        if (params.size() > 2) {
+            userParams = Arrays.copyOfRange(paramArray, 2, paramArray.length);
+        }
+        dispatchAdHocCommon(task, handler, ccxn, isExplain, sql, userParams, userPartitionKey);
+        return null;
+    }
+
+    private final void dispatchAdHocCommon(StoredProcedureInvocation task,
+            ClientInputHandler handler, Connection ccxn, boolean isExplain,
+            String sql, Object[] userParams, Object[] userPartitionKey) {
         List<String> sqlStatements = MiscUtils.splitSQLStatements(sql);
+        String[] stmtsArray = sqlStatements.toArray(new String[sqlStatements.size()]);
 
         AdHocPlannerWork ahpw = new AdHocPlannerWork(
                 m_siteId,
-                false, task.clientHandle, handler.connectionId(),
-                ccxn.getHostnameAndIPAndPort(), handler.isAdmin(), ccxn,
-                sql, sqlStatements, partitionParam, null, false, true,
+                task.clientHandle, handler.connectionId(),
+                handler.isAdmin(), ccxn,
+                sql, stmtsArray, userParams, null, isExplain,
+                userPartitionKey == null, userPartitionKey, -1,
                 task.type, task.originalTxnId, task.originalUniqueId,
                 m_adhocCompletionHandler);
-        if( isExplain ){
-            ahpw.setIsExplainWork();
-        }
         LocalObjectMessage work = new LocalObjectMessage( ahpw );
 
         m_mailbox.send(m_plannerSiteId, work);
-        return null;
     }
 
     ClientResponseImpl dispatchUpdateApplicationCatalog(StoredProcedureInvocation task,
@@ -1682,7 +1643,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         if (catProc == null) {
-            if( task.procName.equals("@AdHoc") ){
+            if (task.procName.equals("@AdHoc") || task.procName.equals("@AdHocSpForTest")) {
                 // Map @AdHoc... to @AdHoc_RW_MP for validation. In the future if security is
                 // configured differently for @AdHoc... variants this code will have to
                 // change in order to use the proper variant based on whether the work
@@ -1690,10 +1651,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 catProc = SystemProcedureCatalog.listing.get("@AdHoc_RW_MP").asCatalogProcedure();
                 assert(catProc != null);
             }
-            else if( task.procName.equals("@Explain") ){
-                return dispatchAdHoc(task, handler, ccxn, true );
+            else if (task.procName.equals("@Explain")) {
+                return dispatchAdHoc(task, handler, ccxn, true);
             }
-            else if(task.procName.equals("@ExplainProc")) {
+            else if (task.procName.equals("@ExplainProc")) {
                 return dispatchExplainProcedure(task, handler, ccxn);
             }
             else if (task.procName.equals("@SendSentinel")) {
@@ -1738,6 +1699,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             // these have helpers that do all the work...
             if (task.procName.equals("@AdHoc")) {
                 return dispatchAdHoc(task, handler, ccxn, false);
+            } else if (task.procName.equals("@AdHocSpForTest")) {
+                return dispatchAdHocSpForTest(task, handler, ccxn, false);
             } else if (task.procName.equals("@UpdateApplicationCatalog")) {
                 return dispatchUpdateApplicationCatalog(task, handler, ccxn);
             } else if (task.procName.equals("@LoadMultipartitionTable")) {
@@ -1879,12 +1842,21 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     void createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch)
             throws VoltTypeException
     {
+        ByteBuffer buf = null;
+        try {
+            buf = plannedStmtBatch.flattenPlanArrayToBuffer();
+        }
+        catch (Exception e) {
+            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+        }
+        assert(buf.hasArray());
+
         // create the execution site task
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         // DR stuff
-        task.type = plannedStmtBatch.type;
-        task.originalTxnId = plannedStmtBatch.originalTxnId;
-        task.originalUniqueId = plannedStmtBatch.originalUniqueId;
+        task.type = plannedStmtBatch.work.type;
+        task.originalTxnId = plannedStmtBatch.work.originalTxnId;
+        task.originalUniqueId = plannedStmtBatch.work.originalUniqueId;
         // pick the sysproc based on the presence of partition info
         // HSQL does not specifically implement AdHoc SP -- instead, use its always-SP implementation of AdHoc
         boolean isSinglePartition = plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForHSQL;
@@ -1901,11 +1873,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             // replicated table read is single-part without a partitioning param
             // I copied this from below, but I'm not convinced that the above statement is correct
             // or that the null behavior here either (a) ever actually happens or (b) has the
-            // desired intent
-            if (plannedStmtBatch.partitionParam != null) {
-                type = VoltType.typeFromObject(plannedStmtBatch.partitionParam).getValue();
+            // desired intent.
+            Object partitionParam = plannedStmtBatch.partitionParam();
+            byte[] param = null;
+            if (partitionParam != null) {
+                type = VoltType.typeFromClass(partitionParam.getClass()).getValue();
+                param = TheHashinator.valueToBytes(partitionParam);
             }
-            partition = TheHashinator.getPartitionForParameter(type, plannedStmtBatch.partitionParam);
+            partition = TheHashinator.getPartitionForParameter(type, partitionParam);
+
+            // Send the partitioning parameter and its type along so that the site can check if
+            // it's mis-partitioned. Type is needed to re-hashinate for command log re-init.
+            task.setParams(param, (byte)type, buf.array());
         }
         else {
             if (plannedStmtBatch.isReadOnly()) {
@@ -1914,30 +1893,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             else {
                 task.procName = "@AdHoc_RW_MP";
             }
-        }
-
-        // Set up the parameters.
-        ByteBuffer buf = ByteBuffer.allocate(plannedStmtBatch.getPlanArraySerializedSize());
-        try {
-            plannedStmtBatch.flattenPlanArrayToBuffer(buf);
-        }
-        catch (Exception e) {
-            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-        }
-        assert(buf.hasArray());
-        if (isSinglePartition) {
-            byte[] param = null;
-            byte type = VoltType.NULL.getValue();
-            // replicated table read is single-part without a partitioning param
-            if (plannedStmtBatch.partitionParam != null) {
-                type = VoltType.typeFromClass(plannedStmtBatch.partitionParam.getClass()).getValue();
-                param = TheHashinator.valueToBytes(plannedStmtBatch.partitionParam);
-            }
-
-            // Send the partitioning parameter and its type along so that the site can check if
-            // it's mis-partitioned. Type is needed to re-hashinate for command log re-init.
-            task.setParams(param, type, buf.array());
-        } else {
             task.setParams(buf.array());
         }
         task.clientHandle = plannedStmtBatch.clientHandle;
@@ -1985,23 +1940,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                rest of the system. If the adhoc sql was planned against an
                                obsolete catalog, re-plan. */
                             LocalObjectMessage work = new LocalObjectMessage(
-                                    new AdHocPlannerWork(m_siteId,
-                                            false,
-                                            plannedStmtBatch.clientHandle,
-                                            plannedStmtBatch.connectionId,
-                                            plannedStmtBatch.hostname,
-                                            plannedStmtBatch.adminConnection,
-                                            plannedStmtBatch.clientData,
-                                            plannedStmtBatch.sqlBatchText,
-                                            plannedStmtBatch.getSQLStatements(),
-                                            plannedStmtBatch.partitionParam,
-                                            null,
-                                            false,
-                                            true,
-                                            plannedStmtBatch.type,
-                                            plannedStmtBatch.originalTxnId,
-                                            plannedStmtBatch.originalUniqueId,
-                                            m_adhocCompletionHandler));
+                                    AdHocPlannerWork.rework(plannedStmtBatch.work, m_adhocCompletionHandler));
 
                             m_mailbox.send(m_plannerSiteId, work);
                         }
@@ -2013,8 +1952,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                 createAdHocTransaction(plannedStmtBatch);
                             }
                             catch (VoltTypeException vte) {
+                                Object partitionParam = plannedStmtBatch.partitionParam();
                                 String msg = "Unable to hash the partition for adhoc partition value: " +
-                                    plannedStmtBatch.partitionParam + ", msg: " + vte.getMessage();
+                                        (partitionParam == null ? "null" : partitionParam.toString()) +
+                                        ", msg: " + vte.getMessage();
                                 ClientResponseImpl errorResponse =
                                     new ClientResponseImpl(
                                             ClientResponseImpl.GRACEFUL_FAILURE,
@@ -2114,14 +2055,27 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 try {
                      ft.get();
                 } catch (Exception e) {
-                    StringWriter sw = new StringWriter();
-                    PrintWriter pw = new PrintWriter(sw);
-                    e.printStackTrace(pw);
-                    pw.flush();
+                    String realReason = result.errorMsg;
+                    // Prefer adding detail to reporting an anonymous exception.
+                    // This helped debugging when it caught a programming error
+                    // -- not sure if this ever should catch anything in production code
+                    // that could be explained in friendlier user terms.
+                    // In that case, the root cause stack trace might be more of a distraction.
+                    if (realReason == null) {
+                        StringWriter sw = new StringWriter();
+                        PrintWriter pw = new PrintWriter(sw);
+                        e.printStackTrace(pw);
+                        Throwable cause = e.getCause();
+                        if (cause != null) {
+                            cause.printStackTrace(pw);
+                        }
+                        pw.flush();
+                        realReason = sw.toString();
+                    }
                     ClientResponseImpl errorResponse =
                             new ClientResponseImpl(
                                     ClientResponseImpl.UNEXPECTED_FAILURE,
-                                    new VoltTable[0], result.errorMsg,
+                                    new VoltTable[0], realReason,
                                     result.clientHandle);
                     ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
                     buf.putInt(buf.capacity() - 4);

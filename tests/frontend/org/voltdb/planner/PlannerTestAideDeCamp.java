@@ -94,26 +94,22 @@ public class PlannerTestAideDeCamp {
      */
     CompiledPlan compileAdHocPlan(String sql, DeterminismMode detMode)
     {
-        compile(sql, 0, null, null, detMode);
+        compile(sql, 0, null, true, false, detMode);
         return m_currentPlan;
     }
 
     List<AbstractPlanNode> compile(String sql, int paramCount, boolean singlePartition, String joinOrder) {
-        Object partitionParameter = null;
-        if (singlePartition) {
-            partitionParameter = "Forced single partitioning";
-        }
-        return compile(sql, paramCount, joinOrder, partitionParameter, DeterminismMode.SAFER);
+        return compile(sql, paramCount, joinOrder, false, true, DeterminismMode.SAFER);
     }
 
     /**
      * Compile and cache the statement and plan and return the final plan graph.
      */
-    private List<AbstractPlanNode> compile(String sql, int paramCount, String joinOrder, Object partitionParameter, DeterminismMode detMode)
+    private List<AbstractPlanNode> compile(String sql, int paramCount, String joinOrder, boolean inferPartitioning, boolean forceSingle, DeterminismMode detMode)
     {
         Statement catalogStmt = proc.getStatements().add("stmt-" + String.valueOf(compileCounter++));
         catalogStmt.setSqltext(sql);
-        catalogStmt.setSinglepartition(partitionParameter != null);
+        catalogStmt.setSinglepartition(forceSingle);
         catalogStmt.setBatched(false);
         catalogStmt.setParamnum(paramCount);
 
@@ -138,13 +134,23 @@ public class PlannerTestAideDeCamp {
 
         DatabaseEstimates estimates = new DatabaseEstimates();
         TrivialCostModel costModel = new TrivialCostModel();
-        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, true, true);
+        PartitioningForStatement partitioning;
+        if (inferPartitioning) {
+            partitioning = PartitioningForStatement.inferPartitioning();
+        } else if (forceSingle) {
+            partitioning = PartitioningForStatement.forceSP();
+        } else {
+            partitioning = PartitioningForStatement.forceMP();
+        }
         QueryPlanner planner =
             new QueryPlanner(catalogStmt.getSqltext(), catalogStmt.getTypeName(),
                     catalogStmt.getParent().getTypeName(), catalog.getClusters().get("cluster"),
                     db, partitioning, hsql, estimates, false, StatementCompiler.DEFAULT_MAX_JOIN_TABLES,
                     costModel, null, joinOrder, detMode);
 
+        if (partitioning.isInferred()) {
+            catalogStmt.setSinglepartition(partitioning.isInferredSingle());
+        }
         CompiledPlan plan = null;
         planner.parse();
         plan = planner.plan();
@@ -152,7 +158,6 @@ public class PlannerTestAideDeCamp {
 
         // Input Parameters
         // We will need to update the system catalogs with this new information
-        // If this is an adhoc query then there won't be any parameters
         for (int i = 0; i < plan.parameters.length; ++i) {
             StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(i));
             ParameterValueExpression pve = plan.parameters[i];
