@@ -428,7 +428,11 @@ public class LeaderAppointer implements Promotable
             tmLog.info("LeaderAppointer repairing with master set: " + CoreUtils.hsIdValueMapToString(masters));
 
             //Setting the map to non-null causes the babysitters to populate it when cleaning up partitions
+            //We are only racing with ourselves in that the creation of a babysitter can trigger callbacks
+            //that result in partitions being cleaned up. We don't have to worry about some other leader appointer.
+            //The iteration order of the partitions doesn't matter
             m_removedPartitionsAtPromotionTime = new HashSet<Integer>();
+
             for (Entry<Integer, Long> master : masters.entrySet()) {
 
                 //Skip processing the partition if it was cleaned up by a babysitter that was previously
