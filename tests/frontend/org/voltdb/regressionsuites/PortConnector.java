@@ -56,17 +56,18 @@ public class PortConnector {
 
     }
 
-    public void write(ByteBuffer buf) throws IOException {
-
+    public long write(ByteBuffer buf) throws IOException {
+        long wrote = 0;
         while (buf.hasRemaining()) {
-            m_socket.write(buf);
+            wrote += m_socket.write(buf);
         }
+        return wrote;
     }
 
     public void read(ByteBuffer buf, long sz) throws IOException {
 
-        while (buf.hasRemaining()) {
-            m_socket.read(buf);
+        while (buf.hasRemaining() && sz > 0) {
+            sz -= m_socket.read(buf);
         }
     }
 

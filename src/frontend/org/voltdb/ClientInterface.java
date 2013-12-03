@@ -1659,7 +1659,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     final ClientResponseImpl handleRead(ByteBuffer buf, ClientInputHandler handler, Connection ccxn) throws IOException {
         final long now = System.currentTimeMillis();
         final FastDeserializer fds = new FastDeserializer(buf);
-        final StoredProcedureInvocation task = fds.readObject(StoredProcedureInvocation.class);
+        StoredProcedureInvocation task = null;
+        try {
+            task = fds.readObject(StoredProcedureInvocation.class);
+        } catch (Exception ex) {
+            return new ClientResponseImpl(
+                    ClientResponseImpl.UNEXPECTED_FAILURE,
+                    new VoltTable[0], ex.getMessage(), ccxn.connectionId());
+        }
         ClientResponseImpl error = null;
 
         // Check for admin mode restrictions before proceeding any further

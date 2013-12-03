@@ -26,11 +26,9 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
-
-import static junit.framework.Assert.assertTrue;
 import junit.framework.TestCase;
-
 import org.voltdb.BackendTarget;
+
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.compiler.VoltProjectBuilder;
 
@@ -61,8 +59,7 @@ public class TestClientPortChannel extends TestCase {
 
             m_config.portGenerator.enablePortProvider();
             m_config.portGenerator.pprovider.setNextClient(rport);
-            m_config.setHasLocalServer(true);
-
+            m_config.setHasLocalServer(false);
             boolean success = m_config.compile(builder);
             assertTrue(success);
 
@@ -73,6 +70,7 @@ public class TestClientPortChannel extends TestCase {
             fail(ex.getMessage());
         } finally {
         }
+//        rport = 21212;
     }
 
     /**
@@ -81,10 +79,9 @@ public class TestClientPortChannel extends TestCase {
      */
     @Override
     public void tearDown() throws Exception {
-        m_config.shutDown();
-    }
-
-    public void testClientPortChannel() throws Exception {
+        if (m_config != null) {
+            m_config.shutDown();
+        }
     }
 
     public void login(PortConnector conn) throws Exception {
@@ -130,114 +127,248 @@ public class TestClientPortChannel extends TestCase {
         channel.close();
     }
 
-    public void testClientPortChannelBadLoginMessage() throws Exception {
-        //Just connect and disconnect
-        PortConnector channel = new PortConnector("localhost", rport);
-        System.out.println("Testing Connect and Close");
-        for (int i = 0; i < 100; i++) {
-            channel.connect();
-            channel.close();
-        }
-
-        //Bad +ve length
-        System.out.println("Testing bad login message");
-        channel.connect();
-        ByteBuffer buf = ByteBuffer.allocate(Integer.SIZE);
-        buf.putInt(10);
-        buf.position(0);
-        channel.write(buf);
-        channel.close();
-
-        //Bad -ve length.
-        System.out.println("Testing negative length of message");
-        channel.connect();
-        buf = ByteBuffer.allocate(Integer.SIZE);
-        buf.putInt(-1);
-        buf.position(0);
-        channel.write(buf);
-        channel.close();
-
-        //Bad 0 length.
-        System.out.println("Testing zero length of message");
-        channel.connect();
-        buf = ByteBuffer.allocate(Integer.SIZE);
-        buf.putInt(0);
-        buf.position(0);
-        channel.write(buf);
-        channel.close();
-
-        //too big length
-        System.out.println("Testing too big length of message");
-        channel.connect();
-        buf = ByteBuffer.allocate(Integer.SIZE);
-        buf.putInt(Integer.MAX_VALUE);
-        buf.position(0);
-        channel.write(buf);
-        channel.close();
-
-        //login message with bad service
-        channel.connect();
-        buf = ByteBuffer.allocate(41);
-        buf.putInt(37);
-        buf.put((byte) '0');
-        buf.putInt(8);
-        buf.put("datacase".getBytes("UTF-8"));
-        buf.putInt(0);
-        buf.put("".getBytes("UTF-8"));
-        buf.put(ConnectionUtil.getHashedPassword(""));
-        buf.flip();
-        channel.write(buf);
-
-        ByteBuffer resp = ByteBuffer.allocate(4);
-        boolean excalled = false;
-        try {
-            channel.read(resp, 4);
-        } catch (IOException ioex) {
-            //Should get called;
-            excalled = true;
-        }
-        assertTrue(excalled);
-        channel.close();
-
-        //Make sure server is up and we can login/connect
-        doLoginAndClose();
-
-    }
+//    public void testClientPortChannelBadLoginMessage() throws Exception {
+//        //Just connect and disconnect
+//        PortConnector channel = new PortConnector("localhost", rport);
+//        System.out.println("Testing Connect and Close");
+//        for (int i = 0; i < 100; i++) {
+//            channel.connect();
+//            channel.close();
+//        }
+//
+//        //Bad +ve length
+//        System.out.println("Testing bad login message");
+//        channel.connect();
+//        ByteBuffer buf = ByteBuffer.allocate(Integer.SIZE);
+//        buf.putInt(10);
+//        buf.position(0);
+//        channel.write(buf);
+//        channel.close();
+//
+//        //Bad -ve length.
+//        System.out.println("Testing negative length of message");
+//        channel.connect();
+//        buf = ByteBuffer.allocate(Integer.SIZE);
+//        buf.putInt(-1);
+//        buf.position(0);
+//        channel.write(buf);
+//        channel.close();
+//
+//        //Bad 0 length.
+//        System.out.println("Testing zero length of message");
+//        channel.connect();
+//        buf = ByteBuffer.allocate(Integer.SIZE);
+//        buf.putInt(0);
+//        buf.position(0);
+//        channel.write(buf);
+//        channel.close();
+//
+//        //too big length
+//        System.out.println("Testing too big length of message");
+//        channel.connect();
+//        buf = ByteBuffer.allocate(Integer.SIZE);
+//        buf.putInt(Integer.MAX_VALUE);
+//        buf.position(0);
+//        channel.write(buf);
+//        channel.close();
+//
+//        //login message with bad service
+//        channel.connect();
+//        buf = ByteBuffer.allocate(41);
+//        buf.putInt(37);
+//        buf.put((byte) '0');
+//        buf.putInt(8);
+//        buf.put("datacase".getBytes("UTF-8"));
+//        buf.putInt(0);
+//        buf.put("".getBytes("UTF-8"));
+//        buf.put(ConnectionUtil.getHashedPassword(""));
+//        buf.flip();
+//        channel.write(buf);
+//
+//        ByteBuffer resp = ByteBuffer.allocate(4);
+//        boolean excalled = false;
+//        try {
+//            channel.read(resp, 4);
+//            resp.flip();
+//            assertEquals(resp.getInt(), 5);
+//        } catch (Exception ioex) {
+//            //Should not get called; we get a legit response.
+//            excalled = true;
+//        }
+//        assertFalse(excalled);
+//        channel.close();
+//
+//        //Make sure server is up and we can login/connect
+//        doLoginAndClose();
+//
+//    }
 
     public void testInvocation() throws Exception {
         PortConnector channel = new PortConnector("localhost", rport);
         channel.connect();
 
-        //Send invocation message before login.
+        //Now start testing combinations of invocation messages.
+        //Start with a good Ping procedure invocation.
+        System.out.println("Testing good Ping invocation before login");
+        byte pingr[] = {0, //Version
+            0, 0, 0, 5,
+            '@', 'P', 'i', 'n', 'g', //proc string length and name
+            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
+            0, 0
+        };
+        boolean failed = false;
+        try {
+            verifyInvocation(pingr, channel, (byte) 1);
+        } catch (Exception ioe) {
+            System.out.println("Good that we could not execute a proc.");
+            failed = true;
+        }
+        assertTrue(failed);
+
+        //reconnect as we should have bombed.
+        channel.connect();
+        //Send login message before invocation.
         login(channel);
 
         //Now start testing combinations of invocation messages.
-        byte pingr[] = {'0', //Version
-            '0', '0', '0', '4', 'P', 'i', 'n', 'g', //proc string length and name
-            '0', '0', '0', '0', '0', '0', '0', '0', //Client Data
-            '0', '0'
-        };
-        ByteBuffer buf = ByteBuffer.allocate(pingr.length + 4);
-        buf.putInt(pingr.length);
-        buf.put(pingr);
-        buf.flip();
+        //Start with a good Ping procedure invocation.
+        System.out.println("Testing good Ping invocation");
+        verifyInvocation(pingr, channel, (byte) 1);
 
+        //With bad message length of various shapes and sizes
+        //Procedure name length mismatch
+        System.out.println("Testing Ping invocation with bad procname length");
+        byte bad_length[] = {0, //Version
+            0, 0, 0, 6,
+            '@', 'P', 'i', 'n', 'g', //proc string length and name
+            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
+            0, 0
+        };
+        verifyInvocation(bad_length, channel, (byte) -3);
+        //Procedure name length -ve long
+        System.out.println("Testing Ping invocation with -1 procname length.");
+        byte neg1_length[] = {0, //Version
+            0, 0, 0, 0,
+            '@', 'P', 'i', 'n', 'g', //proc string length and name
+            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
+            0, 0
+        };
+        byte iarr[] = ByteBuffer.allocate(4).putInt(-1).array();
+        for (int i = 0; i < 4; i++) {
+            neg1_length[i + 1] = iarr[i];
+        }
+        verifyInvocation(neg1_length, channel, (byte) -3);
+
+        System.out.println("Testing Ping invocation with -200 procname length.");
+        byte neg2_length[] = {0, //Version
+            0, 0, 0, 0,
+            '@', 'P', 'i', 'n', 'g', //proc string length and name
+            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
+            0, 0
+        };
+        iarr = ByteBuffer.allocate(4).putInt(-200).array();
+        for (int i = 0; i < 4; i++) {
+            neg1_length[i + 1] = iarr[i];
+        }
+        verifyInvocation(neg1_length, channel, (byte) -3);
+
+        //Procedure name length too long
+        System.out.println("Testing Ping invocation with looooong procname length.");
+        byte too_long_length[] = {0, //Version
+            0, 0, 0, 0,
+            '@', 'P', 'i', 'n', 'g', //proc string length and name
+            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
+            0, 0
+        };
+        iarr = ByteBuffer.allocate(4).putInt(Integer.MAX_VALUE).array();
+        for (int i = 0; i < 4; i++) {
+            too_long_length[i + 1] = iarr[i];
+        }
+        verifyInvocation(too_long_length, channel, (byte) -3);
+
+        //Bad protocol version
+        System.out.println("Testing good Ping invocation with bad protocol version.");
+        byte bad_proto[] = {1, //Version
+            0, 0, 0, 5,
+            '@', 'P', 'i', 'n', 'g', //proc string length and name
+            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
+            0, 0
+        };
+        verifyInvocation(bad_proto, channel, (byte) 1);
+
+        //Client Data - Bad Data meaning invalid number of bytes.
+        System.out.println("Testing good Ping invocation with incomplete client data");
+        byte bad_cl_data[] = {0, //Version
+            0, 0, 0, 5,
+            '@', 'P', 'i', 'n', 'g', //proc string length and name
+            0, 0 //Client Data
+        };
+        verifyInvocation(bad_cl_data, channel, (byte) -3);
+        //too big cient data
+        System.out.println("Testing good Ping invocation with big client data");
+        byte big_cl_data[] = {0, //Version
+            0, 0, 0, 5,
+            '@', 'P', 'i', 'n', 'g', //proc string length and name
+            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
+            0, 0, 0, 0, 0, 0
+        };
+        verifyInvocation(bad_cl_data, channel, (byte) -3);
+        System.out.println("Testing good Ping invocation Again");
+        verifyInvocation(pingr, channel, (byte) 1);
+        channel.close();
+    }
+
+    public void testInvocationParams() throws Exception {
+        PortConnector channel = new PortConnector("localhost", rport);
+        channel.connect();
+
+        //Send login message before invocation.
+        login(channel);
+
+        //Now start testing combinations of invocation messages with invocation params.
+        channel.close();
+    }
+
+    private ByteBuffer verifyInvocation(byte[] in, PortConnector channel, byte expected_status) throws IOException {
+        ByteBuffer buf = ByteBuffer.allocate(in.length + 4);
+        buf.putInt(in.length);
+        buf.put(in);
+        buf.flip();
         channel.write(buf);
 
         ByteBuffer lenbuf = ByteBuffer.allocate(4);
-        channel.read(lenbuf, 4);
+        channel.read(lenbuf, 1);
+        channel.read(lenbuf, 1);
+        channel.read(lenbuf, 1);
+        channel.read(lenbuf, 1);
         lenbuf.flip();
         int len = lenbuf.getInt();
         System.out.println("Response length is: " + len);
 
-        //Start with a good Ping procedure invocation.
-        //With bad message length of various shapes and sizes
-        //Bad protocol version
-        //Procedure name length mismatch
-        //Procedure name length toooooo long
-        //Client Data - Bad Data
-        //too big cient data
-        //Invalid invocation params.
-    }
+        ByteBuffer respbuf = ByteBuffer.allocate(len);
+        channel.read(respbuf, len - 4);
+        respbuf.flip();
+        System.out.println("Version is: " + respbuf.get());
 
+        //client handle data
+        long handle = respbuf.getLong();
+        System.out.println("Client Data is: " + handle);
+        //fields present and status code.
+
+        byte fp = respbuf.get();
+        System.out.println("Fields Present is: " + fp);
+        byte status = respbuf.get();
+        System.out.println("Status is: " + status);
+        assertEquals(expected_status, status);
+
+        len = respbuf.getInt();
+        System.out.println("Status length is: " + len);
+        if (len > 0) {
+            byte statusb[] = new byte[len];
+            respbuf.get(statusb);
+            System.out.println("Status is: " + new String(statusb, "UTF-8"));
+        }
+
+        return respbuf;
+    }
 }
