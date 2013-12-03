@@ -220,8 +220,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 bytesSent += send(mb, m_message);
                 return bytesSent;
             } finally {
-                // Always discard the buffer so that they can be reused
-                discard();
+                // Buffers are only discarded after they are acked. Discarding them here would cause the sender to
+                // generate too much work for the receiver.
                 m_future.set(true);
             }
         }
