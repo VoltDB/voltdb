@@ -32,7 +32,6 @@ import junit.framework.TestCase;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 
@@ -246,8 +245,9 @@ public class TestProcedureInvocation extends TestCase{
         try {
             ByteBuffer buf = ByteBuffer.allocate(pi.getSerializedSize());
             pi.flattenToBuffer(buf);
-            FastDeserializer fd = new FastDeserializer(buf.array());
-            spi = fd.readObject(StoredProcedureInvocation.class);
+            buf.flip();
+            spi = new StoredProcedureInvocation();
+            spi.initFromBuffer(buf);
         } catch (IOException e) {
             e.printStackTrace();
             fail();

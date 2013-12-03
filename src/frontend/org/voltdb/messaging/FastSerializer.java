@@ -24,7 +24,6 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-import org.apache.jute_voltpatches.BinaryInputArchive;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.VoltTable;

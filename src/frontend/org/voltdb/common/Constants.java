@@ -22,4 +22,9 @@ import java.nio.charset.Charset;
 public class Constants
 {
     public static final Charset UTF8ENCODING = Charset.forName("UTF-8");
+
+    // ODBC Datetime Format
+    // if you need microseconds, you'll have to change this code or
+    //  export a bigint representing microseconds since an epoch
+    public static final String ODBC_DATE_FORMAT_STRING = "yyyy-MM-dd HH:mm:ss.SSS";
 }

@@ -35,6 +35,7 @@ import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.MiscUtils;
 
 public class TestPlannerTool extends TestCase {
 
@@ -55,7 +56,7 @@ public class TestPlannerTool extends TestCase {
             start = end;
         }*/
 
-        byte[] bytes = CatalogUtil.toBytes(new File("tpcc-oop.jar"));
+        byte[] bytes = MiscUtils.fileToBytes(new File("tpcc-oop.jar"));
         String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
         Catalog catalog = new Catalog();
         catalog.execute(serializedCatalog);
@@ -147,7 +148,7 @@ public class TestPlannerTool extends TestCase {
         final File jar = new File("testbadddl-oop.jar");
         jar.deleteOnExit();
         builder.compile("testbadddl-oop.jar");
-        byte[] bytes = CatalogUtil.toBytes(new File("testbadddl-oop.jar"));
+        byte[] bytes = MiscUtils.fileToBytes(new File("testbadddl-oop.jar"));
         String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
         assertNotNull(serializedCatalog);
         Catalog c = new Catalog();

@@ -169,28 +169,6 @@ public abstract class CatalogUtil {
     }
 
     /**
-     * Serialize a file into bytes. Used to serialize catalog and deployment
-     * file for UpdateApplicationCatalog on the client.
-     *
-     * @param path
-     * @return a byte array of the file
-     * @throws IOException
-     *             If there are errors reading the file
-     */
-    public static byte[] toBytes(File path) throws IOException {
-        FileInputStream fin = new FileInputStream(path);
-        byte[] buffer = new byte[(int) fin.getChannel().size()];
-        try {
-            if (fin.read(buffer) == -1) {
-                throw new IOException("File " + path.getAbsolutePath() + " is empty");
-            }
-        } finally {
-            fin.close();
-        }
-        return buffer;
-    }
-
-    /**
      * Get a unique id for a plan fragment by munging the indices of it's parents
      * and grandparents in the catalog.
      *
