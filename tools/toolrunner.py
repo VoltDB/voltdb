@@ -206,6 +206,9 @@ def vmain(description='(no description)',
         if not os.path.isdir(venv_dir):
             # Prefer to use the system virtualenv, but fall back to the third_party copy.
             save_dir = os.getcwd()
+            save_lc_all = os.environ.get('LC_ALL', None)
+            # Makes sure a pip failure provides clean output instead of a Unicode error.
+            os.environ['LC_ALL'] = 'C'
             try:
                 os.chdir(venv_base)
                 args = get_virtualenv()
@@ -221,6 +224,11 @@ def vmain(description='(no description)',
                         run_cmd(pip, 'install', package)
             finally:
                 os.chdir(save_dir)
+                if save_lc_all is None:
+                    del os.environ['LC_ALL']
+                else:
+                    os.environ['LC_ALL'] = save_lc_all
+
         venv_complete = True
         # Exec the toolrunner.py script inside the virtual environment by using
         # the virtual environment's Python.
