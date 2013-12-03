@@ -383,11 +383,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                         txnId = m_idManager.getNextUniqueTransactionId();
                         break;
                 }
-                if (r.type == OpCode.createSession) {
-                    txnId = r.sessionId;
-                } else {
-                    txnId = m_idManager.getNextUniqueTransactionId();
-                }
+
                 for (long initiatorHSId : m_hsIds) {
                     if (initiatorHSId == m_hsId) continue;
                     AgreementTaskMessage atm =
