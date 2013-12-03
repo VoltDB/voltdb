@@ -27,7 +27,7 @@
 
 @VOLT.Command(
     bundles = VOLT.ServerBundle('add', False, False, False),
-    description = 'Add host to the VoltDB cluster.'
+    description = 'Add the current node to a VoltDB cluster.'
 )
 def add(runner):
     runner.go()

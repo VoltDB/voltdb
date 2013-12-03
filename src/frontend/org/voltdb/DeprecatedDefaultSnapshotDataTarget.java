@@ -40,12 +40,12 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.messaging.FastSerializer;
 
-import com.google.common.util.concurrent.Callables;
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.ListeningScheduledExecutorService;
-import com.google.common.util.concurrent.MoreExecutors;
+import com.google_voltpatches.common.util.concurrent.Callables;
+import com.google_voltpatches.common.util.concurrent.Futures;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.ListeningScheduledExecutorService;
+import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
 
@@ -380,5 +380,15 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
     @Override
     public SnapshotFormat getFormat() {
         return SnapshotFormat.NATIVE;
+    }
+
+    /**
+     * Get the row count if any, of the content wrapped in the given {@link BBContainer}
+     * @param tupleData
+     * @return the numbers of tuple data rows contained within a container
+     */
+    @Override
+    public int getInContainerRowCount(BBContainer tupleData) {
+        return SnapshotDataTarget.ROW_COUNT_UNSUPPORTED;
     }
 }

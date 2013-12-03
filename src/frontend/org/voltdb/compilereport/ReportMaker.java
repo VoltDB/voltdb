@@ -23,9 +23,7 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltDB;
@@ -55,8 +53,8 @@ import org.voltdb.utils.Encoder;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.SystemStatsCollector;
 
-import com.google.common.base.Charsets;
-import com.google.common.io.Resources;
+import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.io.Resources;
 
 public class ReportMaker {
 
@@ -102,11 +100,12 @@ public class ReportMaker {
 
         // uniqueness column
         sb.append("<td>");
-        if (index.getUnique()) {
+        if (index.getAssumeunique()) {
+            tag(sb, "important", "AssumeUnique");
+        } else if (index.getUnique()) {
             tag(sb, "important", "Unique");
-        }
-        else {
-            tag(sb, "info", "Multikey");
+        } else {
+            tag(sb, "info", "Nonunique");
         }
         sb.append("</td>");
 

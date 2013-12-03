@@ -80,6 +80,7 @@ public class TestIndexScanCountSuite extends RegressionSuite {
         client.callProcedure("TU1.insert", 3, 3);
         client.callProcedure("TU1.insert", 6, 6);
         client.callProcedure("TU1.insert", 8, 8);
+        client.callProcedure("TU1.insert", 10, null);
 
         callWithExpectedCount(client, 5, "TU1_LT", 6000000000L);
         callWithExpectedCount(client, 5, "TU1_LET", 6000000000L);
@@ -102,6 +103,9 @@ public class TestIndexScanCountSuite extends RegressionSuite {
         client.callProcedure("TU3.insert", 8, 3, 456);
         client.callProcedure("TU3.insert", 9, 6, 456);
         client.callProcedure("TU3.insert", 10, 8, 456);
+
+        client.callProcedure("TU3.insert", 11, null, 123);
+        client.callProcedure("TU3.insert", 12, null, 456);
 
         callWithExpectedCount(client, 5, "TU3_LT", 123, 6000000000L);
         callWithExpectedCount(client, 3, "TU3_GET_LT", 123, 3, 6000000000L);
@@ -132,6 +136,9 @@ public class TestIndexScanCountSuite extends RegressionSuite {
         client.callProcedure("TM2.insert", 19, 8, "jia");
         client.callProcedure("TM2.insert", 20, 8, "jia");
 
+        client.callProcedure("TM2.insert", 100, null, "xin");
+        client.callProcedure("TM2.insert", 200, null, "jia");
+
         callWithExpectedCount(client, 5, "TM2_GT_LT", "xin", 3, 6000000000L);
         callWithExpectedCount(client, 8, "TM2_GET_LT", "xin", 3, 6000000000L);
         callWithExpectedCount(client, 5, "TM2_GT_LET", "xin", 3, 6000000000L);
@@ -146,6 +153,7 @@ public class TestIndexScanCountSuite extends RegressionSuite {
         client.callProcedure("TU1.insert", 3, 3);
         client.callProcedure("TU1.insert", 6, 6);
         client.callProcedure("TU1.insert", 8, 8);
+        client.callProcedure("TU1.insert", 10, null);
 
         VoltTable table;
 
@@ -216,6 +224,9 @@ public class TestIndexScanCountSuite extends RegressionSuite {
         client.callProcedure("TU2.insert", 9, 6, "jiao");
         client.callProcedure("TU2.insert", 10, 8, "jiao");
 
+        client.callProcedure("TU2.insert", 11, null, "xin");
+        client.callProcedure("TU2.insert", 12, null, "jiao");
+
         // test with 2,6
         callAdHocFilterWithExpectedCount(client,"TU2", "UNAME = 'jiao' AND POINTS < 6", 3);
         callAdHocFilterWithExpectedCount(client,"TU2", "UNAME = 'jiao' AND POINTS > 2 AND POINTS < 6", 1);
@@ -274,6 +285,9 @@ public class TestIndexScanCountSuite extends RegressionSuite {
         client.callProcedure("TU3.insert", 9, 6, 456);
         client.callProcedure("TU3.insert", 10, 8, 456);
 
+        client.callProcedure("TU3.insert", 11, null, 123);
+        client.callProcedure("TU3.insert", 12, null, 456);
+
         callWithExpectedCount(client, 5, "TU3_LT", 123, 6000000000L);
 
         callWithExpectedCount(client, 3, "TU3_GET_LT", 123, 3, 6000000000L);
@@ -294,6 +308,9 @@ public class TestIndexScanCountSuite extends RegressionSuite {
         client.callProcedure("TU4.insert", 8, 3, "jia", 0);
         client.callProcedure("TU4.insert", 9, 6, "jia", 1);
         client.callProcedure("TU4.insert", 10, 8, "jia", 0);
+
+        client.callProcedure("TU4.insert", 11, null, "xin", 0);
+        client.callProcedure("TU4.insert", 12, null, "jia", 0);
 
         // test with 2,6
         callAdHocFilterWithExpectedCount(client,"TU4", "UNAME = 'xin' AND SEX = 0 AND POINTS < 6", 2);
@@ -317,6 +334,9 @@ public class TestIndexScanCountSuite extends RegressionSuite {
 
         client.callProcedure("TM1.insert", 9, 8);
         client.callProcedure("TM1.insert", 10, 8);
+
+        client.callProcedure("TM1.insert", 11, null);
+        client.callProcedure("TM1.insert", 12, null);
 
         callAdHocFilterWithExpectedCount(client,"TM1", "POINTS < -1", 0);
         callAdHocFilterWithExpectedCount(client,"TM1", "POINTS < 1", 0);
@@ -347,7 +367,6 @@ public class TestIndexScanCountSuite extends RegressionSuite {
         callAdHocFilterWithExpectedCount(client,"TM1", "POINTS > 3 AND POINTS < 6", 1);
     }
 
-
     public void testTwoColumnsMultiIndex() throws Exception {
         Client client = getClient();
 
@@ -372,6 +391,9 @@ public class TestIndexScanCountSuite extends RegressionSuite {
         client.callProcedure("TM2.insert", 18, 6, "jia");
         client.callProcedure("TM2.insert", 19, 8, "jia");
         client.callProcedure("TM2.insert", 20, 8, "jia");
+
+        client.callProcedure("TM2.insert", 100, null, "xin");
+        client.callProcedure("TM2.insert", 200, null, "jia");
 
         callWithExpectedCount(client, 5, "TM2_GT_LT", "xin", 3, 6000000000L);
         callWithExpectedCount(client, 8, "TM2_GET_LT", "xin", 3, 6000000000L);
@@ -411,6 +433,9 @@ public class TestIndexScanCountSuite extends RegressionSuite {
         client.callProcedure("TU5.insert", 2, 0.3);
         client.callProcedure("TU5.insert", 2, 0.4);
         client.callProcedure("TU5.insert", 2, 0.5);
+
+        client.callProcedure("TU5.insert", 1, null);
+        client.callProcedure("TU5.insert", 2, null);
 
         callAdHocFilterWithExpectedCount(client,"TU5", "ID = 1 AND POINTS >= 0.1", 5);
         callAdHocFilterWithExpectedCount(client,"TU5", "ID = 1 AND POINTS > 0.2", 3);

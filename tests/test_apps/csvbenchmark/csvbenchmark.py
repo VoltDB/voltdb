@@ -153,7 +153,7 @@ def run_readlines(cmd):
     return result
 
 def run_csvloader(schema, data_file):
-    rowcount = get_filesize(data_file)
+    rowcount = options.ROW_COUNT
     elapsed_results = []
     parsing_results = []
     loading_results = []
@@ -369,7 +369,7 @@ def data_generic(rebuild=False):
 
     case = "generic"
     data_file = get_datafile_path(case)
-    if rebuild or not os.path.exists(data_file):
+    if rebuild or not os.path.exists(data_file) or get_filesize(data_file) != options.ROW_COUNT:
         with open(data_file, "w") as f:
             for I in range(0, options.ROW_COUNT):
                     print >>f, "%d,%d,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s,%f,%d,%s,%d" \
@@ -400,7 +400,7 @@ def case_generic_noix():
 
 def data_replicated_pk(rebuild=False):
     data_file = get_datafile_path("replicated_pk")
-    if rebuild or not os.path.exists(data_file):
+    if rebuild or not os.path.exists(data_file) or get_filesize(data_file) != options.ROW_COUNT:
         myseq = [0]
         with open(data_file, "w") as f:
             for I in range(0, options.ROW_COUNT):

@@ -74,7 +74,6 @@ class FastSerializer:
     VOLTTYPE_STRING = 9
     VOLTTYPE_TIMESTAMP = 11 # 8 byte long
     VOLTTYPE_DECIMAL = 22  # fixed precision decimal
-    VOLTTYPE_DECIMAL_STRING = 23  # NOT USED?
     VOLTTYPE_MONEY = 20     # 8 byte long
     VOLTTYPE_VOLTTABLE = 21
     VOLTTYPE_VARBINARY = 25
@@ -131,8 +130,7 @@ class FastSerializer:
                        self.VOLTTYPE_STRING: self.readString,
                        self.VOLTTYPE_VARBINARY: self.readVarbinary,
                        self.VOLTTYPE_TIMESTAMP: self.readDate,
-                       self.VOLTTYPE_DECIMAL: self.readDecimal,
-                       self.VOLTTYPE_DECIMAL_STRING: self.readDecimalString}
+                       self.VOLTTYPE_DECIMAL: self.readDecimal}
         self.WRITER = {self.VOLTTYPE_NULL: self.writeNull,
                        self.VOLTTYPE_TINYINT: self.writeByte,
                        self.VOLTTYPE_SMALLINT: self.writeInt16,
@@ -142,8 +140,7 @@ class FastSerializer:
                        self.VOLTTYPE_STRING: self.writeString,
                        self.VOLTTYPE_VARBINARY: self.writeVarbinary,
                        self.VOLTTYPE_TIMESTAMP: self.writeDate,
-                       self.VOLTTYPE_DECIMAL: self.writeDecimal,
-                       self.VOLTTYPE_DECIMAL_STRING: self.writeDecimalString}
+                       self.VOLTTYPE_DECIMAL: self.writeDecimal}
         self.ARRAY_READER = {self.VOLTTYPE_TINYINT: self.readByteArray,
                              self.VOLTTYPE_SMALLINT: self.readInt16Array,
                              self.VOLTTYPE_INTEGER: self.readInt32Array,
@@ -151,8 +148,7 @@ class FastSerializer:
                              self.VOLTTYPE_FLOAT: self.readFloat64Array,
                              self.VOLTTYPE_STRING: self.readStringArray,
                              self.VOLTTYPE_TIMESTAMP: self.readDateArray,
-                             self.VOLTTYPE_DECIMAL: self.readDecimalArray,
-                             self.VOLTTYPE_DECIMAL_STRING: self.readDecimalStringArray}
+                             self.VOLTTYPE_DECIMAL: self.readDecimalArray}
 
         self.__compileStructs()
 
@@ -632,27 +628,6 @@ class FastSerializer:
         cnt = self.readInt16()
         for i in xrange(cnt):
             retval.append(self.readDecimal())
-        return tuple(retval)
-
-    def readDecimalString(self):
-        encoded_string = self.readString()
-        if encoded_string == None:
-            return None
-        val = decimal.Decimal(encoded_string)
-        (sign, digits, exponent) = val.as_tuple()
-        if -exponent > self.__class__.DEFAULT_DECIMAL_SCALE:
-            raise ValueError("Scale of this decimal is %d and the max is 12"
-                             % (-exponent))
-        if len(digits) > 38:
-            raise ValueError("Precision of this decimal is %d and the max is 38"
-                             % (len(digits)))
-        return val
-
-    def readDecimalStringArray(self):
-        retval = []
-        cnt = self.readInt16()
-        for i in xrange(cnt):
-            retval.append(self.readDecimalString())
         return tuple(retval)
 
     def __intToBytes(self, value, sign):

@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.TreeSet;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -52,7 +51,7 @@ import org.voltdb.VoltZK;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.compiler.ClusterConfig;
 
-import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  * Cartographer provides answers to queries about the components in a cluster.
@@ -379,7 +378,7 @@ public class Cartographer extends StatsSource
      * Break this method out to be static and testable independent of ZK, JSON, other ugh.
      */
     static public List<Integer> computeReplacementPartitions(Map<Integer, Integer> repsPerPart, int kfactor,
-            int sitesPerHost, int numberOfPartitions)
+                                                             int sitesPerHost)
     {
         List<Integer> partitions = new ArrayList<Integer>();
         List<Integer> partSortedByRep = sortKeysByValue(repsPerPart);
@@ -395,18 +394,18 @@ public class Cartographer extends StatsSource
         return partitions;
     }
 
-    public List<Integer> getIv2PartitionsToReplace(JSONObject topology) throws JSONException
+    public List<Integer> getIv2PartitionsToReplace(int kfactor, int sitesPerHost)
+        throws JSONException
     {
-        ClusterConfig clusterConfig = new ClusterConfig(topology);
-        hostLog.info("Computing partitions to replace.  Total partitions: " + clusterConfig.getPartitionCount());
+        List<Integer> partitions = getPartitions();
+        hostLog.info("Computing partitions to replace.  Total partitions: " + partitions);
         Map<Integer, Integer> repsPerPart = new HashMap<Integer, Integer>();
-        for (int i = 0; i < clusterConfig.getPartitionCount(); i++) {
-            repsPerPart.put(i, getReplicaCountForPartition(i));
+        for (int pid : partitions) {
+            repsPerPart.put(pid, getReplicaCountForPartition(pid));
         }
-        List<Integer> partitions = computeReplacementPartitions(repsPerPart, clusterConfig.getReplicationFactor(),
-                clusterConfig.getSitesPerHost(), clusterConfig.getPartitionCount());
-        hostLog.info("IV2 Sites will replicate the following partitions: " + partitions);
-        return partitions;
+        List<Integer> partitionsToReplace = computeReplacementPartitions(repsPerPart, kfactor, sitesPerHost);
+        hostLog.info("IV2 Sites will replicate the following partitions: " + partitionsToReplace);
+        return partitionsToReplace;
     }
 
     /**

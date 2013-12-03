@@ -36,7 +36,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
-import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class MpTerm implements Term
 {

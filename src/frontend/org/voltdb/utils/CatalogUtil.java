@@ -111,7 +111,7 @@ import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.xml.sax.SAXException;
 
-import com.google.common.base.Charsets;
+import com.google_voltpatches.common.base.Charsets;
 
 /**
  *

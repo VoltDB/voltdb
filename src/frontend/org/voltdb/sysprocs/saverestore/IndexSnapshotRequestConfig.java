@@ -17,8 +17,8 @@
 
 package org.voltdb.sysprocs.saverestore;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSortedMap;
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableSortedMap;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;

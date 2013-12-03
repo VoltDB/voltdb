@@ -57,7 +57,7 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.StreamSnapshotWritePlan;
 
-import com.google.common.base.Charsets;
+import com.google_voltpatches.common.base.Charsets;
 
 /**
  * SnapshotSaveAPI extracts reusuable snapshot production code

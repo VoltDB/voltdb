@@ -57,10 +57,10 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
-import com.google.common.base.Throwables;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListeningScheduledExecutorService;
-import com.google.common.util.concurrent.MoreExecutors;
+import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListeningScheduledExecutorService;
+import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 /**
  * A scheduler of automated snapshots and manager of archived and retained snapshots.
@@ -174,13 +174,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
          * when it completes.
          */
         SNAPSHOTTING,
-
-        /*
-         * Failure state. This state is entered when a sysproc
-         * fails and the snapshot Daemon can't recover. An error is logged
-         * and the Daemon stops working
-         */
-        FAILURE;
     }
 
     private State m_state = State.STARTUP;
@@ -290,7 +283,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
                 final VoltTable results[] = clientResponse.getResults();
                 if (results.length == 1) {
-                    setState(State.FAILURE);
                     final VoltTable result = results[0];
                     boolean advanced = result.advanceRow();
                     assert(advanced);
@@ -1179,8 +1171,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             initiateSnapshotScan();
         } else if (m_state == State.SCANNING) {
             return;
-        } else if (m_state == State.FAILURE) {
-            return;
         } else if (m_state == State.WAITING){
             processWaitingPeriodicWork(now);
         } else if (m_state == State.SNAPSHOTTING) {
@@ -1310,8 +1300,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             throw new RuntimeException("SnapshotDaemon received a response in the startup state");
         } else if (m_state == State.SCANNING) {
             processScanResponse(response);
-        } else if (m_state == State.FAILURE) {
-            return;
         } else if (m_state == State.DELETING){
             processDeleteResponse(response);
             return;
@@ -1334,7 +1322,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
 
         if (response.getStatus() != ClientResponse.SUCCESS){
-            setState(State.FAILURE);
             logFailureResponse("Snapshot failed", response);
             return;
         }
@@ -1347,7 +1334,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             assert(advanced);
             assert(result.getColumnCount() == 1);
             assert(result.getColumnType(0) == VoltType.STRING);
-            SNAP_LOG.error("Snapshot failed with failure response: " + result.getString(0));
+            SNAP_LOG.warn("Snapshot failed with failure response: " + result.getString(0));
             m_snapshots.removeLast();
             return;
         }
@@ -1379,10 +1366,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         //Continue snapshotting even if a delete fails.
         setState(State.WAITING);
         if (response.getStatus() != ClientResponse.SUCCESS){
-            /*
-             * The delete may fail but the procedure should at least return success...
-             */
-            setState(State.FAILURE);
             logFailureResponse("Delete of snapshots failed", response);
             return;
         }
@@ -1395,7 +1378,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             assert(advanced);
             assert(result.getColumnCount() == 1);
             assert(result.getColumnType(0) == VoltType.STRING);
-            SNAP_LOG.error("Snapshot delete failed with failure response: " + result.getString("ERR_MSG"));
+            SNAP_LOG.warn("Snapshot delete failed with failure response: " + result.getString("ERR_MSG"));
             return;
         }
     }
@@ -1409,21 +1392,20 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * @return
      */
     private void processScanResponse(ClientResponse response) {
-        if (response.getStatus() != ClientResponse.SUCCESS){
-            setState(State.FAILURE);
+        setState(State.WAITING);
+        if (response.getStatus() != ClientResponse.SUCCESS) {
             logFailureResponse("Initial snapshot scan failed", response);
             return;
         }
 
         final VoltTable results[] = response.getResults();
         if (results.length == 1) {
-            setState(State.FAILURE);
             final VoltTable result = results[0];
             boolean advanced = result.advanceRow();
             assert(advanced);
             assert(result.getColumnCount() == 1);
             assert(result.getColumnType(0) == VoltType.STRING);
-            SNAP_LOG.error("Initial snapshot scan failed with failure response: " + result.getString("ERR_MSG"));
+            SNAP_LOG.warn("Initial snapshot scan failed with failure response: " + result.getString("ERR_MSG"));
             return;
         }
         assert(results.length == 3);
@@ -1488,9 +1470,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     }
 
     private void logFailureResponse(String message, ClientResponse response) {
-        SNAP_LOG.error(message, response.getException());
+        SNAP_LOG.warn(message, response.getException());
         if (response.getStatusString() != null) {
-            SNAP_LOG.error(response.getStatusString());
+            SNAP_LOG.warn(response.getStatusString());
         }
     }
 

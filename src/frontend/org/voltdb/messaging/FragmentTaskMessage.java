@@ -35,7 +35,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
-import com.google.common.base.Charsets;
+import com.google_voltpatches.common.base.Charsets;
 
 /**
  * Message from a stored procedure coordinator to an execution site

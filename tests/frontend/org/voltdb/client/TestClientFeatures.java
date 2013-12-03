@@ -28,6 +28,7 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import junit.framework.TestCase;
@@ -185,6 +186,107 @@ public class TestClientFeatures extends TestCase {
 
         client.callProcedure("ArbitraryDurationProc", 3000);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
+    }
+
+    public void testQueryTimeout() throws NoConnectionsException, IOException, ProcCallException {
+        CSL csl = new CSL();
+
+        ClientConfig config = new ClientConfig(null, null, csl);
+        config.setProcedureCallTimeout(0);
+        Client client = ClientFactory.createClient(config);
+        client.createConnection("localhost");
+
+        ClientResponse response = client.callProcedure("ArbitraryDurationProc", 0);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        boolean exceptionCalled = false;
+        try {
+            // Query timeout is in seconds second arg.
+            ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 3, 6000);
+        } catch (ProcCallException ex) {
+            assertEquals(ClientResponse.CONNECTION_TIMEOUT, ex.m_response.getStatus());
+            exceptionCalled = true;
+        }
+        assertTrue(exceptionCalled);
+
+        //larger timeout than proc wait duration
+        exceptionCalled = false;
+        try {
+            // Query timeout is in seconds second arg.
+            ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 30, 6000);
+        } catch (ProcCallException ex) {
+            exceptionCalled = true;
+        }
+        assertFalse(exceptionCalled);
+
+        //no timeout of 0
+        try {
+            // Query timeout is in seconds second arg.
+            ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 0, 2000);
+        } catch (ProcCallException ex) {
+            exceptionCalled = true;
+        }
+        assertFalse(exceptionCalled);
+
+        final CountDownLatch latch = new CountDownLatch(1);
+        class MyCallback implements ProcedureCallback {
+            @Override
+            public void clientCallback(ClientResponse clientResponse) throws Exception {
+                assert (clientResponse.getStatus() == ClientResponse.CONNECTION_TIMEOUT);
+                System.out.println("Async Query timeout called..");
+                latch.countDown();
+            }
+
+        }
+        // Query timeout is in seconds third arg.
+        //Async versions
+        ((ClientImpl) client).callProcedureWithTimeout(new MyCallback(), "ArbitraryDurationProc", 3, 6000);
+        try {
+            latch.await();
+        } catch (InterruptedException ex) {
+            ex.printStackTrace();
+            fail();
+        }
+
+        //Async versions - does not timeout.
+        final CountDownLatch latch2 = new CountDownLatch(1);
+        class MyCallback2 implements ProcedureCallback {
+
+            @Override
+            public void clientCallback(ClientResponse clientResponse) throws Exception {
+                assert (clientResponse.getStatus() == ClientResponse.SUCCESS);
+                latch2.countDown();
+            }
+
+        }
+        // Query timeout is in seconds third arg.
+        ((ClientImpl) client).callProcedureWithTimeout(new MyCallback2(), "ArbitraryDurationProc", 30, 6000);
+        try {
+            latch2.await();
+        } catch (InterruptedException ex) {
+            ex.printStackTrace();
+            fail();
+        }
+
+        //Async versions - 0 timeout.
+        final CountDownLatch latch3 = new CountDownLatch(1);
+        class MyCallback3 implements ProcedureCallback {
+
+            @Override
+            public void clientCallback(ClientResponse clientResponse) throws Exception {
+                assert (clientResponse.getStatus() == ClientResponse.SUCCESS);
+                latch3.countDown();
+            }
+
+        }
+        // Query timeout is in seconds third arg.
+        ((ClientImpl) client).callProcedureWithTimeout(new MyCallback3(), "ArbitraryDurationProc", 0, 6000);
+        try {
+            latch3.await();
+        } catch (InterruptedException ex) {
+            ex.printStackTrace();
+            fail();
+        }
+
     }
 
     /**

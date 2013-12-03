@@ -717,7 +717,7 @@ public class ParameterSet implements JSONString {
             // For Timestamp, also preserve exactly the right amount of fractional second precision.
             if (obj instanceof java.sql.Timestamp) {
                 long nanos = ((java.sql.Timestamp) obj).getNanos();
-                // XXX: This may be slightly controversial, but...
+                // This may be slightly controversial, but...
                 // Throw a conversion error rather than silently rounding/dropping sub-microsecond precision.
                 if ((nanos % 1000) != 0) {
                     throw new RuntimeException("Can't serialize TIMESTAMP value with fractional microseconds");

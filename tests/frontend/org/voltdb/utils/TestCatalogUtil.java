@@ -50,7 +50,7 @@ import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.types.ConstraintType;
 
-import com.google.common.base.Joiner;
+import com.google_voltpatches.common.base.Joiner;
 
 public class TestCatalogUtil extends TestCase {
 

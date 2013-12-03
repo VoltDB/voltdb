@@ -17,7 +17,7 @@
 
 package org.voltdb.rejoin;
 
-import com.google.common.base.Preconditions;
+import com.google_voltpatches.common.base.Preconditions;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;

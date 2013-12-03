@@ -128,6 +128,10 @@ public:
             return NValue::getFalse();
         }*/
 
+        if (lnv.isNull() || rnv.isNull()) {
+            return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+        }
+
         return compare.cmp(lnv, rnv);
     }
 
@@ -169,6 +173,10 @@ public:
         /*if (lnv.isNull() || lnv.isNaN() || rnv.isNull() || rnv.isNaN()) {
             return NValue::getFalse();
         }*/
+
+        if (lnv.isNull() || rnv.isNull()) {
+            return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+        }
 
         return compare.cmp(lnv, rnv);
     }

@@ -17,6 +17,7 @@
 package org.voltdb;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -27,7 +28,7 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.licensetool.LicenseApi;
 
-import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 public interface VoltDBInterface
 {
@@ -71,7 +72,7 @@ public interface VoltDBInterface
     public String getBuildString();
     public String getVersionString();
     public HostMessenger getHostMessenger();
-    public ArrayList<ClientInterface> getClientInterfaces();
+    public List<ClientInterface> getClientInterfaces();
     public OpsAgent getOpsAgent(OpsSelector selector);
     // Keep this method to centralize the cast to StatsAgent for
     // existing code

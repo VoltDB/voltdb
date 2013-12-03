@@ -16,10 +16,10 @@
  */
 package org.voltdb;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSortedMap;
-import com.google.common.collect.Sets;
-import com.google.common.collect.TreeMultimap;
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.collect.ImmutableSortedMap;
+import com.google_voltpatches.common.collect.Sets;
+import com.google_voltpatches.common.collect.TreeMultimap;
 
 import java.util.*;
 

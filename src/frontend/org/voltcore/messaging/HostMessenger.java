@@ -22,6 +22,7 @@ import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -53,9 +54,9 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.MiscUtils;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.primitives.Longs;
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.primitives.Longs;
 
 /**
  * Host messenger contains all the code necessary to join a cluster mesh, and create mailboxes
@@ -709,6 +710,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     @Override
     public String getHostnameForHostID(int hostId) {
+        if (hostId == m_localHostId) {
+            return CoreUtils.getHostnameOrAddress();
+        }
         ForeignHost fh = m_foreignHosts.get(hostId);
         return fh == null ? "UNKNOWN" : fh.hostname();
     }
@@ -953,7 +957,12 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     }
 
     public void sendPoisonPill(String err) {
-        for (ForeignHost fh : m_foreignHosts.values()) {
+        sendPoisonPill(m_foreignHosts.keySet(), err);
+    }
+
+    public void sendPoisonPill(Collection<Integer> hostIds, String err) {
+        for (int hostId : hostIds) {
+            ForeignHost fh = m_foreignHosts.get(hostId);
             if (fh != null && fh.isUp()) {
                 fh.sendPoisonPill(err);
             }

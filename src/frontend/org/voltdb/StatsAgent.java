@@ -26,9 +26,9 @@ import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 
-import com.google.common.base.Supplier;
-import com.google.common.base.Suppliers;
-import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.base.Suppliers;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  * Agent responsible for collecting stats on this host.
@@ -389,6 +389,12 @@ public class StatsAgent extends OpsAgent
         case MANAGEMENT:
             stats = collectManagementStats(interval);
             break;
+        case REBALANCE:
+            stats = collectRebalanceStats(interval);
+            break;
+        case KSAFETY:
+            stats = collectKSafetyStats(interval);
+            break;
         default:
             // Should have been successfully groomed in collectStatsImpl().  Log something
             // for our information but let the null check below return harmlessly
@@ -615,6 +621,32 @@ public class StatsAgent extends OpsAgent
         stats[5] = indStats[0];
         stats[6] = sStats[0];
 
+        return stats;
+    }
+
+    private VoltTable[] collectRebalanceStats(boolean interval)
+    {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable mStats = getStatsAggregate(StatsSelector.REBALANCE, interval, now);
+        if (mStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = mStats;
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectKSafetyStats(boolean interval)
+    {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable mStats = getStatsAggregate(StatsSelector.KSAFETY, interval, now);
+        if (mStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = mStats;
+        }
         return stats;
     }
 

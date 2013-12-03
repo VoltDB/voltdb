@@ -25,17 +25,17 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
-import com.google.common.collect.ImmutableSortedSet;
-import com.google.common.collect.Maps;
-import com.google.common.collect.SortedMapDifference;
+import com.google_voltpatches.common.collect.ImmutableSortedSet;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.SortedMapDifference;
 import org.apache.cassandra_voltpatches.MurmurHash3;
 import org.voltcore.utils.Pair;
 
-import com.google.common.base.Preconditions;
-import com.google.common.base.Supplier;
-import com.google.common.base.Suppliers;
-import com.google.common.collect.ImmutableSortedMap;
-import com.google.common.collect.UnmodifiableIterator;
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.base.Suppliers;
+import com.google_voltpatches.common.collect.ImmutableSortedMap;
+import com.google_voltpatches.common.collect.UnmodifiableIterator;
 import org.voltdb.utils.CompressionService;
 
 /**

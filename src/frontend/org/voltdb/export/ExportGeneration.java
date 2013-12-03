@@ -56,12 +56,12 @@ import org.voltdb.iv2.TxnEgo;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.utils.VoltFile;
 
-import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.MoreExecutors;
+import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.util.concurrent.Futures;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 /**
  * Export data from a single catalog version and database instance.

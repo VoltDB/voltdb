@@ -36,7 +36,7 @@ import org.junit.Test;
 
 import org.voltcore.zk.ZKTestBase;
 
-import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class TestLeaderCache extends ZKTestBase {
 

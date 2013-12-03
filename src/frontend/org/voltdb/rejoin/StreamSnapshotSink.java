@@ -22,13 +22,16 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.google.common.base.Preconditions;
+import com.google_voltpatches.common.base.Preconditions;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
+import org.voltdb.PrivateVoltTableFactory;
+import org.voltdb.SiteProcedureConnection;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
 import org.voltdb.utils.CachedByteBufferAllocator;
 import org.voltdb.utils.FixedDBBPool;
 
@@ -53,6 +56,60 @@ public class StreamSnapshotSink {
     // Schemas of the tables
     private final Map<Integer, byte[]> m_schemas = new HashMap<Integer, byte[]>();
     private long m_bytesReceived = 0;
+
+    /**
+     * A piece of work that can be restored on the site receiving the data.
+     */
+    public static interface RestoreWork {
+        public void restore(SiteProcedureConnection connection);
+    }
+
+    /**
+     * Restores the hashinator on this site, both the Java and the EE hashinator will be restored.
+     */
+    static class HashinatorRestoreWork implements RestoreWork {
+        private final long version;
+        private final byte[] hashinatorConfig;
+
+        public HashinatorRestoreWork(long version, byte[] hashinatorConfig) {
+            this.version = version;
+            this.hashinatorConfig = hashinatorConfig;
+        }
+
+        @Override
+        public void restore(SiteProcedureConnection connection) {
+            rejoinLog.debug("Updating the hashinator to version " + version);
+
+            // Update the Java hashinator
+            TheHashinator.updateConfiguredHashinator(version, hashinatorConfig);
+
+            // Update the EE hashinator
+            connection.updateHashinator(TheHashinator.getCurrentConfig());
+        }
+    }
+
+    /**
+     * Restores a block of table data.
+     */
+    static class TableRestoreWork implements RestoreWork {
+        private final int tableId;
+        private final ByteBuffer tableBlock;
+
+        public TableRestoreWork(int tableId, ByteBuffer tableBlock) {
+            this.tableId = tableId;
+            this.tableBlock = tableBlock;
+        }
+
+        @Override
+        public void restore(SiteProcedureConnection connection) {
+            VoltTable table = PrivateVoltTableFactory.createVoltTableFromBuffer(tableBlock.duplicate(), true);
+
+            // Currently, only export cares about this TXN ID.  Since we don't have one handy, and IV2
+            // doesn't yet care about export, just use Long.MIN_VALUE.
+
+            connection.loadTable(Long.MIN_VALUE, tableId, table, false, false);
+        }
+    }
 
     public StreamSnapshotSink(Mailbox mb)
     {
@@ -120,14 +177,14 @@ public class StreamSnapshotSink {
         return outputBuffer;
     }
 
-    public Pair<Integer, ByteBuffer> take(CachedByteBufferAllocator resultBufferAllocator)
+    public RestoreWork take(CachedByteBufferAllocator resultBufferAllocator)
         throws InterruptedException {
         if (m_in == null || m_ack == null) {
             // terminated already
             return null;
         }
 
-        Pair<Integer, ByteBuffer> result = null;
+        RestoreWork result = null;
         while (!m_EOF) {
             Pair<Long, Pair<Long, BBContainer>> msg = m_in.take();
             result = processMessage(msg, resultBufferAllocator);
@@ -139,7 +196,7 @@ public class StreamSnapshotSink {
         return result;
     }
 
-    public Pair<Integer, ByteBuffer> poll(CachedByteBufferAllocator resultBufferAllocator) {
+    public RestoreWork poll(CachedByteBufferAllocator resultBufferAllocator) {
         if (m_in == null || m_ack == null) {
             // not initialized yet or terminated already
             return null;
@@ -154,16 +211,16 @@ public class StreamSnapshotSink {
      * container once it's processed.
      *
      * @param msg A pair of <sourceHSId, blockContainer>
-     * @return The processed message, or null if there's no data block to return
+     * @return The restore work, or null if there's no data block to return
      *         to the site.
      */
-    private Pair<Integer, ByteBuffer> processMessage(Pair<Long, Pair<Long, BBContainer>> msg,
-                                                     CachedByteBufferAllocator resultBufferAllocator) {
+    private RestoreWork processMessage(Pair<Long, Pair<Long, BBContainer>> msg,
+                                       CachedByteBufferAllocator resultBufferAllocator) {
         if (msg == null) {
             return null;
         }
 
-        Pair<Integer, ByteBuffer> processed = null;
+        RestoreWork restoreWork = null;
         long hsId = msg.getFirst();
         long targetId = msg.getSecond().getFirst();
         BBContainer container = msg.getSecond().getSecond();
@@ -205,10 +262,7 @@ public class StreamSnapshotSink {
                 byte[] hashinatorConfig = new byte[block.remaining()];
                 block.get(hashinatorConfig);
 
-                rejoinLog.debug("Updating the hashinator to version " + version);
-
-                // Update the local hashinator
-                TheHashinator.updateConfiguredHashinator(version, hashinatorConfig);
+                restoreWork = new HashinatorRestoreWork(version, hashinatorConfig);
             }
             else {
                 // It's normal snapshot data afterwards
@@ -225,13 +279,13 @@ public class StreamSnapshotSink {
                 ByteBuffer nextChunk = getNextChunk(m_schemas.get(tableId), block, resultBufferAllocator);
                 m_bytesReceived += nextChunk.remaining();
 
-                processed = Pair.of(tableId, nextChunk);
+                restoreWork = new TableRestoreWork(tableId, nextChunk);
             }
 
             // Queue ack to this block
             m_ack.ack(hsId, m_EOF, targetId, blockIndex);
 
-            return processed;
+            return restoreWork;
         } finally {
             container.discard();
         }

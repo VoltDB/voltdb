@@ -22,7 +22,7 @@ import java.util.concurrent.Callable;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 
-import com.google.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 /**
  * SnapshotDataTarget implementation that drops snapshot data on the floor
@@ -81,4 +81,13 @@ public class DevNullSnapshotTarget implements SnapshotDataTarget {
         return SnapshotFormat.STREAM;
     }
 
+    /**
+     * Get the row count if any, of the content wrapped in the given {@link BBContainer}
+     * @param tupleData
+     * @return the numbers of tuple data rows contained within a container
+     */
+    @Override
+    public int getInContainerRowCount(BBContainer tupleData) {
+        return SnapshotDataTarget.ROW_COUNT_UNSUPPORTED;
+    }
 }

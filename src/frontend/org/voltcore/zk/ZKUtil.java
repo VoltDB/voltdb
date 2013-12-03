@@ -45,8 +45,8 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltcore.utils.Pair;
 
-import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.base.Throwables;
 
 public class ZKUtil {
 
@@ -504,10 +504,12 @@ public class ZKUtil {
 
     public static void deleteRecursively(ZooKeeper zk, String dir) throws KeeperException, InterruptedException
     {
-        List<String> children = zk.getChildren(dir, false);
-        for (String child : children) {
-            deleteRecursively(zk, joinZKPath(dir, child));
-        }
-        zk.delete(dir, -1);
+        try {
+            List<String> children = zk.getChildren(dir, false);
+            for (String child : children) {
+                deleteRecursively(zk, joinZKPath(dir, child));
+            }
+            zk.delete(dir, -1);
+        } catch (KeeperException.NoNodeException ignore) {}
     }
 }

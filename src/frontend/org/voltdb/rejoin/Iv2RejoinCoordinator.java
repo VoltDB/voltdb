@@ -28,8 +28,8 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Multimap;
+import com.google_voltpatches.common.collect.ArrayListMultimap;
+import com.google_voltpatches.common.collect.Multimap;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
@@ -104,7 +104,13 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             // The buffer pool capacity is min(numOfSites to rejoin times 3, 16)
             // or any user specified value.
             Integer userPoolSize = Integer.getInteger("REJOIN_RECEIVE_BUFFER_POOL_SIZE");
-            int poolSize = userPoolSize != null ? userPoolSize : Math.min(sites.size() * 3, 16);
+            int poolSize = 0;
+            if (userPoolSize != null) {
+                poolSize = userPoolSize;
+            } else {
+                poolSize = 3;
+            }
+
             m_snapshotBufPool = new FixedDBBPool();
             // Create a buffer pool for uncompressed stream snapshot data
             m_snapshotBufPool.allocate(SnapshotSiteProcessor.m_snapshotBufferLength, poolSize);
@@ -142,7 +148,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
                                               nonce,
                                               1, // 1 source per rejoining site
                                               m_snapshotBufPool);
-        send(com.google.common.primitives.Longs.toArray(HSIds), msg);
+        send(com.google_voltpatches.common.primitives.Longs.toArray(HSIds), msg);
 
         // For testing, exit if only one property is set...
         if (m_rejoinDeathTestMode && !m_rejoinDeathTestCancel &&

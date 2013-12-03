@@ -29,8 +29,8 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingDeque;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Maps;
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.collect.Maps;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -138,7 +138,7 @@ public class MpTransactionState extends TransactionState
     public void setupProcedureResume(boolean isFinal, List<Integer> deps)
     {
         setupProcedureResume(isFinal,
-                com.google.common.primitives.Ints.toArray(deps));
+                com.google_voltpatches.common.primitives.Ints.toArray(deps));
     }
 
     @Override
@@ -303,7 +303,7 @@ public class MpTransactionState extends TransactionState
                                     CoreUtils.hsIdCollectionToString(e.getValue()));
                         }
                     }
-                    m_mbox.send(com.google.common.primitives.Longs.toArray(m_useHSIds), new DumpMessage());
+                    m_mbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_useHSIds), new DumpMessage());
                 }
             }
         }

@@ -71,7 +71,17 @@ public:
 
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
         assert (m_left);
-        return m_left->eval(tuple1, tuple2).op_negate();
+        NValue operand = m_left->eval(tuple1, tuple2);
+        // NOT TRUE is FALSE
+        if (operand.isTrue()) {
+            return NValue::getFalse();
+        }
+        // NOT FALSE is TRUE
+        if (operand.isFalse()) {
+            return NValue::getTrue();
+        }
+        // NOT NULL is NULL
+        return operand;
     }
 
     std::string debugInfo(const std::string &spacer) const {
@@ -122,6 +132,54 @@ public:
 private:
     ValueType m_targetType;
 };
+
+
+class OperatorAlternativeExpression : public AbstractExpression {
+public:
+    OperatorAlternativeExpression(AbstractExpression *left, AbstractExpression *right)
+        : AbstractExpression(EXPRESSION_TYPE_OPERATOR_ALTERNATIVE, left, right)
+    {
+        assert (m_left);
+        assert (m_right);
+    };
+
+    NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
+        throwFatalException("OperatorAlternativeExpression::eval function has no implementation.");
+    }
+
+    std::string debugInfo(const std::string &spacer) const {
+        return (spacer + "Operator ALTERNATIVE Expression");
+    }
+
+};
+
+class OperatorCaseWhenExpression : public AbstractExpression {
+public:
+    OperatorCaseWhenExpression(ValueType vt, AbstractExpression *left, OperatorAlternativeExpression *right)
+        : AbstractExpression(EXPRESSION_TYPE_OPERATOR_CASE_WHEN, left, right)
+        , m_returnType(vt)
+    {
+    };
+
+    NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
+        assert (m_left);
+        assert (m_right);
+        NValue thenClause = m_left->eval(tuple1, tuple2);
+
+        if (thenClause.isTrue()) {
+            return m_right->getLeft()->eval(tuple1, tuple2).castAs(m_returnType);
+        } else {
+            return m_right->getRight()->eval(tuple1, tuple2).castAs(m_returnType);
+        }
+    }
+
+    std::string debugInfo(const std::string &spacer) const {
+        return (spacer + "Operator CASE WHEN Expression");
+    }
+private:
+    ValueType m_returnType;
+};
+
 
 
 /*

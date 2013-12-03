@@ -38,7 +38,7 @@ import org.voltdb.exceptions.SerializableException;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
-import com.google.common.base.Throwables;
+import com.google_voltpatches.common.base.Throwables;
 
 /**
  * Wrapper for native Execution Engine library.
