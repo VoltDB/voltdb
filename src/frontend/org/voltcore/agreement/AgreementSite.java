@@ -216,6 +216,9 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             }
         }
     }
+
+    private long m_lastUsedTxnId = 0;
+
     @Override
     public void run() {
         try {
@@ -271,6 +274,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                         //Owner is what associates the session with a specific initiator
                         //only used for createSession
                         txnState.m_request.setOwner(txnState.initiatorHSId);
+                        m_lastUsedTxnId = txnState.txnId;
                         m_server.prepRequest(txnState.m_request, txnState.txnId);
                     }
                 }
@@ -357,6 +361,25 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             } else if (lom.payload instanceof Request) {
                 Request r = (Request)lom.payload;
                 long txnId = 0;
+                switch(r.type) {
+                    case OpCode.createSession:
+                        txnId = r.sessionId;
+                        break;
+                    //For reads see if we can skip global agreement and just do the read
+                    case OpCode.exists:
+                    case OpCode.getChildren:
+                    case OpCode.getChildren2:
+                    case OpCode.getData:
+                        //If there are writes they can go in the queue (and some reads), don't short circuit
+                        //in this case because ordering of reads and writes matters
+                        if (!m_txnQueue.isEmpty()) break;
+                        r.setOwner(m_hsId);
+                        m_server.prepRequest(r, m_lastUsedTxnId);
+                        return;
+                    default:
+                        txnId = m_idManager.getNextUniqueTransactionId();
+                        break;
+                }
                 if (r.type == OpCode.createSession) {
                     txnId = r.sessionId;
                 } else {
