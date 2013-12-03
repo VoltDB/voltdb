@@ -127,81 +127,81 @@ public class TestClientPortChannel extends TestCase {
         channel.close();
     }
 
-//    public void testClientPortChannelBadLoginMessage() throws Exception {
-//        //Just connect and disconnect
-//        PortConnector channel = new PortConnector("localhost", rport);
-//        System.out.println("Testing Connect and Close");
-//        for (int i = 0; i < 100; i++) {
-//            channel.connect();
-//            channel.close();
-//        }
-//
-//        //Bad +ve length
-//        System.out.println("Testing bad login message");
-//        channel.connect();
-//        ByteBuffer buf = ByteBuffer.allocate(Integer.SIZE);
-//        buf.putInt(10);
-//        buf.position(0);
-//        channel.write(buf);
-//        channel.close();
-//
-//        //Bad -ve length.
-//        System.out.println("Testing negative length of message");
-//        channel.connect();
-//        buf = ByteBuffer.allocate(Integer.SIZE);
-//        buf.putInt(-1);
-//        buf.position(0);
-//        channel.write(buf);
-//        channel.close();
-//
-//        //Bad 0 length.
-//        System.out.println("Testing zero length of message");
-//        channel.connect();
-//        buf = ByteBuffer.allocate(Integer.SIZE);
-//        buf.putInt(0);
-//        buf.position(0);
-//        channel.write(buf);
-//        channel.close();
-//
-//        //too big length
-//        System.out.println("Testing too big length of message");
-//        channel.connect();
-//        buf = ByteBuffer.allocate(Integer.SIZE);
-//        buf.putInt(Integer.MAX_VALUE);
-//        buf.position(0);
-//        channel.write(buf);
-//        channel.close();
-//
-//        //login message with bad service
-//        channel.connect();
-//        buf = ByteBuffer.allocate(41);
-//        buf.putInt(37);
-//        buf.put((byte) '0');
-//        buf.putInt(8);
-//        buf.put("datacase".getBytes("UTF-8"));
-//        buf.putInt(0);
-//        buf.put("".getBytes("UTF-8"));
-//        buf.put(ConnectionUtil.getHashedPassword(""));
-//        buf.flip();
-//        channel.write(buf);
-//
-//        ByteBuffer resp = ByteBuffer.allocate(4);
-//        boolean excalled = false;
-//        try {
-//            channel.read(resp, 4);
-//            resp.flip();
-//            assertEquals(resp.getInt(), 5);
-//        } catch (Exception ioex) {
-//            //Should not get called; we get a legit response.
-//            excalled = true;
-//        }
-//        assertFalse(excalled);
-//        channel.close();
-//
-//        //Make sure server is up and we can login/connect
-//        doLoginAndClose();
-//
-//    }
+    public void testClientPortChannelBadLoginMessage() throws Exception {
+        //Just connect and disconnect
+        PortConnector channel = new PortConnector("localhost", rport);
+        System.out.println("Testing Connect and Close");
+        for (int i = 0; i < 100; i++) {
+            channel.connect();
+            channel.close();
+        }
+
+        //Bad +ve length
+        System.out.println("Testing bad login message");
+        channel.connect();
+        ByteBuffer buf = ByteBuffer.allocate(Integer.SIZE);
+        buf.putInt(10);
+        buf.position(0);
+        channel.write(buf);
+        channel.close();
+
+        //Bad -ve length.
+        System.out.println("Testing negative length of message");
+        channel.connect();
+        buf = ByteBuffer.allocate(Integer.SIZE);
+        buf.putInt(-1);
+        buf.position(0);
+        channel.write(buf);
+        channel.close();
+
+        //Bad 0 length.
+        System.out.println("Testing zero length of message");
+        channel.connect();
+        buf = ByteBuffer.allocate(Integer.SIZE);
+        buf.putInt(0);
+        buf.position(0);
+        channel.write(buf);
+        channel.close();
+
+        //too big length
+        System.out.println("Testing too big length of message");
+        channel.connect();
+        buf = ByteBuffer.allocate(Integer.SIZE);
+        buf.putInt(Integer.MAX_VALUE);
+        buf.position(0);
+        channel.write(buf);
+        channel.close();
+
+        //login message with bad service
+        channel.connect();
+        buf = ByteBuffer.allocate(41);
+        buf.putInt(37);
+        buf.put((byte) '0');
+        buf.putInt(8);
+        buf.put("datacase".getBytes("UTF-8"));
+        buf.putInt(0);
+        buf.put("".getBytes("UTF-8"));
+        buf.put(ConnectionUtil.getHashedPassword(""));
+        buf.flip();
+        channel.write(buf);
+
+        ByteBuffer resp = ByteBuffer.allocate(4);
+        boolean excalled = false;
+        try {
+            channel.read(resp, 4);
+            resp.flip();
+            assertEquals(resp.getInt(), 5);
+        } catch (Exception ioex) {
+            //Should not get called; we get a legit response.
+            excalled = true;
+        }
+        assertFalse(excalled);
+        channel.close();
+
+        //Make sure server is up and we can login/connect
+        doLoginAndClose();
+
+    }
 
     public void testInvocation() throws Exception {
         PortConnector channel = new PortConnector("localhost", rport);
