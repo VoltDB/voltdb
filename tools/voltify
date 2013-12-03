@@ -31,15 +31,18 @@ import sys
 import os
 from toolrunner import env_path_fix, vmain, warning
 
-# Work around MySQL/OSX issues by adjusting the PATH or DYLD_LIBRARY_PATH
-# environment variables to locate mysql_config and the client library. Note
-# that setting os.environ only works because Python is re-executed by vmain().
+# Make sure mysql_config is available.
+healthy = env_path_fix('PATH', ['/usr/local/mysql/bin'], ['mysql_config'])
+# On Mac make sure the client library is available.
 if sys.platform == 'darwin':
-    if (   not env_path_fix('PATH', ['/usr/local/mysql/bin'], ['mysql_config'])
-        or not env_path_fix('DYLD_LIBRARY_PATH', ['/usr/local/mysql/lib'], ['libmysqlclient.*.dylib'])):
-        warning('The "mysql-python" module may have problems.',
-                'If errors occur please install, re-install, or repair MySQL,',
-                'or update the environment variable(s) mentioned above.')
+    healthy |= env_path_fix('DYLD_LIBRARY_PATH', ['/usr/local/mysql/lib'], ['libmysqlclient.*.dylib'])
+if not healthy:
+    warning('The "mysql-python" module may have problems.',
+            'If errors occur please install, re-install, or repair MySQL,',
+            'or update the environment variable(s) mentioned above.')
+    if sys.platform != 'darwin':
+        warning('You may need to install an additional package with mysql_config.',
+                'E.g. on Ubuntu, "libmysqlclient-dev".')
 
 # Run in an automatically-built virtual environment that includes auto-
 # installed package dependencies.
