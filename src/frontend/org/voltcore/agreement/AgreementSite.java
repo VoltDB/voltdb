@@ -372,10 +372,13 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                     case OpCode.getData:
                         //If there are writes they can go in the queue (and some reads), don't short circuit
                         //in this case because ordering of reads and writes matters
-                        if (!m_txnQueue.isEmpty()) break;
-                        r.setOwner(m_hsId);
-                        m_server.prepRequest(r, m_lastUsedTxnId);
-                        return;
+                        if (m_txnQueue.isEmpty()) {
+                            r.setOwner(m_hsId);
+                            m_server.prepRequest(r, m_lastUsedTxnId);
+                            return;
+                        }
+                        //Fall through is intentional, going with the default of putting
+                        //it in the global order
                     default:
                         txnId = m_idManager.getNextUniqueTransactionId();
                         break;
