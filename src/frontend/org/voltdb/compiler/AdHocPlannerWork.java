@@ -94,11 +94,11 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
      * It's also convenient for simple tests that need to mock up a quick planner request to
      * test related parts of the system.
      */
-    public static AdHocPlannerWork makeStoredProcAdHocPlannerWork(
+    public static AdHocPlannerWork makeStoredProcAdHocPlannerWork(long replySiteId,
             String sql, Object[] userParams, boolean singlePartition, CatalogContext context,
             AsyncCompilerWorkCompletionHandler completionHandler)
     {
-        return new AdHocPlannerWork(-1, 0, 0, false, null, //none of the params on this line are used
+        return new AdHocPlannerWork(replySiteId, 0, 0, false, null,
             sql, new String[] { sql },
             userParams, context, false,
             // ??? The settings passed here for the single partition stored proc caller

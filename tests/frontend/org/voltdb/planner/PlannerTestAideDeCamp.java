@@ -34,6 +34,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
@@ -107,7 +108,9 @@ public class PlannerTestAideDeCamp {
      */
     private List<AbstractPlanNode> compile(String sql, int paramCount, String joinOrder, boolean inferPartitioning, boolean forceSingle, DeterminismMode detMode)
     {
-        Statement catalogStmt = proc.getStatements().add("stmt-" + String.valueOf(compileCounter++));
+        String stmtLabel = "stmt-" + String.valueOf(compileCounter++);
+
+        Statement catalogStmt = proc.getStatements().add(stmtLabel);
         catalogStmt.setSqltext(sql);
         catalogStmt.setSinglepartition(forceSingle);
         catalogStmt.setBatched(false);
@@ -142,19 +145,21 @@ public class PlannerTestAideDeCamp {
         } else {
             partitioning = PartitioningForStatement.forceMP();
         }
-        QueryPlanner planner =
-            new QueryPlanner(catalogStmt.getSqltext(), catalogStmt.getTypeName(),
-                    catalogStmt.getParent().getTypeName(), catalog.getClusters().get("cluster"),
-                    db, partitioning, hsql, estimates, false, StatementCompiler.DEFAULT_MAX_JOIN_TABLES,
-                    costModel, null, joinOrder, detMode);
+        String procName = catalogStmt.getParent().getTypeName();
+        Cluster catalogCluster = catalog.getClusters().get("cluster");
+        QueryPlanner planner = new QueryPlanner(sql, stmtLabel, procName, catalogCluster, db,
+                partitioning, hsql, estimates, false, StatementCompiler.DEFAULT_MAX_JOIN_TABLES,
+                costModel, null, joinOrder, detMode);
 
-        if (partitioning.isInferred()) {
-            catalogStmt.setSinglepartition(partitioning.isInferredSingle());
-        }
         CompiledPlan plan = null;
         planner.parse();
         plan = planner.plan();
         assert(plan != null);
+
+        // Partitioning optionally inferred from the planning process.
+        if (partitioning.isInferred()) {
+            catalogStmt.setSinglepartition(partitioning.isInferredSingle());
+        }
 
         // Input Parameters
         // We will need to update the system catalogs with this new information

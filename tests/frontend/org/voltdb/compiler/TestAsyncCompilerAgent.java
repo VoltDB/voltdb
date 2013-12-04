@@ -111,7 +111,7 @@ public class TestAsyncCompilerAgent {
             };
             // This API that underlies dynamic ad hoc invocation from a stored procedure is
             // also handy here for setting up a mocked up planner work request for testing purposes.
-            AdHocPlannerWork work = AdHocPlannerWork.makeStoredProcAdHocPlannerWork("select * from a",
+            AdHocPlannerWork work = AdHocPlannerWork.makeStoredProcAdHocPlannerWork(100, "select * from a",
                                                                                     null, false, null,
                                                                                     handler);
             LocalObjectMessage msg = new LocalObjectMessage(work);

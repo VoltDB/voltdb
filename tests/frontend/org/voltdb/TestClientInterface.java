@@ -293,8 +293,9 @@ public class TestClientInterface {
         verify(m_messenger).send(eq(32L), captor.capture());
         assertTrue(captor.getValue().payload instanceof AdHocPlannerWork);
         payloadString = captor.getValue().payload.toString();
-        assertTrue(payloadString.contains("partition param index: 0"));
-        assertTrue(payloadString.contains("user param[1]: 3"));
+        assertTrue(payloadString.contains("partition param index: -1"));
+        assertTrue(payloadString.contains("user params: empty"));
+        assertTrue(payloadString.contains("user partitioning: 3"));
     }
 
     @Test
@@ -303,9 +304,9 @@ public class TestClientInterface {
         String query = "select * from a where i = ?";
         int partitionParamIndex = 0;
         Object[] extractedValues =  new Object[0];
-        VoltType[] extractedTypes =  new VoltType[0];
+        VoltType[] paramTypes =  new VoltType[]{VoltType.INTEGER};
         AdHocPlannedStmtBatch plannedStmtBatch =
-                AdHocPlannedStmtBatch.mockStatementBatch(query, extractedValues, extractedTypes,
+                AdHocPlannedStmtBatch.mockStatementBatch(3, query, extractedValues, paramTypes,
                                                          new Object[]{3}, partitionParamIndex);
         m_ci.processFinishedCompilerWork(plannedStmtBatch).run();
 
@@ -346,9 +347,9 @@ public class TestClientInterface {
         // Need a batch and a statement
         String query = "select * from a";
         Object[] extractedValues =  new Object[0];
-        VoltType[] extractedTypes =  new VoltType[0];
+        VoltType[] paramTypes =  new VoltType[0];
         AdHocPlannedStmtBatch plannedStmtBatch =
-            AdHocPlannedStmtBatch.mockStatementBatch(query, extractedValues, extractedTypes, null, -1);
+            AdHocPlannedStmtBatch.mockStatementBatch(3, query, extractedValues, paramTypes, null, -1);
         m_ci.processFinishedCompilerWork(plannedStmtBatch).run();
 
         ArgumentCaptor<Long> destinationCaptor =

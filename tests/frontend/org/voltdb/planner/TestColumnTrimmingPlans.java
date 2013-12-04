@@ -33,7 +33,7 @@ public class TestColumnTrimmingPlans extends PlannerTestCase
                     "testtrimmingplans");
     }
 
-	@Override
+    @Override
     protected void tearDown() throws Exception {
         super.tearDown();
     }
