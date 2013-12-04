@@ -1532,9 +1532,10 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                     e.printStackTrace(pw);
                     response.setResults(
                             new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
-                                                   new VoltTable[] {},
-                                                   "Exception while deserializing procedure params\n" +
-                                                   result.toString()));
+                                    new VoltTable[] {},
+                                    "Exception while deserializing procedure params procedure="
+                                    + itask.getStoredProcedureName() + "\n"
+                                    + result.toString()));
                 }
                 if (callerParams != null) {
                     ClientResponseImpl cr = null;

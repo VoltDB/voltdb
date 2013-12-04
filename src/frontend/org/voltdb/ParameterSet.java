@@ -28,7 +28,6 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.common.Constants;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
@@ -41,9 +40,6 @@ import org.voltdb.types.VoltDecimalHelper;
  *
  */
 public class ParameterSet implements JSONString {
-
-    @SuppressWarnings("unused")
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     static final byte ARRAY = -99;
 
@@ -615,7 +611,13 @@ public class ParameterSet implements JSONString {
 
         byte nextTypeByte = in.readByte();
         if (nextTypeByte == ARRAY) {
-            VoltType nextType = VoltType.get(in.readByte());
+            VoltType nextType = null;
+            byte etype = in.readByte();
+            try {
+                nextType = VoltType.get(etype);
+            } catch (AssertionError ae) {
+                throw new RuntimeException("ParameterSet doesn't support type " + etype);
+            }
             if (nextType == null) {
                 value = null;
             }
@@ -637,7 +639,12 @@ public class ParameterSet implements JSONString {
             }
         }
         else {
-            VoltType nextType = VoltType.get(nextTypeByte);
+            VoltType nextType;
+            try {
+                nextType = VoltType.get(nextTypeByte);
+            } catch (AssertionError ae) {
+                throw new RuntimeException("ParameterSet doesn't support type " + nextTypeByte);
+            }
             switch (nextType) {
                 case NULL:
                     value = null;

@@ -324,8 +324,10 @@ public enum VoltType {
     }
 
     private final static Map<Class<?>, VoltType> s_classes;
+    private final static Map<Byte, VoltType> s_types;
     static {
         s_classes = new HashMap<Class<?>, VoltType>();
+        s_types = new HashMap<Byte, VoltType>();
         for (VoltType type : values()) {
             for (Class<?> cls : type.m_classes) {
                 // Avoid subtle effects when VoltTypes have duplicate m_classes entries (java classes),
@@ -342,6 +344,7 @@ public enum VoltType {
                     throw new RuntimeException("Associate each java class with at most one VoltType.");
                 }
                 s_classes.put(cls, type);
+                s_types.put(type.m_val, type);
             }
         }
     }
@@ -388,10 +391,11 @@ public enum VoltType {
      * @return The appropriate enum value
      */
     public static VoltType get(byte val) {
-        for (VoltType type : VoltType.values()) {
-            if (type.m_val == val) return type;
+        VoltType type = s_types.get(val);
+        if (type == null) {
+            throw new AssertionError("Unknown type: " + String.valueOf(val));
         }
-        throw new AssertionError("Unknown type: " + String.valueOf(val));
+        return type;
     }
 
     private boolean matchesString(String str) {

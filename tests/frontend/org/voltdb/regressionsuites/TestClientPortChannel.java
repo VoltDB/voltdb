@@ -34,7 +34,8 @@ import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestClientPortChannel extends TestCase {
 
-    int rport;
+    int m_clientPort;
+    int m_adminPort;
     LocalCluster m_config;
 
     public TestClientPortChannel(String name) {
@@ -47,18 +48,35 @@ public class TestClientPortChannel extends TestCase {
      */
     @Override
     public void setUp() throws Exception {
-        rport = SecureRandom.getInstance("SHA1PRNG").nextInt(2000) + 22000;
-        System.out.println("Random Client port is: " + rport);
+        m_clientPort = SecureRandom.getInstance("SHA1PRNG").nextInt(2000) + 22000;
+        m_adminPort = m_clientPort + 1;
+        System.out.println("Random Client port is: " + m_clientPort);
         try {
             //Build the catalog
             VoltProjectBuilder builder = new VoltProjectBuilder();
-            builder.addLiteralSchema("");
+            String mySchema
+                    = "create table A ("
+                    + "s varchar(20) default null, "
+                    + "); "
+                    + "create table B ("
+                    + "clm_integer integer default 0 not null, "
+                    + "clm_tinyint tinyint default 0, "
+                    + "clm_smallint smallint default 0, "
+                    + "clm_bigint bigint default 0, "
+                    + "clm_string varchar(20) default null, "
+                    + "clm_decimal decimal default null, "
+                    + "clm_float float default null, "
+                    + "clm_timestamp timestamp default null, "
+                    + "clm_varinary varbinary(20) default null"
+                    + "); ";
+            builder.addLiteralSchema(mySchema);
             String catalogJar = "dummy.jar";
 
             m_config = new LocalCluster(catalogJar, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
             m_config.portGenerator.enablePortProvider();
-            m_config.portGenerator.pprovider.setNextClient(rport);
+            m_config.portGenerator.pprovider.setNextClient(m_clientPort);
+            m_config.portGenerator.pprovider.setAdmin(m_adminPort);
             m_config.setHasLocalServer(false);
             boolean success = m_config.compile(builder);
             assertTrue(success);
@@ -70,7 +88,6 @@ public class TestClientPortChannel extends TestCase {
             fail(ex.getMessage());
         } finally {
         }
-//        rport = 21212;
     }
 
     /**
@@ -84,6 +101,7 @@ public class TestClientPortChannel extends TestCase {
         }
     }
 
+    // Just do a login
     public void login(PortConnector conn) throws Exception {
         ByteBuffer buf = ByteBuffer.allocate(41);
         buf.putInt(37);
@@ -119,17 +137,25 @@ public class TestClientPortChannel extends TestCase {
         System.out.println("Authenticated to server: " + new String(buildStringBytes, "UTF-8"));
     }
 
-    public void doLoginAndClose() throws Exception {
+    //Login with new connection and close
+    public void doLoginAndClose(int port) throws Exception {
         System.out.println("Testing valid login message");
-        PortConnector channel = new PortConnector("localhost", rport);
+        PortConnector channel = new PortConnector("localhost", port);
         channel.connect();
         login(channel);
         channel.close();
     }
 
-    public void testClientPortChannelBadLoginMessage() throws Exception {
+    public void testLoginMessagesClientPort() throws Exception {
+        runBadLoginMessages(m_clientPort);
+    }
+    public void testLoginMessagesAdminPort() throws Exception {
+        runBadLoginMessages(m_adminPort);
+    }
+
+    public void runBadLoginMessages(int port) throws Exception {
         //Just connect and disconnect
-        PortConnector channel = new PortConnector("localhost", rport);
+        PortConnector channel = new PortConnector("localhost", port);
         System.out.println("Testing Connect and Close");
         for (int i = 0; i < 100; i++) {
             channel.connect();
@@ -173,6 +199,7 @@ public class TestClientPortChannel extends TestCase {
         channel.close();
 
         //login message with bad service
+        System.out.println("Testing bad service name");
         channel.connect();
         buf = ByteBuffer.allocate(41);
         buf.putInt(37);
@@ -197,15 +224,48 @@ public class TestClientPortChannel extends TestCase {
             //Should not get called; we get a legit response.
             fail();
         }
+
+        //login message with bad service name length.
+        System.out.println("Testing service name with invalid length");
+        channel.connect();
+        buf = ByteBuffer.allocate(41);
+        buf.putInt(37);
+        buf.put((byte) '0');
+        buf.putInt(Integer.MAX_VALUE);
+        buf.put("database".getBytes("UTF-8"));
+        buf.putInt(0);
+        buf.put("".getBytes("UTF-8"));
+        buf.put(ConnectionUtil.getHashedPassword(""));
+        buf.flip();
+        channel.write(buf);
+
+        boolean mustfail = false;
+        try {
+            ByteBuffer resp = ByteBuffer.allocate(6);
+            channel.read(resp, 6);
+            resp.flip();
+        } catch (Exception ioex) {
+            //Should not get called; we get a legit response.
+            mustfail = true;
+        }
+        assertTrue(mustfail);
+
         channel.close();
 
-        //Make sure server is up and we can login/connect
-        doLoginAndClose();
+        //Make sure server is up and we can login/connect after all the beating it took.
+        doLoginAndClose(port);
 
     }
 
-    public void testInvocation() throws Exception {
-        PortConnector channel = new PortConnector("localhost", rport);
+    public void testInvocationClientPort() throws Exception {
+        runInvocationMessageTest(m_clientPort);
+    }
+    public void testInvocationAdminPort() throws Exception {
+        runInvocationMessageTest(m_adminPort);
+    }
+
+    public void runInvocationMessageTest(int port) throws Exception {
+        PortConnector channel = new PortConnector("localhost", port);
         channel.connect();
 
         //Now start testing combinations of invocation messages.
@@ -319,18 +379,222 @@ public class TestClientPortChannel extends TestCase {
         channel.close();
     }
 
-    public void testInvocationParams() throws Exception {
-        PortConnector channel = new PortConnector("localhost", rport);
+    public void testInvocationParamsClientPort() throws Exception {
+        runInvocationParams(m_clientPort);
+    }
+    public void testInvocationParamsAdminPort() throws Exception {
+        runInvocationParams(m_adminPort);
+    }
+
+    public void runInvocationParams(int port) throws Exception {
+        PortConnector channel = new PortConnector("localhost", port);
         channel.connect();
 
         //Send login message before invocation.
         login(channel);
 
         //Now start testing combinations of invocation messages with invocation params.
+        //no param
+        byte i1[] = {0, //Version
+            0, 0, 0, 8,
+            'B', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
+            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
+            0, 0
+        };
+        int pidx = i1.length - 2;
+        verifyInvocation(i1, channel, (byte) -2);
+        byte i2[] = {0, //Version
+            0, 0, 0, 8,
+            'B', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
+            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
+            0, 0
+        };
+        byte iarr[] = ByteBuffer.allocate(2).putShort(Short.MAX_VALUE).array();
+        i2[pidx] = iarr[0];
+        i2[pidx + 1] = iarr[1];
+        verifyInvocation(i2, channel, (byte) -2);
+        iarr = ByteBuffer.allocate(2).putShort((short) -1).array();
+        i2[pidx] = iarr[0];
+        i2[pidx + 1] = iarr[1];
+        verifyInvocation(i2, channel, (byte) -2);
         //Lie about param count.
-        //Lie length of param string and array.
+        iarr = ByteBuffer.allocate(2).putShort((short) 4).array();
+        i2[pidx] = iarr[0];
+        i2[pidx + 1] = iarr[1];
+        verifyInvocation(i2, channel, (byte) -2);
+        //Put correct param count but no values
+        iarr = ByteBuffer.allocate(2).putShort((short) 9).array();
+        i2[pidx] = iarr[0];
+        i2[pidx + 1] = iarr[1];
+        verifyInvocation(i2, channel, (byte) -2);
+        //Lie length of param string.
+        byte i3[] = {0, //Version
+            0, 0, 0, 8,
+            'A', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
+            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
+            0, 0, 9, //9 is string type
+        };
+        iarr = ByteBuffer.allocate(2).putShort((short) 1).array();
+        i3[21] = iarr[0];
+        i3[21 + 1] = iarr[1];
+        verifyInvocation(i3, channel, (byte) -2);
+
+        //Pass string length of 8 but dont pass string.
+        byte i4[] = {0, //Version
+            0, 0, 0, 8,
+            'A', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
+            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
+            0, 0, 9, //9 is string type
+            0, 0, 0, 0 //String length
+        };
+        iarr = ByteBuffer.allocate(2).putShort((short) 1).array();
+        i4[21] = iarr[0];
+        i4[21 + 1] = iarr[1];
+        iarr = ByteBuffer.allocate(4).putInt(8).array();
+        i4[24] = iarr[0];
+        i4[24 + 1] = iarr[1];
+        i4[24 + 2] = iarr[2];
+        i4[24 + 3] = iarr[3];
+        verifyInvocation(i4, channel, (byte) -2);
+
+        //Pass string length of 6 and pass 6 byte string this should succeed.
+        byte i5[] = {0, //Version
+            0, 0, 0, 8,
+            'A', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
+            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
+            0, 0, 9, //9 is string type
+            0, 0, 0, 0, //String length
+            'v', 'o', 'l', 't', 'd', 'b'
+        };
+        iarr = ByteBuffer.allocate(2).putShort((short) 1).array();
+        i5[21] = iarr[0];
+        i5[21 + 1] = iarr[1];
+        iarr = ByteBuffer.allocate(4).putInt(6).array();
+        i5[24] = iarr[0];
+        i5[24 + 1] = iarr[1];
+        i5[24 + 2] = iarr[2];
+        i5[24 + 3] = iarr[3];
+        verifyInvocation(i5, channel, (byte) 1);
+
+        //Lie length of param  array.
+       byte i6[] = {0, //Version
+            0, 0, 0, 8,
+            'A', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
+            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
+            0, 0, -99 //-99 is array
+        };
+        iarr = ByteBuffer.allocate(2).putShort((short) 1).array();
+        i6[21] = iarr[0];
+        i6[21 + 1] = iarr[1];
+        verifyInvocation(i6, channel, (byte) -2);
+        //Lie length of param  array.
+        byte i61[] = {0, //Version
+            0, 0, 0, 8,
+            'A', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
+            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
+            0, 0, -99, //-99 is array
+            70, //bad element type
+        };
+        iarr = ByteBuffer.allocate(2).putShort((short) 1).array();
+        i61[21] = iarr[0];
+        i61[21 + 1] = iarr[1];
+        verifyInvocation(i61, channel, (byte) -2);
+
+        //Array of Array not supported should not crash server.
+        byte i62[] = {0, //Version
+            0, 0, 0, 8,
+            'A', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
+            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
+            0, 0, -99, //-99 is array
+            -99, //Array of Array
+        };
+        iarr = ByteBuffer.allocate(2).putShort((short) 1).array();
+        i62[21] = iarr[0];
+        i62[21 + 1] = iarr[1];
+        verifyInvocation(i62, channel, (byte) -2);
+
+        //Array of string but no data.
+        byte i63[] = {0, //Version
+            0, 0, 0, 8,
+            'A', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
+            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
+            0, 0, -99, //-99 is array
+            9, //String with no data
+        };
+        iarr = ByteBuffer.allocate(2).putShort((short) 1).array();
+        i63[21] = iarr[0];
+        i63[21 + 1] = iarr[1];
+        verifyInvocation(i63, channel, (byte) -2);
+
+        //Array of string with bad length
+        byte i631[] = {0, //Version
+            0, 0, 0, 8,
+            'A', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
+            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
+            0, 0, -99, //-99 is array
+            9, 0, 0, 0, 0//String with no data
+        };
+        iarr = ByteBuffer.allocate(2).putShort((short) 1).array();
+        i631[21] = iarr[0];
+        i631[21 + 1] = iarr[1];
+        iarr = ByteBuffer.allocate(4).putInt(Integer.MAX_VALUE).array();
+        i631[i631.length - 4] = iarr[0];
+        i631[i631.length - 3] = iarr[1];
+        i631[i631.length - 2] = iarr[2];
+        i631[i631.length - 1] = iarr[3];
+        verifyInvocation(i631, channel, (byte) -2);
+
+        //Array of long but no data.
+        byte i64[] = {0, //Version
+            0, 0, 0, 8,
+            'A', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
+            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
+            0, 0, -99, //-99 is array
+            6, //Long with no data
+        };
+        iarr = ByteBuffer.allocate(2).putShort((short) 1).array();
+        i64[21] = iarr[0];
+        i64[21 + 1] = iarr[1];
+        verifyInvocation(i64, channel, (byte) -2);
+
+        //Array of long with non parsable long
+        byte i65[] = {0, //Version
+            0, 0, 0, 8,
+            'A', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
+            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
+            0, 0, -99, //-99 is array
+            6, //Long
+            'A'
+        };
+        iarr = ByteBuffer.allocate(2).putShort((short) 1).array();
+        i64[21] = iarr[0];
+        i64[21 + 1] = iarr[1];
+        verifyInvocation(i65, channel, (byte) -2);
+
         //Lie data type invaid data type.
-        //Lie valid data type but bad bytes after.
+        byte i7[] = {0, //Version
+            0, 0, 0, 8,
+            'A', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
+            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
+            0, 0, 70, //98 bad
+        };
+        iarr = ByteBuffer.allocate(2).putShort((short) 1).array();
+        i7[21] = iarr[0];
+        i7[21 + 1] = iarr[1];
+        verifyInvocation(i7, channel, (byte) -2);
+
+        //Test Good Ping at end to ensure server is up.
+        System.out.println("Testing good Ping invocation Again");
+        byte pingr[] = {0, //Version
+            0, 0, 0, 5,
+            '@', 'P', 'i', 'n', 'g', //proc string length and name
+            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
+            0, 0
+        };
+        verifyInvocation(pingr, channel, (byte) 1);
+
+        //Test insert again
+        verifyInvocation(i5, channel, (byte) 1);
         channel.close();
     }
 
@@ -342,10 +606,7 @@ public class TestClientPortChannel extends TestCase {
         channel.write(buf);
 
         ByteBuffer lenbuf = ByteBuffer.allocate(4);
-        channel.read(lenbuf, 1);
-        channel.read(lenbuf, 1);
-        channel.read(lenbuf, 1);
-        channel.read(lenbuf, 1);
+        channel.read(lenbuf, 4);
         lenbuf.flip();
         int len = lenbuf.getInt();
         System.out.println("Response length is: " + len);
