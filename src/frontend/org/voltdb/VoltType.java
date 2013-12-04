@@ -329,6 +329,7 @@ public enum VoltType {
         s_classes = new HashMap<Class<?>, VoltType>();
         s_types = new HashMap<Byte, VoltType>();
         for (VoltType type : values()) {
+            s_types.put(type.m_val, type);
             for (Class<?> cls : type.m_classes) {
                 // Avoid subtle effects when VoltTypes have duplicate m_classes entries (java classes),
                 // so that the association of a java class with the earlier VoltType gets obliterated
@@ -344,7 +345,6 @@ public enum VoltType {
                     throw new RuntimeException("Associate each java class with at most one VoltType.");
                 }
                 s_classes.put(cls, type);
-                s_types.put(type.m_val, type);
             }
         }
     }
