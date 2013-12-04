@@ -25,14 +25,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.google_voltpatches.common.collect.Multimap;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
-
 import org.voltdb.VoltDB;
+
+import com.google_voltpatches.common.collect.Multimap;
 
 public class ClusterConfig
 {
@@ -176,6 +176,21 @@ public class ClusterConfig
         }
         m_errorMsg = "Cluster config contains no detected errors";
         return true;
+    }
+
+    public boolean validate(int origStartCount)
+    {
+        boolean isValid = validate();
+        if (isValid && origStartCount < m_hostCount && origStartCount > 0)
+        {
+            if ((m_hostCount - origStartCount) % (m_replicationFactor + 1) != 0)
+            {
+                m_errorMsg = String.format("%d servers required for K-safety=%d",
+                        m_replicationFactor + 1, m_replicationFactor);
+                return false;
+            }
+        }
+        return isValid;
     }
 
     private static class Partition {

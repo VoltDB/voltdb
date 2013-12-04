@@ -214,7 +214,7 @@ public class BalancePartitionsStatistics extends StatsSource {
     {
         final StatsPoint point = statsPoint;
 
-        rowValues[columnNameToIndex.get(Constants.TIMESTAMP)] = point.getStartTimeMillis();
+        rowValues[columnNameToIndex.get(Constants.TIMESTAMP)] = point.getEndTimeMillis();
         rowValues[columnNameToIndex.get(Constants.PERCENTAGE_MOVED)] = point.getPercentageMoved();
         rowValues[columnNameToIndex.get(Constants.MOVED_ROWS)] = point.getMovedRows();
         rowValues[columnNameToIndex.get(Constants.ROWS_PER_SECOND)] = point.getRowsPerSecond();
