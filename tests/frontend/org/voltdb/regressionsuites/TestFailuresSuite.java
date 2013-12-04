@@ -519,7 +519,7 @@ public class TestFailuresSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
         // CONFIG #3: N=2 K=1 Cluster
         /////////////////////////////////////////////////////////////
-        config = new LocalCluster("failures-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("failures-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI).resetKfactorForCommunity(1);
         if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
