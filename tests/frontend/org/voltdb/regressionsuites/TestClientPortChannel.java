@@ -178,24 +178,25 @@ public class TestClientPortChannel extends TestCase {
         buf.putInt(37);
         buf.put((byte) '0');
         buf.putInt(8);
-        buf.put("datacase".getBytes("UTF-8"));
+        buf.put("dataCase".getBytes("UTF-8"));
         buf.putInt(0);
         buf.put("".getBytes("UTF-8"));
         buf.put(ConnectionUtil.getHashedPassword(""));
         buf.flip();
         channel.write(buf);
 
-        ByteBuffer resp = ByteBuffer.allocate(4);
-        boolean excalled = false;
         try {
-            channel.read(resp, 4);
+            ByteBuffer resp = ByteBuffer.allocate(6);
+            channel.read(resp, 6);
             resp.flip();
-            assertEquals(resp.getInt(), 5);
+            resp.getInt();
+            resp.get();
+            byte code = resp.get();
+            assertEquals(5, code);
         } catch (Exception ioex) {
             //Should not get called; we get a legit response.
-            excalled = true;
+            fail();
         }
-        assertFalse(excalled);
         channel.close();
 
         //Make sure server is up and we can login/connect
@@ -326,6 +327,10 @@ public class TestClientPortChannel extends TestCase {
         login(channel);
 
         //Now start testing combinations of invocation messages with invocation params.
+        //Lie about param count.
+        //Lie length of param string and array.
+        //Lie data type invaid data type.
+        //Lie valid data type but bad bytes after.
         channel.close();
     }
 
