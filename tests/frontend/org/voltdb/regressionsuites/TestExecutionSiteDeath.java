@@ -88,7 +88,7 @@ public class TestExecutionSiteDeath extends RegressionSuite {
         project.addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2");
 
         boolean success;
-        config = new LocalCluster("rollback-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("rollback-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI).resetKfactorForCommunity(1);
         LocalCluster lc_config = (LocalCluster)config;
         lc_config.setHasLocalServer(false);
         success = config.compile(project);

@@ -37,6 +37,7 @@ import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CommandLine;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
 /**
@@ -179,10 +180,13 @@ public class LocalCluster implements VoltServerConfig {
 
         m_siteCount = siteCount;
         m_hostCount = hostCount;
+        if (kfactor > 0 && !MiscUtils.isPro()) {
+            m_kfactor = 0;
+        }
         m_kfactor = kfactor;
         m_debug = debug;
         m_jarFileName = jarFileName;
-        m_failureState = kfactor < 1 ? FailureState.ALL_RUNNING : failureState;
+        m_failureState = m_kfactor < 1 ? FailureState.ALL_RUNNING : failureState;
         m_pipes = new ArrayList<PipeToFile>();
         m_cmdLines = new ArrayList<CommandLine>();
 
@@ -1161,6 +1165,20 @@ public class LocalCluster implements VoltServerConfig {
             return false;
         }
         return buildType.toLowerCase().startsWith("memcheck");
+    }
+
+    /**
+     * Kfactor greater than 0 is a PRO feature. In order to run multiple hosts tests for community,
+     * Kfactor has been changed to zero. This function will help the tests reset the kfactor, because
+     * there are some test cases intended for Kfactor features.
+     * @param kfactor
+     * @return
+     */
+    public LocalCluster resetKfactorForCommunity(int kfactor) {
+        if (m_kfactor == 0 && !MiscUtils.isPro()) {
+            m_kfactor = kfactor;
+        }
+        return this;
     }
 
     @Override
