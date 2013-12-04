@@ -123,7 +123,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     tempTableMemory * 1024 * 1024);
         checkErrorCode(errorCode);
 
-        setupPsetBuffer(512 * 1024); // 512k
+        setupPsetBuffer(256 * 1024); // 256k seems like a reasonable per-ee number (but is totally pulled from my a**)
 
         updateHashinator(hashinatorConfig);
         //LOG.info("Initialized Execution Engine");
