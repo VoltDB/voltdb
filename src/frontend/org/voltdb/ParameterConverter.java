@@ -17,6 +17,8 @@
 
 package org.voltdb;
 
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -27,8 +29,6 @@ import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.base.Charsets;
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 
 /**
  * ParameterConverter provides a static helper to convert a deserialized
@@ -361,6 +361,7 @@ public class ParameterConverter {
             return numberParam.doubleValue();
         }
         else if (expectedClz == TimestampType.class) {
+            if (inputClz == Integer.class) return new TimestampType((Integer)param); // null values safe
             if (inputClz == Long.class) return new TimestampType((Long)param); // null values safe
             if (inputClz == TimestampType.class) return param;
             if (inputClz == Date.class) return new TimestampType((Date) param);

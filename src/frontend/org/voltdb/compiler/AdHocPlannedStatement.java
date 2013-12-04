@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import org.voltdb.ParameterSet;
+import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.planner.CompiledPlan;
@@ -212,5 +213,9 @@ public class AdHocPlannedStatement {
         } else {
             return core.getPartitioningParamValue();
         }
+    }
+
+    public VoltType getPartitioningParameterType() {
+        return core.getPartitioningParamType();
     }
 }

@@ -26,8 +26,10 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.network.Connection;
+import org.voltdb.ParameterConverter;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
+import org.voltdb.VoltTypeException;
 import org.voltdb.catalog.Database;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
@@ -47,6 +49,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
     // One or the other of these may be assigned if the planner infers single partition work.
     // Not persisted across serializations.
     public final int partitionParamIndex;
+    public final VoltType partitionParamType;
     public final Object partitionParamValue;
 
     // The planned statements.
@@ -76,6 +79,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
             AdHocPlannerWork work,
             List<AdHocPlannedStatement> stmts,
             int partitionParamIndex,
+            VoltType partitionParamType,
             Object partitionParamValue,
             String errors) {
         this.work = work;
@@ -98,6 +102,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         }
         this.readOnly = allReadOnly;
         this.partitionParamIndex = partitionParamIndex;
+        this.partitionParamType = partitionParamType;
         this.partitionParamValue = partitionParamValue;
         this.errorMsg = errors;
     }
@@ -135,6 +140,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
                 null);
         List<AdHocPlannedStatement> stmts = new ArrayList<AdHocPlannedStatement>();
         stmts.add(s);
+        VoltType partitionParamType = null;
         Object partitionParamValue = null;
         if (work.userPartitionKey != null) {
             partitionParamValue = work.userPartitionKey[0];
@@ -142,10 +148,14 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         else if (partitionParamIndex > -1) {
             partitionParamValue = userParams[partitionParamIndex];
         }
+        if (partitionParamValue != null) {
+            partitionParamType = VoltType.typeFromObject(partitionParamValue);
+        }
         // Finally, mock up the planned batch.
         AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(work,
                                                                            stmts,
                                                                            partitionParamIndex,
+                                                                           partitionParamType,
                                                                            partitionParamValue,
                                                                            null);
         return plannedStmtBatch;
@@ -232,9 +242,40 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
     public ByteBuffer flattenPlanArrayToBuffer() throws IOException {
         int size = 0; // sizeof batch
 
-        ParameterSet userParamCache = work.userParamSet == null ?
-                ParameterSet.emptyParameterSet() :
-                ParameterSet.fromArrayNoCopy(work.userParamSet);
+        ParameterSet userParamCache = null;
+        if (work.userParamSet == null) {
+            userParamCache = ParameterSet.emptyParameterSet();
+        } else {
+            Object[] typedUserParams = new Object[work.userParamSet.length];
+            int ii = 0;
+            for (AdHocPlannedStatement cs : plannedStatements) {
+                for (VoltType paramType : cs.core.parameterTypes) {
+                    if (ii >= typedUserParams.length) {
+                        String errorMsg =
+                            "Too few actual arguments were passed for the parameters in the sql statement(s): (" +
+                            typedUserParams.length + " vs. " + ii + ")";
+                        // Volt-TYPE-Exception is slightly cheating, here, should there be a more general VoltArgumentException?
+                        throw new VoltTypeException(errorMsg);
+                    }
+                    typedUserParams[ii] =
+                            ParameterConverter.tryToMakeCompatible(paramType.classFromType(),
+                                                                   work.userParamSet[ii]);
+                    // System.out.println("DEBUG typed parameter: " + work.userParamSet[ii] +
+                    //         "using type: " + paramType + "as: " + typedUserParams[ii]);
+                    ii++;
+                }
+            }
+            // Each parameter referenced in each statements should be represented
+            // exactly once in userParams.
+            if (ii < typedUserParams.length) {
+                // Volt-TYPE-Exception is slightly cheating, here, should there be a more general VoltArgumentException?
+                String errorMsg =
+                        "Too many actual arguments were passed for the parameters in the sql statement(s): (" +
+                        typedUserParams.length + " vs. " + ii + ")";
+                        throw new VoltTypeException(errorMsg);
+            }
+            userParamCache = ParameterSet.fromArrayNoCopy(typedUserParams);
+        }
         size += userParamCache.getSerializedSize();
 
         size += 2; // sizeof batch
@@ -293,7 +334,12 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         }
         if (partitionParamIndex > -1 && work.userParamSet != null &&
                 work.userParamSet.length > partitionParamIndex) {
-            return work.userParamSet[partitionParamIndex];
+            Object userParamValue = work.userParamSet[partitionParamIndex];
+            if (partitionParamType == null) {
+                return userParamValue;
+            } else {
+                return ParameterConverter.tryToMakeCompatible(partitionParamType.classFromType(), userParamValue);
+            }
         }
         return partitionParamValue;
     }

@@ -225,7 +225,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * that refuses to read responses) occurs inside the SimpleDTXNInitiator which
      * doesn't have access to m_connections
      */
-    private boolean m_hasDTXNBackPressure = false;
+    private final boolean m_hasDTXNBackPressure = false;
 
     // MAX_CONNECTIONS is updated to be (FD LIMIT - 300) after startup
     private final AtomicInteger MAX_CONNECTIONS = new AtomicInteger(800);
@@ -1846,7 +1846,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         try {
             buf = plannedStmtBatch.flattenPlanArrayToBuffer();
         }
-        catch (Exception e) {
+        catch (IOException e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
         assert(buf.hasArray());
@@ -1952,10 +1952,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                 createAdHocTransaction(plannedStmtBatch);
                             }
                             catch (VoltTypeException vte) {
-                                Object partitionParam = plannedStmtBatch.partitionParam();
-                                String msg = "Unable to hash the partition for adhoc partition value: " +
-                                        (partitionParam == null ? "null" : partitionParam.toString()) +
-                                        ", msg: " + vte.getMessage();
+                                String msg = "Unable to execute adhoc sql statement(s): " +
+                                        vte.getMessage();
                                 ClientResponseImpl errorResponse =
                                     new ClientResponseImpl(
                                             ClientResponseImpl.GRACEFUL_FAILURE,

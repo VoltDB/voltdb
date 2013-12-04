@@ -29,7 +29,6 @@ import org.voltdb.SQLStmtAdHocHelper;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
@@ -108,14 +107,6 @@ public abstract class AdHocBase extends VoltSystemProcedure {
                 collectorFragId = ActivePlanRepository.loadOrAddRefPlanFragment(
                         statement.core.collectorHash, statement.core.collectorFragment);
             }
-if (statement.core.parameterTypes == null) {
-System.out.println("DEBUG ad hoc core param types: NONE?");
-} else {
-System.out.println("DEBUG ad hoc core param types: " + statement.core.parameterTypes.length);
-for (VoltType vt : statement.core.parameterTypes) {
-System.out.println("DEBUG ad hoc core param type:  " + vt);
-}
-}
             SQLStmt stmt = SQLStmtAdHocHelper.createWithPlan(
                     statement.sql,
                     aggFragId,

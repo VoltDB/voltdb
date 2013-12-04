@@ -32,6 +32,7 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltType;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.planner.PartitioningForStatement;
 
@@ -153,6 +154,7 @@ public class AsyncCompilerAgent {
         List<String> errorMsgs = new ArrayList<String>();
         List<AdHocPlannedStatement> stmts = new ArrayList<AdHocPlannedStatement>();
         int partitionParamIndex = -1;
+        VoltType partitionParamType = null;
         Object partitionParamValue = null;
         assert(work.sqlStatements != null);
         // Take advantage of the planner optimization for inferring single partition work
@@ -174,6 +176,7 @@ public class AsyncCompilerAgent {
                 // and generated a partition parameter.
                 if (inferSP) {
                     partitionParamIndex = result.getPartitioningParameterIndex();
+                    partitionParamType = result.getPartitioningParameterType();
                     partitionParamValue = result.getPartitioningParameterValue();
                 }
                 stmts.add(result);
@@ -189,6 +192,7 @@ public class AsyncCompilerAgent {
         AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(work,
                                                                            stmts,
                                                                            partitionParamIndex,
+                                                                           partitionParamType,
                                                                            partitionParamValue,
                                                                            errorSummary);
 

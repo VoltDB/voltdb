@@ -303,4 +303,12 @@ public class CorePlan {
         return partitioningParamValue;
     }
 
+    public VoltType getPartitioningParamType() {
+        // TODO Auto-generated method stub
+        if (partitioningParamIndex < 0 || partitioningParamIndex >= parameterTypes.length) {
+            return VoltType.NULL;
+        }
+        return parameterTypes[partitioningParamIndex];
+    }
+
 }

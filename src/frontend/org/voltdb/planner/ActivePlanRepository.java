@@ -163,11 +163,11 @@ public abstract class ActivePlanRepository {
             frag = m_plansById.get(fragmentId);
             // The assert that used to be here would fail in TestAdHocQueries when it
             // re-initialized the RealVoltDB, clearing the m_plansById before
-            // all SQLStmts were finalized.
-            // It's possible that this early return is covering for a minor bug.
+            // all SQLStmts were finalized. Maybe that's just a "test bug" that would be
+            // better fixed with some kind of test-only cleanup hook?
+            // OR It's possible that this early return is covering for a minor bug.
             // Maybe SQLStmt.finalize is calling this method when it shouldn't?
-            // Maybe that's because the SQLStmt site member should be null sometimes
-            // -- but apparently never is?
+            // Maybe that's because the SQLStmt site member should be null in more cases?
             //assert(frag != null);
             if (frag == null) {
                 return;

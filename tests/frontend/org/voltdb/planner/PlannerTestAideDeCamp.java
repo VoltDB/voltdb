@@ -98,8 +98,8 @@ public class PlannerTestAideDeCamp {
         return m_currentPlan;
     }
 
-    List<AbstractPlanNode> compile(String sql, int paramCount, boolean singlePartition, String joinOrder) {
-        return compile(sql, paramCount, joinOrder, false, true, DeterminismMode.SAFER);
+    List<AbstractPlanNode> compile(String sql, int paramCount, boolean inferPartitioning, boolean singlePartition, String joinOrder) {
+        return compile(sql, paramCount, joinOrder, inferPartitioning, singlePartition, DeterminismMode.SAFER);
     }
 
     /**

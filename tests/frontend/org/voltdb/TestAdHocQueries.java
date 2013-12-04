@@ -432,7 +432,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
         }
         finally {
             env.tearDown();
-            //System.out.println("Ending testSimple");
+            System.out.println("Ending testSimple");
         }
     }
 
@@ -489,13 +489,12 @@ public class TestAdHocQueries extends AdHocQueryTester {
             modCount = env.m_client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (?, ?, ?)", 974599638818488301L, "2011-06-24 10:30:28.000000", 5).getResults()[0];
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
-            //4now result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = ?;", 974599638818488300L).getResults()[0];
-            //4now assertEquals(1, result.getRowCount());
-            //System.out.println(result.toString());
-            //FIXME
-            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = ?;", "974599638818488300").getResults()[0];
+            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = ?;", 974599638818488300L).getResults()[0];
             assertEquals(1, result.getRowCount());
             //System.out.println(result.toString());
+            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = ?;", "974599638818488300").getResults()[0];
+            //System.out.println(result.toString());
+            assertEquals(1, result.getRowCount());
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
             result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE TVAL = ?;", dateFormat.parse("2011-06-24 10:30:26.123")).getResults()[0];
             assertEquals(1, result.getRowCount());
@@ -523,9 +522,9 @@ public class TestAdHocQueries extends AdHocQueryTester {
             result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = ?;", 2).getResults()[0];
             assertEquals(1, result.getRowCount());
             //System.out.println(result.toString());
-            //FIXME result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = ?;", "2").getResults()[0];
+            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = ?;", "2").getResults()[0];
             //System.out.println(result.toString());
-            //assertEquals(1, result.getRowCount());
+            assertEquals(1, result.getRowCount());
         }
         finally {
             env.tearDown();

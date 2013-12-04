@@ -36,6 +36,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 public class PlannerTestCase extends TestCase {
 
     private PlannerTestAideDeCamp m_aide;
+    private boolean m_byDefaultInferPartitioning = true;
     private boolean m_byDefaultPlanForSinglePartition;
 
     protected void failToCompile(String sql, String... patterns)
@@ -52,7 +53,7 @@ public class PlannerTestCase extends TestCase {
             paramCount++;
         }
         try {
-            m_aide.compile(sql, paramCount, m_byDefaultPlanForSinglePartition, null);
+            m_aide.compile(sql, paramCount, m_byDefaultInferPartitioning, m_byDefaultPlanForSinglePartition, null);
             fail();
         }
         catch (PlanningErrorException ex) {
@@ -126,7 +127,7 @@ public class PlannerTestCase extends TestCase {
                                                                    boolean planForSinglePartition,
                                                                    String joinOrder)
     {
-        List<AbstractPlanNode> pn = m_aide.compile(sql, paramCount, planForSinglePartition, joinOrder);
+        List<AbstractPlanNode> pn = m_aide.compile(sql, paramCount, m_byDefaultInferPartitioning, planForSinglePartition, joinOrder);
         assertTrue(pn != null);
         assertFalse(pn.isEmpty());
         if (planForSinglePartition) {
@@ -206,6 +207,13 @@ public class PlannerTestCase extends TestCase {
         m_aide = new PlannerTestAideDeCamp(ddlURL, basename);
         m_byDefaultPlanForSinglePartition = planForSinglePartition;
     }
+
+    protected void setupSchema(boolean inferPartitioning, URL ddlURL, String basename) throws Exception
+    {
+        m_byDefaultInferPartitioning = inferPartitioning;
+        m_aide = new PlannerTestAideDeCamp(ddlURL, basename);
+    }
+
 
     Database getDatabase() {
         return m_aide.getDatabase();
