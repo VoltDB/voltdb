@@ -173,7 +173,7 @@ public class TestSystemInformationSuite extends RegressionSuite {
         m_expectedVals.put("jsonenabled", "false");
 
         LocalCluster lcconfig = new LocalCluster("getclusterinfo-cluster.jar", 2, 3, 1,
-                                               BackendTarget.NATIVE_EE_JNI);
+                                               BackendTarget.NATIVE_EE_JNI).resetKfactorForCommunity(1);
         boolean success = lcconfig.compile(project);
         assertTrue(success);
         // need no local server so we set the VoltFileRoot property properly
