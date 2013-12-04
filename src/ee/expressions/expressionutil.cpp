@@ -239,6 +239,19 @@ static AbstractExpression* castFactory(ValueType vt,
     return new OperatorCastExpression(vt, lc);
 }
 
+static AbstractExpression* caseWhenFactory(ValueType vt,
+                                       AbstractExpression *lc, AbstractExpression *rc)
+{
+
+    OperatorAlternativeExpression* alternative = dynamic_cast<OperatorAlternativeExpression*> (rc);
+    if (!rc) {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "operator case when has incorrect expression");
+    }
+    return new OperatorCaseWhenExpression(vt, lc, alternative);
+}
+
+
 /** convert the enumerated value type into a concrete type for
  * constant value expressions templated ctors */
 static AbstractExpression*
@@ -343,6 +356,7 @@ tupleValueFactory(PlannerDomValue obj, ExpressionType et,
 
     return new TupleValueExpression(tableIdx, columnIndex);
 }
+
 
 AbstractExpression *
 ExpressionUtil::conjunctionFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc)
@@ -467,6 +481,12 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
         break;
     case (EXPRESSION_TYPE_HASH_RANGE):
         ret = hashRangeFactory(obj);
+        break;
+    case (EXPRESSION_TYPE_OPERATOR_CASE_WHEN):
+        ret = caseWhenFactory(vt, lc, rc);
+        break;
+    case (EXPRESSION_TYPE_OPERATOR_ALTERNATIVE):
+        ret = new OperatorAlternativeExpression(lc, rc);
         break;
         // must handle all known expressions in this factory
     default:

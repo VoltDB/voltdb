@@ -1745,6 +1745,51 @@ public class TestVoltCompiler extends TestCase {
         compileForDDLTest(getPathForSchema(s), false);
     }
 
+    public void testDDLCompilerIndexesOrMatViewContainSQLFunctionNOW()
+    {
+        // Test indexes.
+        String ddl = "";
+        String errorIndexMsg = "Index IDX_T_TM cannot include the function NOW or CURRENT_TIMESTAMP.";
+        ddl = "create table t(id integer not null, tm timestamp);\n" +
+              "create index idx_t_tm on t(since_epoch(second, CURRENT_TIMESTAMP) - since_epoch(second, tm));";
+        checkDDLErrorMessage(ddl, errorIndexMsg);
+
+        ddl = "create table t(id integer not null, tm timestamp);\n" +
+              "create index idx_t_tm on t(since_epoch(second, NOW) - since_epoch(second, tm));";
+        checkDDLErrorMessage(ddl, errorIndexMsg);
+
+        ddl = "create table t(id integer not null, tm timestamp);\n" +
+              "create index idx_t_tm on t(CURRENT_TIMESTAMP);";
+        checkDDLErrorMessage(ddl, errorIndexMsg);
+
+        // Test MatView.
+        String errorMatviewMsg = "Materialized view \"MY_VIEW\" cannot include the function NOW or CURRENT_TIMESTAMP.";
+        ddl = "create table t(id integer not null, tm timestamp);\n" +
+              "create view my_view as select since_epoch(second, CURRENT_TIMESTAMP) - since_epoch(second, tm), " +
+              "count(*) from t group by since_epoch(second, CURRENT_TIMESTAMP) - since_epoch(second, tm);";
+        checkDDLErrorMessage(ddl, errorMatviewMsg);
+
+        ddl = "create table t(id integer not null, tm timestamp);\n" +
+                "create view my_view as select since_epoch(second, NOW) - since_epoch(second, tm), " +
+                "count(*) from t group by since_epoch(second, NOW) - since_epoch(second, tm);";
+        checkDDLErrorMessage(ddl, errorMatviewMsg);
+
+        ddl = "create table t(id integer not null, tm timestamp);\n" +
+                "create view my_view as select tm, count(*), count(CURRENT_TIMESTAMP)  from t group by tm;";
+        checkDDLErrorMessage(ddl, errorMatviewMsg);
+
+        ddl = "create table t(id integer not null, tm timestamp);\n" +
+                "create view my_view as select tm, count(*), count(NOW)  from t group by tm;";
+        checkDDLErrorMessage(ddl, errorMatviewMsg);
+
+        ddl = "create table t(id integer not null, tm timestamp);\n" +
+                "create view my_view as select tm, count(*) from t " +
+                "where since_epoch(second, CURRENT_TIMESTAMP) - since_epoch(second, tm) > 60 " +
+                "group by tm;";
+        checkDDLErrorMessage(ddl, errorMatviewMsg);
+    }
+
+
     private static final String msgP = "does not include the partitioning column";
     private static final String msgPR =
             "ASSUMEUNIQUE is not valid for an index that includes the partitioning column. " +
@@ -1835,7 +1880,7 @@ public class TestVoltCompiler extends TestCase {
         checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
     }
 
-    private void checkValidUnique(String ddl, String errorMsg) {
+    private void checkDDLErrorMessage(String ddl, String errorMsg) {
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
         final String schemaPath = schemaFile.getPath();
 
@@ -1864,8 +1909,8 @@ public class TestVoltCompiler extends TestCase {
     }
 
     private void checkValidUniqueAndAssumeUnique(String ddl, String errorUnique, String errorAssumeUnique) {
-        checkValidUnique(ddl, errorUnique);
-        checkValidUnique(ddl.replace("UNIQUE", "ASSUMEUNIQUE"), errorAssumeUnique);
+        checkDDLErrorMessage(ddl, errorUnique);
+        checkDDLErrorMessage(ddl.replace("UNIQUE", "ASSUMEUNIQUE"), errorAssumeUnique);
     }
 
     public void testUniqueIndexGiveException() {
@@ -1945,6 +1990,17 @@ public class TestVoltCompiler extends TestCase {
         checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
     }
 
+
+    public void testDDLCompilerMatView()
+    {
+        // Test MatView.
+        String ddl = "";
+        String errorMatviewOrderByMsg = "Materialized view \"MY_VIEW\" with ORDER BY clause is not supported.";
+
+        ddl = "create table t(id integer not null, num integer);\n" +
+                "create view my_view as select num, count(*) from t group by num order by num;";
+        checkDDLErrorMessage(ddl, errorMatviewOrderByMsg);
+    }
 
     public void testPartitionOnBadType() {
         final String simpleSchema =
