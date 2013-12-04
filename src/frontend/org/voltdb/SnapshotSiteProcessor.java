@@ -261,7 +261,7 @@ public class SnapshotSiteProcessor {
         }
     }
 
-    private BBContainer createNewBuffer(final BBContainer origin)
+    private BBContainer createNewBuffer(final BBContainer origin, final boolean noSchedule)
     {
         return new BBContainer(origin.b, origin.address) {
             @Override
@@ -269,31 +269,39 @@ public class SnapshotSiteProcessor {
                 origin.discard();
                 m_availableSnapshotBuffers.incrementAndGet();
 
-                /*
-                 * If IV2 is enabled, don't run the potential snapshot work jigger
-                 * until the quiet period restrictions have been met. In IV2 doSnapshotWork
-                 * is always called with ignoreQuietPeriod and the scheduling is instead done
-                 * via the STPE in RealVoltDB.
-                 *
-                 * The goal of the quiet period is to spread snapshot work out over time and minimize
-                 * the impact on latency
-                 *
-                 * If snapshot priority is 0 then running the jigger immediately is the specified
-                 * policy anyways. 10 would be the largest delay
-                 */
-                if (m_snapshotPriority > 0) {
-                    final long now = System.currentTimeMillis();
-                    //Ask if the site is idle, and if it is queue the work immediately
-                    if (m_idlePredicate.idle(now)) {
-                        m_siteTaskerQueue.offer(new SnapshotTask());
-                        return;
-                    }
+                if (!noSchedule) {
+                    rescheduleSnapshotWork();
+                }
+            }
+        };
+    }
 
-                    //Cache the value locally, the dirty secret is that in edge cases multiple threads
-                    //will read/write briefly, but it isn't a big deal since the scheduling can be wrong
-                    //briefly. Caching it locally will make the logic here saner because it can't change
-                    //as execution progresses
-                    final long quietUntil = m_quietUntil;
+    private void rescheduleSnapshotWork() {
+        /*
+         * If IV2 is enabled, don't run the potential snapshot work jigger
+         * until the quiet period restrictions have been met. In IV2 doSnapshotWork
+         * is always called with ignoreQuietPeriod and the scheduling is instead done
+         * via the STPE in RealVoltDB.
+         *
+         * The goal of the quiet period is to spread snapshot work out over time and minimize
+         * the impact on latency
+         *
+         * If snapshot priority is 0 then running the jigger immediately is the specified
+         * policy anyways. 10 would be the largest delay
+         */
+        if (m_snapshotPriority > 0) {
+            final long now = System.currentTimeMillis();
+            //Ask if the site is idle, and if it is queue the work immediately
+            if (m_idlePredicate.idle(now)) {
+                m_siteTaskerQueue.offer(new SnapshotTask());
+                return;
+            }
+
+            //Cache the value locally, the dirty secret is that in edge cases multiple threads
+            //will read/write briefly, but it isn't a big deal since the scheduling can be wrong
+            //briefly. Caching it locally will make the logic here saner because it can't change
+            //as execution progresses
+            final long quietUntil = m_quietUntil;
 
                     /*
                      * If the current time is > than quietUntil then the quiet period is over
@@ -302,29 +310,29 @@ public class SnapshotSiteProcessor {
                      * Otherwise it needs to be scheduled in the future and the next quiet period
                      * needs to be calculated
                      */
-                    if (now > quietUntil) {
-                        m_siteTaskerQueue.offer(new SnapshotTask());
-                        //Now push the quiet period further into the future,
-                        //generally no threads will be racing to do this
-                        //since the execution site only interacts with one snapshot data target at a time
-                        //except when it is switching tables. It doesn't really matter if it is wrong
-                        //it will just result in a little extra snapshot work being done close together
-                        m_quietUntil =
-                                System.currentTimeMillis() +
+            if (now > quietUntil) {
+                m_siteTaskerQueue.offer(new SnapshotTask());
+                //Now push the quiet period further into the future,
+                //generally no threads will be racing to do this
+                //since the execution site only interacts with one snapshot data target at a time
+                //except when it is switching tables. It doesn't really matter if it is wrong
+                //it will just result in a little extra snapshot work being done close together
+                m_quietUntil =
+                        System.currentTimeMillis() +
                                 (5 * m_snapshotPriority) + ((long)(m_random.nextDouble() * 15));
-                    } else {
-                        //Schedule it to happen after the quiet period has elapsed
-                        VoltDB.instance().schedulePriorityWork(
-                                new Runnable() {
-                                    @Override
-                                    public void run()
-                                    {
-                                        m_siteTaskerQueue.offer(new SnapshotTask());
-                                    }
-                                },
-                                quietUntil - now,
-                                0,
-                                TimeUnit.MILLISECONDS);
+            } else {
+                //Schedule it to happen after the quiet period has elapsed
+                VoltDB.instance().schedulePriorityWork(
+                        new Runnable() {
+                            @Override
+                            public void run()
+                            {
+                                m_siteTaskerQueue.offer(new SnapshotTask());
+                            }
+                        },
+                        quietUntil - now,
+                        0,
+                        TimeUnit.MILLISECONDS);
 
                         /*
                          * This is the same calculation as above except the future is not based
@@ -332,15 +340,13 @@ public class SnapshotSiteProcessor {
                          * and we need to move further past it since we just scheduled snapshot work
                          * at the end of the current quietUntil value
                          */
-                        m_quietUntil =
-                                quietUntil +
+                m_quietUntil =
+                        quietUntil +
                                 (5 * m_snapshotPriority) + ((long)(m_random.nextDouble() * 15));
-                    }
-                } else {
-                    m_siteTaskerQueue.offer(new SnapshotTask());
-                }
             }
-        };
+        } else {
+            m_siteTaskerQueue.offer(new SnapshotTask());
+        }
     }
 
     public void initiateSnapshots(
@@ -453,20 +459,24 @@ public class SnapshotSiteProcessor {
      * Create an output buffer for each task.
      * @return null if there aren't enough buffers left in the pool.
      */
-    private List<BBContainer> getOutputBuffers(Collection<SnapshotTableTask> tableTasks)
+    private List<BBContainer> getOutputBuffers(Collection<SnapshotTableTask> tableTasks, boolean noSchedule)
     {
         final int desired = tableTasks.size();
-        int available = m_availableSnapshotBuffers.get();
+        while (true) {
+            int available = m_availableSnapshotBuffers.get();
 
-        //Limit the number of buffers used concurrently
-        if (desired > available) return null;
-        if (!m_availableSnapshotBuffers.compareAndSet(available, available - desired)) return null;
+            //Limit the number of buffers used concurrently
+            if (desired > available) {
+                return null;
+            }
+            if (m_availableSnapshotBuffers.compareAndSet(available, available - desired)) break;
+        }
 
         List<BBContainer> outputBuffers = new ArrayList<BBContainer>(tableTasks.size());
 
         for (int ii = 0; ii < tableTasks.size(); ii++) {
             final BBContainer origin = DBBPool.allocateDirectAndPool(m_snapshotBufferLength);
-            outputBuffers.add(createNewBuffer(origin));
+            outputBuffers.add(createNewBuffer(origin, noSchedule));
         }
 
         return outputBuffers;
@@ -502,7 +512,11 @@ public class SnapshotSiteProcessor {
         }
     }
 
-    public Future<?> doSnapshotWork(SystemProcedureExecutionContext context) {
+    /*
+     * No schedule means don't try and schedule snapshot work because this is a blocking
+     * task from completeSnapshotWork. This avoids creating thousands of task objects.
+     */
+    public Future<?> doSnapshotWork(SystemProcedureExecutionContext context, boolean noSchedule) {
         ListenableFuture<?> retval = null;
 
         /*
@@ -527,9 +541,12 @@ public class SnapshotSiteProcessor {
             final int tableId = taskEntry.getKey();
             final Collection<SnapshotTableTask> tableTasks = taskEntry.getValue();
 
-            final List<BBContainer> outputBuffers = getOutputBuffers(tableTasks);
+            final List<BBContainer> outputBuffers = getOutputBuffers(tableTasks, noSchedule);
             if (outputBuffers == null) {
                 // Not enough buffers available
+                if (!noSchedule) {
+                    rescheduleSnapshotWork();
+                }
                 break;
             }
 
@@ -831,7 +848,7 @@ public class SnapshotSiteProcessor {
         throws InterruptedException {
         HashSet<Exception> retval = new HashSet<Exception>();
         while (m_snapshotTableTasks != null) {
-            Future<?> result = doSnapshotWork(context);
+            Future<?> result = doSnapshotWork(context, true);
             if (result != null) {
                 try {
                     result.get();

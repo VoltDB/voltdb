@@ -953,7 +953,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public Future<?> doSnapshotWork()
     {
-        return m_snapshotter.doSnapshotWork(m_sysprocContext);
+        return m_snapshotter.doSnapshotWork(m_sysprocContext, false);
     }
 
     @Override

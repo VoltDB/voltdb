@@ -678,8 +678,7 @@ public class Inits {
                                                       ImmutableSet.copyOf(m_rvdb.m_messenger.getLiveHostIds()),
                                                       CatalogUtil.getVoltDbRoot(m_deployment.getPaths()).getAbsolutePath());
                 } catch (IOException e) {
-                    VoltDB.crashLocalVoltDB("Unable to establish a ZooKeeper connection: " +
-                            e.getMessage(), false, e);
+                    VoltDB.crashLocalVoltDB("Unable to construct the RestoreAgent", true, e);
                 }
 
                 m_rvdb.m_restoreAgent.setCatalogContext(m_rvdb.m_catalogContext);
