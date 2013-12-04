@@ -496,6 +496,14 @@ DISTRIBUTION
             <include name="toolrunner.py" />
             <include name="voltify" />
             <include name="voltify.d/**" />
+            <include name="lib/**" />
+        </fileset>
+    </copy>
+
+    <!-- 3rd party libraries copied to the same location in the dist -->
+    <copy todir="${dist.dir}/third_party" >
+        <fileset dir="third_party" defaultexcludes="yes">
+            <include name="python/**" />
         </fileset>
     </copy>
 
