@@ -515,12 +515,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             //Didn't get the value. Client isn't going to get anymore time.
             if (lengthBuffer.hasRemaining()) {
+                timeoutFuture.cancel(false);
                 authLog.debug("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
                               "): wire protocol violation (timeout reading message length).");
                 //Send negative response
                 responseBuffer.put(WIRE_PROTOCOL_TIMEOUT_ERROR).flip();
                 socket.write(responseBuffer);
-                timeoutFuture.cancel(false);
                 socket.close();
                 return null;
             }
@@ -528,22 +528,22 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             final int messageLength = lengthBuffer.getInt();
             if (messageLength < 0) {
+                timeoutFuture.cancel(false);
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
                              "): wire protocol violation (message length " + messageLength + " is negative).");
                 //Send negative response
                 responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
                 socket.write(responseBuffer);
-                timeoutFuture.cancel(false);
                 socket.close();
                 return null;
             }
             if (messageLength > ((1024 * 1024) * 2)) {
+                timeoutFuture.cancel(false);
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
                              "): wire protocol violation (message length " + messageLength + " is too large).");
                 //Send negative response
                 responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
                 socket.write(responseBuffer);
-                timeoutFuture.cancel(false);
                 socket.close();
                 return null;
               }
@@ -563,6 +563,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             //Didn't get the whole message. Client isn't going to get anymore time.
             if (message.hasRemaining()) {
+                timeoutFuture.cancel(false);
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
                              "): wire protocol violation (timeout reading authentication strings).");
                 //Send negative response
