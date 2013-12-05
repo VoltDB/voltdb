@@ -140,7 +140,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     // how long do we wait for a client to read responses before we close the connection?
     // note, this may just be the kernel isn't sending the data from the buffers
-    private final long CLIENT_READ_TIMEOUT_MS = Long.parseLong(System.getProperty("clientreadtimeoutms", "4000"));
+    private final long CLIENT_READ_TIMEOUT_MS = Long.getLong("clientreadtimeoutms", 4000);
 
     /*
      * This lock must be held while checking and signaling a backpressure condition
@@ -1240,6 +1240,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     {
         m_catalogContext.set(context);
         m_cartographer = cartographer;
+
+        // log client timeout
+        hostLog.info("Client read timeout value set to " + String.valueOf(CLIENT_READ_TIMEOUT_MS) + "ms.");
 
         // pre-allocate single partition array
         m_allPartitions = allPartitions;
