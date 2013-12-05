@@ -31,8 +31,11 @@ import org.voltdb.utils.MiscUtils;
 
 public class UpdateBaseProc extends VoltProcedure {
 
+    public final SQLStmt d_getCount = new SQLStmt(
+            "SELECT count(*) FROM dimension where cid = ?;");
+
     public final SQLStmt p_getCIDData = new SQLStmt(
-            "SELECT * FROM partitioned WHERE cid = ? ORDER BY cid, rid desc;");
+            "SELECT * FROM partitioned p INNER JOIN dimension d ON p.cid=d.cid WHERE p.cid = ? ORDER BY cid, rid desc;");
 
     public final SQLStmt p_cleanUp = new SQLStmt(
             "DELETE FROM partitioned WHERE cid = ? and cnt < ?;");
@@ -55,9 +58,11 @@ public class UpdateBaseProc extends VoltProcedure {
     {
         voltQueueSQL(getCIDData, cid);
         voltQueueSQL(getAdHocData);
+        voltQueueSQL(d_getCount, cid);
         VoltTable[] results = voltExecuteSQL();
         VoltTable data = results[0];
         VoltTable adhoc = results[1];
+        VoltTable dim = results[2];
 
         final long txnid = getUniqueId();
         final long ts = getTransactionTime().getTime();
@@ -95,6 +100,7 @@ public class UpdateBaseProc extends VoltProcedure {
         voltQueueSQL(insert, txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, new byte[0]);
         voltQueueSQL(cleanUp, cid, cnt - 10);
         voltQueueSQL(getCIDData, cid);
+        assert dim.getRowCount() == 1;
         VoltTable[] retval = voltExecuteSQL();
         // Verify that our update happened.  The client is reporting data errors on this validation
         // not seen by the server, hopefully this will bisect where they're occuring.
@@ -175,6 +181,11 @@ public class UpdateBaseProc extends VoltProcedure {
         data.resetRowPosition();
         long prevCnt = 0;
         while (data.advanceRow()) {
+            byte desc = (byte) data.getLong("desc");
+            if (desc != cid)
+                throw new VoltAbortException(callerId +
+                        " desc value " + desc +
+                        " not equal to cid value " + cid);
             long cntValue = data.getLong("cnt");
             if ((prevCnt > 0) && ((prevCnt - 1) != cntValue)) {
                 throw new VoltAbortException(callerId +

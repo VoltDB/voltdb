@@ -30,7 +30,7 @@ public class ReadSPInProcAdHoc extends ReadSP {
     @SuppressWarnings("deprecation")
     @Override
     public VoltTable[] run(byte cid) {
-        voltQueueSQLExperimental("SELECT * FROM partitioned WHERE cid = ? ORDER BY cid, rid desc;", cid);
+        voltQueueSQLExperimental("SELECT * FROM partitioned p INNER JOIN dimension d ON p.cid=d.cid WHERE p.cid = ? ORDER BY cid, rid desc;", cid);
         return voltExecuteSQL(true);
     }
 
