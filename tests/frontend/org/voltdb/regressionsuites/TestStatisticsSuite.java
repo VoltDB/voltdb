@@ -400,10 +400,6 @@ public class TestStatisticsSuite extends SaveRestoreBase {
 
     public void testProcedureStatistics() throws Exception {
         System.out.println("\n\nTESTING PROCEDURE STATS\n\n\n");
-        if (KFACTOR == 0) {
-            return;
-        }
-
         Client client  = getFullyConnectedClient();
 
         ColumnInfo[] expectedSchema = new ColumnInfo[19];
@@ -436,6 +432,14 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         // Induce procedure invocations on all partitions.  May fail in non-legacy hashing case
         // this plus R/W replication should ensure that every site on every node runs this transaction
         // at least once
+
+        results = client.callProcedure("@GetPartitionKeys", "INTEGER").getResults();
+        VoltTable keys = results[0];
+        for (int k = 0;k < keys.getRowCount(); k++) {
+            long key = keys.fetchRow(k).getLong(1);
+            client.callProcedure("NEW_ORDER.insert", key);
+        }
+
         for (int i = 0; i < HOSTS * SITES; i++) {
             client.callProcedure("NEW_ORDER.insert", i);
         }
