@@ -59,14 +59,18 @@ import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
-import org.voltcore.network.ReverseDNSPolicy;
 import org.voltcore.network.InputHandler;
 import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.QueueMonitor;
+import org.voltcore.network.ReverseDNSPolicy;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.network.WriteStream;
-import org.voltcore.utils.*;
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DeferredSerialization;
+import org.voltcore.utils.EstTime;
+import org.voltcore.utils.Pair;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.ClientInterfaceHandleManager.Iv2InFlight;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
@@ -133,6 +137,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
     private final ClientAcceptor m_acceptor;
     private ClientAcceptor m_adminAcceptor;
+
+    // how long do we wait for a client to read responses before we close the connection?
+    // note, this may just be the kernel isn't sending the data from the buffers
+    private final long CLIENT_READ_TIMEOUT_MS = Long.parseLong(System.getProperty("clientreadtimeoutms", "4000"));
 
     /*
      * This lock must be held while checking and signaling a backpressure condition
@@ -2342,13 +2350,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         final ArrayList<Connection> connectionsToRemove = new ArrayList<Connection>();
         for (final Connection c : m_connections.keySet()) {
             final int delta = c.writeStream().calculatePendingWriteDelta(now);
-            if (delta > 4000) {
+            if (delta > CLIENT_READ_TIMEOUT_MS) {
                 connectionsToRemove.add(c);
             }
         }
 
         for (final Connection c : connectionsToRemove) {
-            networkLog.warn("Closing connection to " + c + " at " + new java.util.Date() + " because it refuses to read responses");
+            networkLog.warn("Closing connection to " + c + " at " + new java.util.Date() +
+                    " because it has not processed responses for at least " +
+                    String.valueOf(CLIENT_READ_TIMEOUT_MS) + " ms.");
             c.unregister();
         }
     }
