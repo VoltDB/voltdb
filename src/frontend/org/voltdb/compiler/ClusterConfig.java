@@ -185,7 +185,7 @@ public class ClusterConfig
         {
             if ((m_hostCount - origStartCount) % (m_replicationFactor + 1) != 0)
             {
-                m_errorMsg = String.format("%d servers required for K-safety=%d",
+                m_errorMsg = String.format("Must add %d servers at a time for k=%d",
                         m_replicationFactor + 1, m_replicationFactor);
                 return false;
             }
