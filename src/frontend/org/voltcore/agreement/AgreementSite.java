@@ -56,7 +56,7 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 
-import com.google.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 /*
  * A wrapper around a single node ZK server. The server is a modified version of ZK that speaks the ZK
@@ -216,6 +216,9 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             }
         }
     }
+
+    private long m_lastUsedTxnId = 0;
+
     @Override
     public void run() {
         try {
@@ -271,6 +274,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                         //Owner is what associates the session with a specific initiator
                         //only used for createSession
                         txnState.m_request.setOwner(txnState.initiatorHSId);
+                        m_lastUsedTxnId = txnState.txnId;
                         m_server.prepRequest(txnState.m_request, txnState.txnId);
                     }
                 }
@@ -357,11 +361,29 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             } else if (lom.payload instanceof Request) {
                 Request r = (Request)lom.payload;
                 long txnId = 0;
-                if (r.type == OpCode.createSession) {
-                    txnId = r.sessionId;
-                } else {
-                    txnId = m_idManager.getNextUniqueTransactionId();
+                switch(r.type) {
+                    case OpCode.createSession:
+                        txnId = r.sessionId;
+                        break;
+                    //For reads see if we can skip global agreement and just do the read
+                    case OpCode.exists:
+                    case OpCode.getChildren:
+                    case OpCode.getChildren2:
+                    case OpCode.getData:
+                        //If there are writes they can go in the queue (and some reads), don't short circuit
+                        //in this case because ordering of reads and writes matters
+                        if (m_txnQueue.isEmpty()) {
+                            r.setOwner(m_hsId);
+                            m_server.prepRequest(r, m_lastUsedTxnId);
+                            return;
+                        }
+                        //Fall through is intentional, going with the default of putting
+                        //it in the global order
+                    default:
+                        txnId = m_idManager.getNextUniqueTransactionId();
+                        break;
                 }
+
                 for (long initiatorHSId : m_hsIds) {
                     if (initiatorHSId == m_hsId) continue;
                     AgreementTaskMessage atm =

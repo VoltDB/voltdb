@@ -17,8 +17,8 @@
 
 package org.voltcore.messaging;
 
-import static com.google.common.base.Predicates.in;
-import static com.google.common.base.Predicates.not;
+import static com.google_voltpatches.common.base.Predicates.in;
+import static com.google_voltpatches.common.base.Predicates.not;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -28,10 +28,10 @@ import java.util.Set;
 
 import org.voltcore.utils.CoreUtils;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Sets;
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.Sets;
 
 public class SiteFailureMessage extends VoltMessage {
 

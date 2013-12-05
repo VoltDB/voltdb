@@ -26,9 +26,9 @@ import java.util.concurrent.TimeUnit;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
 
-import com.google.common.base.Throwables;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
     private final File m_tempFile;
@@ -146,5 +146,15 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
     @Override
     public String toString() {
         return m_file.toString();
+    }
+
+    /**
+     * Get the row count if any, of the content wrapped in the given {@link BBContainer}
+     * @param tupleData
+     * @return the numbers of tuple data rows contained within a container
+     */
+    @Override
+    public int getInContainerRowCount(BBContainer tupleData) {
+        return SnapshotDataTarget.ROW_COUNT_UNSUPPORTED;
     }
 }

@@ -50,8 +50,8 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.compilereport.ReportMaker;
 import org.voltdb.dtxn.SiteTracker;
 
-import com.google.common.base.Charsets;
-import com.google.common.io.Resources;
+import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.io.Resources;
 
 public class HTTPAdminListener {
 

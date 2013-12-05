@@ -156,7 +156,7 @@ public class VoltTableUtil {
         }
         toCSVWriter(writer, vt, columns);
         String csvString = sw.toString();
-        return Pair.of(csvString.length(), csvString.getBytes(com.google.common.base.Charsets.UTF_8));
+        return Pair.of(csvString.length(), csvString.getBytes(com.google_voltpatches.common.base.Charsets.UTF_8));
     }
 
     /**

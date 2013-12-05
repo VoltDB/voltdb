@@ -1648,6 +1648,7 @@ public class PlanAssembler {
             // Never push down aggregation for MV fix case.
             root = pushDownAggregate(root, aggNode, topAggNode, m_parsedSelect.hasComplexAgg(), newSchema);
 
+
         }
 
         if (m_parsedSelect.isGrouped()) {
@@ -1801,6 +1802,9 @@ public class PlanAssembler {
             coordNode.addAndLinkChild(root);
             root = coordNode;
         }
+        // Set post predicate for top Aggregation node
+        ((AggregatePlanNode) root).setPostPredicate(m_parsedSelect.having);
+
         if (needProjectionNode) {
             ProjectionPlanNode proj = new ProjectionPlanNode();
             proj.addAndLinkChild(root);

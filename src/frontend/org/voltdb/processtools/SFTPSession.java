@@ -33,8 +33,8 @@ import java.util.regex.Pattern;
 
 import org.voltcore.logging.VoltLogger;
 
-import com.google.common.base.Charsets;
-import com.google.common.base.Preconditions;
+import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Preconditions;
 import com.jcraft.jsch.ChannelExec;
 import com.jcraft.jsch.ChannelSftp;
 import com.jcraft.jsch.ChannelSftp.LsEntry;

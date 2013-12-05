@@ -51,12 +51,12 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
 
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.ImmutableSortedMap;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Multimaps;
-import com.google.common.collect.SetMultimap;
-import com.google.common.collect.SortedMapDifference;
+import com.google_voltpatches.common.collect.HashMultimap;
+import com.google_voltpatches.common.collect.ImmutableSortedMap;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Multimaps;
+import com.google_voltpatches.common.collect.SetMultimap;
+import com.google_voltpatches.common.collect.SortedMapDifference;
 
 /**
  * This test verifies that the Java Hashinator behaves

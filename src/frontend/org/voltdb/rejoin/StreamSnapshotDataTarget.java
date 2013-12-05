@@ -32,8 +32,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.SettableFuture;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
@@ -44,8 +42,10 @@ import org.voltdb.SnapshotFormat;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.CompressionService;
 
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.util.concurrent.Futures;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 /**
  * A stream snapshot target for sending snapshot data directly to a rejoining
@@ -206,8 +206,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             try {
                 return send(mb, msgFactory, m_message);
             } finally {
-                // Always discard the buffer so that they can be reused
-                discard();
+                // Buffers are only discarded after they are acked. Discarding them here would cause the sender to
+                // generate too much work for the receiver.
                 m_future.set(true);
             }
         }
@@ -566,5 +566,21 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     @Override
     public SnapshotFormat getFormat() {
         return SnapshotFormat.STREAM;
+    }
+
+    /**
+     * Get the row count if any, of the content wrapped in the given {@link BBContainer}
+     * @param tupleData
+     * @return the numbers of tuple data rows contained within a container
+     */
+    @Override
+    public int getInContainerRowCount(BBContainer tupleData) {
+        // according to TableOutputStream.cpp:TupleOutputStream::endRows() the row count is
+        // at offset 4 (second integer)
+        ByteBuffer bb = tupleData.b.duplicate();
+        bb.position(getHeaderSize());
+        bb.getInt(); // skip first four (partition id)
+
+        return bb.getInt();
     }
 }

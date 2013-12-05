@@ -2216,4 +2216,8 @@ public class FunctionSQL extends Expression {
 
         return exp;
     }
+
+    public static int voltGetCurrentTimestampId() {
+        return FUNC_CURRENT_TIMESTAMP;
+    }
 }

@@ -92,7 +92,6 @@ import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.dtxn.LatencyStats.LatencyInfo;
-import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.MpInitiator;
@@ -107,13 +106,12 @@ import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.Encoder;
-import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListenableFutureTask;
-import com.google.common.util.concurrent.MoreExecutors;
+import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
+import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -904,10 +902,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             now);
                     return true;
                 } catch (Exception e) {
+                    // unable to hash to a site, return an error
                     assert(clientResponse == null);
-                    clientResponse = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
-                            new VoltTable[]{},
-                            "Fail to get the partition for a restarted transaction" + e.getMessage());
+                    clientResponse = getMispartitionedErrorResponse(response.getInvocation(), catProc, e);
                 }
             }
 
@@ -1810,23 +1807,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                 catProc.getPartitionparameter(),
                                 catProc.getPartitioncolumn().getType(),
                                 task);
-            }
-            catch (RuntimeException e) {
+            } catch (Exception e) {
                 // unable to hash to a site, return an error
-                String errorMessage = "Error sending procedure "
-                        + task.procName + " to the correct partition. Make sure parameter values are correct.";
-                authLog.l7dlog( Level.WARN,
-                        LogKeys.host_ClientInterface_unableToRouteSinglePartitionInvocation.name(),
-                        new Object[] { task.procName }, null);
-                return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                        new VoltTable[0], errorMessage, task.clientHandle);
-            }
-            catch (Exception e) {
-                authLog.l7dlog( Level.WARN,
-                        LogKeys.host_ClientInterface_unableToRouteSinglePartitionInvocation.name(),
-                        new Object[] { task.procName }, null);
-                return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                        new VoltTable[0], e.getMessage(), task.clientHandle);
+                return getMispartitionedErrorResponse(task, catProc, e);
             }
         }
         boolean success =
@@ -2529,5 +2512,29 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             latencyStats.add(acg.getLatencyInfo());
         }
         return latencyStats;
+    }
+
+    //Generate a mispartitioned response also log the message.
+    private ClientResponseImpl getMispartitionedErrorResponse(StoredProcedureInvocation task,
+            Procedure catProc, Exception ex) {
+        Object invocationParameter = null;
+        try {
+            invocationParameter = task.getParameterAtIndex(catProc.getPartitionparameter());
+        } catch (Exception ex2) {
+        }
+        String exMsg = "Unknown";
+        if (ex != null) {
+            exMsg = ex.getMessage();
+        }
+        String errorMessage = "Error sending procedure " + task.procName
+                + " to the correct partition. Make sure parameter values are correct."
+                + " Parameter value " + invocationParameter
+                + ", partition column " + catProc.getPartitioncolumn().getName()
+                + " type " + catProc.getPartitioncolumn().getType()
+                + " Message: " + exMsg;
+        authLog.warn(errorMessage);
+        ClientResponseImpl clientResponse = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
+                new VoltTable[0], errorMessage, task.clientHandle);
+        return clientResponse;
     }
 }

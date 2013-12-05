@@ -38,7 +38,7 @@ import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltTableUtil;
 
-import com.google.common.primitives.Longs;
+import com.google_voltpatches.common.primitives.Longs;
 
 /**
  * A system procedure for validating that the rows at every partition hash correctly when hashed with the

@@ -44,8 +44,8 @@ import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
-import com.google.common.base.Charsets;
-import com.google.common.base.Throwables;
+import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Throwables;
 
 /* Serializes data over a connection that presumably is being read
  * by a voltdb execution engine. The serialization is currently a
@@ -362,7 +362,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     continue;
                 }
                 if (status == kErrorCode_getQueuedExportBytes) {
-                    ByteBuffer header = ByteBuffer.allocate(12);
+                    ByteBuffer header = ByteBuffer.allocate(8);
                     while (header.hasRemaining()) {
                         final int read = m_socket.getChannel().read(header);
                         if (read == -1) {
@@ -373,8 +373,16 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
                     int partitionId = header.getInt();
                     int signatureLength = header.getInt();
+                    ByteBuffer sigbuf = ByteBuffer.allocate(signatureLength);
+                    while (sigbuf.hasRemaining()) {
+                        final int read = m_socket.getChannel().read(sigbuf);
+                        if (read == -1) {
+                            throw new EOFException();
+                        }
+                    }
+                    sigbuf.flip();
                     byte signatureBytes[] = new byte[signatureLength];
-                    header.get(signatureBytes);
+                    sigbuf.get(signatureBytes);
                     String signature = new String(signatureBytes, "UTF-8");
 
                     long retval = ExportManager.getQueuedExportBytes(partitionId, signature);

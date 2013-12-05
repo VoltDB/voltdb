@@ -24,7 +24,7 @@ import java.util.zip.InflaterInputStream;
 
 import org.voltdb.common.Constants;
 
-import com.google.common.base.Charsets;
+import com.google_voltpatches.common.base.Charsets;
 
 /**
  * Encode and decode strings and byte arrays to/from hexidecimal

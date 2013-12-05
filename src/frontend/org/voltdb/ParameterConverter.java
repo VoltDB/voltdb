@@ -26,7 +26,9 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
 
-import com.google.common.base.Charsets;
+import com.google_voltpatches.common.base.Charsets;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 
 /**
  * ParameterConverter provides a static helper to convert a deserialized
@@ -107,7 +109,7 @@ public class ParameterConverter {
      * Given a string, covert it to a primitive type or return null.
      */
     private static Object convertStringToPrimitive(String value, final Class<?> expectedClz)
-    throws Exception
+    throws VoltTypeException
     {
         value = value.trim();
         // detect CSV null
@@ -135,7 +137,7 @@ public class ParameterConverter {
         // ignore the exception and fail through below
         catch (NumberFormatException nfe) {}
 
-        throw new Exception(
+        throw new VoltTypeException(
                 "tryToMakeCompatible: Unable to convert string "
                 + value + " to "  + expectedClz.getName()
                 + " value for target parameter.");
@@ -150,7 +152,7 @@ public class ParameterConverter {
             final Class<?> expectedComponentClz,
             final Class<?> inputComponentClz,
             Object param)
-    throws Exception
+    throws VoltTypeException
     {
         int inputLength = Array.getLength(param);
 
@@ -168,7 +170,13 @@ public class ParameterConverter {
         else if ((inputComponentClz == byte[].class) && (expectedComponentClz == String.class)) {
             String[] values = new String[inputLength];
             for (int i = 0; i < inputLength; i++) {
-                values[i] = new String((byte[]) Array.get(param, i), "UTF-8");
+                try {
+                    values[i] = new String((byte[]) Array.get(param, i), "UTF-8");
+                } catch (UnsupportedEncodingException ex) {
+                    throw new VoltTypeException(
+                            "tryScalarMakeCompatible: Unsupported encoding:"
+                            + expectedComponentClz.getName() + " to provided " + inputComponentClz.getName());
+                }
             }
             return values;
         }
@@ -186,7 +194,7 @@ public class ParameterConverter {
              * and incur the performance hit. The client should serialize the correct invocation
              * parameters
              */
-            throw new Exception(
+            throw new VoltTypeException(
                     "tryScalarMakeCompatible: Unable to match parameter array:"
                     + expectedComponentClz.getName() + " to provided " + inputComponentClz.getName());
         }
@@ -204,7 +212,7 @@ public class ParameterConverter {
      * @throws Exception with a message describing why the types are incompatible.
      */
     public static Object tryToMakeCompatible(final Class<?> expectedClz, final Object param)
-    throws Exception
+    throws VoltTypeException
     {
         // uncomment for debugging
         /*System.err.printf("Converting %s of type %s to type %s\n",
@@ -297,7 +305,7 @@ public class ParameterConverter {
 
         // make sure we get the array/scalar match
         if (expectedClz.isArray() != inputClz.isArray()) {
-            throw new Exception(String.format("Array / Scalar parameter mismatch (%s to %s)",
+            throw new VoltTypeException(String.format("Array / Scalar parameter mismatch (%s to %s)",
                     inputClz.getName(), expectedClz.getName()));
         }
 
@@ -315,7 +323,7 @@ public class ParameterConverter {
         if ((expectedClz == int.class) && (numberParam != null)) {
             long val = numberParam.longValue();
             if (val == VoltType.NULL_INTEGER) {
-                throw new Exception("tryToMakeCompatible: The provided long value: ("
+                throw new VoltTypeException("tryToMakeCompatible: The provided long value: ("
                         + param.toString() + ") might be interpreted as integer null. " +
                                 "Try explicitly using a int parameter.");
             }
@@ -327,7 +335,7 @@ public class ParameterConverter {
             if ((inputClz == Long.class) || (inputClz == Integer.class)) {
                 long val = numberParam.longValue();
                 if (val == VoltType.NULL_SMALLINT) {
-                    throw new Exception("tryToMakeCompatible: The provided int or long value: ("
+                    throw new VoltTypeException("tryToMakeCompatible: The provided int or long value: ("
                             + param.toString() + ") might be interpreted as smallint null. " +
                                     "Try explicitly using a short parameter.");
                 }
@@ -340,7 +348,7 @@ public class ParameterConverter {
             if ((inputClz == Long.class) || (inputClz == Integer.class) || (inputClz == Short.class)) {
                 long val = numberParam.longValue();
                 if (val == VoltType.NULL_TINYINT) {
-                    throw new Exception("tryToMakeCompatible: The provided short, int or long value: ("
+                    throw new VoltTypeException("tryToMakeCompatible: The provided short, int or long value: ("
                             + param.toString() + ") might be interpreted as tinyint null. " +
                                     "Try explicitly using a byte parameter.");
                 }
@@ -433,15 +441,24 @@ public class ParameterConverter {
                 return bd;
             }
             if (inputClz == Float.class || inputClz == Double.class) {
-                return VoltDecimalHelper.deserializeBigDecimalFromString(String.format("%.12f", param));
+                try {
+                    return VoltDecimalHelper.deserializeBigDecimalFromString(String.format("%.12f", param));
+                } catch (IOException ex) {
+                    throw new VoltTypeException(String.format("deserialize Float from string failed. (%s to %s)",
+                            inputClz.getName(), expectedClz.getName()));
+                }
             }
-            return VoltDecimalHelper.deserializeBigDecimalFromString(String.valueOf(param));
-        }
-        else if (expectedClz == VoltTable.class && inputClz == VoltTable.class) {
+            try {
+                return VoltDecimalHelper.deserializeBigDecimalFromString(String.valueOf(param));
+            } catch (IOException ex) {
+                throw new VoltTypeException(String.format("deserialize BigDecimal from string failed. (%s to %s)",
+                        inputClz.getName(), expectedClz.getName()));
+            }
+        } else if (expectedClz == VoltTable.class && inputClz == VoltTable.class) {
             return param;
         }
 
-        throw new Exception(
+        throw new VoltTypeException(
                 "tryToMakeCompatible: The provided value: (" + param.toString() + ") of type: " + inputClz.getName() +
                 " is not a match or is out of range for the target parameter type: " + expectedClz.getName());
     }
@@ -455,7 +472,7 @@ public class ParameterConverter {
      * @throws Exception if a parse error occurs (consistent with above).
      */
     public static Object stringToLong(Object param, Class<?> slot)
-        throws VoltTypeException
+    throws VoltTypeException
     {
         try {
             if (slot == byte.class ||

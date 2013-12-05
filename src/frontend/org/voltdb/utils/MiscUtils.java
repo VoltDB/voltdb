@@ -45,14 +45,14 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.licensetool.LicenseException;
 
-import com.google.common.base.Supplier;
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.ListMultimap;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
-import com.google.common.net.HostAndPort;
+import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.collect.ArrayListMultimap;
+import com.google_voltpatches.common.collect.ListMultimap;
+import com.google_voltpatches.common.collect.Lists;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Multimap;
+import com.google_voltpatches.common.collect.Multimaps;
+import com.google_voltpatches.common.net.HostAndPort;
 
 public class MiscUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -65,7 +65,7 @@ public class MiscUtils {
     public static void copyFile(String fromPath, String toPath) throws Exception {
         File inputFile = new File(fromPath);
         File outputFile = new File(toPath);
-        com.google.common.io.Files.copy(inputFile, outputFile);
+        com.google_voltpatches.common.io.Files.copy(inputFile, outputFile);
     }
 
     /**
@@ -732,6 +732,96 @@ public class MiscUtils {
             return rti;
         } else {
             return invocation;
+        }
+    }
+
+    /**
+     * Utility class to convert and hold a human-friendly time value and unit
+     * string.  For now it only deals with hours, minutes or seconds and their
+     * fractions.
+     * TODO: Parameterize conversion to optionally support other units, e.g. ms.
+     */
+    public static class HumanTime
+    {
+        /// The scaled time value.
+        public final double value;
+        /// The scale unit name ("hour", "minute", or "second").
+        public final String unit;
+
+        /**
+         * Private constructor. Use static methods to construct.
+         * @param value the scaled time value.
+         * @param unit the unit name (unchecked)
+         */
+        private HumanTime(double value, String unit)
+        {
+            this.value = value;
+            this.unit = unit;
+        }
+
+        /**
+         * Scale a nanoseconds number for human consumption.
+         * @param nanos time in nanoseconds.
+         */
+        public static HumanTime scale(double nanos)
+        {
+            // Start with hours and adjust down until it's >1. Stop at seconds.
+            double value = nanos / 1000000000 / 3600;
+            String unit;
+            if (value >= 1) {
+                unit = "hour";
+            }
+            else{
+                value *= 60.0;
+                if (value >= 1) {
+                    unit = "minute";
+                }
+                else {
+                    value *= 60.0;
+                    unit = "second";
+                }
+            }
+            return new HumanTime(value, unit);
+        }
+
+        /**
+         * Format a string for human consumption based on raw nanoseconds.
+         * @param nanos time in nanoseconds.
+         * @return formatted string.
+         */
+        public static String formatTime(double nanos)
+        {
+            HumanTime tu = scale(nanos);
+            return String.format("%.2f %ss", tu.value, tu.unit);
+        }
+
+        /**
+         * Format a rate string, for example <value>/second based on an input value
+         * and duration in nanoseconds. Specify the itemUnit value if you would
+         * like to insert a character or word (add your own leading space),
+         * e.g. "%" or " Megawatts", between the rate and the slash ('/').
+         * @param value arbitrary value for rate calculation.
+         * @param nanos time in nanoseconds.
+         * @param itemUnit unit name for value
+         * @return formatted string.
+         */
+        public static String formatRate(double value, double nanos, String itemUnit)
+        {
+            // Multiply by 60 so that a seconds duration becomes a per minute rate, and so on..
+            HumanTime tu = scale((nanos * 60) / value);
+            return String.format("%.2f%s/%s", 60 / tu.value, itemUnit, tu.unit);
+        }
+
+        /**
+         * Format a rate string, for example <value>/second based on an input value
+         * and duration in nanoseconds.
+         * @param value arbitrary value for rate calculation.
+         * @param nanos time in nanoseconds.
+         * @return formatted string.
+         */
+        public static String formatRate(double value, double nanos)
+        {
+            return formatRate(value, nanos, "");
         }
     }
 }

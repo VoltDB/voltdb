@@ -42,9 +42,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.*;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.json_voltpatches.JSONArray;
@@ -80,9 +78,9 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
-import com.google.common.base.Throwables;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.SettableFuture;
+import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public class SnapshotUtil {
 
@@ -1330,14 +1328,14 @@ public class SnapshotUtil {
                                        final boolean notifyChanges)
     {
         final SnapshotInitiationInfo snapInfo = new SnapshotInitiationInfo(path, nonce, blocking, format, data);
-        final SettableFuture<ClientResponse> responseFuture = SettableFuture.create();
         final SimpleClientResponseAdapter adapter =
-            new SimpleClientResponseAdapter(ClientInterface.SNAPSHOT_UTIL_CID, "SnapshotUtilAdapter");
+                new SimpleClientResponseAdapter(ClientInterface.SNAPSHOT_UTIL_CID, "SnapshotUtilAdapter", true);
+        final LinkedTransferQueue<ClientResponse> responses = new LinkedTransferQueue<ClientResponse>();
         adapter.registerCallback(clientHandle, new SimpleClientResponseAdapter.Callback() {
             @Override
             public void handleResponse(ClientResponse response)
             {
-                responseFuture.set(response);
+                responses.offer(response);
             }
         });
 
@@ -1349,7 +1347,7 @@ public class SnapshotUtil {
                 // abort if unable to succeed in 2 hours
                 final long startTime = System.currentTimeMillis();
                 boolean hasRequested = false;
-                while (System.currentTimeMillis() - startTime <= (120 * 60000)) {
+                while (System.currentTimeMillis() - startTime <= TimeUnit.HOURS.toMillis(2)) {
                     try {
                         if (!hasRequested) {
                             sd.createAndWatchRequestNode(clientHandle, adapter, snapInfo, notifyChanges);
@@ -1357,8 +1355,11 @@ public class SnapshotUtil {
                         }
 
                         try {
-                            response = responseFuture.get();
-                        } catch (ExecutionException e) {
+                            response = responses.poll(
+                                    TimeUnit.HOURS.toMillis(2) - (System.currentTimeMillis() - startTime),
+                                    TimeUnit.MILLISECONDS);
+                            if (response == null) break;
+                        } catch (InterruptedException e) {
                             VoltDB.crashLocalVoltDB("Should never happen", true, e);
                         }
 
@@ -1372,8 +1373,7 @@ public class SnapshotUtil {
                             hasRequested = false;
                             continue;
                         } else if (isSnapshotQueued(results) && notifyChanges) {
-                            // retry after a second
-                            Thread.sleep(1000);
+                            //Wait for an update on the queued state via ZK
                             continue;
                         } else {
                             // other errors are not recoverable

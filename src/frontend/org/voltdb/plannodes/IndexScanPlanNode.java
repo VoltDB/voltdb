@@ -26,6 +26,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
@@ -35,7 +36,9 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
@@ -51,6 +54,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         END_EXPRESSION,
         SEARCHKEY_EXPRESSIONS,
         INITIAL_EXPRESSION,
+        SKIP_NULL_PREDICATE,
         KEY_ITERATE,
         LOOKUP_TYPE,
         DETERMINISM_ONLY,
@@ -76,8 +80,12 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // at runtime in the lookup on the index
     protected final List<AbstractExpression> m_searchkeyExpressions = new ArrayList<AbstractExpression>();
 
-    // for reverse scan LTE only. used to do forward scan to find the correct starting point
+    // for reverse scan LTE only.
+    // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
+    // iteration after it had to initially settle for starting at "greater than a prefix key".
     protected AbstractExpression m_initialExpression;
+
+    private AbstractExpression m_skip_null_predicate;
 
     // ???
     protected Boolean m_keyIterate = false;
@@ -120,6 +128,61 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         if (apn != null) {
             m_outputSchema = apn.m_outputSchema.clone();
         }
+    }
+
+    public void setSkipNullPredicate() {
+        int searchKeySize = m_searchkeyExpressions.size();
+        if (m_lookupType == IndexLookupType.EQ || searchKeySize == 0 || isReverseScan()) {
+            m_skip_null_predicate = null;
+            return;
+        }
+
+        int nextKeyIndex;
+        if (m_endExpression != null &&
+                searchKeySize < ExpressionUtil.uncombine(m_endExpression).size()) {
+            nextKeyIndex = searchKeySize;
+        } else {
+            nextKeyIndex = searchKeySize - 1;
+        }
+
+        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+
+        String exprsjson = m_catalogIndex.getExpressionsjson();
+        List<AbstractExpression> indexedExprs = null;
+        if (exprsjson.isEmpty()) {
+            indexedExprs = new ArrayList<AbstractExpression>();
+
+            List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(m_catalogIndex.getColumns(), "index");
+            for (int i = 0; i <= nextKeyIndex; i++) {
+                ColumnRef colRef = indexedColRefs.get(i);
+                Column col = colRef.getColumn();
+                TupleValueExpression tve = new TupleValueExpression(m_targetTableName, m_targetTableAlias,
+                        col.getTypeName(), col.getTypeName());
+                tve.setValueType(VoltType.get((byte)col.getType()));
+                tve.setValueSize(col.getSize());
+                indexedExprs.add(tve);
+            }
+        } else {
+            try {
+                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson);
+            } catch (JSONException e) {
+                e.printStackTrace();
+                assert(false);
+            }
+
+        }
+        AbstractExpression expr;
+        for (int i = 0; i < nextKeyIndex; i++) {
+            AbstractExpression idxExpr = indexedExprs.get(i);
+            expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
+                    idxExpr, (AbstractExpression) m_searchkeyExpressions.get(i).clone());
+            exprs.add(expr);
+        }
+        AbstractExpression nullExpr = indexedExprs.get(nextKeyIndex);
+        expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
+        exprs.add(expr);
+        m_skip_null_predicate = ExpressionUtil.combine(exprs);
+        m_skip_null_predicate.finalizeValueTypes();
     }
 
     @Override
@@ -336,6 +399,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         return m_initialExpression;
     }
 
+    public AbstractExpression getSkipNullPredicate() {
+        return m_skip_null_predicate;
+    }
+
     public boolean isReverseScan() {
         return m_sortDirection == SortDirectionType.DESC ||
                 m_lookupType == IndexLookupType.LT || m_lookupType == IndexLookupType.LTE;
@@ -353,6 +420,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         List<TupleValueExpression> index_tves =
             new ArrayList<TupleValueExpression>();
         index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_endExpression));
+        index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_initialExpression));
+        index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_skip_null_predicate));
         for (AbstractExpression search_exp : m_searchkeyExpressions)
         {
             index_tves.addAll(ExpressionUtil.getTupleValueExpressions(search_exp));
@@ -502,6 +571,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             stringer.key(Members.INITIAL_EXPRESSION.name()).value(m_initialExpression);
         }
 
+        if (m_skip_null_predicate != null) {
+            stringer.key(Members.SKIP_NULL_PREDICATE.name()).value(m_skip_null_predicate);
+        }
+
         stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array();
         for (AbstractExpression ae : m_searchkeyExpressions) {
             assert (ae instanceof JSONString);
@@ -527,6 +600,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         //load searchkey_expressions
         AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
                 Members.SEARCHKEY_EXPRESSIONS.name());
+        m_skip_null_predicate = AbstractExpression.fromJSONChild(jobj, Members.SKIP_NULL_PREDICATE.name());
     }
 
     @Override

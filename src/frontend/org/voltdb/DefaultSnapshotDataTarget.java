@@ -47,12 +47,12 @@ import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.CompressionService;
 
-import com.google.common.util.concurrent.Callables;
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.ListeningScheduledExecutorService;
-import com.google.common.util.concurrent.MoreExecutors;
+import com.google_voltpatches.common.util.concurrent.Callables;
+import com.google_voltpatches.common.util.concurrent.Futures;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.ListeningScheduledExecutorService;
+import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 
 public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
@@ -338,8 +338,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         Future<BBContainer> compressionTask = null;
         if (prependLength) {
             BBContainer cont =
-                    DBBPool.allocateDirectAndPool(
-                            CompressionService.maxCompressedLength(SnapshotSiteProcessor.m_snapshotBufferLength));
+                    DBBPool.allocateDirectAndPool(SnapshotSiteProcessor.m_snapshotBufferCompressedLen);
             //Skip 4-bytes so the partition ID is not compressed
             //That way if we detect a corruption we know what partition is bad
             tupleData.b.position(tupleData.b.position() + 4);
@@ -456,6 +455,16 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     @Override
     public SnapshotFormat getFormat() {
         return SnapshotFormat.NATIVE;
+    }
+
+    /**
+     * Get the row count if any, of the content wrapped in the given {@link BBContainer}
+     * @param tupleData
+     * @return the numbers of tuple data rows contained within a container
+     */
+    @Override
+    public int getInContainerRowCount(BBContainer tupleData) {
+        return SnapshotDataTarget.ROW_COUNT_UNSUPPORTED;
     }
 
     @Override

@@ -21,8 +21,8 @@ import java.nio.ByteBuffer;
 
 import org.voltcore.utils.CoreUtils;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 public class SiteFailureForwardMessage extends SiteFailureMessage {
     public long m_reportingHSId;
