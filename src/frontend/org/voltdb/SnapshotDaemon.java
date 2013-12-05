@@ -888,7 +888,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 //Do this check to avoid an NPE
                                 if (results == null || results.length == 0 || results[0].getRowCount() < 1) {
                                     SNAP_LOG.error("Queued user snapshot request reattempt received an unexpected response" +
-                                            " and will not be reattempted");
+                                            " and will not be reattempted. The client response is (status: " +
+                                            clientResponse.getStatus() + " " + clientResponse.getStatusString() +
+                                            " result: " + (results != null && results.length > 0 ? results[0] : "null") +
+                                            ")");
                                     /*
                                      * Don't think this should happen, reset the watch to allow later requests
                                      */
