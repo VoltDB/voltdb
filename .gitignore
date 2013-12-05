@@ -41,3 +41,7 @@ doc/tutorials/auction/csvloader_*.csv
 /.idea
 *.iml
 /tools/voltify.venv
+/*.sublime-project
+/*.sublime-workspace
+/testobjects/
+/.tags
