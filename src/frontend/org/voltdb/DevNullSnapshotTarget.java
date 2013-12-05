@@ -22,7 +22,7 @@ import java.util.concurrent.Callable;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 
-import com.google.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 /**
  * SnapshotDataTarget implementation that drops snapshot data on the floor

@@ -38,7 +38,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 
-import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class SnapshotCompletionMonitor {
     private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");

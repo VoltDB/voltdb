@@ -310,6 +310,12 @@ enum ExpressionType {
     // -----------------------------
     EXPRESSION_TYPE_HASH_RANGE                      = 200,
 
+    // -----------------------------
+    // Internals added for Case When
+    // -----------------------------
+    EXPRESSION_TYPE_OPERATOR_CASE_WHEN                       = 300,
+    EXPRESSION_TYPE_OPERATOR_ALTERNATIVE                     = 301,
+
 };
 
 // ------------------------------------------------------------------

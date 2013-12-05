@@ -26,7 +26,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
 
-import com.google.common.collect.ImmutableSortedMap;
+import com.google_voltpatches.common.collect.ImmutableSortedMap;
 
 /**
  *

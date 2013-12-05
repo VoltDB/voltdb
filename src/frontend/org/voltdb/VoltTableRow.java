@@ -735,8 +735,6 @@ public abstract class VoltTableRow {
             else
                 js.value(dec.toString());
             break;
-        case DECIMAL_STRING:
-            break;
         case INVALID:
             break;
         case NULL:

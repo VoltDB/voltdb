@@ -47,9 +47,9 @@ import org.voltdb.processtools.SFTPSession.SFTPException;
 import org.voltdb.processtools.SSHTools;
 import org.voltdb.types.TimestampType;
 
-import com.google.common.base.Charsets;
-import com.google.common.base.Throwables;
-import com.google.common.net.HostAndPort;
+import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.net.HostAndPort;
 
 public class Collector {
     private static String m_voltDbRootPath = null;

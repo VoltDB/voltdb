@@ -61,7 +61,7 @@ import org.apache.zookeeper_voltpatches.server.DataTree;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltDB;
 
-import com.google.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 /**
  * This is the main class of ZooKeeper client library. To use a ZooKeeper

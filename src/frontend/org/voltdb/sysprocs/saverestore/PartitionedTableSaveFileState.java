@@ -176,8 +176,8 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
 
             // if there are some work to do
             if(loadPartitions.size() > 0){
-                int[] relevantPartitionIds = com.google.common.primitives.Ints.toArray(loadPartitions);
-                int[] originalHosts = com.google.common.primitives.Ints.toArray(loadOrigHosts);
+                int[] relevantPartitionIds = com.google_voltpatches.common.primitives.Ints.toArray(loadPartitions);
+                int[] originalHosts = com.google_voltpatches.common.primitives.Ints.toArray(loadOrigHosts);
                 List<Long> sitesAtHost = st.getSitesForHost(host);
 
                 // for each site of this host, generate one work fragment and let them execute in parallel

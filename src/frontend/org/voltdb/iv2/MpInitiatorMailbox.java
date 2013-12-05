@@ -29,7 +29,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
 
-import com.google.common.base.Throwables;
+import com.google_voltpatches.common.base.Throwables;
 
 /**
  * InitiatorMailbox accepts initiator work and proxies it to the
@@ -280,7 +280,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
             m_scheduler.handleMessageRepair(needsRepair, work);
         }
         else if (repairWork instanceof CompleteTransactionMessage) {
-            send(com.google.common.primitives.Longs.toArray(needsRepair), repairWork);
+            send(com.google_voltpatches.common.primitives.Longs.toArray(needsRepair), repairWork);
         }
         else {
             throw new RuntimeException("During MPI repair: Invalid repair message type: " + repairWork);

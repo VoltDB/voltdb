@@ -17,7 +17,7 @@
 
 package org.voltdb.export;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -49,14 +49,14 @@ import org.voltdb.common.Constants;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
-import com.google.common.base.Charsets;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
-import com.google.common.io.Files;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.SettableFuture;
+import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.io.Files;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 import java.util.concurrent.RejectedExecutionException;
 
 /**
