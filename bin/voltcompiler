@@ -99,7 +99,7 @@ EXTRA_CLASSPATH=$1
 shift
 
 JAVA=`which java`
-JAVA_HEAP_MAX=-Xmx1024m
+JAVA_HEAP_MAX=-Xmx1536m
 
 # some Java parameters
 if [ "$JAVA_HOME" != "" ]; then

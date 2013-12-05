@@ -84,7 +84,7 @@ fi
 JAVA=`which java`
 if [ x"$JAVA_HEAP_MAX" = "x" ]
 then
-    JAVA_HEAP_MAX=-Xmx1024m
+    JAVA_HEAP_MAX=-Xmx1536m
 fi
 
 # some Java parameters
