@@ -717,7 +717,7 @@ public class SQLCommand
         return param;
     }
 
-    private static String byteArrayToHexString(byte[] data)
+    static String byteArrayToHexString(byte[] data)
     {
         StringBuffer hexString = new StringBuffer();
         for (int i=0;i<data.length;i++)
@@ -740,75 +740,34 @@ public class SQLCommand
     }
 
     // Output generation
-    private static String OutputFormat = "fixed";
-    private static boolean OutputShowMetadata = true;
+    private static SQLCommandOutputFormatter outputFormatter = new SQLCommandOutputFormatterDefault();
+    private static boolean outputShowMetadata = true;
 
     private static boolean isUpdateResult(VoltTable table)
     {
         return ((table.getColumnName(0).length() == 0 || table.getColumnName(0).equals("modified_tuples"))&& table.getRowCount() == 1 && table.getColumnCount() == 1 && table.getColumnType(0) == VoltType.BIGINT);
     }
+
     private static void printResponse(ClientResponse response) throws Exception
     {
         if (response.getStatus() != ClientResponse.SUCCESS)
             throw new Exception("Execution Error: " + response.getStatusString());
-        if (OutputFormat.equals("fixed"))
-        {
-            for(VoltTable t : response.getResults())
-            {
-                if (isUpdateResult(t))
-                {
-                    if(OutputShowMetadata)
-                        System.out.printf("\n\n(%d row(s) affected)\n", t.fetchRow(0).getLong(0));
-                    continue;
+        for (VoltTable t : response.getResults()) {
+            long rowCount;
+            if (!isUpdateResult(t)) {
+                rowCount = t.getRowCount();
+                // Run it through the output formatter.
+                if (outputShowMetadata) {
+                    outputFormatter.printMetadata(System.out, t);
+                    t.resetRowPosition();
                 }
-
-                // Use the VoltTable pretty printer to display formatted output.
-                System.out.println(t.toFormattedString());
-
-                if (OutputShowMetadata)
-                    System.out.printf("\n\n(%d row(s) affected)\n", t.getRowCount());
+                outputFormatter.printTable(System.out, t);
             }
-        }
-        else
-        {
-            String separator = OutputFormat.equals("csv") ? "," : "\t";
-            for(VoltTable t : response.getResults())
-            {
-                if (isUpdateResult(t))
-                {
-                    if(OutputShowMetadata)
-                        System.out.printf("\n\n(%d row(s) affected)\n", t.fetchRow(0).getLong(0));
-                    continue;
-                }
-                int columnCount = t.getColumnCount();
-                if (OutputShowMetadata)
-                {
-                    for (int i = 0; i < columnCount; i++)
-                    {
-                        if (i > 0) System.out.print(separator);
-                        System.out.print(t.getColumnName(i));
-                    }
-                    System.out.print("\n");
-                }
-                t.resetRowPosition();
-                while(t.advanceRow())
-                {
-                    for (int i = 0; i < columnCount; i++)
-                    {
-                        if (i > 0) System.out.print(separator);
-                        Object v = t.get(i, t.getColumnType(i));
-                        if (t.wasNull())
-                            v = "NULL";
-                        else if (t.getColumnType(i) == VoltType.VARBINARY)
-                            v = byteArrayToHexString((byte[])v);
-                        else
-                            v = v.toString();
-                        System.out.print(v);
-                    }
-                    System.out.print("\n");
-                }
-                if (OutputShowMetadata)
-                    System.out.printf("\n\n(%d row(s) affected)\n", t.getRowCount());
+            else {
+                rowCount = t.fetchRow(0).getLong(0);
+            }
+            if (outputShowMetadata) {
+                System.out.printf("\n\n(%d row(s) affected)\n", rowCount);
             }
         }
     }
@@ -1112,12 +1071,28 @@ public class SQLCommand
                 else if (arg.startsWith("--output-format="))
                 {
                     if (Pattern.compile("(fixed|csv|tab)", Pattern.CASE_INSENSITIVE).matcher(arg.split("=")[1].toLowerCase()).matches())
-                        OutputFormat = arg.split("=")[1].toLowerCase();
+                    {
+                        String formatName = arg.split("=")[1].toLowerCase();
+                        if (formatName.equals("fixed"))
+                        {
+                            outputFormatter = new SQLCommandOutputFormatterDefault();
+                        }
+                        else if (formatName.equals("csv"))
+                        {
+                            outputFormatter = new SQLCommandOutputFormatterCSV();
+                        }
+                        else
+                        {
+                            outputFormatter = new SQLCommandOutputFormatterTabDelimited();
+                        }
+                    }
                     else
+                    {
                         printUsage("Invalid value for --output-format");
+                    }
                 }
                 else if (arg.equals("--output-skip-metadata"))
-                    OutputShowMetadata = false;
+                    outputShowMetadata = false;
                 else if (arg.equals("--debug"))
                     debug = true;
                 else if (arg.equals("--help"))
