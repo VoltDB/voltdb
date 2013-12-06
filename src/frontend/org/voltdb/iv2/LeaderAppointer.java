@@ -356,7 +356,9 @@ public class LeaderAppointer implements Promotable
             tmLog.debug("LeaderAppointer in startup");
             m_state.set(AppointerState.CLUSTER_START);
         }
-        else if (m_state.get() == AppointerState.INIT) {
+        //INIT is the default before promotion at runtime. Don't do this startup check
+        //Let the rest of the promotion run and determine k-safety which is the else block.
+        else if (m_state.get() == AppointerState.INIT && !VoltDB.instance().isRunning()) {
             ImmutableMap<Integer, Long> masters = m_iv2masters.pointInTimeCache();
             try {
                 if ((appointees.size() < getInitialPartitionCount()) ||
