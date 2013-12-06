@@ -22,6 +22,7 @@ import java.nio.charset.Charset;
 public class Constants
 {
     public static final Charset UTF8ENCODING = Charset.forName("UTF-8");
+    public static final Charset US_ASCII_ENCODING = Charset.forName("US-ASCII");
 
     // ODBC Datetime Format
     // if you need microseconds, you'll have to change this code or

@@ -115,7 +115,8 @@ public class EchoServer {
                     VoltTable table = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(fds.buffer());
                     ByteBuffer buf = ByteBuffer.allocate(table.getSerializedSize());
                     table.flattenToBuffer(buf);
-                    fs.write(buf.array());
+                    buf.flip();
+                    fs.write(buf);
                     break;
                 default:
                     throw new RuntimeException("FIXME: Unsupported type " + type);

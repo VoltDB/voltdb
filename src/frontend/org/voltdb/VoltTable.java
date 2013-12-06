@@ -18,10 +18,10 @@
 package org.voltdb;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -31,6 +31,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.common.Constants;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.CompressionService;
@@ -130,8 +131,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     public static final String QUOTED_CSV_NULL = "\"\\N\"";
 
     static final int NULL_STRING_INDICATOR = -1;
-    static final String METADATA_ENCODING = "US-ASCII";
-    static final String ROWDATA_ENCODING = "UTF-8";
+    static final Charset METADATA_ENCODING = Constants.US_ASCII_ENCODING;
+    static final Charset ROWDATA_ENCODING = Constants.UTF8ENCODING;
 
     static final AtomicInteger expandCountDouble = new AtomicInteger(0);
 
@@ -1381,21 +1382,16 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         return true;
     }
 
-    private final void writeStringToBuffer(String s, String encoding, ByteBuffer b) {
+    private final void writeStringToBuffer(String s, Charset encoding, ByteBuffer b) {
         if (s == null) {
             b.putInt(NULL_STRING_INDICATOR);
             return;
         }
 
         int len = 0;
-        byte[] strbytes = null;
-        try {
-            strbytes = s.getBytes(encoding);
-            len = strbytes.length;
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
+        byte[] strbytes = s.getBytes(encoding);
         assert (strbytes != null);
+        len = strbytes.length;
         b.putInt(len);
         b.put(strbytes);
     }

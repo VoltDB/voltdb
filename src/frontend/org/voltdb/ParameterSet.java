@@ -531,8 +531,10 @@ public class ParameterSet implements JSONString {
                     value = new TimestampType(micros);
                     break;
                 case VOLTTABLE:
-                    value = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(in.slice());
-                    in.position(in.position() + ((VoltTable) value).getSerializedSize());
+                    final int tableSize = in.getInt();
+                    byte[] tableBytes = new byte[tableSize];
+                    in.get(tableBytes);
+                    value = PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(tableBytes), false);
                     break;
                 case DECIMAL: {
                     BigDecimal decimal_val = SerializationHelper.getBigDecimal(in);

@@ -423,7 +423,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             ByteBuffer buf = fallbackBuffer == null ? deserializer.buffer() : fallbackBuffer;
             final VoltTable results[] = new VoltTable[numResults];
             for (int ii = 0; ii < numResults; ii++) {
-                results[ii] = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(buf);
+                int len = buf.getInt();
+                byte[] bufCopy = new byte[len];
+                buf.get(bufCopy);
+                results[ii] = PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(bufCopy), true);
             }
             return results;
         } catch (final IOException ex) {

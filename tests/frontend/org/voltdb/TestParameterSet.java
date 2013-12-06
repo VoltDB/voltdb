@@ -483,12 +483,15 @@ public class TestParameterSet extends TestCase {
         BigDecimal bdtmp3 = new BigDecimal(54321).setScale(VoltDecimalHelper.kDefaultScale);
         BigDecimal[] bigdecimalarray = new BigDecimal[] {bdtmp1, bdtmp2, bdtmp3};
 
-        VoltTable vttmp1 = new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.INTEGER));
-        vttmp1.addRow(Integer.MAX_VALUE);
-        VoltTable vttmp2 = new VoltTable(new VoltTable.ColumnInfo("bar", VoltType.INTEGER));
-        vttmp2.addRow(Integer.MIN_VALUE);
-        VoltTable vttmp3 = new VoltTable(new VoltTable.ColumnInfo("far", VoltType.INTEGER));
-        vttmp3.addRow(new Integer(5));
+        VoltTable vttmp1 = new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.INTEGER),
+                new VoltTable.ColumnInfo("bar", VoltType.STRING));
+        vttmp1.addRow(Integer.MAX_VALUE, "ry@nlikestheyankees");
+        VoltTable vttmp2 = new VoltTable(new VoltTable.ColumnInfo("bar", VoltType.INTEGER),
+                new VoltTable.ColumnInfo("bar", VoltType.STRING));
+        vttmp2.addRow(Integer.MIN_VALUE, null);
+        VoltTable vttmp3 = new VoltTable(new VoltTable.ColumnInfo("far", VoltType.INTEGER),
+                new VoltTable.ColumnInfo("bar", VoltType.STRING));
+        vttmp3.addRow(new Integer(5), "");
         VoltTable[] volttablearray = new VoltTable[] { vttmp1, vttmp2, vttmp3 };
 
         assertTrue(bigdecimalparam.scale() == VoltDecimalHelper.kDefaultScale);
