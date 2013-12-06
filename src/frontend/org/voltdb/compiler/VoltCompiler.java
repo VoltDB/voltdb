@@ -21,7 +21,6 @@ import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -100,7 +99,7 @@ import org.xml.sax.ErrorHandler;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
-import com.google.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableList;
 
 /**
  * Compiles a project XML file and some metadata into a Jarfile

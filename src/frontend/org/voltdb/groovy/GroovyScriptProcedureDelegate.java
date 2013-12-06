@@ -31,7 +31,7 @@ import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 
-import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class GroovyScriptProcedureDelegate extends VoltProcedure implements GroovyCodeBlockConstants {
 

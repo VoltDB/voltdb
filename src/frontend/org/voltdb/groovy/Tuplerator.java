@@ -28,7 +28,7 @@ import java.util.NavigableMap;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 
-import com.google.common.collect.ImmutableSortedMap;
+import com.google_voltpatches.common.collect.ImmutableSortedMap;
 
 /**
  * Groovy table access expediter. It allows you to easily navigate a VoltTable,

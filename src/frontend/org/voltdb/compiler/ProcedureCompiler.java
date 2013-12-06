@@ -57,7 +57,7 @@ import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.CatalogUtil;
 
-import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  * Compiles stored procedures into a given catalog,
