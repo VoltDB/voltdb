@@ -240,7 +240,9 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
     }
     // end tuple processing while loop
 
-    checkRemainingTuples("");
+    if (m_tuplesRemaining != 0) {
+        checkRemainingTuples("");
+    }
 
     // Need to close the output streams and insert row counts.
     outputStreams.close();
