@@ -757,11 +757,7 @@ public class SQLCommand
             if (!isUpdateResult(t)) {
                 rowCount = t.getRowCount();
                 // Run it through the output formatter.
-                if (outputShowMetadata) {
-                    outputFormatter.printMetadata(System.out, t);
-                    t.resetRowPosition();
-                }
-                outputFormatter.printTable(System.out, t);
+                outputFormatter.printTable(System.out, t, outputShowMetadata);
             }
             else {
                 rowCount = t.fetchRow(0).getLong(0);

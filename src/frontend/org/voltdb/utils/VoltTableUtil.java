@@ -16,7 +16,6 @@
  */
 package org.voltdb.utils;
 
-import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.math.BigDecimal;
@@ -30,6 +29,8 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
+
+import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 
 
 /*
@@ -60,7 +61,7 @@ public class VoltTableUtil {
         }
     };
 
-    public static void toCSVWriter(CSVWriter csv, VoltTable vt, ArrayList<VoltType> columnTypes) throws IOException {
+    public static void toCSVWriter(CSVWriter csv, VoltTable vt, List<VoltType> columnTypes) throws IOException {
         final SimpleDateFormat sdf = m_sdf.get();
         String[] fields = new String[vt.getColumnCount()];
         while (vt.advanceRow()) {
