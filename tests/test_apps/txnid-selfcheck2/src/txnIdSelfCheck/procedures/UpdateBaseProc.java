@@ -34,6 +34,7 @@ public class UpdateBaseProc extends VoltProcedure {
     public final SQLStmt d_getCount = new SQLStmt(
             "SELECT count(*) FROM dimension where cid = ?;");
 
+    // join partitioned tbl to replicated tbl. This enables detection of some replica faults.
     public final SQLStmt p_getCIDData = new SQLStmt(
             "SELECT * FROM partitioned p INNER JOIN dimension d ON p.cid=d.cid WHERE p.cid = ? ORDER BY cid, rid desc;");
 
@@ -177,15 +178,18 @@ public class UpdateBaseProc extends VoltProcedure {
 
         byte cid = (byte) data.fetchRow(0).getLong("cid");
 
-        // make sure all cnt values are consecutive
         data.resetRowPosition();
         long prevCnt = 0;
         while (data.advanceRow()) {
+            // check that the inner join of partitioned and replicated tables
+            // produce the expected result
             byte desc = (byte) data.getLong("desc");
-            if (desc != cid)
+            if (desc != cid) {
                 throw new VoltAbortException(callerId +
                         " desc value " + desc +
                         " not equal to cid value " + cid);
+            }
+            // make sure all cnt values are consecutive
             long cntValue = data.getLong("cnt");
             if ((prevCnt > 0) && ((prevCnt - 1) != cntValue)) {
                 throw new VoltAbortException(callerId +

@@ -100,8 +100,10 @@ public class ClientThread extends Thread {
             try {
                   t1 = client.callProcedure("@AdHoc", sql1).getResults()[0];
                   t2 = client.callProcedure("@AdHoc", sql2).getResults()[0];
-                  if (client.callProcedure("@AdHoc", sql3).getResults()[0].fetchRow(0).getLong(0) == 0)
+                  // init the dimension table to have one record for each cid.
+                  if (client.callProcedure("@AdHoc", sql3).getResults()[0].fetchRow(0).getLong(0) == 0) {
                       client.callProcedure("@AdHoc", sql4);
+                  }
                   break;
             }
             catch (Exception e) {
