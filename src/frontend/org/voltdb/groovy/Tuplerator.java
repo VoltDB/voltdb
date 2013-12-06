@@ -76,7 +76,6 @@ public class Tuplerator extends GroovyObjectSupport {
             StringBuilder cName = new StringBuilder(table.getColumnName(c));
 
             byIndex[c] = cType;
-            // byNameBuilder.put(cName.toString(), c);
 
             boolean upperCaseIt = false;
             for (int i = 0; i < cName.length();) {

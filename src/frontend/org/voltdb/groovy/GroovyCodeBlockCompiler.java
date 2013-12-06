@@ -20,13 +20,23 @@ import groovy.lang.GroovyClassLoader;
 import groovy_voltpatches.util.DelegatingScript;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.List;
 
 import org.codehaus.groovy.control.CompilationFailedException;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.customizers.ImportCustomizer;
+import org.voltdb.VoltProcedure;
 import org.voltdb.compiler.CodeBlockCompilerException;
 
+/**
+ * A singleton that holds an instance of a VoltDB groovy procedure script compiler. The compiler
+ * is preconfigured to make each script a {@link VoltProcedure} delegate, and garnish it with
+ * predefined includes.
+ *
+ * @author ssantoro
+ *
+ */
 public class GroovyCodeBlockCompiler  {
 
     private final GroovyClassLoader gcl;
@@ -49,13 +59,10 @@ public class GroovyCodeBlockCompiler  {
         // conf.getOptimizationOptions().put("indy", true);
         conf.setScriptBaseClass(DelegatingScript.class.getName());
 
-        File groovyOut = new File("groovyout");
-        if (!groovyOut.exists()) groovyOut.mkdir();
-        if (!groovyOut.isDirectory() || !groovyOut.canRead() || !groovyOut.canWrite()) {
-            throw new RuntimeException("Cannot access directory\"" + groovyOut + "\"");
-        }
+        File groovyOut = createGroovyOutDirectory();
+
         List<String> classPath = conf.getClasspath();
-        classPath.add(groovyOut.getName());
+        classPath.add(groovyOut.getAbsolutePath());
         conf.setClasspathList(classPath);
 
         conf.setTargetDirectory(groovyOut);
@@ -66,7 +73,7 @@ public class GroovyCodeBlockCompiler  {
     public Class<?> parseCodeBlock(final String codeBlock, final String classNameForCodeBlock) {
         Class<?> parsedClazz;
         try {
-            parsedClazz = gcl.parseClass(codeBlock,classNameForCodeBlock + ".groovy");
+            parsedClazz = gcl.parseClass(codeBlock, classNameForCodeBlock + ".groovy");
         } catch (CompilationFailedException e) {
             throw new CodeBlockCompilerException(e.getMessage());
         }
@@ -81,4 +88,22 @@ public class GroovyCodeBlockCompiler  {
         final static GroovyCodeBlockCompiler instance = new GroovyCodeBlockCompiler();
     }
 
+    final static File createGroovyOutDirectory() {
+        File groovyOut;
+        try {
+            groovyOut = File.createTempFile("groovyout", ".tmp");
+        } catch (IOException e) {
+            throw new RuntimeException("Cannot create groovy procedure compiler output directory", e);
+        }
+        if (!groovyOut.delete() || !groovyOut.mkdir()) {
+            throw new RuntimeException("Cannot create directory\"" + groovyOut + "\"");
+        }
+        if (   !groovyOut.isDirectory()
+            || !groovyOut.canRead()
+            || !groovyOut.canWrite()
+            || !groovyOut.canExecute()) {
+            throw new RuntimeException("Cannot access directory\"" + groovyOut + "\"");
+        }
+        return groovyOut;
+    }
 }
