@@ -52,7 +52,8 @@ CopyOnWriteContext::CopyOnWriteContext(
              m_blocksCompacted(0),
              m_serializationBatches(0),
              m_inserts(0),
-             m_updates(0)
+             m_updates(0),
+             m_deletes(0)
 {
 }
 
@@ -83,6 +84,13 @@ CopyOnWriteContext::handleActivation(TableStreamType streamType)
     m_surgeon.activateSnapshot();
 
     m_iterator.reset(new CopyOnWriteIterator(&getTable(), &m_surgeon, m_blocks.begin(), m_blocks.end()));
+
+    if (m_inserts != 0 || m_updates != 0 || m_deletes != 0) {
+        char msg[1024];
+        snprintf(msg, 1024, "COW context is not properly initialized inserts: %jd updates: %jd deletes: %jd",
+                 m_inserts, m_updates, m_deletes);
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, msg);
+    }
 
     return ACTIVATION_SUCCEEDED;
 }
@@ -186,6 +194,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
                          "Compacted block count: %jd\n"
                          "Dirty insert count: %jd\n"
                          "Dirty update count: %jd\n"
+                         "Deleted tuple count: %jd\n"
                          "Partition column: %d\n",
                          table.name().c_str(),
                          table.tableType().c_str(),
@@ -195,6 +204,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
                          (intmax_t)m_blocksCompacted,
                          (intmax_t)m_inserts,
                          (intmax_t)m_updates,
+                         (intmax_t)m_deletes,
                          table.partitionColumn());
 #ifdef DEBUG
                 // Use a format string to prevent overzealous compiler warnings.
@@ -229,6 +239,8 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
         }
     }
     // end tuple processing while loop
+
+    checkRemainingTuples("");
 
     // Need to close the output streams and insert row counts.
     outputStreams.close();
@@ -293,7 +305,11 @@ bool CopyOnWriteContext::notifyTupleDelete(TableTuple &tuple) {
      * Now check where this is relative to the COWIterator.
      */
     CopyOnWriteIterator *iter = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get());
-    return !iter->needToDirtyTuple(blockStartAddress, address);
+    bool d = !iter->needToDirtyTuple(blockStartAddress, address);
+    if (d) {
+        m_deletes++;
+    }
+    return d;
 }
 
 void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
