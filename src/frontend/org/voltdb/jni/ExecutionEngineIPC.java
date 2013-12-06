@@ -787,6 +787,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     ParameterSet pset = (ParameterSet) parameterSets[i];
                     ByteBuffer buf = ByteBuffer.allocate(pset.getSerializedSize());
                     pset.flattenToBuffer(buf);
+                    buf.flip();
                     fser.write(buf);
                 }
             }
