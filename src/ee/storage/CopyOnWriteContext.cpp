@@ -88,7 +88,7 @@ CopyOnWriteContext::handleActivation(TableStreamType streamType)
     if (m_inserts != 0 || m_updates != 0 || m_deletes != 0) {
         char msg[1024];
         snprintf(msg, 1024, "COW context is not properly initialized inserts: %jd updates: %jd deletes: %jd",
-                 m_inserts, m_updates, m_deletes);
+                 (intmax_t)m_inserts, (intmax_t)m_updates, (intmax_t)m_deletes);
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, msg);
     }
 
