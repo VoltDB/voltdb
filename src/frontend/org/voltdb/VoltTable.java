@@ -18,10 +18,10 @@
 package org.voltdb;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -31,9 +31,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializable;
-import org.voltdb.messaging.FastSerializer;
+import org.voltdb.common.Constants;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.CompressionService;
@@ -115,7 +113,7 @@ rely on the garbage collector.
  * t.addRow(-9, "moreData");
  * </code>
  */
-public final class VoltTable extends VoltTableRow implements FastSerializable, JSONString {
+public final class VoltTable extends VoltTableRow implements JSONString {
 
     /**
      * Size in bytes of the maximum length for a VoltDB tuple.
@@ -133,8 +131,8 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
     public static final String QUOTED_CSV_NULL = "\"\\N\"";
 
     static final int NULL_STRING_INDICATOR = -1;
-    static final String METADATA_ENCODING = "US-ASCII";
-    static final String ROWDATA_ENCODING = "UTF-8";
+    static final Charset METADATA_ENCODING = Constants.US_ASCII_ENCODING;
+    static final Charset ROWDATA_ENCODING = Constants.UTF8ENCODING;
 
     static final AtomicInteger expandCountDouble = new AtomicInteger(0);
 
@@ -939,65 +937,6 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
     }
 
     /**
-     * End users should not call this method.
-     * Read an VoltTable from a {@link org.voltdb.messaging.FastDeserializer} into this object.
-     */
-    @Override
-    public final void readExternal(FastDeserializer in) throws IOException {
-        // Note: some of the snapshot and save/restore code makes assumptions
-        // about the binary layout of tables.
-
-        final int len = in.readInt();
-        // smallest table is 4-bytes with zero value
-        // indicating rowcount is 0
-        assert(len >= 4);
-        m_buffer = in.readBuffer(len);
-        m_buffer.position(m_buffer.limit());
-
-        // rowstart represents and offset to the start of row data,
-        //  but the serialization is the non-inclusive length of the header,
-        //  so add two bytes.
-        m_rowStart = m_buffer.getInt(0) + 4;
-
-        m_colCount = m_buffer.getShort(5);
-        m_rowCount = m_buffer.getInt(m_rowStart);
-
-        assert(verifyTableInvariants());
-    }
-
-    /**
-     * End users should not call this method.
-     * Write this VoltTable to a {@link org.voltdb.messaging.FastSerializer}.
-     */
-    @Override
-    public final void writeExternal(FastSerializer out) throws IOException {
-        // Note: some of the snapshot and save/restore code makes assumptions
-        // about the binary layout of tables.
-
-        // test json
-        /*String jsonString = toJSONString();
-        //System.err.println(jsonString);
-        try {
-            VoltTable copy = VoltTable.fromJSONString(jsonString);
-            jsonString = copy.toJSONString();
-            //System.err.println(jsonString);
-            assert(hasSameContents(copy));
-        } catch (Exception e) {
-            e.printStackTrace();
-            System.exit(-1);
-        }*/
-
-        assert(verifyTableInvariants());
-        final ByteBuffer buffer = m_buffer.duplicate();
-        final int pos = buffer.position();
-        buffer.position(0);
-        buffer.limit(pos);
-        out.writeInt(pos);
-        out.write(buffer);
-        assert(verifyTableInvariants());
-    }
-
-    /**
      * Returns a {@link java.lang.String String} representation of this table.
      * Resulting string will contain schema and all data and will be formatted.
      * @return a {@link java.lang.String String} representation of this table.
@@ -1443,21 +1382,16 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         return true;
     }
 
-    private final void writeStringToBuffer(String s, String encoding, ByteBuffer b) {
+    private final void writeStringToBuffer(String s, Charset encoding, ByteBuffer b) {
         if (s == null) {
             b.putInt(NULL_STRING_INDICATOR);
             return;
         }
 
         int len = 0;
-        byte[] strbytes = null;
-        try {
-            strbytes = s.getBytes(encoding);
-            len = strbytes.length;
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
+        byte[] strbytes = s.getBytes(encoding);
         assert (strbytes != null);
+        len = strbytes.length;
         b.putInt(len);
         b.put(strbytes);
     }

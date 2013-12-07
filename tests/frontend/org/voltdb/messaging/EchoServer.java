@@ -27,7 +27,9 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.ByteBuffer;
 
+import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.types.VoltDecimalHelper;
@@ -110,8 +112,11 @@ public class EchoServer {
                     VoltDecimalHelper.serializeBigDecimal(bd, fs);
                     break;
                 case VOLTTABLE:
-                    VoltTable table = fds.readObject(VoltTable.class);
-                    fs.writeObject(table);
+                    VoltTable table = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(fds.buffer());
+                    ByteBuffer buf = ByteBuffer.allocate(table.getSerializedSize());
+                    table.flattenToBuffer(buf);
+                    buf.flip();
+                    fs.write(buf);
                     break;
                 default:
                     throw new RuntimeException("FIXME: Unsupported type " + type);
