@@ -1147,6 +1147,10 @@ final class RangeVariable {
 
     /*************** VOLTDB *********************/
 
+    private Expression subqueryExpression;
+
+    void setSubqueryExpression(Expression sqe) { subqueryExpression = sqe; }
+
     /**
      * VoltDB added method to get a non-catalog-dependent
      * representation of this HSQLDB object.
@@ -1184,11 +1188,9 @@ final class RangeVariable {
             scan.attributes.put("tablealias", tableAlias.name);
         }
 
-        if (rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
-            if (rangeTable instanceof TableDerived) {
-                VoltXMLElement subQuery = ((TableDerived) rangeTable).dataExpression.voltGetXML(session);
-                scan.children.add(subQuery);
-            }
+        if (subqueryExpression != null) {
+            VoltXMLElement subQuery = subqueryExpression.voltGetXML(session);
+            scan.children.add(subQuery);
         }
 
         // note if this is an outer join

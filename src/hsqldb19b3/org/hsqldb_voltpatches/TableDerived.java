@@ -48,9 +48,6 @@ public class TableDerived extends Table {
 
     QueryExpression queryExpression;
     View            view;
-    
-    /*************** VOLTDB *********************/
-    Expression      dataExpression;
 
     public TableDerived(Database database, HsqlName name, int type) {
 

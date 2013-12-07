@@ -124,6 +124,8 @@ public class StatementQuery extends StatementDMQL {
     @Override
     void getTableNamesForWrite(OrderedHashSet set) {}
 
+    /*************** VOLTDB *********************/
+
     private static class Pair<T, U> {
         protected final T m_first;
         protected final U m_second;
@@ -170,8 +172,6 @@ public class StatementQuery extends StatementDMQL {
         }
         return false;
     }
-
-    /*************** VOLTDB *********************/
 
     /**
      * VoltDB added method to get a non-catalog-dependent
@@ -474,11 +474,11 @@ public class StatementQuery extends StatementDMQL {
 
         return query;
     }
-    
+
     /**
      * Extract columnref elements from the input element.
      * @param element
-     * @param cols - output collection containing the column references 
+     * @param cols - output collection containing the column references
      */
     static protected void extractColumnReferences(VoltXMLElement element, List<VoltXMLElement> cols) {
         if ("columnref".equalsIgnoreCase(element.name)) {
