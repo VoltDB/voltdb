@@ -92,12 +92,18 @@ public class ClientThread extends Thread {
 
         String sql1 = String.format("select * from partitioned where cid = %d order by rid desc limit 1", cid);
         String sql2 = String.format("select * from replicated  where cid = %d order by rid desc limit 1", cid);
+        String sql3 = String.format("select count(*) FROM dimension WHERE cid = %d", cid);
+        String sql4 = String.format("insert into dimension (cid, desc) VALUES (%d, %d)", cid, cid);
         VoltTable t1;
         VoltTable t2;
         while (true) {
             try {
                   t1 = client.callProcedure("@AdHoc", sql1).getResults()[0];
                   t2 = client.callProcedure("@AdHoc", sql2).getResults()[0];
+                  // init the dimension table to have one record for each cid.
+                  if (client.callProcedure("@AdHoc", sql3).getResults()[0].fetchRow(0).getLong(0) == 0) {
+                      client.callProcedure("@AdHoc", sql4);
+                  }
                   break;
             }
             catch (Exception e) {

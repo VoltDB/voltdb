@@ -79,11 +79,11 @@ import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.iv2.Cartographer;
-import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.MiscUtils;
 
 public class TestClientInterface {
     // mocked objects that CI requires
@@ -170,7 +170,7 @@ public class TestClientInterface {
             throw new IOException();
         }
 
-        byte[] bytes = CatalogUtil.toBytes(cat);
+        byte[] bytes = MiscUtils.fileToBytes(cat);
         String serializedCat = CatalogUtil.loadCatalogFromJar(bytes, null);
         assertNotNull(serializedCat);
         Catalog catalog = new Catalog();
@@ -202,15 +202,17 @@ public class TestClientInterface {
      * @throws IOException
      */
     private static ByteBuffer createMsg(Long origTxnId, String name,
-                                        final Object...params) throws IOException {
-        FastSerializer fs = new FastSerializer();
+                                        final Object...params) throws IOException
+    {
         StoredProcedureInvocation proc = new StoredProcedureInvocation();
         proc.setProcName(name);
         if (origTxnId != null)
             proc.setOriginalTxnId(origTxnId);
         proc.setParams(params);
-        fs.writeObject(proc);
-        return fs.getBuffer();
+        ByteBuffer buf = ByteBuffer.allocate(proc.getSerializedSize());
+        proc.flattenToBuffer(buf);
+        buf.flip();
+        return buf;
     }
 
     /**

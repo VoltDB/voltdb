@@ -1644,28 +1644,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
         }
 
-        // start one site in the current thread
-        Thread.currentThread().setName("ExecutionSiteAndVoltDB");
         m_isRunning = true;
-        try
-        {
-            while (m_isRunning) {
-                Thread.sleep(1);
-            }
-        }
-        catch (Throwable thrown)
-        {
-            String errmsg = " encountered an unexpected error and will die, taking this VoltDB node down.";
-            hostLog.error(errmsg);
-            // It's too easy for stdout to get lost, especially if we are crashing, so log FATAL, instead.
-            // Logging also automatically prefixes lines with "ExecutionSite [X:Y] "
-            // thrown.printStackTrace();
-            hostLog.fatal("Stack trace of thrown exception: " + thrown.toString());
-            for (StackTraceElement ste : thrown.getStackTrace()) {
-                hostLog.fatal(ste.toString());
-            }
-            VoltDB.crashLocalVoltDB(errmsg, true, thrown);
-        }
     }
 
     /**

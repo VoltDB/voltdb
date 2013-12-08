@@ -53,6 +53,9 @@ public class CurrentTimestampProcedure extends VoltProcedure {
 
     public long run() {
 
+        time = new Date();
+        long starttime = time.getTime()*1000;
+
         // TEST TIMESTAMP function in DEFAULT and Select.
         voltQueueSQL(insertStmt, 1, 1);
         voltQueueSQL(insertStmt, 2, 1);
@@ -63,6 +66,7 @@ public class CurrentTimestampProcedure extends VoltProcedure {
         voltQueueSQL(selectStmt);
         VoltTable vt = voltExecuteSQL()[0];
         time = new Date();
+        long endtime = time.getTime()*1000;
 
         long timeValue = -1;
         long id = 0;
@@ -88,17 +92,25 @@ public class CurrentTimestampProcedure extends VoltProcedure {
                 throw new VoltAbortException("bad inconsistent current_timestamp value from different partitions");
             }
         }
-        if( Math.abs(time.getTime()*1000 - timeValue) > epsilonMicros  || time.getTime()*1000 < timeValue) {
-            throw new VoltAbortException("bad current_timestamp value, off too much from current system time.");
+
+        if( Math.abs(timeValue - starttime) > epsilonMicros) {
+            throw new VoltAbortException(
+                "bad current_timestamp, off too much from previous system time. Difference(usec): " +
+                (timeValue - starttime));
         }
 
+        if( timeValue > endtime + epsilonMicros) {
+            throw new VoltAbortException(
+                "bad current_timestamp, off too much from later system time. Difference(usec): " +
+                (endtime - timeValue));
+        }
 
         // Test Update
         voltQueueSQL(updateStmt, 2, 1);
         voltQueueSQL(groupbyStmt);
 
         vt = voltExecuteSQL()[1];
-        time = new Date();
+
         assert(vt.advanceRow());
         if(vt.getRowCount() != 1) {
             throw new VoltAbortException("bad row count");
@@ -110,8 +122,16 @@ public class CurrentTimestampProcedure extends VoltProcedure {
             throw new VoltAbortException("bad group by row count");
         }
 
-        if( Math.abs(time.getTime()*1000 - timeValue) > epsilonMicros  || time.getTime()*1000 < timeValue) {
-            throw new VoltAbortException("bad current_timestamp value, off too much from current system time.");
+        if( Math.abs(timeValue - starttime) > epsilonMicros) {
+            throw new VoltAbortException(
+                "bad current_timestamp, off too much from previous system time. Difference(usec): " +
+                (timeValue - starttime));
+        }
+
+        if( timeValue > endtime + epsilonMicros) {
+            throw new VoltAbortException(
+                "bad current_timestamp, off too much from later system time. Difference(usec): " +
+                (endtime - timeValue));
         }
 
         return 1;

@@ -34,6 +34,7 @@ import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.MiscUtils;
 
 public class TestVoltDB extends TestCase {
 
@@ -199,7 +200,7 @@ public class TestVoltDB extends TestCase {
         String catalogJar = testDir + File.separator + jarName;
         assertTrue("Project failed to compile", project.compile(catalogJar));
 
-        byte[] bytes = CatalogUtil.toBytes(new File(catalogJar));
+        byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
         String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
         assertNotNull("Error loading catalog from jar", serializedCatalog);
 
@@ -237,7 +238,7 @@ public class TestVoltDB extends TestCase {
         String catalogJar = testDir + File.separator + jarName;
         assertTrue("Project failed to compile", project.compile(catalogJar));
 
-        byte[] bytes = CatalogUtil.toBytes(new File(catalogJar));
+        byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
         String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
         assertNotNull("Error loading catalog from jar", serializedCatalog);
 

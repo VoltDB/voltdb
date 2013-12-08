@@ -29,8 +29,9 @@ import org.voltdb.VoltTable;
 
 public class ReadSP extends VoltProcedure {
 
+    // join partitioned tbl to replicated tbl. This enables detection of some replica faults.
     public final SQLStmt p_getCIDData = new SQLStmt(
-            "SELECT * FROM partitioned WHERE cid = ? ORDER BY cid, rid desc;");
+            "SELECT * FROM partitioned p INNER JOIN dimension d ON p.cid=d.cid WHERE p.cid = ? ORDER BY cid, rid desc;");
 
     public VoltTable[] run(byte cid) {
         voltQueueSQL(p_getCIDData, cid);
