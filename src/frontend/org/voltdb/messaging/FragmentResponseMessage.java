@@ -17,13 +17,13 @@
 
 package org.voltdb.messaging;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.SerializableException;
 
@@ -244,16 +244,10 @@ public class FragmentResponseMessage extends VoltMessage {
             m_dependencyIds.add(buf.getInt());
         for (int i = 0; i < m_dependencyCount; i++) {
             boolean isNull = buf.get() == 0 ? true : false;
-            FastDeserializer fds = new FastDeserializer(buf);
-            try {
-                if (isNull) {
-                    m_dependencies.add(null);
-                } else {
-                    m_dependencies.add(fds.readObject(VoltTable.class));
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-                assert(false);
+            if (isNull) {
+                m_dependencies.add(null);
+            } else {
+                m_dependencies.add(PrivateVoltTableFactory.createVoltTableFromSharedBuffer(buf));
             }
         }
         m_exception = SerializableException.deserializeFromBuffer(buf);

@@ -96,7 +96,6 @@ import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -2081,16 +2080,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             /*
                              * Round trip the invocation to initialize it for command logging
                              */
-                            FastSerializer fs = new FastSerializer();
                             try {
-                                fs.writeObject(task);
-                                ByteBuffer source = fs.getBuffer();
-                                ByteBuffer copy = ByteBuffer.allocate(source.remaining());
-                                copy.put(source);
-                                copy.flip();
-                                FastDeserializer fds = new FastDeserializer(copy);
-                                task = new StoredProcedureInvocation();
-                                task.readExternal(fds);
+                                task = MiscUtils.roundTripForCL(task);
                             } catch (Exception e) {
                                 hostLog.fatal(e);
                                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);

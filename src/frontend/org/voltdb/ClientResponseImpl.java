@@ -197,7 +197,15 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         } else {
             m_hash = null;
         }
-        results = (VoltTable[]) in.readArray(VoltTable.class);
+        int tableCount = in.readShort();
+        results = new VoltTable[tableCount];
+        for (int i = 0; i < tableCount; i++) {
+            int tableSize = in.readInt();
+            byte[] bytes = new byte[tableSize];
+            in.readFully(bytes);
+            ByteBuffer tempBuf = ByteBuffer.wrap(bytes);
+            results[i] = new VoltTable(tempBuf, false);
+        }
         setProperly = true;
     }
 

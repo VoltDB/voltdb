@@ -25,9 +25,8 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-import org.voltdb.PrivateVoltTableFactory;
-import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.common.Constants;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 
@@ -105,18 +104,11 @@ public class FastDeserializer implements DataInput {
      * @return A derserialized object.
      * @throws IOException Rethrows any IOExceptions thrown.
      */
-    @SuppressWarnings("unchecked")
     public <T extends FastSerializable> T readObject(final Class<T> expectedType) throws IOException {
         assert(expectedType != null);
         T obj = null;
         try {
-            // Since VoltTable has no empty ctor, special case it
-            if (expectedType == VoltTable.class) {
-                obj = (T) PrivateVoltTableFactory.createUninitializedVoltTable();
-            }
-            else {
-                obj = expectedType.newInstance();
-            }
+            obj = expectedType.newInstance();
             obj.readExternal(this);
         } catch (final InstantiationException e) {
             e.printStackTrace();
@@ -188,15 +180,15 @@ public class FastDeserializer implements DataInput {
      * @throws IOException Rethrows any IOExceptions.
      */
     public String readString() throws IOException {
-        final int NULL_STRING_INDICATOR = -1;
-
         final int len = readInt();
 
         // check for null string
-        if (len == NULL_STRING_INDICATOR)
+        if (len == VoltType.NULL_STRING_LENGTH) {
             return null;
+        }
+        assert len >= 0;
 
-        if (len < NULL_STRING_INDICATOR) {
+        if (len < VoltType.NULL_STRING_LENGTH) {
             throw new IOException("String length is negative " + len);
         }
         if (len > buffer.remaining()) {
@@ -224,16 +216,15 @@ public class FastDeserializer implements DataInput {
      * @throws IOException Rethrows any IOExceptions.
      */
     public byte[] readVarbinary() throws IOException {
-        final int NULL_STRING_INDICATOR = -1;
-
         final int len = readInt();
 
         // check for null string
-        if (len == NULL_STRING_INDICATOR)
+        if (len == VoltType.NULL_STRING_LENGTH) {
             return null;
+        }
         assert len >= 0;
 
-        if (len < NULL_STRING_INDICATOR) {
+        if (len < VoltType.NULL_STRING_LENGTH) {
             throw new IOException("Varbinary length is negative " + len);
         }
         if (len > buffer.remaining()) {

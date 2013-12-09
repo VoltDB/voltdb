@@ -43,7 +43,6 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.messaging.FastDeserializer;
 
 public class TestDistributer extends TestCase {
 
@@ -61,8 +60,8 @@ public class TestDistributer extends TestCase {
         @Override
         public void handleMessage(ByteBuffer message, Connection c) {
             try {
-                FastDeserializer fds = new FastDeserializer(message);
-                StoredProcedureInvocation spi = fds.readObject(StoredProcedureInvocation.class);
+                StoredProcedureInvocation spi = new StoredProcedureInvocation();
+                spi.initFromBuffer(message);
 
                 // record if we got a ping
                 if (spi.getProcName().equals("@Ping"))
