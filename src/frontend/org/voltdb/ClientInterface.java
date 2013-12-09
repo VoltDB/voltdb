@@ -2133,7 +2133,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             public void run() {
                 try {
                     //Using the current time makes this vulnerable to NTP weirdness...
-                    checkForDeadConnections(System.currentTimeMillis());
+                    checkForDeadConnections(EstTime.currentTimeMillis());
                 } catch (Exception ex) {
                     log.warn("Exception while checking for dead connections", ex);
                 }

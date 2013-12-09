@@ -21,7 +21,9 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.Callable;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -37,6 +39,10 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
     private long m_bytesWritten = 0;
     private Runnable m_onCloseTask;
     private boolean m_needsFinalClose;
+
+    //Remember to sync regularly
+    private static final int m_bytesAllowedBeforeSync = (1024 * 1024) * 256;
+    private int m_bytesSinceLastSync = 0;
 
     /*
      * If a write fails then this snapshot is hosed.
@@ -89,7 +95,12 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
                             int written = m_fc.write(data.b);
                             if (written > 0) {
                                 m_bytesWritten += written;
+                                m_bytesSinceLastSync += written;
                             }
+                        }
+                        if (m_bytesSinceLastSync > m_bytesAllowedBeforeSync) {
+                            m_fc.force(false);
+                            m_bytesSinceLastSync = 0;
                         }
                     } finally {
                         data.discard();
