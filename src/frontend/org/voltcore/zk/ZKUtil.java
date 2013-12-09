@@ -550,8 +550,7 @@ public class ZKUtil {
                     for (String child: children) {
                         listing.add(new ListingNode(callbackPair.getSecond(), child));
                     }
-                } catch (KeeperException.NoNodeException e) {
-                    //This can happen when a partition is being removed from the system
+                } catch (KeeperException.NoNodeException ignoreIt) {
                 }
                 itr.remove();
             }
@@ -566,7 +565,7 @@ public class ZKUtil {
             lnitr.remove();
         }
         try {
-            lastCallback.getResult();
+            lastCallback.get();
         } catch (KeeperException.NoNodeException ignoreIt) {
         }
     }
