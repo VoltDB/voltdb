@@ -112,6 +112,8 @@ class Distributer {
     private final long m_procedureCallTimeoutMS;
     private static final long MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
     private final long m_connectionResponseTimeoutMS;
+    private final Map<Integer, ClientAffinityStats> m_clientAffinityStats =
+        new HashMap<Integer, ClientAffinityStats>();
 
     public final RateLimiter m_rateLimiter = new RateLimiter();
 
@@ -705,9 +707,10 @@ class Distributer {
              */
             if (m_useClientAffinity && (m_hashinator != null)) {
                 final Procedure procedureInfo = m_procedureInfo.get(invocation.getProcName());
+                Integer hashedPartition = -1;
 
                 if (procedureInfo != null) {
-                    Integer hashedPartition = MpInitiator.MP_INIT_PID;
+                    hashedPartition = MpInitiator.MP_INIT_PID;
                     if (!procedureInfo.multiPart) {
                         hashedPartition = m_hashinator.getHashedPartitionForParameter(
                                 procedureInfo.partitionParameterType,
@@ -748,6 +751,39 @@ class Distributer {
                     // Client affinity picked a connection that was actually disconnected.  Reset to null
                     // and let the round-robin choice pick a connection
                     cxn = null;
+                }
+                ClientAffinityStats stats = m_clientAffinityStats.get(hashedPartition);
+                if (stats == null) {
+                    stats = new ClientAffinityStats(hashedPartition, 0, 0, 0, 0);
+                    m_clientAffinityStats.put(hashedPartition, stats);
+                }
+                if (cxn != null) {
+                    if (procedureInfo != null) {
+                        if (procedureInfo.readOnly) {
+                            stats.addAffinityRead();
+                        }
+                        else {
+                            stats.addAffinityWrite();
+                        }
+                    }
+                    else {
+                        stats.addAffinityWrite();
+                    }
+                }
+                // account these here because we lose the partition ID and procedure info once we
+                // bust out of this scope.
+                else {
+                    if (procedureInfo != null) {
+                        if (procedureInfo.readOnly) {
+                            stats.addRrRead();
+                        }
+                        else {
+                            stats.addRrWrite();
+                        }
+                    }
+                    else {
+                        stats.addRrWrite();
+                    }
                 }
             }
             if (cxn == null) {
@@ -831,7 +867,8 @@ class Distributer {
     }
 
     ClientStatsContext createStatsContext() {
-        return new ClientStatsContext(this, getStatsSnapshot(), getIOStatsSnapshot());
+        return new ClientStatsContext(this, getStatsSnapshot(), getIOStatsSnapshot(),
+                getAffinityStatsSnapshot());
     }
 
     Map<Long, Map<String, ClientStats>> getStatsSnapshot() {
@@ -873,6 +910,18 @@ class Distributer {
             retval.put(conn.connectionId(), cios);
         }
 
+        return retval;
+    }
+
+    Map<Integer, ClientAffinityStats> getAffinityStatsSnapshot()
+    {
+        Map<Integer, ClientAffinityStats> retval = new HashMap<Integer, ClientAffinityStats>();
+        // these get modified under this lock in queue()
+        synchronized(this) {
+            for (Entry<Integer, ClientAffinityStats> e : m_clientAffinityStats.entrySet()) {
+                retval.put(e.getKey(), (ClientAffinityStats)e.getValue().clone());
+            }
+        }
         return retval;
     }
 
