@@ -183,7 +183,13 @@ public class ClusterConfig
         boolean isValid = validate();
         if (isValid && origStartCount < m_hostCount && origStartCount > 0)
         {
-            if ((m_hostCount - origStartCount) % (m_replicationFactor + 1) != 0)
+            if ((m_hostCount - origStartCount) > m_replicationFactor + 1)
+            {
+                m_errorMsg = String.format("You can only add %d servers at a time for k=&d",
+                        m_replicationFactor + 1, m_replicationFactor);
+                return false;
+            }
+            else if ((m_hostCount - origStartCount) % (m_replicationFactor + 1) != 0)
             {
                 m_errorMsg = String.format("Must add %d servers at a time for k=%d",
                         m_replicationFactor + 1, m_replicationFactor);
