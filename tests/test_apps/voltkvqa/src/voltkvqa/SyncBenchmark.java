@@ -34,6 +34,8 @@
 
 package voltkvqa;
 
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -48,6 +50,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ClientAffinityStats;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
@@ -358,7 +361,16 @@ public class SyncBenchmark {
         System.out.println(HORIZONTAL_RULE);
         System.out.println(stats.latencyHistoReport());
 
-        // 3. Write stats to file if requested
+        // 3. Affinity stats
+        System.out.print("\n" + HORIZONTAL_RULE);
+        System.out.println(" Client Affinity Statistics");
+        System.out.print(HORIZONTAL_RULE + "\n");
+        Map<Integer, ClientAffinityStats> affinityStats = fullStatsContext.fetch().getAffinityStats();
+        for (Entry<Integer, ClientAffinityStats> e : affinityStats.entrySet()) {
+            System.out.println(e.getValue());
+        }
+
+        // 4. Write stats to file if requested
         client.writeSummaryCSV(stats, config.statsfile);
     }
 

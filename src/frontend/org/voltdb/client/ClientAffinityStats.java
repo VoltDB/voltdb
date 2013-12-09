@@ -101,7 +101,7 @@ public class ClientAffinityStats {
     public String toString()
     {
         String afdisplay = "Partition ID %d:  %d affinity writes, %d affinity reads, " +
-            "%d round-robin writes, %d round-robin reads\n";
+            "%d round-robin writes, %d round-robin reads";
         return String.format(afdisplay, m_partitionId, m_affinityWrites, m_affinityReads,
                 m_rrWrites, m_rrReads);
     }
