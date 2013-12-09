@@ -26,7 +26,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 import org.voltdb.VoltType;
-import org.voltdb.common.Constants;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 
@@ -186,7 +185,6 @@ public class FastDeserializer implements DataInput {
         if (len == VoltType.NULL_STRING_LENGTH) {
             return null;
         }
-        assert len >= 0;
 
         if (len < VoltType.NULL_STRING_LENGTH) {
             throw new IOException("String length is negative " + len);

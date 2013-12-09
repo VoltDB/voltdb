@@ -468,7 +468,7 @@ public class ParameterSet implements JSONString {
         byte nextTypeByte = in.get();
         if (nextTypeByte == ARRAY) {
             VoltType nextType = null;
-            byte etype = in.readByte();
+            byte etype = in.get();
             try {
                 nextType = VoltType.get(etype);
             } catch (AssertionError ae) {

@@ -1658,10 +1658,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     final ClientResponseImpl handleRead(ByteBuffer buf, ClientInputHandler handler, Connection ccxn) throws IOException {
         final long now = System.currentTimeMillis();
-        final FastDeserializer fds = new FastDeserializer(buf);
-        StoredProcedureInvocation task = null;
+        StoredProcedureInvocation task = new StoredProcedureInvocation();
         try {
-            task = fds.readObject(StoredProcedureInvocation.class);
+            task.initFromBuffer(buf);
         } catch (Exception ex) {
             return new ClientResponseImpl(
                     ClientResponseImpl.UNEXPECTED_FAILURE,
