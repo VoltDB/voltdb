@@ -17,18 +17,17 @@
 
 package org.voltdb;
 
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Date;
 
+import org.voltdb.common.Constants;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
-
-import com.google_voltpatches.common.base.Charsets;
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 
 /**
  * ParameterConverter provides a static helper to convert a deserialized
@@ -72,10 +71,6 @@ public class ParameterConverter {
             Object value,
             final Class<?> expectedClz)
     {
-        // skip this (used for sysprocs)
-        if (value instanceof SystemProcedureExecutionContext)
-            return true;
-
         if (expectedClz == long.class) {
             assert(value != null);
             assert(value.getClass() == Long.class);
@@ -97,9 +92,14 @@ public class ParameterConverter {
             assert(value.getClass() == Double.class);
         }
         else if (value != null) {
-            assert(value.getClass() == expectedClz);
+            Class<?> clz = value.getClass();
+            if (clz != expectedClz) {
+                // skip this without linking to it (used for sysprocs)
+                return expectedClz.getSimpleName().equals("SystemProcedureExecutionContext") &&
+                        expectedClz.isAssignableFrom(clz);
+            }
             if (expectedClz.isArray()) {
-                assert(value.getClass().getComponentType() == expectedClz.getComponentType());
+                assert(clz.getComponentType() == expectedClz.getComponentType());
             }
         }
         return true;
@@ -285,7 +285,7 @@ public class ParameterConverter {
             if (expectedClz == byte[].class) return param;
             // allow byte arrays to be passed into string parameters
             else if (expectedClz == String.class) {
-                String value = new String((byte[]) param, Charsets.UTF_8);
+                String value = new String((byte[]) param, Constants.UTF8ENCODING);
                 if (value.equals(VoltTable.CSV_NULL)) return nullValueForType(expectedClz);
                 else return value;
             }
@@ -299,9 +299,9 @@ public class ParameterConverter {
             return nullValueForType(expectedClz);
         }
         // these are used by system procedures and are ignored here
-        else if (param instanceof SystemProcedureExecutionContext) {
+        /*else if (param instanceof SystemProcedureExecutionContext) {
             return param;
-        }
+        }*/
 
         // make sure we get the array/scalar match
         if (expectedClz.isArray() != inputClz.isArray()) {
@@ -458,6 +458,13 @@ public class ParameterConverter {
             return param;
         }
 
+        // handle SystemProcedureExecutionContext without linking to it
+        if (expectedClz.getSimpleName().equals("SystemProcedureExecutionContext")) {
+            if (expectedClz.isAssignableFrom(inputClz)) {
+                return param;
+            }
+        }
+
         throw new VoltTypeException(
                 "tryToMakeCompatible: The provided value: (" + param.toString() + ") of type: " + inputClz.getName() +
                 " is not a match or is out of range for the target parameter type: " + expectedClz.getName());
@@ -492,4 +499,3 @@ public class ParameterConverter {
         }
     }
 }
-

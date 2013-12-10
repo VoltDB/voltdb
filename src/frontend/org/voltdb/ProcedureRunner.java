@@ -941,19 +941,12 @@ public class ProcedureRunner {
    }
 
    protected ClientResponseImpl getErrorResponse(byte status, String msg, SerializableException e) {
-
-       StringBuilder msgOut = new StringBuilder();
-       msgOut.append("VOLTDB ERROR: ");
-       msgOut.append(msg);
-
-       log.trace(msgOut);
-
        return new ClientResponseImpl(
                status,
                m_appStatusCode,
                m_appStatusString,
                new VoltTable[0],
-               msgOut.toString(), e);
+               msg);
    }
 
    /**

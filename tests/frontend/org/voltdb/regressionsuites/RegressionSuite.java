@@ -42,6 +42,8 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.ProcCallException;
 
+import com.google_voltpatches.common.net.HostAndPort;
+
 /**
  * Base class for a set of JUnit tests that perform regression tests
  * on a running VoltDB server. It is assumed that all tests will access
@@ -213,10 +215,11 @@ public class RegressionSuite extends TestCase {
         final Random r = new Random();
         final String listener = listeners.get(r.nextInt(listeners.size()));
         byte[] hashedPassword = ConnectionUtil.getHashedPassword(m_password);
+        HostAndPort hNp = HostAndPort.fromString(listener);
+        assert(hNp.hasPort());
         final SocketChannel channel = (SocketChannel)
             ConnectionUtil.getAuthenticatedConnection(
-                    listener,
-                    m_username, hashedPassword, port(0))[0];
+                    hNp.getHostText(), m_username, hashedPassword, hNp.getPort())[0];
         channel.configureBlocking(true);
         if (!noTearDown) {
             synchronized (m_clientChannels) {
