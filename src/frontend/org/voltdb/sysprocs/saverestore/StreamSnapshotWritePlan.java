@@ -255,8 +255,21 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         for (StreamSnapshotRequestConfig.Stream stream : streams) {
             // Use a tree map so that it's deterministic across nodes
             TreeMultimap<Long, Long> partitionStreamPairs = TreeMultimap.create(stream.streamPairs);
-            Entry<Long, Long> candidate = partitionStreamPairs.entries().iterator().next();
-            replicatedSrcToDst.put(candidate.getKey(), candidate.getValue());
+            /*
+             * If the partition is null this is a rejoin and we need to stream
+             * every replicated table several times to load each partition
+             */
+            if (stream.partition == null) {
+                for (Entry<Long, Long> candidate : partitionStreamPairs.entries()) {
+                    replicatedSrcToDst.put(candidate.getKey(), candidate.getValue());
+                }
+            } else {
+                /*
+                 * If this is a rebalance, we need to stream the replicated data exactly once per partition
+                 */
+                Entry<Long, Long> candidate = partitionStreamPairs.entries().iterator().next();
+                replicatedSrcToDst.put(candidate.getKey(), candidate.getValue());
+            }
         }
 
         return replicatedSrcToDst;
