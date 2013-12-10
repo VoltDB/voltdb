@@ -24,6 +24,7 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.planner.StmtTableScan;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.types.ExpressionType;
 
@@ -249,11 +250,16 @@ public class TupleValueExpression extends AbstractValueExpression {
     }
 
     @Override
-    protected void loadFromJSONObject(JSONObject obj) throws JSONException
+    protected void loadFromJSONObject(JSONObject obj, StmtTableScan tableScan) throws JSONException
     {
         m_columnIndex = obj.getInt(Members.COLUMN_IDX.name());
         if (obj.has(Members.TABLE_IDX.name())) {
             m_tableIdx = obj.getInt(Members.TABLE_IDX.name());
+        }
+        if (tableScan != null) {
+            m_tableAlias = tableScan.m_tableAlias;
+            m_tableName = tableScan.m_table.getTypeName();
+            m_columnName = tableScan.m_columnIndexToName.get(m_columnIndex);
         }
     }
 
@@ -326,6 +332,10 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     @Override
     public String explain(String impliedTableName) {
+        if (m_tableName == null) {
+            return impliedTableName;
+        }
+
         if (m_tableName.equals(impliedTableName)) {
             return m_columnName;
         } else {

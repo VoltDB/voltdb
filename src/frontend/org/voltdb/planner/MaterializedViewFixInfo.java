@@ -121,7 +121,7 @@ public class MaterializedViewFixInfo {
         if (complexGroupbyJson.length() > 0) {
             List<AbstractExpression> mvComplexGroupbyCols = null;
             try {
-                mvComplexGroupbyCols = AbstractExpression.fromJSONArrayString(complexGroupbyJson);
+                mvComplexGroupbyCols = AbstractExpression.fromJSONArrayString(complexGroupbyJson, null);
             } catch (JSONException e) {
                 e.printStackTrace();
             }

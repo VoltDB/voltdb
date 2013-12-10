@@ -329,12 +329,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
             StmtTableScan tableScan = m_parsedStmt.stmtCache.get(idx);
 
             try {
-                List<AbstractExpression> tmpList = AbstractExpression.fromJSONArrayString(exprsjson);
-                indexedExprs = new ArrayList<AbstractExpression>();
-                for (AbstractExpression expr: tmpList) {
-                    indexedExprs.add(expr.replaceTVEsWithAlias(tableScan));
-                }
-
+                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, tableScan);
             } catch (JSONException e) {
                 e.printStackTrace();
                 assert(false);

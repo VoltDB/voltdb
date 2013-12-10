@@ -1770,11 +1770,7 @@ public class DDLCompiler {
             if (groupbyExprs != null) {
                 StmtTableScan tableScan = StmtTableScan.getStmtTableScan(srcTable);
                 try {
-                    List<AbstractExpression> tmpList = AbstractExpression.fromJSONArrayString(expressionjson);
-                    indexedExprs = new ArrayList<AbstractExpression>();
-                    for (AbstractExpression expr: tmpList) {
-                        indexedExprs.add(expr.replaceTVEsWithAlias(tableScan));
-                    }
+                    indexedExprs = AbstractExpression.fromJSONArrayString(expressionjson, tableScan);
                 } catch (JSONException e) {
                     e.printStackTrace();
                     assert(false);

@@ -434,13 +434,8 @@ public abstract class CatalogUtil {
             } else {
                 List<AbstractExpression> indexedExprs = null;
                 try {
-                    List<AbstractExpression> tmpList = AbstractExpression.fromJSONArrayString(jsonstring);
-                    indexedExprs = new ArrayList<AbstractExpression>();
-                    for (AbstractExpression expr: tmpList) {
-                        indexedExprs.add(expr.replaceTVEsWithAlias(StmtTableScan.getStmtTableScan(catalog_tbl)));
-                    }
-
-
+                    indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring,
+                            StmtTableScan.getStmtTableScan(catalog_tbl));
                 } catch (JSONException e) {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
@@ -1676,7 +1671,7 @@ public abstract class CatalogUtil {
             indexSize = getSortedCatalogItems(index.getColumns(), "index").size();
         } else {
             try {
-                indexSize = AbstractExpression.fromJSONArrayString(jsonstring).size();
+                indexSize = AbstractExpression.fromJSONArrayString(jsonstring, null).size();
             } catch (JSONException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();

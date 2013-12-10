@@ -162,11 +162,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             }
         } else {
             try {
-                List<AbstractExpression> tmpList = AbstractExpression.fromJSONArrayString(exprsjson);
-                indexedExprs = new ArrayList<AbstractExpression>();
-                for (AbstractExpression expr: tmpList) {
-                    indexedExprs.add(expr.replaceTVEsWithAlias(m_tableScan));
-                }
+                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, m_tableScan);
             } catch (JSONException e) {
                 e.printStackTrace();
                 assert(false);
@@ -596,13 +592,13 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
         m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
         //load end_expression
-        m_endExpression = AbstractExpression.fromJSONChild(jobj, Members.END_EXPRESSION.name());
+        m_endExpression = AbstractExpression.fromJSONChild(jobj, Members.END_EXPRESSION.name(), m_tableScan);
         // load initial_expression
-        m_initialExpression = AbstractExpression.fromJSONChild(jobj, Members.INITIAL_EXPRESSION.name());
+        m_initialExpression = AbstractExpression.fromJSONChild(jobj, Members.INITIAL_EXPRESSION.name(), m_tableScan);
         //load searchkey_expressions
         AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
-                Members.SEARCHKEY_EXPRESSIONS.name());
-        m_skip_null_predicate = AbstractExpression.fromJSONChild(jobj, Members.SKIP_NULL_PREDICATE.name());
+                Members.SEARCHKEY_EXPRESSIONS.name(), m_tableScan);
+        m_skip_null_predicate = AbstractExpression.fromJSONChild(jobj, Members.SKIP_NULL_PREDICATE.name(), m_tableScan);
     }
 
     @Override
@@ -652,11 +648,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             else {
                 try {
                     List<AbstractExpression> indexExpressions =
-                        AbstractExpression.fromJSONArrayString(jsonExpr);
+                        AbstractExpression.fromJSONArrayString(jsonExpr, m_tableScan);
                     int ii = 0;
                     for (AbstractExpression ae : indexExpressions) {
-                        AbstractExpression newExpr = ae.replaceTVEsWithAlias(m_tableScan);
-                        asIndexed[ii++] = newExpr.explain(m_targetTableName);
+                        asIndexed[ii++] = ae.explain(m_targetTableName);
                     }
                 } catch (JSONException e) {
                     // If something unexpected went wrong,

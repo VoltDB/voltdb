@@ -1112,13 +1112,8 @@ public class PlanAssembler {
                 else {
 
                     try {
-                        List<AbstractExpression> tmpList = AbstractExpression.fromJSONArrayString(jsonExpr);
                         StmtTableScan tableScan = m_parsedSelect.stmtCache.get(m_parsedSelect.tableAliasIndexMap.get(fromTableAlias));
-                        indexExpressions = new ArrayList<AbstractExpression>();
-                        for (AbstractExpression expr: tmpList) {
-                            indexExpressions.add(expr.replaceTVEsWithAlias(tableScan));
-                        }
-
+                        indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, tableScan);
                     } catch (JSONException e) {
                         e.printStackTrace(); // danger will robinson
                         assert(false);
@@ -1552,7 +1547,6 @@ public class PlanAssembler {
             String fromTableAlias = groupBys.get(0).expression.findFromTableAlias();
             assert(fromTableAlias != null);
             int idx = m_parsedSelect.tableAliasIndexMap.get(fromTableAlias);
-            StmtTableScan fromTableScan = m_parsedSelect.stmtCache.get(idx);
 
             for (Index index : allIndexes) {
                 if (!IndexType.isScannable(index.getType())) {
@@ -1600,9 +1594,9 @@ public class PlanAssembler {
 
                     // either pure expression index or mix of expressions and simple columns
                     List<AbstractExpression> indexedExprs = null;
-
+                    StmtTableScan fromTableScan = m_parsedSelect.stmtCache.get(idx);
                     try {
-                        indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson);
+                        indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, fromTableScan);
                     } catch (JSONException e) {
                         e.printStackTrace();
                         assert(false);
@@ -1615,7 +1609,7 @@ public class PlanAssembler {
                         // ignore order of keys in GROUP BY expr
                         boolean foundMatch = false;
                         for (int j = 0; j < groupBys.size(); j++) {
-                            AbstractExpression indexExpr = indexedExprs.get(j).replaceTVEsWithAlias(fromTableScan);
+                            AbstractExpression indexExpr = indexedExprs.get(j);
                             if (groupBys.get(i).expression.bindingToIndexedExpression(indexExpr) != null ) {
                                 foundMatch = true;
                                 break;

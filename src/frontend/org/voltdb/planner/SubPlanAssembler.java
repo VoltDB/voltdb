@@ -255,12 +255,7 @@ public abstract class SubPlanAssembler {
             try {
                 // This MAY want to happen once when the plan is loaded from the catalog
                 // and cached in a sticky cached index-to-expressions map?
-                List<AbstractExpression> tmpList = AbstractExpression.fromJSONArrayString(exprsjson);
-                indexedExprs = new ArrayList<AbstractExpression>();
-                for (AbstractExpression expr: tmpList) {
-                    indexedExprs.add(expr.replaceTVEsWithAlias(tableScan));
-                }
-
+                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, tableScan);
                 keyComponentCount = indexedExprs.size();
             } catch (JSONException e) {
                 e.printStackTrace();
