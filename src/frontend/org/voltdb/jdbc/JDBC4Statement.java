@@ -259,8 +259,6 @@ public class JDBC4Statement implements java.sql.Statement
     }
 
     private ArrayList<VoltSQL> batch = null;
-    @SuppressWarnings("unused")
-    private ArrayList<String> warnings = null;
     protected boolean isClosed = false;
     private int fetchDirection = ResultSet.FETCH_FORWARD;
     private int fetchSize = 0;
@@ -353,7 +351,7 @@ public class JDBC4Statement implements java.sql.Statement
     {
         checkClosed();
         VoltSQL query = VoltSQL.parseSQL(sql);
-        if (query.hasParameters() || !query.isOfType(VoltSQL.TYPE_INSERT,VoltSQL.TYPE_UPDATE,VoltSQL.TYPE_DELETE))
+        if (!query.isOfType(VoltSQL.TYPE_INSERT,VoltSQL.TYPE_UPDATE,VoltSQL.TYPE_DELETE))
             throw SQLError.get(SQLError.ILLEGAL_STATEMENT, sql);
         this.addBatch(query);
     }
@@ -379,7 +377,6 @@ public class JDBC4Statement implements java.sql.Statement
     public void clearWarnings() throws SQLException
     {
         checkClosed();
-        warnings = null;
     }
 
     // Releases this Statement object's database and JDBC resources immediately instead of waiting for this to happen when it is automatically closed.
@@ -479,7 +476,7 @@ public class JDBC4Statement implements java.sql.Statement
     {
         checkClosed();
         VoltSQL query = VoltSQL.parseSQL(sql);
-        if (query.hasParameters() || !query.isOfType(VoltSQL.TYPE_SELECT))
+        if (!query.isOfType(VoltSQL.TYPE_SELECT))
             throw SQLError.get(SQLError.ILLEGAL_STATEMENT, sql);
         return this.executeQuery(query);
     }
@@ -496,7 +493,7 @@ public class JDBC4Statement implements java.sql.Statement
     {
         checkClosed();
         VoltSQL query = VoltSQL.parseSQL(sql);
-        if (query.hasParameters() || !query.isOfType(VoltSQL.TYPE_INSERT,VoltSQL.TYPE_UPDATE,VoltSQL.TYPE_DELETE))
+        if (!query.isOfType(VoltSQL.TYPE_INSERT,VoltSQL.TYPE_UPDATE,VoltSQL.TYPE_DELETE))
             throw SQLError.get(SQLError.ILLEGAL_STATEMENT, sql);
         return this.executeUpdate(query);
     }

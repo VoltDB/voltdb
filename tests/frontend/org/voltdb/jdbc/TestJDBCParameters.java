@@ -59,9 +59,9 @@ public class TestJDBCParameters {
         final String tablename;
         final String typedecl;
         final String[] good;
-        final String bad;
+        final String[] bad;
 
-        Data(String typename, int dimension, String[] good, String bad)
+        Data(String typename, int dimension, String[] good, String[] bad)
         {
             this.typename = typename;
             this.dimension = dimension;
@@ -69,7 +69,15 @@ public class TestJDBCParameters {
             for (int i = 0; i < this.good.length; ++i) {
                 this.good[i] = good[i];
             }
-            this.bad = bad;
+            if (bad != null) {
+                this.bad = new String[bad.length];
+                for (int i = 0; i < this.bad.length; ++i) {
+                    this.bad[i] = bad[i];
+                }
+            }
+            else {
+                this.bad = null;
+            }
             this.tablename = String.format("T_%s", this.typename);
             if (dimension > 0) {
                 this.typedecl = String.format("%s(%d)", this.typename, this.dimension);
@@ -81,15 +89,33 @@ public class TestJDBCParameters {
     };
 
     static Data[] data = new Data[] {
-            new Data("TINYINT", 0, new String[] {"11", "22", "33"}, "abc"),
-            new Data("SMALLINT", 0, new String[] {"-11", "-22", "-33"}, "3.2"),
-            new Data("INTEGER", 0, new String[] {"0", "1", "2"}, ""),
-            new Data("BIGINT", 0, new String[] {"9999999999999", "8888888888888", "7777777777777"}, "Jan 23 2011"),
-            new Data("FLOAT", 0, new String[] {"3.1415926", "2.81828", "-9.0"}, "x"),
-            new Data("DECIMAL", 0, new String[] {"1111.2222", "-3333.4444", "+5555.6666"}, ""),
-            new Data("VARCHAR", 100, new String[] {"abcdefg", "hijklmn", "opqrstu"}, ""),
-            new Data("VARBINARY", 100, new String[] {"deadbeef01234567", "aaaa", "12341234"}, "xxx"),
-            new Data("TIMESTAMP", 0, new String[] {"9999999999999", "0", "1"}, ""),
+            new Data("TINYINT", 0,
+                        new String[] {"11", "22", "33"},
+                        new String[] {"abc"}),
+            new Data("SMALLINT", 0,
+                        new String[] {"-11", "-22", "-33"},
+                        new String[] {"3.2", "blah"}),
+            new Data("INTEGER", 0,
+                        new String[] {"0", "1", "2"},
+                        new String[] {""}),
+            new Data("BIGINT", 0,
+                        new String[] {"9999999999999", "8888888888888", "7777777777777"},
+                        new String[] {"Jan 23 2011"}),
+            new Data("FLOAT", 0,
+                        new String[] {"3.1415926", "2.81828", "-9.0"},
+                        new String[] {"x"}),
+            new Data("DECIMAL", 0,
+                        new String[] {"1111.2222", "-3333.4444", "+5555.6666"},
+                        new String[] {""}),
+            new Data("VARCHAR", 100,
+                        new String[] {"abcdefg", "hijklmn", "opqrstu"},
+                        null),
+            new Data("VARBINARY", 100,
+                        new String[] {"deadbeef01234567", "aaaa", "12341234"},
+                        new String[] {"xxx"}),
+            new Data("TIMESTAMP", 0,
+                        new String[] {"9999999999999", "0", "1"},
+                        new String[] {""}),
     };
 
     @BeforeClass
@@ -186,15 +212,21 @@ public class TestJDBCParameters {
                                   d.typename, d.good[0], e.getMessage());
                 fail();
             }
-            try {
-                PreparedStatement sel = conn.prepareStatement(q);
-                sel.setString(1, d.bad);
-                sel.execute();
-                System.err.printf("ERROR(SELECT): %s value='%s': * should have failed *\n",
-                                  d.typename, d.good[0]);
-            }
-            catch(SQLException e) {
-                ;
+            if (d.bad != null) {
+                for (String value : d.bad) {
+                    boolean exceptionReceived = false;
+                    try {
+                        PreparedStatement sel = conn.prepareStatement(q);
+                        sel.setString(1, value);
+                        sel.execute();
+                        System.err.printf("ERROR(SELECT): %s value='%s': * should have failed *\n",
+                                          d.typename, value);
+                    }
+                    catch(SQLException e) {
+                        exceptionReceived = true;
+                    }
+                    assertTrue(exceptionReceived);
+                }
             }
         }
     }
