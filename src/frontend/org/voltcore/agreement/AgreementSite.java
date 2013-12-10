@@ -274,8 +274,34 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                         //Owner is what associates the session with a specific initiator
                         //only used for createSession
                         txnState.m_request.setOwner(txnState.initiatorHSId);
-                        m_lastUsedTxnId = txnState.txnId;
-                        m_server.prepRequest(txnState.m_request, txnState.txnId);
+
+                        /*
+                         * We may pull reads out of the priority queue outside the global
+                         * order. This means the txnid might be wrong so just sub
+                         * the last used txnid from a write that is guaranteed to have been globally
+                         * ordered properly
+                         *
+                         * It doesn't matter for the most part, but the ZK code we give the ID to expects to
+                         * it to always increase and if we pull reads in early that will not always be true.
+                         */
+                        long txnIdToUse = txnState.txnId;
+                        switch (txnState.m_request.type) {
+                            case OpCode.exists:
+                            case OpCode.getChildren:
+                            case OpCode.getChildren2:
+                            case OpCode.getData:
+                                //Don't use the txnid generated for the read since
+                                //it may not be globally ordered with writes
+                                txnIdToUse = m_lastUsedTxnId;
+                                break;
+                            default:
+                                //This is a write, stash away the txnid for use
+                                //for future reads
+                                m_lastUsedTxnId = txnState.txnId;
+                                break;
+                        }
+
+                        m_server.prepRequest(txnState.m_request, txnIdToUse);
                     }
                 }
                 else if (m_recoverBeforeTxn != null) {
