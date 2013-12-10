@@ -49,11 +49,9 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.JdbcDatabaseMetaDataGenerator;
-import org.voltdb.LegacyHashinator;
-import org.voltdb.TheHashinator;
-import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
+import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.iv2.MpInitiator;
 
 /**
@@ -107,7 +105,7 @@ class Distributer {
     private final Map<Integer, NodeConnection> m_hostIdToConnection = new HashMap<Integer, NodeConnection>();
     private final Map<String, Procedure> m_procedureInfo = new HashMap<String, Procedure>();
     //This is the instance of the Hashinator we picked from TOPO used only for client affinity.
-    private TheHashinator m_hashinator = null;
+    private HashinatorLite m_hashinator = null;
     //This is a global timeout that will be used if a per-procedure timeout is not provided with the procedure call.
     private final long m_procedureCallTimeoutMS;
     private static final long MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
@@ -593,7 +591,7 @@ class Distributer {
             boolean useClientAffinity) {
         m_useMultipleThreads = useMultipleThreads;
         m_network = new VoltNetworkPool(
-            m_useMultipleThreads ? Math.max(1, (int)(CoreUtils.availableProcessors() / 4) ) : 1, null);
+            m_useMultipleThreads ? Math.max(1, CoreUtils.availableProcessors() / 4 ) : 1, null);
         m_network.start();
         m_procedureCallTimeoutMS = procedureCallTimeoutMS;
         m_connectionResponseTimeoutMS = connectionResponseTimeoutMS;
@@ -907,14 +905,13 @@ class Distributer {
         //First table contains the description of partition ids master/slave relationships
         VoltTable vt = tables[0];
 
-        //In future let TOPO return cooked bytes when cooked and we use correct recipie
+        //In future let TOPO return cooked bytes when cooked and we use correct recipe
         boolean cooked = false;
         if (tables.length == 1) {
             //Just in case the new client connects to the old version of Volt that only returns 1 topology table
             // We're going to get the MPI back in this table, so subtract it out from the number of partitions.
             int numPartitions = vt.getRowCount() - 1;
-            m_hashinator = TheHashinator.getHashinator(LegacyHashinator.class,
-                    LegacyHashinator.getConfigureBytes(numPartitions), cooked);
+            m_hashinator = new HashinatorLite(numPartitions); // legacy only
         } else {
             //Second table contains the hash function
             boolean advanced = tables[1].advanceRow();
@@ -923,9 +920,10 @@ class Distributer {
                                    "performance will be lower because transactions can't be routed at this client");
                 return;
             }
-            m_hashinator = TheHashinator.getHashinator(
-                    HashinatorType.valueOf(tables[1].getString("HASHTYPE")).hashinatorClass,
-                    tables[1].getVarbinary("HASHCONFIG"), cooked);
+            m_hashinator = new HashinatorLite(
+                    HashinatorLiteType.valueOf(tables[1].getString("HASHTYPE")),
+                    tables[1].getVarbinary("HASHCONFIG"),
+                    cooked);
         }
         m_partitionMasters.clear();
         m_partitionReplicas.clear();
@@ -1003,9 +1001,9 @@ class Distributer {
         return m_hashinator.getHashedPartitionForParameter(typeValue, value);
     }
 
-    public HashinatorType getHashinatorType() {
+    public HashinatorLiteType getHashinatorType() {
         if (m_hashinator == null) {
-            return HashinatorType.LEGACY;
+            return HashinatorLiteType.LEGACY;
         }
         return m_hashinator.getConfigurationType();
     }
