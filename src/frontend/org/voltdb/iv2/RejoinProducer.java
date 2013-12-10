@@ -326,34 +326,53 @@ public class RejoinProducer extends JoinProducerBase {
             // have not finished on all nodes, let the snapshot completion
             // monitor tell the rejoin coordinator.
 
-            SnapshotCompletionEvent event = null;
-            // Block until the snapshot interest triggers.
-            try {
-                REJOINLOG.debug(m_whoami
-                        + "waiting on snapshot completion monitor.");
-                event = m_completionMonitorAwait.get();
-                m_completionAction.setSnapshotTxnId(event.multipartTxnId);
-                REJOINLOG.debug(m_whoami
-                        + "snapshot monitor completed. "
-                        + "Sending SNAPSHOT_FINISHED and Handing off to site.");
-                RejoinMessage snap_complete = new RejoinMessage(
-                        m_mailbox.getHSId(), Type.SNAPSHOT_FINISHED);
-                m_mailbox.send(m_coordinatorHsId, snap_complete);
+            final SiteTasker finishingTask = new SiteTasker() {
+                @Override
+                public void run(SiteProcedureConnection siteConnection) {
+                    throw new RuntimeException(
+                            "Unexpected execution of run method in rejoin producer.");
+                }
 
-            } catch (InterruptedException crashme) {
-                VoltDB.crashLocalVoltDB(
-                        "Interrupted awaiting snapshot completion.", true,
-                        crashme);
-            } catch (ExecutionException e) {
-                VoltDB.crashLocalVoltDB(
-                        "Unexpected exception awaiting snapshot completion.",
-                        true, e);
-            }
-            setJoinComplete(
-                    siteConnection,
-                    event.exportSequenceNumbers,
-                    true /* requireExistingSequenceNumbers */
+                @Override
+                public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog rejoinTaskLog) throws IOException {
+                    if (!m_completionMonitorAwait.isDone()) {
+                        m_taskQueue.offer(this);
+                    }
+                    SnapshotCompletionEvent event = null;
+                    // Block until the snapshot interest triggers.
+                    try {
+                        REJOINLOG.debug(m_whoami
+                                + "waiting on snapshot completion monitor.");
+                        event = m_completionMonitorAwait.get();
+                        m_completionAction.setSnapshotTxnId(event.multipartTxnId);
+                        REJOINLOG.debug(m_whoami
+                                + "snapshot monitor completed. "
+                                + "Sending SNAPSHOT_FINISHED and Handing off to site.");
+                        RejoinMessage snap_complete = new RejoinMessage(
+                                m_mailbox.getHSId(), Type.SNAPSHOT_FINISHED);
+                        m_mailbox.send(m_coordinatorHsId, snap_complete);
+
+                    } catch (InterruptedException crashme) {
+                        VoltDB.crashLocalVoltDB(
+                                "Interrupted awaiting snapshot completion.", true,
+                                crashme);
+                    } catch (ExecutionException e) {
+                        VoltDB.crashLocalVoltDB(
+                                "Unexpected exception awaiting snapshot completion.",
+                                true, e);
+                    }
+                    setJoinComplete(
+                            siteConnection,
+                            event.exportSequenceNumbers,
+                            true /* requireExistingSequenceNumbers */
                     );
+                }
+            };
+            try {
+                finishingTask.runForRejoin(siteConnection, null);
+            } catch (IOException e) {
+                VoltDB.crashLocalVoltDB("Unexpected IOException in rejoin", true, e);
+            }
         }
     }
 
@@ -404,35 +423,54 @@ public class RejoinProducer extends JoinProducerBase {
          * Don't notify the rejoin coordinator yet. The stream snapshot may
          * have not finished on all nodes, let the snapshot completion
          * monitor tell the rejoin coordinator.
+         *
+         * This used to block on the completion interest, but this raced
+         * with fragments from the MPI that needed dummy responses. If the fragments
+         * came after the EOF then they wouldn't receive dummy responses
+         * and then the MPI wouldn't invoke SnapshotSaveAPI.logParticipatingHostCount
          */
+        final SiteTasker finishingTask = new SiteTasker() {
 
-        // Block until the snapshot interest triggers.
-        // -- rtb: not sure this race can happen in the live rejoin case?
-        // Maybe with tiny data sets? I'm going to accept
-        // the simple and correct action of blocking until there
-        // is an indication that a non-blocking wait is necesary.
-        SnapshotCompletionEvent event = null;
+            @Override
+            public void run(SiteProcedureConnection siteConnection) {
+                throw new RuntimeException(
+                        "Unexpected execution of run method in rejoin producer.");
+            }
+
+            @Override
+            public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog rejoinTaskLog) throws IOException {
+                if (!m_completionMonitorAwait.isDone()) {
+                    m_taskQueue.offer(this);
+                }
+                SnapshotCompletionEvent event = null;
+                try {
+                    REJOINLOG.debug(m_whoami
+                            + "waiting on snapshot completion monitor.");
+                    event = m_completionMonitorAwait.get();
+                    m_completionAction.setSnapshotTxnId(event.multipartTxnId);
+                    REJOINLOG.debug(m_whoami + " monitor completed. Sending SNAPSHOT_FINISHED "
+                            + "and handing off to site.");
+                    RejoinMessage snap_complete = new RejoinMessage(
+                            m_mailbox.getHSId(), Type.SNAPSHOT_FINISHED);
+                    m_mailbox.send(m_coordinatorHsId, snap_complete);
+                } catch (InterruptedException crashme) {
+                    VoltDB.crashLocalVoltDB(
+                            "Interrupted awaiting snapshot completion.", true, crashme);
+                } catch (ExecutionException e) {
+                    VoltDB.crashLocalVoltDB(
+                            "Unexpected exception awaiting snapshot completion.", true,
+                            e);
+                }
+                setJoinComplete(
+                        siteConnection,
+                        event.exportSequenceNumbers,
+                        true /* requireExistingSequenceNumbers */);
+            }
+        };
         try {
-            REJOINLOG.debug(m_whoami
-                    + "waiting on snapshot completion monitor.");
-            event = m_completionMonitorAwait.get();
-            m_completionAction.setSnapshotTxnId(event.multipartTxnId);
-            REJOINLOG.debug(m_whoami + " monitor completed. Sending SNAPSHOT_FINISHED "
-                    + "and handing off to site.");
-            RejoinMessage snap_complete = new RejoinMessage(
-                    m_mailbox.getHSId(), Type.SNAPSHOT_FINISHED);
-            m_mailbox.send(m_coordinatorHsId, snap_complete);
-        } catch (InterruptedException crashme) {
-            VoltDB.crashLocalVoltDB(
-                    "Interrupted awaiting snapshot completion.", true, crashme);
-        } catch (ExecutionException e) {
-            VoltDB.crashLocalVoltDB(
-                    "Unexpected exception awaiting snapshot completion.", true,
-                    e);
+            finishingTask.runForRejoin(siteConnection, null);
+        } catch (IOException e) {
+            VoltDB.crashLocalVoltDB("Unexpected IOException in rejoin", true, e);
         }
-        setJoinComplete(
-                siteConnection,
-                event.exportSequenceNumbers,
-                true /* requireExistingSequenceNumbers */);
     }
 }
