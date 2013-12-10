@@ -18,6 +18,7 @@
 package org.voltdb.client;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -42,17 +43,23 @@ public class ClientStatsContext {
     Map<Long, Map<String, ClientStats>> m_current;
     Map<Long, ClientIOStats> m_baselineIO;
     Map<Long, ClientIOStats> m_currentIO;
+    Map<Integer, ClientAffinityStats> m_baselineAffinity;
+    Map<Integer, ClientAffinityStats> m_currentAffinity;
     long m_baselineTS;
     long m_currentTS;
 
     ClientStatsContext(Distributer distributor,
                        Map<Long, Map<String, ClientStats>> current,
-                       Map<Long, ClientIOStats> currentIO) {
+                       Map<Long, ClientIOStats> currentIO,
+                       Map<Integer, ClientAffinityStats> currentAffinity)
+    {
         m_distributor = distributor;
         m_baseline = new TreeMap<Long, Map<String, ClientStats>>();
         m_baselineIO = new TreeMap<Long, ClientIOStats>();
+        m_baselineAffinity = new HashMap<Integer, ClientAffinityStats>();
         m_current = current;
         m_currentIO = currentIO;
+        m_currentAffinity = currentAffinity;
         m_baselineTS = m_currentTS = System.currentTimeMillis();
     }
 
@@ -68,6 +75,7 @@ public class ClientStatsContext {
         m_current = m_distributor.getStatsSnapshot();
         m_currentIO = m_distributor.getIOStatsSnapshot();
         m_currentTS = System.currentTimeMillis();
+        m_currentAffinity = m_distributor.getAffinityStatsSnapshot();
         return this;
     }
 
@@ -80,14 +88,17 @@ public class ClientStatsContext {
      */
     public ClientStatsContext fetchAndResetBaseline() {
         fetch();
-        ClientStatsContext retval = new ClientStatsContext(m_distributor, m_current, m_currentIO);
+        ClientStatsContext retval = new ClientStatsContext(m_distributor, m_current, m_currentIO,
+                m_currentAffinity);
         retval.m_baseline = m_baseline;
         retval.m_baselineIO = m_baselineIO;
         retval.m_baselineTS = m_baselineTS;
+        retval.m_baselineAffinity = m_baselineAffinity;
         retval.m_currentTS = m_currentTS;
         m_baseline = m_current;
         m_baselineIO = m_currentIO;
         m_baselineTS = m_currentTS;
+        m_baselineAffinity = m_currentAffinity;
         return retval;
     }
 
@@ -190,6 +201,20 @@ public class ClientStatsContext {
             }
         }
 
+        return retval;
+    }
+
+    public Map<Integer, ClientAffinityStats> getAffinityStats()
+    {
+        Map<Integer, ClientAffinityStats> retval = new TreeMap<Integer, ClientAffinityStats>();
+        for (Entry<Integer, ClientAffinityStats> e : m_currentAffinity.entrySet()) {
+            if (m_baselineAffinity.containsKey(e.getKey())) {
+                retval.put(e.getKey(), ClientAffinityStats.diff(e.getValue(), m_baselineAffinity.get(e.getKey())));
+            }
+            else {
+                retval.put(e.getKey(), (ClientAffinityStats) e.getValue().clone());
+            }
+        }
         return retval;
     }
 
