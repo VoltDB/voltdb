@@ -94,7 +94,6 @@ public class SnapshotCompletionMonitor {
             newChildren.removeAll(m_lastKnownSnapshots);
             m_lastKnownSnapshots = children;
             for (String newSnapshot : newChildren) {
-                SNAP_LOG.info("TEMP MESSAGE SnapshotCompletionMonitor saw children change for " + newSnapshot);
                 String path = VoltZK.completed_snapshots + "/" + newSnapshot;
                 try {
                     byte data[] = m_zk.getData(path, new Watcher() {
@@ -153,11 +152,9 @@ public class SnapshotCompletionMonitor {
 
     private void processSnapshotData(byte data[]) throws Exception {
         if (data == null) {
-            SNAP_LOG.info("TEMP MESSAGE SnapshotCompletionMonitor saw null data");
             return;
         }
         JSONObject jsonObj = new JSONObject(new String(data, "UTF-8"));
-        SNAP_LOG.info("TEMP MESSAGE SnapshotCompletionMonitor saw " + jsonObj.toString(4));
         long txnId = jsonObj.getLong("txnId");
         int hostCount = jsonObj.getInt("hostCount");
         String path = jsonObj.getString("path");
@@ -169,7 +166,6 @@ public class SnapshotCompletionMonitor {
         String truncReqId = jsonObj.optString("truncReqId");
 
         if (hostCount == 0) {
-            SNAP_LOG.info("TEMP MESSAGE SnapshotCompletionMonitor saw snapshot completion");
             /*
              * Convert the JSON object containing the export sequence numbers for each
              * table and partition to a regular map
@@ -206,7 +202,6 @@ public class SnapshotCompletionMonitor {
                 }
             }
 
-            SNAP_LOG.info("TEMP MESSAGE SnapshotCompletionMonitor is invoking callbacks");
             Iterator<SnapshotCompletionInterest> iter = m_interests.iterator();
             while (iter.hasNext()) {
                 SnapshotCompletionInterest interest = iter.next();
