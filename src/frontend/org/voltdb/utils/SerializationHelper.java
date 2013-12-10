@@ -225,20 +225,11 @@ public class SerializationHelper {
             return;
         }
 
-        if (bytes.length > VoltType.MAX_VALUE_LENGTH) {
-            throw new IOException("Varbinary exceeds maximum length of "
-                                  + VoltType.MAX_VALUE_LENGTH + " bytes.");
-        }
-
         buf.putInt(bytes.length);
         buf.put(bytes);
     }
 
     public static void writeArray(byte[] values, ByteBuffer buf) throws IOException {
-        if (values.length > VoltType.MAX_VALUE_LENGTH) {
-            throw new IOException("Array exceeds maximum length of "
-                                  + VoltType.MAX_VALUE_LENGTH + " bytes");
-        }
         buf.putInt(values.length);
         buf.put(values);
     }

@@ -41,6 +41,7 @@ import org.voltdb.client.ClientConfigForTest;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.common.Constants;
 
 import com.google_voltpatches.common.net.HostAndPort;
 
@@ -216,10 +217,13 @@ public class RegressionSuite extends TestCase {
         final String listener = listeners.get(r.nextInt(listeners.size()));
         byte[] hashedPassword = ConnectionUtil.getHashedPassword(m_password);
         HostAndPort hNp = HostAndPort.fromString(listener);
-        assert(hNp.hasPort());
+        int port = Constants.DEFAULT_PORT;
+        if (hNp.hasPort()) {
+            port = hNp.getPort();
+        }
         final SocketChannel channel = (SocketChannel)
             ConnectionUtil.getAuthenticatedConnection(
-                    hNp.getHostText(), m_username, hashedPassword, hNp.getPort())[0];
+                    hNp.getHostText(), m_username, hashedPassword, port)[0];
         channel.configureBlocking(true);
         if (!noTearDown) {
             synchronized (m_clientChannels) {
