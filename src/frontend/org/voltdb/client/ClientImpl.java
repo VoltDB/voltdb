@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
-import org.voltdb.TheHashinator.HashinatorType;
+import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
@@ -249,7 +249,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             throw new java.io.InterruptedIOException("Interrupted while waiting for response");
         }
         if (cb.getResponse().getStatus() != ClientResponse.SUCCESS) {
-            throw new ProcCallException(cb.getResponse(), cb.getResponse().getStatusString(), cb.getResponse().getException());
+            throw new ProcCallException(cb.getResponse(), cb.getResponse().getStatusString(), null);
         }
         // cb.result() throws ProcCallException if procedure failed
         return cb.getResponse();
@@ -626,7 +626,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
 
     }
 
-    public HashinatorType getHashinatorType() {
+    public HashinatorLiteType getHashinatorType() {
         return m_distributer.getHashinatorType();
     }
 }
