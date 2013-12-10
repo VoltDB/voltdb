@@ -148,8 +148,6 @@ public class JDBC4Statement implements java.sql.Statement
 
             if (this.type == TYPE_EXEC)
                 return new VoltSQL(this.sql, this.parameterCount, this.type, params);
-            else if (this.parameterCount == 0)
-                return new VoltSQL(this.sql, 0, this.type);
             else
             {
                 Object[] paramsOut = new Object[params.length+1];
