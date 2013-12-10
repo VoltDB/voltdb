@@ -24,9 +24,10 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-import org.apache.jute_voltpatches.BinaryInputArchive;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.ParameterSet;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
@@ -296,6 +297,33 @@ public class FastSerializer implements DataOutput {
         }
         writeInt(bin.length);
         write(bin);
+    }
+
+    /**
+     * Write a table using it's ByteBuffer serialization code.
+     */
+    public void writeTable(VoltTable table) throws IOException {
+        int len = table.getSerializedSize();
+        growIfNeeded(len);
+        table.flattenToBuffer(buffer.b);
+    }
+
+    /**
+     * Write an SPI using it's ByteBuffer serialization code.
+     */
+    public void writeInvocation(StoredProcedureInvocation invocation) throws IOException {
+        int len = invocation.getSerializedSize();
+        growIfNeeded(len);
+        invocation.flattenToBuffer(buffer.b);
+    }
+
+    /**
+     * Write a ParameterSet using it's ByteBuffer serialization code.
+     */
+    public void writeParameterSet(ParameterSet params) throws IOException {
+        int len = params.getSerializedSize();
+        growIfNeeded(len);
+        params.flattenToBuffer(buffer.b);
     }
 
     // These writeArray() methods are tested in TestSQLTypesSuite.

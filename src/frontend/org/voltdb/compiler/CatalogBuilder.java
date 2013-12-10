@@ -48,7 +48,7 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
 import org.voltdb.ProcInfoData;
-import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.NotImplementedException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -339,7 +339,7 @@ public class CatalogBuilder {
             if (!compile(new VoltCompiler(), jarFile.getAbsolutePath())) {
                 return null;
             }
-            return CatalogUtil.toBytes(jarFile);
+            return MiscUtils.fileToBytes(jarFile);
         } catch (Exception e) {
             e.printStackTrace();
             return null;

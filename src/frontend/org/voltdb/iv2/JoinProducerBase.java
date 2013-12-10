@@ -71,6 +71,7 @@ public abstract class JoinProducerBase extends SiteTasker {
 
         protected void register()
         {
+            new VoltLogger("SNAPSHOT").info("TEMP MESSAGE " + m_whoami + "registering snapshot completion action");
             JOINLOG.debug(m_whoami + "registering snapshot completion action");
             VoltDB.instance().getSnapshotCompletionMonitor().addInterest(this);
         }

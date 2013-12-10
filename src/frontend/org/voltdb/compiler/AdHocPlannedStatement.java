@@ -23,7 +23,6 @@ import java.util.Arrays;
 
 import org.voltdb.ParameterSet;
 import org.voltdb.common.Constants;
-import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CorePlan;
 
@@ -147,8 +146,7 @@ public class AdHocPlannedStatement {
         buf.get(sql);
 
         // params
-        FastDeserializer fds = new FastDeserializer(buf);
-        ParameterSet parameterSet = ParameterSet.fromFastDeserializer(fds);
+        ParameterSet parameterSet = ParameterSet.fromByteBuffer(buf);
 
         return new AdHocPlannedStatement(sql, core, parameterSet, null, null, null);
     }

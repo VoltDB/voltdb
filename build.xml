@@ -129,6 +129,29 @@
     <fileset refid="voltpro.classpath"/>
 </path>
 
+<patternset id='junit.exclusions'>
+<!--Global exclude list for junit -->
+    <!-- Exclude nested classes -->
+    <exclude name="**/*$*.class"/>
+
+    <!-- Exclude quarantine -->
+    <exclude name="org/voltdb/quarantine/**/*.class"/>
+
+    <!-- Specifig exclude community tests -->
+    <exclude name="org/voltdb/regressionsuites/TestMaliciousClientSuite.class" /> <!-- fails legacy -->
+    <!-- Recorded as ENG-4423 -->
+    <exclude name="**/TestRejoinFuzz.class" />
+    <exclude name="**/TestRejoinFuzz2.class" />
+
+    <!-- Specific Excluded pro tests -->
+    <exclude name="**/TestCommandLogServer.class" />
+    <exclude name="**/TestCommandLog.class"/>
+    <exclude name="**/TestPauselessRejoinFuzz.class" /> <!-- fails legacy -->
+    <exclude name="**/TestExportBase.class"/>
+    <exclude name="org/voltdb/regressionsuites/TestIV2BlacklistSaveRestoreSysprocSuite.class" /> <!-- fails legacy -->
+
+</patternset>
+
 <patternset id='junit.regression.h1.path'>
     <!-- Standard junit fileset -->
     <include name='org/voltdb/regressionsuites/TestA*.class' />
@@ -148,9 +171,7 @@
     <include name='org/voltdb/regressionsuites/TestO*.class' />
     <include name='org/voltdb/regressionsuites/TestP*.class' />
     <!-- Exclude tests -->
-    <exclude name="org/voltdb/regressionsuites/**/*$*.class"/>
-    <exclude name="org/voltdb/regressionsuites/TestIV2BlacklistSaveRestoreSysprocSuite.class" />
-    <exclude name="org/voltdb/regressionsuites/TestMaliciousClientSuite.class" /> <!-- fails legacy -->
+    <patternset refid='junit.exclusions'/>
 </patternset>
 
 <patternset id='junit.regression.h2.path'>
@@ -166,7 +187,7 @@
     <include name='org/voltdb/regressionsuites/TestY*.class' />
     <include name='org/voltdb/regressionsuites/TestZ*.class' />
     <!-- Exclude tests -->
-    <exclude name="org/voltdb/regressionsuites/**/*$*.class"/>
+    <patternset refid='junit.exclusions'/>
 </patternset>
 
 <patternset id='junit.all.path'>
@@ -174,19 +195,8 @@
     <include name='org/hsqldb_voltpatches/**/Test*.class'/>
     <include name='org/voltcore/**/Test*.class' />
     <include name='org/voltdb/**/Test*.class'/>
-
-    <!-- Exclude nested classes -->
-    <exclude name="**/*$*.class"/>
-    <exclude name="org/voltdb/quarantine/**/*.class"/>
-    <exclude name="**/TestExportBase.class"/>
-    <!-- Excluded pro tests -->
-    <exclude name="**/TestCommandLogServer.class" />
-    <exclude name="**/TestCommandLog.class"/>
-    <exclude name="**/TestPauselessRejoinFuzz.class" /> <!-- fails legacy -->
-    <!-- Exclude community tests -->
-    <!-- Recorded as ENG-4423 -->
-    <exclude name="**/TestRejoinFuzz.class" />
-    <exclude name="**/TestRejoinFuzz2.class" />
+    <!-- Exclude tests -->
+    <patternset refid="junit.exclusions"/>
 </patternset>
 
 <patternset id='junit.exclude.regression.path'>
