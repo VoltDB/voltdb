@@ -23,10 +23,15 @@
 
 package org.voltdb.jdbc;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 
 import org.junit.AfterClass;
@@ -39,6 +44,8 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
 
 public class TestJDBCParameters {
+    private static final String TEST_XML = "jdbcparameterstest.xml";
+    private static final String TEST_JAR = "jdbcparameterstest.jar";
     static String testjar;
     static ServerThread server;
     static Connection conn;
@@ -51,15 +58,18 @@ public class TestJDBCParameters {
         final int dimension;
         final String tablename;
         final String typedecl;
-        final String sgood;
-        final String sbad;
+        final String[] good;
+        final String bad;
 
-        Data(String typename, int dimension, String sgood, String sbad)
+        Data(String typename, int dimension, String[] good, String bad)
         {
             this.typename = typename;
             this.dimension = dimension;
-            this.sgood = sgood;
-            this.sbad = sbad;
+            this.good = new String[good.length];
+            for (int i = 0; i < this.good.length; ++i) {
+                this.good[i] = good[i];
+            }
+            this.bad = bad;
             this.tablename = String.format("T_%s", this.typename);
             if (dimension > 0) {
                 this.typedecl = String.format("%s(%d)", this.typename, this.dimension);
@@ -71,15 +81,15 @@ public class TestJDBCParameters {
     };
 
     static Data[] data = new Data[] {
-            new Data("TINYINT", 0, "11", "abc"),
-            new Data("SMALLINT", 0, "-11", "3.2"),
-            new Data("INTEGER", 0, "0", ""),
-            new Data("BIGINT", 0, "9999999999999", "Jan 23 2011"),
-            new Data("FLOAT", 0, "3.1415926", "x"),
-            new Data("DECIMAL", 0, "", ""),
-            new Data("VARCHAR", 100, "", ""),
-            //new Data("VARBINARY", 100, "", ""),
-            new Data("TIMESTAMP", 0, "", ""),
+            new Data("TINYINT", 0, new String[] {"11", "22", "33"}, "abc"),
+            new Data("SMALLINT", 0, new String[] {"-11", "-22", "-33"}, "3.2"),
+            new Data("INTEGER", 0, new String[] {"0", "1", "2"}, ""),
+            new Data("BIGINT", 0, new String[] {"9999999999999", "8888888888888", "7777777777777"}, "Jan 23 2011"),
+            new Data("FLOAT", 0, new String[] {"3.1415926", "2.81828", "-9.0"}, "x"),
+            new Data("DECIMAL", 0, new String[] {"1111.2222", "-3333.4444", "+5555.6666"}, ""),
+            new Data("VARCHAR", 100, new String[] {"abcdefg", "hijklmn", "opqrstu"}, ""),
+            new Data("VARBINARY", 100, new String[] {"deadbeef01234567", "aaaa", "12341234"}, "xxx"),
+            new Data("TIMESTAMP", 0, new String[] {"9999999999999", "0", "1"}, ""),
     };
 
     @BeforeClass
@@ -87,19 +97,39 @@ public class TestJDBCParameters {
         // Add one T_<type> table for each data type.
         String ddl = "";
         for (Data d : data) {
-            ddl += String.format("CREATE TABLE %s(ID %s NOT NULL, S1 VARCHAR(255), PRIMARY KEY(ID)); ",
+            ddl += String.format("CREATE TABLE %s(ID %s NOT NULL, VALUE VARCHAR(255)); ",
                                  d.tablename, d.typedecl);
         }
 
         pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
-        boolean success = pb.compile(Configuration.getPathToCatalogForTest("jdbcparameterstest.jar"), 3, 1, 0);
+        boolean success = pb.compile(Configuration.getPathToCatalogForTest(TEST_JAR), 3, 1, 0);
         assert(success);
-        MiscUtils.copyFile(pb.getPathToDeployment(), Configuration.getPathToCatalogForTest("jdbcparameterstest.xml"));
-        testjar = Configuration.getPathToCatalogForTest("jdbcparameterstest.jar");
+        MiscUtils.copyFile(pb.getPathToDeployment(), Configuration.getPathToCatalogForTest(TEST_XML));
+        testjar = Configuration.getPathToCatalogForTest(TEST_JAR);
 
         // Set up ServerThread and Connection
         startServer();
+
+        // Populate tables.
+        for (Data d : data) {
+            String q = String.format("insert into %s values(?, ?)", d.tablename);
+            for (String id : d.good) {
+                try {
+                    PreparedStatement sel = conn.prepareStatement(q);
+                        sel.setString(1, id);
+                        sel.setString(2, String.format("VALUE:%s:%s", d.tablename, id));
+                        sel.execute();
+                        int count = sel.getUpdateCount();
+                        assertTrue(count==1);
+                }
+                catch(SQLException e) {
+                    System.err.printf("ERROR(INSERT): %s value='%s': %s\n",
+                                      d.typename, d.good[0], e.getMessage());
+                    fail();
+                }
+            }
+        }
     }
 
     @AfterClass
@@ -139,10 +169,33 @@ public class TestJDBCParameters {
     public void testSetString() throws Exception
     {
         for (Data d : data) {
-            String q = String.format("select * from %s where id=?", d.tablename);
-            PreparedStatement sel = conn.prepareStatement(q);
-            sel.setString(1, d.sgood);
-            sel.execute();
+            String q = String.format("select * from %s where id != ?", d.tablename);
+            try {
+                PreparedStatement sel = conn.prepareStatement(q);
+                sel.setString(1, d.good[0]);
+                sel.execute();
+                ResultSet rs = sel.getResultSet();
+                int rowCount = 0;
+                while (rs.next()) {
+                    rowCount++;
+                }
+                assertEquals(d.good.length-1, rowCount);
+            }
+            catch(SQLException e) {
+                System.err.printf("ERROR(SELECT): %s value='%s': %s\n",
+                                  d.typename, d.good[0], e.getMessage());
+                fail();
+            }
+            try {
+                PreparedStatement sel = conn.prepareStatement(q);
+                sel.setString(1, d.bad);
+                sel.execute();
+                System.err.printf("ERROR(SELECT): %s value='%s': * should have failed *\n",
+                                  d.typename, d.good[0]);
+            }
+            catch(SQLException e) {
+                ;
+            }
         }
     }
 }
