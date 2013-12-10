@@ -40,7 +40,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.export.ExportManager;
-import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
@@ -441,17 +440,16 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
             resultTablesBuffer.flip();
 
-            final FastDeserializer ds = new FastDeserializer(resultTablesBuffer);
             // check if anything was changed
-            final boolean dirty = ds.readBoolean();
+            final boolean dirty = resultTablesBuffer.get() > 0;
             if (dirty)
                 m_dirty = true;
 
             for (int ii = 0; ii < tables.length; ii++) {
-                final int dependencyCount = ds.readInt(); // ignore the table count
+                final int dependencyCount = resultTablesBuffer.getInt(); // ignore the table count
                 assert(dependencyCount == 1); //Expect one dependency generated per plan fragment
-                ds.readInt(); // ignore the dependency ID
-                tables[ii] = (VoltTable) ds.readObject(tables[ii], null);
+                resultTablesBuffer.getInt(); // ignore the dependency ID
+                tables[ii] = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(resultTablesBuffer);
             }
         }
 
@@ -786,7 +784,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     fser.write((ByteBuffer) parameterSets[i]);
                 }
                 else {
-                    ((ParameterSet) parameterSets[i]).writeExternal(fser);
+                    ParameterSet pset = (ParameterSet) parameterSets[i];
+                    ByteBuffer buf = ByteBuffer.allocate(pset.getSerializedSize());
+                    pset.flattenToBuffer(buf);
+                    buf.flip();
+                    fser.write(buf);
                 }
             }
         } catch (final IOException exception) {
@@ -1006,10 +1008,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 final ByteBuffer messageBuffer = readMessage();
                 if (messageBuffer == null) return null;
 
-                final FastDeserializer fds = new FastDeserializer(messageBuffer);
                 final VoltTable results[] = new VoltTable[1];
-                final VoltTable resultTable = PrivateVoltTableFactory.createUninitializedVoltTable();
-                results[0] = (VoltTable)fds.readObject(resultTable, this);
+                results[0] = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(messageBuffer);
                 return results;
             }
         } catch (final IOException e) {
@@ -1371,21 +1371,16 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     public int hashinate(Object value, HashinatorConfig config)
     {
         ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(value);
-
-        final FastSerializer fser = new FastSerializer();
-        try {
-            parameterSet.writeExternal(fser);
-        } catch (final IOException exception) {
-            throw new RuntimeException(exception);
-        }
+        parameterSet.getSerializedSize(); // in case this memoizes stuff
 
         m_data.clear();
         m_data.putInt(Commands.Hashinate.m_id);
         m_data.putInt(config.type.typeId());
         m_data.putInt(config.configBytes.length);
         m_data.put(config.configBytes);
-        m_data.put(fser.getBuffer());
         try {
+            parameterSet.flattenToBuffer(m_data);
+
             m_data.flip();
             m_connection.write();
 

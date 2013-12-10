@@ -46,6 +46,7 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * A subclass of VoltProjectBuilder that already knows about all of the
@@ -178,7 +179,7 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
         assert(status);
 
         // read in the catalog
-        byte[] bytes = CatalogUtil.toBytes(new File(catalogJar));
+        byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
         String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
         assert(serializedCatalog != null);
 

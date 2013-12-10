@@ -183,7 +183,11 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
         container.b.position(0);
 
         FastSerializer schemaSerializer = new FastSerializer();
-        schemaTable.writeExternal(schemaSerializer);
+        int schemaTableLen = schemaTable.getSerializedSize();
+        ByteBuffer serializedSchemaTable = ByteBuffer.allocate(schemaTableLen);
+        schemaTable.flattenToBuffer(serializedSchemaTable);
+        serializedSchemaTable.flip();
+        schemaSerializer.write(serializedSchemaTable);
         final BBContainer schemaContainer = schemaSerializer.getBBContainer();
         schemaContainer.b.limit(schemaContainer.b.limit() - 4);//Don't want the row count
         schemaContainer.b.position(schemaContainer.b.position() + 4);//Don't want total table length

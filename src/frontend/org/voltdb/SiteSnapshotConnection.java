@@ -35,7 +35,6 @@ public interface SiteSnapshotConnection
             Deque<SnapshotTableTask> tasks,
             List<SnapshotDataTarget> targets,
             long txnId,
-            int numLiveHosts,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers);
 
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException;
