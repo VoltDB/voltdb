@@ -42,7 +42,7 @@ CTX = BuildContext(sys.argv)
 #  specific targets
 CTX.CPPFLAGS += """-Wall -Wextra -Werror -Woverloaded-virtual
             -Wpointer-arith -Wcast-qual -Wwrite-strings
-            -Winit-self -Wno-sign-compare -Wno-unused-parameter -Wno-unused-private-field
+            -Winit-self -Wno-sign-compare -Wno-unused-parameter
             -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK
             -fno-omit-frame-pointer
             -fvisibility=default
@@ -130,7 +130,7 @@ CTX.JNIBINFLAGS += " " + libpaths
 CTX.JNIBINFLAGS += " -ljava -ljvm -lverify"
 
 if CTX.PLATFORM == "Darwin":
-    CTX.CPPFLAGS += " -DMACOSX -arch x86_64"
+    CTX.CPPFLAGS += " -DMACOSX -arch x86_64 -Wno-unused-private-field"
     CTX.JNIEXT = "jnilib"
     CTX.JNILIBFLAGS = " -bundle"
     CTX.JNIBINFLAGS = " -framework JavaVM,1.7"
