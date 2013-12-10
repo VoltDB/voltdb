@@ -17,7 +17,9 @@
 
 package org.voltdb.planner;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.SchemaColumn;
@@ -34,4 +36,6 @@ public class StmtTableScan {
     public String m_tableAlias = null;
     // Store a table-hashed list of the columns actually used by this statement.
     public HashSet<SchemaColumn> m_scanColumns = null ;
+
+    public Map<Integer, String> m_columnIndexToName = new HashMap<Integer, String>();
 }

@@ -30,6 +30,7 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
+import org.voltdb.planner.StmtTableScan;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -640,6 +641,62 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
         return this;
     }
+
+    /**
+     * It is expected called after function fromJSONString, constructing an expression from json.
+     * For TVEs, it only serialized column index and table index. In order to match expression,
+     * there needs more information to revert back the table name, table alisa and column name.
+     * @param tableScan
+     * @return
+     */
+    public AbstractExpression replaceTVEsWithAlias(StmtTableScan tableScan) {
+        if (this instanceof TupleValueExpression) {
+            TupleValueExpression tve = (TupleValueExpression) this;
+            if (tve.m_tableName == null) {
+                tve.m_tableName = tableScan.m_table.getTypeName();
+            }
+            if (tve.m_tableAlias == null) {
+                tve.m_tableAlias = tableScan.m_tableAlias;
+            }
+            if (tve.m_columnName == null) {
+                assert(tve.m_columnIndex >= 0);
+                tve.m_columnName = tableScan.m_columnIndexToName.get(tve.m_columnIndex);
+            }
+            return this;
+        }
+
+        AbstractExpression lnode = null, rnode = null;
+        ArrayList<AbstractExpression> newArgs = null;
+        if (m_left != null) {
+            lnode = m_left.replaceTVEsWithAlias(tableScan);
+        }
+        if (m_right != null) {
+            rnode = m_right.replaceTVEsWithAlias(tableScan);
+        }
+
+        boolean changed = false;
+        if (m_args != null) {
+            newArgs = new ArrayList<AbstractExpression>();
+            for (AbstractExpression expr: m_args) {
+                AbstractExpression ex = expr.replaceTVEsWithAlias(tableScan);
+                newArgs.add(ex);
+                if (ex != expr) {
+                    changed = true;
+                }
+            }
+        }
+
+        if (m_left != lnode || m_right != rnode || changed) {
+            AbstractExpression resExpr = (AbstractExpression) this.clone();
+            resExpr.setLeft(lnode);
+            resExpr.setRight(rnode);
+            resExpr.setArgs(newArgs);
+            return resExpr;
+        }
+
+        return this;
+    }
+
 
     public ArrayList<AbstractExpression> findBaseTVEs() {
         return findAllSubexpressionsOfType(ExpressionType.VALUE_TUPLE);

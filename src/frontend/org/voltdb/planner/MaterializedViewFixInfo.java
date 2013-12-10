@@ -112,7 +112,7 @@ public class MaterializedViewFixInfo {
             return false;
         }
 
-        String partitionColName = partitionCol.getName();
+        int partitionColIndex = partitionCol.getIndex();
         MaterializedViewInfo mvInfo = srcTable.getViews().get(mvTableName);
 
         int numOfGroupByColumns;
@@ -130,7 +130,7 @@ public class MaterializedViewFixInfo {
             for (AbstractExpression expr: mvComplexGroupbyCols) {
                 if (expr instanceof TupleValueExpression) {
                     TupleValueExpression tve = (TupleValueExpression) expr;
-                    if (tve.getColumnName().equals(partitionColName)) {
+                    if (tve.getColumnIndex() == partitionColIndex) {
                         // If group by columns contain partition column from source table.
                         // Then, query on MV table will have duplicates from each partition.
                         // There is no need to fix this case, so just return.
@@ -143,7 +143,7 @@ public class MaterializedViewFixInfo {
             numOfGroupByColumns = mvSimpleGroupbyCols.size();
 
             for (ColumnRef colRef: mvSimpleGroupbyCols) {
-                if (colRef.getColumn().getName().equals(partitionColName)) {
+                if (colRef.getColumn().getIndex() == partitionColIndex) {
                     // If group by columns contain partition column from source table.
                     // Then, query on MV table will have duplicates from each partition.
                     // There is no need to fix this case, so just return.

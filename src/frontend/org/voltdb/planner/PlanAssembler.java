@@ -1540,6 +1540,19 @@ public class PlanAssembler {
             Table targetTable = m_catalogDb.getTables().get(((SeqScanPlanNode)root).getTargetTableName());
             CatalogMap<Index> allIndexes = targetTable.getIndexes();
             ArrayList<ParsedColInfo> groupBys = m_parsedSelect.groupByColumns;
+            List<AbstractExpression> tves = groupBys.get(0).expression.findBaseTVEs();
+            String fromTable = null;
+            for (AbstractExpression expr: tves) {
+                String newTableAlias = ((TupleValueExpression) expr).getTableAlias();
+                if (fromTable == null) {
+                    fromTable = newTableAlias;
+                } else if (! fromTable.equals(newTableAlias)) {
+                    // Group by TVEs from different tables can not use any index.
+                    return root;
+                }
+            }
+
+            assert(fromTable != null);
 
             for (Index index : allIndexes) {
                 if (!IndexType.isScannable(index.getType())) {
@@ -1553,12 +1566,19 @@ public class PlanAssembler {
                     if (groupBys.size() > indexedColRefs.size()) {
                         continue;
                     }
+
                     for (int i = 0; i < groupBys.size(); i++) {
                         // don't compare column idx here, because resolveColumnIndex is not yet called
-                        if (groupBys.get(i).expression.getExpressionType() != ExpressionType.VALUE_TUPLE) {
+                        AbstractExpression expr = groupBys.get(i).expression;
+                        if (expr.getExpressionType() != ExpressionType.VALUE_TUPLE) {
                             replacable = false;
                             break;
                         }
+                        if (!fromTable.equals(((TupleValueExpression)expr).getTableAlias())) {
+                            replacable = false;
+                            break;
+                        }
+
                         // ignore order of keys in GROUP BY expr
                         boolean foundMatch = false;
                         for (int j = 0; j < groupBys.size(); j++) {
@@ -1577,8 +1597,12 @@ public class PlanAssembler {
                         return indexScanNode;
                     }
                 } else {
+                    int idx = m_parsedSelect.tableAliasIndexMap.get(fromTable);
+                    StmtTableScan fromTableScan = m_parsedSelect.stmtCache.get(idx);
+
                     // either pure expression index or mix of expressions and simple columns
                     List<AbstractExpression> indexedExprs = null;
+
                     try {
                         indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson);
                     } catch (JSONException e) {
@@ -1593,7 +1617,8 @@ public class PlanAssembler {
                         // ignore order of keys in GROUP BY expr
                         boolean foundMatch = false;
                         for (int j = 0; j < groupBys.size(); j++) {
-                            if (groupBys.get(i).expression.equals(indexedExprs.get(j))) {
+                            AbstractExpression indexExpr = indexedExprs.get(j).replaceTVEsWithAlias(fromTableScan);
+                            if (groupBys.get(i).expression.bindingToIndexedExpression(indexExpr) != null ) {
                                 foundMatch = true;
                                 break;
                             }

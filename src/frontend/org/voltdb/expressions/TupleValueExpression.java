@@ -34,9 +34,6 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     public enum Members {
         COLUMN_IDX,
-        TABLE_NAME,
-        TABLE_ALIAS,
-        COLUMN_NAME,
         TABLE_IDX,  // used for JOIN queries only, 0 for outer table, 1 for inner table
     }
 
@@ -228,6 +225,39 @@ public class TupleValueExpression extends AbstractValueExpression {
         return true;
     }
 
+    public boolean equalsWithTableAlias(Object obj, String tableAlias) {
+        if (obj instanceof TupleValueExpression == false) {
+            return false;
+        }
+        TupleValueExpression expr = (TupleValueExpression) obj;
+
+        if ((m_tableName == null) != (expr.m_tableName == null)) {
+            return false;
+        }
+        if ((m_columnName == null) != (expr.m_columnName == null)) {
+            return false;
+        }
+        if (m_tableName != null) { // Implying both sides non-null
+            if (m_tableName.equals(expr.m_tableName) == false) {
+                return false;
+            }
+        }
+        if (m_tableAlias != null) {
+            // Implying both sides non-null
+            // If one of the table aliases is NULL it is considered to be a wild card
+            // matching any alias.
+            if (m_tableAlias.equals(tableAlias) == false) {
+                return false;
+            }
+        }
+        if (m_columnName != null) { // Implying both sides non-null
+            if (m_columnName.equals(expr.m_columnName) == false) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     @Override
     public int hashCode() {
         // based on implementation of equals
@@ -246,15 +276,8 @@ public class TupleValueExpression extends AbstractValueExpression {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.key(Members.COLUMN_IDX.name()).value(m_columnIndex);
-        stringer.key(Members.TABLE_NAME.name()).value(m_tableName);
-        stringer.key(Members.TABLE_ALIAS.name()).value(m_tableAlias);
-        // Column name is not required in the EE but testing showed that it is
-        // needed to support type resolution of indexed expressions in the planner
-        // after they get round-tripped through the catalog's index definition.
-        stringer.key(Members.COLUMN_NAME.name()).value(m_columnName);
         if (m_tableIdx > 0) {
             stringer.key(Members.TABLE_IDX.name()).value(m_tableIdx);
-            //System.out.println("TVE: toJSONString(), tableIdx = " + m_tableIdx);
         }
     }
 
@@ -262,12 +285,8 @@ public class TupleValueExpression extends AbstractValueExpression {
     protected void loadFromJSONObject(JSONObject obj) throws JSONException
     {
         m_columnIndex = obj.getInt(Members.COLUMN_IDX.name());
-        m_tableName = obj.getString(Members.TABLE_NAME.name());
-        m_tableAlias = obj.getString(Members.TABLE_ALIAS.name());
-        m_columnName = obj.getString(Members.COLUMN_NAME.name());
         if (obj.has(Members.TABLE_IDX.name())) {
             m_tableIdx = obj.getInt(Members.TABLE_IDX.name());
-            //System.out.println("TVE: loadFromJSONObject(), tableIdx = " + m_tableIdx);
         }
     }
 
