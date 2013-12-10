@@ -249,7 +249,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             throw new java.io.InterruptedIOException("Interrupted while waiting for response");
         }
         if (cb.getResponse().getStatus() != ClientResponse.SUCCESS) {
-            throw new ProcCallException(cb.getResponse(), cb.getResponse().getStatusString(), null);
+            throw new ProcCallException(cb.getResponse(), cb.getResponse().getStatusString(), cb.getResponse().getException());
         }
         // cb.result() throws ProcCallException if procedure failed
         return cb.getResponse();
