@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.SchemaColumn;
 
@@ -38,4 +39,17 @@ public class StmtTableScan {
     public HashSet<SchemaColumn> m_scanColumns = null ;
 
     public Map<Integer, String> m_columnIndexToName = new HashMap<Integer, String>();
+
+    public static StmtTableScan getStmtTableScan (Table table) {
+        assert(table != null);
+        StmtTableScan tableScan = new StmtTableScan();
+        tableScan.m_table = table;
+        tableScan.m_tableAlias = table.getTypeName();
+
+        for (Column col: table.getColumns()) {
+            tableScan.m_columnIndexToName.put(col.getIndex(), col.getTypeName());
+        }
+
+        return tableScan;
+    }
 }

@@ -651,18 +651,21 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      */
     public AbstractExpression replaceTVEsWithAlias(StmtTableScan tableScan) {
         if (this instanceof TupleValueExpression) {
+            assert(tableScan != null);
+            // As TVE is loaded
             TupleValueExpression tve = (TupleValueExpression) this;
-            if (tve.m_tableName == null) {
-                tve.m_tableName = tableScan.m_table.getTypeName();
-            }
-            if (tve.m_tableAlias == null) {
-                tve.m_tableAlias = tableScan.m_tableAlias;
-            }
-            if (tve.m_columnName == null) {
-                assert(tve.m_columnIndex >= 0);
-                tve.m_columnName = tableScan.m_columnIndexToName.get(tve.m_columnIndex);
-            }
-            return this;
+            String tableName = tableScan.m_table.getTypeName();
+            String columnName = tableScan.m_columnIndexToName.get(tve.m_columnIndex);
+
+            TupleValueExpression newTVE = new TupleValueExpression(tableName, tableScan.m_tableAlias,
+                    columnName, columnName, tve.m_columnIndex);
+
+            // Json loaded TVE expression does not contain value type and its size.
+            // Should get this information from its schema.
+            newTVE.setValueType(tve.getValueType());
+            newTVE.setValueSize(tve.getValueSize());
+
+            return newTVE;
         }
 
         AbstractExpression lnode = null, rnode = null;
@@ -695,6 +698,31 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         }
 
         return this;
+    }
+
+
+    public String findFromTableAlias() {
+        if (this instanceof TupleValueExpression) {
+            return ((TupleValueExpression) this).getTableAlias();
+        }
+        String tableAlias = null;
+        if (m_left != null) {
+            tableAlias = m_left.findFromTableAlias();
+        }
+        if (tableAlias != null) return tableAlias;
+
+        if (m_right != null) {
+            tableAlias = m_right.findFromTableAlias();
+        }
+        if (tableAlias != null) return tableAlias;
+
+        if (m_args != null) {
+            for (AbstractExpression expr: m_args) {
+                tableAlias = expr.findFromTableAlias();
+                if (tableAlias != null) return tableAlias;
+            }
+        }
+        return tableAlias;
     }
 
 

@@ -255,10 +255,12 @@ public abstract class SubPlanAssembler {
             try {
                 // This MAY want to happen once when the plan is loaded from the catalog
                 // and cached in a sticky cached index-to-expressions map?
-                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson);
-                for (AbstractExpression expr : indexedExprs) {
-                    expr = expr.replaceTVEsWithAlias(tableScan);
+                List<AbstractExpression> tmpList = AbstractExpression.fromJSONArrayString(exprsjson);
+                indexedExprs = new ArrayList<AbstractExpression>();
+                for (AbstractExpression expr: tmpList) {
+                    indexedExprs.add(expr.replaceTVEsWithAlias(tableScan));
                 }
+
                 keyComponentCount = indexedExprs.size();
             } catch (JSONException e) {
                 e.printStackTrace();
@@ -1227,6 +1229,8 @@ public abstract class SubPlanAssembler {
         StmtTableScan tableCache = m_parsedStmt.stmtCache.get(tableAliasIdx);
         scanNode.setTargetTableName(tableCache.m_table.getTypeName());
         scanNode.setTargetTableAlias(tableCache.m_tableAlias);
+        scanNode.setTableScan(tableCache);
+
         //TODO: push scan column identification into "setTargetTableName"
         // (on the way to enabling it for DML plans).
         Set<SchemaColumn> scanColumns = m_parsedStmt.stmtCache.get(tableAliasIdx).m_scanColumns;
@@ -1306,6 +1310,8 @@ public abstract class SubPlanAssembler {
         }
         scanNode.setTargetTableAlias(tableCache.m_tableAlias);
         scanNode.setTargetIndexName(index.getTypeName());
+
+        scanNode.setTableScan(tableCache);
 
         scanNode.setSkipNullPredicate();
         return resultNode;

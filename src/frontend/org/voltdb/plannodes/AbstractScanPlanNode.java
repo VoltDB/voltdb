@@ -32,6 +32,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.StmtTableScan;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.CatalogUtil;
 
@@ -53,6 +54,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     // The target table is the table that the plannode wants to perform some operation on.
     protected String m_targetTableName = "";
     protected String m_targetTableAlias = null;
+
+    protected StmtTableScan m_tableScan = null;
 
     protected AbstractScanPlanNode() {
         super();
@@ -139,6 +142,14 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
      */
     public void setTargetTableAlias(String alias) {
         m_targetTableAlias = alias;
+    }
+
+    public void setTableScan(StmtTableScan tableScan) {
+        m_tableScan = tableScan;
+    }
+
+    public StmtTableScan getTableScan() {
+        return m_tableScan;
     }
 
     /**
@@ -342,10 +353,11 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
-        m_predicate = AbstractExpression.fromJSONChild(jobj, Members.PREDICATE.name());
         m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
         m_targetTableAlias = jobj.getString( Members.TARGET_TABLE_ALIAS.name() );
 
+        AbstractExpression expr = AbstractExpression.fromJSONChild(jobj, Members.PREDICATE.name());
+        m_predicate = expr.replaceTVEsWithAlias(m_tableScan);
     }
 
     @Override

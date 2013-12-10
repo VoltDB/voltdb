@@ -106,6 +106,7 @@ import org.voltdb.compilereport.StatementAnnotation;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.planner.StmtTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
@@ -433,7 +434,13 @@ public abstract class CatalogUtil {
             } else {
                 List<AbstractExpression> indexedExprs = null;
                 try {
-                    indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring);
+                    List<AbstractExpression> tmpList = AbstractExpression.fromJSONArrayString(jsonstring);
+                    indexedExprs = new ArrayList<AbstractExpression>();
+                    for (AbstractExpression expr: tmpList) {
+                        indexedExprs.add(expr.replaceTVEsWithAlias(StmtTableScan.getStmtTableScan(catalog_tbl)));
+                    }
+
+
                 } catch (JSONException e) {
                     // TODO Auto-generated catch block
                     e.printStackTrace();

@@ -225,39 +225,6 @@ public class TupleValueExpression extends AbstractValueExpression {
         return true;
     }
 
-    public boolean equalsWithTableAlias(Object obj, String tableAlias) {
-        if (obj instanceof TupleValueExpression == false) {
-            return false;
-        }
-        TupleValueExpression expr = (TupleValueExpression) obj;
-
-        if ((m_tableName == null) != (expr.m_tableName == null)) {
-            return false;
-        }
-        if ((m_columnName == null) != (expr.m_columnName == null)) {
-            return false;
-        }
-        if (m_tableName != null) { // Implying both sides non-null
-            if (m_tableName.equals(expr.m_tableName) == false) {
-                return false;
-            }
-        }
-        if (m_tableAlias != null) {
-            // Implying both sides non-null
-            // If one of the table aliases is NULL it is considered to be a wild card
-            // matching any alias.
-            if (m_tableAlias.equals(tableAlias) == false) {
-                return false;
-            }
-        }
-        if (m_columnName != null) { // Implying both sides non-null
-            if (m_columnName.equals(expr.m_columnName) == false) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     @Override
     public int hashCode() {
         // based on implementation of equals

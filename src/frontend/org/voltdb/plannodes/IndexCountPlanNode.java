@@ -103,6 +103,8 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_targetTableName = isp.m_targetTableName;
         m_targetIndexName = isp.m_targetIndexName;
 
+        m_tableScan = isp.getTableScan();
+
         m_predicate = null;
         m_bindings = isp.getBindings();
 
@@ -173,7 +175,12 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             }
         } else {
             try {
-                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson);
+                List<AbstractExpression> tmpList = AbstractExpression.fromJSONArrayString(exprsjson);
+                indexedExprs = new ArrayList<AbstractExpression>();
+                for (AbstractExpression expr: tmpList) {
+                    indexedExprs.add(expr.replaceTVEsWithAlias(m_tableScan));
+                }
+
             } catch (JSONException e) {
                 e.printStackTrace();
                 assert(false);
@@ -275,7 +282,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
                     missingKeyType = VoltType.get((byte)(indexedColRefs.get(indexSize - 1).getColumn().getType()));
                 }
             } else {
-                AbstractExpression lastIndexableExpr = indexedExprs.get(indexSize - 1);
+                AbstractExpression lastIndexableExpr = indexedExprs.get(indexSize - 1).replaceTVEsWithAlias(isp.getTableScan());
                 for (AbstractExpression expr : endComparisons) {
                     if (expr.getLeft().bindingToIndexedExpression(lastIndexableExpr) != null) {
                         canPadding = false;
@@ -458,7 +465,8 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
                     AbstractExpression.fromJSONArrayString(jsonExpr);
                 int ii = 0;
                 for (AbstractExpression ae : indexExpressions) {
-                    asIndexed[ii++] = ae.explain(m_targetTableName);
+                    AbstractExpression newExpr = ae.replaceTVEsWithAlias(m_tableScan);
+                    asIndexed[ii++] = newExpr.explain(m_targetTableName);
                 }
             } catch (JSONException e) {
                 // If something unexpected went wrong,
@@ -477,7 +485,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             usageInfo += "\n" + indent + " count matches to " + end;
         }
         if (m_skip_null_predicate != null) {
-            String predicate = m_skip_null_predicate.explain(m_targetTableName);
+            String predicate = m_skip_null_predicate.replaceTVEsWithAlias(m_tableScan).explain(m_targetTableName);
             usageInfo += "\n" + indent + " discounting rows where " + predicate;
         }
         // Describe the table name and either a user-provided name of the index or

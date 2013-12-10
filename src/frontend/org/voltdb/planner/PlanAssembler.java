@@ -295,7 +295,7 @@ public class PlanAssembler {
             if (rawplan == null)
                 break;
             // Update the best cost plan so far
-            m_planSelector.considerCandidatePlan(rawplan);
+            m_planSelector.considerCandidatePlan(rawplan, parsedStmt);
         }
         return m_planSelector.m_bestPlan;
     }
@@ -1062,6 +1062,7 @@ public class PlanAssembler {
 
         // get all of the columns in the sort
         List<AbstractExpression> orderExpressions = orderByNode.getSortExpressions();
+        String fromTableAlias = orderExpressions.get(0).findFromTableAlias();
 
         // In theory, for every table in the query, there needs to exist a uniqueness constraint
         // (primary key or other unique index) on some of the ORDER BY values regardless of whether
@@ -1109,8 +1110,15 @@ public class PlanAssembler {
                 }
                 // if this is a fancy expression-based index...
                 else {
+
                     try {
-                        indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr);
+                        List<AbstractExpression> tmpList = AbstractExpression.fromJSONArrayString(jsonExpr);
+                        StmtTableScan tableScan = m_parsedSelect.stmtCache.get(m_parsedSelect.tableAliasIndexMap.get(fromTableAlias));
+                        indexExpressions = new ArrayList<AbstractExpression>();
+                        for (AbstractExpression expr: tmpList) {
+                            indexExpressions.add(expr.replaceTVEsWithAlias(tableScan));
+                        }
+
                     } catch (JSONException e) {
                         e.printStackTrace(); // danger will robinson
                         assert(false);
@@ -1540,19 +1548,11 @@ public class PlanAssembler {
             Table targetTable = m_catalogDb.getTables().get(((SeqScanPlanNode)root).getTargetTableName());
             CatalogMap<Index> allIndexes = targetTable.getIndexes();
             ArrayList<ParsedColInfo> groupBys = m_parsedSelect.groupByColumns;
-            List<AbstractExpression> tves = groupBys.get(0).expression.findBaseTVEs();
-            String fromTable = null;
-            for (AbstractExpression expr: tves) {
-                String newTableAlias = ((TupleValueExpression) expr).getTableAlias();
-                if (fromTable == null) {
-                    fromTable = newTableAlias;
-                } else if (! fromTable.equals(newTableAlias)) {
-                    // Group by TVEs from different tables can not use any index.
-                    return root;
-                }
-            }
 
-            assert(fromTable != null);
+            String fromTableAlias = groupBys.get(0).expression.findFromTableAlias();
+            assert(fromTableAlias != null);
+            int idx = m_parsedSelect.tableAliasIndexMap.get(fromTableAlias);
+            StmtTableScan fromTableScan = m_parsedSelect.stmtCache.get(idx);
 
             for (Index index : allIndexes) {
                 if (!IndexType.isScannable(index.getType())) {
@@ -1574,7 +1574,7 @@ public class PlanAssembler {
                             replacable = false;
                             break;
                         }
-                        if (!fromTable.equals(((TupleValueExpression)expr).getTableAlias())) {
+                        if (!fromTableAlias.equals(((TupleValueExpression)expr).getTableAlias())) {
                             replacable = false;
                             break;
                         }
@@ -1597,8 +1597,6 @@ public class PlanAssembler {
                         return indexScanNode;
                     }
                 } else {
-                    int idx = m_parsedSelect.tableAliasIndexMap.get(fromTable);
-                    StmtTableScan fromTableScan = m_parsedSelect.stmtCache.get(idx);
 
                     // either pure expression index or mix of expressions and simple columns
                     List<AbstractExpression> indexedExprs = null;
