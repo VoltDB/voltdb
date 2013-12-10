@@ -67,7 +67,7 @@ public class HashinatorLite {
      * Pointer to an array of integers containing the tokens and partitions. Even values are tokens and odd values
      * are partition ids.
      */
-    private long m_etokens;
+    private long m_etokens = 0;
     private int m_etokenCount;
 
     private final sun.misc.Unsafe unsafe;
@@ -118,6 +118,13 @@ public class HashinatorLite {
 
     public HashinatorLite(int numPartitions) {
         this(HashinatorLiteType.LEGACY, getLegacyConfigureBytes(numPartitions), false);
+    }
+
+    @Override
+    public void finalize() {
+        if (m_etokens != 0) {
+            unsafe.freeMemory(m_etokens);
+        }
     }
 
     /**
