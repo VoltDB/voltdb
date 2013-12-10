@@ -337,6 +337,7 @@ public class RejoinProducer extends JoinProducerBase {
                 public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog rejoinTaskLog) throws IOException {
                     if (!m_completionMonitorAwait.isDone()) {
                         m_taskQueue.offer(this);
+                        return;
                     }
                     SnapshotCompletionEvent event = null;
                     // Block until the snapshot interest triggers.
@@ -441,6 +442,7 @@ public class RejoinProducer extends JoinProducerBase {
             public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog rejoinTaskLog) throws IOException {
                 if (!m_completionMonitorAwait.isDone()) {
                     m_taskQueue.offer(this);
+                    return;
                 }
                 SnapshotCompletionEvent event = null;
                 try {
