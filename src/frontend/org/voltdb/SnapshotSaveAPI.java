@@ -233,7 +233,6 @@ public class SnapshotSaveAPI
                                 taskList,
                                 targetList,
                                 multiPartTxnId,
-                                VoltDB.instance().getHostMessenger().getLiveHostIds().size(),
                                 exportSequenceNumbers);
                     }
                 }
