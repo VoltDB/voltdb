@@ -20,6 +20,19 @@ CREATE TABLE partitioned
 PARTITION TABLE partitioned ON COLUMN cid;
 CREATE INDEX P_CIDINDEX ON partitioned (cid);
 
+-- dimension table
+CREATE TABLE dimension
+(
+  cid        tinyint            NOT NULL
+, desc	     tinyint     		NOT NULL
+, CONSTRAINT PK_id_d PRIMARY KEY
+  (
+    cid
+  )
+, UNIQUE ( cid )
+);
+CREATE UNIQUE INDEX D_DESCINDEX ON dimension (desc);
+
 -- replicated table
 CREATE TABLE replicated
 (
@@ -127,3 +140,4 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGRTableInsert;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonSP;
 PARTITION PROCEDURE PoisonSP ON TABLE partitioned COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonMP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PopulateDimension;
