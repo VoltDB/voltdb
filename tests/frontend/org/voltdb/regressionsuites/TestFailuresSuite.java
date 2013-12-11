@@ -34,6 +34,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.exceptions.ConstraintFailureException;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.failureprocs.BadDecimalToVarcharCompare;
 import org.voltdb_testprocs.regressionsuites.failureprocs.BadFloatToVarcharCompare;
 import org.voltdb_testprocs.regressionsuites.failureprocs.BadVarcharCompare;
@@ -330,12 +331,26 @@ public class TestFailuresSuite extends RegressionSuite {
             totalBytes += STRLEN;
         }
 
+        // Some tests are run with a different effective partition count on community builds,
+        // due to a k-factor downgrade, so allow for a possible per partition row count scale difference.
+        int kFactorScaleDown;
+        if (MiscUtils.isPro()) {
+            kFactorScaleDown = 1;
+        } else {
+            kFactorScaleDown = 2;
+        }
+
         for (int ii = 0; ii < 4; ii++) {
             results = client.callProcedure("SelectBigString", ii).getResults();
             System.out.println(results[0].getRowCount());
             long rowCount = results[0].getRowCount();
             //With elastic hashing the numbers are a little fuzzy
-            assertTrue(rowCount > 800 && rowCount < 950);
+            if ( ! ((rowCount > 800 && rowCount < 950) ||
+                    (rowCount > 800/kFactorScaleDown && rowCount < 950/kFactorScaleDown))) {
+                System.out.println("Unexpected row count: " + rowCount);
+            }
+            assertTrue((rowCount > 800 && rowCount < 950) ||
+                (rowCount > 800/kFactorScaleDown && rowCount < 950/kFactorScaleDown));
         }
 
         //System.out.printf("Fail Bytes: %d, Expected Rows %d\n", totalBytes, expectedRows);
@@ -519,7 +534,7 @@ public class TestFailuresSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
         // CONFIG #3: N=2 K=1 Cluster
         /////////////////////////////////////////////////////////////
-        config = new LocalCluster("failures-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI).resetKfactorForCommunity(1);
+        config = new LocalCluster("failures-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 

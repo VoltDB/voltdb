@@ -1168,20 +1168,6 @@ public class LocalCluster implements VoltServerConfig {
         return buildType.toLowerCase().startsWith("memcheck");
     }
 
-    /**
-     * Kfactor greater than 0 is a PRO feature. In order to run multiple hosts tests for community,
-     * Kfactor has been changed to zero. This function will help the tests reset the kfactor, because
-     * there are some test cases intended for Kfactor features.
-     * @param kfactor
-     * @return
-     */
-    public LocalCluster resetKfactorForCommunity(int kfactor) {
-        if (m_kfactor == 0 && !MiscUtils.isPro()) {
-            m_kfactor = kfactor;
-        }
-        return this;
-    }
-
     @Override
     public boolean isValgrind() {
         return templateCmdLine.m_backend == BackendTarget.NATIVE_EE_VALGRIND_IPC;

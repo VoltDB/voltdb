@@ -161,7 +161,9 @@ public abstract class ActivePlanRepository {
         FragInfo frag = null;
         synchronized (FragInfo.class) {
             frag = m_plansById.get(fragmentId);
-            assert(frag != null);
+            if (frag == null) {
+                return;
+            }
             if (--frag.refCount == 0) {
                 // The disused fragment belongs in the LRU map at the end -- at the current "ticker".
                 // If its lastUse value is 0 like a new entry's, it is not currently in the map.
