@@ -657,7 +657,7 @@ public class SQLCommand
                             if (param.length() % 2 == 1)
                                 throw new Exception("Invalid varbinary value: input must have an even amount of characters to be a valid hex string.");
                             String val = Unquote.matcher(param).replaceAll("").replace("''","'");
-                            objectParams[i] = hexStringToByteArray(val);
+                            objectParams[i] = Encoder.hexDecode(val);
                         }
                     }
                     else
@@ -717,31 +717,9 @@ public class SQLCommand
         return param;
     }
 
-    static String byteArrayToHexString(byte[] data)
-    {
-        StringBuffer hexString = new StringBuffer();
-        for (int i=0;i<data.length;i++)
-        {
-            String hex = Integer.toHexString(0xFF & data[i]);
-            if (hex.length() == 1)
-                hexString.append('0');
-            hexString.append(hex);
-        }
-        return hexString.toString();
-    }
-
-    private static byte[] hexStringToByteArray(String s)
-    {
-        int len = s.length();
-        byte[] data = new byte[len / 2];
-        for (int i = 0; i < len; i += 2)
-            data[i/2] = (byte) ((Character.digit(s.charAt(i), 16) << 4) + Character.digit(s.charAt(i+1), 16));
-        return data;
-    }
-
     // Output generation
-    private static SQLCommandOutputFormatter outputFormatter = new SQLCommandOutputFormatterDefault();
-    private static boolean outputShowMetadata = true;
+    private static SQLCommandOutputFormatter m_outputFormatter = new SQLCommandOutputFormatterDefault();
+    private static boolean m_outputShowMetadata = true;
 
     private static boolean isUpdateResult(VoltTable table)
     {
@@ -757,12 +735,12 @@ public class SQLCommand
             if (!isUpdateResult(t)) {
                 rowCount = t.getRowCount();
                 // Run it through the output formatter.
-                outputFormatter.printTable(System.out, t, outputShowMetadata);
+                m_outputFormatter.printTable(System.out, t, m_outputShowMetadata);
             }
             else {
                 rowCount = t.fetchRow(0).getLong(0);
             }
-            if (outputShowMetadata) {
+            if (m_outputShowMetadata) {
                 System.out.printf("\n\n(%d row(s) affected)\n", rowCount);
             }
         }
@@ -1071,15 +1049,15 @@ public class SQLCommand
                         String formatName = arg.split("=")[1].toLowerCase();
                         if (formatName.equals("fixed"))
                         {
-                            outputFormatter = new SQLCommandOutputFormatterDefault();
+                            m_outputFormatter = new SQLCommandOutputFormatterDefault();
                         }
                         else if (formatName.equals("csv"))
                         {
-                            outputFormatter = new SQLCommandOutputFormatterCSV();
+                            m_outputFormatter = new SQLCommandOutputFormatterCSV();
                         }
                         else
                         {
-                            outputFormatter = new SQLCommandOutputFormatterTabDelimited();
+                            m_outputFormatter = new SQLCommandOutputFormatterTabDelimited();
                         }
                     }
                     else
@@ -1087,20 +1065,24 @@ public class SQLCommand
                         printUsage("Invalid value for --output-format");
                     }
                 }
-                else if (arg.equals("--output-skip-metadata"))
-                    outputShowMetadata = false;
-                else if (arg.equals("--debug"))
+                else if (arg.equals("--output-skip-metadata")) {
+                    m_outputShowMetadata = false;
+                }
+                else if (arg.equals("--debug")) {
                     debug = true;
+                }
                 else if (arg.equals("--help"))
                 {
                     printHelp(System.out); // Print readme to the screen
                     System.out.println("\n\n");
                     printUsage(0);
                 }
-                else if ((arg.equals("--usage")) || (arg.equals("-?")))
+                else if ((arg.equals("--usage")) || (arg.equals("-?"))) {
                     printUsage(0);
-                else
+                }
+                else {
                     printUsage("Invalid Parameter: " + arg);
+                }
             }
 
             // Split server list

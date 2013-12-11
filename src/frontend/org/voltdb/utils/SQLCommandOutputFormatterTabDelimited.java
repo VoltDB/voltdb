@@ -23,6 +23,7 @@ import java.io.PrintStream;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 
+
 /**
  * Tab-delimited output formatter for SQLCommand.
  */
@@ -49,10 +50,12 @@ class SQLCommandOutputFormatterTabDelimited implements SQLCommandOutputFormatter
                 Object v = t.get(i, t.getColumnType(i));
                 if (t.wasNull())
                     v = "NULL";
-                else if (t.getColumnType(i) == VoltType.VARBINARY)
-                    v = SQLCommand.byteArrayToHexString((byte[])v);
-                else
+                else if (t.getColumnType(i) == VoltType.VARBINARY) {
+                    v = Encoder.hexEncode((byte[])v);
+                }
+                else {
                     v = v.toString();
+                }
                 stream.print(v);
             }
             stream.print("\n");

@@ -57,7 +57,9 @@ class SQLCommandOutputFormatterCSV implements SQLCommandOutputFormatter
 
         @Override
         public void close() throws IOException
-        {}
+        {
+            m_stream.close();
+        }
     }
 
     @Override
