@@ -683,28 +683,23 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         return this;
     }
 
-    public String findFromTableAlias() {
-        if (this instanceof TupleValueExpression) {
-            return ((TupleValueExpression) this).getTableAlias();
-        }
+    public String baseTableAlias() {
         String tableAlias = null;
         if (m_left != null) {
-            tableAlias = m_left.findFromTableAlias();
+            tableAlias = m_left.baseTableAlias();
+            if (tableAlias != null) return tableAlias;
         }
-        if (tableAlias != null) return tableAlias;
-
         if (m_right != null) {
-            tableAlias = m_right.findFromTableAlias();
+            tableAlias = m_right.baseTableAlias();
+            if (tableAlias != null) return tableAlias;
         }
-        if (tableAlias != null) return tableAlias;
-
         if (m_args != null) {
             for (AbstractExpression expr: m_args) {
-                tableAlias = expr.findFromTableAlias();
+                tableAlias = expr.baseTableAlias();
                 if (tableAlias != null) return tableAlias;
             }
         }
-        return tableAlias;
+        return null;
     }
 
 

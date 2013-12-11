@@ -40,15 +40,23 @@ public class StmtTableScan {
 
     public Map<Integer, String> m_columnIndexToName = new HashMap<Integer, String>();
 
+    public void populateColumnDictionary() {
+        for (Column col: m_table.getColumns()) {
+            m_columnIndexToName.put(col.getIndex(), col.getTypeName());
+        }
+    }
+
+    public String getColumnName(int idx) {
+        return m_columnIndexToName.get(idx);
+    }
+
     public static StmtTableScan getStmtTableScan (Table table) {
         assert(table != null);
         StmtTableScan tableScan = new StmtTableScan();
         tableScan.m_table = table;
         tableScan.m_tableAlias = table.getTypeName();
 
-        for (Column col: table.getColumns()) {
-            tableScan.m_columnIndexToName.put(col.getIndex(), col.getTypeName());
-        }
+       tableScan.populateColumnDictionary();
 
         return tableScan;
     }

@@ -376,12 +376,10 @@ public abstract class AbstractParsedStmt {
             tableCache.m_tableAlias = tableAlias;
             tableCache.m_table = getTableFromDB(tableName);
             assert(tableCache.m_table != null);
+            tableCache.populateColumnDictionary();
+
             stmtCache.add(tableCache);
             tableAliasIndexMap.put(tableAlias, nextIndex);
-
-            for (Column col: tableCache.m_table.getColumns()) {
-                tableCache.m_columnIndexToName.put(col.getIndex(), col.getTypeName());
-            }
         }
         return tableAliasIndexMap.get(tableAlias);
     }

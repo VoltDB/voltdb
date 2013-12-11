@@ -259,7 +259,7 @@ public class TupleValueExpression extends AbstractValueExpression {
         if (tableScan != null) {
             m_tableAlias = tableScan.m_tableAlias;
             m_tableName = tableScan.m_table.getTypeName();
-            m_columnName = tableScan.m_columnIndexToName.get(m_columnIndex);
+            m_columnName = tableScan.getColumnName(m_columnIndex);
         }
     }
 
@@ -301,6 +301,11 @@ public class TupleValueExpression extends AbstractValueExpression {
         return inputSchema.getIndexOfTve(this);
     }
 
+    @Override
+    public String baseTableAlias() {
+        return m_tableAlias;
+    }
+
     // Even though this function applies generally to expressions and tables and not just to TVEs as such,
     // this function is somewhat TVE-related because TVEs DO represent the points where expression trees
     // depend on tables.
@@ -333,7 +338,13 @@ public class TupleValueExpression extends AbstractValueExpression {
     @Override
     public String explain(String impliedTableName) {
         if (m_tableName == null) {
-            return impliedTableName;
+            String tableName = "";
+            if (m_tableIdx != 0) {
+                assert(m_tableIdx == 1);
+                // This is join inner table
+                tableName += "inner table.";
+            }
+            return tableName + "column:" + m_columnIndex;
         }
 
         if (m_tableName.equals(impliedTableName)) {

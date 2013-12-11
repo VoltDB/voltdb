@@ -1062,7 +1062,7 @@ public class PlanAssembler {
 
         // get all of the columns in the sort
         List<AbstractExpression> orderExpressions = orderByNode.getSortExpressions();
-        String fromTableAlias = orderExpressions.get(0).findFromTableAlias();
+        String fromTableAlias = orderExpressions.get(0).baseTableAlias();
 
         // In theory, for every table in the query, there needs to exist a uniqueness constraint
         // (primary key or other unique index) on some of the ORDER BY values regardless of whether
@@ -1111,8 +1111,8 @@ public class PlanAssembler {
                 // if this is a fancy expression-based index...
                 else {
                     int idx = m_parsedSelect.tableAliasIndexMap.get(fromTableAlias);
+                    StmtTableScan tableScan = m_parsedSelect.stmtCache.get(idx);
                     try {
-                        StmtTableScan tableScan = m_parsedSelect.stmtCache.get(idx);
                         indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, tableScan);
                     } catch (JSONException e) {
                         e.printStackTrace(); // danger will robinson
@@ -1544,7 +1544,7 @@ public class PlanAssembler {
             CatalogMap<Index> allIndexes = targetTable.getIndexes();
             ArrayList<ParsedColInfo> groupBys = m_parsedSelect.groupByColumns;
 
-            String fromTableAlias = groupBys.get(0).expression.findFromTableAlias();
+            String fromTableAlias = groupBys.get(0).expression.baseTableAlias();
             assert(fromTableAlias != null);
             int idx = m_parsedSelect.tableAliasIndexMap.get(fromTableAlias);
 

@@ -878,7 +878,7 @@ public abstract class SubPlanAssembler {
      * @param table          the index base table, used to validate column base tables
      * @param filtersToCover query conditions that may contain the desired equality filters
      */
-    private List<AbstractExpression> recoverOrderSpoilers(int[] orderSpoilers, int nSpoilers,
+    private static List<AbstractExpression> recoverOrderSpoilers(int[] orderSpoilers, int nSpoilers,
         int nRecoveredSpoilers,
         List<AbstractExpression> indexedExprs, int[] colIds,
         Table table, List<AbstractExpression> filtersToCover)
@@ -958,7 +958,7 @@ public abstract class SubPlanAssembler {
      * index scan to be applicable.
      * -- or null if there is no filter that matches the indexed expression
      */
-    private IndexableExpression getIndexableExpressionFromFilters(
+    private static IndexableExpression getIndexableExpressionFromFilters(
         ExpressionType targetComparator, ExpressionType altTargetComparator,
         AbstractExpression coveringExpr, int coveringColId, Table table,
         List<AbstractExpression> filtersToCover,
@@ -1103,7 +1103,7 @@ public abstract class SubPlanAssembler {
         return new IndexableExpression(originalFilter, normalizedExpr, binding);
     }
 
-    private boolean isOperandDependentOnTable(AbstractExpression expr, Table table) {
+    private static boolean isOperandDependentOnTable(AbstractExpression expr, Table table) {
         for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(expr)) {
             //TODO: This clumsy testing of table names regardless of table aliases is
             // EXACTLY why we can't have nice things like self-joins.
@@ -1115,7 +1115,7 @@ public abstract class SubPlanAssembler {
         return false;
     }
 
-    private List<AbstractExpression> bindingIfValidIndexedFilterOperand(Table table,
+    private static List<AbstractExpression> bindingIfValidIndexedFilterOperand(Table table,
         AbstractExpression indexableExpr, AbstractExpression otherExpr,
         AbstractExpression coveringExpr, int coveringColId)
     {
