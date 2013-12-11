@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
-import org.voltdb.TheHashinator.HashinatorType;
+import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
@@ -626,7 +626,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
 
     }
 
-    public HashinatorType getHashinatorType() {
+    public HashinatorLiteType getHashinatorType() {
         return m_distributer.getHashinatorType();
     }
 }

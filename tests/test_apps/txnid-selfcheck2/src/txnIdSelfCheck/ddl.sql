@@ -31,7 +31,7 @@ CREATE TABLE dimension
   )
 , UNIQUE ( cid )
 );
-CREATE INDEX D_CIDINDEX ON dimension (cid);
+CREATE UNIQUE INDEX D_DESCINDEX ON dimension (desc);
 
 -- replicated table
 CREATE TABLE replicated
@@ -140,3 +140,4 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGRTableInsert;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonSP;
 PARTITION PROCEDURE PoisonSP ON TABLE partitioned COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonMP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PopulateDimension;
