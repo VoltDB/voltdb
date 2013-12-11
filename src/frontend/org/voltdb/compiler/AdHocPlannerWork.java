@@ -34,7 +34,6 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
     // -- otherwise, it contains one element to support @AdHocSpForTest and
     // ad hoc statements queued within single-partition stored procs.
     final Object[] userPartitionKey;
-    final int partitionParamIndex;
     public final ProcedureInvocationType type;
     public final long originalTxnId;
     public final long originalUniqueId;
@@ -44,7 +43,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
             boolean adminConnection, Connection clientConnection,
             String sqlBatchText, String[] sqlStatements,
             Object[] userParamSet, CatalogContext context, boolean isExplain,
-            boolean inferPartitioning, Object[] userPartitionKey, int partitionParamIndex,
+            boolean inferPartitioning, Object[] userPartitionKey,
             ProcedureInvocationType type, long originalTxnId, long originalUniqueId,
             AsyncCompilerWorkCompletionHandler completionHandler)
     {
@@ -58,7 +57,6 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
         this.isExplainWork = isExplain;
         this.inferPartitioning = inferPartitioning;
         this.userPartitionKey = userPartitionKey;
-        this.partitionParamIndex = partitionParamIndex;
         this.type = type;
         this.originalUniqueId = originalUniqueId;
         this.originalTxnId = originalTxnId;
@@ -82,7 +80,6 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
                 orig.isExplainWork,
                 orig.inferPartitioning,
                 orig.userPartitionKey,
-                orig.partitionParamIndex,
                 orig.type,
                 orig.originalTxnId,
                 orig.originalUniqueId,
@@ -108,14 +105,13 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
             // -- EXCEPT that writes to replicated tables are strictly forbdden -- and there
             // should be no correlation inferred or assumed between the partitioning and the
             // statement's constants or parameters.
-            false, (singlePartition ? new Object[1] /*???*/ : null), (singlePartition ? 0 /*???*/: -1),
+            false, (singlePartition ? new Object[1] /*any vector element will do, even null*/ : null),
             ProcedureInvocationType.ORIGINAL, 0, 0, completionHandler);
     }
 
     @Override
     public String toString() {
         String retval = super.toString();
-        retval += "\n  partition param index: " + partitionParamIndex;
         if (userParamSet == null || (userParamSet.length == 0)) {
             retval += "\n  user params: empty";
         } else {

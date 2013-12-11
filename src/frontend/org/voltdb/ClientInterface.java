@@ -1412,7 +1412,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 task.clientHandle, handler.connectionId(),
                 handler.isAdmin(), ccxn,
                 sql, stmtsArray, userParams, null, isExplain,
-                userPartitionKey == null, userPartitionKey, -1,
+                userPartitionKey == null, userPartitionKey,
                 task.type, task.originalTxnId, task.originalUniqueId,
                 m_adhocCompletionHandler);
         LocalObjectMessage work = new LocalObjectMessage( ahpw );
