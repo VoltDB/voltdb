@@ -40,6 +40,8 @@ import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -94,6 +96,16 @@ public class SyncBenchmark {
     final AtomicLong failedPuts = new AtomicLong(0);
     final AtomicLong rawPutData = new AtomicLong(0);
     final AtomicLong networkPutData = new AtomicLong(0);
+
+    // For retry connections
+    private final ExecutorService es = Executors.newCachedThreadPool(new ThreadFactory() {
+        @Override
+        public Thread newThread(Runnable arg0) {
+            Thread thread = new Thread(arg0, "Retry Connection");
+            thread.setDaemon(true);
+            return thread;
+        }
+    });
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -176,6 +188,14 @@ public class SyncBenchmark {
             // if the benchmark is still active
             if (benchmarkComplete.get() == false) {
                 System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
+                // setup for retry
+                final String server = MiscUtils.getHostnameColonPortString(hostname, port);
+                es.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        connectToOneServerWithRetry(server);
+                    }
+                });
             }
         }
     }
