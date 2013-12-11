@@ -42,6 +42,7 @@ import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -57,6 +58,7 @@ import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NullCallback;
+import org.voltdb.utils.MiscUtils;
 
 public class SyncBenchmark {
 
@@ -296,15 +298,28 @@ public class SyncBenchmark {
      * periodically during a benchmark.
      */
     public synchronized void printStatistics() {
-        ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
+        ClientStatsContext statscontext = periodicStatsContext.fetchAndResetBaseline();
+        long afWrites = 0;
+        long afReads = 0;
+        long rrWrites = 0;
+        long rrReads = 0;
+        Map<Integer, ClientAffinityStats> affinityStats = statscontext.getAffinityStats();
+        for (Entry<Integer, ClientAffinityStats> e : affinityStats.entrySet()) {
+            afWrites += e.getValue().getAffinityWrites();
+            afReads += e.getValue().getAffinityReads();
+            rrWrites += e.getValue().getRrWrites();
+            rrReads += e.getValue().getRrReads();
+        }
+        ClientStats stats = statscontext.getStats();
         long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
 
         System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
         System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
-        System.out.printf("Avg/95%% Latency %.2f/%dms\n", stats.getAverageLatency(),
+        System.out.printf("Avg/95%% Latency %.2f/%dms, ", stats.getAverageLatency(),
                 stats.kPercentileLatency(0.95));
+        System.out.printf("%d AW, %d AR, %d RRW, %d RRR\n", afWrites, afReads, rrWrites, rrReads);
     }
 
     /**
