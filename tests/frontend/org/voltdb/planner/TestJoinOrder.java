@@ -23,6 +23,8 @@
 
 package org.voltdb.planner;
 
+import java.util.List;
+
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
@@ -30,7 +32,7 @@ import org.voltdb.plannodes.SeqScanPlanNode;
 
 public class TestJoinOrder extends PlannerTestCase {
     public void testBasicJoinOrder() {
-        AbstractPlanNode pn = compileWithJoinOrder("select * FROM T1, T2, T3, T4, T5, T6, T7", "T7,T6,T5,T4,T3,T2,T1");
+        AbstractPlanNode pn = compileSPWithJoinOrder("select * FROM T1, T2, T3, T4, T5, T6, T7", "T7,T6,T5,T4,T3,T2,T1");
         AbstractPlanNode n = pn.getChild(0).getChild(0);
         for (int ii = 1; ii <= 7; ii++) {
             if (ii == 6) {
@@ -46,7 +48,7 @@ public class TestJoinOrder extends PlannerTestCase {
             }
         }
 
-        pn = compileWithJoinOrder("select * FROM T1, T2, T3, T4, T5, T6, T7", "T1,T2,T3,T4,T5,T6,T7");
+        pn = compileSPWithJoinOrder("select * FROM T1, T2, T3, T4, T5, T6, T7", "T1,T2,T3,T4,T5,T6,T7");
         n = pn.getChild(0).getChild(0);
         for (int ii = 7; ii > 0; ii--) {
             if (ii == 2) {
@@ -64,24 +66,24 @@ public class TestJoinOrder extends PlannerTestCase {
     }
 
     public void testAliasJoinOrder() {
-        AbstractPlanNode pn = compileWithJoinOrder("select * from P1 X, P2 Y where A=B", "X,Y");
-        AbstractPlanNode n = pn.getChild(0).getChild(0);
+        List<AbstractPlanNode> pns = compileWithJoinOrderToFragments("select * from P1 X, P2 Y where A=B", "X,Y");
+        AbstractPlanNode n = pns.get(1).getChild(0);
         assertEquals("P1", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
         assertEquals("P2", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
 
-        pn = compileWithJoinOrder("select * from P1, P2 Y where A=B", "P1,Y");
-        n = pn.getChild(0).getChild(0);
+        pns = compileWithJoinOrderToFragments("select * from P1, P2 Y where A=B", "P1,Y");
+        n = pns.get(1).getChild(0);
         assertEquals("P1", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
         assertEquals("P2", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
 
-        pn = compileWithJoinOrder("select * from P1 , P1 Y where P1.A=Y.A", "P1,Y");
-        n = pn.getChild(0).getChild(0);
+        pns = compileWithJoinOrderToFragments("select * from P1 , P1 Y where P1.A=Y.A", "P1,Y");
+        n = pns.get(1).getChild(0);
         assertEquals("P1", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
         assertEquals("P1", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
     }
 
     public void testOuterJoinOrder() {
-        AbstractPlanNode pn = compileWithJoinOrder("select * FROM T1 LEFT JOIN T2 ON T1.A = T2.B", "T1, T2");
+        AbstractPlanNode pn = compileSPWithJoinOrder("select * FROM T1 LEFT JOIN T2 ON T1.A = T2.B", "T1, T2");
         AbstractPlanNode n = pn.getChild(0).getChild(0);
         assertTrue(((SeqScanPlanNode)n.getChild(0)).getTargetTableName().equals("T1"));
         assertTrue(((SeqScanPlanNode)n.getChild(1)).getTargetTableName().equals("T2"));
@@ -95,14 +97,14 @@ public class TestJoinOrder extends PlannerTestCase {
     }
 
     public void testMicroOptimizationJoinOrder() {
-        AbstractPlanNode pn = compileWithJoinOrder("select * from J1, P2 where A=B", "J1, P2");
-        AbstractPlanNode n = pn.getChild(0).getChild(0);
+        List<AbstractPlanNode> pns = compileWithJoinOrderToFragments("select * from J1, P2 where A=B", "J1, P2");
+        AbstractPlanNode n = pns.get(1).getChild(0);
         assertTrue(((IndexScanPlanNode)n.getChild(0)).getTargetTableName().equals("J1"));
         assertTrue(((SeqScanPlanNode)n.getChild(1)).getTargetTableName().equals("P2"));
     }
 
     public void testInnerOuterJoinOrder() {
-        AbstractPlanNode pn = compileWithJoinOrder(
+        AbstractPlanNode pn = compileSPWithJoinOrder(
                 "select * FROM T1, T2, T3 LEFT JOIN T4 ON T3.C = T4.D LEFT JOIN T5 ON T3.C = T5.E, T6,T7",
                 "T2, T1, T3, T4, T5, T7, T6");
         AbstractPlanNode n = pn.getChild(0).getChild(0);
@@ -156,7 +158,7 @@ public class TestJoinOrder extends PlannerTestCase {
 
     @Override
     protected void setUp() throws Exception {
-        setupSchema(TestJoinOrder.class.getResource("testjoinorder-ddl.sql"), "testjoinorder", true);
+        setupSchema(true, TestJoinOrder.class.getResource("testjoinorder-ddl.sql"), "testjoinorder");
     }
 
     @Override

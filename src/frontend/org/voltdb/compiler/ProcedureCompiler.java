@@ -276,7 +276,9 @@ public abstract class ProcedureCompiler {
                 // from trying to infer a constant partitioning value from the statement.
                 partitionParameter = "StatementCompiler dummied up single partitioning for QueryPlanner";
             }
-            PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, false, true);
+            PartitioningForStatement partitioning =
+                info.singlePartition ? PartitioningForStatement.forceSP() :
+                                       PartitioningForStatement.forceMP();
             StatementCompiler.compile(compiler, hsql, catalog, db,
                     estimates, catalogStmt, stmt.getText(), stmt.getJoinOrder(),
                     detMode, partitioning);
@@ -299,7 +301,7 @@ public abstract class ProcedureCompiler {
                         if (commonPartitionExpression == null) {
                             commonPartitionExpression = statementPartitionExpression;
                             exampleSPstatement = stmt.getText();
-                            exampleSPvalue = partitioning.inferredPartitioningValue();
+                            exampleSPvalue = partitioning.getInferredPartitioningValue();
                         }
                         else if (commonPartitionExpression.equals(statementPartitionExpression) ||
                                    (statementPartitionExpression instanceof ParameterValueExpression &&
@@ -587,13 +589,9 @@ public abstract class ProcedureCompiler {
         Statement catalogStmt = procedure.getStatements().add(VoltDB.ANON_STMT_NAME);
 
         // compile the statement
-        Object partitionParameter = null;
-        if (info.singlePartition) {
-            // Dummy up a partitioning value to indicate the intent and prevent the planner
-            // from trying to infer a constant partitioning value from the statement.
-            partitionParameter = "StatementCompiler dummied up single partitioning for QueryPlanner";
-        }
-        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, false, true);
+        PartitioningForStatement partitioning =
+            info.singlePartition ? PartitioningForStatement.forceSP() :
+                                   PartitioningForStatement.forceMP();
         // default to FASTER detmode because stmt procs can't feed read output into writes
         StatementCompiler.compile(compiler, hsql, catalog, db,
                 estimates, catalogStmt, procedureDescriptor.m_singleStmt,
@@ -647,7 +645,7 @@ public abstract class ProcedureCompiler {
                                 ":" + ((ParameterValueExpression) statementPartitionExpression).getParameterIndex() + "'";
                     } else {
                         String valueDescription = null;
-                        Object partitionValue = partitioning.inferredPartitioningValue();
+                        Object partitionValue = partitioning.getInferredPartitioningValue();
                         if (partitionValue == null) {
                             // Statement partitioned on a runtime constant. This is likely to be cryptic, but hopefully gets the idea across.
                             valueDescription = "of " + statementPartitionExpression.toString();

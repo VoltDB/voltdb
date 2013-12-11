@@ -213,64 +213,60 @@ public class PlanAssembler {
             subAssembler = new SelectSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
             return;
         }
-        //TODO: eliminate this redundant "else after a return" and un-indent this block.
-        else {
-            // check that no modification happens to views
-            if (tableListIncludesView(parsedStmt.tableList)) {
-                throw new RuntimeException(
-                "Illegal to modify a materialized view.");
-            }
 
-            // Check that only multi-partition writes are made to replicated tables.
-            // figure out which table we're updating/deleting
-            assert (parsedStmt.tableList.size() == 1);
-            Table targetTable = parsedStmt.tableList.get(0);
-            if (targetTable.getIsreplicated()) {
-                if (m_partitioning.wasSpecifiedAsSingle()) {
-                    String msg = "Trying to write to replicated table '" + targetTable.getTypeName()
-                                 + "' in a single-partition procedure.";
-                    throw new PlanningErrorException(msg);
-                }
-            } else if (m_partitioning.wasSpecifiedAsSingle() == false) {
-                m_partitioning.setPartitioningColumn(targetTable.getPartitioncolumn());
-            }
-
-            if (parsedStmt instanceof ParsedInsertStmt) {
-                m_parsedInsert = (ParsedInsertStmt) parsedStmt;
-                // The currently handled inserts are too simple to even require a subplan assembler. So, done.
-                return;
-            }
-
-            if (parsedStmt instanceof ParsedUpdateStmt) {
-                if (tableListIncludesExportOnly(parsedStmt.tableList)) {
-                    throw new RuntimeException(
-                    "Illegal to update an export table.");
-                }
-                m_parsedUpdate = (ParsedUpdateStmt) parsedStmt;
-            } else if (parsedStmt instanceof ParsedDeleteStmt) {
-                if (tableListIncludesExportOnly(parsedStmt.tableList)) {
-                    throw new RuntimeException(
-                    "Illegal to delete from an export table.");
-                }
-                m_parsedDelete = (ParsedDeleteStmt) parsedStmt;
-            } else {
-                throw new RuntimeException(
-                        "Unknown subclass of AbstractParsedStmt.");
-            }
-            if ( ! m_partitioning.wasSpecifiedAsSingle()) {
-                //TODO: When updates and deletes can contain joins, this step may have to be
-                // deferred so that the valueEquivalence set can be analyzed per join order.
-                // This appears to be an unfortunate side effect of how the HSQL interface
-                // misleadingly organizes the placement of join/where filters on the statement tree.
-                // This throws off the accounting of equivalence join filters until they can be
-                // normalized in analyzeJoinFilters, but that normalization process happens on a
-                // per-join-order basis, and so, so must this analysis.
-                HashMap<AbstractExpression, Set<AbstractExpression>>
-                    valueEquivalence = parsedStmt.analyzeValueEquivalence();
-                m_partitioning.analyzeForMultiPartitionAccess(parsedStmt.stmtCache, valueEquivalence);
-            }
-            subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
+        // check that no modification happens to views
+        if (tableListIncludesView(parsedStmt.tableList)) {
+            throw new RuntimeException("Illegal to modify a materialized view.");
         }
+
+        m_partitioning.setIsDML();
+
+        // Check that only multi-partition writes are made to replicated tables.
+        // figure out which table we're updating/deleting
+        assert (parsedStmt.tableList.size() == 1);
+        Table targetTable = parsedStmt.tableList.get(0);
+        if (targetTable.getIsreplicated()) {
+            if (m_partitioning.wasSpecifiedAsSingle()) {
+                String msg = "Trying to write to replicated table '" + targetTable.getTypeName()
+                        + "' in a single-partition procedure.";
+                throw new PlanningErrorException(msg);
+            }
+        } else if (m_partitioning.wasSpecifiedAsSingle() == false) {
+            m_partitioning.setPartitioningColumn(targetTable.getPartitioncolumn());
+        }
+
+        if (parsedStmt instanceof ParsedInsertStmt) {
+            m_parsedInsert = (ParsedInsertStmt) parsedStmt;
+            // The currently handled inserts are too simple to even require a subplan assembler. So, done.
+            return;
+        }
+
+        if (parsedStmt instanceof ParsedUpdateStmt) {
+            if (tableListIncludesExportOnly(parsedStmt.tableList)) {
+                throw new RuntimeException("Illegal to update an export table.");
+            }
+            m_parsedUpdate = (ParsedUpdateStmt) parsedStmt;
+        } else if (parsedStmt instanceof ParsedDeleteStmt) {
+            if (tableListIncludesExportOnly(parsedStmt.tableList)) {
+                throw new RuntimeException("Illegal to delete from an export table.");
+            }
+            m_parsedDelete = (ParsedDeleteStmt) parsedStmt;
+        } else {
+            throw new RuntimeException("Unknown subclass of AbstractParsedStmt.");
+        }
+        if ( ! m_partitioning.wasSpecifiedAsSingle()) {
+            //TODO: When updates and deletes can contain joins, this step may have to be
+            // deferred so that the valueEquivalence set can be analyzed per join order.
+            // This appears to be an unfortunate side effect of how the HSQL interface
+            // misleadingly organizes the placement of join/where filters on the statement tree.
+            // This throws off the accounting of equivalence join filters until they can be
+            // normalized in analyzeJoinFilters, but that normalization process happens on a
+            // per-join-order basis, and so, so must this analysis.
+            HashMap<AbstractExpression, Set<AbstractExpression>>
+                valueEquivalence = parsedStmt.analyzeValueEquivalence();
+            m_partitioning.analyzeForMultiPartitionAccess(parsedStmt.stmtCache, valueEquivalence);
+        }
+        subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
     }
 
     /**
@@ -368,7 +364,6 @@ public class PlanAssembler {
 
         assert (nextStmt != null);
         retval.parameters = nextStmt.getParameters();
-        retval.setPartitioningKey(m_partitioning.effectivePartitioningValue());
         return retval;
     }
 
@@ -703,8 +698,7 @@ public class PlanAssembler {
         // connect the nodes to build the graph
         deleteNode.addAndLinkChild(subSelectRoot);
 
-        if (m_partitioning.wasSpecifiedAsSingle() ||
-            (m_partitioning.effectivePartitioningExpression() != null)) {
+        if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
             return deleteNode;
         }
 
@@ -781,8 +775,7 @@ public class PlanAssembler {
         // connect the nodes to build the graph
         updateNode.addAndLinkChild(subSelectRoot);
 
-        if (m_partitioning.wasSpecifiedAsSingle() ||
-            (m_partitioning.effectivePartitioningExpression() != null)) {
+        if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
             return updateNode;
         }
 
@@ -882,13 +875,13 @@ public class PlanAssembler {
                         const_expr.refineValueType(VoltType.get((byte) column.getType()), column.getSize());
                     }
                 }
+                assert(expr != null);
             }
 
             // Hint that this statement can be executed SP.
             if (column.equals(m_partitioning.getColumn())) {
                 String fullColumnName = targetTable.getTypeName() + "." + column.getTypeName();
-                m_partitioning.addPartitioningExpression(fullColumnName, expr);
-                m_partitioning.setInferredValue(ConstantValueExpression.extractPartitioningValue(expr.getValueType(), expr));
+                m_partitioning.addPartitioningExpression(fullColumnName, expr, expr.getValueType());
             }
 
             // add column to the materialize node.
@@ -904,8 +897,7 @@ public class PlanAssembler {
         // connect the insert and the materialize nodes together
         insertNode.addAndLinkChild(materializeNode);
 
-        if (m_partitioning.wasSpecifiedAsSingle() ||
-            (m_partitioning.effectivePartitioningExpression() != null)) {
+        if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
             insertNode.setMultiPartition(false);
             return insertNode;
         }

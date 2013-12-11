@@ -27,25 +27,19 @@ public class Pair<T, U> {
     protected final U m_second;
     protected transient final int m_hash;
 
-    public Pair(T first, U second, final boolean hash) {
+    public Pair(T first, U second) {
         m_first = first;
         m_second = second;
-        if (hash) {
-            m_hash = (first == null ? 0 : first.hashCode() * 31)
-                    + (second == null ? 0 : second.hashCode());
-        } else {
-            m_hash = 0;
-        }
+        m_hash = (first == null ? 0 : first.hashCode() * 31) +
+                (second == null ? 0 : second.hashCode());
     }
 
-    public Pair(T first, U second) {
-        this(first, second, true);
-    }
-
+    @Override
     public String toString() {
         return "<" + m_first.toString() + ", " + m_second.toString() + ">";
     }
 
+    @Override
     public int hashCode() {
         return m_hash;
     }
@@ -67,6 +61,7 @@ public class Pair<T, U> {
         return ((m_first == null) || (m_second == null));
     }
 
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
