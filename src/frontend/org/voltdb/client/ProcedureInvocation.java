@@ -21,7 +21,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltdb.ParameterSet;
-import org.voltdb.VoltType;
+import org.voltdb.utils.SerializationHelper;
 
 /**
  * Client stored procedure invocation object. Server uses an internal
@@ -89,13 +89,7 @@ public class ProcedureInvocation {
             buf.putLong(m_originalTxnId);
             buf.putLong(m_originalUniqueId);
         }
-        if (m_procNameBytes == null) {
-            buf.putInt(VoltType.NULL_STRING_LENGTH);
-        }
-        else {
-            buf.putInt(m_procNameBytes.length);
-            buf.put(m_procNameBytes);
-        }
+        SerializationHelper.writeVarbinary(m_procNameBytes, buf);
         buf.putLong(m_clientHandle);
         m_parameters.flattenToBuffer(buf);
         return buf;

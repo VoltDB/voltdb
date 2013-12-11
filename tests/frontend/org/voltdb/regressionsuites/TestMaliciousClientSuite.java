@@ -52,13 +52,9 @@ public class TestMaliciousClientSuite extends RegressionSuite {
         for (int ii = 0; ii < 2000; ii++) {
             ArrayList<SocketChannel> channels = new ArrayList<SocketChannel>();
             for (int zz = 0; zz < 100; zz++) {
-                //System.err.printf("opening: %d\n", zz);
                 channels.add(getClientChannel(true));
             }
-            //System.err.flush();
-            //int i = 0;
             for (SocketChannel sc : channels) {
-                //System.err.printf("closing: %d\n", i++);
                 sc.close();
             }
             System.out.printf("Ran through testManyClientsComingAndGoing loop %d times.\n", ii);
