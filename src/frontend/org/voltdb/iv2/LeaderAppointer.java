@@ -774,15 +774,9 @@ public class LeaderAppointer implements Promotable
         }
         m_callbacks.remove(pid);
         try {
-            try {
-                m_zk.delete(ZKUtil.joinZKPath(VoltZK.iv2masters, String.valueOf(pid)), -1);
-            } catch (KeeperException.NoNodeException e) {}
-            try {
-                m_zk.delete(ZKUtil.joinZKPath(VoltZK.iv2appointees, String.valueOf(pid)), -1);
-            } catch (KeeperException.NoNodeException e) {}
-            try {
-                m_zk.delete(ZKUtil.joinZKPath(VoltZK.leaders_initiators, "partition_" + String.valueOf(pid)), -1);
-            } catch (KeeperException.NoNodeException e) {}
+            ZKUtil.asyncDeleteRecursively(m_zk, ZKUtil.joinZKPath(VoltZK.iv2masters, String.valueOf(pid)));
+            ZKUtil.asyncDeleteRecursively(m_zk, ZKUtil.joinZKPath(VoltZK.iv2appointees, String.valueOf(pid)));
+            ZKUtil.asyncDeleteRecursively(m_zk, ZKUtil.joinZKPath(VoltZK.leaders_initiators, "partition_" + String.valueOf(pid)));
         } catch (Exception e) {
             tmLog.error("Error removing partition info", e);
         }
