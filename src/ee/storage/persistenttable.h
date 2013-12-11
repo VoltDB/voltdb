@@ -214,11 +214,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     std::string tableType() const;
     virtual std::string debug();
 
-    /*
-     * Find the block a tuple belongs to. Returns TBPtr(NULL) if no block is found.
-     */
-    static TBPtr findBlock(char *tuple, TBMap &blocks, int blockSize);
-
     int partitionColumn() const { return m_partitionColumn; }
     /** inlined here because it can't be inlined in base Table, as it
      *  uses Tuple.copy.
@@ -360,6 +355,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
      */
     void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
 
+    // helper for deleteTupleStorage
+    TBPtr findBlock(char *tuple);
+
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom
      * to do additional processing for views and Export
@@ -450,10 +448,7 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
     }
 
     if (block.get() == NULL) {
-        block = findBlock(tuple.address(), m_data, m_tableAllocationSize);
-        if (block.get() == NULL) {
-            throwFatalException("Tried to find a tuple block for a tuple but couldn't find one");
-        }
+       block = findBlock(tuple.address());
     }
 
     bool transitioningToBlockWithSpace = !block->hasFreeTuples();
@@ -485,23 +480,25 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
     }
 }
 
-inline TBPtr PersistentTable::findBlock(char *tuple, TBMap &blocks, int blockSize) {
-    if (!blocks.empty()) {
-        TBMapI i = blocks.lower_bound(tuple);
-
-        // Not the first tuple of any known block, move back a block, see if it
-        // belongs to the previous block
-        if (i == blocks.end() || i.key() != tuple) {
-            i--;
+inline TBPtr PersistentTable::findBlock(char *tuple) {
+    TBMapI i = m_data.lower_bound(tuple);
+    if (i == m_data.end() && m_data.empty()) {
+        throwFatalException("Tried to find a tuple block for a tuple but couldn't find one");
+    }
+    if (i == m_data.end()) {
+        i--;
+        if (i.key() + m_tableAllocationSize < tuple) {
+            throwFatalException("Tried to find a tuple block for a tuple but couldn't find one");
         }
-
-        // If the tuple is within the block boundaries, we found the block
-        if (i.key() <= tuple && tuple < i.key() + blockSize) {
-            return i.data();
+    } else {
+        if (i.key() != tuple) {
+            i--;
+            if (i.key() + m_tableAllocationSize < tuple) {
+                throwFatalException("Tried to find a tuple block for a tuple but couldn't find one");
+            }
         }
     }
-
-    return TBPtr(NULL);
+    return i.data();
 }
 
 inline TBPtr PersistentTable::allocateNextBlock() {
