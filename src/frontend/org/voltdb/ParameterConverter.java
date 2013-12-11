@@ -298,10 +298,6 @@ public class ParameterConverter {
         else if (param == VoltType.NULL_DECIMAL) {
             return nullValueForType(expectedClz);
         }
-        // these are used by system procedures and are ignored here
-        /*else if (param instanceof SystemProcedureExecutionContext) {
-            return param;
-        }*/
 
         // make sure we get the array/scalar match
         if (expectedClz.isArray() != inputClz.isArray()) {
@@ -459,6 +455,7 @@ public class ParameterConverter {
         }
 
         // handle SystemProcedureExecutionContext without linking to it
+        // these are used by system procedures and are ignored here
         if (expectedClz.getSimpleName().equals("SystemProcedureExecutionContext")) {
             if (expectedClz.isAssignableFrom(inputClz)) {
                 return param;

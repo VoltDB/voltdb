@@ -946,7 +946,7 @@ public class ProcedureRunner {
                m_appStatusCode,
                m_appStatusString,
                new VoltTable[0],
-               msg);
+               "VOLTDB ERROR: " + msg);
    }
 
    /**
