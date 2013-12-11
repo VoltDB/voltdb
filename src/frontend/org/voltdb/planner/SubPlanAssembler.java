@@ -824,7 +824,6 @@ public abstract class SubPlanAssembler {
                             ColumnRef nextColRef = indexedColRefs.get(jj);
                             if (colInfo.expression instanceof TupleValueExpression &&
                                 colInfo.tableName.equals(tableScan.m_table.getTypeName()) &&
-                                colInfo.tableAlias.equals(tableScan.m_tableAlias) &&
                                 colInfo.columnName.equals(nextColRef.getColumn().getTypeName())) {
                                 break;
                             }

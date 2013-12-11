@@ -1110,9 +1110,9 @@ public class PlanAssembler {
                 }
                 // if this is a fancy expression-based index...
                 else {
-
+                    int idx = m_parsedSelect.tableAliasIndexMap.get(fromTableAlias);
                     try {
-                        StmtTableScan tableScan = m_parsedSelect.stmtCache.get(m_parsedSelect.tableAliasIndexMap.get(fromTableAlias));
+                        StmtTableScan tableScan = m_parsedSelect.stmtCache.get(idx);
                         indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, tableScan);
                     } catch (JSONException e) {
                         e.printStackTrace(); // danger will robinson
