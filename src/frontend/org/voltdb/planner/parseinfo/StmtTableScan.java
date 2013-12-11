@@ -71,6 +71,10 @@ public abstract class StmtTableScan {
         return null;
     }
 
+    public PartitioningForStatement getPartitioning() {
+        return null;
+    }
+
     public void setPartitioning(PartitioningForStatement partitioning) {
     }
 

@@ -59,6 +59,11 @@ public class StmtSubqueryScan extends StmtTableScan {
     }
 
     @Override
+    public PartitioningForStatement getPartitioning() {
+        return m_partitioning;
+    }
+
+    @Override
     public void setPartitioning(PartitioningForStatement partitioning) {
         m_partitioning = partitioning;
     }

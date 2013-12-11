@@ -32,10 +32,8 @@ import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
-import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.NodeSchema;
@@ -133,7 +131,7 @@ public class TestSubQueries   extends PlannerTestCase {
             assertEquals("TEMP", ((SeqScanPlanNode) n).getTargetTableName());
             n = n.getChild(0);
             assertTrue(n instanceof ProjectionPlanNode);
-            assertTrue(n.getChild(0) instanceof IndexScanPlanNode);
+            assertTrue(n.getChild(0) instanceof SeqScanPlanNode);
         }
 
         {
@@ -183,8 +181,14 @@ public class TestSubQueries   extends PlannerTestCase {
         }
 
         {
+            // Join of a single partitioned sub-queries. The partitions are same
+            List<AbstractPlanNode> lpn = compileToFragments("select D1, D2 FROM (SELECT A, D D1 FROM P1 WHERE A=2) TEMP1, (SELECT A, D D2 FROM P2 WHERE A=2) TEMP2");
+            assertTrue(lpn.size() == 1);
+        }
+
+        {
             // Join of a single partitioned sub-queries. The partitions are different
-            failToCompile("select D1, D2 FROM (SELECT A, D D1 FROM P1 WHERE A=2) TEMP1, (SELECT A, D D2 FROM P2 WHERE A=2) TEMP2",
+            failToCompile("select D1, D2 FROM (SELECT A, D D1 FROM P1 WHERE A=2) TEMP1, (SELECT A, D D2 FROM P2 WHERE A=1) TEMP2",
             "Join of multiple partitioned tables has insufficient join criteria.");
         }
 
@@ -193,9 +197,21 @@ public class TestSubQueries   extends PlannerTestCase {
             failToCompile("select D1, D2 FROM (SELECT A, D D1 FROM P1) TEMP1, (SELECT A, D D2 FROM P2) TEMP2 WHERE TEMP1.A = 1 AND TEMP2.A = 2",
             "Join of multiple partitioned tables has insufficient join criteria.");
         }
+
+        {
+            // Unfortunately, the sub-query partitioning value is not propagated up to the parent
+            List lpn = compileToFragments("SELECT A, C FROM P2 JOIN (SELECT A, C FROM P1 WHERE P1.A=1) TEMP ON P2.A = TEMP.A");
+            assertTrue(lpn.size() == 2);
+        }
+
+        {
+            List lpn = compileToFragments("SELECT A, C FROM P2 JOIN (SELECT A, C FROM P1 WHERE P1.A=1) TEMP ON P2.A = 1");
+            assertTrue(lpn.size() == 1);
+        }
+
      }
 
-    public void testOuterJoinSubQuery() {
+    public void testJoinSubQuery() {
         {
             List<AbstractPlanNode> lpn = compileToFragments("SELECT A, C FROM R1 LEFT JOIN (SELECT A, C FROM P1) TEMP ON TEMP.C = R1.C ");
             assertTrue(lpn.size() == 2);
@@ -211,18 +227,31 @@ public class TestSubQueries   extends PlannerTestCase {
             assertEquals(1, n.getChildCount());
             n = n.getChild(0);
             assertTrue(n instanceof ProjectionPlanNode);
-            assertTrue(n.getChild(0) instanceof IndexScanPlanNode);
+            assertTrue(n.getChild(0) instanceof SeqScanPlanNode);
         }
-    }
 
-
-    public void testWhereSubquery() {
         {
-          AbstractPlanNode pn = compile("DELETE FROM R1 WHERE A IN (SELECT A A1 FROM R1 WHERE A>1)");
-          pn = pn.getChild(0);
+            List<AbstractPlanNode> lpn = compileToFragments("SELECT A, C FROM R1 JOIN (SELECT A, C FROM R2 JOIN P1 ON R2.C = P1.C) TEMP ON TEMP.C = R1.C ");
+            assertTrue(lpn.size() == 2);
+            AbstractPlanNode n = lpn.get(1).getChild(0);
+            assertTrue(n instanceof NestLoopPlanNode);
+        }
+
+        {
+            List<AbstractPlanNode> lpn = compileToFragments("SELECT A, C FROM R1 JOIN (SELECT A, C FROM R2 LEFT JOIN P1 ON R2.C = P1.C) TEMP ON TEMP.C = R1.C ");
+            assertTrue(lpn.size() == 2);
         }
 
     }
+
+
+//    public void testWhereSubquery() {
+//        {
+//          AbstractPlanNode pn = compile("DELETE FROM R1 WHERE A IN (SELECT A A1 FROM R1 WHERE A>1)");
+//          pn = pn.getChild(0);
+//        }
+//
+//    }
 
     private void verifyOutputSchema(AbstractPlanNode pn, String... columns) {
         NodeSchema ns = pn.getOutputSchema();
