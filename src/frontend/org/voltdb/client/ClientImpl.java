@@ -28,10 +28,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
-import org.voltdb.TheHashinator.HashinatorType;
 
-import org.voltdb.utils.CatalogUtil;
+import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.MiscUtils;
 
 /**
  *  A client that connects to one or more nodes in a VoltCluster
@@ -393,9 +393,9 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     private Object[] getUpdateCatalogParams(File catalogPath, File deploymentPath)
     throws IOException {
         Object[] params = new Object[2];
-        params[0] = CatalogUtil.toBytes(catalogPath);
+        params[0] = MiscUtils.fileToBytes(catalogPath);
         if (deploymentPath != null) {
-            params[1] = new String(CatalogUtil.toBytes(deploymentPath), "UTF-8");
+            params[1] = new String(MiscUtils.fileToBytes(deploymentPath), "UTF-8");
         }
         else {
             params[1] = null;
@@ -626,7 +626,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
 
     }
 
-    public HashinatorType getHashinatorType() {
+    public HashinatorLiteType getHashinatorType() {
         return m_distributer.getHashinatorType();
     }
 }

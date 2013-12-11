@@ -21,7 +21,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 
 import org.json_voltpatches.JSONString;
-import org.voltdb.VoltDB;
+import org.voltdb.common.Constants;
 
 public class TimestampType implements JSONString, Comparable<TimestampType> {
     /**
@@ -127,7 +127,7 @@ public class TimestampType implements JSONString, Comparable<TimestampType> {
      */
     @Override
     public String toString() {
-        SimpleDateFormat sdf = new SimpleDateFormat(VoltDB.ODBC_DATE_FORMAT_STRING);
+        SimpleDateFormat sdf = new SimpleDateFormat(Constants.ODBC_DATE_FORMAT_STRING);
         Date dateToMillis = m_date;
         short usecs = m_usecs;
         if (usecs < 0) {
