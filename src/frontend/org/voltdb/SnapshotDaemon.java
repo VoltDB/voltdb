@@ -1473,7 +1473,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     }
 
     private void logFailureResponse(String message, ClientResponse response) {
-        SNAP_LOG.warn(message, response.getException());
+        SNAP_LOG.warn(message + "\n" + response.getStatusString());
         if (response.getStatusString() != null) {
             SNAP_LOG.warn(response.getStatusString());
         }

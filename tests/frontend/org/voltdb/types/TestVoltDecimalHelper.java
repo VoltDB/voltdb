@@ -27,7 +27,6 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 
 import junit.framework.TestCase;
-import org.voltdb.messaging.*;
 
 public class TestVoltDecimalHelper extends TestCase {
 
@@ -61,16 +60,6 @@ public class TestVoltDecimalHelper extends TestCase {
 
         int cmp = bd.compareTo(bd2);
         assertEquals(0, cmp);
-
-        FastSerializer fs = new FastSerializer();
-        VoltDecimalHelper.serializeBigDecimal(bd, fs);
-        BigDecimal bd3 = VoltDecimalHelper.deserializeBigDecimal(fs.getBuffer());
-
-        System.out.println(bd.toString());
-        System.out.println(bd3.toString());
-
-        cmp = bd.compareTo(bd3);
-        assertEquals(0, cmp);
     }
 
     public void testSerializatinRoundTripNegative() throws Exception {
@@ -85,16 +74,6 @@ public class TestVoltDecimalHelper extends TestCase {
         System.out.println(bd2.toString());
 
         int cmp = bd.compareTo(bd2);
-        assertEquals(0, cmp);
-
-        FastSerializer fs = new FastSerializer();
-        VoltDecimalHelper.serializeBigDecimal(bd, fs);
-        BigDecimal bd3 = VoltDecimalHelper.deserializeBigDecimal(fs.getBuffer());
-
-        System.out.println(bd.toString());
-        System.out.println(bd3.toString());
-
-        cmp = bd.compareTo(bd3);
         assertEquals(0, cmp);
     }
 

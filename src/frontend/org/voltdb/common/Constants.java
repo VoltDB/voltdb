@@ -28,4 +28,32 @@ public class Constants
     // if you need microseconds, you'll have to change this code or
     //  export a bigint representing microseconds since an epoch
     public static final String ODBC_DATE_FORMAT_STRING = "yyyy-MM-dd HH:mm:ss.SSS";
+
+    public static final int DEFAULT_PORT = 21212;
+
+    // reasons a connection can fail
+    public static final byte AUTHENTICATION_FAILURE = -1;
+    public static final byte MAX_CONNECTIONS_LIMIT_ERROR = 1;
+    public static final byte WIRE_PROTOCOL_TIMEOUT_ERROR = 2;
+    public static final byte WIRE_PROTOCOL_FORMAT_ERROR = 3;
+    public static final byte AUTHENTICATION_FAILURE_DUE_TO_REJOIN = 4;
+    public static final byte EXPORT_DISABLED_REJECTION = 5;
+
+    // from jdbc metadata generation
+    public static final String JSON_PARTITION_PARAMETER = "partitionParameter";
+    public static final String JSON_PARTITION_PARAMETER_TYPE = "partitionParameterType";
+    public static final String JSON_SINGLE_PARTITION = "singlePartition";
+    public static final String JSON_READ_ONLY = "readOnly";
+
+    // The transaction id layout.
+    static final long UNUSED_SIGN_BITS = 1;
+    static final long SEQUENCE_BITS = 49;
+    static final long PARTITIONID_BITS = 14;
+
+    // maximum values for the txn id fields
+    static final long SEQUENCE_MAX_VALUE = (1L << SEQUENCE_BITS) - 1L;
+    static final int PARTITIONID_MAX_VALUE = (1 << PARTITIONID_BITS) - 1;
+
+    // from MP Initiator
+    public static final int MP_INIT_PID = PARTITIONID_MAX_VALUE;
 }

@@ -117,7 +117,12 @@ public class ConstraintFailureException extends SQLException {
             sb.append(", Table CatalogId ");
             sb.append(tableName);
             sb.append('\n');
-            sb.append(getTuples().toString());
+            sb.append("Relevant Tuples:\n");
+            sb.append(getTuples().toFormattedString());
+            // remove trailing whitespace
+            while (Character.isWhitespace(sb.charAt(sb.length() - 1))) {
+                sb.setLength(sb.length() - 1);
+            }
             return sb.toString();
         }
     }

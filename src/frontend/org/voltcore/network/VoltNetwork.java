@@ -80,8 +80,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.EstTimeUpdater;
 import org.voltcore.utils.Pair;
 
-import vanilla.java.affinity.impl.PosixJNAAffinity;
-
 /** Produces work for registered ports that are selected for read, write */
 class VoltNetwork implements Runnable
 {
@@ -270,7 +268,9 @@ class VoltNetwork implements Runnable
     @Override
     public void run() {
         if (m_coreBindId != null) {
-            PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindId);
+            // Remove Affinity for now to make this dependency dissapear from the client.
+            // Goal is to remove client dependency on this class in the medium term.
+            //PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindId);
         }
         try {
             while (m_shouldStop == false) {
