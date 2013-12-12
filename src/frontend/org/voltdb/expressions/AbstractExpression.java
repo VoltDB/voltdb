@@ -30,6 +30,7 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
+import org.voltdb.planner.StmtTableScan;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -307,8 +308,8 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     public static boolean areOverloadedJSONExpressionLists(String jsontext1, String jsontext2)
     {
         try {
-            List<AbstractExpression> list1 = fromJSONArrayString(jsontext1);
-            List<AbstractExpression> list2 = fromJSONArrayString(jsontext2);
+            List<AbstractExpression> list1 = fromJSONArrayString(jsontext1, null);
+            List<AbstractExpression> list2 = fromJSONArrayString(jsontext2, null);
             return list1.equals(list2);
         } catch (JSONException je) {
             return false;
@@ -469,16 +470,47 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     protected void loadFromJSONObject(JSONObject obj) throws JSONException { }
+    protected void loadFromJSONObject(JSONObject obj, StmtTableScan tableScan) throws JSONException
+    {
+        loadFromJSONObject(obj);
+    }
 
+    /**
+     * For TVEs, it is only serialized column index and table index. In order to match expression,
+     * there needs more information to revert back the table name, table alisa and column name.
+     * Without adding extra information, TVEs will only have column index and table index available.
+     *
+     *
+     */
+
+    /**
+     * For TVEs, it is only serialized column index and table index. In order to match expression,
+     * there needs more information to revert back the table name, table alisa and column name.
+     * Without adding extra information, TVEs will only have column index and table index available.
+     * This function is only used for various of plan nodes, except AbstractScanPlanNode.
+     * @param jobj
+     * @param label
+     * @return
+     * @throws JSONException
+     */
     public static AbstractExpression fromJSONChild(JSONObject jobj, String label) throws JSONException
     {
         if(jobj.isNull(label)) {
             return null;
         }
-        return fromJSONObject(jobj.getJSONObject(label));
+        return fromJSONObject(jobj.getJSONObject(label), null);
+
     }
 
-    private static AbstractExpression fromJSONObject(JSONObject obj) throws JSONException
+    public static AbstractExpression fromJSONChild(JSONObject jobj, String label,  StmtTableScan tableScan) throws JSONException
+    {
+        if(jobj.isNull(label)) {
+            return null;
+        }
+        return fromJSONObject(jobj.getJSONObject(label), tableScan);
+    }
+
+    private static AbstractExpression fromJSONObject(JSONObject obj,  StmtTableScan tableScan) throws JSONException
     {
         ExpressionType type = ExpressionType.valueOf(obj.getString(Members.TYPE.name()));
         AbstractExpression expr;
@@ -497,46 +529,56 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         expr.m_valueType = VoltType.typeFromString(obj.getString(Members.VALUE_TYPE.name()));
         expr.m_valueSize = obj.getInt(Members.VALUE_SIZE.name());
 
-        expr.m_left = AbstractExpression.fromJSONChild(obj, Members.LEFT.name());
-        expr.m_right = AbstractExpression.fromJSONChild(obj, Members.RIGHT.name());
+        expr.m_left = AbstractExpression.fromJSONChild(obj, Members.LEFT.name(), tableScan);
+        expr.m_right = AbstractExpression.fromJSONChild(obj, Members.RIGHT.name(), tableScan);
 
         if (!obj.isNull(Members.ARGS.name())) {
             JSONArray jarray = obj.getJSONArray(Members.ARGS.name());
             ArrayList<AbstractExpression> arguments = new ArrayList<AbstractExpression>();
-            loadFromJSONArray(arguments, jarray);
+            loadFromJSONArray(arguments, jarray, tableScan);
             expr.setArgs(arguments);
         }
 
-        expr.loadFromJSONObject(obj);
+        expr.loadFromJSONObject(obj, tableScan);
         return expr;
     }
 
-    public static List<AbstractExpression> fromJSONArrayString(String jsontext) throws JSONException
+    public static List<AbstractExpression> fromJSONArrayString(String jsontext, StmtTableScan tableScan) throws JSONException
     {
         JSONArray jarray = new JSONArray(jsontext);
         List<AbstractExpression> result = new ArrayList<AbstractExpression>();
-        loadFromJSONArray(result, jarray);
+        loadFromJSONArray(result, jarray, tableScan);
         return result;
     }
 
+    /**
+     * For TVEs, it is only serialized column index and table index. In order to match expression,
+     * there needs more information to revert back the table name, table alisa and column name.
+     * By adding @param tableScan, the TVE will load table name, table alias and column name for TVE.
+     * @param starter
+     * @param parent
+     * @param label
+     * @param tableScan
+     * @throws JSONException
+     */
     public static void loadFromJSONArrayChild(List<AbstractExpression> starter,
-                                              JSONObject parent, String label)
+                                              JSONObject parent, String label, StmtTableScan tableScan)
     throws JSONException
     {
         if( parent.isNull(label) ) {
             return;
         }
         JSONArray jarray = parent.getJSONArray(label);
-        loadFromJSONArray(starter, jarray);
+        loadFromJSONArray(starter, jarray, tableScan);
     }
 
     private static void loadFromJSONArray(List<AbstractExpression> starter,
-                                          JSONArray jarray) throws JSONException
+                                          JSONArray jarray,  StmtTableScan tableScan) throws JSONException
     {
         int size = jarray.length();
         for( int i = 0 ; i < size; i++ ) {
             JSONObject tempjobj = jarray.getJSONObject( i );
-            starter.add(fromJSONObject(tempjobj));
+            starter.add(fromJSONObject(tempjobj, tableScan));
         }
     }
 
@@ -640,6 +682,26 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
         return this;
     }
+
+    public String baseTableAlias() {
+        String tableAlias = null;
+        if (m_left != null) {
+            tableAlias = m_left.baseTableAlias();
+            if (tableAlias != null) return tableAlias;
+        }
+        if (m_right != null) {
+            tableAlias = m_right.baseTableAlias();
+            if (tableAlias != null) return tableAlias;
+        }
+        if (m_args != null) {
+            for (AbstractExpression expr: m_args) {
+                tableAlias = expr.baseTableAlias();
+                if (tableAlias != null) return tableAlias;
+            }
+        }
+        return null;
+    }
+
 
     public ArrayList<AbstractExpression> findBaseTVEs() {
         return findAllSubexpressionsOfType(ExpressionType.VALUE_TUPLE);

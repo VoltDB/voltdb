@@ -24,6 +24,7 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.planner.StmtTableScan;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.types.ExpressionType;
 
@@ -34,9 +35,6 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     public enum Members {
         COLUMN_IDX,
-        TABLE_NAME,
-        TABLE_ALIAS,
-        COLUMN_NAME,
         TABLE_IDX,  // used for JOIN queries only, 0 for outer table, 1 for inner table
     }
 
@@ -246,28 +244,22 @@ public class TupleValueExpression extends AbstractValueExpression {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.key(Members.COLUMN_IDX.name()).value(m_columnIndex);
-        stringer.key(Members.TABLE_NAME.name()).value(m_tableName);
-        stringer.key(Members.TABLE_ALIAS.name()).value(m_tableAlias);
-        // Column name is not required in the EE but testing showed that it is
-        // needed to support type resolution of indexed expressions in the planner
-        // after they get round-tripped through the catalog's index definition.
-        stringer.key(Members.COLUMN_NAME.name()).value(m_columnName);
         if (m_tableIdx > 0) {
             stringer.key(Members.TABLE_IDX.name()).value(m_tableIdx);
-            //System.out.println("TVE: toJSONString(), tableIdx = " + m_tableIdx);
         }
     }
 
     @Override
-    protected void loadFromJSONObject(JSONObject obj) throws JSONException
+    protected void loadFromJSONObject(JSONObject obj, StmtTableScan tableScan) throws JSONException
     {
         m_columnIndex = obj.getInt(Members.COLUMN_IDX.name());
-        m_tableName = obj.getString(Members.TABLE_NAME.name());
-        m_tableAlias = obj.getString(Members.TABLE_ALIAS.name());
-        m_columnName = obj.getString(Members.COLUMN_NAME.name());
         if (obj.has(Members.TABLE_IDX.name())) {
             m_tableIdx = obj.getInt(Members.TABLE_IDX.name());
-            //System.out.println("TVE: loadFromJSONObject(), tableIdx = " + m_tableIdx);
+        }
+        if (tableScan != null) {
+            m_tableAlias = tableScan.m_tableAlias;
+            m_tableName = tableScan.m_table.getTypeName();
+            m_columnName = tableScan.getColumnName(m_columnIndex);
         }
     }
 
@@ -309,6 +301,11 @@ public class TupleValueExpression extends AbstractValueExpression {
         return inputSchema.getIndexOfTve(this);
     }
 
+    @Override
+    public String baseTableAlias() {
+        return m_tableAlias;
+    }
+
     // Even though this function applies generally to expressions and tables and not just to TVEs as such,
     // this function is somewhat TVE-related because TVEs DO represent the points where expression trees
     // depend on tables.
@@ -340,6 +337,16 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     @Override
     public String explain(String impliedTableName) {
+        if (m_tableName == null) {
+            String tableName = "";
+            if (m_tableIdx != 0) {
+                assert(m_tableIdx == 1);
+                // This is join inner table
+                tableName += "inner table.";
+            }
+            return tableName + "column:" + m_columnIndex;
+        }
+
         if (m_tableName.equals(impliedTableName)) {
             return m_columnName;
         } else {
