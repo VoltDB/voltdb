@@ -319,61 +319,7 @@ public class RejoinProducer extends JoinProducerBase {
             Preconditions.checkNotNull(m_streamSnapshotMb);
             VoltDB.instance().getHostMessenger().removeMailbox(m_streamSnapshotMb.getHSId());
 
-            // m_rejoinSnapshotBytes = m_rejoinSiteProcessor.bytesTransferred();
-            // m_rejoinSiteProcessor = null;
-
-            // Don't notify the rejoin coordinator yet. The stream snapshot may
-            // have not finished on all nodes, let the snapshot completion
-            // monitor tell the rejoin coordinator.
-
-            final SiteTasker finishingTask = new SiteTasker() {
-                @Override
-                public void run(SiteProcedureConnection siteConnection) {
-                    throw new RuntimeException(
-                            "Unexpected execution of run method in rejoin producer.");
-                }
-
-                @Override
-                public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog rejoinTaskLog) throws IOException {
-                    if (!m_completionMonitorAwait.isDone()) {
-                        m_taskQueue.offer(this);
-                        return;
-                    }
-                    SnapshotCompletionEvent event = null;
-                    // Block until the snapshot interest triggers.
-                    try {
-                        REJOINLOG.debug(m_whoami
-                                + "waiting on snapshot completion monitor.");
-                        event = m_completionMonitorAwait.get();
-                        m_completionAction.setSnapshotTxnId(event.multipartTxnId);
-                        REJOINLOG.debug(m_whoami
-                                + "snapshot monitor completed. "
-                                + "Sending SNAPSHOT_FINISHED and Handing off to site.");
-                        RejoinMessage snap_complete = new RejoinMessage(
-                                m_mailbox.getHSId(), Type.SNAPSHOT_FINISHED);
-                        m_mailbox.send(m_coordinatorHsId, snap_complete);
-
-                    } catch (InterruptedException crashme) {
-                        VoltDB.crashLocalVoltDB(
-                                "Interrupted awaiting snapshot completion.", true,
-                                crashme);
-                    } catch (ExecutionException e) {
-                        VoltDB.crashLocalVoltDB(
-                                "Unexpected exception awaiting snapshot completion.",
-                                true, e);
-                    }
-                    setJoinComplete(
-                            siteConnection,
-                            event.exportSequenceNumbers,
-                            true /* requireExistingSequenceNumbers */
-                    );
-                }
-            };
-            try {
-                finishingTask.runForRejoin(siteConnection, null);
-            } catch (IOException e) {
-                VoltDB.crashLocalVoltDB("Unexpected IOException in rejoin", true, e);
-            }
+            doFinishingTask(siteConnection);
         }
     }
 
@@ -420,6 +366,10 @@ public class RejoinProducer extends JoinProducerBase {
         // Just turn the watchdog off after we've gotten the last block.
         kickWatchdog(false);
 
+        doFinishingTask(siteConnection);
+    }
+
+    private void doFinishingTask(final SiteProcedureConnection siteConnection) {
         /*
          * Don't notify the rejoin coordinator yet. The stream snapshot may
          * have not finished on all nodes, let the snapshot completion
