@@ -758,13 +758,8 @@ class Distributer {
                     m_clientAffinityStats.put(hashedPartition, stats);
                 }
                 if (cxn != null) {
-                    if (procedureInfo != null) {
-                        if (procedureInfo.readOnly) {
-                            stats.addAffinityRead();
-                        }
-                        else {
-                            stats.addAffinityWrite();
-                        }
+                    if (procedureInfo != null && procedureInfo.readOnly) {
+                        stats.addAffinityRead();
                     }
                     else {
                         stats.addAffinityWrite();
@@ -773,13 +768,8 @@ class Distributer {
                 // account these here because we lose the partition ID and procedure info once we
                 // bust out of this scope.
                 else {
-                    if (procedureInfo != null) {
-                        if (procedureInfo.readOnly) {
-                            stats.addRrRead();
-                        }
-                        else {
-                            stats.addRrWrite();
-                        }
+                    if (procedureInfo != null && procedureInfo.readOnly) {
+                        stats.addRrRead();
                     }
                     else {
                         stats.addRrWrite();

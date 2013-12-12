@@ -204,6 +204,9 @@ public class ClientStatsContext {
         return retval;
     }
 
+    /**
+     * Get the client affinity stats.  Will only be populated if client affinity is enabled.
+     */
     public Map<Integer, ClientAffinityStats> getAffinityStats()
     {
         Map<Integer, ClientAffinityStats> retval = new TreeMap<Integer, ClientAffinityStats>();
@@ -215,6 +218,28 @@ public class ClientStatsContext {
                 retval.put(e.getKey(), (ClientAffinityStats) e.getValue().clone());
             }
         }
+        return retval;
+    }
+
+    /**
+     * Roll up the per-partition affinity stats and return the totals for each of the four
+     * categories.
+     */
+    public ClientAffinityStats getAggregateAffinityStats()
+    {
+        long afWrites = 0;
+        long afReads = 0;
+        long rrWrites = 0;
+        long rrReads = 0;
+        Map<Integer, ClientAffinityStats> affinityStats = getAffinityStats();
+        for (Entry<Integer, ClientAffinityStats> e : affinityStats.entrySet()) {
+            afWrites += e.getValue().getAffinityWrites();
+            afReads += e.getValue().getAffinityReads();
+            rrWrites += e.getValue().getRrWrites();
+            rrReads += e.getValue().getRrReads();
+        }
+        ClientAffinityStats retval = new ClientAffinityStats(Integer.MAX_VALUE, afWrites, rrWrites,
+               afReads, rrReads);
         return retval;
     }
 

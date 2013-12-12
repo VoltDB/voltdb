@@ -299,17 +299,7 @@ public class SyncBenchmark {
      */
     public synchronized void printStatistics() {
         ClientStatsContext statscontext = periodicStatsContext.fetchAndResetBaseline();
-        long afWrites = 0;
-        long afReads = 0;
-        long rrWrites = 0;
-        long rrReads = 0;
-        Map<Integer, ClientAffinityStats> affinityStats = statscontext.getAffinityStats();
-        for (Entry<Integer, ClientAffinityStats> e : affinityStats.entrySet()) {
-            afWrites += e.getValue().getAffinityWrites();
-            afReads += e.getValue().getAffinityReads();
-            rrWrites += e.getValue().getRrWrites();
-            rrReads += e.getValue().getRrReads();
-        }
+        ClientAffinityStats affinityStats = statscontext.getAggregateAffinityStats();
         ClientStats stats = statscontext.getStats();
         long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
 
@@ -319,7 +309,11 @@ public class SyncBenchmark {
                 stats.getInvocationAborts(), stats.getInvocationErrors());
         System.out.printf("Avg/95%% Latency %.2f/%dms, ", stats.getAverageLatency(),
                 stats.kPercentileLatency(0.95));
-        System.out.printf("%d AW, %d AR, %d RRW, %d RRR\n", afWrites, afReads, rrWrites, rrReads);
+        System.out.printf("%d AW, %d AR, %d RRW, %d RRR\n",
+                affinityStats.getAffinityWrites(),
+                affinityStats.getAffinityReads(),
+                affinityStats.getRrWrites(),
+                affinityStats.getRrReads());
     }
 
     /**

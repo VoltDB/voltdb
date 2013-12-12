@@ -17,6 +17,14 @@
 
 package org.voltdb.client;
 
+/**
+ * Collect the client's opinion of the operation of client affinity.  For the
+ * given partition ID, affinityWrites tracks write transactions that the client
+ * believes it knows the master for.  AffinityReads tracks read transactions
+ * the the client believes it found a replica for.  Round-robin stats reflect
+ * the client's lack of information when client affinity is on and indicate
+ * transactions that were routed using the default round-robin algorithm.
+ */
 public class ClientAffinityStats {
 
     private int m_partitionId;
