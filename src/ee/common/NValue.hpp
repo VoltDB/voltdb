@@ -569,7 +569,7 @@ class NValue {
     }
 
     // Declared public for cppunit test purposes .
-    static int64_t parseTimestampString(const char* str);
+    static int64_t parseTimestampString(const std::string &txt);
 
   private:
     /*
@@ -1194,8 +1194,10 @@ class NValue {
             retval.getTimestamp() = whole.ToInt(); break;
         }
         case VALUE_TYPE_VARCHAR: {
-            const char* str = reinterpret_cast<const char*>(getObjectValue());
-            retval.getTimestamp() = parseTimestampString(str);
+            const int32_t length = getObjectLength();
+            const char* bytes = reinterpret_cast<const char*>(getObjectValue());
+            const std::string value(bytes, length);
+            retval.getTimestamp() = parseTimestampString(value);
             break;
         }
         case VALUE_TYPE_VARBINARY:

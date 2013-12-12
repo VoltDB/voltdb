@@ -117,11 +117,11 @@ import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.VoltSampler;
 
-import com.google.common.base.Charsets;
-import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.SettableFuture;
+import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -1644,28 +1644,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
         }
 
-        // start one site in the current thread
-        Thread.currentThread().setName("ExecutionSiteAndVoltDB");
         m_isRunning = true;
-        try
-        {
-            while (m_isRunning) {
-                Thread.sleep(1);
-            }
-        }
-        catch (Throwable thrown)
-        {
-            String errmsg = " encountered an unexpected error and will die, taking this VoltDB node down.";
-            hostLog.error(errmsg);
-            // It's too easy for stdout to get lost, especially if we are crashing, so log FATAL, instead.
-            // Logging also automatically prefixes lines with "ExecutionSite [X:Y] "
-            // thrown.printStackTrace();
-            hostLog.fatal("Stack trace of thrown exception: " + thrown.toString());
-            for (StackTraceElement ste : thrown.getStackTrace()) {
-                hostLog.fatal(ste.toString());
-            }
-            VoltDB.crashLocalVoltDB(errmsg, true, thrown);
-        }
     }
 
     /**

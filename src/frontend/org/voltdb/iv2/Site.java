@@ -661,9 +661,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             Deque<SnapshotTableTask> tasks,
             List<SnapshotDataTarget> targets,
             long txnId,
-            int numLiveHosts,
             Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers) {
-        m_snapshotter.initiateSnapshots(m_sysprocContext, format, tasks, targets, txnId, numLiveHosts,
+        m_snapshotter.initiateSnapshots(m_sysprocContext, format, tasks, targets, txnId,
                                         exportSequenceNumbers);
     }
 
@@ -953,7 +952,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public Future<?> doSnapshotWork()
     {
-        return m_snapshotter.doSnapshotWork(m_sysprocContext);
+        return m_snapshotter.doSnapshotWork(m_sysprocContext, false);
     }
 
     @Override

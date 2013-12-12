@@ -24,8 +24,6 @@ import java.util.zip.InflaterInputStream;
 
 import org.voltdb.common.Constants;
 
-import com.google.common.base.Charsets;
-
 /**
  * Encode and decode strings and byte arrays to/from hexidecimal
  * string values. This was originally added so binary values could
@@ -63,12 +61,12 @@ public class Encoder {
 
     /**
      *
-     * @param string A (latin) string to be hex encoded.
+     * @param string A string to be hex encoded.
      * @return The double-length hex encoded string.
      */
     public static String hexEncode(String string) {
         // this will need to be less "western" in the future
-        return hexEncode(string.getBytes(Charsets.ISO_8859_1));
+        return hexEncode(string.getBytes(Constants.UTF8ENCODING));
     }
 
     /**
@@ -117,7 +115,7 @@ public class Encoder {
 
     public static String compressAndBase64Encode(String string) {
         try {
-            byte[] inBytes = string.getBytes(Charsets.UTF_8);
+            byte[] inBytes = string.getBytes(Constants.UTF8ENCODING);
             ByteArrayOutputStream baos = new ByteArrayOutputStream((int)(string.length() * 0.7));
             DeflaterOutputStream dos = new DeflaterOutputStream(baos);
             dos.write(inBytes);
@@ -149,7 +147,7 @@ public class Encoder {
             return "";
         }
         byte bytes[] = decodeBase64AndDecompressToBytes(string);
-        return new String(bytes, Charsets.UTF_8);
+        return new String(bytes, Constants.UTF8ENCODING);
     }
 
     public static byte[] decodeBase64AndDecompressToBytes(String string) {
@@ -175,7 +173,7 @@ public class Encoder {
 
     public static String base64Encode(String string) {
         try {
-            final byte[] inBytes = string.getBytes(Charsets.UTF_8);
+            final byte[] inBytes = string.getBytes(Constants.UTF8ENCODING);
             return Base64.encodeToString(inBytes, false);
         } catch (Exception e) {
             throw new RuntimeException(e);

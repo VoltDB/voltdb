@@ -38,7 +38,7 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.utils.MiscUtils;
 
-import com.google.common.collect.Maps;
+import com.google_voltpatches.common.collect.Maps;
 
 public class BalancePartitionsStatistics extends StatsSource {
     private static final VoltLogger log = new VoltLogger("JOIN");

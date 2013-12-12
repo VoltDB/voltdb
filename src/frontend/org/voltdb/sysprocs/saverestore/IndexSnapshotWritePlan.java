@@ -40,9 +40,9 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.HashRangeExpression;
 import org.voltdb.sysprocs.SnapshotRegistry;
 
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-import com.google.common.primitives.Longs;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Sets;
+import com.google_voltpatches.common.primitives.Longs;
 
 public class IndexSnapshotWritePlan extends SnapshotWritePlan {
     @Override

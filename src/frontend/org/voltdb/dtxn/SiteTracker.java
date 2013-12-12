@@ -31,9 +31,9 @@ import org.voltdb.MailboxNodeContent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK.MailboxType;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 public class SiteTracker {
     private final int m_hostId;

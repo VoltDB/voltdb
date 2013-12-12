@@ -19,7 +19,6 @@ package org.voltdb.jni;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -307,11 +306,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         final VoltTable vt =  m_dependencyTracker.nextDependency(dependencyId);
         if (vt != null) {
             final ByteBuffer buf2 = vt.getTableDataReference();
-            byte[] bytes = buf2.array();
-            // if a buffer has an offset, just getting the array will give you the wrong thing
-            if (buf2.arrayOffset() != 0) {
-                bytes = Arrays.copyOfRange(bytes, buf2.arrayOffset(), bytes.length);
-            }
+            int pos = buf2.position();
+            byte[] bytes = new byte[buf2.limit() - pos];
+            buf2.get(bytes);
+            buf2.position(pos);
             return bytes;
         }
         else {

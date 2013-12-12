@@ -40,7 +40,7 @@ import org.apache.zookeeper_voltpatches.data.ACL;
 import org.apache.zookeeper_voltpatches.data.Id;
 import org.apache.zookeeper_voltpatches.data.Stat;
 
-import com.google.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 /**
  * The command line client to ZooKeeper.

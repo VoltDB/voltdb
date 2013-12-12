@@ -57,7 +57,7 @@ public class EveryPartitionTask extends TransactionTask
     public void run(SiteProcedureConnection siteConnection)
     {
         hostLog.debug("STARTING: " + this);
-        m_mailbox.send(com.google.common.primitives.Longs.toArray(m_initiatorHSIds), m_initiationMsg);
+        m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_initiatorHSIds), m_initiationMsg);
         m_txnState.setDone();
         m_queue.flush(getTxnId());
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);

@@ -17,9 +17,9 @@
 
 package org.voltcore.network;
 
-import com.google.common.base.Function;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
+import com.google_voltpatches.common.base.Function;
+import com.google_voltpatches.common.cache.Cache;
+import com.google_voltpatches.common.cache.CacheBuilder;
 import org.voltcore.utils.CoreUtils;
 
 import java.net.InetAddress;

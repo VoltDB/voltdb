@@ -52,7 +52,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.messaging.BorrowTaskMessage;
-import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -72,9 +71,9 @@ public class TestMpTransactionState extends TestCase
     ByteBuffer createDummyParameterSet() throws IOException
     {
         ParameterSet blah = ParameterSet.fromArrayNoCopy(new Long(4321), new Long(5678));
-        FastSerializer fs = new FastSerializer();
-        blah.writeExternal(fs);
-        ByteBuffer params = fs.getBuffer();
+        ByteBuffer params = ByteBuffer.allocate(blah.getSerializedSize());
+        blah.flattenToBuffer(params);
+        params.flip();
         return params;
     }
 

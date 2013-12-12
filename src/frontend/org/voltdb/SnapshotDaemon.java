@@ -57,10 +57,10 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
-import com.google.common.base.Throwables;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListeningScheduledExecutorService;
-import com.google.common.util.concurrent.MoreExecutors;
+import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListeningScheduledExecutorService;
+import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 /**
  * A scheduler of automated snapshots and manager of archived and retained snapshots.
@@ -888,7 +888,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 //Do this check to avoid an NPE
                                 if (results == null || results.length == 0 || results[0].getRowCount() < 1) {
                                     SNAP_LOG.error("Queued user snapshot request reattempt received an unexpected response" +
-                                            " and will not be reattempted");
+                                            " and will not be reattempted. The client response is (status: " +
+                                            clientResponse.getStatus() + " " + clientResponse.getStatusString() +
+                                            " result: " + (results != null && results.length > 0 ? results[0] : "null") +
+                                            ")");
                                     /*
                                      * Don't think this should happen, reset the watch to allow later requests
                                      */
@@ -1470,7 +1473,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     }
 
     private void logFailureResponse(String message, ClientResponse response) {
-        SNAP_LOG.warn(message, response.getException());
+        SNAP_LOG.warn(message + "\n" + response.getStatusString());
         if (response.getStatusString() != null) {
             SNAP_LOG.warn(response.getStatusString());
         }

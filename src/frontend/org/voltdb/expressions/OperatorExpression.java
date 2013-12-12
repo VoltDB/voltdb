@@ -123,6 +123,11 @@ public class OperatorExpression extends AbstractExpression {
             }
             return;
         }
+        if (type == ExpressionType.OPERATOR_CASE_WHEN || type == ExpressionType.OPERATOR_ALTERNATIVE) {
+            assert(m_valueType != null);
+            m_valueSize = m_valueType.getMaxLengthInBytes();
+            return;
+        }
         VoltType left_type = m_left.getValueType();
         //XXX Not sure how unary minus (and unary plus?) are handled (possibly via an implicit zero left argument?)
         VoltType right_type = m_right.getValueType();

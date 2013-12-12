@@ -45,8 +45,8 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.utils.CatalogUtil;
 
-import com.google.common.primitives.Ints;
-import com.google.common.primitives.Longs;
+import com.google_voltpatches.common.primitives.Ints;
+import com.google_voltpatches.common.primitives.Longs;
 
 /**
  * Create a snapshot write plan for a CSV snapshot.  This will attempt to write

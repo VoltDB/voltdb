@@ -44,8 +44,8 @@ import org.voltcore.zk.ZKUtil.ByteArrayCallback;
 
 import org.voltdb.VoltDB;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 /**
  * Tracker monitors and provides snapshots of a single ZK node's

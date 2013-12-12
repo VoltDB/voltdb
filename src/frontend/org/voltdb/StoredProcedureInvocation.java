@@ -28,16 +28,15 @@ import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.client.ProcedureInvocationType;
+import org.voltdb.common.Constants;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializable;
-import org.voltdb.messaging.FastSerializer;
 
 /**
  * Represents a serializeable bundle of procedure name and parameters. This
  * is the object that is sent by the client library to call a stored procedure.
  *
  */
-public class StoredProcedureInvocation implements FastSerializable, JSONString {
+public class StoredProcedureInvocation implements JSONString {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     ProcedureInvocationType type = ProcedureInvocationType.ORIGINAL;
@@ -217,7 +216,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
             buf.putLong(originalUniqueId);
         }
         buf.putInt(procName.length());
-        buf.put(procName.getBytes());
+        buf.put(procName.getBytes(Constants.UTF8ENCODING));
         buf.putLong(clientHandle);
         if (serializedParams != null)
         {
@@ -275,57 +274,9 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
             @Override
             public ParameterSet call() throws Exception {
-                FastDeserializer fds = new FastDeserializer(duplicate);
-                return ParameterSet.fromFastDeserializer(fds);
+                return ParameterSet.fromByteBuffer(duplicate);
             }
         });
-    }
-
-    @Override
-    public void readExternal(FastDeserializer in) throws IOException {
-        byte version = in.readByte();// version number also embeds the type
-        type = ProcedureInvocationType.typeFromByte(version);
-
-        /*
-         * If it's a replicated invocation, there should be two txn IDs
-         * following the version byte. The first txn ID is the new txn ID, the
-         * second one is the original txn ID.
-         */
-        if (type == ProcedureInvocationType.REPLICATED) {
-            originalTxnId = in.readLong();
-            originalUniqueId = in.readLong();
-        }
-
-        procName = in.readString().intern();
-        clientHandle = in.readLong();
-        // do not deserialize parameters in ClientInterface context
-        serializedParams = in.remainder();
-        final ByteBuffer duplicate = serializedParams.duplicate();
-        params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
-            @Override
-            public ParameterSet call() throws Exception {
-                FastDeserializer fds = new FastDeserializer(duplicate);
-                return ParameterSet.fromFastDeserializer(fds);
-            }
-        });
-    }
-
-    @Override
-    public void writeExternal(FastSerializer out) throws IOException {
-        assert(!((params == null) && (serializedParams == null)));
-        assert((params != null) || (serializedParams != null));
-        out.write(type.getValue());//version and type, version is currently 0
-        if (type == ProcedureInvocationType.REPLICATED) {
-            out.writeLong(originalTxnId);
-            out.writeLong(originalUniqueId);
-        }
-        out.writeString(procName);
-        out.writeLong(clientHandle);
-        if (serializedParams != null)
-            out.write(serializedParams.duplicate());
-        else if (params != null) {
-            getParams().writeExternal(out);
-        }
     }
 
     @Override

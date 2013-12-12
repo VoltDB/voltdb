@@ -51,7 +51,6 @@ import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.iv2.UniqueIdGenerator;
-import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.sysprocs.AdHocBase;
@@ -942,19 +941,12 @@ public class ProcedureRunner {
    }
 
    protected ClientResponseImpl getErrorResponse(byte status, String msg, SerializableException e) {
-
-       StringBuilder msgOut = new StringBuilder();
-       msgOut.append("VOLTDB ERROR: ");
-       msgOut.append(msg);
-
-       log.trace(msgOut);
-
        return new ClientResponseImpl(
                status,
                m_appStatusCode,
                m_appStatusString,
                new VoltTable[0],
-               msgOut.toString(), e);
+               "VOLTDB ERROR: " + msg);
    }
 
    /**
@@ -1169,21 +1161,23 @@ public class ProcedureRunner {
            state.m_depsToResume[i] = collectorOutputDepId;
 
            // Build the set of params for the frags
-           FastSerializer fs = new FastSerializer();
+           ByteBuffer paramBuf = null;
            try {
                if (queuedSQL.serialization != null) {
-                   fs.write(queuedSQL.serialization);
+                   paramBuf = ByteBuffer.allocate(queuedSQL.serialization.capacity());
+                   paramBuf.put(queuedSQL.serialization);
                }
                else {
-                   queuedSQL.params.writeExternal(fs);
+                   paramBuf = ByteBuffer.allocate(queuedSQL.params.getSerializedSize());
+                   queuedSQL.params.flattenToBuffer(paramBuf);
                }
            } catch (IOException e) {
                throw new RuntimeException("Error serializing parameters for SQL statement: " +
                                           queuedSQL.stmt.getText() + " with params: " +
                                           queuedSQL.params.toJSONString(), e);
            }
-           ByteBuffer params = fs.getBuffer();
-           assert(params != null);
+           assert(paramBuf != null);
+           paramBuf.flip();
 
             /*
              * This numfrags == 1 code is for routing multi-partition reads of a
@@ -1196,7 +1190,7 @@ public class ProcedureRunner {
              * read locally but we break up the batches in the face of mixed reads and
              * writes
              */
-           state.addStatement(i, queuedSQL.stmt, params, m_site);
+           state.addStatement(i, queuedSQL.stmt, paramBuf, m_site);
        }
 
        // instruct the dtxn what's needed to resume the proc

@@ -26,8 +26,8 @@ import org.voltdb.StatsSource;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSortedMap;
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.collect.ImmutableSortedMap;
 
 public class KSafetyStats extends StatsSource {
     private volatile NavigableMap<Integer, Integer> m_kSafetyMap;
@@ -70,6 +70,6 @@ public class KSafetyStats extends StatsSource {
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
         @SuppressWarnings("rawtypes")
         Iterator iter = m_kSafetyMap.entrySet().iterator();
-        return (Iterator<Object>)iter;
+        return iter;
     }
 }
