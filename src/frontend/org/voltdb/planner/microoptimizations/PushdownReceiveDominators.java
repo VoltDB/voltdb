@@ -20,7 +20,7 @@ package org.voltdb.planner.microoptimizations;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.voltdb.catalog.Database;
+import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.DistinctPlanNode;
@@ -29,7 +29,7 @@ import org.voltdb.types.PlanNodeType;
 public class PushdownReceiveDominators extends MicroOptimization {
 
     @Override
-    public List<CompiledPlan> apply(CompiledPlan plan, Database db) {
+    public List<CompiledPlan> apply(CompiledPlan plan, AbstractParsedStmt parsedStmt) {
 
         ArrayList<CompiledPlan> retval = new ArrayList<CompiledPlan>();
 

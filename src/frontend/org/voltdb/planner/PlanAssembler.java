@@ -295,7 +295,7 @@ public class PlanAssembler {
             if (rawplan == null)
                 break;
             // Update the best cost plan so far
-            m_planSelector.considerCandidatePlan(rawplan);
+            m_planSelector.considerCandidatePlan(rawplan, parsedStmt);
         }
         return m_planSelector.m_bestPlan;
     }
@@ -1062,6 +1062,7 @@ public class PlanAssembler {
 
         // get all of the columns in the sort
         List<AbstractExpression> orderExpressions = orderByNode.getSortExpressions();
+        String fromTableAlias = orderExpressions.get(0).baseTableAlias();
 
         // In theory, for every table in the query, there needs to exist a uniqueness constraint
         // (primary key or other unique index) on some of the ORDER BY values regardless of whether
@@ -1109,8 +1110,10 @@ public class PlanAssembler {
                 }
                 // if this is a fancy expression-based index...
                 else {
+                    int idx = m_parsedSelect.tableAliasIndexMap.get(fromTableAlias);
+                    StmtTableScan tableScan = m_parsedSelect.stmtCache.get(idx);
                     try {
-                        indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr);
+                        indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, tableScan);
                     } catch (JSONException e) {
                         e.printStackTrace(); // danger will robinson
                         assert(false);
@@ -1541,6 +1544,10 @@ public class PlanAssembler {
             CatalogMap<Index> allIndexes = targetTable.getIndexes();
             ArrayList<ParsedColInfo> groupBys = m_parsedSelect.groupByColumns;
 
+            String fromTableAlias = groupBys.get(0).expression.baseTableAlias();
+            assert(fromTableAlias != null);
+            int idx = m_parsedSelect.tableAliasIndexMap.get(fromTableAlias);
+
             for (Index index : allIndexes) {
                 if (!IndexType.isScannable(index.getType())) {
                     continue;
@@ -1553,12 +1560,19 @@ public class PlanAssembler {
                     if (groupBys.size() > indexedColRefs.size()) {
                         continue;
                     }
+
                     for (int i = 0; i < groupBys.size(); i++) {
                         // don't compare column idx here, because resolveColumnIndex is not yet called
-                        if (groupBys.get(i).expression.getExpressionType() != ExpressionType.VALUE_TUPLE) {
+                        AbstractExpression expr = groupBys.get(i).expression;
+                        if (expr.getExpressionType() != ExpressionType.VALUE_TUPLE) {
                             replacable = false;
                             break;
                         }
+                        if (!fromTableAlias.equals(((TupleValueExpression)expr).getTableAlias())) {
+                            replacable = false;
+                            break;
+                        }
+
                         // ignore order of keys in GROUP BY expr
                         boolean foundMatch = false;
                         for (int j = 0; j < groupBys.size(); j++) {
@@ -1579,8 +1593,10 @@ public class PlanAssembler {
                 } else {
                     // either pure expression index or mix of expressions and simple columns
                     List<AbstractExpression> indexedExprs = null;
+                    StmtTableScan fromTableScan = m_parsedSelect.stmtCache.get(idx);
+
                     try {
-                        indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson);
+                        indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, fromTableScan);
                     } catch (JSONException e) {
                         e.printStackTrace();
                         assert(false);
@@ -1589,11 +1605,15 @@ public class PlanAssembler {
                     if (groupBys.size() > indexedExprs.size()) {
                         continue;
                     }
+                    ArrayList<AbstractExpression> allBindings = new ArrayList<AbstractExpression>();
                     for (int i = 0; i < groupBys.size(); i++) {
                         // ignore order of keys in GROUP BY expr
                         boolean foundMatch = false;
                         for (int j = 0; j < groupBys.size(); j++) {
-                            if (groupBys.get(i).expression.equals(indexedExprs.get(j))) {
+                            AbstractExpression indexExpr = indexedExprs.get(j);
+                            List<AbstractExpression> binding = groupBys.get(i).expression.bindingToIndexedExpression(indexExpr);
+                            if (binding != null ) {
+                                allBindings.addAll(binding);
                                 foundMatch = true;
                                 break;
                             }
@@ -1605,6 +1625,7 @@ public class PlanAssembler {
                     }
                     if (replacable) {
                         IndexScanPlanNode indexScanNode = new IndexScanPlanNode((SeqScanPlanNode)root, null, index, SortDirectionType.ASC);
+                        indexScanNode.setBindings(allBindings);
                         return indexScanNode;
                     }
                 }

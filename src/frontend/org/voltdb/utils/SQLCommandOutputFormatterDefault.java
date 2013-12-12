@@ -15,20 +15,23 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.planner.microoptimizations;
+package org.voltdb.utils;
 
-import java.util.List;
+import java.io.IOException;
+import java.io.PrintStream;
 
-import org.voltdb.compiler.DeterminismMode;
-import org.voltdb.planner.AbstractParsedStmt;
-import org.voltdb.planner.CompiledPlan;
+import org.voltdb.VoltTable;
 
-public abstract class MicroOptimization {
-    protected AbstractParsedStmt m_parsedStmt;
-
-    boolean shouldRun(DeterminismMode detMode) {
-        return true;
+/**
+ * Default output formatter for SQLCommand.
+ */
+class SQLCommandOutputFormatterDefault implements SQLCommandOutputFormatter
+{
+    @Override
+    public void printTable(PrintStream stream, VoltTable t, boolean includeColumnNames)
+            throws IOException
+    {
+        // Use the VoltTable pretty printer to display formatted output.
+        stream.println(t.toFormattedString());
     }
-
-    public abstract List<CompiledPlan> apply(CompiledPlan plan, AbstractParsedStmt parsedStmt) ;
 }

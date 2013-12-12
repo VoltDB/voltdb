@@ -198,6 +198,7 @@ public class BalancePartitionsStatistics extends StatsSource {
 
     public static interface Constants
     {
+        public final static String TIMESTAMP = "TIMESTAMP";
         public final static String PERCENTAGE_MOVED = "PERCENTAGE_MOVED";
         public final static String MOVED_ROWS = "MOVED_ROWS";
         public final static String ROWS_PER_SECOND = "ROWS_PER_SECOND";
@@ -212,6 +213,7 @@ public class BalancePartitionsStatistics extends StatsSource {
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns)
     {
+        columns.add(new ColumnInfo(Constants.TIMESTAMP, VoltType.BIGINT));
         columns.add(new ColumnInfo(Constants.PERCENTAGE_MOVED, VoltType.FLOAT));
         columns.add(new ColumnInfo(Constants.MOVED_ROWS, VoltType.BIGINT));
         columns.add(new ColumnInfo(Constants.ROWS_PER_SECOND, VoltType.FLOAT));
@@ -228,6 +230,7 @@ public class BalancePartitionsStatistics extends StatsSource {
     {
         final StatsPoint point = statsPoint;
 
+        rowValues[columnNameToIndex.get(Constants.TIMESTAMP)] = System.currentTimeMillis();
         rowValues[columnNameToIndex.get(Constants.PERCENTAGE_MOVED)] = point.getPercentageMoved();
         rowValues[columnNameToIndex.get(Constants.MOVED_ROWS)] = point.getMovedRows();
         rowValues[columnNameToIndex.get(Constants.ROWS_PER_SECOND)] = point.getRowsPerSecond();
@@ -373,17 +376,17 @@ public class BalancePartitionsStatistics extends StatsSource {
 
         double getThroughput()
         {
-            return movedBytes / getDurationMillis();
+            return getDurationMillis() == 0 ? 0.0 : movedBytes / getDurationMillis();
         }
 
         double getCompletedFraction()
         {
-            return (double)movedRanges / totalRanges;
+            return totalRanges == 0 ? 0.0 : (double)movedRanges / totalRanges;
         }
 
         public double getPercentageMoved()
         {
-            return (movedRanges / (double)totalRanges) * 100.0;
+            return totalRanges == 0 ? 0.0 : (movedRanges / (double)totalRanges) * 100.0;
         }
 
         public String getFormattedPercentageMovedRate()
@@ -395,7 +398,7 @@ public class BalancePartitionsStatistics extends StatsSource {
         public double getRowsPerSecond()
         {
             final double durationInSecs = getDurationMillis() / 1000.0;
-            return movedRows / durationInSecs;
+            return getDurationMillis() == 0 ? 0.0 : movedRows / durationInSecs;
         }
 
         public String getFormattedEstimatedRemaining()
@@ -414,32 +417,33 @@ public class BalancePartitionsStatistics extends StatsSource {
         public double getRangesPerSecond()
         {
             final double durationInSecs = getDurationMillis() / 1000.0;
-            return movedRanges / durationInSecs;
+            return getDurationMillis() == 0 ? 0.0 : movedRanges / durationInSecs;
         }
 
         public double getMegabytesPerSecond()
         {
-            return (movedBytes / (1024.0 * 1024.0)) / (getDurationMillis() / 1000.0);
+            return getDurationMillis() == 0 ?
+                    0.0 : (movedBytes / (1024.0 * 1024.0)) / (getDurationMillis() / 1000.0);
         }
 
         public double getInvocationsPerSecond()
         {
             final double durationInSecs = getDurationMillis() / 1000.0;
-            return invocationCount / durationInSecs;
+            return getDurationMillis() == 0 ? 0.0 : invocationCount / durationInSecs;
         }
 
         public double getAverageInvocationLatency()
         {
             //Convert to floating point millis
-            return getInvocationLatencyMillis() / (double)invocationCount;
+            return invocationCount == 0 ? 0.0 : getInvocationLatencyMillis() / (double)invocationCount;
         }
 
         public double getAverageInvocationTime() {
-            return TimeUnit.NANOSECONDS.toMillis(invocationTimeNanos) / (double)invocationCount;
+            return invocationCount == 0 ? 0.0 : TimeUnit.NANOSECONDS.toMillis(invocationTimeNanos) / (double)invocationCount;
         }
 
         public double getAverageInvocationTransferTime() {
-            return TimeUnit.NANOSECONDS.toMillis(invocationTransferTimeNanos) / (double)invocationCount;
+            return invocationCount == 0 ? 0.0 : TimeUnit.NANOSECONDS.toMillis(invocationTransferTimeNanos) / (double)invocationCount;
         }
 
         public final static String formatTimeInterval(double dms)
