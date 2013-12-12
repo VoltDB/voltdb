@@ -30,8 +30,8 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
+import org.voltdb.common.Constants;
 import org.voltdb.utils.Encoder;
-import org.voltdb.utils.MiscUtils;
 
 /**
  *  A client that connects to one or more nodes in a VoltCluster
@@ -249,7 +249,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             throw new java.io.InterruptedIOException("Interrupted while waiting for response");
         }
         if (cb.getResponse().getStatus() != ClientResponse.SUCCESS) {
-            throw new ProcCallException(cb.getResponse(), cb.getResponse().getStatusString(), cb.getResponse().getException());
+            throw new ProcCallException(cb.getResponse(), cb.getResponse().getStatusString(), null);
         }
         // cb.result() throws ProcCallException if procedure failed
         return cb.getResponse();
@@ -393,9 +393,9 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     private Object[] getUpdateCatalogParams(File catalogPath, File deploymentPath)
     throws IOException {
         Object[] params = new Object[2];
-        params[0] = MiscUtils.fileToBytes(catalogPath);
+        params[0] = ClientUtils.fileToBytes(catalogPath);
         if (deploymentPath != null) {
-            params[1] = new String(MiscUtils.fileToBytes(deploymentPath), "UTF-8");
+            params[1] = new String(ClientUtils.fileToBytes(deploymentPath), Constants.UTF8ENCODING);
         }
         else {
             params[1] = null;

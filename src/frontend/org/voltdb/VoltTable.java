@@ -23,7 +23,6 @@ import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.Arrays;
-import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.json_voltpatches.JSONArray;
@@ -31,12 +30,11 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.client.ClientUtils;
 import org.voltdb.common.Constants;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
-import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
-import org.voltdb.utils.MiscUtils;
 
 /*
  * The primary representation of a result set (of tuples) or a temporary
@@ -1297,8 +1295,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         if (mypos != theirpos) {
             return false;
         }
-        long checksum1 = MiscUtils.cheesyBufferCheckSum(m_buffer);
-        long checksum2 = MiscUtils.cheesyBufferCheckSum(other.m_buffer);
+        long checksum1 = ClientUtils.cheesyBufferCheckSum(m_buffer);
+        long checksum2 = ClientUtils.cheesyBufferCheckSum(other.m_buffer);
         boolean checksum = (checksum1 == checksum2);
         assert(verifyTableInvariants());
         return checksum;
@@ -1471,42 +1469,6 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      */
     public void setStatusCode(byte code) {
         m_buffer.put( 4, code);
-    }
-
-    public byte[] getCompressedBytes() throws IOException {
-        final int startPosition = m_buffer.position();
-        try {
-            m_buffer.position(0);
-            if (m_buffer.isDirect()) {
-                return CompressionService.compressBuffer(m_buffer);
-            } else {
-                assert(m_buffer.hasArray());
-                return CompressionService.compressBytes(
-                            m_buffer.array(),
-                            m_buffer.arrayOffset() + m_buffer.position(),
-                            m_buffer.limit());
-            }
-        } finally {
-            m_buffer.position(startPosition);
-        }
-    }
-
-    public Future<byte[]> getCompressedBytesAsync() throws IOException {
-        final int startPosition = m_buffer.position();
-        try {
-            m_buffer.position(0);
-            if (m_buffer.isDirect()) {
-                return CompressionService.compressBufferAsync(m_buffer.duplicate());
-            } else {
-                assert(m_buffer.hasArray());
-                return CompressionService.compressBytesAsync(
-                        m_buffer.array(),
-                        m_buffer.arrayOffset() + m_buffer.position(),
-                        m_buffer.limit());
-            }
-        } finally {
-            m_buffer.position(startPosition);
-        }
     }
 
     public int getSerializedSize() {

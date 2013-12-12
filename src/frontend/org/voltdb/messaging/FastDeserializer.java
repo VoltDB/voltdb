@@ -230,7 +230,7 @@ public class FastDeserializer implements DataInput {
      * @throws IOException
      */
     public BigDecimal readBigDecimal() throws IOException {
-        return VoltDecimalHelper.deserializeBigDecimal(this);
+        return VoltDecimalHelper.deserializeBigDecimal(buffer);
     }
 
     /**
