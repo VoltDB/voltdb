@@ -26,6 +26,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 import org.voltdb.VoltType;
+import org.voltdb.common.Constants;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 
@@ -196,14 +197,7 @@ public class FastDeserializer implements DataInput {
         // now assume not null
         final byte[] strbytes = new byte[len];
         readFully(strbytes);
-        String retval = null;
-        try {
-            retval = new String(strbytes, "UTF-8");
-        } catch (final UnsupportedEncodingException e) {
-            e.printStackTrace();
-        }
-
-        return retval;
+        return new String(strbytes, Constants.UTF8ENCODING);
     }
 
     /**
