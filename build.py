@@ -130,7 +130,7 @@ CTX.JNIBINFLAGS += " " + libpaths
 CTX.JNIBINFLAGS += " -ljava -ljvm -lverify"
 
 if CTX.PLATFORM == "Darwin":
-    CTX.CPPFLAGS += " -DMACOSX -arch x86_64 -Wno-unused-private-field"
+    CTX.CPPFLAGS += " -DMACOSX -arch x86_64"
     CTX.JNIEXT = "jnilib"
     CTX.JNILIBFLAGS = " -bundle"
     CTX.JNIBINFLAGS = " -framework JavaVM,1.7"
