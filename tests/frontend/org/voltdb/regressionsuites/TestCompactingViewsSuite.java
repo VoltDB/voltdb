@@ -56,10 +56,6 @@ public class TestCompactingViewsSuite extends RegressionSuite {
             public void clientCallback(ClientResponse clientResponse) throws Exception {
                 if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
                     System.err.println(clientResponse.getStatusString());
-                    if (clientResponse.getException() != null) {
-                        System.err.println(clientResponse.getException().getMessage());
-                        clientResponse.getException().printStackTrace();
-                    }
                 }
 
                 assertEquals(ClientResponse.SUCCESS, clientResponse.getStatus());

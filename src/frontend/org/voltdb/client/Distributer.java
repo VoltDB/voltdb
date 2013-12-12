@@ -48,11 +48,10 @@ import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.JdbcDatabaseMetaDataGenerator;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
-import org.voltdb.iv2.MpInitiator;
+import org.voltdb.common.Constants;
 
 /**
  *   De/multiplexes transactions across a cluster
@@ -705,7 +704,7 @@ class Distributer {
                 final Procedure procedureInfo = m_procedureInfo.get(invocation.getProcName());
 
                 if (procedureInfo != null) {
-                    Integer hashedPartition = MpInitiator.MP_INIT_PID;
+                    Integer hashedPartition = Constants.MP_INIT_PID;
                     if (!procedureInfo.multiPart) {
                         hashedPartition = m_hashinator.getHashedPartitionForParameter(
                                 procedureInfo.partitionParameterType,
@@ -958,11 +957,11 @@ class Distributer {
                 String jsString = vt.getString(6);
                 String procedureName = vt.getString(2);
                 JSONObject jsObj = new JSONObject(jsString);
-                boolean readOnly = jsObj.getBoolean(JdbcDatabaseMetaDataGenerator.JSON_READ_ONLY);
-                if (jsObj.getBoolean(JdbcDatabaseMetaDataGenerator.JSON_SINGLE_PARTITION)) {
-                    int partitionParameter = jsObj.getInt(JdbcDatabaseMetaDataGenerator.JSON_PARTITION_PARAMETER);
+                boolean readOnly = jsObj.getBoolean(Constants.JSON_READ_ONLY);
+                if (jsObj.getBoolean(Constants.JSON_SINGLE_PARTITION)) {
+                    int partitionParameter = jsObj.getInt(Constants.JSON_PARTITION_PARAMETER);
                     int partitionParameterType =
-                        jsObj.getInt(JdbcDatabaseMetaDataGenerator.JSON_PARTITION_PARAMETER_TYPE);
+                        jsObj.getInt(Constants.JSON_PARTITION_PARAMETER_TYPE);
                     m_procedureInfo.put(procedureName,
                             new Procedure(false,readOnly, partitionParameter, partitionParameterType));
                 } else {
