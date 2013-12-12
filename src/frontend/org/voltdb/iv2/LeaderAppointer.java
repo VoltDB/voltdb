@@ -60,7 +60,7 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
-import com.google_voltpatches.common.collect.ImmutableSortedMap;
+import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 /**
@@ -688,8 +688,8 @@ public class LeaderAppointer implements Promotable
         boolean retval = true;
         List<String> partitionDirs = null;
 
-        ImmutableSortedMap.Builder<Integer,Integer> lackingReplication =
-                ImmutableSortedMap.naturalOrder();
+        ImmutableSortedSet.Builder<KSafetyStats.StatsPoint> lackingReplication =
+                ImmutableSortedSet.naturalOrder();
 
         try {
             partitionDirs = m_zk.getChildren(VoltZK.leaders_initiators, null);
@@ -713,7 +713,7 @@ public class LeaderAppointer implements Promotable
                 VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
             }
         }
-
+        final long statTs = System.currentTimeMillis();
         for (String partitionDir : partitionDirs) {
             int pid = LeaderElector.getPartitionFromElectionDir(partitionDir);
 
@@ -749,15 +749,17 @@ public class LeaderAppointer implements Promotable
                         hostsOnRing.add(hostId);
                     }
                 }
-                if (!isInitializing && replicas.size() <= m_kfactor && !partitionNotOnHashRing) {
-                    lackingReplication.put(pid, m_kfactor + 1 - replicas.size());
+                if (!isInitializing && !partitionNotOnHashRing) {
+                    lackingReplication.add(
+                            new KSafetyStats.StatsPoint(statTs, pid, m_kfactor + 1 - replicas.size())
+                            );
                 }
             }
             catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
             }
         }
-        m_stats.setSafetyMap(lackingReplication.build());
+        m_stats.setSafetySet(lackingReplication.build());
 
         return retval;
     }
@@ -774,15 +776,9 @@ public class LeaderAppointer implements Promotable
         }
         m_callbacks.remove(pid);
         try {
-            try {
-                m_zk.delete(ZKUtil.joinZKPath(VoltZK.iv2masters, String.valueOf(pid)), -1);
-            } catch (KeeperException.NoNodeException e) {}
-            try {
-                m_zk.delete(ZKUtil.joinZKPath(VoltZK.iv2appointees, String.valueOf(pid)), -1);
-            } catch (KeeperException.NoNodeException e) {}
-            try {
-                m_zk.delete(ZKUtil.joinZKPath(VoltZK.leaders_initiators, "partition_" + String.valueOf(pid)), -1);
-            } catch (KeeperException.NoNodeException e) {}
+            ZKUtil.asyncDeleteRecursively(m_zk, ZKUtil.joinZKPath(VoltZK.iv2masters, String.valueOf(pid)));
+            ZKUtil.asyncDeleteRecursively(m_zk, ZKUtil.joinZKPath(VoltZK.iv2appointees, String.valueOf(pid)));
+            ZKUtil.asyncDeleteRecursively(m_zk, ZKUtil.joinZKPath(VoltZK.leaders_initiators, "partition_" + String.valueOf(pid)));
         } catch (Exception e) {
             tmLog.error("Error removing partition info", e);
         }

@@ -186,7 +186,7 @@ public class BalancePartitionsStatistics extends StatsSource {
 
     public static interface Constants
     {
-        public final static String TOTAL_RANGES = "TOTAL_RANGES";
+        public final static String TIMESTAMP = "TIMESTAMP";
         public final static String PERCENTAGE_MOVED = "PERCENTAGE_MOVED";
         public final static String MOVED_ROWS = "MOVED_ROWS";
         public final static String ROWS_PER_SECOND = "ROWS_PER_SECOND";
@@ -199,7 +199,7 @@ public class BalancePartitionsStatistics extends StatsSource {
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns)
     {
-        columns.add(new ColumnInfo(Constants.TOTAL_RANGES, VoltType.BIGINT));
+        columns.add(new ColumnInfo(Constants.TIMESTAMP, VoltType.BIGINT));
         columns.add(new ColumnInfo(Constants.PERCENTAGE_MOVED, VoltType.FLOAT));
         columns.add(new ColumnInfo(Constants.MOVED_ROWS, VoltType.BIGINT));
         columns.add(new ColumnInfo(Constants.ROWS_PER_SECOND, VoltType.FLOAT));
@@ -214,7 +214,7 @@ public class BalancePartitionsStatistics extends StatsSource {
     {
         final StatsPoint point = statsPoint;
 
-        rowValues[columnNameToIndex.get(Constants.TOTAL_RANGES)] = point.getTotalRanges();
+        rowValues[columnNameToIndex.get(Constants.TIMESTAMP)] = point.getEndTimeMillis();
         rowValues[columnNameToIndex.get(Constants.PERCENTAGE_MOVED)] = point.getPercentageMoved();
         rowValues[columnNameToIndex.get(Constants.MOVED_ROWS)] = point.getMovedRows();
         rowValues[columnNameToIndex.get(Constants.ROWS_PER_SECOND)] = point.getRowsPerSecond();
@@ -370,17 +370,17 @@ public class BalancePartitionsStatistics extends StatsSource {
 
         double getThroughput()
         {
-            return movedBytes / getDurationMillis();
+            return getDurationMillis() == 0 ? 0.0 : movedBytes / getDurationMillis();
         }
 
         double getCompletedFraction()
         {
-            return (double)movedRanges / totalRanges;
+            return totalRanges == 0 ? 0.0 : (double)movedRanges / totalRanges;
         }
 
         public double getPercentageMoved()
         {
-            return (movedRanges / (double)totalRanges) * 100.0;
+            return totalRanges == 0 ? 0.0 : (movedRanges / (double)totalRanges) * 100.0;
         }
 
         public String getFormattedPercentageMovedRate()
@@ -392,7 +392,7 @@ public class BalancePartitionsStatistics extends StatsSource {
         public double getRowsPerSecond()
         {
             final double durationInSecs = getDurationMillis() / 1000.0;
-            return movedRows / durationInSecs;
+            return getDurationMillis() == 0 ? 0.0 : movedRows / durationInSecs;
         }
 
         public String getFormattedEstimatedRemaining()
@@ -411,24 +411,25 @@ public class BalancePartitionsStatistics extends StatsSource {
         public double getRangesPerSecond()
         {
             final double durationInSecs = getDurationMillis() / 1000.0;
-            return movedRanges / durationInSecs;
+            return getDurationMillis() == 0 ? 0.0 : movedRanges / durationInSecs;
         }
 
         public double getMegabytesPerSecond()
         {
-            return (movedBytes / (1024.0 * 1024.0)) / (getDurationMillis() / 1000.0);
+            return getDurationMillis() == 0 ?
+                    0.0 : (movedBytes / (1024.0 * 1024.0)) / (getDurationMillis() / 1000.0);
         }
 
         public double getInvocationsPerSecond()
         {
             final double durationInSecs = getDurationMillis() / 1000.0;
-            return invocationCount / durationInSecs;
+            return getDurationMillis() == 0 ? 0.0 : invocationCount / durationInSecs;
         }
 
         public double getAverageInvocationTime()
         {
             //Convert to floating point millis
-            return getInvocationTimeMillis() / invocationCount;
+            return invocationCount == 0 ? 0.0 :getInvocationTimeMillis() / invocationCount;
         }
 
         public final static String formatTimeInterval(double dms)
