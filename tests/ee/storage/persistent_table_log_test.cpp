@@ -316,12 +316,14 @@ TEST_F(PersistentTableLogTest, InsertThenUndoInsertsOneTest) {
 }
 
 TEST_F(PersistentTableLogTest, FindBlockTest) {
-    const int blockSize = 20;
+    initTable(true);
+    const int blockSize = m_table->getTableAllocationSize();
+    TBBucketPtr bucket(new TBBucket());
 
     // these will be used as artificial tuple block addresses
-    TBPtr block1((TupleBlock *)malloc(1));
-    TBPtr block2((TupleBlock *)malloc(1));
-    TBPtr block3((TupleBlock *)malloc(1));
+    TBPtr block1(new TupleBlock(m_table, bucket));
+    TBPtr block2(new TupleBlock(m_table, bucket));
+    TBPtr block3(new TupleBlock(m_table, bucket));
 
     TBMap blocks;
     char *base = block1->address();
@@ -343,6 +345,11 @@ TEST_F(PersistentTableLogTest, FindBlockTest) {
               block1->address());
     ASSERT_EQ(PersistentTable::findBlock(base + blockSize * 4 - 1, blocks, blockSize)->address(),
               block3->address());
+
+    blocks.clear();
+    delete block1.get();
+    delete block2.get();
+    delete block3.get();
 }
 
 int main() {
