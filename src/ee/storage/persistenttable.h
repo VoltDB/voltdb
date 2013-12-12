@@ -734,6 +734,9 @@ inline TBPtr PersistentTable::findBlock(char *tuple, TBMap &blocks, int blockSiz
 
         // If the tuple is within the block boundaries, we found the block
         if (i.key() <= tuple && tuple < i.key() + blockSize) {
+            if (i.data().get() == NULL) {
+                throwFatalException("A block has gone missing in the tuple block map.");
+            }
             return i.data();
         }
     }

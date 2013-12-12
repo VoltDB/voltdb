@@ -82,7 +82,7 @@ CopyOnWriteContext::handleActivation(TableStreamType streamType)
 
     m_surgeon.activateSnapshot();
 
-    m_iterator.reset(new CopyOnWriteIterator(&getTable(), &m_surgeon, m_blocks.begin(), m_blocks.end()));
+    m_iterator.reset(new CopyOnWriteIterator(&getTable(), &m_surgeon, m_blocks));
 
     return ACTIVATION_SUCCEEDED;
 }
