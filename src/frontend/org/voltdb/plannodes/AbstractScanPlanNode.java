@@ -74,8 +74,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     public void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tableUpdated,
                                     Collection<String> indexes)
     {
-        assert(m_targetTableAlias != null);
-        tablesRead.add(m_targetTableAlias);
+        assert(m_targetTableName != null);
+        tablesRead.add(m_targetTableName);
     }
 
     @Override
