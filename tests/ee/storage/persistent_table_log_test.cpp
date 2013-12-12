@@ -319,12 +319,9 @@ TEST_F(PersistentTableLogTest, FindBlockTest) {
     const int blockSize = 20;
 
     // these will be used as artificial tuple block addresses
-    char addr1[1];
-    char addr2[1];
-    char addr3[1];
-    TBPtr block1((TupleBlock *)addr1);
-    TBPtr block2((TupleBlock *)addr2);
-    TBPtr block3((TupleBlock *)addr3);
+    TBPtr block1((TupleBlock *)malloc(1));
+    TBPtr block2((TupleBlock *)malloc(1));
+    TBPtr block3((TupleBlock *)malloc(1));
 
     TBMap blocks;
     char *base = block1->address();
