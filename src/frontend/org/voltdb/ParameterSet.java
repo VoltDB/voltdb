@@ -18,7 +18,6 @@
 package org.voltdb;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -125,11 +124,7 @@ public class ParameterSet implements JSONString {
                             if (strings[zz] == null) {
                                 size += 4;
                             } else {
-                                try {
-                                    arrayEncodedStrings[zz] = strings[zz].getBytes("UTF-8");
-                                } catch (UnsupportedEncodingException e) {
-                                    VoltDB.crashLocalVoltDB("Shouldn't happen", false, e);
-                                }
+                                arrayEncodedStrings[zz] = strings[zz].getBytes(Constants.UTF8ENCODING);
                                 size += 4 + arrayEncodedStrings[zz].length;
                             }
                         }
