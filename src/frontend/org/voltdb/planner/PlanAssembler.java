@@ -1591,10 +1591,10 @@ public class PlanAssembler {
                         return indexScanNode;
                     }
                 } else {
-
                     // either pure expression index or mix of expressions and simple columns
                     List<AbstractExpression> indexedExprs = null;
                     StmtTableScan fromTableScan = m_parsedSelect.stmtCache.get(idx);
+
                     try {
                         indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, fromTableScan);
                     } catch (JSONException e) {
@@ -1605,12 +1605,15 @@ public class PlanAssembler {
                     if (groupBys.size() > indexedExprs.size()) {
                         continue;
                     }
+                    ArrayList<AbstractExpression> allBindings = new ArrayList<AbstractExpression>();
                     for (int i = 0; i < groupBys.size(); i++) {
                         // ignore order of keys in GROUP BY expr
                         boolean foundMatch = false;
                         for (int j = 0; j < groupBys.size(); j++) {
                             AbstractExpression indexExpr = indexedExprs.get(j);
-                            if (groupBys.get(i).expression.bindingToIndexedExpression(indexExpr) != null ) {
+                            List<AbstractExpression> binding = groupBys.get(i).expression.bindingToIndexedExpression(indexExpr);
+                            if (binding != null ) {
+                                allBindings.addAll(binding);
                                 foundMatch = true;
                                 break;
                             }
@@ -1622,6 +1625,7 @@ public class PlanAssembler {
                     }
                     if (replacable) {
                         IndexScanPlanNode indexScanNode = new IndexScanPlanNode((SeqScanPlanNode)root, null, index, SortDirectionType.ASC);
+                        indexScanNode.setBindings(allBindings);
                         return indexScanNode;
                     }
                 }
