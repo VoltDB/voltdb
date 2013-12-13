@@ -223,33 +223,37 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     /**
      * Recursively build a set of table aliases read by the (sub)plan or (sub)plan fragment
-     * {@see AbstractPlanNode#getTablesAndIndexes(Collection, Collection, Collection, boolean)}
+     * {@see AbstractPlanNode#getTablesAndIndexes(Collection, Collection, Collection, Collection, Collection)}
      *
-     * @param tablesRead Set of tables read potentially added to at each recursive level.
+     * @param tableAliasesRead Set of table aliases read potentially added to at each recursive level.
      */
-    public final void getTablesReadByFragment(Collection<String> tablesRead)
+    public final void getTablesReadByFragment(Collection<String> tableAliasesRead)
     {
-        getTablesAndIndexes(tablesRead, null, null);
+        Collection<String> tablesRead = new ArrayList<String>();
+        getTablesAndIndexes(tablesRead, tableAliasesRead, null, null, null);
     }
     /**
-     * Recursively build sets of read and updated tables, as well as used indexes.
+     * Recursively build sets of read and updated tables, their aliases, as well as used indexes.
      *
-     * @param tablesRead Set of table aliases read potentially added to at each recursive level.
-     * @param tablesUpdated Set of tables updated/inserted into/deleted
+     * @param tablesRead Set of table names read potentially added to at each recursive level.
+     * @param tableAliasesRead Set of table aliases read potentially added to at each recursive level.
+     * @param tablesUpdated Set of table names updated/inserted into/deleted
+     * potentially added to at each recursive level.
+     * @param tableAliasesUpdated Set of table aliases updated/inserted into/deleted
      * potentially added to at each recursive level.
      * @param indexes Set of indexes potentially added to at each recursive level.
-     * @boolean acrossFragments Controls whether any ReceivePlanNode should be traversed
      * so that the sets will reflect the plan's other fragment.
      * Only the current fragment is of interest when called from the PlanAssembler.
      */
-    public void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tablesUpdated,
+    public void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tableAliasesRead,
+                                    Collection<String> tablesUpdated, Collection<String> tableAliasesUpdated,
                                     Collection<String> indexes)
     {
         for (AbstractPlanNode node : m_inlineNodes.values()) {
-            node.getTablesAndIndexes(tablesRead, tablesUpdated, indexes);
+            node.getTablesAndIndexes(tablesRead, tableAliasesRead, tablesUpdated, tableAliasesUpdated, indexes);
         }
         for (AbstractPlanNode node : m_children) {
-            node.getTablesAndIndexes(tablesRead, tablesUpdated, indexes);
+            node.getTablesAndIndexes(tablesRead, tableAliasesRead, tablesUpdated, tableAliasesUpdated, indexes);
         }
     }
 

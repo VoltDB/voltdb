@@ -1533,13 +1533,15 @@ public abstract class CatalogUtil {
                                               AbstractPlanNode bottomPlan)
     {
         Collection<String> tablesRead = new TreeSet<String>();
+        Collection<String> tableAliasesRead = new TreeSet<String>();
         Collection<String> tablesUpdated = new TreeSet<String>();
+        Collection<String> tableAliasesUpdated = new TreeSet<String>();
         Collection<String> indexes = new TreeSet<String>();
         if (topPlan != null) {
-            topPlan.getTablesAndIndexes(tablesRead, tablesUpdated, indexes);
+            topPlan.getTablesAndIndexes(tablesRead, tableAliasesRead, tablesUpdated, tableAliasesUpdated, indexes);
         }
         if (bottomPlan != null) {
-            bottomPlan.getTablesAndIndexes(tablesRead, tablesUpdated, indexes);
+            bottomPlan.getTablesAndIndexes(tablesRead, tableAliasesRead, tablesUpdated, tableAliasesUpdated, indexes);
         }
 
         // make useage only in either read or updated, not both

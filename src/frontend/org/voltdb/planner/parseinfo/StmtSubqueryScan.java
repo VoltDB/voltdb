@@ -55,7 +55,10 @@ public class StmtSubqueryScan extends StmtTableScan {
 
     @Override
     public boolean getIsreplicated() {
-        return m_tempTable.getIsreplicated();
+        if (m_isReplicated == null) {
+            m_isReplicated = new Boolean(m_tempTable.getIsreplicated());
+        }
+        return m_isReplicated.booleanValue();
     }
 
     @Override
@@ -123,5 +126,7 @@ public class StmtSubqueryScan extends StmtTableScan {
     PartitioningForStatement m_partitioning = null;
     // The mapping - the temp table column to the sub-query (column, table) pair
     Map<String, ParsedColInfo> m_columnMap = new HashMap<String, ParsedColInfo>();
+    // Replicated indicator
+    Boolean m_isReplicated = null;
 
 }

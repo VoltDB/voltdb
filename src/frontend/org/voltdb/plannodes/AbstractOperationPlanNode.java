@@ -40,8 +40,11 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public final void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tableUpdated,
-                                          Collection<String> indexes)
+    public void getTablesAndIndexes(Collection<String> tablesRead,
+                                    Collection<String> tableAliasesRead,
+                                    Collection<String> tableUpdated,
+                                    Collection<String> tableAliaseUpdated,
+                                    Collection<String> indexes)
     {
         assert(m_targetTableName.length() > 0);
         tableUpdated.add(m_targetTableName);

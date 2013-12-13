@@ -128,10 +128,13 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tableUpdated,
+    public void getTablesAndIndexes(Collection<String> tablesRead,
+                                    Collection<String> tableAliasesRead,
+                                    Collection<String> tableUpdated,
+                                    Collection<String> tableAliaseUpdated,
                                     Collection<String> indexes)
     {
-        super.getTablesAndIndexes(tablesRead, tableUpdated, indexes);
+        super.getTablesAndIndexes(tablesRead, tableAliasesRead, tableUpdated, tableUpdated, indexes);
         assert(m_targetIndexName.length() > 0);
         if (indexes != null) {
             assert(m_targetIndexName.length() > 0);

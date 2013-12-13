@@ -1105,10 +1105,13 @@ public abstract class SubPlanAssembler {
         plan.getTablesReadByFragment(tablesRead);
         for (String tableAliasName : tablesRead) {
             Integer tableIdx = m_parsedStmt.tableAliasIndexMap.get(tableAliasName);
-            assert(tableIdx != null);
-            StmtTableScan tableCache = m_parsedStmt.stmtCache.get(tableIdx);
-            if ( ! tableCache.getIsreplicated()) {
-                return false;
+            // The table may belong to a child sub-query. In such a case, it won't be in the
+            // parent cache.
+            if (tableIdx != null) {
+                StmtTableScan tableCache = m_parsedStmt.stmtCache.get(tableIdx);
+                if ( ! tableCache.getIsreplicated()) {
+                    return false;
+                }
             }
 
         }

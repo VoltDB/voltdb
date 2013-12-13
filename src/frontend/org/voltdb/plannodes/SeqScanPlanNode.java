@@ -23,6 +23,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 
 public class SeqScanPlanNode extends AbstractScanPlanNode {
@@ -114,11 +115,14 @@ public SeqScanPlanNode(String tableName, String tableAlias) {
                 if (columnAlias != null) {
                     columnName = columnAlias;
                 }
+                assert(col.getExpression() instanceof TupleValueExpression);
+                // Replace the current TVE with the new one.
+                TupleValueExpression colExpr = new TupleValueExpression(m_targetTableName, m_targetTableAlias, columnName, columnAlias);
                 SchemaColumn newCol = new SchemaColumn(m_targetTableName,
                         m_targetTableAlias,
                         columnName,
                         columnAlias,
-                        (AbstractExpression) col.getExpression().clone());
+                        colExpr);
                 m_tableSchema.addColumn(newCol);
             }
         }

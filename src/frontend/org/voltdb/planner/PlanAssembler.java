@@ -654,8 +654,6 @@ public class PlanAssembler {
             if (receivers.size() == 1) {
                 // The subplan SHOULD be good to go, but just make sure that it doesn't
                 // scan a partitioned table except under the ReceivePlanNode that was just found.
-                HashSet<String> tablesRead = new HashSet<String>();
-                root.getTablesReadByFragment(tablesRead);
                 if (! subAssembler.hasReplicatedResult(root)) {
                     throw new PlanningErrorException(
                             "This special case join between an outer replicated table and " +

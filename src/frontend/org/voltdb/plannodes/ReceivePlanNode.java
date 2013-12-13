@@ -88,7 +88,10 @@ public class ReceivePlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tableUpdated,
+    public void getTablesAndIndexes(Collection<String> tablesRead,
+                                    Collection<String> tableAliasesRead,
+                                    Collection<String> tableUpdated,
+                                    Collection<String> tableAliaseUpdated,
                                     Collection<String> indexes)
     {
         // ReceiveNode is a dead end. This method is not intended to cross fragments

@@ -71,11 +71,21 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tableUpdated,
+    public void getTablesAndIndexes(Collection<String> tablesRead,
+                                    Collection<String> tableAliasesRead,
+                                    Collection<String> tableUpdated,
+                                    Collection<String> tableAliaseUpdated,
                                     Collection<String> indexes)
     {
         assert(m_targetTableName != null);
-        tablesRead.add(m_targetTableName);
+        assert(m_targetTableAlias != null);
+        tableAliasesRead.add(m_targetTableAlias);
+        if (!m_isSubQuery) {
+            tablesRead.add(m_targetTableName);
+        } else {
+            assert(m_children.size() == 1);
+            m_children.get(0).getTablesAndIndexes(tablesRead, tableAliasesRead, tableUpdated, tableAliaseUpdated, indexes);
+        }
     }
 
     @Override
@@ -301,7 +311,6 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 throw new PlanningErrorException("Unable to find index for column: " +
                                            tve.getColumnName());
             }
-
             tve.setColumnIndex(index);
         }
 
