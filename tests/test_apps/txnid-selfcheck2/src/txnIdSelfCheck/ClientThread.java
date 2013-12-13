@@ -98,6 +98,8 @@ public class ClientThread extends Thread {
             try {
                   t1 = client.callProcedure("@AdHoc", sql1).getResults()[0];
                   t2 = client.callProcedure("@AdHoc", sql2).getResults()[0];
+                  // init the dimension table to have one record for each cid.
+                  client.callProcedure("PopulateDimension", cid);
                   break;
             }
             catch (Exception e) {

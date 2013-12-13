@@ -1,4 +1,5 @@
--- partitioned table
+-- partitioned tableSSUM
+
 CREATE TABLE partitioned
 (
   txnid      bigint             NOT NULL
@@ -13,12 +14,25 @@ CREATE TABLE partitioned
 , value      varbinary(1048576) NOT NULL
 , CONSTRAINT PK_id_p PRIMARY KEY
   (
-    txnid
+    cid, txnid
   )
 , UNIQUE ( cid, rid )
 );
 PARTITION TABLE partitioned ON COLUMN cid;
 CREATE INDEX P_CIDINDEX ON partitioned (cid);
+
+-- dimension table
+CREATE TABLE dimension
+(
+  cid        tinyint            NOT NULL
+, desc	     tinyint     		NOT NULL
+, CONSTRAINT PK_id_d PRIMARY KEY
+  (
+    cid
+  )
+, UNIQUE ( cid )
+);
+CREATE UNIQUE INDEX D_DESCINDEX ON dimension (desc);
 
 -- replicated table
 CREATE TABLE replicated
@@ -127,3 +141,4 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGRTableInsert;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonSP;
 PARTITION PROCEDURE PoisonSP ON TABLE partitioned COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonMP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PopulateDimension;

@@ -13,12 +13,25 @@ CREATE TABLE partitioned
 , value      varbinary(1048576) NOT NULL
 , CONSTRAINT PK_id_p PRIMARY KEY
   (
-    txnid
+    cid, txnid
   )
 , UNIQUE ( cid, rid )
 );
 PARTITION TABLE partitioned ON COLUMN cid;
 CREATE INDEX P_CIDINDEX ON partitioned (cid);
+
+-- dimension table
+CREATE TABLE dimension
+(
+  cid        tinyint            NOT NULL
+, desc       tinyint            NOT NULL
+, CONSTRAINT PK_id_d PRIMARY KEY
+  (
+    cid
+  )
+, UNIQUE ( cid )
+);
+CREATE INDEX D_CIDINDEX ON dimension (cid);
 
 -- replicated table
 CREATE TABLE replicated
