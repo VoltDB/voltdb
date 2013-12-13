@@ -155,7 +155,6 @@ public abstract class StatementCompiler {
             index++;
         }
         catalogStmt.setReplicatedtabledml(plan.replicatedTableDML);
-        partitioning.setIsReplicatedTableDML(plan.replicatedTableDML);
 
         // output the explained plan to disk (or caller) for debugging
         StringBuilder planDescription = new StringBuilder(1000); // Initial capacity estimate.

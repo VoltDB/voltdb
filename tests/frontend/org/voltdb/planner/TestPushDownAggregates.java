@@ -215,9 +215,8 @@ public class TestPushDownAggregates extends PlannerTestCase {
     //TODO: Not sure what this has to do with PushDownAggregates -- move this test case?
     public void testSinglePartOffset()
     {
-        List<AbstractPlanNode> pn = compileSinglePartitionToFragments("select PKEY from T1 order by PKEY limit 5 offset 1");
-        assertEquals(1, pn.size());
-        assertTrue(pn.get(0).toExplainPlanString().contains("LIMIT"));
+        AbstractPlanNode pn = compile("select PKEY from T1 order by PKEY limit 5 offset 1");
+        assertTrue(pn.toExplainPlanString().contains("LIMIT"));
     }
 
     public void testMultiPartOffset() {
