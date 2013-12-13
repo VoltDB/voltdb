@@ -26,7 +26,12 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 @VOLT.Command(
-    bundles = VOLT.ServerBundle('create'),
+    bundles = VOLT.ServerBundle('create',
+                                needs_catalog=True,
+                                supports_live=False,
+                                default_host=True,
+                                safemode_available=False,
+                                supports_daemon=True),
     options = (
         # Hidden option to restore the hashinator in addition to the tables.
         VOLT.BooleanOption('-r', '--replica', 'replica', 'start replica cluster', default = False),

@@ -41,6 +41,8 @@ import re
 import pkgutil
 import binascii
 import stat
+import daemon
+import signal
 import textwrap
 import string
 
@@ -54,6 +56,7 @@ class Global:
     debug_enabled   = False
     dryrun_enabled  = False
     manifest_path   = 'MANIFEST'
+    state_directory = ''
 
 #===============================================================================
 def set_dryrun(dryrun):
@@ -82,6 +85,24 @@ def set_debug(debug):
         Global.verbose_enabled = True
 
 #===============================================================================
+def set_state_directory(directory):
+#===============================================================================
+    if not os.path.exists(directory):
+        try:
+            os.makedirs(directory)
+        except (OSError, IOError), e:
+            abort('Error creating state directory "%s".' % directory, e)
+    Global.state_directory = os.path.expandvars(os.path.expanduser(directory))
+
+#===============================================================================
+def get_state_directory():
+#===============================================================================
+    """
+    Return and create as needed a path for saving state.
+    """
+    return Global.state_directory
+
+#===============================================================================
 def is_dryrun():
 #===============================================================================
     """
@@ -104,6 +125,11 @@ def is_debug():
     Return True if debug messages are enabled.
     """
     return Global.debug_enabled
+
+#===============================================================================
+def get_state_directory():
+#===============================================================================
+    return Global.state_directory
 
 #===============================================================================
 def display_messages(msgs, f = sys.stdout, tag = None, level = 0):
@@ -426,6 +452,109 @@ def pipe_cmd(*args):
         proc.stdout.close()
     except Exception, e:
         warning('Exception running command: %s' % ' '.join(args), e)
+
+#===============================================================================
+class Daemonizer(daemon.Daemon):
+#===============================================================================
+    """
+    Class that supports daemonization (inherited from the daemon module). The
+    current process, i.e. the running Python script is completely replaced by
+    the executed program.
+    """
+
+    def __init__(self, name, description, output=None):
+        """
+        Constructor. The optional "output" keyword specifies an override to
+        the default ~/.command_name output directory.
+        """
+        self.name = name
+        self.description = description
+        self.output_dir = output
+        if self.output_dir is None:
+            self.output_dir = get_state_directory()
+        pid = os.path.join(self.output_dir, '%s.pid' % name)
+        out = os.path.join(self.output_dir, '%s.out' % name)
+        err = os.path.join(self.output_dir, '%s.err' % name)
+        self.output_files = [out, err]
+        daemon.Daemon.__init__(self, pid, stdout=out, stderr=err)
+        # Clean up PID files of defunct processes.
+        self.purge_defunct()
+
+    def start_daemon(self, *args):
+        """
+        Start a daemon process.
+        """
+        # Replace existing output files.
+        for path in self.output_files:
+            if os.path.exists(path):
+                try:
+                    os.remove(path)
+                except (IOError, OSError), e:
+                    abort('Unable to remove the existing output file "%s".' % path, e)
+        try:
+            info('Starting %s in the background...' % (self.description), [
+                    'Output files are in "%s".' % self.output_dir
+                ])
+            self.start(*args)
+        except daemon.Daemon.AlreadyRunningException, e:
+            abort('A %s background process appears to be running.' % self.description, (
+                     'Process ID (PID): %d' % e.pid,
+                     'PID file: %s' % e.pidfile),
+                  'Please stop the process and try again.')
+        except (IOError, OSError), e:
+            abort('Unable to start the %s background process.' % self.description, e)
+
+    def stop_daemon(self, kill_signal=signal.SIGTERM):
+        """
+        Stop a daemon process.
+        """
+        try:
+            daemon.Daemon.stop(self, kill_signal=kill_signal)
+            info("%s (process ID %d) was stopped." % (self.description, self.pid))
+        except daemon.Daemon.NotRunningException, e:
+            if e.pid != -1:
+                addendum = ' as process ID %d' % e.pid
+            else:
+                addendum = ''
+            abort('%s is no longer running%s.' % (self.description, addendum))
+        except (IOError, OSError), e:
+            abort('Unable to stop the %s background process.' % self.description, e)
+
+    def on_started(self, *args_in):
+        """
+        Post-daemonization call-back.
+        """
+        # Strip out things requiring shell interpretation, e.g. quotes.
+        args = [arg.replace('"', '') for arg in args_in]
+        try:
+            os.execvp(args[0], args)
+        except (OSError, IOError), e:
+            abort('Failed to exec:', args, e)
+
+    def get_running(self):
+        """
+        Scan for PID files that have running processes.
+        Returns a list of the current running PIDs.
+        """
+        running = []
+        for path in glob.glob(os.path.join(self.output_dir, "*.pid")):
+            pid, alive = daemon.get_status(path)
+            if alive:
+                running.append(pid)
+        return running
+
+    def purge_defunct(self):
+        """
+        Purge PID files of defunct daemon processes.
+        """
+        for path in glob.glob(os.path.join(self.output_dir, "*.pid")):
+            pid, alive = daemon.get_status(path)
+            if not alive:
+                try:
+                    info('Deleting stale PID file "%s"...' % path)
+                    os.remove(path)
+                except (OSError, IOError), e:
+                    warning('Failed to delete PID file "%s".' % path, e)
 
 #===============================================================================
 def is_string(item):
