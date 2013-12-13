@@ -103,7 +103,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             m_outstandingWriteTasksLock.newCondition();
 
     private static final ListeningExecutorService m_es = CoreUtils.getSingleThreadExecutor("Snapshot write service ");
-    private static final ListeningScheduledExecutorService m_syncService = MoreExecutors.listeningDecorator(
+    static final ListeningScheduledExecutorService m_syncService = MoreExecutors.listeningDecorator(
             Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("Snapshot sync service")));
 
     public DefaultSnapshotDataTarget(
@@ -259,7 +259,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     m_bytesAllowedBeforeSync.release(bytesSinceLastSync);
                 }
             }
-        }, 1, 1, TimeUnit.SECONDS);
+        }, 500, 500, TimeUnit.MILLISECONDS);
         m_syncTask = syncTask;
     }
 
