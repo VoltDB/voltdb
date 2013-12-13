@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # This file is part of VoltDB.
 
 # Copyright (C) 2008-2013 VoltDB Inc.
@@ -26,28 +28,27 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import sys
+import os
+from toolrunner import env_path_fix, vmain, warning
 
-def show_config(runner):
-    if not runner.opts.arg:
-        # All labels.
-        for (key, value) in runner.config.query_pairs():
-            sys.stdout.write('%s=%s\n' % (key, value))
-    else:
-        # Specific keys requested.
-        for filter in runner.opts.arg:
-            n = 0
-            for (key, value) in runner.config.query_pairs(filter = filter):
-                sys.stdout.write('%s=%s\n' % (key, value))
-                n += 1
-            if n == 0:
-                sys.stdout.write('%s *not found*\n' % filter)
+# Make sure mysql_config is available.
+healthy = env_path_fix('PATH', ['/usr/local/mysql/bin'], ['mysql_config'])
+# On Mac make sure the client library is available.
+if sys.platform == 'darwin':
+    healthy |= env_path_fix('DYLD_LIBRARY_PATH', ['/usr/local/mysql/lib'], ['libmysqlclient.*.dylib'])
+if not healthy:
+    warning('The "mysql-python" module may have problems.',
+            'If errors occur please install, re-install, or repair MySQL,',
+            'or update the environment variable(s) mentioned above.')
+    if sys.platform != 'darwin':
+        warning('You may need to install an additional package with mysql_config.',
+                'E.g. on Ubuntu, "libmysqlclient-dev".')
 
-@VOLT.Multi_Command(
-    description  = 'Display various types of information.',
-    modifiers = [
-        VOLT.Modifier('config', show_config,
-                      'Display all or specific configuration key/value pairs.',
-                      arg_name = 'KEY')]
-)
-def show(runner):
-    runner.go()
+# Run in an automatically-built virtual environment that includes auto-
+# installed package dependencies.
+vmain(description='External database schema import commands.',
+      standalone=True,
+      packages=('mysql-python', 'ez_setup', 'schemaobject'),
+      directory=os.getcwd(),
+      verbose=sys.argv[1:]==['-v'],
+      libpath=os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])), 'lib', 'python'))

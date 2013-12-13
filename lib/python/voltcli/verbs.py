@@ -152,6 +152,7 @@ class CommandVerb(BaseVerb):
         # Allow the bundles to adjust options.
         for bundle in self.bundles:
             bundle.initialize(self)
+        self.add_options(cli.BooleanOption(None, '--dry-run', 'dryrun', None))
 
     def execute(self, runner):
         # Start the bundles, e.g. to create client a connection.
@@ -206,7 +207,7 @@ class PackageVerb(CommandVerb):
         self.set_defaults(description  = 'Create a runnable Python program package.',
                           baseverb     = True,
                           hideverb     = True,
-                          description2 = '''\
+                          description2 = '''
 The optional NAME argument(s) allow package generation for base commands other
 than the current one. If no NAME is provided the current base command is
 packaged.''')
@@ -256,8 +257,8 @@ class MultiVerb(CommandVerb):
                 usage = '%s %s' % (self.name, mod.name)
             rows.append((usage, mod.description))
         caption = '"%s" Command Variations' % self.name
-        description2 = utility.format_table(rows, caption = caption, separator = '  ')
-        self.set_defaults(description2 = description2.strip())
+        other_info = utility.format_table(rows, caption = caption, separator = '  ')
+        self.set_defaults(other_info = other_info.strip())
         args = [
             cli.StringArgument('modifier',
                                'command modifier (valid modifiers: %s)' % valid_modifiers)]
@@ -342,11 +343,12 @@ class VerbSpace(object):
     """
     Manages a collection of Verb objects that support a particular CLI interface.
     """
-    def __init__(self, name, version, description, VOLT, verbs):
+    def __init__(self, name, version, description, VOLT, scan_dirs, verbs):
         self.name        = name
         self.version     = version
         self.description = description.strip()
         self.VOLT        = VOLT
+        self.scan_dirs   = scan_dirs
         self.verbs       = verbs
         self.verb_names  = self.verbs.keys()
         self.verb_names.sort()
