@@ -52,7 +52,7 @@ public class TestPlansTPCC extends PlannerTestCase {
     }
 
     public void testSelectAllSQL() {
-        compile("SELECT * FROM WAREHOUSE;", 0);
+        compile("SELECT * FROM WAREHOUSE;");
     }
 
     public void testNewOrderSQL() {
