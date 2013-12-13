@@ -50,7 +50,9 @@ public class ProcedureInvocation {
         m_originalUniqueId = originalUniqueId;
         m_clientHandle = handle;
         m_procName = procName;
-        m_parameters = ParameterSet.fromArrayWithCopy(parameters);
+        m_parameters = (parameters != null
+                            ? ParameterSet.fromArrayWithCopy(parameters)
+                            : ParameterSet.emptyParameterSet());
 
         // auto-set the type if both txn IDs are set
         if (m_originalTxnId == -1 && m_originalUniqueId == -1) {
