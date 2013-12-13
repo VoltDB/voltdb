@@ -273,7 +273,7 @@ public class TestClientInterface {
         assertTrue(captor.getValue().payload instanceof AdHocPlannerWork );
         System.out.println( captor.getValue().payload.toString() );
         String payloadString = captor.getValue().payload.toString();
-        assertTrue(payloadString.contains("partition param index: -1"));
+        assertTrue(payloadString.contains("user partitioning: none"));
     }
 
     @Test
@@ -285,7 +285,7 @@ public class TestClientInterface {
         verify(m_messenger).send(eq(32L), captor.capture());
         assertTrue(captor.getValue().payload instanceof AdHocPlannerWork);
         String payloadString = captor.getValue().payload.toString();
-        assertTrue(payloadString.contains("partition param index: -1"));
+        assertTrue(payloadString.contains("user partitioning: none"));
 
         // single-part adhoc
         reset(m_messenger);
@@ -295,7 +295,6 @@ public class TestClientInterface {
         verify(m_messenger).send(eq(32L), captor.capture());
         assertTrue(captor.getValue().payload instanceof AdHocPlannerWork);
         payloadString = captor.getValue().payload.toString();
-        assertTrue(payloadString.contains("partition param index: -1"));
         assertTrue(payloadString.contains("user params: empty"));
         assertTrue(payloadString.contains("user partitioning: 3"));
     }
