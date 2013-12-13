@@ -24,8 +24,7 @@ import java.util.Map.Entry;
 import java.util.TreeMap;
 
 import org.voltcore.utils.EstTime;
-
-import org.voltdb.VoltDB;
+import org.voltdb.common.Constants;
 
 /**
  * Maintain a set of the last N recently used credentials and
@@ -95,7 +94,7 @@ public class AuthenticatedConnectionCache {
     }
 
     public AuthenticatedConnectionCache(int targetSize, String serverHostname) {
-        this(targetSize, serverHostname, VoltDB.DEFAULT_PORT, 0);
+        this(targetSize, serverHostname, Constants.DEFAULT_PORT, 0);
     }
 
     public AuthenticatedConnectionCache(int targetSize, String serverHostname, int serverPort, int adminPort) {
