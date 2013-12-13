@@ -80,10 +80,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             StringBuilder sb = new StringBuilder();
             sb.append(String.format("FRAGMENT PLAN HASH: %s\n", Encoder.hexEncode(m_planHash)));
             if (m_parameterSet != null) {
-                FastDeserializer fds = new FastDeserializer(m_parameterSet.asReadOnlyBuffer());
                 ParameterSet pset = null;
                 try {
-                    pset = ParameterSet.fromFastDeserializer(fds);
+                    pset = ParameterSet.fromByteBuffer(m_parameterSet.asReadOnlyBuffer());
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -263,14 +262,14 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                                                             boolean isForReplay) {
         ByteBuffer parambytes = null;
         if (params != null) {
-            FastSerializer fs = new FastSerializer();
+            parambytes = ByteBuffer.allocate(params.getSerializedSize());
             try {
-                params.writeExternal(fs);
+                params.flattenToBuffer(parambytes);
+                parambytes.flip();
             }
             catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Failed to serialize parameter for fragment: " + params.toString(), true, e);
             }
-            parambytes = fs.getBuffer();
         }
 
         FragmentTaskMessage ret = new FragmentTaskMessage(initiatorHSId, coordinatorHSId,
@@ -431,9 +430,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         ParameterSet params = null;
         final ByteBuffer paramData = m_items.get(index).m_parameterSet.asReadOnlyBuffer();
         if (paramData != null) {
-            final FastDeserializer fds = new FastDeserializer(paramData);
             try {
-                params = ParameterSet.fromFastDeserializer(fds);
+                params = ParameterSet.fromByteBuffer(paramData);
             }
             catch (final IOException e) {
                 hostLog.l7dlog(Level.FATAL,

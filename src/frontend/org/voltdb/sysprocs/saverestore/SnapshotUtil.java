@@ -42,7 +42,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.concurrent.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedTransferQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.json_voltpatches.JSONArray;
@@ -75,6 +78,7 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.common.Constants;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
@@ -1282,7 +1286,7 @@ public class SnapshotUtil {
                     VoltDB.crashLocalVoltDB("Failed to initiate snapshot", false, null);
                 } else if (resp.getStatus() != ClientResponseImpl.SUCCESS) {
                     VoltDB.crashLocalVoltDB("Failed to initiate snapshot: "
-                                            + resp.getStatusString(), true, resp.getException());
+                                            + resp.getStatusString(), true, null);
                 }
 
                 assert resp != null;
@@ -1403,7 +1407,7 @@ public class SnapshotUtil {
     }
 
     public static String formatHumanReadableDate(long timestamp) {
-        SimpleDateFormat sdf = new SimpleDateFormat(VoltDB.ODBC_DATE_FORMAT_STRING + "z");
+        SimpleDateFormat sdf = new SimpleDateFormat(Constants.ODBC_DATE_FORMAT_STRING + "z");
         sdf.setTimeZone(VoltDB.VOLT_TIMEZONE);
         return sdf.format(new Date(timestamp));
     }

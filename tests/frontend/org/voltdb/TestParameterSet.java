@@ -53,6 +53,7 @@ package org.voltdb;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Date;
 
 import junit.framework.TestCase;
@@ -61,6 +62,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.json_voltpatches.JSONException;
 import org.voltdb.types.TimestampType;
+import org.voltdb.types.VoltDecimalHelper;
 
 public class TestParameterSet extends TestCase {
     ParameterSet params;
@@ -455,5 +457,74 @@ public class TestParameterSet extends TestCase {
         assertNotSame(crc2, crc3);
         assertNotSame(crc2, crc4);
         assertNotSame(crc3, crc4);
+    }
+
+    public void testRoundtrip() throws IOException {
+        Byte byteparam = new Byte((byte) 2);
+        Short shortparam = new Short(Short.MAX_VALUE);
+        Integer intparam = new Integer(Integer.MIN_VALUE);
+        Long longparam = new Long(Long.MAX_VALUE -1);
+        Double doubleparam = new Double(Double.MAX_VALUE -1);
+        String stringparam = new String("ABCDE");
+        TimestampType dateparam = new TimestampType(); // current time
+        BigDecimal bigdecimalparam = new BigDecimal(7654321).setScale(VoltDecimalHelper.kDefaultScale);
+        VoltTable volttableparam = new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.INTEGER));
+        volttableparam.addRow(Integer.MAX_VALUE);
+
+        byte[] bytearray = new byte[] {(byte)'f', (byte)'o', (byte)'o'};
+        short[] shortarray = new short[] {Short.MAX_VALUE, Short.MIN_VALUE, (short)5};
+        int[] intarray = new int[] {Integer.MAX_VALUE, Integer.MIN_VALUE, 5};
+        double[] doublearray = new double[] {Double.MAX_VALUE, Double.MIN_VALUE, 5.5};
+        String[] stringarray = new String[] {"ABC", "DEF", "HIJ"};
+        TimestampType[] datearray = new TimestampType[] {new TimestampType(), new TimestampType(), new TimestampType()};
+
+        BigDecimal bdtmp1 = new BigDecimal(7654321).setScale(VoltDecimalHelper.kDefaultScale);
+        BigDecimal bdtmp2 = new BigDecimal(654321).setScale(VoltDecimalHelper.kDefaultScale);
+        BigDecimal bdtmp3 = new BigDecimal(54321).setScale(VoltDecimalHelper.kDefaultScale);
+        BigDecimal[] bigdecimalarray = new BigDecimal[] {bdtmp1, bdtmp2, bdtmp3};
+
+        VoltTable vttmp1 = new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.INTEGER),
+                new VoltTable.ColumnInfo("bar", VoltType.STRING));
+        vttmp1.addRow(Integer.MAX_VALUE, "ry@nlikestheyankees");
+        VoltTable vttmp2 = new VoltTable(new VoltTable.ColumnInfo("bar", VoltType.INTEGER),
+                new VoltTable.ColumnInfo("bar", VoltType.STRING));
+        vttmp2.addRow(Integer.MIN_VALUE, null);
+        VoltTable vttmp3 = new VoltTable(new VoltTable.ColumnInfo("far", VoltType.INTEGER),
+                new VoltTable.ColumnInfo("bar", VoltType.STRING));
+        vttmp3.addRow(new Integer(5), "");
+        VoltTable[] volttablearray = new VoltTable[] { vttmp1, vttmp2, vttmp3 };
+
+        assertTrue(bigdecimalparam.scale() == VoltDecimalHelper.kDefaultScale);
+        assertTrue(bdtmp1.scale() == VoltDecimalHelper.kDefaultScale);
+        assertTrue(bdtmp2.scale() == VoltDecimalHelper.kDefaultScale);
+        assertTrue(bdtmp3.scale() == VoltDecimalHelper.kDefaultScale);
+
+        ParameterSet pset = ParameterSet.fromArrayNoCopy(byteparam,
+                                                         shortparam,
+                                                         intparam,
+                                                         longparam,
+                                                         doubleparam,
+                                                         stringparam,
+                                                         dateparam,
+                                                         bigdecimalparam,
+                                                         volttableparam,
+                                                         bytearray,
+                                                         shortarray,
+                                                         intarray,
+                                                         doublearray,
+                                                         stringarray,
+                                                         datearray,
+                                                         bigdecimalarray,
+                                                         volttablearray);
+
+        ByteBuffer buf = ByteBuffer.allocate(pset.getSerializedSize());
+        pset.flattenToBuffer(buf);
+        buf.flip();
+        ParameterSet pset2 = ParameterSet.fromByteBuffer(buf);
+
+        Object[] pset1array = pset.toArray();
+        Object[] pset2array = pset2.toArray();
+
+        assertTrue(Arrays.deepEquals(pset1array, pset2array));
     }
 }

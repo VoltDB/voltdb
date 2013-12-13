@@ -175,7 +175,6 @@ class VerbRunner(object):
         self.verbspace    = verbspace
         self.config       = config
         self.default_func = None
-        self.project_path = os.path.join(os.getcwd(), 'project.xml')
         # The internal verbspaces are just used for packaging other verbspaces.
         self.internal_verbspaces = internal_verbspaces
         # Create a Java runner.
@@ -455,6 +454,19 @@ class VerbRunner(object):
         self.setup_daemon_kwargs(kwargs, name=name, description=description, output=output)
         return self._get_daemonizer(**kwargs)
 
+    def find_resource(self, name, required=False):
+        """
+        Find a resource file.
+        """
+        if self.verbspace.scan_dirs:
+            for scan_dir in self.verbspace.scan_dirs:
+                path = os.path.join(scan_dir, name)
+                if os.path.exists(path):
+                    return path
+        if required:
+            utility.abort('Resource file "%s" is missing.' % name)
+        return None
+
     def _print_verb_help(self, verb_name):
         # Internal method to display help for a verb
         verb = self.verbspace.verbs[verb_name]
@@ -579,8 +591,9 @@ def load_verbspace(command_name, command_dir, config, version, description, pack
     # script location and the location of this module. The executed modules
     # have decorator calls that populate the verbs dictionary.
     finder = utility.PythonSourceFinder()
-    for scan_dir in scan_base_dirs:
-        finder.add_path(os.path.join(scan_dir, verbs_subdir))
+    scan_dirs = [os.path.join(d, verbs_subdir) for d in scan_base_dirs]
+    for scan_dir in scan_dirs:
+        finder.add_path(scan_dir)
     # If running from a zip package add resource locations.
     if package:
         finder.add_resource('__main__', os.path.join('voltcli', verbs_subdir))
@@ -593,7 +606,7 @@ def load_verbspace(command_name, command_dir, config, version, description, pack
         if verb_name not in verbs:
             verbs[verb_name] = verb_cls(verb_name, default_func)
 
-    return VerbSpace(command_name, version, description, namespace_VOLT, verbs)
+    return VerbSpace(command_name, version, description, namespace_VOLT, scan_dirs, verbs)
 
 #===============================================================================
 class VoltConfig(utility.PersistentConfig):
@@ -619,7 +632,8 @@ class VoltCLIParser(cli.CLIParser):
         """
         VoltCLIParser constructor.
         """
-        cli.CLIParser.__init__(self, verbspace.verbs,
+        cli.CLIParser.__init__(self, environment.command_name,
+                                     verbspace.verbs,
                                      base_cli_spec.options,
                                      base_cli_spec.usage,
                                      '\n'.join((verbspace.description,
@@ -639,6 +653,8 @@ def run_command(verbspace, internal_verbspaces, config, *args, **kwargs):
     # Initialize utility function options according to parsed options.
     utility.set_verbose(command.opts.verbose)
     utility.set_debug(  command.opts.debug)
+    if hasattr(command.opts, 'dryrun'):
+        utility.set_dryrun( command.opts.dryrun)
 
     # Run the command. Pass along kwargs. This allows verbs calling other verbs
     # to add keyword arguments like "classpath".
@@ -666,8 +682,8 @@ def main(command_name, command_dir, version, description, *args, **kwargs):
         utility.set_debug(opts.debug)
 
         # Load the configuration and state
-        permanent_path = os.path.join(os.getcwd(), 'volt.cfg')
-        local_path     = os.path.join(os.getcwd(), 'volt_local.cfg')
+        permanent_path = os.path.join(os.getcwd(), environment.config_name)
+        local_path     = os.path.join(os.getcwd(), environment.config_name_local)
         config = VoltConfig(permanent_path, local_path)
 
         # Initialize the environment

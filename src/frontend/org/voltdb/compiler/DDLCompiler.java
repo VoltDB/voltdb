@@ -59,6 +59,7 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
+import org.voltdb.planner.StmtTableScan;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
@@ -1767,8 +1768,9 @@ public class DDLCompiler {
 
             // complex group by exprs
             if (groupbyExprs != null) {
+                StmtTableScan tableScan = StmtTableScan.getStmtTableScan(srcTable);
                 try {
-                    indexedExprs = AbstractExpression.fromJSONArrayString(expressionjson);
+                    indexedExprs = AbstractExpression.fromJSONArrayString(expressionjson, tableScan);
                 } catch (JSONException e) {
                     e.printStackTrace();
                     assert(false);

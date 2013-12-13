@@ -131,14 +131,14 @@ else
     VOLTDB_LIB=$VOLTDB_HOME/lib
 fi
 
-JAVA_HEAP_MAX=-Xmx1024m
+JAVA_HEAP_MAX=-Xmx2048m
 
 # check envvars which might override default args
 if [ -n "${VOLTDB_HEAPSIZE:+x}" ]; then
   #echo "run with heapsize $VOLTDB_HEAPSIZE"
   JAVA_HEAP_MAX="-Xmx""$VOLTDB_HEAPSIZE""m"
 else
-  JAVA_HEAP_MAX="-Xmx1024m"
+  JAVA_HEAP_MAX="-Xmx2048m"
 fi
 #echo $JAVA_HEAP_MAX
 

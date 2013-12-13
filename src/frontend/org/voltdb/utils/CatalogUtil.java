@@ -106,6 +106,7 @@ import org.voltdb.compilereport.StatementAnnotation;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.planner.StmtTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
@@ -166,28 +167,6 @@ public abstract class CatalogUtil {
         }
 
         return serializedCatalog;
-    }
-
-    /**
-     * Serialize a file into bytes. Used to serialize catalog and deployment
-     * file for UpdateApplicationCatalog on the client.
-     *
-     * @param path
-     * @return a byte array of the file
-     * @throws IOException
-     *             If there are errors reading the file
-     */
-    public static byte[] toBytes(File path) throws IOException {
-        FileInputStream fin = new FileInputStream(path);
-        byte[] buffer = new byte[(int) fin.getChannel().size()];
-        try {
-            if (fin.read(buffer) == -1) {
-                throw new IOException("File " + path.getAbsolutePath() + " is empty");
-            }
-        } finally {
-            fin.close();
-        }
-        return buffer;
     }
 
     /**
@@ -455,7 +434,8 @@ public abstract class CatalogUtil {
             } else {
                 List<AbstractExpression> indexedExprs = null;
                 try {
-                    indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring);
+                    indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring,
+                            StmtTableScan.getStmtTableScan(catalog_tbl));
                 } catch (JSONException e) {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
@@ -1691,7 +1671,7 @@ public abstract class CatalogUtil {
             indexSize = getSortedCatalogItems(index.getColumns(), "index").size();
         } else {
             try {
-                indexSize = AbstractExpression.fromJSONArrayString(jsonstring).size();
+                indexSize = AbstractExpression.fromJSONArrayString(jsonstring, null).size();
             } catch (JSONException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();

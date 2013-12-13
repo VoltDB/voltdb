@@ -73,21 +73,14 @@ public class ConstraintFailureException extends SQLException {
     }
 
     /**
-     * Get the table containing the involved tuples (target and source) that caused the constraint violation. The table
-     * is lazy deserialized for performance.
+     * Get the table containing the involved tuples (target and source) that caused the constraint violation.
      */
     public VoltTable getTuples() {
         if (table != null) {
             return table;
         }
 
-        table = PrivateVoltTableFactory.createUninitializedVoltTable();
-        try {
-            table.readExternal(new FastDeserializer(buffer));
-        } catch (IOException e) {
-            LOG.severe(e.toString());
-            return null;
-        }
+        table = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(buffer);
 
         return table;
     }
@@ -124,7 +117,12 @@ public class ConstraintFailureException extends SQLException {
             sb.append(", Table CatalogId ");
             sb.append(tableName);
             sb.append('\n');
-            sb.append(getTuples().toString());
+            sb.append("Relevant Tuples:\n");
+            sb.append(getTuples().toFormattedString());
+            // remove trailing whitespace
+            while (Character.isWhitespace(sb.charAt(sb.length() - 1))) {
+                sb.setLength(sb.length() - 1);
+            }
             return sb.toString();
         }
     }

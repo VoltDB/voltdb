@@ -29,10 +29,10 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import junit.framework.TestCase;
 
+import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.InsertNewOrder;
-import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
@@ -46,6 +46,7 @@ import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.multipartitionprocs.MultiSiteSelect;
 
 public class TestTwoSitePlans extends TestCase {
@@ -82,7 +83,7 @@ public class TestTwoSitePlans extends TestCase {
         pb.compile(catalogJar, 2, 0);
 
         // load a catalog
-        byte[] bytes = CatalogUtil.toBytes(new File(catalogJar));
+        byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
         String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
 
         // create the catalog (that will be passed to the ClientInterface

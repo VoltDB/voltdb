@@ -20,10 +20,10 @@ package org.voltdb.planner.microoptimizations;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DeterminismMode;
+import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
@@ -51,7 +51,8 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
     }
 
     @Override
-    public List<CompiledPlan> apply(CompiledPlan plan, Database db) {
+    public List<CompiledPlan> apply(CompiledPlan plan, AbstractParsedStmt parsedStmt) {
+        this.m_parsedStmt = parsedStmt;
         ArrayList<CompiledPlan> retval = new ArrayList<CompiledPlan>();
 
         //TODO: This should not further penalize seqscan plans that have
@@ -60,7 +61,7 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
         AbstractPlanNode planGraph = plan.rootPlanGraph;
 
         if (!plan.isOrderDeterministic()) {
-            planGraph = recursivelyApply(planGraph, db);
+            planGraph = recursivelyApply(planGraph);
             plan.rootPlanGraph = planGraph;
         }
 
@@ -68,7 +69,7 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
         return retval;
     }
 
-    AbstractPlanNode recursivelyApply(AbstractPlanNode plan, Database db)
+    AbstractPlanNode recursivelyApply(AbstractPlanNode plan)
     {
         assert(plan != null);
 
@@ -84,7 +85,7 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
 
         for (AbstractPlanNode child : children) {
             // TODO this will break when children feed multiple parents
-            AbstractPlanNode newChild = recursivelyApply(child, db);
+            AbstractPlanNode newChild = recursivelyApply(child);
             // Do a graft into the (parent) plan only if a replacement for a child was found.
             if (newChild == child) {
                 continue;
@@ -103,7 +104,7 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
         SeqScanPlanNode scanNode = (SeqScanPlanNode) plan;
 
         String tableName = scanNode.getTargetTableName();
-        Table table = db.getTables().get(tableName);
+        Table table = m_parsedStmt.m_db.getTables().get(tableName);
         assert(table != null);
 
         Index indexToScan = null;
