@@ -121,7 +121,7 @@ public class TestVoltMessageSerialization extends TestCase {
 
         InitiateResponseMessage iresponse = new InitiateResponseMessage(itask);
         iresponse.setResults( new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
-                new VoltTable[] { table, table }, "knockknockbananna", new EEException(1)));
+                new VoltTable[] { table, table }, "knockknockbananna"));
         iresponse.setClientHandle(99);
 
         InitiateResponseMessage iresponse2 = (InitiateResponseMessage) checkVoltMessage(iresponse);
@@ -144,7 +144,7 @@ public class TestVoltMessageSerialization extends TestCase {
 
         InitiateResponseMessage iresponse = new InitiateResponseMessage(itask);
         iresponse.setResults( new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
-                new VoltTable[] { table, table }, "knockknockbananna", new EEException(1)));
+                new VoltTable[] { table, table }, "knockknockbananna"));
         iresponse.setClientHandle(99);
 
         InitiateResponseMessage iresponse2 = (InitiateResponseMessage) checkVoltMessage(iresponse);

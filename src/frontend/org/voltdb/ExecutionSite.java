@@ -1331,9 +1331,8 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             Deque<SnapshotTableTask> tasks,
             List<SnapshotDataTarget> targets,
             long txnId,
-            int numLiveHosts,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
-        m_snapshotter.initiateSnapshots(m_systemProcedureContext, format, tasks, targets, txnId, numLiveHosts,
+        m_snapshotter.initiateSnapshots(m_systemProcedureContext, format, tasks, targets, txnId,
                                         exportSequenceNumbers);
     }
 

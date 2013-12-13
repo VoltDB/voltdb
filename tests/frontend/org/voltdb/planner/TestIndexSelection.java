@@ -52,14 +52,15 @@ public class TestIndexSelection extends PlannerTestCase {
         AbstractPlanNode pn = compile("select id from a, t where a.id < (t.a + ?);");
         pn = pn.getChild(0);
         pn = pn.getChild(0);
-        // System.out.println("DEBUG: " + pn.toExplainPlanString());
+//        System.out.println("DEBUG: " + pn.toExplainPlanString());
         assertTrue(pn instanceof NestLoopIndexPlanNode);
         IndexScanPlanNode indexScan = (IndexScanPlanNode)pn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
         assertEquals(IndexLookupType.LT, indexScan.getLookupType());
         assertTrue(indexScan.toJSONString().contains("\"TARGET_INDEX_NAME\":\"SYS_IDX_ID_"));
         pn = pn.getChild(0);
         assertTrue(pn instanceof SeqScanPlanNode);
-        assertTrue(pn.toJSONString().contains("\"TABLE_NAME\":\"T\""));
+//        System.out.println("DEBUG: " + pn.toJSONString());
+        assertTrue(pn.toJSONString().contains("\"TARGET_TABLE_NAME\":\"T\""));
     }
 
     // This tests recognition of covering parameters to prefer a hash index that would use a

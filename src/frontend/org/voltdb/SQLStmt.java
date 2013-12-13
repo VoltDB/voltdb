@@ -111,6 +111,18 @@ public class SQLStmt {
      */
     @Override
     protected void finalize() throws Throwable {
+        // I have some doubts as to whether site is ever null, whether it ever should be,
+        // and whether it should be the determining factor in this cleanup code.
+        // "site" is only used here and arguably abused as a null/non-null boolean.
+        // The interesting cases to consider are:
+        // - the standard SQLStmts that are defined in user VoltProcedure classes.
+        // Oddly, these can be static members or instance members based on the whim of the user
+        //  -- are SQLStmts in either of these cases "finalized" before site shutdown,
+        // at a time when refreshing them in the LRU isn't pointless?
+        // - the dynamic SQLStmts built for ad hoc queries.
+        // These include client-issued ad hocs and "experimental" stored-proc-issued ad hocs.
+        // I'm totally guessing that site==null was supposed to distinguish somehow among
+        // some of these cases but I don't really know, or know which or know why or know how. --paul
         if (site != null) {
             ActivePlanRepository.decrefPlanFragmentById(aggregator.id);
             if (collector != null) {

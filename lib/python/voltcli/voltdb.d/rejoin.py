@@ -26,7 +26,12 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 @VOLT.Command(
-    bundles = VOLT.ServerBundle('rejoin', False, True, False),
+    bundles = VOLT.ServerBundle('rejoin',
+                                needs_catalog=False,
+                                supports_live=True,
+                                default_host=False,
+                                safemode_available=False,
+                                supports_daemon=True),
     description = 'Rejoin the current node to a VoltDB cluster.'
 )
 def rejoin(runner):

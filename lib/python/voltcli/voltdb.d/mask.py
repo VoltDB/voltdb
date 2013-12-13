@@ -61,5 +61,5 @@ def mask(runner):
 
     # Build the positional and keyword argument lists and invoke the scrambler
     args = runner.opts.deploymentfile
-    runner.java.execute(CatalogPasswordScrambler, None, *args)
+    runner.java_execute(CatalogPasswordScrambler, None, *args)
 

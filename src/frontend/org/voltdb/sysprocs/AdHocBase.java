@@ -76,7 +76,9 @@ public abstract class AdHocBase extends VoltSystemProcedure {
 
         ByteBuffer buf = ByteBuffer.wrap(serializedBatchData);
         AdHocPlannedStatement[] statements = null;
+        Object[] userparams = null;
         try {
+            userparams = AdHocPlannedStmtBatch.userParamsFromBuffer(buf);
             statements = AdHocPlannedStmtBatch.planArrayFromBuffer(buf);
         }
         catch (IOException e) {
@@ -105,7 +107,6 @@ public abstract class AdHocBase extends VoltSystemProcedure {
                 collectorFragId = ActivePlanRepository.loadOrAddRefPlanFragment(
                         statement.core.collectorHash, statement.core.collectorFragment);
             }
-
             SQLStmt stmt = SQLStmtAdHocHelper.createWithPlan(
                     statement.sql,
                     aggFragId,
@@ -119,7 +120,14 @@ public abstract class AdHocBase extends VoltSystemProcedure {
                     statement.core.parameterTypes,
                     m_site);
 
-            voltQueueSQL(stmt, statement.extractedParamValues.toArray());
+            // When there are no user-provided parameters, statements may have parameterized constants.
+            Object[] params;
+            if (userparams.length > 0) {
+                params = userparams;
+            } else {
+                params = statement.extractedParamArray();
+            }
+            voltQueueSQL(stmt, params);
         }
 
         return voltExecuteSQL(true);

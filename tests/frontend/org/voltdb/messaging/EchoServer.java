@@ -45,6 +45,7 @@ public class EchoServer {
 
     static void echo(byte[] t, byte[] buffer, int length) {
         VoltType type = null;
+        ByteBuffer buf;
 
         if (t[0] == ARRAY_BEGIN) {
             isArray = true;
@@ -108,12 +109,15 @@ public class EchoServer {
                     fs.writeLong(micros);
                     break;
                 case DECIMAL:
-                    BigDecimal bd = VoltDecimalHelper.deserializeBigDecimal(fds);
-                    VoltDecimalHelper.serializeBigDecimal(bd, fs);
+                    BigDecimal bd = VoltDecimalHelper.deserializeBigDecimal(fds.buffer());
+                    buf = ByteBuffer.allocate(16);
+                    VoltDecimalHelper.serializeBigDecimal(bd, buf);
+                    buf.flip();
+                    fs.write(buf);
                     break;
                 case VOLTTABLE:
                     VoltTable table = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(fds.buffer());
-                    ByteBuffer buf = ByteBuffer.allocate(table.getSerializedSize());
+                    buf = ByteBuffer.allocate(table.getSerializedSize());
                     table.flattenToBuffer(buf);
                     buf.flip();
                     fs.write(buf);
