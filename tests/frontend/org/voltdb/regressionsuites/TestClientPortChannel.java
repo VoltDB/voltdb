@@ -583,6 +583,18 @@ public class TestClientPortChannel extends TestCase {
         i7[21 + 1] = iarr[1];
         verifyInvocation(i7, channel, (byte) -2);
 
+        //Lie data type invaid data type.
+        byte i71[] = {0, //Version
+            0, 0, 0, 8,
+            'A', '.', 'i', 'n', 's', 'e', 'r', 't', //proc string length and name
+            0, 0, 0, 0, 0, 0, 0, 0, //Client Data
+            0, 0, 26, //98 bad
+        };
+        iarr = ByteBuffer.allocate(2).putShort((short) 1).array();
+        i71[21] = iarr[0];
+        i71[21 + 1] = iarr[1];
+        verifyInvocation(i71, channel, (byte) -2);
+
         //Test Good Ping at end to ensure server is up.
         System.out.println("Testing good Ping invocation Again");
         byte pingr[] = {0, //Version

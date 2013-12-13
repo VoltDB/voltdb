@@ -324,12 +324,12 @@ public enum VoltType {
     }
 
     private final static Map<Class<?>, VoltType> s_classes;
-    private final static Map<Byte, VoltType> s_types;
+    //Update this if you add a type.
+    private final static VoltType s_types[] = new VoltType[26];
     static {
         s_classes = new HashMap<Class<?>, VoltType>();
-        s_types = new HashMap<Byte, VoltType>();
         for (VoltType type : values()) {
-            s_types.put(type.m_val, type);
+            s_types[type.m_val] = type;
             for (Class<?> cls : type.m_classes) {
                 // Avoid subtle effects when VoltTypes have duplicate m_classes entries (java classes),
                 // so that the association of a java class with the earlier VoltType gets obliterated
@@ -391,7 +391,7 @@ public enum VoltType {
      * @return The appropriate enum value
      */
     public static VoltType get(byte val) {
-        VoltType type = s_types.get(val);
+        VoltType type = (val < s_types.length) ? s_types[val] : null;
         if (type == null) {
             throw new AssertionError("Unknown type: " + String.valueOf(val));
         }
