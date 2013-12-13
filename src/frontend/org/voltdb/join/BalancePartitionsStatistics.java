@@ -31,7 +31,6 @@ import java.util.Iterator;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 
-import com.google_voltpatches.common.base.Stopwatch;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.StatsSource;
 import org.voltdb.VoltTable.ColumnInfo;
