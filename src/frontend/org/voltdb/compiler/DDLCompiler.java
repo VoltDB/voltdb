@@ -1825,6 +1825,11 @@ public class DDLCompiler {
             throw m_compiler.new VoltCompilerException(msg);
         }
 
+        if (!stmt.tempTableList.isEmpty()) {
+            msg += "contains sub-queries which are not allowed.";
+            throw m_compiler.new VoltCompilerException(msg);
+        }
+
         if (displayColCount <= groupColCount) {
             msg += "has too few columns.";
             throw m_compiler.new VoltCompilerException(msg);

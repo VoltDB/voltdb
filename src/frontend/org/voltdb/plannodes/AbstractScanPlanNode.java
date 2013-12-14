@@ -307,10 +307,6 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         for (TupleValueExpression tve : predicate_tves)
         {
             int index = tve.resolveColumnIndexesUsingSchema(m_tableSchema);
-            if (index == -1) {
-                throw new PlanningErrorException("Unable to find index for column: " +
-                                           tve.getColumnName());
-            }
             tve.setColumnIndex(index);
         }
 
@@ -336,11 +332,6 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 assert(col.getExpression() instanceof TupleValueExpression);
                 TupleValueExpression tve = (TupleValueExpression)col.getExpression();
                 int index = tve.resolveColumnIndexesUsingSchema(m_tableSchema);
-                if (index == -1) {
-                    throw new PlanningErrorException("Unable to find index for column: " +
-                                               col.toString());
-                }
-
                 tve.setColumnIndex(index);
             }
             m_outputSchema.sortByTveIndex();

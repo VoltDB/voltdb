@@ -424,8 +424,7 @@ public class PartitioningForStatement implements Cloneable{
         m_countOfIndependentlyPartitionedTables = eqSets.size() + unfilteredPartitionKeyCount +
                 countOfIndependentlyPartitionedSubqueries;
         if ((unfilteredPartitionKeyCount == 0) && (eqSets.size() == 1)) {
-            if (partitioningObject != null) {
-                assert(constPartitioningExpr != null);
+            if (constPartitioningExpr != null) {
                 addPartitioningExpression(tokenPartitionKey.getTableName() + '.' + tokenPartitionKey.getColumnName(), constPartitioningExpr);
                 setInferredValue(partitioningObject);
             }

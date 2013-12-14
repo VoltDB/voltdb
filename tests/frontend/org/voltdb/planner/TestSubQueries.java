@@ -238,8 +238,9 @@ public class TestSubQueries   extends PlannerTestCase {
         }
 
         {
-            List<AbstractPlanNode> lpn = compileToFragments("SELECT A, C FROM R1 JOIN (SELECT A, C FROM R2 LEFT JOIN P1 ON R2.C = P1.C) TEMP ON TEMP.C = R1.C ");
-            assertTrue(lpn.size() == 2);
+            failToCompile("SELECT A, C FROM R1 JOIN (SELECT A, C FROM R2 LEFT JOIN P1 ON R2.C = P1.C) TEMP ON TEMP.C = R1.C ",
+                    "This special case join between an outer replicated table and " +
+                    "an inner partitioned table is too complex and is not supported.");
         }
 
     }

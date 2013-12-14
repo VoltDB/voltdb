@@ -103,10 +103,10 @@ public class MaterializedViewFixInfo {
             List<ParsedColInfo> displayColumns, List<ParsedColInfo> groupByColumns) {
 
         // Check valid cases first
-//@TODO
-if (mvTableScan.getScanType() != StmtTableScan.TABLE_SCAN_TYPE.TARGET_TABLE_SCAN) {
-    return false;
-}
+        if (mvTableScan.getScanType() != StmtTableScan.TABLE_SCAN_TYPE.TARGET_TABLE_SCAN) {
+            // Materialized view on a sub-query is not supported.
+            return false;
+        }
         Table table = mvTableScan.getTargetTable();
         assert (table != null);
         String mvTableName = table.getTypeName();

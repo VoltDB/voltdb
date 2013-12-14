@@ -31,6 +31,7 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
@@ -648,9 +649,13 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
 
             // This col.index set up is only useful for Materialized view.
-            org.voltdb.catalog.Column catalogColumn =
-                    getTableFromDB(groupbyCol.tableName).getColumns().getIgnoreCase(groupbyCol.columnName);
-            groupbyCol.index = catalogColumn.getIndex();
+            // Currently, the view can only be on a catalog table and not a sub-query
+            Table table = getTableFromDB(groupbyCol.tableName);
+            if (table != null) {
+                org.voltdb.catalog.Column catalogColumn =
+                    table.getColumns().getIgnoreCase(groupbyCol.columnName);
+                groupbyCol.index = catalogColumn.getIndex();
+            }
         }
         else
         {

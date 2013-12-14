@@ -59,6 +59,7 @@ public abstract class AbstractParsedStmt {
     protected HashMap<Long, ParameterValueExpression> m_paramsById = new HashMap<Long, ParameterValueExpression>();
 
     public ArrayList<Table> tableList = new ArrayList<Table>();
+    public ArrayList<TempTable> tempTableList = new ArrayList<TempTable>();
     private Table m_DDLIndexedTable = null;
 
     public void setTable(Table tbl) {
@@ -641,7 +642,12 @@ public abstract class AbstractParsedStmt {
         StmtTableScan tableCache = stmtCache.get(aliasIdx);
         if (tableCache.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TARGET_TABLE_SCAN) {
             Table table = tableCache.getTargetTable();
+            assert(table != null);
             tableList.add(table);
+        } else {
+            TempTable tempTable = tableCache.getTempTable();
+            assert(tempTable != null);
+            tempTableList.add(tempTable);
         }
 
         // The join type of the leaf node is always INNER

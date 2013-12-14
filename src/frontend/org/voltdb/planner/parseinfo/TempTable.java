@@ -17,7 +17,6 @@
 
 package org.voltdb.planner.parseinfo;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.voltdb.planner.AbstractParsedStmt;
