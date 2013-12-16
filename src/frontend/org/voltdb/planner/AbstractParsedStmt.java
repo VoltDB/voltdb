@@ -463,6 +463,11 @@ public abstract class AbstractParsedStmt {
         }
         expr.setExpressionType(exprType);
 
+        if (exprType == ExpressionType.OPERATOR_CASE_WHEN || exprType == ExpressionType.OPERATOR_ALTERNATIVE) {
+            String valueType = exprNode.attributes.get("valuetype");
+            expr.setValueType(VoltType.typeFromString(valueType));
+        }
+
         // get the first (left) node that is an element
         VoltXMLElement leftExprNode = exprNode.children.get(0);
         assert(leftExprNode != null);

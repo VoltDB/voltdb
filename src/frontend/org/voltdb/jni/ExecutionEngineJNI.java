@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.ParameterSet;
@@ -35,11 +36,9 @@ import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializer;
-import org.voltdb.messaging.FastSerializer.BufferGrowCallback;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
-import com.google.common.base.Throwables;
+import com.google_voltpatches.common.base.Throwables;
 
 /**
  * Wrapper for native Execution Engine library.
@@ -60,9 +59,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     /** The HStoreEngine pointer. */
     private long pointer;
 
-    /** Create a FastSerializer for serializing arguments to C++. Use a direct
+    /** Create a ByteBuffer (in a container) for serializing arguments to C++. Use a direct
     ByteBuffer as it will be passed directly to the C++ code. */
-    private final FastSerializer fsForParameterSet;
+    private BBContainer psetBuffer = null;
 
     /**
      * A deserializer backed by a direct byte buffer, for fast access from C++.
@@ -123,26 +122,35 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     getStringBytes(hostname),
                     tempTableMemory * 1024 * 1024);
         checkErrorCode(errorCode);
-        fsForParameterSet = new FastSerializer(true, new BufferGrowCallback() {
-            @Override
-            public void onBufferGrow(final FastSerializer obj) {
-                LOG.trace("Parameter buffer has grown. re-setting to EE..");
-                final int code = nativeSetBuffers(pointer,
-                        fsForParameterSet.getContainerNoFlip().b,
-                        fsForParameterSet.getContainerNoFlip().b.capacity(),
-                        deserializer.buffer(), deserializer.buffer().capacity(),
-                        exceptionBuffer, exceptionBuffer.capacity());
-                checkErrorCode(code);
-            }
-        });
 
-        errorCode = nativeSetBuffers(pointer, fsForParameterSet.getContainerNoFlip().b,
-                fsForParameterSet.getContainerNoFlip().b.capacity(),
+        setupPsetBuffer(256 * 1024); // 256k seems like a reasonable per-ee number (but is totally pulled from my a**)
+
+        updateHashinator(hashinatorConfig);
+        //LOG.info("Initialized Execution Engine");
+    }
+
+    final void setupPsetBuffer(int size) {
+        if (psetBuffer != null) {
+            psetBuffer.discard();
+        }
+
+        psetBuffer = DBBPool.allocateDirect(size);
+
+        int errorCode = nativeSetBuffers(pointer, psetBuffer.b,
+                psetBuffer.b.capacity(),
                 deserializer.buffer(), deserializer.buffer().capacity(),
                 exceptionBuffer, exceptionBuffer.capacity());
         checkErrorCode(errorCode);
-        updateHashinator(hashinatorConfig);
-        //LOG.info("Initialized Execution Engine");
+    }
+
+    final void clearPsetAndEnsureCapacity(int size) {
+        assert(psetBuffer != null);
+        if (size > psetBuffer.b.capacity()) {
+            setupPsetBuffer(size);
+        }
+        else {
+            psetBuffer.b.clear();
+        }
     }
 
     /** Utility method to throw a Runtime exception based on the error code and serialized exception **/
@@ -238,23 +246,26 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
 
         // serialize the param sets
-        fsForParameterSet.clear();
+        int allPsetSize = 0;
+        for (int i = 0; i < batchSize; ++i) {
+            if (parameterSets[i] instanceof ByteBuffer) {
+                allPsetSize += ((ByteBuffer) parameterSets[i]).limit();
+            }
+            else {
+                allPsetSize += ((ParameterSet) parameterSets[i]).getSerializedSize();
+            }
+        }
+
+        clearPsetAndEnsureCapacity(allPsetSize);
         for (int i = 0; i < batchSize; ++i) {
             if (parameterSets[i] instanceof ByteBuffer) {
                 ByteBuffer buf = (ByteBuffer) parameterSets[i];
-                try {
-                    fsForParameterSet.write(buf);
-                } catch (IOException exception) {
-                    throw new RuntimeException("Error serializing parameters for SQL batch element: " +
-                            i + " with plan fragment ID: " + planFragmentIds[i] +
-                            " and with pre-serialized params of length: " +
-                            buf.capacity(), exception);
-                }
+                psetBuffer.b.put(buf);
             }
             else {
                 ParameterSet pset = (ParameterSet) parameterSets[i];
                 try {
-                    pset.writeExternal(fsForParameterSet);
+                    pset.flattenToBuffer(psetBuffer.b);
                 }
                 catch (final IOException exception) {
                     throw new RuntimeException("Error serializing parameters for SQL batch element: " +
@@ -331,12 +342,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 deserializer.buffer().capacity());
         checkErrorCode(errorCode);
 
-        try {
-            return deserializer.readObject(VoltTable.class);
-        } catch (final IOException ex) {
-            LOG.error("Failed to retrieve table:" + tableId + ex);
-            throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
-        }
+        return PrivateVoltTableFactory.createVoltTableFromSharedBuffer(deserializer.buffer());
     }
 
     @Override
@@ -411,14 +417,16 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             throwExceptionForError(ERRORCODE_ERROR);
         }
 
-
         try {
             deserializer.readInt();//Ignore the length of the result tables
-            FastDeserializer fds = fallbackBuffer == null ? deserializer : new FastDeserializer(fallbackBuffer);
+
+            ByteBuffer buf = fallbackBuffer == null ? deserializer.buffer() : fallbackBuffer;
             final VoltTable results[] = new VoltTable[numResults];
             for (int ii = 0; ii < numResults; ii++) {
-                final VoltTable resultTable = PrivateVoltTableFactory.createUninitializedVoltTable();
-                results[ii] = (VoltTable)fds.readObject(resultTable, this);
+                int len = buf.getInt();
+                byte[] bufCopy = new byte[len];
+                buf.get(bufCopy);
+                results[ii] = PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(bufCopy), true);
             }
             return results;
         } catch (final IOException ex) {
@@ -537,9 +545,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(value, config.type.typeId(), config.configBytes);
 
         // serialize the param set
-        fsForParameterSet.clear();
+        clearPsetAndEnsureCapacity(parameterSet.getSerializedSize());
         try {
-            parameterSet.writeExternal(fsForParameterSet);
+            parameterSet.flattenToBuffer(psetBuffer.b);
         } catch (final IOException exception) {
             throw new RuntimeException(exception); // can't happen
         }
@@ -558,9 +566,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(config.configBytes);
 
             // serialize the param set
-            fsForParameterSet.clear();
+            clearPsetAndEnsureCapacity(parameterSet.getSerializedSize());
             try {
-                parameterSet.writeExternal(fsForParameterSet);
+                parameterSet.flattenToBuffer(psetBuffer.b);
             } catch (final IOException exception) {
                 throw new RuntimeException(exception); // can't happen
             }
@@ -586,11 +594,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public byte[] executeTask(TaskType taskType, byte[] task) {
-        fsForParameterSet.clear();
+        clearPsetAndEnsureCapacity(8 + task.length);
+
         byte retval[] = null;
         try {
-            fsForParameterSet.writeLong(taskType.taskId);
-            fsForParameterSet.write(task);
+            psetBuffer.b.putLong(taskType.taskId);
+            psetBuffer.b.put(task);
 
             //Clear is destructive, do it before the native call
             deserializer.clear();

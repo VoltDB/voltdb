@@ -95,10 +95,12 @@ import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Initiator;
+import org.voltdb.iv2.KSafetyStats;
 import org.voltdb.iv2.LeaderAppointer;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SpInitiator;
 import org.voltdb.iv2.TxnEgo;
+import org.voltdb.join.BalancePartitionsStatistics;
 import org.voltdb.join.ElasticJoinService;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
@@ -115,11 +117,11 @@ import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.VoltSampler;
 
-import com.google.common.base.Charsets;
-import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.SettableFuture;
+import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -156,7 +158,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private static final String m_defaultVersionString = "4.0";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
-    final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
+    final List<ClientInterface> m_clientInterfaces = new CopyOnWriteArrayList<ClientInterface>();
     HTTPAdminListener m_adminListener;
     private OpsRegistrar m_opsRegistrar = new OpsRegistrar();
 
@@ -437,9 +439,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
              * by host messenger and the k-factor/host count/sites per host. This starting state
              * is published to ZK as the topology metadata node.
              *
-             * On rejoin the rejoining node has to inspect the topology meta node to find out what is missing
-             * and then update the topology listing itself as a replacement for one of the missing host ids.
+             * On join and rejoin the node has to inspect the topology meta node to find out what is missing
+             * and then update the topology listing itself as the replica for those partitions.
              * Then it does a compare and set of the topology.
+             *
+             * Ning: topology may not reflect the true partitions in the cluster during join. So if another node
+             * is trying to rejoin, it should rely on the cartographer's view to pick the partitions to replace.
              */
             JSONObject topo = getTopology(config.m_startAction, m_joinCoordinator);
             m_partitionsToSitesAtStartupForExportInit = new ArrayList<Pair<Integer, Long>>();
@@ -449,9 +454,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 ClusterConfig clusterConfig = new ClusterConfig(topo);
                 List<Integer> partitions = null;
                 if (isRejoin) {
-                    partitions = m_cartographer.getIv2PartitionsToReplace(topo);
                     m_configuredNumberOfPartitions = m_cartographer.getPartitionCount();
                     m_configuredReplicationFactor = clusterConfig.getReplicationFactor();
+                    partitions = m_cartographer.getIv2PartitionsToReplace(m_configuredReplicationFactor,
+                                                                          clusterConfig.getSitesPerHost());
                     if (partitions.size() == 0) {
                         VoltDB.crashLocalVoltDB("The VoltDB cluster already has enough nodes to satisfy " +
                                 "the requested k-safety factor of " +
@@ -558,6 +564,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             getStatsAgent().registerStatsSource(StatsSelector.LIVECLIENTS, 0, m_liveClientsStats);
             m_latencyStats = new LatencyStats(m_myHostId);
 
+            BalancePartitionsStatistics rebalanceStats = new BalancePartitionsStatistics();
+            getStatsAgent().registerStatsSource(StatsSelector.REBALANCE, 0, rebalanceStats);
+
+            KSafetyStats kSafetyStats = new KSafetyStats();
+            getStatsAgent().registerStatsSource(StatsSelector.KSAFETY, 0, kSafetyStats);
+
             /*
              * Initialize the command log on rejoin and join before configuring the IV2
              * initiators.  This will prevent them from receiving transactions
@@ -597,7 +609,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         m_catalogContext.cluster.getNetworkpartition(),
                         m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"),
                         usingCommandLog,
-                        topo, m_MPI);
+                        topo, m_MPI, kSafetyStats);
                 m_globalServiceElector.registerService(m_leaderAppointer);
 
                 for (Initiator iv2init : m_iv2Initiators) {
@@ -774,12 +786,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         elasticServiceClass.getConstructor(HostMessenger.class,
                                                            ClientInterface.class,
                                                            Cartographer.class,
+                                                           BalancePartitionsStatistics.class,
                                                            String.class,
                                                            int.class);
                     m_elasticJoinService =
                         (ElasticJoinService) constructor.newInstance(m_messenger,
                                                                      m_clientInterfaces.get(0),
                                                                      m_cartographer,
+                                                                     rebalanceStats,
                                                                      clSnapshotPath,
                                                                      m_deployment.getCluster().getKfactor());
                 }
@@ -1630,28 +1644,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
         }
 
-        // start one site in the current thread
-        Thread.currentThread().setName("ExecutionSiteAndVoltDB");
         m_isRunning = true;
-        try
-        {
-            while (m_isRunning) {
-                Thread.sleep(1);
-            }
-        }
-        catch (Throwable thrown)
-        {
-            String errmsg = " encountered an unexpected error and will die, taking this VoltDB node down.";
-            hostLog.error(errmsg);
-            // It's too easy for stdout to get lost, especially if we are crashing, so log FATAL, instead.
-            // Logging also automatically prefixes lines with "ExecutionSite [X:Y] "
-            // thrown.printStackTrace();
-            hostLog.fatal("Stack trace of thrown exception: " + thrown.toString());
-            for (StackTraceElement ste : thrown.getStackTrace()) {
-                hostLog.fatal(ste.toString());
-            }
-            VoltDB.crashLocalVoltDB(errmsg, true, thrown);
-        }
     }
 
     /**
@@ -1947,7 +1940,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     @Override
-    public ArrayList<ClientInterface> getClientInterfaces() {
+    public List<ClientInterface> getClientInterfaces() {
         return m_clientInterfaces;
     }
 
@@ -2070,9 +2063,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // so there is no need to wait for the truncation snapshot requested
             // above to finish.
             if (logRecoveryCompleted || m_joining) {
+                String actionName = m_joining ? "join" : "rejoin";
                 m_rejoining = false;
                 m_joining = false;
-                consoleLog.info("Node rejoin completed");
+                consoleLog.info(String.format("Node %s completed", actionName));
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to log host rejoin completion to ZK", true, e);
@@ -2218,7 +2212,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
         if (m_rejoining) {
             if (requestId.equals(m_rejoinTruncationReqId)) {
-                consoleLog.info("Node rejoin completed");
+                String actionName = m_joining ? "join" : "rejoin";
+                consoleLog.info(String.format("Node %s completed", actionName));
                 m_rejoinTruncationReqId = null;
                 m_rejoining = false;
             }

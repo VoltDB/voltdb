@@ -50,7 +50,7 @@ import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDBInterface;
 import org.voltdb.messaging.CompleteTransactionMessage;
 
-import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class TestSpSchedulerSpHandle extends TestCase
 {

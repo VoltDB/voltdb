@@ -19,7 +19,7 @@ package org.voltcore.zk;
 
 import java.util.concurrent.ExecutionException;
 import org.json_voltpatches.JSONObject;
-import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  * A read-only interface to MapCache for consumers that do not

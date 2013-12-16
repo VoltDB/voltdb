@@ -149,6 +149,28 @@ public class JdbcDatabaseMetaDataGenerator
                           new ColumnInfo("SPECIFIC_NAME", VoltType.STRING)
         };
 
+    static public final ColumnInfo[] TYPEINFO_SCHEMA =
+        new ColumnInfo[] {
+            new ColumnInfo("TYPE_NAME", VoltType.STRING),
+            new ColumnInfo("DATA_TYPE", VoltType.INTEGER),
+            new ColumnInfo("PRECISION", VoltType.INTEGER),
+            new ColumnInfo("LITERAL_PREFIX", VoltType.STRING),
+            new ColumnInfo("LITERAL_SUFFIX", VoltType.STRING),
+            new ColumnInfo("CREATE_PARAMS", VoltType.STRING),
+            new ColumnInfo("NULLABLE", VoltType.SMALLINT),
+            new ColumnInfo("CASE_SENSITIVE", VoltType.TINYINT), //should be bool...
+            new ColumnInfo("SEARCHABLE", VoltType.SMALLINT),
+            new ColumnInfo("UNSIGNED_ATTRIBUTE", VoltType.TINYINT), //should be bool
+            new ColumnInfo("FIXED_PREC_SCALE", VoltType.TINYINT), //should be bool
+            new ColumnInfo("AUTO_INCREMENT", VoltType.TINYINT), //should be bool
+            new ColumnInfo("LOCAL_TYPE_NAME", VoltType.STRING),
+            new ColumnInfo("MINIMUM_SCALE", VoltType.SMALLINT),
+            new ColumnInfo("MAXIMUM_SCALE", VoltType.SMALLINT),
+            new ColumnInfo("SQL_DATA_TYPE", VoltType.INTEGER),
+            new ColumnInfo("SQL_DATETIME_SUB", VoltType.INTEGER),
+            new ColumnInfo("NUM_PREC_RADIX", VoltType.INTEGER)
+        };
+
     JdbcDatabaseMetaDataGenerator(Catalog catalog)
     {
         m_catalog = catalog;
@@ -181,6 +203,10 @@ public class JdbcDatabaseMetaDataGenerator
         else if (selector.equalsIgnoreCase("PROCEDURECOLUMNS"))
         {
             result = getProcedureColumns();
+        }
+        else if (selector.equalsIgnoreCase("TYPEINFO"))
+        {
+            result = getTypeInfo();
         }
         return result;
     }
@@ -224,86 +250,28 @@ public class JdbcDatabaseMetaDataGenerator
     }
 
     // Might consider consolidating this into VoltType if we go big on JDBC stuff.
+    // Considered and done
     private int getColumnSqlDataType(VoltType type)
     {
-        int jdbc_sql_type = java.sql.Types.OTHER;
-        switch(type)
-        {
-        case TINYINT:
-            jdbc_sql_type = java.sql.Types.TINYINT;
-            break;
-        case SMALLINT:
-            jdbc_sql_type = java.sql.Types.SMALLINT;
-            break;
-        case INTEGER:
-            jdbc_sql_type = java.sql.Types.INTEGER;
-            break;
-        case BIGINT:
-            jdbc_sql_type = java.sql.Types.BIGINT;
-            break;
-        case FLOAT:
-            jdbc_sql_type = java.sql.Types.DOUBLE;
-            break;
-        case TIMESTAMP:
-            jdbc_sql_type = java.sql.Types.TIMESTAMP;
-            break;
-        case STRING:
-            jdbc_sql_type = java.sql.Types.VARCHAR;
-            break;
-        case DECIMAL:
-            jdbc_sql_type = java.sql.Types.DECIMAL;
-            break;
-        case VARBINARY:
-            jdbc_sql_type = java.sql.Types.VARBINARY;
-            break;
-        default:
-            // XXX What's the right behavior here?
-        }
-        return jdbc_sql_type;
+        return type.getJdbcSqlType();
     }
 
     private String getColumnSqlTypeName(VoltType type)
     {
-        String jdbc_sql_typename = "OTHER";
-        switch(type)
-        {
-        case TINYINT:
-            jdbc_sql_typename = "TINYINT";
-            break;
-        case SMALLINT:
-            jdbc_sql_typename = "SMALLINT";
-            break;
-        case INTEGER:
-            jdbc_sql_typename = "INTEGER";
-            break;
-        case BIGINT:
-            jdbc_sql_typename = "BIGINT";
-            break;
-        case FLOAT:
-            jdbc_sql_typename = "DOUBLE";
-            break;
-        case TIMESTAMP:
-            jdbc_sql_typename = "TIMESTAMP";
-            break;
-        case STRING:
-            jdbc_sql_typename = "VARCHAR";
-            break;
-        case DECIMAL:
-            jdbc_sql_typename = "DECIMAL";
-            break;
-        case VARBINARY:
-            jdbc_sql_typename = "VARBINARY";
-            break;
-        default:
-            // XXX What's the right behavior here?
+        String jdbc_sql_typename = type.toSQLString();
+        if (jdbc_sql_typename == null) {
+            jdbc_sql_typename = "OTHER";
         }
-        return jdbc_sql_typename;
+        return jdbc_sql_typename.toUpperCase();
     }
 
     // Integer[0] is the column size and Integer[1] is the radix
     private Integer[] getColumnSizeAndRadix(Column column)
     {
         Integer[] col_size_radix = {null, null};
+        // This looks similar to VoltType.getTypePrecisionAndRadix.  However,
+        // the String/VARBINARY values depend on the schema, not an intrinsic property
+        // of the type, so it stays here for now.
         VoltType type = VoltType.get((byte) column.getType());
         switch(type)
         {
@@ -340,6 +308,7 @@ public class JdbcDatabaseMetaDataGenerator
 
     private Integer getColumnDecimalDigits(VoltType type)
     {
+        // Would be nice to push this into VoltType someday
         Integer num_dec_digits = null;
         switch(type)
         {
@@ -594,39 +563,8 @@ public class JdbcDatabaseMetaDataGenerator
     // Integer[0] is the column size and Integer[1] is the radix
     private Integer[] getParamPrecisionAndRadix(ProcParameter param)
     {
-        Integer[] col_size_radix = {null, null};
         VoltType type = VoltType.get((byte) param.getType());
-        switch(type)
-        {
-        //
-        case TINYINT:
-        case SMALLINT:
-        case INTEGER:
-        case BIGINT:
-        case TIMESTAMP:
-            col_size_radix[0] = (type.getLengthInBytesForFixedTypes() * 8) - 1;
-            col_size_radix[1] = 2;
-            break;
-        case FLOAT:
-            col_size_radix[0] = 53;  // magic for double
-            col_size_radix[1] = 2;
-            break;
-        case STRING:
-            col_size_radix[0] = VoltType.MAX_VALUE_LENGTH;
-            col_size_radix[1] = null;
-            break;
-        case DECIMAL:
-            col_size_radix[0] = VoltDecimalHelper.kDefaultPrecision;
-            col_size_radix[1] = 10;
-            break;
-        case VARBINARY:
-            col_size_radix[0] = VoltType.MAX_VALUE_LENGTH;
-            col_size_radix[1] = null;
-            break;
-        default:
-            // XXX What's the right behavior here?
-        }
-        return col_size_radix;
+        return type.getTypePrecisionAndRadix();
     }
 
     private int getParamLength(ProcParameter param)
@@ -638,6 +576,7 @@ public class JdbcDatabaseMetaDataGenerator
     private Integer getParamCharOctetLength(ProcParameter param)
     {
         Integer length = null;
+        // Would be nice to push this type-dependent stuff to VoltType someday.
         VoltType type = VoltType.get((byte) param.getType());
         switch(type)
         {
@@ -689,6 +628,40 @@ public class JdbcDatabaseMetaDataGenerator
                                "", // is_nullable
                                proc.getTypeName()  // specific name
                 );
+            }
+        }
+        return results;
+    }
+
+    VoltTable getTypeInfo()
+    {
+        VoltTable results = new VoltTable(TYPEINFO_SCHEMA);
+        for (VoltType type : VoltType.values())
+        {
+            if (type.isJdbcVisible()) {
+                Byte unsigned = null;
+                if (type.isUnsigned() != null) {
+                    unsigned = (byte)(type.isUnsigned() ? 1 : 0);
+                }
+                results.addRow(type.toSQLString().toUpperCase(),
+                        type.getJdbcSqlType(),
+                        type.getTypePrecisionAndRadix()[0],
+                        type.getLiteralPrefix(),
+                        type.getLiteralSuffix(),
+                        type.getCreateParams(),
+                        type.getNullable(),
+                        type.isCaseSensitive() ? 1 : 0,
+                        type.getSearchable(),
+                        unsigned,
+                        0,  // no money types (according to definition) in Volt?
+                        0,  // no auto-increment
+                        type.toSQLString().toUpperCase(),
+                        type.getMinimumScale(),
+                        type.getMaximumScale(),
+                        null,
+                        null,
+                        type.getTypePrecisionAndRadix()[1]
+                        );
             }
         }
         return results;

@@ -669,7 +669,7 @@ public class LocalCluster implements VoltServerConfig {
             ptf = new PipeToFile(
                     fileName,
                     proc.getInputStream(),
-                    startAction == StartAction.JOIN ? PipeToFile.m_rejoinToken : PipeToFile.m_initToken,
+                    startAction == StartAction.JOIN ? PipeToFile.m_joinToken : PipeToFile.m_initToken,
                     false,
                     proc);
             m_pipes.add(ptf);

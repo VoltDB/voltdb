@@ -19,6 +19,7 @@ package org.voltdb.rejoin;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.voltcore.logging.VoltLogger;
@@ -83,9 +84,9 @@ implements Runnable {
 
     @Override
     public void run() {
-        LinkedBlockingQueue<BBContainer> bufferQueue =
+        BlockingQueue<BBContainer> bufferQueue =
             m_bufferPool.getQueue(SnapshotSiteProcessor.m_snapshotBufferLength);
-        LinkedBlockingQueue<BBContainer> compressionBufferQueue =
+        BlockingQueue<BBContainer> compressionBufferQueue =
             m_bufferPool.getQueue(SnapshotSiteProcessor.m_snapshotBufferCompressedLen);
 
         try {

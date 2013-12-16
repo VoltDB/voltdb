@@ -581,10 +581,10 @@ void PersistentTable::deleteTupleRelease(char* tupleData)
 void PersistentTable::deleteTupleFinalize(TableTuple &target)
 {
     // A snapshot (background scan) in progress can still cause a hold-up.
-    // canSafelyFreeTuple() defaults to returning true for all context types
+    // notifyTupleDelete() defaults to returning true for all context types
     // other than CopyOnWriteContext.
     if (   m_tableStreamer != NULL
-        && ! m_tableStreamer->canSafelyFreeTuple(target)) {
+        && ! m_tableStreamer->notifyTupleDelete(target)) {
         // Mark it pending delete and let the snapshot land the finishing blow.
 
         // This "already pending delete" guard prevents any
@@ -649,7 +649,7 @@ void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
     assert(target.isActive());
 
     deleteFromAllIndexes(&target);
-    deleteTupleStorage(target); // also frees object columns
+    deleteTupleFinalize(target); // also frees object columns
 }
 
 TableTuple PersistentTable::lookupTuple(TableTuple tuple) {

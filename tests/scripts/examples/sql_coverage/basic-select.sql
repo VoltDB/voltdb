@@ -47,7 +47,7 @@ SELECT COUNT(*) FROM @fromtables
 
 -- test where expressions
 --- test comparison operators (<, <=, =, >=, >)
-SELECT * FROM @fromtables WHERE _variable[@comparabletype] _cmp @comparableconstant
+SELECT * FROM @fromtables WHERE _maybe _variable[@comparabletype] _cmp @comparableconstant
 --- test arithmetic operators (+, -, *, /) with comparison ops
 SELECT * FROM @fromtables WHERE (_variable[@comparabletype] @aftermath) _cmp @comparableconstant
 --- test logic operators (AND) with comparison ops
@@ -68,6 +68,7 @@ SELECT _variable[#order], _variable FROM @fromtables ORDER BY __[#order] _sortor
 SELECT _variable[#grouped], COUNT(*) AS FOO FROM @fromtables GROUP BY __[#grouped]
 -- test GROUP BY ORDER BY COUNT(*) with optional LIMIT/OFFSET
 SELECT _variable[#grouped], COUNT(*) AS FOO FROM @fromtables GROUP BY __[#grouped] ORDER BY 2, 1 _optionallimitoffset
+
 -- test INNER JOIN (we'll do more two-table join fun separately, this just checks syntax)
 SELECT * FROM @fromtables LHS INNER JOIN @fromtables RHS ON LHS.@idcol = RHS.@idcol
 -- TODO: If the intent is to support a schema with multiple id-partitioned tables,

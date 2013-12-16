@@ -17,7 +17,7 @@
 
 package org.voltdb;
 
-import com.google.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 import java.io.IOException;
 import java.util.concurrent.Callable;
@@ -25,6 +25,7 @@ import java.util.concurrent.Callable;
 import org.voltcore.utils.DBBPool.BBContainer;
 
 public interface SnapshotDataTarget {
+    public final static int ROW_COUNT_UNSUPPORTED = -1;
     /**
      * Get the number of bytes that should be left available at the beginning of each tuple block
      * provided to this target. The default implementation requires 4 bytes in order to length
@@ -65,4 +66,12 @@ public interface SnapshotDataTarget {
      * Get the snapshot format this target uses
      */
     public SnapshotFormat getFormat();
+
+    /**
+     * Get the row count if any, of the content wrapped in the given {@link BBContainer}
+     * @param tupleData
+     * @return the numbers of tuple data rows contained within a container or
+     *   ROW_COUNT_UNSUPPORTED if the implementor does not support it
+     */
+    public int getInContainerRowCount(BBContainer tupleData);
 }

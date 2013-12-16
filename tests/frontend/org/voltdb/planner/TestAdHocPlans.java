@@ -35,6 +35,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.MiscUtils;
 
 public class TestAdHocPlans extends AdHocQueryTester {
 
@@ -45,7 +46,7 @@ public class TestAdHocPlans extends AdHocQueryTester {
     protected void setUp() throws Exception {
         // For planner-only testing, we shouldn't care about IV2
         VoltDB.Configuration config = setUpSPDB();
-        byte[] bytes = CatalogUtil.toBytes(new File(config.m_pathToCatalog));
+        byte[] bytes = MiscUtils.fileToBytes(new File(config.m_pathToCatalog));
         String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
         Catalog catalog = new Catalog();
         catalog.execute(serializedCatalog);

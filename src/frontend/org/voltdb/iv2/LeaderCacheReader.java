@@ -18,7 +18,7 @@
 package org.voltdb.iv2;
 
 import java.util.concurrent.ExecutionException;
-import com.google.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  * A read-only interface to LeaderCache for consumers that do not

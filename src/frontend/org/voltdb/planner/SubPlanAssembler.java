@@ -347,11 +347,13 @@ public abstract class SubPlanAssembler {
                     if (inListExpr != null) {
                         // Make sure all prior key component equality filters
                         // were based on constants and/or parameters.
-                        for (AbstractExpression comparator : retval.indexExprs) {
-                            AbstractExpression otherExpr = comparator.getRight();
+                        for (AbstractExpression eq_comparator : retval.indexExprs) {
+                            AbstractExpression otherExpr = eq_comparator.getRight();
                             if (otherExpr.hasAnySubexpressionOfType(ExpressionType.VALUE_TUPLE)) {
                                 // Can't index this IN LIST filter without some kind of three-way NLIJ,
-                                // so pass it by.
+                                // so, add it to the post-filters.
+                                AbstractExpression in_list_comparator = inListExpr.getOriginalFilter();
+                                retval.otherExprs.add(in_list_comparator);
                                 inListExpr = null;
                                 break;
                             }
@@ -511,7 +513,9 @@ public abstract class SubPlanAssembler {
                         retval.indexExprs.clear();
                         AbstractExpression comparator = startingBoundExpr.getFilter();
                         retval.endExprs.add(comparator);
-
+                        // The initial expression is needed to control a (short?) forward scan to
+                        // adjust the start of a reverse iteration after it had to initially settle
+                        // for starting at "greater than a prefix key".
                         retval.initialExpr.addAll(retval.indexExprs);
                         // Look up type here does not matter in EE, because the # of active search keys is 0.
                         // EE use m_index->moveToEnd(false) to get END, setting scan to reverse scan.
@@ -610,7 +614,10 @@ public abstract class SubPlanAssembler {
                 // add to indexExprs because it will be used as part of searchKey
                 retval.indexExprs.add(upperBoundComparator);
                 // initialExpr is set for both cases
-                // but will be used for LTE and only when overflow case of LT
+                // but will be used for LTE and only when overflow case of LT.
+                // The initial expression is needed to control a (short?) forward scan to
+                // adjust the start of a reverse iteration after it had to initially settle
+                // for starting at "greater than a prefix key".
                 retval.initialExpr.addAll(retval.indexExprs);
             }
         }
@@ -637,6 +644,9 @@ public abstract class SubPlanAssembler {
                 // tell the EE to do reverse scan.
                 if (retval.sortDirection == SortDirectionType.DESC && retval.indexExprs.size() > 0) {
                     retval.lookupType = IndexLookupType.LTE;
+                    // The initial expression is needed to control a (short?) forward scan to
+                    // adjust the start of a reverse iteration after it had to initially settle
+                    // for starting at "greater than a prefix key".
                     retval.initialExpr.addAll(retval.indexExprs);
                 } else {
                     retval.lookupType = IndexLookupType.GTE;
@@ -1305,6 +1315,8 @@ public abstract class SubPlanAssembler {
         scanNode.setBindings(path.bindings);
         scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
         scanNode.setPredicate(ExpressionUtil.combine(path.otherExprs));
+        // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
+        // iteration after it had to initially settle for starting at "greater than a prefix key".
         scanNode.setInitialExpression(ExpressionUtil.combine(path.initialExpr));
         //TODO: push scan column identification into "setTargetTableName"
         // (on the way to enabling it for DML plans).
@@ -1313,6 +1325,8 @@ public abstract class SubPlanAssembler {
             scanNode.setScanColumns(scanColumns);
         }
         scanNode.setTargetIndexName(index.getTypeName());
+
+        scanNode.setSkipNullPredicate();
         return resultNode;
     }
 

@@ -119,7 +119,9 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
                 if (index == -1)
                 {
                     throw new RuntimeException("Unable to find index for nestloopindexscan TVE: " +
-                                               tve.toString());
+                                               tve.toString() + " in NodeSchemas " +
+                                               outer_schema.toString() + "\nand\n" +
+                                               index_schema.toString());
                 }
                 tableIdx = 1;   // 1 for inner table
             }
@@ -132,6 +134,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
             new ArrayList<TupleValueExpression>();
         index_tves.addAll(ExpressionUtil.getTupleValueExpressions(inline_scan.getEndExpression()));
         index_tves.addAll(ExpressionUtil.getTupleValueExpressions(inline_scan.getInitialExpression()));
+        index_tves.addAll(ExpressionUtil.getTupleValueExpressions(inline_scan.getSkipNullPredicate()));
         for (AbstractExpression search_exp : inline_scan.getSearchKeyExpressions())
         {
             index_tves.addAll(ExpressionUtil.getTupleValueExpressions(search_exp));

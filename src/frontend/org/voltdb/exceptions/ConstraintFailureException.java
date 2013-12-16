@@ -73,21 +73,14 @@ public class ConstraintFailureException extends SQLException {
     }
 
     /**
-     * Get the table containing the involved tuples (target and source) that caused the constraint violation. The table
-     * is lazy deserialized for performance.
+     * Get the table containing the involved tuples (target and source) that caused the constraint violation.
      */
     public VoltTable getTuples() {
         if (table != null) {
             return table;
         }
 
-        table = PrivateVoltTableFactory.createUninitializedVoltTable();
-        try {
-            table.readExternal(new FastDeserializer(buffer));
-        } catch (IOException e) {
-            LOG.severe(e.toString());
-            return null;
-        }
+        table = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(buffer);
 
         return table;
     }

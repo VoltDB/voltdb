@@ -111,7 +111,7 @@ import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.xml.sax.SAXException;
 
-import com.google.common.base.Charsets;
+import com.google_voltpatches.common.base.Charsets;
 
 /**
  *
@@ -166,28 +166,6 @@ public abstract class CatalogUtil {
         }
 
         return serializedCatalog;
-    }
-
-    /**
-     * Serialize a file into bytes. Used to serialize catalog and deployment
-     * file for UpdateApplicationCatalog on the client.
-     *
-     * @param path
-     * @return a byte array of the file
-     * @throws IOException
-     *             If there are errors reading the file
-     */
-    public static byte[] toBytes(File path) throws IOException {
-        FileInputStream fin = new FileInputStream(path);
-        byte[] buffer = new byte[(int) fin.getChannel().size()];
-        try {
-            if (fin.read(buffer) == -1) {
-                throw new IOException("File " + path.getAbsolutePath() + " is empty");
-            }
-        } finally {
-            fin.close();
-        }
-        return buffer;
     }
 
     /**

@@ -1526,10 +1526,10 @@ public class Expression {
         // other operations
         prototypes.put(OpTypes.CAST,          (new VoltXMLElement("operation")).withValue("optype", "cast"));
         prototypes.put(OpTypes.ZONE_MODIFIER, null); // ???
-        prototypes.put(OpTypes.CASEWHEN,      null); // Planned for support as a special function
+        prototypes.put(OpTypes.CASEWHEN,      (new VoltXMLElement("operation")).withValue("optype", "operator_case_when"));
         prototypes.put(OpTypes.ORDER_BY,      new VoltXMLElement("orderby"));
         prototypes.put(OpTypes.LIMIT,         new VoltXMLElement("limit"));
-        prototypes.put(OpTypes.ALTERNATIVE,   null); // not yet supported ExpressionOp
+        prototypes.put(OpTypes.ALTERNATIVE,   (new VoltXMLElement("operation")).withValue("optype", "operator_alternative"));
         prototypes.put(OpTypes.MULTICOLUMN,   null); // an uninteresting!? ExpressionColumn case
     }
 
@@ -1722,6 +1722,21 @@ public class Expression {
             exp.children.add(StatementQuery.voltGetXMLExpression(subQuery.queryExpression, parameters, session));
             return exp;
 
+        case OpTypes.ALTERNATIVE:
+            assert(nodes.length == 2);
+            // If with ELSE clause, pad NULL with it.
+            if (nodes[RIGHT] instanceof ExpressionValue) {
+                ExpressionValue val = (ExpressionValue) nodes[RIGHT];
+                if (val.valueData == null && val.dataType == Type.SQL_ALL_TYPES) {
+                    exp.children.get(RIGHT).attributes.put("valuetype", dataType.getNameString());
+                }
+            }
+        case OpTypes.CASEWHEN:
+            // Hsql has check dataType can not be null.
+            assert(dataType != null);
+            exp.attributes.put("valuetype", dataType.getNameString());
+            return exp;
+
         default:
             return exp;
         }
@@ -1805,8 +1820,6 @@ public class Expression {
 
         case OpTypes.ZONE_MODIFIER:
             opAsString = "ZONE modifier operations"; break; // ???
-        case OpTypes.ALTERNATIVE:
-            opAsString = "ALTERNATIVE operations"; break; // not yet supported ExpressionOp
         case OpTypes.MULTICOLUMN:
             opAsString = "a MULTICOLUMN operation"; break; // an uninteresting!? ExpressionColumn case
 

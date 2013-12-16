@@ -94,16 +94,28 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 throw new RuntimeException(sb.toString());
             }
 
-            if (parsedStmt.tableAliasIndexMap.keySet().containsAll(tableAliases) == false) {
-                for (String name : tableAliases) {
-                    if (parsedStmt.tableAliasIndexMap.containsKey(name) == false) {
-                        StringBuilder sb = new StringBuilder();
-                        sb.append("The specified join order \"");
-                        sb.append(parsedStmt.joinOrder).append("\" contains ").append(name);
-                        sb.append(" which doesn't exist in the FROM clause");
-                        throw new RuntimeException(sb.toString());
+            Set<String> aliasSet = parsedStmt.tableAliasIndexMap.keySet();
+            Set<String> specifiedNames = new HashSet<String>(tableAliases);
+            specifiedNames.removeAll(aliasSet);
+            if (specifiedNames.isEmpty() == false) {
+                StringBuilder sb = new StringBuilder();
+                sb.append("The specified join order \"");
+                sb.append(parsedStmt.joinOrder).append("\" contains ");
+                int i = 0;
+                for (String name : specifiedNames) {
+                    sb.append(name);
+                    if (++i != specifiedNames.size()) {
+                        sb.append(',');
                     }
                 }
+                sb.append(" which ");
+                if (specifiedNames.size() == 1) {
+                    sb.append("doesn't ");
+                } else {
+                    sb.append("don't ");
+                }
+                sb.append("exist in the FROM clause");
+                throw new RuntimeException(sb.toString());
             }
             if ( ! isValidJoinOrder(tableAliases)) {
                 throw new RuntimeException("The specified join order is invalid for the given query");

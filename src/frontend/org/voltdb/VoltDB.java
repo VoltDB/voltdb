@@ -85,11 +85,6 @@ public class VoltDB {
     //Whatever the default timezone was for this locale before we replaced it
     public static final TimeZone REAL_DEFAULT_TIMEZONE;
 
-    // ODBC Datetime Format
-    // if you need microseconds, you'll have to change this code or
-    //  export a bigint representing microseconds since an epoch
-    public static final String ODBC_DATE_FORMAT_STRING = "yyyy-MM-dd HH:mm:ss.SSS";
-
     // if VoltDB is running in your process, prepare to use UTC (GMT) timezone
     public synchronized static void setDefaultTimezone() {
         TimeZone.setDefault(GMT_TIMEZONE);
@@ -512,8 +507,8 @@ public class VoltDB {
                         + "       voltdb3 recover [host <hostname>] [deployment <deployment.xml>]\n"
                         + "       voltdb3 rejoin host <hostname>\n";
             }
-            message += "       voltdb collect [<option> ...] <path-to-voltdbroot> (run voltdb collect -h for more details)\n";
-            message += "       voltdb compile [<option> ...] [<ddl-file> ...]  (run voltdb compile -h for more details)\n";
+            message += "       voltdb3 collect [<option> ...] <path-to-voltdbroot> (run voltdb3 collect -h for more details)\n";
+            message += "       voltdb3 compile [<option> ...] [<ddl-file> ...]  (run voltdb3 compile -h for more details)\n";
             os.print(message);
             // Log it to log4j as well, which will capture the output to a file for (hopefully never) cases where VEM has issues (it generates command lines).
             hostLog.info(message);

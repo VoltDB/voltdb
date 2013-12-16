@@ -82,10 +82,9 @@ public:
     virtual bool notifyTupleUpdate(TableTuple &tuple);
 
     /**
-     * Optional tuple freeing check handler.
+     * Optional tuple delete handler.
      */
-    virtual bool canSafelyFreeTuple(TableTuple tuple);
-
+    virtual bool notifyTupleDelete(TableTuple &tuple);
 
 private:
 
@@ -133,6 +132,7 @@ private:
     int64_t m_serializationBatches;
     int64_t m_inserts;
     int64_t m_updates;
+    int64_t m_deletes;
 
     void checkRemainingTuples(const std::string &label);
 

@@ -140,7 +140,7 @@ public abstract class OpsAgent
      */
     protected void handleJSONMessageAsDummy(JSONObject obj) throws Exception {
         hostLog.info("Generating dummy response for ops request " + obj);
-        sendOpsResponse(null, obj);
+        sendOpsResponse(null, obj, OPS_DUMMY);
     }
 
     /**
@@ -370,11 +370,15 @@ public abstract class OpsAgent
         request.c.writeStream().enqueue(buf);
     }
 
+    protected void sendOpsResponse(VoltTable[] results, JSONObject obj) throws Exception {
+        sendOpsResponse(results, obj, OPS_PAYLOAD);
+    }
+
     /**
      * Return the results of distributed work to the original requesting agent.
      * Used by subclasses to respond after they've done their local work.
      */
-    protected void sendOpsResponse(VoltTable[] results, JSONObject obj) throws Exception
+    private void sendOpsResponse(VoltTable[] results, JSONObject obj, byte payloadType) throws Exception
     {
         long requestId = obj.getLong("requestId");
         long returnAddress = obj.getLong("returnAddress");
@@ -383,7 +387,7 @@ public abstract class OpsAgent
             ByteBuffer responseBuffer = ByteBuffer.allocate(8);
             responseBuffer.putLong(requestId);
             byte responseBytes[] = CompressionService.compressBytes(responseBuffer.array());
-            BinaryPayloadMessage bpm = new BinaryPayloadMessage( new byte[] {OPS_PAYLOAD}, responseBytes);
+            BinaryPayloadMessage bpm = new BinaryPayloadMessage( new byte[] {payloadType}, responseBytes);
             m_mailbox.send(returnAddress, bpm);
             return;
         }
@@ -407,7 +411,7 @@ public abstract class OpsAgent
         }
         byte responseBytes[] = CompressionService.compressBytes(responseBuffer.array());
 
-        BinaryPayloadMessage bpm = new BinaryPayloadMessage( new byte[] {OPS_PAYLOAD}, responseBytes);
+        BinaryPayloadMessage bpm = new BinaryPayloadMessage( new byte[] {payloadType}, responseBytes);
         m_mailbox.send(returnAddress, bpm);
     }
 

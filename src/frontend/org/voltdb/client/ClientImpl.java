@@ -28,10 +28,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
-import org.voltdb.TheHashinator.HashinatorType;
 
-import org.voltdb.utils.CatalogUtil;
+import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.MiscUtils;
 
 /**
  *  A client that connects to one or more nodes in a VoltCluster
@@ -184,11 +184,26 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     public final ClientResponse callProcedure(String procName, Object... parameters)
         throws IOException, NoConnectionsException, ProcCallException
     {
+        return callProcedureWithTimeout(procName, Distributer.USE_DEFAULT_TIMEOUT, parameters);
+    }
+
+    /**
+     * Synchronously invoke a procedure call blocking until a result is available.
+     *
+     * @param procName class name (not qualified by package) of the procedure to execute.
+     * @param timeout timeout for the procedure in seconds.
+     * @param parameters vararg list of procedure's parameter values.
+     * @return ClientResponse for execution.
+     * @throws org.voltdb.client.ProcCallException
+     * @throws NoConnectionsException
+     */
+    public ClientResponse callProcedureWithTimeout(String procName, long timeout, Object... parameters)
+            throws IOException, NoConnectionsException, ProcCallException {
         final SyncCallback cb = new SyncCallback();
         cb.setArgs(parameters);
-        final ProcedureInvocation invocation =
-              new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
-        return callProcedure(cb, invocation);
+        final ProcedureInvocation invocation
+                = new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
+        return callProcedure(cb, timeout, invocation);
     }
 
     /**
@@ -208,11 +223,11 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             new ProcedureInvocation(originalTxnId, originalUniqueId,
                                     m_handle.getAndIncrement(),
                                     procName, parameters);
-        return callProcedure(cb, invocation);
+        return callProcedure(cb, Distributer.USE_DEFAULT_TIMEOUT, invocation);
     }
 
-    private final ClientResponse callProcedure(SyncCallback cb, ProcedureInvocation invocation)
-        throws IOException, NoConnectionsException, ProcCallException
+    private final ClientResponse callProcedure(SyncCallback cb, long timeout, ProcedureInvocation invocation)
+            throws IOException, NoConnectionsException, ProcCallException
     {
         if (m_isShutdown) {
             throw new NoConnectionsException("Client instance is shutdown");
@@ -226,7 +241,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         m_distributer.queue(
                 invocation,
                 cb,
-                true);
+                true, timeout);
 
         try {
             cb.waitForResponse();
@@ -250,10 +265,29 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     @Override
     public final boolean callProcedure(ProcedureCallback callback, String procName, Object... parameters)
     throws IOException, NoConnectionsException {
+        return callProcedureWithTimeout(callback, procName, Distributer.USE_DEFAULT_TIMEOUT, parameters);
+    }
+
+    /**
+     * Asynchronously invoke a procedure call.
+     *
+     * @param callback TransactionCallback that will be invoked with procedure results.
+     * @param procName class name (not qualified by package) of the procedure to execute.
+     * @param timeout timeout for the procedure in seconds.
+     * @param parameters vararg list of procedure's parameter values.
+     * @return True if the procedure was queued and false otherwise
+     */
+    public boolean callProcedureWithTimeout(ProcedureCallback callback, String procName,
+            long timeout, Object... parameters) throws IOException, NoConnectionsException {
         if (m_isShutdown) {
             return false;
         }
-        return callProcedure(callback, 0, procName, parameters);
+        if (callback instanceof ProcedureArgumentCacher) {
+            ((ProcedureArgumentCacher) callback).setArgs(parameters);
+        }
+        ProcedureInvocation invocation
+                = new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
+        return private_callProcedure(callback, 0, invocation, timeout);
     }
 
     /**
@@ -285,7 +319,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             new ProcedureInvocation(originalTxnId, originalUniqueId,
                                     m_handle.getAndIncrement(),
                                     procName, parameters);
-        return private_callProcedure(callback, 0, invocation);
+        return private_callProcedure(callback, 0, invocation, Distributer.USE_DEFAULT_TIMEOUT);
     }
 
     @Override
@@ -300,21 +334,21 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     public final boolean callProcedure(
            ProcedureCallback callback,
            int expectedSerializedSize,
-           String procName,
-           Object... parameters)
+            String procName,
+            Object... parameters)
            throws NoConnectionsException, IOException {
         if (callback instanceof ProcedureArgumentCacher) {
             ((ProcedureArgumentCacher)callback).setArgs(parameters);
         }
         ProcedureInvocation invocation =
             new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
-        return private_callProcedure(callback, expectedSerializedSize, invocation);
+        return private_callProcedure(callback, expectedSerializedSize, invocation, 0);
     }
 
     private final boolean private_callProcedure(
             ProcedureCallback callback,
             int expectedSerializedSize,
-            ProcedureInvocation invocation)
+            ProcedureInvocation invocation, long timeout)
             throws IOException, NoConnectionsException {
         if (m_isShutdown) {
             return false;
@@ -330,7 +364,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             while (!m_distributer.queue(
                     invocation,
                     callback,
-                    isBlessed)) {
+                    isBlessed, timeout)) {
                 try {
                     backpressureBarrier();
                 } catch (InterruptedException e) {
@@ -342,7 +376,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             return m_distributer.queue(
                     invocation,
                     callback,
-                    isBlessed);
+                    isBlessed, timeout);
         }
     }
 
@@ -359,9 +393,9 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     private Object[] getUpdateCatalogParams(File catalogPath, File deploymentPath)
     throws IOException {
         Object[] params = new Object[2];
-        params[0] = CatalogUtil.toBytes(catalogPath);
+        params[0] = MiscUtils.fileToBytes(catalogPath);
         if (deploymentPath != null) {
-            params[1] = new String(CatalogUtil.toBytes(deploymentPath), "UTF-8");
+            params[1] = new String(MiscUtils.fileToBytes(deploymentPath), "UTF-8");
         }
         else {
             params[1] = null;

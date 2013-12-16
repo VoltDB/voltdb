@@ -22,7 +22,7 @@ import java.util.Set;
 
 import org.voltcore.utils.CoreUtils;
 
-import com.google.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 
 public final class FaultMessage extends VoltMessage {

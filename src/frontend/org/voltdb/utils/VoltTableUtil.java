@@ -16,7 +16,6 @@
  */
 package org.voltdb.utils;
 
-import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.math.BigDecimal;
@@ -29,7 +28,10 @@ import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.common.Constants;
 import org.voltdb.types.TimestampType;
+
+import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 
 
 /*
@@ -54,7 +56,7 @@ public class VoltTableUtil {
         @Override
         public SimpleDateFormat initialValue() {
             SimpleDateFormat sdf = new SimpleDateFormat(
-                    VoltDB.ODBC_DATE_FORMAT_STRING);
+                    Constants.ODBC_DATE_FORMAT_STRING);
             sdf.setTimeZone(tz);
             return sdf;
         }
@@ -156,7 +158,7 @@ public class VoltTableUtil {
         }
         toCSVWriter(writer, vt, columns);
         String csvString = sw.toString();
-        return Pair.of(csvString.length(), csvString.getBytes(com.google.common.base.Charsets.UTF_8));
+        return Pair.of(csvString.length(), csvString.getBytes(com.google_voltpatches.common.base.Charsets.UTF_8));
     }
 
     /**

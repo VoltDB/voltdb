@@ -20,7 +20,7 @@ package org.apache.cassandra_voltpatches;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-import com.google.common.primitives.UnsignedBytes;
+import com.google_voltpatches.common.primitives.UnsignedBytes;
 
 /**
  * This is a very fast, non-cryptographic hash suitable for general hash-based

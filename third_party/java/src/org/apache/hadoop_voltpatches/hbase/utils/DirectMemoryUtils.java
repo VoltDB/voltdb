@@ -27,7 +27,7 @@ import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.util.List;
 
-import com.google.common.base.Preconditions;
+import com.google_voltpatches.common.base.Preconditions;
 
 public class DirectMemoryUtils {
   /**

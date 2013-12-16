@@ -27,14 +27,18 @@ import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
+import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
@@ -45,9 +49,9 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
     public enum Members {
         TARGET_INDEX_NAME,
-        KEY_ITERATE,
         SEARCHKEY_EXPRESSIONS,
         ENDKEY_EXPRESSIONS,
+        SKIP_NULL_PREDICATE,
         LOOKUP_TYPE,
         END_TYPE;
     }
@@ -58,9 +62,6 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
     // The index to use in the scan operation
     protected String m_targetIndexName;
-
-    // ???
-    protected Boolean m_keyIterate = false;
 
     //
     protected List<AbstractExpression> m_endkeyExpressions = new ArrayList<AbstractExpression>();
@@ -80,6 +81,8 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     protected Index m_catalogIndex = null;
 
     private ArrayList<AbstractExpression> m_bindings;
+
+    private AbstractExpression m_skip_null_predicate;
 
     public IndexCountPlanNode() {
         super();
@@ -115,14 +118,83 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
             m_endType = endType;
             m_endkeyExpressions.addAll(endKeys);
+
+            setSkipNullPredicate(false);
         } else {
             // for reverse scan, swap everything of searchkey and endkey
             // because we added the last < / <= to searchkey but not endExpr
+            assert(endType == IndexLookupType.EQ);
             m_lookupType = endType;     // must be EQ, but doesn't matter, since previous lookup type is not GT
             m_searchkeyExpressions.addAll(endKeys);
             m_endType = isp.m_lookupType;
             m_endkeyExpressions = isp.getSearchKeyExpressions();
+
+            setSkipNullPredicate(true);
         }
+    }
+
+    private void setSkipNullPredicate(boolean isReverseScan) {
+
+        int nextKeyIndex = -1;
+
+        if (isReverseScan) {
+            if (m_searchkeyExpressions.size() < m_endkeyExpressions.size()) {
+                assert(m_endType == IndexLookupType.LT || m_endType == IndexLookupType.LTE);
+                assert( m_endkeyExpressions.size() - m_searchkeyExpressions.size() == 1);
+                nextKeyIndex = m_searchkeyExpressions.size();
+            }
+        } else {
+            // useful for underflow case to eliminate nulls
+            if (m_searchkeyExpressions.size() >= m_endkeyExpressions.size()) {
+                if (m_lookupType == IndexLookupType.GT || m_lookupType == IndexLookupType.GTE) {
+                    assert(m_searchkeyExpressions.size() > 0);
+                    nextKeyIndex = m_searchkeyExpressions.size() - 1;
+                }
+            }
+        }
+        if (nextKeyIndex < 0) {
+            return ;
+        }
+
+        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+
+        String exprsjson = m_catalogIndex.getExpressionsjson();
+        List<AbstractExpression> indexedExprs = null;
+        if (exprsjson.isEmpty()) {
+            indexedExprs = new ArrayList<AbstractExpression>();
+
+            List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(m_catalogIndex.getColumns(), "index");
+            for (int i = 0; i <= nextKeyIndex; i++) {
+                ColumnRef colRef = indexedColRefs.get(i);
+                Column col = colRef.getColumn();
+                TupleValueExpression tve = new TupleValueExpression(m_targetTableName, m_targetTableAlias,
+                        col.getTypeName(), col.getTypeName());
+                tve.setValueType(VoltType.get((byte)col.getType()));
+                tve.setValueSize(col.getSize());
+                tve.resolveForTable((Table)m_catalogIndex.getParent());
+                indexedExprs.add(tve);
+            }
+        } else {
+            try {
+                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson);
+            } catch (JSONException e) {
+                e.printStackTrace();
+                assert(false);
+            }
+
+        }
+        AbstractExpression expr;
+        for (int i = 0; i < nextKeyIndex; i++) {
+            AbstractExpression idxExpr = indexedExprs.get(i);
+            expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
+                    idxExpr, (AbstractExpression) m_searchkeyExpressions.get(i).clone());
+            exprs.add(expr);
+        }
+        AbstractExpression nullExpr = indexedExprs.get(nextKeyIndex);
+        expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
+        exprs.add(expr);
+        m_skip_null_predicate = ExpressionUtil.combine(exprs);
+        m_skip_null_predicate.finalizeValueTypes();
     }
 
     // Create an IndexCountPlanNode that replaces the parent aggregate and chile indexscan
@@ -308,7 +380,6 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.KEY_ITERATE.name()).value(m_keyIterate);
         stringer.key(Members.LOOKUP_TYPE.name()).value(m_lookupType.toString());
         stringer.key(Members.END_TYPE.name()).value(m_endType.toString());
         stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_targetIndexName);
@@ -331,23 +402,27 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             stringer.value(ae);
         }
         stringer.endArray();
+
+        if (m_skip_null_predicate != null) {
+            stringer.key(Members.SKIP_NULL_PREDICATE.name()).value(m_skip_null_predicate);
+        }
     }
 
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
-        m_keyIterate = jobj.getBoolean( Members.KEY_ITERATE.name() );
 
         m_lookupType = IndexLookupType.get( jobj.getString( Members.LOOKUP_TYPE.name() ) );
         m_endType = IndexLookupType.get( jobj.getString( Members.END_TYPE.name() ) );
         m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
         m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
-        JSONObject tempjobj = null;
         //load end_expression
         AbstractExpression.loadFromJSONArrayChild(m_endkeyExpressions, jobj,
                 Members.ENDKEY_EXPRESSIONS.name());
         AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
                 Members.SEARCHKEY_EXPRESSIONS.name());
+
+        m_skip_null_predicate = AbstractExpression.fromJSONChild(jobj, Members.SKIP_NULL_PREDICATE.name());
     }
 
     @Override
@@ -355,24 +430,94 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         assert(m_catalogIndex != null);
 
         int indexSize = CatalogUtil.getCatalogIndexSize(m_catalogIndex);
-        int keySize = m_searchkeyExpressions.size();
+        int searchkeySize = m_searchkeyExpressions.size();
+        int endkeySize = m_endkeyExpressions.size();
 
+        int keySize = Math.max(searchkeySize, endkeySize);
         String scanType = "tree-counter";
-        if (m_lookupType != IndexLookupType.EQ)
-            scanType = "tree-counter";
 
         String cover = "covering";
         if (indexSize > keySize)
             cover = String.format("%d/%d cols", keySize, indexSize);
 
         String usageInfo = String.format("(%s %s)", scanType, cover);
-        if (keySize == 0)
-            usageInfo = "(for sort order only)";
 
+        String[] asIndexed = new String[indexSize];
+        // Not really expecting to need these fall-back labels,
+        // but in the case of an unexpected error accessing the catalog data,
+        // they beat an NPE.
+        for (int ii = 0; ii < keySize; ++ii) {
+            asIndexed[ii] = "(index key " + ii + ")";
+        }
+        String jsonExpr = m_catalogIndex.getExpressionsjson();
+        // if this is a pure-column index...
+        if (jsonExpr.isEmpty()) {
+            // grab the short names of the indexed columns in use.
+            for (ColumnRef cref : m_catalogIndex.getColumns()) {
+                Column col = cref.getColumn();
+                asIndexed[cref.getIndex()] = col.getName();
+            }
+        }
+        else {
+            try {
+                List<AbstractExpression> indexExpressions =
+                    AbstractExpression.fromJSONArrayString(jsonExpr);
+                int ii = 0;
+                for (AbstractExpression ae : indexExpressions) {
+                    asIndexed[ii++] = ae.explain(m_targetTableName);
+                }
+            } catch (JSONException e) {
+                // If something unexpected went wrong,
+                // just fall back on the positional key labels.
+            }
+        }
+
+        // Explain the search keys that describe the boundaries of the index count, like
+        // "(event_type = 1 AND event_start > x.start_time)"
+        if (searchkeySize > 0) {
+            String start = explainKeys(asIndexed, m_searchkeyExpressions, m_targetTableName, m_lookupType);
+            usageInfo += "\n" + indent + " count matches from " + start;
+        }
+        if (endkeySize > 0) {
+            String end = explainKeys(asIndexed, m_endkeyExpressions, m_targetTableName, m_endType);
+            usageInfo += "\n" + indent + " count matches to " + end;
+        }
+        if (m_skip_null_predicate != null) {
+            String predicate = m_skip_null_predicate.explain(m_targetTableName);
+            usageInfo += "\n" + indent + " discounting rows where " + predicate;
+        }
+        // Describe the table name and either a user-provided name of the index or
+        // its user-specified role ("primary key").
         String retval = "INDEX COUNT of \"" + m_targetTableName + "\"";
-        retval += " using \"" + m_targetIndexName + "\"";
-        retval += " " + usageInfo;
+        String indexDescription = " using \"" + m_targetIndexName + "\"";
+        // Replace ugly system-generated index name with a description of its user-specified role.
+        if (m_targetIndexName.startsWith("SYS_IDX_PK_") ||
+            m_targetIndexName.startsWith("SYS_IDX_SYS_PK_") ||
+            m_targetIndexName.startsWith("MATVIEW_PK_INDEX") ) {
+            indexDescription = " using its primary key index";
+        }
+        // Bring all the pieces together describing the index, how it is scanned,
+        // and whatever extra filter processing is done to the result.
+        retval += indexDescription;
+        retval += usageInfo;
         return retval;
+    }
+
+    private static String explainKeys(String[] asIndexed, List<AbstractExpression> keyExpressions,
+            String targetTableName, IndexLookupType lookupType) {
+        String conjunction = "";
+        String result = "(";
+        int prefixSize = keyExpressions.size() - 1;
+        for (int ii = 0; ii < prefixSize; ++ii) {
+            result += conjunction +
+                asIndexed[ii] + " = " + keyExpressions.get(ii).explain(targetTableName);
+            conjunction = ") AND (";
+        }
+        // last element
+        result += conjunction +
+            asIndexed[prefixSize] + " " + lookupType.getSymbol() + " " +
+            keyExpressions.get(prefixSize).explain(targetTableName) + ")";
+        return result;
     }
 
     public ArrayList<AbstractExpression> getBindings() {

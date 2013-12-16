@@ -35,7 +35,6 @@ APPCLASSPATH=$CLASSPATH:$({ \
 CLIENTCLASSPATH=$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
     \ls -1 "$VOLTDB_LIB"/commons-cli-1.2.jar; \
-    \ls -1 "$VOLTDB_LIB"/guava-15.0.jar; \
 } 2> /dev/null | paste -sd ':' - )
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"

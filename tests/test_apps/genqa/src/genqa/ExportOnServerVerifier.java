@@ -65,7 +65,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.types.TimestampType;
 
-import com.google.common.base.Throwables;
+import com.google_voltpatches.common.base.Throwables;
 import com.jcraft.jsch.ChannelSftp;
 import com.jcraft.jsch.ChannelSftp.LsEntry;
 import com.jcraft.jsch.JSch;
@@ -873,7 +873,7 @@ public class ExportOnServerVerifier {
                 Vector<LsEntry> files = rh.channel.ls(rh.path);
                 List<String> paths = new ArrayList<String>();
 
-                int trackerModifyTime = rh.channel.stat(rh.path + "/" + TRACKER_FILENAME).getMTime();
+                final int trackerModifyTime = rh.channel.stat(rh.path + "/" + TRACKER_FILENAME).getMTime();
 
                 boolean activeInRemote = false;
                 boolean filesInRemote = false;
@@ -887,12 +887,14 @@ public class ExportOnServerVerifier {
                             !entry.getAttrs().isDir())
                     {
                         final String entryFileName = rh.path + "/" + entry.getFilename();
+                        final int entryModifyTime = entry.getAttrs().getMTime();
 
                         if (!entry.getFilename().contains("active"))
                         {
                             Matcher mtc = EXPORT_FILENAME_REGEXP.matcher(entry.getFilename());
                             if (mtc.matches()) {
                                 paths.add(entryFileName);
+                                activeInRemote = activeInRemote || entryModifyTime > trackerModifyTime;
                                 filesInRemote = true;
                             } else {
                                 System.err.println(
@@ -902,8 +904,7 @@ public class ExportOnServerVerifier {
                         }
                         else if (entry.getFilename().trim().toLowerCase().startsWith("active-"))
                         {
-                            int activeModifyTime = entry.getAttrs().getMTime();
-                            if ((trackerModifyTime - activeModifyTime) > 120)
+                            if ((trackerModifyTime - entryModifyTime) > 120)
                             {
                                 final String renamed = rh.path + "/" + entry.getFilename().substring("active-".length());
                                 rh.channel.rename(entryFileName, renamed);
@@ -1056,12 +1057,12 @@ public class ExportOnServerVerifier {
         System.out.println("All active seen flag is " + allActiveSeen());
         if (!allActiveSeen()) {
             for (RemoteHost host: m_hosts) {
-                if (!host.activeSeen) {
-                    String hn = "(unknown)";
-                    try {
-                        hn = host.channel.getSession().getHost();
-                    } catch (JSchException ignoreIt) {}
-                    System.out.println("\tno active file was detected on " + hn);
+                String hn = "(unknown)";
+                try {
+                    hn = host.channel.getSession().getHost();
+                } catch (JSchException ignoreIt) {}
+                if (!host.activeSeen && host.fileSeen) {
+                    System.out.println("\tno activity was detected on " + hn);
                 }
             }
         }

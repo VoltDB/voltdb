@@ -112,6 +112,10 @@ public class CSVLoader {
     public static final long DEFAULT_COLUMN_LIMIT_SIZE = 16777216;
 
     /**
+     * Used for testing only.
+     */
+    public static boolean testMode = false;
+    /**
      * Configuration options.
      */
     public static class CSVConfig extends CLIConfig {
@@ -276,14 +280,12 @@ public class CSVLoader {
         } catch (Exception e) {
             m_log.error("Error connecting to the servers: "
                     + config.servers);
-            close_cleanup();
             System.exit(-1);
         }
         assert (csvClient != null);
 
         try {
             if (!CSVPartitionProcessor.initializeProcessorInformation(config, csvClient)) {
-                close_cleanup();
                 System.exit(-1);
             }
 
@@ -294,9 +296,15 @@ public class CSVLoader {
             Map<Long, BlockingQueue<CSVLineWithMetaData>> lineq =
                     new HashMap<Long, BlockingQueue<CSVLineWithMetaData>>(CSVPartitionProcessor.m_numProcessors);
             List<CSVPartitionProcessor> processors = new ArrayList<CSVPartitionProcessor>(CSVPartitionProcessor.m_numProcessors);
+            int numBatchesInQueuePerPartition = (1000 / CSVPartitionProcessor.m_numProcessors);
+            if (numBatchesInQueuePerPartition < 5) {
+                numBatchesInQueuePerPartition = 5;
+            }
+            m_log.debug("Max Number of batches per partition processor: " + numBatchesInQueuePerPartition);
             for (long i = 0; i < CSVPartitionProcessor.m_numProcessors; i++) {
-                LinkedBlockingQueue<CSVLineWithMetaData> partitionQueue =
-                        new LinkedBlockingQueue<CSVLineWithMetaData>(Integer.MAX_VALUE);
+                //Keep only numBatchesInQueuePerPartition batches worth data in queue.
+                LinkedBlockingQueue<CSVLineWithMetaData> partitionQueue
+                        = new LinkedBlockingQueue<CSVLineWithMetaData>(config.batch * numBatchesInQueuePerPartition);
                 lineq.put(i, partitionQueue);
                 CSVPartitionProcessor processor = new CSVPartitionProcessor(csvClient, i,
                         CSVPartitionProcessor.m_partitionedColumnIndex, partitionQueue, endOfData);
@@ -344,7 +352,12 @@ public class CSVLoader {
             m_log.info("Read " + insertCount + " rows from file and successfully inserted "
                     + ackCount + " rows (final)");
             produceFiles(ackCount, insertCount);
+            boolean noerrors = CSVFileReader.m_errorInfo.isEmpty();
             close_cleanup();
+            //In test junit mode we let it continue for reuse
+            if (!CSVLoader.testMode) {
+                System.exit(noerrors ? 0 : -1);
+            }
         } catch (Exception ex) {
             m_log.error("Exception Happened while loading CSV data: " + ex);
             System.exit(1);
@@ -497,5 +510,6 @@ public class CSVLoader {
         out_invaliderowfile.close();
         out_logfile.close();
         out_reportfile.close();
+
     }
 }

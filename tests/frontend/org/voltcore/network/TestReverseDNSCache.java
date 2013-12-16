@@ -34,7 +34,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.SelectionKey;
 
-import com.google.common.base.Function;
+import com.google_voltpatches.common.base.Function;
 import junit.framework.TestCase;
 import org.junit.BeforeClass;
 import org.junit.Test;

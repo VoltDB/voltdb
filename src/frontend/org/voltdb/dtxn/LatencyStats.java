@@ -28,7 +28,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 
-import com.google.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableList;
 
 /**
  * Class that provides latency information in buckets. Each bucket contains the
