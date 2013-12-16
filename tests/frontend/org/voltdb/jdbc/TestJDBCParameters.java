@@ -33,6 +33,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -188,6 +189,31 @@ public class TestJDBCParameters {
         if (server != null) {
             try { server.shutdown(); } catch (InterruptedException e) { /*empty*/ }
             server = null;
+        }
+    }
+
+    /**
+     * Make sure non-PreparedStatement queries still work.
+     */
+    @Test
+    public void testSimpleStatement() throws Exception
+    {
+        for (Data d : data) {
+            try {
+                String q = String.format("select * from %s", d.tablename);
+                Statement sel = conn.createStatement();
+                sel.execute(q);
+                ResultSet rs = sel.getResultSet();
+                int rowCount = 0;
+                while (rs.next()) {
+                    rowCount++;
+                }
+                assertEquals(d.good.length, rowCount);
+            }
+            catch(SQLException e) {
+                System.err.printf("ERROR(SELECT): %s: %s\n", d.typename, e.getMessage());
+                fail();
+            }
         }
     }
 
