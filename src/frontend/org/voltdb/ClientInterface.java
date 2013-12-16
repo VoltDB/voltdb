@@ -509,6 +509,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             //Didn't get the value. Client isn't going to get anymore time.
             if (lengthBuffer.hasRemaining()) {
+                timeoutFuture.cancel(false);
                 authLog.debug("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
                               "): wire protocol violation (timeout reading message length).");
                 //Send negative response
@@ -521,6 +522,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             final int messageLength = lengthBuffer.getInt();
             if (messageLength < 0) {
+                timeoutFuture.cancel(false);
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
                              "): wire protocol violation (message length " + messageLength + " is negative).");
                 //Send negative response
@@ -530,13 +532,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return null;
             }
             if (messageLength > ((1024 * 1024) * 2)) {
-                  authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                               "): wire protocol violation (message length " + messageLength + " is too large).");
-                  //Send negative response
-                  responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
-                  socket.write(responseBuffer);
-                  socket.close();
-                  return null;
+                timeoutFuture.cancel(false);
+                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
+                             "): wire protocol violation (message length " + messageLength + " is too large).");
+                //Send negative response
+                responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
+                socket.write(responseBuffer);
+                socket.close();
+                return null;
               }
 
             final ByteBuffer message = ByteBuffer.allocate(messageLength);
@@ -554,6 +557,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             //Didn't get the whole message. Client isn't going to get anymore time.
             if (message.hasRemaining()) {
+                timeoutFuture.cancel(false);
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
                              "): wire protocol violation (timeout reading authentication strings).");
                 //Send negative response
@@ -576,6 +580,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final String service = fds.readString();
             final String username = fds.readString();
             final byte password[] = new byte[20];
+            //We should be left with SHA-1 bytes only.
+            if (message.remaining() != 20) {
+                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress()
+                        + "): user " + username + " failed authentication.");
+                //Send negative response
+                responseBuffer.put(AUTHENTICATION_FAILURE).flip();
+                socket.write(responseBuffer);
+                socket.close();
+                return null;
+            }
             message.get(password);
 
             CatalogContext context = m_catalogContext.get();
@@ -1605,8 +1619,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     final ClientResponseImpl handleRead(ByteBuffer buf, ClientInputHandler handler, Connection ccxn) throws IOException {
         final long now = System.currentTimeMillis();
-        final StoredProcedureInvocation task = new StoredProcedureInvocation();
-        task.initFromBuffer(buf);
+        StoredProcedureInvocation task = new StoredProcedureInvocation();
+        try {
+            task.initFromBuffer(buf);
+        } catch (Exception ex) {
+            return new ClientResponseImpl(
+                    ClientResponseImpl.UNEXPECTED_FAILURE,
+                    new VoltTable[0], ex.getMessage(), ccxn.connectionId());
+        }
         ClientResponseImpl error = null;
 
         // Check for admin mode restrictions before proceeding any further
