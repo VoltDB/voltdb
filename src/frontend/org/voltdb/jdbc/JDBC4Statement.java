@@ -112,7 +112,6 @@ public class JDBC4Statement implements java.sql.Statement
         protected VoltTable[] execute(JDBC4ClientConnection connection, long timeout) throws SQLException {
             try
             {
-                //return connection.execute(this.sql[0], timeout, this.parameters).getResults();
                 if (this.type == TYPE_EXEC)
                     return connection.execute(this.sql[0], timeout, this.parameters).getResults();
                 else
