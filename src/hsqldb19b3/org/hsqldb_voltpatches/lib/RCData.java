@@ -55,7 +55,7 @@ import java.util.StringTokenizer;
  * @see <a href="../../../../util-guide/sqltool-chapt.html#sqltool_auth-sect"
  *      target="guide">
  *     The RC File section of the HyperSQL Utilities Guide</a>
- * @see org.hsqldb.sample.SqlFileEmbedder
+ * @see org.hsqldb_voltpatches.sample.SqlFileEmbedder
  * @author Blaine Simpson (blaine dot simpson at admc dot com)
  */
 public class RCData {

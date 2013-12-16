@@ -883,7 +883,7 @@ public final class Right {
     }
 
     /**
-     * Used solely by org.hsqldb.dbinfo in existing system tables lacking column
+     * Used solely by org.hsqldb_voltpatches.dbinfo in existing system tables lacking column
      * level reporting.<p>
      *
      * Returns names of individual rights instead of ALL

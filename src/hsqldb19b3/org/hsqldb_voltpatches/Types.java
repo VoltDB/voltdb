@@ -1142,12 +1142,12 @@ public class Types {
             case Types.SQL_BINARY :
             case Types.SQL_VARBINARY :
 
-                // but wrapped by org.hsqldb.Binary
+                // but wrapped by org.hsqldb_voltpatches.Binary
                 return "[B";
 
             case Types.OTHER :
 
-                // but wrapped by org.hsqldb.JavaObject
+                // but wrapped by org.hsqldb_voltpatches.JavaObject
                 return "java.lang.Object";
 
             case Types.SQL_BOOLEAN :

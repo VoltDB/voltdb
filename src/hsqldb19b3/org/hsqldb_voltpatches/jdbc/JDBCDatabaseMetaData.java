@@ -145,18 +145,18 @@ import org.hsqldb_voltpatches.types.Type;
  *
  * <div class="GeneralExample">
  * <ol>
- * <li>If a class whose fully qualified name is org.hsqldb.DatabaseInformationFull
+ * <li>If a class whose fully qualified name is org.hsqldb_voltpatches.DatabaseInformationFull
  *     can be found and it has an accesible constructor that takes an
- *     org.hsqldb.Database object as its single parameter, then an instance of
+ *     org.hsqldb_voltpatches.Database object as its single parameter, then an instance of
  *     that class is reflectively instantiated and is used by the database
  *     instance to produce its system tables. <p>
  *
  * <li>If 1.) fails, then the process is repeated, attempting to create an
- *     instance of org.hsqldb.DatabaseInformationMain (which provides just the
+ *     instance of org.hsqldb_voltpatches.DatabaseInformationMain (which provides just the
  *     core set of system tables required to service this class, but now does
  *     so in a more security aware and comprehensive fashion). <p>
  *
- * <li>If 2.) fails, then an instance of org.hsqldb.DatabaseInformation is
+ * <li>If 2.) fails, then an instance of org.hsqldb_voltpatches.DatabaseInformation is
  *     installed (that, by default, produces no system tables, meaning that
  *     calls to all related methods in this class will fail, throwing an
  *     SQLException stating that a required system table is not found). <p>
@@ -1075,7 +1075,7 @@ public class JDBCDatabaseMetaData implements DatabaseMetaData {
         return true;
     }
 
-    /** @todo needs the full conversion matrix here. Should use org.hsqldb.types */
+    /** @todo needs the full conversion matrix here. Should use org.hsqldb_voltpatches.types */
 
     /**
      * (JDBC4 clarification:)
@@ -2861,8 +2861,8 @@ public class JDBCDatabaseMetaData implements DatabaseMetaData {
      * (including case) as they are stored in the database. <p>
      *
      * Since 1.7.2, this feature is supported by default. If the jar is
-     * compiled without org.hsqldb.DatabaseInformationFull or
-     * org.hsqldb.DatabaseInformationMain, the feature is
+     * compiled without org.hsqldb_voltpatches.DatabaseInformationFull or
+     * org.hsqldb_voltpatches.DatabaseInformationMain, the feature is
      * not supported. The default implementation is
      * {@link org.hsqldb_voltpatches.dbinfo.DatabaseInformationFull}.
      * </div>
@@ -3030,8 +3030,8 @@ public class JDBCDatabaseMetaData implements DatabaseMetaData {
      * (including case) as they are stored in the database. <p>
      *
      * Since 1.7.2, this feature is supported by default. If the jar is
-     * compiled without org.hsqldb.DatabaseInformationFull or
-     * org.hsqldb.DatabaseInformationMain, the feature is
+     * compiled without org.hsqldb_voltpatches.DatabaseInformationFull or
+     * org.hsqldb_voltpatches.DatabaseInformationMain, the feature is
      * not supported. The default implementation is
      * {@link org.hsqldb_voltpatches.dbinfo.DatabaseInformationFull}.
      * </div>
@@ -3124,8 +3124,8 @@ public class JDBCDatabaseMetaData implements DatabaseMetaData {
      * of JDBC3 compliant tools. <p>
      *
      * Since 1.7.2, this feature is supported by default. If the jar is
-     * compiled without org.hsqldb.DatabaseInformationFull or
-     * org.hsqldb.DatabaseInformationMain, the feature is
+     * compiled without org.hsqldb_voltpatches.DatabaseInformationFull or
+     * org.hsqldb_voltpatches.DatabaseInformationMain, the feature is
      * not supported. The default implementation is
      * {@link org.hsqldb_voltpatches.dbinfo.DatabaseInformationFull}.
      * </div>
@@ -3253,8 +3253,8 @@ public class JDBCDatabaseMetaData implements DatabaseMetaData {
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
      * Since 1.7.2, this feature is supported by default. If the jar is
-     * compiled without org.hsqldb.DatabaseInformationFull or
-     * org.hsqldb.DatabaseInformationMain, the feature is
+     * compiled without org.hsqldb_voltpatches.DatabaseInformationFull or
+     * org.hsqldb_voltpatches.DatabaseInformationMain, the feature is
      * not supported. The default implementation is
      * {@link org.hsqldb_voltpatches.dbinfo.DatabaseInformationFull}.
      * </div>
@@ -3287,8 +3287,8 @@ public class JDBCDatabaseMetaData implements DatabaseMetaData {
      * types.
      *
      * Since 1.7.2, this feature is supported by default. If the jar is
-     * compiled without org.hsqldb.DatabaseInformationFull or
-     * org.hsqldb.DatabaseInformationMain, the feature is
+     * compiled without org.hsqldb_voltpatches.DatabaseInformationFull or
+     * org.hsqldb_voltpatches.DatabaseInformationMain, the feature is
      * not supported. The default implementation is
      * {@link org.hsqldb_voltpatches.dbinfo.DatabaseInformationFull}.
      * </div>
@@ -3399,8 +3399,8 @@ public class JDBCDatabaseMetaData implements DatabaseMetaData {
      * the engine does not support the related features. <p>
      *
      * Since 1.7.2, this feature is supported by default. If the jar is
-     * compiled without org.hsqldb.DatabaseInformationFull or
-     * org.hsqldb.DatabaseInformationMain, the feature is
+     * compiled without org.hsqldb_voltpatches.DatabaseInformationFull or
+     * org.hsqldb_voltpatches.DatabaseInformationMain, the feature is
      * not supported. The default implementation is
      * {@link org.hsqldb_voltpatches.dbinfo.DatabaseInformationFull}.
      * </div>
@@ -3476,8 +3476,8 @@ public class JDBCDatabaseMetaData implements DatabaseMetaData {
      * (including case) as they are stored in the database. <p>
      *
      * Since 1.7.2, this feature is supported by default. If the jar is
-     * compiled without org.hsqldb.DatabaseInformationFull or
-     * org.hsqldb.DatabaseInformationMain, the feature is
+     * compiled without org.hsqldb_voltpatches.DatabaseInformationFull or
+     * org.hsqldb_voltpatches.DatabaseInformationMain, the feature is
      * not supported. The default implementation is
      * {@link org.hsqldb_voltpatches.dbinfo.DatabaseInformationFull}.
      * </div>
@@ -3564,8 +3564,8 @@ public class JDBCDatabaseMetaData implements DatabaseMetaData {
      * (including case) as they are stored in the database. <p>
      *
      * Since 1.7.2, this feature is supported by default. If the jar is
-     * compiled without org.hsqldb.DatabaseInformationFull or
-     * org.hsqldb.DatabaseInformationMain, the feature is
+     * compiled without org.hsqldb_voltpatches.DatabaseInformationFull or
+     * org.hsqldb_voltpatches.DatabaseInformationMain, the feature is
      * not supported. The default implementation is
      * {@link org.hsqldb_voltpatches.dbinfo.DatabaseInformationFull}.
      * </div>
@@ -3666,8 +3666,8 @@ public class JDBCDatabaseMetaData implements DatabaseMetaData {
      * the column definition in the database. <p>
      *
      * Since 1.7.2, this feature is supported by default. If the jar is
-     * compiled without org.hsqldb.DatabaseInformationFull or
-     * org.hsqldb.DatabaseInformationMain, the feature is
+     * compiled without org.hsqldb_voltpatches.DatabaseInformationFull or
+     * org.hsqldb_voltpatches.DatabaseInformationMain, the feature is
      * not supported. The default implementation is
      * {@link org.hsqldb_voltpatches.dbinfo.DatabaseInformationFull}.
      * </div>
@@ -3782,8 +3782,8 @@ public class JDBCDatabaseMetaData implements DatabaseMetaData {
      * (including case) as they are stored in the database. <p>
      *
      * Since 1.7.2, this feature is supported by default. If the jar is
-     * compiled without org.hsqldb.DatabaseInformationFull or
-     * org.hsqldb.DatabaseInformationMain, the feature is
+     * compiled without org.hsqldb_voltpatches.DatabaseInformationFull or
+     * org.hsqldb_voltpatches.DatabaseInformationMain, the feature is
      * not supported. The default implementation is
      * {@link org.hsqldb_voltpatches.dbinfo.DatabaseInformationFull}.
      * </div>
@@ -3850,8 +3850,8 @@ public class JDBCDatabaseMetaData implements DatabaseMetaData {
      * (including case) as they are stored in the database. <p>
      *
      * Since 1.7.2, this feature is supported by default. If the jar is
-     * compiled without org.hsqldb.DatabaseInformationFull or
-     * org.hsqldb.DatabaseInformationMain, the feature is
+     * compiled without org.hsqldb_voltpatches.DatabaseInformationFull or
+     * org.hsqldb_voltpatches.DatabaseInformationMain, the feature is
      * not supported. The default implementation is
      * {@link org.hsqldb_voltpatches.dbinfo.DatabaseInformationFull}.
      * </div>
@@ -3965,8 +3965,8 @@ public class JDBCDatabaseMetaData implements DatabaseMetaData {
      * (including case) as they are stored in the database. <p>
      *
      * Since 1.7.2, this feature is supported by default. If the jar is
-     * compiled without org.hsqldb.DatabaseInformationFull or
-     * org.hsqldb.DatabaseInformationMain, the feature is
+     * compiled without org.hsqldb_voltpatches.DatabaseInformationFull or
+     * org.hsqldb_voltpatches.DatabaseInformationMain, the feature is
      * not supported. The default implementation is
      * {@link org.hsqldb_voltpatches.dbinfo.DatabaseInformationFull}.
      * </div>
@@ -4080,8 +4080,8 @@ public class JDBCDatabaseMetaData implements DatabaseMetaData {
      * (including case) as they are stored in the database. <p>
      *
      * Since 1.7.2, this feature is supported by default. If the jar is
-     * compiled without org.hsqldb.DatabaseInformationFull or
-     * org.hsqldb.DatabaseInformationMain, the feature is
+     * compiled without org.hsqldb_voltpatches.DatabaseInformationFull or
+     * org.hsqldb_voltpatches.DatabaseInformationMain, the feature is
      * not supported. The default implementation is
      * {@link org.hsqldb_voltpatches.dbinfo.DatabaseInformationFull}.
      * </div>
@@ -4200,8 +4200,8 @@ public class JDBCDatabaseMetaData implements DatabaseMetaData {
      * (including case) as they are stored in the database. <p>
      *
      * Since 1.7.2, this feature is supported by default. If the jar is
-     * compiled without org.hsqldb.DatabaseInformationFull or
-     * org.hsqldb.DatabaseInformationMain, the feature is
+     * compiled without org.hsqldb_voltpatches.DatabaseInformationFull or
+     * org.hsqldb_voltpatches.DatabaseInformationMain, the feature is
      * not supported. The default implementation is
      * {@link org.hsqldb_voltpatches.dbinfo.DatabaseInformationFull}.
      * </div>
@@ -4323,8 +4323,8 @@ public class JDBCDatabaseMetaData implements DatabaseMetaData {
      * <h3>HSQLDB-Specific Information:</h3> <p>
      *
      * Since 1.7.2, this feature is supported by default. If the jar is
-     * compiled without org.hsqldb.DatabaseInformationFull or
-     * org.hsqldb.DatabaseInformationMain, the feature is
+     * compiled without org.hsqldb_voltpatches.DatabaseInformationFull or
+     * org.hsqldb_voltpatches.DatabaseInformationMain, the feature is
      * not supported. The default implementation is
      * {@link org.hsqldb_voltpatches.dbinfo.DatabaseInformationFull}.
      * </div>
@@ -4394,8 +4394,8 @@ public class JDBCDatabaseMetaData implements DatabaseMetaData {
      * (including case) as they are stored in the database. <p>
      *
      * Since 1.7.2, this feature is supported by default. If the jar is
-     * compiled without org.hsqldb.DatabaseInformationFull or
-     * org.hsqldb.DatabaseInformationMain, the feature is
+     * compiled without org.hsqldb_voltpatches.DatabaseInformationFull or
+     * org.hsqldb_voltpatches.DatabaseInformationMain, the feature is
      * not supported. The default implementation is
      * {@link org.hsqldb_voltpatches.dbinfo.DatabaseInformationFull}.
      * </div>
@@ -4788,7 +4788,7 @@ public class JDBCDatabaseMetaData implements DatabaseMetaData {
      * Starting with 1.7.2, there is an option to support this feature
      * to greater or lesser degrees.  See the documentation specific to the
      * selected system table provider implementation. The default implementation
-     * is org.hsqldb.DatabaseInformationFull.
+     * is org.hsqldb_voltpatches.DatabaseInformationFull.
      * </div>
      * <!-- end release-specific documentation -->
      * @param catalog a catalog name; must match the catalog name as it
@@ -5003,8 +5003,8 @@ public class JDBCDatabaseMetaData implements DatabaseMetaData {
      * for DOMAIN and DISTINCT types.<p>
      *
      * If the jar is
-     * compiled without org.hsqldb.DatabaseInformationFull or
-     * org.hsqldb.DatabaseInformationMain, the feature is
+     * compiled without org.hsqldb_voltpatches.DatabaseInformationFull or
+     * org.hsqldb_voltpatches.DatabaseInformationMain, the feature is
      * not supported. The default implementation is
      * {@link org.hsqldb_voltpatches.dbinfo.DatabaseInformationFull}.
      * </div>

@@ -54,7 +54,7 @@ import org.hsqldb_voltpatches.navigator.RowIterator;
 import org.hsqldb_voltpatches.navigator.RowSetNavigator;
 import org.hsqldb_voltpatches.result.Result;
 
-//import org.hsqldb.lib.StopWatch;
+//import org.hsqldb_voltpatches.lib.StopWatch;
 
 /**
  * @todo - can lock the database engine as readonly in a wrapper for this when

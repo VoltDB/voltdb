@@ -4685,7 +4685,7 @@ public class JDBCCallableStatement extends JDBCPreparedStatement implements Call
      *
      * @param columnIndex of the column value for which to perform the
      *                 conversion
-     * @param targetType the org.hsqldb.types.Type object for targetType
+     * @param targetType the org.hsqldb_voltpatches.types.Type object for targetType
      * @return an Object of the requested targetType, representing the value of the
      *       specified column
      * @throws SQLException when there is no rowData, the column index is

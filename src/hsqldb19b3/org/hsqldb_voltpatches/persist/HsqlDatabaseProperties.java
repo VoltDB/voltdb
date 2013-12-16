@@ -85,7 +85,7 @@ public class HsqlDatabaseProperties extends HsqlProperties {
      * access to all classe or method names formed by substitution of the
      * asterisk.<p>
      *
-     * All methods of org.hsqldb.Library and java.lang.Math are always
+     * All methods of org.hsqldb_voltpatches.Library and java.lang.Math are always
      * accessible.
      *
      *

@@ -93,7 +93,7 @@ import org.hsqldb_voltpatches.persist.HsqlProperties;
  * all JDBC 2 methods can be called while executing under the version 1.1.x
  * <em>Java Runtime Environment</em><sup><font size="-2">TM</font></sup>.
  * However, in addition to this technique requiring explicit casts to the
- * org.hsqldb.jdbc.* classes, some of the method calls also require
+ * org.hsqldb_voltpatches.jdbc.* classes, some of the method calls also require
  * <code>int</code> values that are defined only in the JDBC 2 or greater
  * version of the {@link java.sql.ResultSet ResultSet} interface.  For this
  * reason, when the product is compiled under JDK 1.1.x, these values are

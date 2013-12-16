@@ -178,7 +178,7 @@ import org.hsqldb_voltpatches.result.ResultConstants;
  *
  * <b>Network Server Database Connections:</b> <p>
  *
- * The {@link org.hsqldb.server.Server Server} database connection <b>&lt;url&gt;</b>
+ * The {@link org.hsqldb_voltpatches.server.Server Server} database connection <b>&lt;url&gt;</b>
  * takes one of the two following forms: <p>
  *
  * <div class="GeneralExample">
@@ -190,7 +190,7 @@ import org.hsqldb_voltpatches.result.ResultConstants;
  * </ol>
  * </div> <p>
  *
- * The {@link org.hsqldb.server.WebServer WebServer} database connection <b>&lt;url&gt;</b>
+ * The {@link org.hsqldb_voltpatches.server.WebServer WebServer} database connection <b>&lt;url&gt;</b>
  * takes one of two following forms: <p>
  *
  * <div class="GeneralExample">
@@ -211,7 +211,7 @@ import org.hsqldb_voltpatches.result.ResultConstants;
  *
  * For more information on server configuration regarding mounting multiple
  * databases and assigning them <b>&lt;alias&gt;</b> values, please read the
- * Java API documentation for {@link org.hsqldb.server.Server Server} and related
+ * Java API documentation for {@link org.hsqldb_voltpatches.server.Server Server} and related
  * chapters in the general documentation, especially the <em>Advanced Users
  * Guide</em>. <p>
  *
@@ -418,10 +418,10 @@ import org.hsqldb_voltpatches.result.ResultConstants;
  * component of the <b>res:</b> database connection <b>&lt;url&gt;</b> is always
  * taken to be relative to the default package and resource URL resolution is
  * always performed using the ClassLoader that loads the
- * org.hsqldb.persist.Logger class. That is, if the <b>&lt;path&gt;</b>
+ * org.hsqldb_voltpatches.persist.Logger class. That is, if the <b>&lt;path&gt;</b>
  * component does not start with '/', then'/' is prepended when obtaining the
  * resource URLs used to read the database files, and only the effective class
- * path of org.hsqldb.persist.Logger's ClassLoader is searched. <p>
+ * path of org.hsqldb_voltpatches.persist.Logger's ClassLoader is searched. <p>
  *
  * <hr>
  *
@@ -443,7 +443,7 @@ import org.hsqldb_voltpatches.result.ResultConstants;
  * all JDBC 2 methods can be called while executing under the version 1.1.x
  * <em>Java Runtime Environment</em><sup><font size="-2">TM</font></sup>.
  * However, in addition to this technique requiring explicit casts to the
- * org.hsqldb.jdbc.* classes, some of the method calls also require
+ * org.hsqldb_voltpatches.jdbc.* classes, some of the method calls also require
  * <code>int</code> values that are defined only in the JDBC 2 or greater
  * version of the {@link java.sql.ResultSet ResultSet} interface.  For this
  * reason, when the product is compiled under JDK 1.1.x, these values are
@@ -660,7 +660,7 @@ public class JDBCConnection implements Connection {
      *
      * Starting with 1.7.2, the support for and behaviour of
      * CallableStatement has changed.  Please read the introductory section
-     * of the documentation for org.hsqldb.jdbc.JDBCCallableStatement.
+     * of the documentation for org.hsqldb_voltpatches.jdbc.JDBCCallableStatement.
      *
      * </div> <!-- end release-specific documentation -->
      *
