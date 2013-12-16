@@ -45,7 +45,6 @@ import org.voltdb.utils.Encoder;
  * interactively accept SQL and outputs plans on standard out.
  */
 public class PlannerTool {
-
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     final Database m_database;
