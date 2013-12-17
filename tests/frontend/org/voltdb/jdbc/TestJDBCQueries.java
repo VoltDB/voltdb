@@ -44,7 +44,7 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
 
-public class TestJDBCParameters {
+public class TestJDBCQueries {
     private static final String TEST_XML = "jdbcparameterstest.xml";
     private static final String TEST_JAR = "jdbcparameterstest.jar";
     static String testjar;
@@ -192,9 +192,6 @@ public class TestJDBCParameters {
         }
     }
 
-    /**
-     * Make sure non-PreparedStatement queries still work.
-     */
     @Test
     public void testSimpleStatement() throws Exception
     {
@@ -218,7 +215,28 @@ public class TestJDBCParameters {
     }
 
     @Test
-    public void testSetString() throws Exception
+    public void testQueryBatch() throws Exception
+    {
+        Statement batch = conn.createStatement();
+        for (Data d : data) {
+            String q = String.format("update %s set value='%s'", d.tablename, "whatever");
+            batch.addBatch(q);
+        }
+        try {
+            int[] resultCodes = batch.executeBatch();
+            assertEquals(data.length, resultCodes.length);
+            for (int i = 0; i < data.length; ++i) {
+                assertEquals(data[i].good.length, resultCodes[i]);
+            }
+        }
+        catch(SQLException e) {
+            System.err.printf("ERROR: %s\n", e.getMessage());
+            fail();
+        }
+    }
+
+    @Test
+    public void testParameterizedQueries() throws Exception
     {
         for (Data d : data) {
             String q = String.format("select * from %s where id != ?", d.tablename);
