@@ -276,7 +276,7 @@ public:
         const voltdb::ValueType columnType = m_schema->columnType(idx);
         const char* dataPtr = getDataPtr(idx);
         const bool isInlined = m_schema->columnIsInlined(idx);
-        return NValue::deserializeFromTupleStorage( dataPtr, columnType, isInlined);
+        return NValue::initFromTupleStorage(dataPtr, columnType, isInlined);
     }
 
     inline const voltdb::TupleSchema* getSchema() const {
