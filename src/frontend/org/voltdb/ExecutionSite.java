@@ -793,7 +793,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                     if (message == null) {
                         //Will return null if there is no work, safe to block on the mailbox if there is no work
                         boolean hadWork =
-                            (m_snapshotter.doSnapshotWork(m_systemProcedureContext) != null);
+                            (m_snapshotter.doSnapshotWork(m_systemProcedureContext, false) != null);
 
                         /*
                          * Do rejoin work here before it blocks on the mailbox
@@ -818,7 +818,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                         handleMailboxMessage(message);
                     } else {
                         //idle, do snapshot work
-                        m_snapshotter.doSnapshotWork(m_systemProcedureContext);
+                        m_snapshotter.doSnapshotWork(m_systemProcedureContext, false);
                         // do some rejoin work
                         doRejoinWork();
                     }
@@ -1200,7 +1200,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             {
             }
         } else if (message instanceof PotentialSnapshotWorkMessage) {
-            m_snapshotter.doSnapshotWork(m_systemProcedureContext);
+            m_snapshotter.doSnapshotWork(m_systemProcedureContext, false);
         }
         else if (message instanceof ExecutionSiteLocalSnapshotMessage) {
             hostLog.info("Executing local snapshot. Completing any on-going snapshots.");
@@ -1331,9 +1331,8 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             Deque<SnapshotTableTask> tasks,
             List<SnapshotDataTarget> targets,
             long txnId,
-            int numLiveHosts,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
-        m_snapshotter.initiateSnapshots(m_systemProcedureContext, format, tasks, targets, txnId, numLiveHosts,
+        m_snapshotter.initiateSnapshots(m_systemProcedureContext, format, tasks, targets, txnId,
                                         exportSequenceNumbers);
     }
 
@@ -1532,9 +1531,10 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                     e.printStackTrace(pw);
                     response.setResults(
                             new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
-                                                   new VoltTable[] {},
-                                                   "Exception while deserializing procedure params\n" +
-                                                   result.toString()));
+                                    new VoltTable[] {},
+                                    "Exception while deserializing procedure params procedure="
+                                    + itask.getStoredProcedureName() + "\n"
+                                    + result.toString()));
                 }
                 if (callerParams != null) {
                     ClientResponseImpl cr = null;

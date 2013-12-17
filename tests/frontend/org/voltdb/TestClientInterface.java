@@ -28,7 +28,10 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.*;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyInt;
+import static org.mockito.Matchers.anyLong;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -76,12 +79,11 @@ import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.iv2.Cartographer;
-import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
-import org.voltdb.planner.CorePlan;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.MiscUtils;
 
 public class TestClientInterface {
     // mocked objects that CI requires
@@ -168,7 +170,7 @@ public class TestClientInterface {
             throw new IOException();
         }
 
-        byte[] bytes = CatalogUtil.toBytes(cat);
+        byte[] bytes = MiscUtils.fileToBytes(cat);
         String serializedCat = CatalogUtil.loadCatalogFromJar(bytes, null);
         assertNotNull(serializedCat);
         Catalog catalog = new Catalog();
@@ -200,15 +202,17 @@ public class TestClientInterface {
      * @throws IOException
      */
     private static ByteBuffer createMsg(Long origTxnId, String name,
-                                        final Object...params) throws IOException {
-        FastSerializer fs = new FastSerializer();
+                                        final Object...params) throws IOException
+    {
         StoredProcedureInvocation proc = new StoredProcedureInvocation();
         proc.setProcName(name);
         if (origTxnId != null)
             proc.setOriginalTxnId(origTxnId);
         proc.setParams(params);
-        fs.writeObject(proc);
-        return fs.getBuffer();
+        ByteBuffer buf = ByteBuffer.allocate(proc.getSerializedSize());
+        proc.flattenToBuffer(buf);
+        buf.flip();
+        return buf;
     }
 
     /**
@@ -268,7 +272,8 @@ public class TestClientInterface {
         verify(m_messenger).send(eq(32L), captor.capture());
         assertTrue(captor.getValue().payload instanceof AdHocPlannerWork );
         System.out.println( captor.getValue().payload.toString() );
-        assertTrue(captor.getValue().payload.toString().contains("partition param: null"));
+        String payloadString = captor.getValue().payload.toString();
+        assertTrue(payloadString.contains("user partitioning: none"));
     }
 
     @Test
@@ -279,40 +284,31 @@ public class TestClientInterface {
         ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
         verify(m_messenger).send(eq(32L), captor.capture());
         assertTrue(captor.getValue().payload instanceof AdHocPlannerWork);
-        assertTrue(captor.getValue().payload.toString().contains("partition param: null"));
+        String payloadString = captor.getValue().payload.toString();
+        assertTrue(payloadString.contains("user partitioning: none"));
 
         // single-part adhoc
         reset(m_messenger);
-        msg = createMsg("@AdHoc", "select * from a where i = 3", 3);
+        msg = createMsg("@AdHocSpForTest", "select * from a where i = 3", 3);
         resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
         verify(m_messenger).send(eq(32L), captor.capture());
         assertTrue(captor.getValue().payload instanceof AdHocPlannerWork);
-        assertTrue(captor.getValue().payload.toString().contains("partition param: 3"));
+        payloadString = captor.getValue().payload.toString();
+        assertTrue(payloadString.contains("user params: empty"));
+        assertTrue(payloadString.contains("user partitioning: 3"));
     }
 
     @Test
     public void testFinishedSPAdHocPlanning() throws Exception {
         // Need a batch and a statement
-        AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
-                "select * from a where i = 3", 3, 0, 0, "localhost", false,
-                ProcedureInvocationType.ORIGINAL, 0, 0, null);
-        AdHocPlannedStatement s = new AdHocPlannedStatement("select * from a where i = 3".getBytes
-                (Constants.UTF8ENCODING),
-                new CorePlan(new byte[0],
-                        null,
-                        new byte[20],
-                        null,
-                        false,
-                        false,
-                        true,
-                        new VoltType[0],
-                        0),
-                ParameterSet.fromArrayNoCopy(new Object[0]),
-                null,
-                null,
-                3);
-        plannedStmtBatch.addStatement(s);
+        String query = "select * from a where i = ?";
+        int partitionParamIndex = 0;
+        Object[] extractedValues =  new Object[0];
+        VoltType[] paramTypes =  new VoltType[]{VoltType.INTEGER};
+        AdHocPlannedStmtBatch plannedStmtBatch =
+                AdHocPlannedStmtBatch.mockStatementBatch(3, query, extractedValues, paramTypes,
+                                                         new Object[]{3}, partitionParamIndex);
         m_ci.processFinishedCompilerWork(plannedStmtBatch).run();
 
         ArgumentCaptor<Long> destinationCaptor =
@@ -332,11 +328,15 @@ public class TestClientInterface {
         VoltType type = VoltType.get((Byte) message.getStoredProcedureInvocation().getParameterAtIndex(1));
         assertTrue(type.isInteger());
         byte[] serializedData = (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(2);
-        AdHocPlannedStatement[] statements = AdHocPlannedStmtBatch.planArrayFromBuffer(ByteBuffer.wrap(serializedData));
+        ByteBuffer buf = ByteBuffer.wrap(serializedData);
+        Object[] parameters = AdHocPlannedStmtBatch.userParamsFromBuffer(buf);
+        assertEquals(1, parameters.length);
+        assertEquals(3, parameters[0]);
+        AdHocPlannedStatement[] statements = AdHocPlannedStmtBatch.planArrayFromBuffer(buf);
         assertTrue(Arrays.equals(TheHashinator.valueToBytes(3), (byte[]) partitionParam));
         assertEquals(1, statements.length);
         String sql = new String(statements[0].sql, Constants.UTF8ENCODING);
-        assertEquals("select * from a where i = 3", sql);
+        assertEquals(query, sql);
     }
 
     /**
@@ -346,23 +346,11 @@ public class TestClientInterface {
     @Test
     public void testFinishedMPAdHocPlanning() throws Exception {
         // Need a batch and a statement
-        AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
-                "select * from a", null, 0, 0, "localhost", false, ProcedureInvocationType.ORIGINAL, 0, 0, null);
-        AdHocPlannedStatement s = new AdHocPlannedStatement("select * from a".getBytes(Constants.UTF8ENCODING),
-                                                            new CorePlan(new byte[0],
-                                                                         new byte[0],
-                                                                         new byte[20],
-                                                                         new byte[20],
-                                                                         false,
-                                                                         false,
-                                                                         true,
-                                                                         new VoltType[0],
-                                                                         0),
-                                                            ParameterSet.emptyParameterSet(),
-                                                            null,
-                                                            null,
-                                                            null);
-        plannedStmtBatch.addStatement(s);
+        String query = "select * from a";
+        Object[] extractedValues =  new Object[0];
+        VoltType[] paramTypes =  new VoltType[0];
+        AdHocPlannedStmtBatch plannedStmtBatch =
+            AdHocPlannedStmtBatch.mockStatementBatch(3, query, extractedValues, paramTypes, null, -1);
         m_ci.processFinishedCompilerWork(plannedStmtBatch).run();
 
         ArgumentCaptor<Long> destinationCaptor =
@@ -379,10 +367,13 @@ public class TestClientInterface {
         assertEquals("@AdHoc_RO_MP", message.getStoredProcedureName());
 
         byte[] serializedData = (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(0);
-        AdHocPlannedStatement[] statements = AdHocPlannedStmtBatch.planArrayFromBuffer(ByteBuffer.wrap(serializedData));
+        ByteBuffer buf = ByteBuffer.wrap(serializedData);
+        Object[] parameters = AdHocPlannedStmtBatch.userParamsFromBuffer(buf);
+        assertEquals(0, parameters.length);
+        AdHocPlannedStatement[] statements = AdHocPlannedStmtBatch.planArrayFromBuffer(buf);
         assertEquals(1, statements.length);
         String sql = new String(statements[0].sql, Constants.UTF8ENCODING);
-        assertEquals("select * from a", sql);
+        assertEquals(query, sql);
     }
 
     @Test
@@ -421,7 +412,6 @@ public class TestClientInterface {
         catalogResult.clientHandle = 0;
         catalogResult.connectionId = 0;
         catalogResult.adminConnection = false;
-        catalogResult.hostname = "localhost";
         // catalog change specific boiler plate
         catalogResult.catalogHash = "blah".getBytes();
         catalogResult.catalogBytes = "blah".getBytes();

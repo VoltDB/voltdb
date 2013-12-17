@@ -171,6 +171,7 @@ public abstract class BaseInitiator implements Initiator
             m_scheduler.setCommandLog(cl);
 
             m_siteThread = new Thread(m_executionSite);
+            m_siteThread.setDaemon(false);
             m_siteThread.start();
     }
 

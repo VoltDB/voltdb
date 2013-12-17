@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google.common.collect.Maps;
+import com.google_voltpatches.common.collect.Maps;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
@@ -147,7 +147,7 @@ public class MpProcedureTask extends ProcedureTask
 
             restart.setTruncationHandle(m_msg.getTruncationHandle());
             restart.setOriginalTxnId(m_msg.getOriginalTxnId());
-            m_initiator.send(com.google.common.primitives.Longs.toArray(m_initiatorHSIds), restart);
+            m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(m_initiatorHSIds), restart);
         }
         final InitiateResponseMessage response = processInitiateTask(txn.m_initiationMsg, siteConnection);
         // We currently don't want to restart read-only MP transactions because:
@@ -205,7 +205,7 @@ public class MpProcedureTask extends ProcedureTask
 
         complete.setTruncationHandle(m_msg.getTruncationHandle());
         complete.setOriginalTxnId(m_msg.getOriginalTxnId());
-        m_initiator.send(com.google.common.primitives.Longs.toArray(m_initiatorHSIds), complete);
+        m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(m_initiatorHSIds), complete);
         m_txnState.setDone();
         m_queue.flush(getTxnId());
     }

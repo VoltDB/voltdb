@@ -17,25 +17,22 @@
 
 package org.voltdb.utils;
 
+import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.EELibraryLoader;
 import org.voltdb.VoltDB;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 
 public class FixedDBBPool {
-    /*
-     * Keep track of the origin for each buffer so that they can be freed
-     * individually as the each thread with ownership of the buffer discard them
-     * post recovery completion.
-     */
-    protected final HashMap<DBBPool.BBContainer, DBBPool.BBContainer> m_bufferToOriginMap =
-        new HashMap<DBBPool.BBContainer, DBBPool.BBContainer>();
-    // Key is the size of the buffers in the correcponding queue
-    protected final Map<Integer, LinkedBlockingQueue<DBBPool.BBContainer>> m_buffers =
-        new HashMap<Integer, LinkedBlockingQueue<DBBPool.BBContainer>>();
+    // Key is the size of the buffers for the corresponding permits
+    protected final NonBlockingHashMap<Integer, Semaphore> m_permits =
+        new NonBlockingHashMap<Integer, Semaphore>();
 
     public FixedDBBPool()
     {
@@ -46,32 +43,149 @@ public class FixedDBBPool {
         EELibraryLoader.loadExecutionEngineLibrary(true);
     }
 
-    public synchronized void allocate(int bufLenInBytes, int capacity)
+    public void allocate(int bufLenInBytes, int capacity)
     {
-        LinkedBlockingQueue<DBBPool.BBContainer> bufQueue = m_buffers.get(bufLenInBytes);
-        if (bufQueue == null) {
-            bufQueue = new LinkedBlockingQueue<DBBPool.BBContainer>(capacity);
-            m_buffers.put(bufLenInBytes, bufQueue);
-        }
-
-        final LinkedBlockingQueue<DBBPool.BBContainer> finalBufQueue = bufQueue;
-        for (int ii = 0; ii < capacity; ii++) {
-            final DBBPool.BBContainer origin = DBBPool.allocateDirect(bufLenInBytes);
-            final long bufferAddress = DBBPool.getBufferAddress(origin.b);
-            final DBBPool.BBContainer buffer = new DBBPool.BBContainer(origin.b, bufferAddress) {
-                @Override
-                public void discard() {
-                    finalBufQueue.offer(this);
-                }
-            };
-            m_bufferToOriginMap.put(buffer, origin);
-            bufQueue.offer(buffer);
-        }
+        m_permits.putIfAbsent(bufLenInBytes, new Semaphore(capacity));
     }
 
-    public synchronized LinkedBlockingQueue<DBBPool.BBContainer> getQueue(int bufLenInBytes)
+    public BlockingQueue<DBBPool.BBContainer> getQueue(final int bufLenInBytes)
     {
-        return m_buffers.get(bufLenInBytes);
+        return new BlockingQueue<BBContainer>() {
+
+            @Override
+            public boolean add(BBContainer bbContainer) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public boolean offer(BBContainer bbContainer) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public BBContainer remove() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public BBContainer poll() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public BBContainer element() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public BBContainer peek() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void put(BBContainer bbContainer) throws InterruptedException {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public boolean offer(BBContainer bbContainer, long timeout, TimeUnit unit) throws InterruptedException {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public BBContainer take() throws InterruptedException {
+                final Semaphore permits = m_permits.get(bufLenInBytes);
+                permits.acquire();
+                final BBContainer origin = DBBPool.allocateDirectAndPool(bufLenInBytes);
+                return new BBContainer(origin.b, origin.address) {
+                    @Override
+                    public void discard() {
+                        permits.release();
+                        origin.discard();
+                    }
+                };
+            }
+
+            @Override
+            public BBContainer poll(long timeout, TimeUnit unit) throws InterruptedException {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public int remainingCapacity() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public boolean remove(Object o) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public boolean containsAll(Collection<?> c) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public boolean addAll(Collection<? extends BBContainer> c) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public boolean removeAll(Collection<?> c) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public boolean retainAll(Collection<?> c) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void clear() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public int size() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public boolean isEmpty() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public boolean contains(Object o) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public Iterator<BBContainer> iterator() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public Object[] toArray() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public <T> T[] toArray(T[] a) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public int drainTo(Collection<? super BBContainer> c) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public int drainTo(Collection<? super BBContainer> c, int maxElements) {
+                throw new UnsupportedOperationException();
+            }
+        };
     }
 
     /**
@@ -80,12 +194,8 @@ public class FixedDBBPool {
      *
      * This method is idempotent.
      */
-    public synchronized void clear()
+    public void clear()
     {
-        for (DBBPool.BBContainer originContainer : m_bufferToOriginMap.values()) {
-            originContainer.discard();
-        }
-        m_bufferToOriginMap.clear();
-        m_buffers.clear();
+        m_permits.clear();
     }
 }

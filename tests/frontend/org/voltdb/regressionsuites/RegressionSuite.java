@@ -34,11 +34,16 @@ import junit.framework.TestCase;
 
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientConfigForTest;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ConnectionUtil;
+import org.voltdb.client.ProcCallException;
+import org.voltdb.common.Constants;
+
+import com.google_voltpatches.common.net.HostAndPort;
 
 /**
  * Base class for a set of JUnit tests that perform regression tests
@@ -211,10 +216,14 @@ public class RegressionSuite extends TestCase {
         final Random r = new Random();
         final String listener = listeners.get(r.nextInt(listeners.size()));
         byte[] hashedPassword = ConnectionUtil.getHashedPassword(m_password);
+        HostAndPort hNp = HostAndPort.fromString(listener);
+        int port = Constants.DEFAULT_PORT;
+        if (hNp.hasPort()) {
+            port = hNp.getPort();
+        }
         final SocketChannel channel = (SocketChannel)
             ConnectionUtil.getAuthenticatedConnection(
-                    listener,
-                    m_username, hashedPassword, port(0))[0];
+                    hNp.getHostText(), m_username, hashedPassword, port)[0];
         channel.configureBlocking(true);
         if (!noTearDown) {
             synchronized (m_clientChannels) {
@@ -268,6 +277,13 @@ public class RegressionSuite extends TestCase {
         return isLocalCluster() ? ((LocalCluster)m_config).internalPort(hostId) : VoltDB.DEFAULT_INTERNAL_PORT+hostId;
     }
 
+    static public void validateTableOfLongs(Client c, String sql, long[][] expected)
+            throws Exception, IOException, ProcCallException {
+        assertNotNull(expected);
+        VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfLongs(vt, expected);
+    }
+
     static public void validateTableOfScalarLongs(VoltTable vt, long[] expected) {
         assertNotNull(expected);
         assertEquals(expected.length, vt.getRowCount());
@@ -313,7 +329,12 @@ public class RegressionSuite extends TestCase {
                     }
                 }
             }
-            assertEquals(expected[i], actual);
+            if (expected[i] != Long.MIN_VALUE) {
+                assertEquals(expected[i], actual);
+            } else {
+                VoltType type = vt.getColumnType(i);
+                assertEquals(Long.parseLong(type.getNullValue().toString()), actual);
+            }
         }
     }
 }

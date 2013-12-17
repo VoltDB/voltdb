@@ -29,12 +29,12 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.utils.CatalogUtil;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.UnmodifiableIterator;
-import com.google.common.util.concurrent.Callables;
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.UnmodifiableIterator;
+import com.google_voltpatches.common.util.concurrent.Callables;
+import com.google_voltpatches.common.util.concurrent.Futures;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 /**
  * A class that manages streaming data from a single table. It knows how to interpret the return codes and check for

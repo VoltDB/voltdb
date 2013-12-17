@@ -35,7 +35,7 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.PortGenerator;
 
-import com.google.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 /**
  *

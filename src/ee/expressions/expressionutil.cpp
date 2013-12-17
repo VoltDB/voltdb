@@ -239,6 +239,19 @@ static AbstractExpression* castFactory(ValueType vt,
     return new OperatorCastExpression(vt, lc);
 }
 
+static AbstractExpression* caseWhenFactory(ValueType vt,
+                                       AbstractExpression *lc, AbstractExpression *rc)
+{
+
+    OperatorAlternativeExpression* alternative = dynamic_cast<OperatorAlternativeExpression*> (rc);
+    if (!rc) {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "operator case when has incorrect expression");
+    }
+    return new OperatorCaseWhenExpression(vt, lc, alternative);
+}
+
+
 /** convert the enumerated value type into a concrete type for
  * constant value expressions templated ctors */
 static AbstractExpression*
@@ -325,7 +338,6 @@ tupleValueFactory(PlannerDomValue obj, ExpressionType et,
 {
     // read the tuple value expression specific data
     int columnIndex = obj.valueForKey("COLUMN_IDX").asInt();
-    std::string tableName = obj.valueForKey("TABLE_NAME").asStr();
     int tableIdx = 0;
     if (obj.hasNonNullKey("TABLE_IDX")) {
         tableIdx = obj.valueForKey("TABLE_IDX").asInt();
@@ -334,8 +346,12 @@ tupleValueFactory(PlannerDomValue obj, ExpressionType et,
     // verify input
     if (columnIndex < 0) {
         char message[100]; // enough to hold all numbers up to 64-bits
-        snprintf(message, 100, "tupleValueFactory: invalid column_idx %d for table %s",
-                columnIndex, tableName.c_str());
+        std::string tableName = "";
+        if (tableIdx != 0) {
+            // join inner table
+            tableName = " inner";
+        }
+        snprintf(message, 100, "tupleValueFactory: invalid column_idx %d for%s table", columnIndex, tableName.c_str());
 
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                 std::string(message));
@@ -343,6 +359,7 @@ tupleValueFactory(PlannerDomValue obj, ExpressionType et,
 
     return new TupleValueExpression(tableIdx, columnIndex);
 }
+
 
 AbstractExpression *
 ExpressionUtil::conjunctionFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc)
@@ -467,6 +484,12 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
         break;
     case (EXPRESSION_TYPE_HASH_RANGE):
         ret = hashRangeFactory(obj);
+        break;
+    case (EXPRESSION_TYPE_OPERATOR_CASE_WHEN):
+        ret = caseWhenFactory(vt, lc, rc);
+        break;
+    case (EXPRESSION_TYPE_OPERATOR_ALTERNATIVE):
+        ret = new OperatorAlternativeExpression(lc, rc);
         break;
         // must handle all known expressions in this factory
     default:

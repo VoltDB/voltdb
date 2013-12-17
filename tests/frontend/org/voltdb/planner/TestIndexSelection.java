@@ -24,7 +24,6 @@
 package org.voltdb.planner;
 
 import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -53,14 +52,15 @@ public class TestIndexSelection extends PlannerTestCase {
         AbstractPlanNode pn = compile("select id from a, t where a.id < (t.a + ?);");
         pn = pn.getChild(0);
         pn = pn.getChild(0);
-        // System.out.println("DEBUG: " + pn.toExplainPlanString());
+//        System.out.println("DEBUG: " + pn.toExplainPlanString());
         assertTrue(pn instanceof NestLoopIndexPlanNode);
         IndexScanPlanNode indexScan = (IndexScanPlanNode)pn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
         assertEquals(IndexLookupType.LT, indexScan.getLookupType());
         assertTrue(indexScan.toJSONString().contains("\"TARGET_INDEX_NAME\":\"SYS_IDX_ID_"));
         pn = pn.getChild(0);
         assertTrue(pn instanceof SeqScanPlanNode);
-        assertTrue(pn.toJSONString().contains("\"TABLE_NAME\":\"T\""));
+//        System.out.println("DEBUG: " + pn.toJSONString());
+        assertTrue(pn.toJSONString().contains("\"TARGET_TABLE_NAME\":\"T\""));
     }
 
     // This tests recognition of covering parameters to prefer a hash index that would use a
@@ -103,5 +103,25 @@ public class TestIndexSelection extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof IndexScanPlanNode);
         assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"DELETED_SINCE_IDX\""));
+    }
+
+    public void testCaseWhenIndex()
+    {
+        AbstractPlanNode pn = compile("select * from l where CASE WHEN a > b THEN a ELSE b END > 8;");
+        pn = pn.getChild(0);
+        System.out.println(pn.toExplainPlanString());
+        assertTrue(pn.toExplainPlanString().contains("CASEWHEN_IDX1"));
+
+
+        pn = compile("select * from l WHERE CASE WHEN a < 10 THEN a*5 ELSE a + 5 END > 2");
+        pn = pn.getChild(0);
+        System.out.println(pn.toExplainPlanString());
+        assertTrue(pn.toExplainPlanString().contains("CASEWHEN_IDX2"));
+
+        // Negative case
+        pn = compile("select * from l WHERE CASE WHEN a < 10 THEN a*2 ELSE a + 5 END > 2");
+        pn = pn.getChild(0);
+        System.out.println(pn.toExplainPlanString());
+        assertTrue(pn.toExplainPlanString().contains("using its primary key index (for deterministic order only)"));
     }
 }

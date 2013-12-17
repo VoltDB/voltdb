@@ -48,13 +48,10 @@ import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.JdbcDatabaseMetaDataGenerator;
-import org.voltdb.LegacyHashinator;
-import org.voltdb.TheHashinator;
-import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
-import org.voltdb.iv2.MpInitiator;
+import org.voltdb.client.HashinatorLite.HashinatorLiteType;
+import org.voltdb.common.Constants;
 
 /**
  *   De/multiplexes transactions across a cluster
@@ -65,6 +62,7 @@ import org.voltdb.iv2.MpInitiator;
 class Distributer {
 
     static final long PING_HANDLE = Long.MAX_VALUE;
+    static final long USE_DEFAULT_TIMEOUT = 0;
 
     // handles used internally are negative and decrement for each call
     public final AtomicLong m_sysHandle = new AtomicLong(-1);
@@ -106,11 +104,13 @@ class Distributer {
     private final Map<Integer, NodeConnection> m_hostIdToConnection = new HashMap<Integer, NodeConnection>();
     private final Map<String, Procedure> m_procedureInfo = new HashMap<String, Procedure>();
     //This is the instance of the Hashinator we picked from TOPO used only for client affinity.
-    private TheHashinator m_hashinator = null;
-    // timeout for individual procedure calls
+    private HashinatorLite m_hashinator = null;
+    //This is a global timeout that will be used if a per-procedure timeout is not provided with the procedure call.
     private final long m_procedureCallTimeoutMS;
     private static final long MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
     private final long m_connectionResponseTimeoutMS;
+    private final Map<Integer, ClientAffinityStats> m_clientAffinityStats =
+        new HashMap<Integer, ClientAffinityStats>();
 
     public final RateLimiter m_rateLimiter = new RateLimiter();
 
@@ -188,7 +188,7 @@ class Distributer {
                         // check for connection age
                         long sinceLastResponse = now - c.m_lastResponseTime;
 
-                        // if outstanding ping and timeout, close the connection
+                        // if outstanding ping and timeoutMS, close the connection
                         if (c.m_outstandingPing && (sinceLastResponse > m_connectionResponseTimeoutMS)) {
                             // memoize why it's closing
                             c.m_closeCause = DisconnectCause.TIMEOUT;
@@ -196,7 +196,7 @@ class Distributer {
                             c.m_connection.unregister();
                         }
 
-                        // if 1/3 of the timeout since last response, send a ping
+                        // if 1/3 of the timeoutMS since last response, send a ping
                         if ((!c.m_outstandingPing) && (sinceLastResponse > (m_connectionResponseTimeoutMS / 3))) {
                             c.sendPing();
                         }
@@ -210,11 +210,11 @@ class Distributer {
 
                             // if the timeout is expired, call the callback and remove the
                             // bookeeping data
-                            if ((now - cb.timestamp) > m_procedureCallTimeoutMS) {
+                            if ((now - cb.timestamp) > cb.m_procedureTimeoutMS) {
 
-                                // make the minimum timeout for certain long running system procedures
+                                // make the minimum timeoutMS for certain long running system procedures
                                 //  higher than the default 2m.
-                                // you can still set the default timeout higher than even this value
+                                // you can still set the default timeoutMS higher than even this value
                                 boolean isLongOp = false;
                                 // this form allows you to list ops to treat specially
                                 isLongOp |= cb.name.equals("@UpdateApplicationCatalog");
@@ -229,7 +229,7 @@ class Distributer {
                                         "",
                                         new VoltTable[0],
                                         String.format("No response received in the allotted time (set to %d ms).",
-                                                m_procedureCallTimeoutMS));
+                                                cb.m_procedureTimeoutMS));
                                 r.setClientHandle(handle);
                                 r.setClientRoundtrip((int) (now - cb.timestamp));
                                 r.setClusterRoundtrip((int) (now - cb.timestamp));
@@ -254,13 +254,16 @@ class Distributer {
     }
 
     class CallbackBookeeping {
-        public CallbackBookeeping(long timestamp, ProcedureCallback callback, String name) {
+        public CallbackBookeeping(long timestamp, ProcedureCallback callback, String name, long timeout) {
             assert(callback != null);
             this.timestamp = timestamp;
             this.callback = callback;
             this.name = name;
+            this.m_procedureTimeoutMS = (timeout == Distributer.USE_DEFAULT_TIMEOUT) ? m_procedureCallTimeoutMS : (timeout * 1000L);
         }
         long timestamp;
+        //Timeout in ms 0 means use conenction specified procedure timeoutMS.
+        final long m_procedureTimeoutMS;
         ProcedureCallback callback;
         String name;
     }
@@ -281,7 +284,7 @@ class Distributer {
         }
 
         public void createWork(long handle, String name, ByteBuffer c,
-                ProcedureCallback callback, boolean ignoreBackpressure) {
+                ProcedureCallback callback, boolean ignoreBackpressure, long timeout) {
             assert(callback != null);
             long now = System.currentTimeMillis();
             now = m_rateLimiter.sendTxnWithOptionalBlockAndReturnCurrentTime(
@@ -303,7 +306,7 @@ class Distributer {
                 }
 
                 assert(m_callbacks.containsKey(handle) == false);
-                m_callbacks.put(handle, new CallbackBookeeping(now, callback, name));
+                m_callbacks.put(handle, new CallbackBookeeping(now, callback, name, timeout));
                 m_callbacksToInvoke.incrementAndGet();
             }
             m_connection.writeStream().enqueue(c);
@@ -589,7 +592,7 @@ class Distributer {
             boolean useClientAffinity) {
         m_useMultipleThreads = useMultipleThreads;
         m_network = new VoltNetworkPool(
-            m_useMultipleThreads ? Math.max(1, (int)(CoreUtils.availableProcessors() / 4) ) : 1, null);
+            m_useMultipleThreads ? Math.max(1, CoreUtils.availableProcessors() / 4 ) : 1, null);
         m_network.start();
         m_procedureCallTimeoutMS = procedureCallTimeoutMS;
         m_connectionResponseTimeoutMS = connectionResponseTimeoutMS;
@@ -655,11 +658,11 @@ class Distributer {
 
             ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
             //The handle is specific to topology updates and has special cased handling
-            queue(spi, new TopoUpdateCallback(), true);
+            queue(spi, new TopoUpdateCallback(), true, USE_DEFAULT_TIMEOUT);
 
             spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@SystemCatalog", "PROCEDURES");
             //The handle is specific to procedure updates and has special cased handling
-            queue(spi, new ProcUpdateCallback(), true);
+            queue(spi, new ProcUpdateCallback(), true, USE_DEFAULT_TIMEOUT);
         }
     }
 
@@ -675,8 +678,8 @@ class Distributer {
     boolean queue(
             ProcedureInvocation invocation,
             ProcedureCallback cb,
-            final boolean ignoreBackpressure)
-    throws NoConnectionsException {
+            final boolean ignoreBackpressure, final long timeout)
+            throws NoConnectionsException {
         assert(invocation != null);
         assert(cb != null);
 
@@ -701,9 +704,10 @@ class Distributer {
              */
             if (m_useClientAffinity && (m_hashinator != null)) {
                 final Procedure procedureInfo = m_procedureInfo.get(invocation.getProcName());
+                Integer hashedPartition = -1;
 
                 if (procedureInfo != null) {
-                    Integer hashedPartition = MpInitiator.MP_INIT_PID;
+                    hashedPartition = Constants.MP_INIT_PID;
                     if (!procedureInfo.multiPart) {
                         hashedPartition = m_hashinator.getHashedPartitionForParameter(
                                 procedureInfo.partitionParameterType,
@@ -745,6 +749,29 @@ class Distributer {
                     // and let the round-robin choice pick a connection
                     cxn = null;
                 }
+                ClientAffinityStats stats = m_clientAffinityStats.get(hashedPartition);
+                if (stats == null) {
+                    stats = new ClientAffinityStats(hashedPartition, 0, 0, 0, 0);
+                    m_clientAffinityStats.put(hashedPartition, stats);
+                }
+                if (cxn != null) {
+                    if (procedureInfo != null && procedureInfo.readOnly) {
+                        stats.addAffinityRead();
+                    }
+                    else {
+                        stats.addAffinityWrite();
+                    }
+                }
+                // account these here because we lose the partition ID and procedure info once we
+                // bust out of this scope.
+                else {
+                    if (procedureInfo != null && procedureInfo.readOnly) {
+                        stats.addRrRead();
+                    }
+                    else {
+                        stats.addRrWrite();
+                    }
+                }
             }
             if (cxn == null) {
                 for (int i=0; i < totalConnections; ++i) {
@@ -778,7 +805,7 @@ class Distributer {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            cxn.createWork(invocation.getHandle(), invocation.getProcName(), buf, cb, ignoreBackpressure);
+            cxn.createWork(invocation.getHandle(), invocation.getProcName(), buf, cb, ignoreBackpressure, timeout);
         }
 
         return !backpressure;
@@ -827,7 +854,8 @@ class Distributer {
     }
 
     ClientStatsContext createStatsContext() {
-        return new ClientStatsContext(this, getStatsSnapshot(), getIOStatsSnapshot());
+        return new ClientStatsContext(this, getStatsSnapshot(), getIOStatsSnapshot(),
+                getAffinityStatsSnapshot());
     }
 
     Map<Long, Map<String, ClientStats>> getStatsSnapshot() {
@@ -872,6 +900,18 @@ class Distributer {
         return retval;
     }
 
+    Map<Integer, ClientAffinityStats> getAffinityStatsSnapshot()
+    {
+        Map<Integer, ClientAffinityStats> retval = new HashMap<Integer, ClientAffinityStats>();
+        // these get modified under this lock in queue()
+        synchronized(this) {
+            for (Entry<Integer, ClientAffinityStats> e : m_clientAffinityStats.entrySet()) {
+                retval.put(e.getKey(), (ClientAffinityStats)e.getValue().clone());
+            }
+        }
+        return retval;
+    }
+
     public synchronized Object[] getInstanceId() {
         return m_clusterInstanceId;
     }
@@ -903,14 +943,13 @@ class Distributer {
         //First table contains the description of partition ids master/slave relationships
         VoltTable vt = tables[0];
 
-        //In future let TOPO return cooked bytes when cooked and we use correct recipie
+        //In future let TOPO return cooked bytes when cooked and we use correct recipe
         boolean cooked = false;
         if (tables.length == 1) {
             //Just in case the new client connects to the old version of Volt that only returns 1 topology table
             // We're going to get the MPI back in this table, so subtract it out from the number of partitions.
             int numPartitions = vt.getRowCount() - 1;
-            m_hashinator = TheHashinator.getHashinator(LegacyHashinator.class,
-                    LegacyHashinator.getConfigureBytes(numPartitions), cooked);
+            m_hashinator = new HashinatorLite(numPartitions); // legacy only
         } else {
             //Second table contains the hash function
             boolean advanced = tables[1].advanceRow();
@@ -919,9 +958,10 @@ class Distributer {
                                    "performance will be lower because transactions can't be routed at this client");
                 return;
             }
-            m_hashinator = TheHashinator.getHashinator(
-                    HashinatorType.valueOf(tables[1].getString("HASHTYPE")).hashinatorClass,
-                    tables[1].getVarbinary("HASHCONFIG"), cooked);
+            m_hashinator = new HashinatorLite(
+                    HashinatorLiteType.valueOf(tables[1].getString("HASHTYPE")),
+                    tables[1].getVarbinary("HASHCONFIG"),
+                    cooked);
         }
         m_partitionMasters.clear();
         m_partitionReplicas.clear();
@@ -956,11 +996,11 @@ class Distributer {
                 String jsString = vt.getString(6);
                 String procedureName = vt.getString(2);
                 JSONObject jsObj = new JSONObject(jsString);
-                boolean readOnly = jsObj.getBoolean(JdbcDatabaseMetaDataGenerator.JSON_READ_ONLY);
-                if (jsObj.getBoolean(JdbcDatabaseMetaDataGenerator.JSON_SINGLE_PARTITION)) {
-                    int partitionParameter = jsObj.getInt(JdbcDatabaseMetaDataGenerator.JSON_PARTITION_PARAMETER);
+                boolean readOnly = jsObj.getBoolean(Constants.JSON_READ_ONLY);
+                if (jsObj.getBoolean(Constants.JSON_SINGLE_PARTITION)) {
+                    int partitionParameter = jsObj.getInt(Constants.JSON_PARTITION_PARAMETER);
                     int partitionParameterType =
-                        jsObj.getInt(JdbcDatabaseMetaDataGenerator.JSON_PARTITION_PARAMETER_TYPE);
+                        jsObj.getInt(Constants.JSON_PARTITION_PARAMETER_TYPE);
                     m_procedureInfo.put(procedureName,
                             new Procedure(false,readOnly, partitionParameter, partitionParameterType));
                 } else {
@@ -999,9 +1039,9 @@ class Distributer {
         return m_hashinator.getHashedPartitionForParameter(typeValue, value);
     }
 
-    public HashinatorType getHashinatorType() {
+    public HashinatorLiteType getHashinatorType() {
         if (m_hashinator == null) {
-            return HashinatorType.LEGACY;
+            return HashinatorLiteType.LEGACY;
         }
         return m_hashinator.getConfigurationType();
     }

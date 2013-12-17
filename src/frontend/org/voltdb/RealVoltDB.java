@@ -48,7 +48,14 @@ import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
 import java.util.SortedMap;
-import java.util.concurrent.*;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.cassandra_voltpatches.GCInspector;
@@ -117,11 +124,11 @@ import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.VoltSampler;
 
-import com.google.common.base.Charsets;
-import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.SettableFuture;
+import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -155,7 +162,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    private static final String m_defaultVersionString = "4.0";
+    private static final String m_defaultVersionString = "4.0.1";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final List<ClientInterface> m_clientInterfaces = new CopyOnWriteArrayList<ClientInterface>();
@@ -579,6 +586,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
              * If sync command log is on, not initializing the command log before the initiators
              * are up would cause deadlock.
              */
+            if ((m_commandLog != null) && (m_commandLog.needsInitialization())) {
+                consoleLog.l7dlog(Level.INFO, LogKeys.host_VoltDB_StayTunedForLogging.name(), null);
+            }
+            else {
+                consoleLog.l7dlog(Level.INFO, LogKeys.host_VoltDB_StayTunedForNoLogging.name(), null);
+            }
             if (m_commandLog != null && (isRejoin || m_joining)) {
                 //On rejoin the starting IDs are all 0 so technically it will load any snapshot
                 //but the newest snapshot will always be the truncation snapshot taken after rejoin
@@ -1644,28 +1657,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
         }
 
-        // start one site in the current thread
-        Thread.currentThread().setName("ExecutionSiteAndVoltDB");
         m_isRunning = true;
-        try
-        {
-            while (m_isRunning) {
-                Thread.sleep(1);
-            }
-        }
-        catch (Throwable thrown)
-        {
-            String errmsg = " encountered an unexpected error and will die, taking this VoltDB node down.";
-            hostLog.error(errmsg);
-            // It's too easy for stdout to get lost, especially if we are crashing, so log FATAL, instead.
-            // Logging also automatically prefixes lines with "ExecutionSite [X:Y] "
-            // thrown.printStackTrace();
-            hostLog.fatal("Stack trace of thrown exception: " + thrown.toString());
-            for (StackTraceElement ste : thrown.getStackTrace()) {
-                hostLog.fatal(ste.toString());
-            }
-            VoltDB.crashLocalVoltDB(errmsg, true, thrown);
-        }
     }
 
     /**

@@ -20,10 +20,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ForwardingMap;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableMap.Builder;
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.collect.ForwardingMap;
+import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableMap.Builder;
 
 /**
  * Key set, value set, and entry set are all immutable as are their iterators.

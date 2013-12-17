@@ -46,7 +46,7 @@ import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
-import com.google.common.base.Charsets;
+import com.google_voltpatches.common.base.Charsets;
 
 /**
  * Compiles individual SQL statements and updates the given catalog.
@@ -155,7 +155,6 @@ public abstract class StatementCompiler {
             index++;
         }
         catalogStmt.setReplicatedtabledml(plan.replicatedTableDML);
-        partitioning.setIsReplicatedTableDML(plan.replicatedTableDML);
 
         // output the explained plan to disk (or caller) for debugging
         StringBuilder planDescription = new StringBuilder(1000); // Initial capacity estimate.

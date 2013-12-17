@@ -40,12 +40,12 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.messaging.FastSerializer;
 
-import com.google.common.util.concurrent.Callables;
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.ListeningScheduledExecutorService;
-import com.google.common.util.concurrent.MoreExecutors;
+import com.google_voltpatches.common.util.concurrent.Callables;
+import com.google_voltpatches.common.util.concurrent.Futures;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.ListeningScheduledExecutorService;
+import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
 
@@ -183,7 +183,11 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
         container.b.position(0);
 
         FastSerializer schemaSerializer = new FastSerializer();
-        schemaTable.writeExternal(schemaSerializer);
+        int schemaTableLen = schemaTable.getSerializedSize();
+        ByteBuffer serializedSchemaTable = ByteBuffer.allocate(schemaTableLen);
+        schemaTable.flattenToBuffer(serializedSchemaTable);
+        serializedSchemaTable.flip();
+        schemaSerializer.write(serializedSchemaTable);
         final BBContainer schemaContainer = schemaSerializer.getBBContainer();
         schemaContainer.b.limit(schemaContainer.b.limit() - 4);//Don't want the row count
         schemaContainer.b.position(schemaContainer.b.position() + 4);//Don't want total table length

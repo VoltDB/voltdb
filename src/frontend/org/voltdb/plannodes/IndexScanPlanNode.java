@@ -125,6 +125,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         if (apn != null) {
             m_outputSchema = apn.m_outputSchema.clone();
         }
+        m_tableScan = srcNode.getTableScan();
     }
 
     public void setSkipNullPredicate() {
@@ -161,7 +162,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             }
         } else {
             try {
-                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson);
+                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, m_tableScan);
             } catch (JSONException e) {
                 e.printStackTrace();
                 assert(false);
@@ -591,20 +592,19 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
         m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
         //load end_expression
-        m_endExpression = AbstractExpression.fromJSONChild(jobj, Members.END_EXPRESSION.name());
+        m_endExpression = AbstractExpression.fromJSONChild(jobj, Members.END_EXPRESSION.name(), m_tableScan);
         // load initial_expression
-        m_initialExpression = AbstractExpression.fromJSONChild(jobj, Members.INITIAL_EXPRESSION.name());
+        m_initialExpression = AbstractExpression.fromJSONChild(jobj, Members.INITIAL_EXPRESSION.name(), m_tableScan);
         //load searchkey_expressions
         AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
-                Members.SEARCHKEY_EXPRESSIONS.name());
-        m_skip_null_predicate = AbstractExpression.fromJSONChild(jobj, Members.SKIP_NULL_PREDICATE.name());
+                Members.SEARCHKEY_EXPRESSIONS.name(), m_tableScan);
+        m_skip_null_predicate = AbstractExpression.fromJSONChild(jobj, Members.SKIP_NULL_PREDICATE.name(), m_tableScan);
     }
 
     @Override
     protected String explainPlanForNode(String indent) {
         assert(m_catalogIndex != null);
 
-        int indexSize = CatalogUtil.getCatalogIndexSize(m_catalogIndex);
         int keySize = m_searchkeyExpressions.size();
 
         // When there is no start key, count a range scan key for each ANDed end condition.
@@ -628,6 +628,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             predicatePrefix = "\n" + indent + " filter by ";
         }
         else {
+            int indexSize = CatalogUtil.getCatalogIndexSize(m_catalogIndex);
             String[] asIndexed = new String[indexSize];
             // Not really expecting to need these fall-back labels,
             // but in the case of an unexpected error accessing the catalog data,
@@ -647,7 +648,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             else {
                 try {
                     List<AbstractExpression> indexExpressions =
-                        AbstractExpression.fromJSONArrayString(jsonExpr);
+                        AbstractExpression.fromJSONArrayString(jsonExpr, m_tableScan);
                     int ii = 0;
                     for (AbstractExpression ae : indexExpressions) {
                         asIndexed[ii++] = ae.explain(m_targetTableName);

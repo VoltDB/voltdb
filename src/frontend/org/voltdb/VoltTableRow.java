@@ -17,9 +17,9 @@
 
 package org.voltdb;
 
-import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
@@ -735,8 +735,6 @@ public abstract class VoltTableRow {
             else
                 js.value(dec.toString());
             break;
-        case DECIMAL_STRING:
-            break;
         case INVALID:
             break;
         case NULL:
@@ -764,7 +762,7 @@ public abstract class VoltTableRow {
     }
 
     /** Reads a string from a buffer with a specific encoding. */
-    final String readString(int position, String encoding) {
+    final String readString(int position, Charset encoding) {
         // Sanity check the string size int position. Note that the eventual
         // m_buffer.get() does check for underflow, getInt() does not.
         if (STRING_LEN_SIZE > m_buffer.limit() - position) {
@@ -800,13 +798,7 @@ public abstract class VoltTableRow {
         m_buffer.get(stringData);
         m_buffer.position(oldPos);
 
-        String retval = null;
-        try {
-            retval = new String(stringData, encoding);
-        } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
-        }
-        return retval;
+        return new String(stringData, encoding);
     }
 
 }

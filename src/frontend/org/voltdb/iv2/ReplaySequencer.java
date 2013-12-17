@@ -19,10 +19,13 @@ package org.voltdb.iv2;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.Map.Entry;
 import java.util.TreeMap;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
@@ -75,6 +78,8 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
  */
 public class ReplaySequencer
 {
+    static final VoltLogger tmLog = new VoltLogger("TM");
+
     // place holder that associates sentinel, first fragment and
     // work that follows in the transaction sequence.
     private class ReplayEntry {
@@ -132,6 +137,16 @@ public class ReplaySequencer
 
         boolean isEmpty() {
             return isReady() && m_servedFragment && m_blockedMessages.isEmpty();
+        }
+
+        @Override
+        public String toString()
+        {
+            return String.format("(SENTINEL TXNID: %d (%s), %d BLOCKED MESSAGES, %s)\n%s",
+                                 m_sentinalTxnId, TxnEgo.txnIdToString(m_sentinalTxnId),
+                                 m_blockedMessages.size(),
+                                 m_servedFragment ? "SERVED FRAGMENT" : "",
+                                 m_firstFragment);
         }
     }
 
@@ -392,5 +407,20 @@ public class ReplaySequencer
             }
         }
         return true;
+    }
+
+    public void dump(long hsId)
+    {
+        final String who = CoreUtils.hsIdToString(hsId);
+        tmLog.info(String.format("%s: REPLAY SEQUENCER DUMP, LAST POLLED FRAGMENT %d (%s), LAST SEEN TXNID %d (%s), %s%s%s",
+                                 who,
+                                 m_lastPolledFragmentTxnId, TxnEgo.txnIdToString(m_lastPolledFragmentTxnId),
+                                 m_lastSeenTxnId, TxnEgo.txnIdToString(m_lastSeenTxnId),
+                                 m_eolReached ? "EOL, " : "",
+                                 m_mpiEOLReached ? "MPI EOL, " : "",
+                                 m_mustDrain ? "MUST DRAIN" : ""));
+        for (Entry<Long, ReplayEntry> e : m_replayEntries.entrySet()) {
+            tmLog.info(String.format("%s: REPLAY ENTRY %s: %s", who, e.getKey(), e.getValue()));
+        }
     }
 }

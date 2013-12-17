@@ -17,9 +17,9 @@
 
 package org.voltcore.utils;
 
-import com.google.common.base.Throwables;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
+import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.cache.Cache;
+import com.google_voltpatches.common.cache.CacheBuilder;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 

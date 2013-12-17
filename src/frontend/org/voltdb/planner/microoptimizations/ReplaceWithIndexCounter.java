@@ -20,8 +20,10 @@ package org.voltdb.planner.microoptimizations;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AggregateExpression;
+import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -30,11 +32,14 @@ import org.voltdb.plannodes.IndexCountPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.TableCountPlanNode;
+import org.voltdb.types.ExpressionType;
 
 public class ReplaceWithIndexCounter extends MicroOptimization {
 
     @Override
-    public List<CompiledPlan> apply(CompiledPlan plan, Database db) {
+    public List<CompiledPlan> apply(CompiledPlan plan, AbstractParsedStmt parsedStmt) {
+        this.m_parsedStmt = parsedStmt;
+
         ArrayList<CompiledPlan> retval = new ArrayList<CompiledPlan>();
 
         AbstractPlanNode planGraph = plan.rootPlanGraph;
@@ -86,6 +91,21 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
         if (child instanceof SeqScanPlanNode) {
             if (((SeqScanPlanNode)child).getPredicate() != null) {
                 return plan;
+            }
+            AbstractExpression postPredicate = aggplan.getPostPredicate();
+            if (postPredicate != null) {
+                List<AbstractExpression> aggList = postPredicate.findAllSubexpressionsOfClass(AggregateExpression.class);
+
+                boolean allCountStar = true;
+                for (AbstractExpression expr: aggList) {
+                    if (expr.getExpressionType() != ExpressionType.AGGREGATE_COUNT_STAR) {
+                        allCountStar = false;
+                        break;
+                    }
+                }
+                if (allCountStar) {
+                    return plan;
+                }
             }
             return new TableCountPlanNode((AbstractScanPlanNode)child, aggplan);
         }

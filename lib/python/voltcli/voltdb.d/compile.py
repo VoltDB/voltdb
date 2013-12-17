@@ -89,4 +89,4 @@ def compile(runner):
     if runner.opts.ddl:
         args.extend(runner.opts.ddl)
     kwargs = dict(classpath = runner.opts.classpath)
-    runner.java.execute(VoltCompiler, None, *args, **kwargs)
+    runner.java_execute(VoltCompiler, None, *args, **kwargs)

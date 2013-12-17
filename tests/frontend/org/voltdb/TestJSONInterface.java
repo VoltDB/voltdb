@@ -85,8 +85,8 @@ import org.voltdb.compiler.procedures.CrazyBlahProc;
 import org.voltdb.compiler.procedures.DelayProc;
 import org.voltdb.compiler.procedures.SelectStarHelloWorld;
 import org.voltdb.types.TimestampType;
-import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.MiscUtils;
 
 public class TestJSONInterface extends TestCase {
 
@@ -538,12 +538,12 @@ public class TestJSONInterface extends TestCase {
         // Call @AdHoc with zero parameters
         pset = ParameterSet.emptyParameterSet();
         responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
-        assertTrue(responseJSON.contains("Adhoc system procedure requires exactly one or two parameters"));
+        assertTrue(responseJSON.contains("Adhoc system procedure requires at least the query parameter."));
 
         // Call @AdHoc with many parameters (more than 2)
         pset = ParameterSet.fromArrayNoCopy("select * from blah", "foo", "bar");
         responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
-        assertTrue(responseJSON.contains("Adhoc system procedure requires exactly one or two parameters"));
+        assertTrue(responseJSON.contains("Unable to execute adhoc sql statement(s): Too many actual arguments were passed for the parameters in the sql statement(s): (2 vs. 0)"));
 
     } finally {
         if (server != null) {
@@ -783,8 +783,8 @@ public class TestJSONInterface extends TestCase {
         success = builder2.compile(Configuration.getPathToCatalogForTest("json-update.jar"));
         assertTrue(success);
 
-        pset = ParameterSet.fromArrayNoCopy(Encoder.hexEncode(CatalogUtil.toBytes(new File(config.m_pathToCatalog))),
-                           new String(CatalogUtil.toBytes(new File(builder2.getPathToDeployment())), "UTF-8"));
+        pset = ParameterSet.fromArrayNoCopy(Encoder.hexEncode(MiscUtils.fileToBytes(new File(config.m_pathToCatalog))),
+                           new String(MiscUtils.fileToBytes(new File(builder2.getPathToDeployment())), "UTF-8"));
         response = callProcOverJSON("@UpdateApplicationCatalog", pset,
                                     ui[0].name, ui[0].password, true);
         r = responseFromJSON(response);

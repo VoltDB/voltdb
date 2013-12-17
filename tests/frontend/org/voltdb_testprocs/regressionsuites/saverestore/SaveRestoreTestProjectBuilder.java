@@ -26,10 +26,12 @@ package org.voltdb_testprocs.regressionsuites.saverestore;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.MiscUtils;
 
 public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
 {
@@ -117,7 +119,7 @@ public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
         assert(status);
 
         // read in the catalog
-        byte[] bytes = CatalogUtil.toBytes(new File(catalogJar));
+        byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
         String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
         assert(serializedCatalog != null);
 

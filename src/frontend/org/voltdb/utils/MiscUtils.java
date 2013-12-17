@@ -14,9 +14,11 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.voltdb.utils;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.BindException;
 import java.net.ServerSocket;
@@ -45,14 +47,14 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.licensetool.LicenseException;
 
-import com.google.common.base.Supplier;
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.ListMultimap;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
-import com.google.common.net.HostAndPort;
+import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.collect.ArrayListMultimap;
+import com.google_voltpatches.common.collect.ListMultimap;
+import com.google_voltpatches.common.collect.Lists;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Multimap;
+import com.google_voltpatches.common.collect.Multimaps;
+import com.google_voltpatches.common.net.HostAndPort;
 
 public class MiscUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -65,7 +67,29 @@ public class MiscUtils {
     public static void copyFile(String fromPath, String toPath) throws Exception {
         File inputFile = new File(fromPath);
         File outputFile = new File(toPath);
-        com.google.common.io.Files.copy(inputFile, outputFile);
+        com.google_voltpatches.common.io.Files.copy(inputFile, outputFile);
+    }
+
+    /**
+     * Serialize a file into bytes. Used to serialize catalog and deployment
+     * file for UpdateApplicationCatalog on the client.
+     *
+     * @param path
+     * @return a byte array of the file
+     * @throws IOException
+     *             If there are errors reading the file
+     */
+    public static byte[] fileToBytes(File path) throws IOException {
+        FileInputStream fin = new FileInputStream(path);
+        byte[] buffer = new byte[(int) fin.getChannel().size()];
+        try {
+            if (fin.read(buffer) == -1) {
+                throw new IOException("File " + path.getAbsolutePath() + " is empty");
+            }
+        } finally {
+            fin.close();
+        }
+        return buffer;
     }
 
     /**

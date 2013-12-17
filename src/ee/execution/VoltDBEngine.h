@@ -648,10 +648,12 @@ inline void VoltDBEngine::resetReusedResultOutputBuffer(const size_t headerSize)
  * Set up statistics for long running operations thru m_engine if total tuples accessed passes the threshold.
  */
 inline void VoltDBEngine::noteTuplesProcessedForProgressMonitoring(int tuplesProcessed) {
+#ifndef ENABLE_POST_4_0
     m_tuplesProcessedInFragment += tuplesProcessed;
     if((m_tuplesProcessedInFragment % LONG_OP_THRESHOLD) == 0) {
         reportProgessToTopend();
     }
+#endif
 }
 
 } // namespace voltdb

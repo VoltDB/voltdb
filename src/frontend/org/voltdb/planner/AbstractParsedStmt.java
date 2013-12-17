@@ -72,7 +72,7 @@ public abstract class AbstractParsedStmt {
     public HashMap<String, Integer> tableAliasIndexMap = new HashMap<String, Integer>();
 
     protected final String[] m_paramValues;
-    protected final Database m_db;
+    public final Database m_db;
 
     static final String INSERT_NODE_NAME = "insert";
     static final String UPDATE_NODE_NAME = "update";
@@ -376,6 +376,8 @@ public abstract class AbstractParsedStmt {
             tableCache.m_tableAlias = tableAlias;
             tableCache.m_table = getTableFromDB(tableName);
             assert(tableCache.m_table != null);
+            tableCache.populateColumnDictionary();
+
             stmtCache.add(tableCache);
             tableAliasIndexMap.put(tableAlias, nextIndex);
         }
@@ -404,6 +406,11 @@ public abstract class AbstractParsedStmt {
             throw new RuntimeException(e.getMessage(), e);
         }
         expr.setExpressionType(exprType);
+
+        if (exprType == ExpressionType.OPERATOR_CASE_WHEN || exprType == ExpressionType.OPERATOR_ALTERNATIVE) {
+            String valueType = exprNode.attributes.get("valuetype");
+            expr.setValueType(VoltType.typeFromString(valueType));
+        }
 
         // get the first (left) node that is an element
         VoltXMLElement leftExprNode = exprNode.children.get(0);

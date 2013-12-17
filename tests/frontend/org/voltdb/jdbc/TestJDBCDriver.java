@@ -23,50 +23,91 @@
 
 package org.voltdb.jdbc;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 import java.util.regex.Pattern;
+import static junit.framework.Assert.assertFalse;
 
 import org.junit.AfterClass;
+import static org.junit.Assert.assertEquals;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
-import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
-import org.voltdb.benchmark.tpcc.procedures.InsertNewOrder;
-import org.voltdb.utils.BuildDirectoryUtils;
-import org.voltdb_testprocs.regressionsuites.multipartitionprocs.MultiSiteSelect;
+import org.voltdb.VoltDB.Configuration;
+import org.voltdb.client.ArbitraryDurationProc;
+import org.voltdb.client.TestClientFeatures;
+import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.MiscUtils;
 
 public class TestJDBCDriver {
     static String testjar;
     static ServerThread server;
     static Connection conn;
-    static TPCCProjectBuilder pb;
+    static Connection myconn;
+    static VoltProjectBuilder pb;
 
     @BeforeClass
-    public static void setUp() throws ClassNotFoundException, SQLException {
-        testjar = BuildDirectoryUtils.getBuildDirectoryPath() + File.separator
-                + "jdbcdrivertest.jar";
+    public static void setUp() throws Exception {
+        // Fake out the constraints that were previously written against the
+        // TPCC schema
+        String ddl =
+            "CREATE TABLE TT(A1 INTEGER NOT NULL, A2_ID INTEGER, PRIMARY KEY(A1));" +
+            "CREATE TABLE ORDERS(A1 INTEGER NOT NULL, A2_ID INTEGER, PRIMARY KEY(A1));" +
+            "CREATE TABLE ORDER_THIS(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1));" +
+            "CREATE TABLE LAST(A1 INTEGER NOT NULL, A2_ID INTEGER, PRIMARY KEY(A1));" +
+            "CREATE TABLE STEAL_THIS_TABLE(A1 INTEGER NOT NULL, A2_ID INTEGER, PRIMARY KEY(A1));" +
+            "CREATE TABLE BLAST_IT(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1));" +
+            "CREATE TABLE ROBBIE_MUSTOE(A1 INTEGER NOT NULL, A2_ID INTEGER, PRIMARY KEY(A1));" +
+            "CREATE TABLE CUSTOMER(A1 INTEGER NOT NULL, A2_ID INTEGER, A3 INTEGER, A4 INTEGER, " +
+                             "A5_0 INTEGER, A6 INTEGER, A7_ID INTEGER, A8 INTEGER, A9 INTEGER, " +
+                             "A10 INTEGER, A11 INTEGER, A12_ID INTEGER, A13 INTEGER, A14 INTEGER, " +
+                             "A15 INTEGER, A16 INTEGER, A17_ID INTEGER, A18 INTEGER, A19 INTEGER, " +
+                             "A20 INTEGER, A21 INTEGER, A22_ID INTEGER, A23 INTEGER, A24_ID INTEGER, " +
+                             "A25 INTEGER, A26_MIDDLE INTEGER, " +
+                             "PRIMARY KEY(A1));" +
+            "CREATE TABLE NUMBER_NINE(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1));" +
+            "CREATE TABLE WAREHOUSE(A1 INTEGER NOT NULL, A2 INTEGER, A3 INTEGER, A4_ID INTEGER, " +
+                             "A5 INTEGER, A6 INTEGER, A7 INTEGER, A8 INTEGER, W_ID INTEGER, " +
+                             "PRIMARY KEY(A1));" +
+            "CREATE UNIQUE INDEX UNIQUE_ORDERS_HASH ON ORDERS (A1, A2_ID); " +
+            "CREATE INDEX IDX_ORDERS_HASH ON ORDERS (A2_ID);";
 
-        // compile a catalog
-        pb = new TPCCProjectBuilder();
-        pb.addDefaultSchema();
-        pb.addDefaultPartitioning();
-        pb.addProcedures(MultiSiteSelect.class, InsertNewOrder.class);
-        pb.compile(testjar, 2, 0);
+
+        pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        pb.addSchema(TestClientFeatures.class.getResource("clientfeatures.sql"));
+        pb.addProcedures(ArbitraryDurationProc.class);
+        pb.addPartitionInfo("TT", "A1");
+        pb.addPartitionInfo("ORDERS", "A1");
+        pb.addPartitionInfo("LAST", "A1");
+        pb.addPartitionInfo("BLAST_IT", "A1");
+        pb.addPartitionInfo("ROBBIE_MUSTOE", "A1");
+        pb.addPartitionInfo("CUSTOMER", "A1");
+        pb.addPartitionInfo("NUMBER_NINE", "A1");
+        pb.addStmtProcedure("InsertA", "INSERT INTO TT VALUES(?,?);", "TT.A1: 0");
+        pb.addStmtProcedure("SelectB", "SELECT * FROM TT;");
+        boolean success = pb.compile(Configuration.getPathToCatalogForTest("jdbcdrivertest.jar"), 3, 1, 0);
+        assert(success);
+        MiscUtils.copyFile(pb.getPathToDeployment(), Configuration.getPathToCatalogForTest("jdbcdrivertest.xml"));
+        testjar = Configuration.getPathToCatalogForTest("jdbcdrivertest.jar");
 
         // Set up ServerThread and Connection
         startServer();
@@ -87,6 +128,13 @@ public class TestJDBCDriver {
 
         Class.forName("org.voltdb.jdbc.Driver");
         conn = DriverManager.getConnection("jdbc:voltdb://localhost:21212");
+        myconn = null;
+    }
+
+    private static Connection getJdbcConnection(String url, Properties props) throws Exception
+    {
+        Class.forName("org.voltdb.jdbc.Driver");
+        return DriverManager.getConnection(url, props);
     }
 
     private static void stopServer() throws SQLException {
@@ -94,10 +142,27 @@ public class TestJDBCDriver {
             conn.close();
             conn = null;
         }
+        if (myconn != null) {
+            myconn.close();
+            myconn = null;
+        }
         if (server != null) {
             try { server.shutdown(); } catch (InterruptedException e) { /*empty*/ }
             server = null;
         }
+    }
+
+    @Test
+    public void testURLParsing() throws Exception
+    {
+        String url = "jdbc:voltdb://server1:21212,server2?prop1=true&prop2=false";
+        String[] servers = Driver.getServersFromURL(url);
+        assertEquals("server1:21212", servers[0]);
+        assertEquals("server2", servers[1]);
+        Map<String, String> props = Driver.getPropsFromURL(url);
+        assertEquals(2, props.size());
+        assertEquals("true", props.get("prop1"));
+        assertEquals("false", props.get("prop2"));
     }
 
     @Test
@@ -140,7 +205,7 @@ public class TestJDBCDriver {
     @Test
     public void testAllTables() throws SQLException {
         // TPCC has 10 tables
-        tableTest(null, "%", 10);
+        tableTest(null, "%", 12);
     }
 
     @Test
@@ -149,7 +214,7 @@ public class TestJDBCDriver {
             int expected = 0;
             // TPCC has 10 tables and no views
             if (type.equals("TABLE")) {
-                expected = 10;
+                expected = 12;
             }
             tableTest(new String[] {type}, "%", expected);
         }
@@ -157,17 +222,17 @@ public class TestJDBCDriver {
 
     @Test
     public void testFilterTableByName() throws SQLException {
-        // TPCC has 1 "ORDERS" tables
+        // schema has 1 "ORDERS" tables
         tableTest(null, "ORDERS", 1);
-         // TPCC has 1 "ORDER_" table
+         // schema has 1 "ORDER_" table
         tableTest(null, "ORDER_", 1);
-         // TPCC has 2 tables that start with "O"
+         // schema has 2 tables that start with "O"
         tableTest(null, "O%", 2);
-         // TPCC has 5 tables with names containing "ST"
+         // schema has 5 tables with names containing "ST"
         tableTest(null, "%ST%", 5);
-        // TPCC has 10 tables
-        tableTest(null, "", 10);
-        // TPCC has 10 tables, but won't match the types array
+        // schema has 10 tables
+        tableTest(null, "", 12);
+        // schema has 10 tables, but won't match the types array
         tableTest(new String[] {""}, "", 0);
     }
 
@@ -217,9 +282,9 @@ public class TestJDBCDriver {
         tableColumnTest("CUSTOMER%", "", 26);
         tableColumnTest("CUSTOMER%", "%MIDDLE", 1);
         tableColumnTest("CUSTOMER", "____", 1);
-        tableColumnTest("%", "%ID", 32);
-        tableColumnTest(null, "%ID", 32);
-        tableColumnTest(null, "", 97);
+        tableColumnTest("%", "%ID", 13);
+        tableColumnTest(null, "%ID", 13);
+        tableColumnTest(null, "", 63);
     }
 
     /**
@@ -251,12 +316,12 @@ public class TestJDBCDriver {
 
     @Test
     public void testAllIndexes() throws SQLException {
-        indexInfoTest("ORDERS", false, 10);
+        indexInfoTest("ORDERS", false, 4);
     }
 
     @Test
     public void testFilterIndexByUnique() throws SQLException {
-        indexInfoTest("ORDERS", true, 7);
+        indexInfoTest("ORDERS", true, 3);
     }
 
     @Test
@@ -268,7 +333,7 @@ public class TestJDBCDriver {
             assertEquals("ORDERS", keys.getString("TABLE_NAME"));
             count++;
         }
-        assertEquals(3, count);
+        assertEquals(1, count);
     }
 
     @Test
@@ -276,8 +341,8 @@ public class TestJDBCDriver {
         ResultSet procedures =
                 conn.getMetaData().getProcedures("blah", "blah", "%");
         int count = 0;
-        List<String> names = Arrays.asList(new String[] {"MultiSiteSelect",
-                                                         "InsertNewOrder"});
+        List<String> names = Arrays.asList(new String[] {"InsertA",
+            "SelectB", "ArbitraryDurationProc"});
         while (procedures.next()) {
             String procedure = procedures.getString("PROCEDURE_NAME");
             if (procedure.contains(".")) {
@@ -287,15 +352,16 @@ public class TestJDBCDriver {
             }
             count++;
         }
-        // 7 tables * 4 CRUD/table + 2 procedures +
-        // 3 for replicated crud and 2 for insert where partition key !in primary
-        assertEquals(7 * 4 + 2 + 3 + 2, count);
+        System.out.println("Procedure count is: " + count);
+        // 8 tables * 4 CRUD/table + 3 procedures +
+        // 4 tables * 3 for replicated crud
+        assertEquals(8 * 4 + 3 + 4 * 3, count);
     }
 
     @Test
     public void testFilterProcedureByName() {
         try {
-            conn.getMetaData().getProcedures("blah", "blah", "InsertNewOrder");
+            conn.getMetaData().getProcedures("blah", "blah", "InsertA");
         } catch (SQLException e) {
             return;
         }
@@ -327,8 +393,8 @@ public class TestJDBCDriver {
 
     @Test
     public void testAllProcedureColumns() throws SQLException {
-        procedureColumnTest("InsertNewOrder", null, 3);
-        procedureColumnTest("InsertNewOrder", "%", 3);
+        procedureColumnTest("InsertA", null, 2);
+        procedureColumnTest("InsertA", "%", 2);
     }
 
     @Test
@@ -385,15 +451,13 @@ public class TestJDBCDriver {
     @Test
     public void testDoubleInsert() throws SQLException {
         // long i_id, long i_im_id, String i_name, double i_price, String i_data
-        CallableStatement cs = conn.prepareCall("{call InsertNewOrder(?, ?, ?)}");
+        CallableStatement cs = conn.prepareCall("{call InsertA(?, ?)}");
         cs.setInt(1, 55);
         cs.setInt(2, 66);
-        cs.setInt(3, 77);
         cs.execute();
         try {
             cs.setInt(1, 55);
             cs.setInt(2, 66);
-            cs.setInt(3, 77);
             cs.execute();
         } catch (SQLException e) {
             // Since it's a GENERAL_ERROR we need to look for a string by pattern.
@@ -422,5 +486,259 @@ public class TestJDBCDriver {
         }
         // Restore a working connection for any remaining tests
         startServer();
+    }
+
+    @Test
+    public void testSetMaxRows() throws SQLException    {
+        // Add 10 rows
+        PreparedStatement ins = conn.prepareCall("{call InsertA(?, ?)}");
+        for (int i = 0; i < 10; i++) {
+            ins.setInt(1, i);
+            ins.setInt(2, i + 50);
+            ins.execute();
+        }
+
+        // check for our 10 rows
+        PreparedStatement cs = conn.prepareCall("{call SelectB}");
+        ResultSet rs = cs.executeQuery();
+        int count = 0;
+        while (rs.next()) {
+            count++;
+        }
+        assertEquals(10, count);
+
+        // constrain to 5 and try again.
+        cs.setMaxRows(5);
+        assertEquals(5, cs.getMaxRows());
+        rs = cs.executeQuery();
+        count = 0;
+        while (rs.next()) {
+            count++;
+        }
+        assertEquals(5, count);
+
+        // Verify 0 gets us everything again
+        cs.setMaxRows(0);
+        assertEquals(0, cs.getMaxRows());
+        rs = cs.executeQuery();
+        count = 0;
+        while (rs.next()) {
+            count++;
+        }
+        assertEquals(10, count);
+
+        // Go for spot-on
+        cs.setMaxRows(10);
+        assertEquals(10, cs.getMaxRows());
+        rs = cs.executeQuery();
+        count = 0;
+        while (rs.next()) {
+            count++;
+        }
+        assertEquals(10, count);
+    }
+
+    //Test to check Query Timeout
+    @Test
+    public void testQueryTimeout() throws SQLException {
+        //Use no timeout so default timeout of 2 min and thus no exception should be thrown.
+        PreparedStatement stmt = conn.prepareCall("{call ArbitraryDurationProc(?)}");
+        stmt.setLong(1, 6000);
+        boolean exceptionCalled = false;
+        try {
+            stmt.execute();
+        } catch (SQLException ex) {
+            System.out.println("Query threw exception when not expected to: " + ex.getSQLState());
+            exceptionCalled = true;
+        }
+        assertFalse(exceptionCalled);
+
+        //Now make it timeout
+        stmt.setQueryTimeout(1);
+        stmt.setLong(1, 6000);
+        try {
+            stmt.execute();
+        } catch (SQLException ex) {
+            System.out.println("Query timed out: " + ex.getSQLState());
+            exceptionCalled = true;
+        }
+        assertTrue(exceptionCalled);
+
+        //redo statement with long timeout should not timeout
+        stmt.setQueryTimeout(30);
+        stmt.setLong(1, 6000);
+        exceptionCalled = false;
+        try {
+            stmt.execute();
+        } catch (SQLException ex) {
+            System.out.println("Query threw exception when not expected to: " + ex.getSQLState());
+            exceptionCalled = true;
+        }
+        assertFalse(exceptionCalled);
+
+        //Check -ve value
+        try {
+            stmt.setQueryTimeout(-1);
+        } catch (SQLException ex) {
+            //Bad value
+            exceptionCalled = true;
+        }
+        assertTrue(exceptionCalled);
+
+    }
+
+    private void checkSafeMode(Connection myconn)
+    {
+        boolean threw = false;
+        try {
+            myconn.commit();
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertTrue(threw);
+        threw = false;
+        // autocommit true should never throw
+        try {
+            myconn.setAutoCommit(true);
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertFalse(threw);
+        threw = false;
+        try {
+            myconn.setAutoCommit(false);
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertTrue(threw);
+        threw = false;
+        try {
+            myconn.rollback();
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertTrue(threw);
+    }
+
+    private void checkCarlosDanger(Connection myconn)
+    {
+        boolean threw = false;
+        try {
+            myconn.commit();
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertFalse(threw);
+        threw = false;
+        // autocommit true should never throw
+        try {
+            myconn.setAutoCommit(true);
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertFalse(threw);
+        threw = false;
+        try {
+            myconn.setAutoCommit(false);
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertFalse(threw);
+        threw = false;
+        try {
+            myconn.rollback();
+        }
+        catch (SQLException bleh) {
+            threw = true;
+        }
+        assertFalse(threw);
+    }
+
+    @Test
+    public void testSafetyOffThroughProperties() throws Exception
+    {
+        Properties props = new Properties();
+        // Check default behavior
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        checkSafeMode(myconn);
+        myconn.close();
+
+        // Check commit and setAutoCommit
+        props.setProperty(JDBC4Connection.COMMIT_THROW_EXCEPTION, "true");
+        props.setProperty(JDBC4Connection.ROLLBACK_THROW_EXCEPTION, "true");
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        checkSafeMode(myconn);
+        myconn.close();
+
+        props.setProperty(JDBC4Connection.COMMIT_THROW_EXCEPTION, "false");
+        props.setProperty(JDBC4Connection.ROLLBACK_THROW_EXCEPTION, "false");
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        checkCarlosDanger(myconn);
+        myconn.close();
+    }
+
+    @Test
+    public void testSafetyOffThroughURL() throws Exception
+    {
+        Properties props = new Properties();
+        // Check default behavior
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        checkSafeMode(myconn);
+        myconn.close();
+
+        // Check commit and setAutoCommit
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212?" +
+                JDBC4Connection.COMMIT_THROW_EXCEPTION + "=true" + "&" +
+                JDBC4Connection.ROLLBACK_THROW_EXCEPTION + "=true", props);
+        checkSafeMode(myconn);
+        myconn.close();
+
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212?" +
+                JDBC4Connection.COMMIT_THROW_EXCEPTION + "=false" + "&" +
+                JDBC4Connection.ROLLBACK_THROW_EXCEPTION + "=false", props);
+        checkCarlosDanger(myconn);
+        myconn.close();
+    }
+
+    @Test
+    public void testSafetyOffThroughSystemProp() throws Exception {
+        String tmppath = "/tmp/" + System.getProperty("user.name");
+        String propfile = tmppath + "/voltdb.properties";
+        // start clean
+        File tmp = new File(propfile);
+        if (tmp.exists()) {
+            tmp.delete();
+        }
+        Properties props = new Properties();
+        props.setProperty(JDBC4Connection.COMMIT_THROW_EXCEPTION, "false");
+        props.setProperty(JDBC4Connection.ROLLBACK_THROW_EXCEPTION, "false");
+        FileOutputStream out = null;
+        try {
+            out = new FileOutputStream(propfile);
+            props.store(out, "");
+        } catch (FileNotFoundException e) {
+            fail();
+        } catch (IOException e) {
+            fail();
+        }        finally {
+            if (out != null) {
+                try {
+                    out.close();
+                } catch (IOException e) { }
+            }
+        }
+
+        System.setProperty(Driver.JDBC_PROP_FILE_PROP, propfile);
+        props = new Properties();
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        checkCarlosDanger(myconn);
+        myconn.close();
     }
 }

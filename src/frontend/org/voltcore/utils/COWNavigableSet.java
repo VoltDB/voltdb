@@ -20,9 +20,9 @@ import java.util.Collection;
 import java.util.NavigableSet;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ForwardingNavigableSet;
-import com.google.common.collect.ImmutableSortedSet;
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.collect.ForwardingNavigableSet;
+import com.google_voltpatches.common.collect.ImmutableSortedSet;
 
 
 public class COWNavigableSet<E extends Comparable<E>> extends ForwardingNavigableSet<E> {

@@ -51,7 +51,6 @@ import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.iv2.UniqueIdGenerator;
-import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.sysprocs.AdHocBase;
@@ -291,8 +290,7 @@ public class ProcedureRunner {
             else {
                 assert(m_catProc.getStatements().size() == 1);
                 try {
-                    m_cachedSingleStmt.params = getCleanParams(
-                            m_cachedSingleStmt.stmt, paramList);
+                    m_cachedSingleStmt.params = getCleanParams(m_cachedSingleStmt.stmt, paramList);
                     if (getHsqlBackendIfExists() != null) {
                         // HSQL handling
                         VoltTable table =
@@ -379,14 +377,18 @@ public class ProcedureRunner {
 
         if (m_catProc.getSinglepartition()) {
             StoredProcedureInvocation invocation = txnState.getInvocation();
-            int parameterType = m_catProc.getPartitioncolumn().getType();
-            int partitionparameter = m_catProc.getPartitionparameter();
-            Object parameterAtIndex = invocation.getParameterAtIndex(partitionparameter);
+            int parameterType;
+            Object parameterAtIndex;
 
             // check if AdHoc_RO_SP or AdHoc_RW_SP
             if (m_procedure instanceof AdHocBase) {
                 // ClientInterface should pre-validate this param is valid
-                parameterType = (Byte) invocation.getParameterAtIndex(partitionparameter + 1);
+                parameterAtIndex = invocation.getParameterAtIndex(0);
+                parameterType = (Byte) invocation.getParameterAtIndex(1);
+            } else {
+                parameterType = m_catProc.getPartitioncolumn().getType();
+                int partitionparameter = m_catProc.getPartitionparameter();
+                parameterAtIndex = invocation.getParameterAtIndex(partitionparameter);
             }
 
             // Note that @LoadSinglepartitionTable has problems if the parititoning param
@@ -510,20 +512,19 @@ public class ProcedureRunner {
         }
 
         try {
-            AdHocPlannedStmtBatch paw = m_csp.plan( sql, !m_catProc.getSinglepartition(),
-                    ProcedureInvocationType.ORIGINAL, 0, 0).get();
-            if (paw.errorMsg != null) {
-                throw new VoltAbortException("Failed to plan sql '" + sql + "' error: " + paw.errorMsg);
+            AdHocPlannedStmtBatch batch = m_csp.plan(sql, args, m_catProc.getSinglepartition()).get();
+            if (batch.errorMsg != null) {
+                throw new VoltAbortException("Failed to plan sql '" + sql + "' error: " + batch.errorMsg);
             }
 
-            if (m_catProc.getReadonly() && !paw.isReadOnly()) {
+            if (m_catProc.getReadonly() && !batch.isReadOnly()) {
                 throw new VoltAbortException("Attempted to queue DML adhoc sql '" + sql + "' from read only procedure");
             }
 
-            assert(1 == paw.plannedStatements.size());
+            assert(1 == batch.plannedStatements.size());
 
             QueuedSQL queuedSQL = new QueuedSQL();
-            AdHocPlannedStatement plannedStatement = paw.plannedStatements.get(0);
+            AdHocPlannedStatement plannedStatement = batch.plannedStatements.get(0);
 
             long aggFragId = ActivePlanRepository.loadOrAddRefPlanFragment(
                     plannedStatement.core.aggregatorHash, plannedStatement.core.aggregatorFragment);
@@ -545,24 +546,33 @@ public class ProcedureRunner {
                     plannedStatement.core.readOnly,
                     plannedStatement.core.parameterTypes,
                     m_site);
-            if (plannedStatement.extractedParamValues.size() == 0) {
-                // case handles if there were parameters OR
-                // if there were no constants to pull out
-                queuedSQL.params = getCleanParams(queuedSQL.stmt, args);
-            }
-            else {
+            Object[] argumentParams = args;
+            // case handles if there were parameters OR
+            // if there were no constants to pull out
+            // In the current scheme, which does not support combining user-provided parameters
+            // with planner-extracted parameters in the same statement, an original sql statement
+            // containing parameters to match its provided arguments should bypass the parameterizer,
+            // so there should be no extracted params.
+            // The presence of extracted paremeters AND user-provided arguments can only arise when
+            // the arguments have no user-specified parameters in the sql statement
+            // to put these arguments to use -- these are invalid, so flag an error.
+            // Even the special "partitioning argument" provided to @AdHocSpForTest with no
+            // corresponding parameter in the sql should have been noted and discarded by the
+            // dispatcher before reaching this ProcedureRunner. This opens the possibility of
+            // supporting @AdHocSpForTest with queries that contain '?' parameters.
+            if (plannedStatement.hasExtractedParams()) {
                 if (args.length > 0) {
                     throw new ExpectedProcedureException(
                             "Number of arguments provided was " + args.length  +
-                            " where 0 were expected for statement " + sql);
+                            " where 0 were expected for statement: " + sql);
                 }
-                Object[] extractedParams = plannedStatement.extractedParamValues.toArray();
-                if (extractedParams.length != queuedSQL.stmt.statementParamJavaTypes.length) {
-                    String msg = String.format("Wrong number of extracted param for parameterized statement: %s", sql);
+                argumentParams = plannedStatement.extractedParamArray();
+                if (argumentParams.length != queuedSQL.stmt.statementParamJavaTypes.length) {
+                    String msg = String.format("Wrong number of params for parameterized statement: %s", sql);
                     throw new VoltAbortException(msg);
                 }
-                queuedSQL.params = getCleanParams(queuedSQL.stmt, extractedParams);
             }
+            queuedSQL.params = getCleanParams(queuedSQL.stmt, argumentParams);
 
             updateCRC(queuedSQL);
             m_batch.add(queuedSQL);
@@ -700,7 +710,7 @@ public class ProcedureRunner {
         return sysproc.executePlanFragment(dependencies, fragmentId, params, m_systemProcedureContext);
     }
 
-    protected ParameterSet getCleanParams(SQLStmt stmt, Object... inArgs) {
+    private final ParameterSet getCleanParams(SQLStmt stmt, Object... inArgs) {
         final int numParamTypes = stmt.statementParamJavaTypes.length;
         final byte stmtParamTypes[] = stmt.statementParamJavaTypes;
         final Object[] args = new Object[numParamTypes];
@@ -772,6 +782,9 @@ public class ProcedureRunner {
         stmt.statementParamJavaTypes = new byte[numStatementParamJavaTypes];
         for (StmtParameter param : catStmt.getParameters()) {
             stmt.statementParamJavaTypes[param.getIndex()] = (byte)param.getJavatype();
+            // ??? How does the SQLStmt successfully handle IN LIST queries without
+            // caching the value of param.getIsarray() here?
+            // Is the array-ness also reflected in the javatype? --paul
         }
     }
 
@@ -942,19 +955,12 @@ public class ProcedureRunner {
    }
 
    protected ClientResponseImpl getErrorResponse(byte status, String msg, SerializableException e) {
-
-       StringBuilder msgOut = new StringBuilder();
-       msgOut.append("VOLTDB ERROR: ");
-       msgOut.append(msg);
-
-       log.trace(msgOut);
-
        return new ClientResponseImpl(
                status,
                m_appStatusCode,
                m_appStatusString,
                new VoltTable[0],
-               msgOut.toString(), e);
+               "VOLTDB ERROR: " + msg);
    }
 
    /**
@@ -1169,21 +1175,23 @@ public class ProcedureRunner {
            state.m_depsToResume[i] = collectorOutputDepId;
 
            // Build the set of params for the frags
-           FastSerializer fs = new FastSerializer();
+           ByteBuffer paramBuf = null;
            try {
                if (queuedSQL.serialization != null) {
-                   fs.write(queuedSQL.serialization);
+                   paramBuf = ByteBuffer.allocate(queuedSQL.serialization.capacity());
+                   paramBuf.put(queuedSQL.serialization);
                }
                else {
-                   queuedSQL.params.writeExternal(fs);
+                   paramBuf = ByteBuffer.allocate(queuedSQL.params.getSerializedSize());
+                   queuedSQL.params.flattenToBuffer(paramBuf);
                }
            } catch (IOException e) {
                throw new RuntimeException("Error serializing parameters for SQL statement: " +
                                           queuedSQL.stmt.getText() + " with params: " +
                                           queuedSQL.params.toJSONString(), e);
            }
-           ByteBuffer params = fs.getBuffer();
-           assert(params != null);
+           assert(paramBuf != null);
+           paramBuf.flip();
 
             /*
              * This numfrags == 1 code is for routing multi-partition reads of a
@@ -1196,7 +1204,7 @@ public class ProcedureRunner {
              * read locally but we break up the batches in the face of mixed reads and
              * writes
              */
-           state.addStatement(i, queuedSQL.stmt, params, m_site);
+           state.addStatement(i, queuedSQL.stmt, paramBuf, m_site);
        }
 
        // instruct the dtxn what's needed to resume the proc
