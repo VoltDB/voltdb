@@ -34,13 +34,18 @@ package org.hsqldb_voltpatches.jdbc;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
+
+//#ifdef JAVA6
 import java.sql.RowIdLifetime;
+
+//#endif JAVA6
 import java.sql.SQLException;
 
-import org.hsqldb_voltpatches.FunctionCustom;
+import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.lib.StringUtil;
 import org.hsqldb_voltpatches.persist.HsqlDatabaseProperties;
 import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.FunctionCustom;
 
 /* $Id: JDBCDatabaseMetaData.java 2952 2009-03-26 00:20:19Z fredt $ */
 
@@ -6204,6 +6209,8 @@ public class JDBCDatabaseMetaData implements DatabaseMetaData {
         return schemaName;
     }
 
+    /************************* Volt DB Extensions *************************/
+
     public ResultSet getPseudoColumns(String catalog, String schemaPattern,
             String tableNamePattern, String columnNamePattern)
             throws SQLException {
@@ -6213,4 +6220,5 @@ public class JDBCDatabaseMetaData implements DatabaseMetaData {
     public boolean generatedKeyAlwaysReturned() throws SQLException {
         throw new SQLException();
     }
+    /**********************************************************************/
 }

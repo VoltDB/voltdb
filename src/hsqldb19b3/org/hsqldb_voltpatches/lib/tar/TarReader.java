@@ -189,10 +189,12 @@ public class TarReader {
     }
 
     public void read() throws IOException, TarMalformatException {
+        // A VoltDB extension to make extraction more verbose
         read(true);
     }
 
     public void read(boolean verbose) throws IOException, TarMalformatException {
+        // End of VoltDB extension
 
         TarEntryHeader header;
         boolean        anyUnsupporteds = false;
@@ -277,9 +279,11 @@ public class TarReader {
                          * Thefore the currently "shown" name is still being
                          * extracted.
                          */
+                        // A VoltDB extension to make extraction more verbose
                         if (verbose) {
                             System.out.println(header.toString());
                         }
+                        // End of VoltDB extension
 
                         // Instance variable mode will be used to differentiate
                         // behavior inside of extractFile().

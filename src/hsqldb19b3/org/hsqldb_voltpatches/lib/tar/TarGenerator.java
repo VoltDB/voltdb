@@ -42,7 +42,6 @@ import java.io.PipedOutputStream;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.zip.GZIPOutputStream;
 
 import org.hsqldb_voltpatches.lib.StringUtil;
 
@@ -181,10 +180,6 @@ public class TarGenerator {
         }
     }
 
-    public TarGenerator(GZIPOutputStream outputStream) throws IOException {
-        archive = new TarFileOutputStream(outputStream);
-    }
-
     public void queueEntry(File file)
     throws FileNotFoundException, TarMalformatException {
         queueEntry(null, file);
@@ -301,7 +296,11 @@ public class TarGenerator {
                 }
             }
 
-            archive.finish(outputToStream);
+            if (outputToStream) {
+                archive.finishStream();
+                return;
+            }
+            archive.finish();
         } catch (IOException ioe) {
             System.err.println();    // Exception should cause a report
 
@@ -322,6 +321,10 @@ public class TarGenerator {
 
             throw ioe;
         }
+    }
+
+    public TarGenerator(java.util.zip.GZIPOutputStream outputStream) throws IOException {
+        archive = new TarFileOutputStream(outputStream);
     }
 
     /**

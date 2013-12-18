@@ -36,9 +36,7 @@ import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.DriverPropertyInfo;
 import java.sql.SQLException;
-import java.sql.SQLFeatureNotSupportedException;
 import java.util.Properties;
-import java.util.logging.Logger;
 
 import org.hsqldb_voltpatches.DatabaseURL;
 import org.hsqldb_voltpatches.ErrorCode;
@@ -74,7 +72,7 @@ import org.hsqldb_voltpatches.persist.HsqlProperties;
  *  that a user can load and register the HSQL Database Engine driver by
  *  calling:
  *  <pre>
- *  <code>Class.forName("org.hsqldb.jdbc.JDBCDriver")</code>
+ *  <code>Class.forName("org.hsqldb_voltpatches.jdbc.JDBCDriver")</code>
  *  </pre>
  *
  *  For detailed information about how to obtain HSQLDB JDBC Connections,
@@ -129,7 +127,7 @@ import org.hsqldb_voltpatches.persist.HsqlProperties;
  * When built under a Java runtime that supports JDBC 4.0, HSQLDB distribution
  * jars containing the Driver implementation also include the file
  * <code>META-INF/services/java.sql.Driver</code>. This file contains the fully
- * qualified class name ('org.hsqldb.jdbc.JDBCDriver') of the HSQLDB implementation
+ * qualified class name ('org.hsqldb_voltpatches.jdbc.JDBCDriver') of the HSQLDB implementation
  * of <code>java.sql.Driver</code>. <p>
  *
  * Hence, under JDBC 4.0 or greater, applications no longer need to explictly
@@ -491,7 +489,10 @@ public class JDBCDriver implements Driver {
         }
     }
 
-    public Logger getParentLogger() throws SQLFeatureNotSupportedException {
-        throw new SQLFeatureNotSupportedException();
+    /************************* Volt DB Extensions *************************/
+
+    public java.util.logging.Logger getParentLogger() throws java.sql.SQLFeatureNotSupportedException {
+        throw new java.sql.SQLFeatureNotSupportedException();
     }
+    /**********************************************************************/
 }

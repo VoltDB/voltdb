@@ -106,7 +106,7 @@ public class BaseHashMap {
     protected long[]   longValueTable;
 
     //
-    protected int       accessMin;
+    int                 accessMin;
     protected int       accessCount;
     protected int[]     accessTable;
     protected boolean[] multiValueTable;
@@ -115,7 +115,7 @@ public class BaseHashMap {
     final float       loadFactor;
     final int         initialCapacity;
     int               threshold;
-    protected int     maxCapacity;
+    int               maxCapacity;
     protected int     purgePolicy = NO_PURGE;
     protected boolean minimizeOnEmpty;
 
@@ -143,13 +143,22 @@ public class BaseHashMap {
             throw new IllegalArgumentException();
         }
 
+        // A VoltDB extension to prevent a flaky crash?
         if (initialCapacity < 3) {
             initialCapacity = 3;
         }
-
+        // End of VoltDB extension
         this.loadFactor      = 1;    // can use any value if necessary
         this.initialCapacity = initialCapacity;
         threshold            = initialCapacity;
+
+        // A VoltDB extension to prevent a flaky crash?
+        /* disable 3 lines ...
+        if (threshold < 3) {
+            threshold = 3;
+        }
+        ... disabled 3 lines */
+        // End of VoltDB extension
 
         int hashtablesize = (int) (initialCapacity * loadFactor);
 
@@ -1161,10 +1170,11 @@ public class BaseHashMap {
         if (key == null) {
             return false;
         }
-
+        // A VoltDB extension to prevent a flaky crash?
         if (hashIndex.elementCount == 0) {
             return false;
         }
+        // End of VoltDB extension
 
         int lookup = getLookup(key, key.hashCode());
 
@@ -1173,10 +1183,11 @@ public class BaseHashMap {
     }
 
     protected boolean containsKey(int key) {
-
+        // A VoltDB extension to prevent a flaky crash?
         if (hashIndex.elementCount == 0) {
             return false;
         }
+        // End of VoltDB extension
 
         int lookup = getLookup(key);
 
@@ -1185,10 +1196,11 @@ public class BaseHashMap {
     }
 
     protected boolean containsKey(long key) {
-
+        // A VoltDB extension to prevent a flaky crash?
         if (hashIndex.elementCount == 0) {
             return false;
         }
+        // End of VoltDB extension
 
         int lookup = getLookup(key);
 
@@ -1197,12 +1209,13 @@ public class BaseHashMap {
     }
 
     protected boolean containsValue(Object value) {
-
-        int lookup = 0;
-
+        // A VoltDB extension to prevent a flaky crash?
         if (hashIndex.elementCount == 0) {
             return false;
         }
+        // End of VoltDB extension
+
+        int lookup = 0;
 
         if (value == null) {
             for (; lookup < hashIndex.newNodePointer; lookup++) {
@@ -1250,12 +1263,10 @@ public class BaseHashMap {
             this.lookup = lookup;
         }
 
-        @Override
         public boolean hasNext() {
             return lookup != -1;
         }
 
-        @Override
         public Object next() throws NoSuchElementException {
 
             if (lookup == -1) {
@@ -1277,22 +1288,18 @@ public class BaseHashMap {
             return value;
         }
 
-        @Override
         public int nextInt() throws NoSuchElementException {
             throw new NoSuchElementException("Hash Iterator");
         }
 
-        @Override
         public long nextLong() throws NoSuchElementException {
             throw new NoSuchElementException("Hash Iterator");
         }
 
-        @Override
         public void remove() throws NoSuchElementException {
             throw new NoSuchElementException("Hash Iterator");
         }
 
-        @Override
         public void setValue(Object value) {
             throw new NoSuchElementException("Hash Iterator");
         }
@@ -1320,12 +1327,10 @@ public class BaseHashMap {
             }
         }
 
-        @Override
         public boolean hasNext() {
             return lookup != -1;
         }
 
-        @Override
         public Object next() throws NoSuchElementException {
 
             Object value = objectKeyTable[lookup];
@@ -1335,22 +1340,18 @@ public class BaseHashMap {
             return value;
         }
 
-        @Override
         public int nextInt() throws NoSuchElementException {
             throw new NoSuchElementException("Hash Iterator");
         }
 
-        @Override
         public long nextLong() throws NoSuchElementException {
             throw new NoSuchElementException("Hash Iterator");
         }
 
-        @Override
         public void remove() throws NoSuchElementException {
             throw new NoSuchElementException("Hash Iterator");
         }
 
-        @Override
         public void setValue(Object value) {
             throw new NoSuchElementException("Hash Iterator");
         }
@@ -1376,12 +1377,10 @@ public class BaseHashMap {
             this.keys = keys;
         }
 
-        @Override
         public boolean hasNext() {
             return counter < hashIndex.elementCount;
         }
 
-        @Override
         public Object next() throws NoSuchElementException {
 
             if ((keys && !isObjectKey) || (!keys && !isObjectValue)) {
@@ -1405,7 +1404,6 @@ public class BaseHashMap {
             throw new NoSuchElementException("Hash Iterator");
         }
 
-        @Override
         public int nextInt() throws NoSuchElementException {
 
             if ((keys && !isIntKey) || (!keys && !isIntValue)) {
@@ -1429,7 +1427,6 @@ public class BaseHashMap {
             throw new NoSuchElementException("Hash Iterator");
         }
 
-        @Override
         public long nextLong() throws NoSuchElementException {
 
             if ((!isLongKey || !keys)) {
@@ -1453,7 +1450,6 @@ public class BaseHashMap {
             throw new NoSuchElementException("Hash Iterator");
         }
 
-        @Override
         public void remove() throws NoSuchElementException {
 
             if (removed) {
@@ -1484,12 +1480,13 @@ public class BaseHashMap {
             }
 
             if (isList) {
+                // A VoltDB extension to prevent a flaky crash?
                 removeRow(lookup);
+                // End of VoltDB extension
                 lookup--;
             }
         }
 
-        @Override
         public void setValue(Object value) {
 
             if (keys) {

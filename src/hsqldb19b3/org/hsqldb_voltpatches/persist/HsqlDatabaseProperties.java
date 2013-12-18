@@ -441,7 +441,6 @@ public class HsqlDatabaseProperties extends HsqlProperties {
      * Creates file with defaults if it didn't exist.
      * Returns false if file already existed.
      */
-    @Override
     public boolean load() {
 
         boolean exists;
@@ -510,7 +509,6 @@ public class HsqlDatabaseProperties extends HsqlProperties {
         database.setMetaDirty(false);
     }
 
-    @Override
     public void save() {
 
         if (!DatabaseURL.isFileBasedDatabaseType(database.getType())

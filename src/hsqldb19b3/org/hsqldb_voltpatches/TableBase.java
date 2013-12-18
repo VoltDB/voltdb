@@ -213,10 +213,6 @@ public class TableBase {
         return indexList[i];
     }
 
-    public Index[] getIndexes() {
-        return indexList;
-    }
-
     /**
      *  Returns the indexes
      */
@@ -295,6 +291,7 @@ public class TableBase {
             if (index.getExpressions() != null) {
                 continue;
             }
+            // End of VoltDB extension
             int[] cols      = index.getColumns();
             int   colsCount = index.getVisibleColumns();
 
@@ -402,22 +399,18 @@ public class TableBase {
         return newindex;
     }
 
-    // A VoltDB extension to support indexed expressions
-    public final Index createAndAddExprIndexStructure(HsqlName name, int[] cols, Expression[] indexExprs, boolean unique, boolean constraint) {
-
-        Index newExprIndex = createExprIndexStructure(name, cols, indexExprs, unique, constraint);
-        addIndex(newExprIndex);
-        return newExprIndex;
-    } /* createAndAddExprIndexStructure */
-
     final Index createIndexStructure(HsqlName name, int[] columns,
                                      boolean[] descending,
                                      boolean[] nullsLast, boolean unique,
                                      boolean constraint, boolean forward) {
 
         if (primaryKeyCols == null) {
-            //VOLTDB changed ... throw Error.runtimeError(ErrorCode.U_S0500, "createIndex");
-            primaryKeyCols = new int[0]; // ... VOLTDB changed to support matview-based indexes
+            // A VoltDB extension to support matview-based indexes
+            primaryKeyCols = new int[0];
+            /* disable 1 line ...
+            throw Error.runtimeError(ErrorCode.U_S0500, "createIndex");
+            ... disabled 1 line */
+            // End of VoltDB extension
         }
 
         int    s     = columns.length;
@@ -436,29 +429,6 @@ public class TableBase {
 
         return newIndex;
     }
-
-    // A VoltDB extension to support indexed expressions
-    final Index createExprIndexStructure(HsqlName name, int[] columns, Expression[] expressions, boolean unique, boolean constraint) {
-        // TODO: DEFinitely implement for indexExprs
-        if (primaryKeyCols == null) {
-            //VOLTDB changed ... throw Error.runtimeError(ErrorCode.U_S0500, "createIndex");
-            primaryKeyCols = new int[0]; // ... VOLTDB changed to support matview-based indexes
-        }
-
-        int    s     = columns.length;
-        int[]  cols  = new int[s];
-        Type[] types = new Type[s];
-
-        for (int j = 0; j < s; j++) {
-            cols[j]  = columns[j];
-            types[j] = colTypes[cols[j]];
-        }
-
-        long id = database.persistentStoreCollection.getNextId();
-        Index newExprIndex = new IndexAVL(name, id, this, cols, types, expressions, unique, constraint);
-
-        return newExprIndex;
-    } /* createExprIndexStructure */
 
     final void addIndex(Index index) {
 
@@ -520,19 +490,6 @@ public class TableBase {
 
         return newIndex;
     }
-
-    /**
-     *  Create new memory-resident index with indexed expressions. For MEMORY and TEXT tables.
-     *  A VoltDB extension to support indexed expressions.
-     * @param indexExprs
-     */
-    public final Index createExprIndex(PersistentStore store, HsqlName name, int[] cols,
-                                       Expression[] indexExprs, boolean unique, boolean constraint) {
-
-        Index newExprIndex = createAndAddExprIndexStructure(name, cols, indexExprs, unique, constraint);
-
-        return newExprIndex;
-    } /* createExprIndex */
 
     public void clearAllData(Session session) {
 

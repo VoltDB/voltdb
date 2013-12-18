@@ -74,12 +74,10 @@ public final class ExpressionLike extends ExpressionLogical {
         this.likeObject = other.likeObject;
     }
 
-    @Override
     void collectObjectNames(Set set) {
         super.collectObjectNames(set);
     }
 
-    @Override
     public HsqlList resolveColumnReferences(RangeVariable[] rangeVarArray,
             int rangeCount, HsqlList unresolvedSet, boolean acceptsSequences) {
 
@@ -93,7 +91,6 @@ public final class ExpressionLike extends ExpressionLogical {
         return unresolvedSet;
     }
 
-    @Override
     public Object getValue(Session session) {
 
         if (opType != OpTypes.LIKE) {
@@ -118,7 +115,6 @@ public final class ExpressionLike extends ExpressionLogical {
         return likeObject.compare(session, leftValue);
     }
 
-    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -364,7 +360,6 @@ public final class ExpressionLike extends ExpressionLogical {
         }
     }
 
-    @Override
     public String getSQL() {
 
         String       left  = getContextSQL(nodes[LEFT]);
@@ -384,7 +379,6 @@ public final class ExpressionLike extends ExpressionLogical {
         return sb.toString();
     }
 
-    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer();

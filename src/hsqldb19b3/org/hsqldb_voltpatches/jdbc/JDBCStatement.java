@@ -35,7 +35,6 @@ import java.sql.BatchUpdateException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.SQLFeatureNotSupportedException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
 
@@ -1097,7 +1096,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
         int[]           updateCounts = new int[navigator.getSize()];
 
         for (int i = 0; i < updateCounts.length; i++) {
-            Object[] data = navigator.getNext();
+            Object[] data = (Object[]) navigator.getNext();
 
             updateCounts[i] = ((Integer) data[0]).intValue();
         }
@@ -1807,6 +1806,8 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
         }
     }
 
+    /************************* Volt DB Extensions *************************/
+
     public void closeOnCompletion() throws SQLException {
         throw new SQLException();
     }
@@ -1814,4 +1815,5 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
     public boolean isCloseOnCompletion() throws SQLException {
         throw new SQLException();
     }
+    /**********************************************************************/
 }

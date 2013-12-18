@@ -48,7 +48,7 @@ import java.util.StringTokenizer;
  * Manages all the details we need to connect up to database(s),
  * in a declarative way.
  * <P/>
- * The file <CODE>src/org/hsqldb/sample/SqlFileEmbedder.java</CODE>
+ * The file <CODE>src/org/hsqldb_voltpatches/sample/SqlFileEmbedder.java</CODE>
  * in the HSQLDB distribution provides an example of how to use RCData for your
  * own programs.
  *
