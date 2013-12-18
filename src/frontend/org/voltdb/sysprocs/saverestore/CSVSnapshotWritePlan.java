@@ -33,6 +33,7 @@ import java.util.Map;
 
 import org.json_voltpatches.JSONObject;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 
 import org.voltdb.catalog.Table;
@@ -70,6 +71,8 @@ import com.google.common.primitives.Longs;
  * site on a node. */
 public class CSVSnapshotWritePlan extends SnapshotWritePlan
 {
+    static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
+
     protected boolean createSetupInternal(
             String file_path, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
@@ -217,6 +220,11 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
                 sitesToInclude.add(localSite);
             }
         }
+
+        if (sitesToInclude.isEmpty()) {
+            SNAP_LOG.info("This host was not selected to write CSV data for any partition");
+        }
+
         return sitesToInclude;
     }
 }

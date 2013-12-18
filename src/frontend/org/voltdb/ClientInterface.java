@@ -2281,13 +2281,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             public void run() {
                 try {
                     //Using the current time makes this vulnerable to NTP weirdness...
-                    checkForDeadConnections(System.currentTimeMillis());
+                    checkForDeadConnections(EstTime.currentTimeMillis());
                 } catch (Exception ex) {
                     log.warn("Exception while checking for dead connections", ex);
                 }
             }
         }, 200, 200, TimeUnit.MILLISECONDS);
     }
+
+    private static final long CLIENT_HANGUP_TIMEOUT = Long.getLong("CLIENT_HANGUP_TIMEOUT", 4000);
 
     /**
      * Check for dead connections by providing each connection with the current
@@ -2296,16 +2298,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @param now Current time in milliseconds
      */
     private final void checkForDeadConnections(final long now) {
-        final ArrayList<Connection> connectionsToRemove = new ArrayList<Connection>();
+        final ArrayList<Pair<Connection, Integer>> connectionsToRemove = new ArrayList<Pair<Connection, Integer>>();
         for (final Connection c : m_connections) {
             final int delta = c.writeStream().calculatePendingWriteDelta(now);
-            if (delta > 4000) {
-                connectionsToRemove.add(c);
+            if (delta > CLIENT_HANGUP_TIMEOUT) {
+                connectionsToRemove.add(Pair.of(c, delta));
             }
         }
 
-        for (final Connection c : connectionsToRemove) {
-            networkLog.warn("Closing connection to " + c + " at " + new java.util.Date() + " because it refuses to read responses");
+        for (final Pair<Connection, Integer> p : connectionsToRemove) {
+            Connection c = p.getFirst();
+            networkLog.warn("Closing connection to " + c +
+                    " because it hasn't read a response that was pending for " +  p.getSecond() + " milliseconds");
             c.unregister();
         }
     }

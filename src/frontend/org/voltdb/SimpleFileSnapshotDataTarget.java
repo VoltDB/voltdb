@@ -39,6 +39,9 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
     private Runnable m_onCloseTask;
     private boolean m_needsFinalClose;
 
+    private static final long MAX_BYTES_SINCE_SYNC = 1024 * 1024 * 256;
+    private long m_bytesSinceLastSync = 0;
+
     /*
      * If a write fails then this snapshot is hosed.
      * Set the flag so all writes return immediately. The system still
@@ -90,7 +93,12 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
                             int written = m_fc.write(data.b);
                             if (written > 0) {
                                 m_bytesWritten += written;
+                                m_bytesSinceLastSync += written;
                             }
+                        }
+                        if (m_bytesSinceLastSync > MAX_BYTES_SINCE_SYNC) {
+                            m_bytesSinceLastSync = 0;
+                            m_fc.force(false);
                         }
                     } finally {
                         data.discard();
