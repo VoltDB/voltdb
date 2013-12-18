@@ -102,7 +102,8 @@ public class TestPlansDML extends PlannerTestCase {
         //n = pn.getChild(0).getChild(0);
         assertTrue(pn instanceof InsertPlanNode);
 
-}
+    }
+
 
     @Override
     protected void setUp() throws Exception {

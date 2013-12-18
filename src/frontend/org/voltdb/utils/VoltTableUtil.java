@@ -62,7 +62,7 @@ public class VoltTableUtil {
         }
     };
 
-    public static void toCSVWriter(CSVWriter csv, VoltTable vt, ArrayList<VoltType> columnTypes) throws IOException {
+    public static void toCSVWriter(CSVWriter csv, VoltTable vt, List<VoltType> columnTypes) throws IOException {
         final SimpleDateFormat sdf = m_sdf.get();
         String[] fields = new String[vt.getColumnCount()];
         while (vt.advanceRow()) {

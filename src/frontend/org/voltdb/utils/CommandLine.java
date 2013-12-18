@@ -510,11 +510,7 @@ public class CommandLine extends VoltDB.Configuration
         // VOLTDB main() parameters
         //
         cmdline.add("org.voltdb.VoltDB");
-        if (m_startAction == StartAction.JOIN) {
-            cmdline.add("add");
-        } else {
-            cmdline.add(m_startAction.verb());
-        }
+        cmdline.add(m_startAction.verb());
 
         cmdline.add("host"); cmdline.add(m_leader);
         cmdline.add("catalog"); cmdline.add(jarFileName());

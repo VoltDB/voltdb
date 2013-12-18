@@ -373,7 +373,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
             }
         }
         AbstractExpression.loadFromJSONArrayChild(m_groupByExpressions, jobj,
-                                                  Members.GROUPBY_EXPRESSIONS.name());
+                                                  Members.GROUPBY_EXPRESSIONS.name(), null);
         m_prePredicate = AbstractExpression.fromJSONChild(jobj, Members.PRE_PREDICATE.name());
         m_postPredicate = AbstractExpression.fromJSONChild(jobj, Members.POST_PREDICATE.name());
     }
