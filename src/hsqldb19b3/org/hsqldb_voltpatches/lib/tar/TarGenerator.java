@@ -259,74 +259,6 @@ public class TarGenerator {
         }
     }
 
-    public void write(boolean outputToStream, boolean verbose) throws IOException, TarMalformatException {
-
-        if (TarFileOutputStream.debug) {
-            System.out.println(RB.singleton.getString(RB.WRITE_QUEUE_REPORT,
-                    entryQueue.size()));
-        }
-
-        TarEntrySupplicant entry;
-
-        try {
-            for (int i = 0; i < entryQueue.size(); i++) {
-                if (verbose) {
-                    System.out.print(Integer.toString(i + 1) + " / "
-                                     + entryQueue.size() + ' ');
-                }
-
-                entry = (TarEntrySupplicant) entryQueue.get(i);
-
-                if (verbose) {
-                    System.out.print(entry.getPath() + "... ");
-                }
-
-                if (entry.getDataSize() >= paxThreshold) {
-                    entry.makeXentry().write();
-                    if (verbose) {
-                        System.out.print("x... ");
-                    }
-                }
-
-                entry.write();
-                archive.assertAtBlockBoundary();
-
-                if (verbose) {
-                    System.out.println();
-                }
-            }
-
-            if (outputToStream) {
-                archive.finishStream();
-                return;
-            }
-            archive.finish();
-        } catch (IOException ioe) {
-            System.err.println();    // Exception should cause a report
-
-            try {
-
-                // Just release resources from any Entry's input, which may be
-                // left open.
-                for (int i = 0; i < entryQueue.size(); i++) {
-                    ((TarEntrySupplicant) entryQueue.get(i)).close();
-                }
-
-                archive.close();
-            } catch (IOException ne) {
-
-                // Too difficult to report every single error.
-                // More important that the user know about the original Exc.
-            }
-
-            throw ioe;
-        }
-    }
-
-    public TarGenerator(java.util.zip.GZIPOutputStream outputStream) throws IOException {
-        archive = new TarFileOutputStream(outputStream);
-    }
-
     /**
      * Slots for supplicant files and input streams to be added to a Tar
      * archive.
@@ -753,4 +685,75 @@ public class TarGenerator {
 
         // Be conservative, because these files contain passwords
     }
+
+    /************************* Volt DB Extensions *************************/
+
+    public void write(boolean outputToStream, boolean verbose) throws IOException, TarMalformatException {
+
+        if (TarFileOutputStream.debug) {
+            System.out.println(RB.singleton.getString(RB.WRITE_QUEUE_REPORT,
+                    entryQueue.size()));
+        }
+
+        TarEntrySupplicant entry;
+
+        try {
+            for (int i = 0; i < entryQueue.size(); i++) {
+                if (verbose) {
+                    System.out.print(Integer.toString(i + 1) + " / "
+                                     + entryQueue.size() + ' ');
+                }
+
+                entry = (TarEntrySupplicant) entryQueue.get(i);
+
+                if (verbose) {
+                    System.out.print(entry.getPath() + "... ");
+                }
+
+                if (entry.getDataSize() >= paxThreshold) {
+                    entry.makeXentry().write();
+                    if (verbose) {
+                        System.out.print("x... ");
+                    }
+                }
+
+                entry.write();
+                archive.assertAtBlockBoundary();
+
+                if (verbose) {
+                    System.out.println();
+                }
+            }
+
+            if (outputToStream) {
+                archive.finishStream();
+                return;
+            }
+            archive.finish();
+        } catch (IOException ioe) {
+            System.err.println();    // Exception should cause a report
+
+            try {
+
+                // Just release resources from any Entry's input, which may be
+                // left open.
+                for (int i = 0; i < entryQueue.size(); i++) {
+                    ((TarEntrySupplicant) entryQueue.get(i)).close();
+                }
+
+                archive.close();
+            } catch (IOException ne) {
+
+                // Too difficult to report every single error.
+                // More important that the user know about the original Exc.
+            }
+
+            throw ioe;
+        }
+    }
+
+    public TarGenerator(java.util.zip.GZIPOutputStream outputStream) throws IOException {
+        archive = new TarFileOutputStream(outputStream);
+    }
+    /**********************************************************************/
 }

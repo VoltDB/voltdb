@@ -279,9 +279,11 @@ public class TarReader {
                          * Thefore the currently "shown" name is still being
                          * extracted.
                          */
-                        // A VoltDB extension to make extraction more verbose
+                        // A VoltDB extension to make extraction less verbose
                         if (verbose) {
-                            System.out.println(header.toString());
+                        // End of VoltDB extension
+                        System.out.println(header.toString());
+                        // A VoltDB extension to make extraction less verbose
                         }
                         // End of VoltDB extension
 

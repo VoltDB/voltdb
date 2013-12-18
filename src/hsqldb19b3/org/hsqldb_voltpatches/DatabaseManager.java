@@ -40,6 +40,12 @@ import org.hsqldb_voltpatches.lib.HsqlTimer;
 import org.hsqldb_voltpatches.lib.IntKeyHashMap;
 import org.hsqldb_voltpatches.lib.Iterator;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
+// A VoltDB extension to disable a subpackage dependency
+/* disable 2 lines ...
+import org.hsqldb_voltpatches.server.Server;
+import org.hsqldb_voltpatches.server.ServerConstants;
+... disabled 2 lines */
+// End of VoltDB extension
 import org.hsqldb_voltpatches.store.ValuePool;
 
 /**
@@ -160,6 +166,25 @@ public class DatabaseManager {
         return db == null ? null
                           : db.sessionManager.getSession(sessionId);
     }
+
+    // A VoltDB extension to disable a subpackage dependency
+    /* disable 14 lines ...
+    /**
+     * Used by server to open or create a database
+     */
+
+// loosecannon1@users 1.7.2 patch properties on the JDBC URL
+    public static int getDatabase(String type, String path, Server server,
+                                  HsqlProperties props) {
+
+        Database db = getDatabase(type, path, props);
+
+        registerServer(server, db);
+
+        return db.databaseID;
+    }
+    ... disabled 14 lines */
+    // End of VoltDB extension
 
     /**
      * This has to be improved once a threading model is in place.
@@ -324,6 +349,12 @@ public class DatabaseManager {
         Object  key  = path;
         HashMap databaseMap;
 
+// A VoltDB extension to disable a subpackage dependency
+/* disable 1 line ...
+        notifyServers(database);
+... disabled 1 line */
+// End of VoltDB extension
+
         if (type == DatabaseURL.S_FILE) {
             databaseMap = fileDatabaseMap;
             key         = filePathToKey(path);
@@ -343,6 +374,93 @@ public class DatabaseManager {
             ValuePool.resetPool();
         }
     }
+// A VoltDB extension to disable a subpackage dependency
+/* disable 93 lines ...
+    /**
+     * Maintains a map of servers to sets of databases.
+     * Servers register each of their databases.
+     * When a database is shutdown, all the servers accessing it are notified.
+     * The database is then removed form the sets for all servers and the
+     * servers that have no other database are removed from the map.
+     */
+    static HashMap serverMap = new HashMap();
+
+    /**
+     * Deregisters a server completely.
+     */
+    public static void deRegisterServer(Server server) {
+        serverMap.remove(server);
+    }
+
+    /**
+     * Deregisters a server as serving a given database. Not yet used.
+     */
+    private static void deRegisterServer(Server server, Database db) {
+
+        Iterator it = serverMap.values().iterator();
+
+        for (; it.hasNext(); ) {
+            HashSet databases = (HashSet) it.next();
+
+            databases.remove(db);
+
+            if (databases.isEmpty()) {
+                it.remove();
+            }
+        }
+    }
+
+    /**
+     * Registers a server as serving a given database.
+     */
+    private static void registerServer(Server server, Database db) {
+
+        if (!serverMap.containsKey(server)) {
+            serverMap.put(server, new HashSet());
+        }
+
+        HashSet databases = (HashSet) serverMap.get(server);
+
+        databases.add(db);
+    }
+
+    /**
+     * Notifies all servers that serve the database that the database has been
+     * shutdown.
+     */
+    private static void notifyServers(Database db) {
+
+        Iterator it = serverMap.keySet().iterator();
+
+        for (; it.hasNext(); ) {
+            Server  server    = (Server) it.next();
+            HashSet databases = (HashSet) serverMap.get(server);
+
+            if (databases.contains(db)) {
+                server.notify(ServerConstants.SC_DATABASE_SHUTDOWN,
+                              db.databaseID);
+            }
+        }
+    }
+
+    static boolean isServerDB(Database db) {
+
+        Iterator it = serverMap.keySet().iterator();
+
+        for (; it.hasNext(); ) {
+            Server  server    = (Server) it.next();
+            HashSet databases = (HashSet) serverMap.get(server);
+
+            if (databases.contains(db)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+... disabled 93 lines */
+// End of VoltDB extension
 
     // Timer
     private static final HsqlTimer timer = new HsqlTimer();

@@ -2764,7 +2764,7 @@ public class ParserDDL extends ParserRoutine {
                 if (set == null) {
                     hasNonColumnExprs = true;
                     set = getBaseColumnNames(indexExprs);
-				}
+                }
                 // End of VoltDB extension
                 Constraint c = new Constraint(constName, set,
                                               Constraint.UNIQUE);

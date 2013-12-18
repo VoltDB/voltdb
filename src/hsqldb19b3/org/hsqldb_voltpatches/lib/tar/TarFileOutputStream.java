@@ -328,11 +328,13 @@ public class TarFileOutputStream {
      * @see #close
      */
     public void finish() throws IOException {
+        // A VoltDB extension to make tar output more flexible
         finishStream();
         writeFile.renameTo(targetFile);
     }
 
     public void finishStream() throws IOException {
+        // End of VoltDB extension
 
         try {
             long finalBlock = bytesWritten / 512 + 2;
@@ -365,7 +367,14 @@ public class TarFileOutputStream {
         }
 
         writeStream.close();
+        // A VoltDB extension to make tar output more flexible
+        /* disable 1 line ...
+        writeFile.renameTo(targetFile);
+        ... disabled 1 line */
+        // End of VoltDB extension
     }
+
+    /************************* Volt DB Extensions *************************/
 
     public TarFileOutputStream(GZIPOutputStream outputStream) throws IOException {
         blocksPerRecord = TarFileOutputStream.Compression.DEFAULT_BLOCKS_PER_RECORD;
@@ -374,5 +383,5 @@ public class TarFileOutputStream {
 
         writeStream = outputStream;
     }
-
+    /**********************************************************************/
 }

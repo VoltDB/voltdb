@@ -4074,10 +4074,10 @@ public class ParserDQL extends ParserBase {
                 // But better late than sorry.
                 throw e;
             }
-        /* disable 1 line ...
+            /* disable 1 line ...
             readExpression(exprList, parseList, 0, parseList.length, false);
-        ... disabled 1 line */
-        // End of VoltDB extension
+            ... disabled 1 line */
+            // End of VoltDB extension
         }
 
         Expression[] expr = new Expression[exprList.size()];
