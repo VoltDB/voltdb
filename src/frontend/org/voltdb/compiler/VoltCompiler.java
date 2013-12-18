@@ -877,10 +877,11 @@ public class VoltCompiler {
         // if this is a fancy expression-based index...
         else {
             try {
-                List<AbstractExpression> indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr);
+                int partitionColIndex = partitionCol.getIndex();
+                List<AbstractExpression> indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, null);
                 for (AbstractExpression expr: indexExpressions) {
                     if (expr instanceof TupleValueExpression &&
-                            ((TupleValueExpression) expr).getColumnName().equals(partitionCol.getName()) ) {
+                            ((TupleValueExpression) expr).getColumnIndex() == partitionColIndex ) {
                         containsPartitionColumn = true;
                         break;
                     }
