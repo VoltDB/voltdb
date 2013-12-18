@@ -592,27 +592,20 @@ SnapshotCompletionInterest
                 // If cmdlogmap is null, there were no command log segments, so all snapshots are potentially valid,
                 // don't do any TXN ID consistency checking between command log and snapshot
                 if (cmdlogmap != null) {
-                    if (snapmap == null || cmdlogmap.size() != snapmap.size()) {
-                        LOG.debug("Rejecting snapshot due to mismatching partition count (THIS IS BOGUS)");
-                        LOG.debug("command log count: " + cmdlogmap.size() + ", snapshot count: " + snapmap.size());
-                        info = null;
-                    }
-                    else {
-                        for (Integer cmdpart : cmdlogmap.keySet()) {
-                            Long snaptxnId = snapmap.get(cmdpart);
-                            if (snaptxnId == null) {
-                                info = null;
-                                LOG.debug("Rejecting snapshot due to missing partition: " + cmdpart);
-                                break;
-                            }
-                            else if (snaptxnId < cmdlogmap.get(cmdpart)) {
-                                LOG.debug("Rejecting snapshot because it does not overlap the command log");
-                                LOG.debug("for partition: " + cmdpart);
-                                LOG.debug("command log txn ID: " + cmdlogmap.get(cmdpart));
-                                LOG.debug("snapshot txn ID: " + snaptxnId);
-                                info = null;
-                                break;
-                            }
+                    for (Integer cmdpart : cmdlogmap.keySet()) {
+                        Long snaptxnId = snapmap.get(cmdpart);
+                        if (snaptxnId == null) {
+                            info = null;
+                            LOG.debug("Rejecting snapshot due to missing partition: " + cmdpart);
+                            break;
+                        }
+                        else if (snaptxnId < cmdlogmap.get(cmdpart)) {
+                            LOG.debug("Rejecting snapshot because it does not overlap the command log");
+                            LOG.debug("for partition: " + cmdpart);
+                            LOG.debug("command log txn ID: " + cmdlogmap.get(cmdpart));
+                            LOG.debug("snapshot txn ID: " + snaptxnId);
+                            info = null;
+                            break;
                         }
                     }
                 }
