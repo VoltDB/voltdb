@@ -828,12 +828,14 @@ class NValue {
 
     const TTInt& getDecimal() const {
         assert(getValueType() == VALUE_TYPE_DECIMAL);
-        return *reinterpret_cast<const TTInt*>(m_data);
+        const void* retval = reinterpret_cast<const void*>(m_data);
+        return *reinterpret_cast<const TTInt*>(retval);
     }
 
     TTInt& getDecimal() {
         assert(getValueType() == VALUE_TYPE_DECIMAL);
-        return *reinterpret_cast<TTInt*>(m_data);
+        void* retval = reinterpret_cast<void*>(m_data);
+        return *reinterpret_cast<TTInt*>(retval);
     }
 
     const bool& getBoolean() const {
