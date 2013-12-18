@@ -162,7 +162,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    private static final String m_defaultVersionString = "4.0";
+    private static final String m_defaultVersionString = "4.0.1";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final List<ClientInterface> m_clientInterfaces = new CopyOnWriteArrayList<ClientInterface>();

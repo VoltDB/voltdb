@@ -102,7 +102,7 @@ public class CompiledPlan {
     /** Which extracted param is the partitioning object (assuming parameterized plans) */
     public int partitioningKeyIndex = -1;
 
-    private Object m_partitioningKey;
+    private Object m_partitioningValue;
 
     void resetPlanNodeIds() {
         int nextId = resetPlanNodeIds(rootPlanGraph, 1);
@@ -194,12 +194,12 @@ public class CompiledPlan {
         return total;
     }
 
-    public void setPartitioningKey(Object object) {
-        m_partitioningKey = object;
+    public void setPartitioningValue(Object object) {
+        m_partitioningValue = object;
     }
 
-    public Object getPartitioningKey() {
-        return m_partitioningKey;
+    public Object getPartitioningValue() {
+        return m_partitioningValue;
     }
 
     public static byte[] bytesForPlan(AbstractPlanNode planGraph) {

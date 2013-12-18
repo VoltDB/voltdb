@@ -461,7 +461,13 @@ public class ParameterSet implements JSONString {
 
         byte nextTypeByte = in.get();
         if (nextTypeByte == ARRAY) {
-            VoltType nextType = VoltType.get(in.get());
+            VoltType nextType = null;
+            byte etype = in.get();
+            try {
+                nextType = VoltType.get(etype);
+            } catch (AssertionError ae) {
+                throw new RuntimeException("ParameterSet doesn't support type " + etype);
+            }
             if (nextType == null) {
                 value = null;
             }
@@ -483,7 +489,12 @@ public class ParameterSet implements JSONString {
             }
         }
         else {
-            VoltType nextType = VoltType.get(nextTypeByte);
+            VoltType nextType;
+            try {
+                nextType = VoltType.get(nextTypeByte);
+            } catch (AssertionError ae) {
+                throw new RuntimeException("ParameterSet doesn't support type " + nextTypeByte);
+            }
             switch (nextType) {
                 case NULL:
                     value = null;

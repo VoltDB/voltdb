@@ -25,6 +25,17 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-@VOLT.Command(description = 'Export to file. Run without arguments for usage.')
-def exporttofile(runner):
-    runner.java.execute('org.voltdb.exportclient.ExportToFileClient', None, *runner.args)
+import signal
+from voltcli import utility
+
+@VOLT.Command(
+    description = 'Stop a VoltDB server daemon.',
+    options = [
+        VOLT.StringOption('-H', '--host', 'host',
+            'HOST[:PORT] (default HOST=localhost, PORT=3021)',
+            default='localhost:3021'),
+    ]
+)
+def stop(runner):
+    daemonizer = runner.create_daemonizer(description="VoltDB server")
+    daemonizer.stop_daemon()

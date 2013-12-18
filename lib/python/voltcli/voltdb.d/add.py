@@ -26,7 +26,12 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 @VOLT.Command(
-    bundles = VOLT.ServerBundle('add', False, False, False),
+    bundles = VOLT.ServerBundle('add',
+                                needs_catalog=False,
+                                supports_live=False,
+                                default_host=False,
+                                safemode_available=False,
+                                supports_daemon=True),
     description = 'Add the current node to a VoltDB cluster.'
 )
 def add(runner):

@@ -78,8 +78,9 @@ abstract public class ProcedureTask extends TransactionTask
                 response.setResults(
                         new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
                             new VoltTable[] {},
-                            "Exception while deserializing procedure params\n" +
-                            result.toString()));
+                                "Exception while deserializing procedure params, procedure="
+                                + m_procName + "\n"
+                                + result.toString()));
             }
             if (callerParams != null) {
                 ClientResponseImpl cr = null;
