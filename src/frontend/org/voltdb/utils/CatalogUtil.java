@@ -21,7 +21,6 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
@@ -53,7 +52,6 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONStringer;
 import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -1683,128 +1681,6 @@ public abstract class CatalogUtil {
         return indexSize;
     }
 
-    /**
-     * Generate JSON string representing the database catalog.
-     * @param dbCatalog  database catalog
-     * @return  JSON string
-     * @throws JSONException
-     */
-    public static String generateCatalogJSON(Database dbCatalog) throws JSONException
-    {
-        DatabaseJSONGenerator jsonGenerator = new DatabaseJSONGenerator(dbCatalog);
-        return jsonGenerator.generate();
-    }
-
-    /**
-     * Generate JSON file representing the database catalog.
-     * @param jsonPath  output JSON file path
-     * @param dbCatalog  database catalog
-     * @throws JSONException
-     * @throws IOException
-     */
-    public static void generateCatalogJSONFile(String jsonPath, Database dbCatalog)
-            throws JSONException, IOException
-    {
-        DatabaseJSONGenerator jsonGenerator = new DatabaseJSONGenerator(dbCatalog);
-        String jsonString = jsonGenerator.generate();
-        File jsonFile = new File(jsonPath);
-        FileWriter jsonWriter = new FileWriter(jsonFile);
-        jsonWriter.write(jsonString);
-        jsonWriter.close();
-    }
-
-    /**
-     * Implementation class for catalog JSON generation.
-     */
-    private static class DatabaseJSONGenerator
-    {
-        final Database m_db;
-        final JSONStringer m_stringer = new JSONStringer();
-
-        DatabaseJSONGenerator(Database db)
-        {
-            assert(db != null);
-            m_db = db;
-        }
-
-        String generate() throws JSONException
-        {
-            m_stringer.object();
-            {
-                m_stringer.key("tables").array();
-                {
-                    final CatalogMap<Table> tables = m_db.getTables();
-                    for (Table table: tables) {
-                        if (table.getMaterializer() == null) {
-                            catalogTableToJSON(table);
-                        }
-                    }
-                }
-                m_stringer.endArray();
-                m_stringer.key("views").array();
-                {
-                    final CatalogMap<Table> tables = m_db.getTables();
-                    for (Table table: tables) {
-                        if (table.getMaterializer() != null) {
-                            catalogTableToJSON(table);
-                        }
-                    }
-                }
-                m_stringer.endArray();
-            }
-            m_stringer.endObject();
-            return m_stringer.toString();
-        }
-
-        private void catalogTableToJSON(Table table) throws JSONException
-        {
-            m_stringer.object();
-            {
-                m_stringer.key("name").value(table.getTypeName());
-                m_stringer.key("columns").array();
-                {
-                    final CatalogMap<Column> columns = table.getColumns();
-                    for (Column column: columns) {
-                        m_stringer.object();
-                        {
-                            m_stringer.key("name").value(column.getTypeName());
-                            VoltType columnType = VoltType.get((byte)column.getType());
-                            m_stringer.key("type").value(columnType.name());
-                            // Is this the best way to distinguish VAR... types.
-                            if (columnType.getMaxLengthInBytes() != VoltType.MAX_VALUE_LENGTH) {
-                                m_stringer.key("size").value(column.getSize());
-                            }
-                        }
-                        m_stringer.endObject();
-                    }
-                    m_stringer.endArray();
-                }
-                m_stringer.key("indexes").array();
-                {
-                    final CatalogMap<Index> indexes = table.getIndexes();
-                    for (Index index: indexes) {
-                        m_stringer.object();
-                        {
-                            m_stringer.key("name").value(index.getTypeName());
-                            VoltType indexType = VoltType.get((byte)index.getType());
-                            m_stringer.key("type").value(indexType.name());
-                            m_stringer.key("columns").array();
-                            {
-                                final CatalogMap<ColumnRef> columnRefs = index.getColumns();
-                                for (ColumnRef columnRef: columnRefs) {
-                                    m_stringer.value(columnRef.getTypeName());
-                                }
-                                m_stringer.endArray();
-                            }
-                        }
-                        m_stringer.endObject();
-                    }
-                    m_stringer.endArray();
-                }
-            }
-            m_stringer.endObject();
-        }
-    }
 
     /**
      * Base class for raw catalog sizes.
