@@ -120,7 +120,7 @@ public class VoltCompiler {
     private Map<String, ProcInfoData> m_procInfoOverrides = null;
 
     String m_projectFileURL = null;
-    String m_jarOutputPath = null;
+    String m_outputPath = null;
     String m_currentFilename = null;
     Map<String, String> m_ddlFilePaths = new HashMap<String, String>();
     String[] m_addedClasses = null;
@@ -373,13 +373,13 @@ public class VoltCompiler {
             final String[] ddlFilePaths)
     {
         m_projectFileURL = projectFileURL;
-        m_jarOutputPath = jarOutputPath;
+        m_outputPath = jarOutputPath;
 
         if (m_projectFileURL == null && (ddlFilePaths == null || ddlFilePaths.length == 0)) {
             addErr("One or more DDL files are required.");
             return false;
         }
-        if (m_jarOutputPath == null) {
+        if (m_outputPath == null) {
             addErr("The output jar path is null.");
             return false;
         }
@@ -1604,9 +1604,33 @@ public class VoltCompiler {
 
     }
 
+    private boolean compileToJSON(String jsonPath, String... ddlFilePaths)
+    {
+        m_outputPath = jsonPath;
+        HSQLInterface hsql = HSQLInterface.loadHsqldb();
+        try {
+            m_catalog = loadSchema(hsql, DdlProceduresToLoad.NO_DDL_PROCEDURES, ddlFilePaths);
+            CatalogUtil.generateCatalogJSONFile(m_outputPath, getCatalogDatabase());
+        }
+        catch (VoltCompilerException e) {
+            System.err.println("Error: Failed to load the schema.");
+            return false;
+        }
+        catch (JSONException e) {
+            System.err.println("Error: Failed to generate the JSON output.");
+            return false;
+        }
+        catch (IOException e) {
+            System.err.println("Error: Failed to write the JSON file.");
+            return false;
+        }
+        return true;
+    }
+
     // Usage messages for new and legacy syntax.
     static final String usageNew    = "VoltCompiler <output-JAR> <input-DDL> ...";
     static final String usageLegacy = "VoltCompiler <project-file> <output-JAR>";
+    static final String usageJSON   = "VoltCompiler <output-JSON> <input-DDL> ...";
 
     /**
      * Main
@@ -1615,6 +1639,7 @@ public class VoltCompiler {
      *
      *         New syntax: OUTPUT_JAR INPUT_DDL ...
      *      Legacy syntax: PROJECT_FILE OUTPUT_JAR
+     *       Catalog dump: OUTPUT_JSON INPUT_DDL ...
      *
      * @param args  arguments (see above)
      */
@@ -1649,9 +1674,12 @@ public class VoltCompiler {
                 System.exit(-1);
             }
         }
+        else if (args.length > 0 && args[0].toLowerCase().endsWith(".json" )) {
+            success = compiler.compileToJSON(args[0], ArrayUtils.subarray(args, 1, args.length));
+        }
         else {
             // Can't recognize the arguments or there are no arguments.
-            System.err.printf("Usage: %s\n       %s\n", usageNew, usageLegacy);
+            System.err.printf("Usage: %s\n       %s\n       %s\n", usageNew, usageLegacy, usageJSON);
             System.exit(-1);
         }
 
@@ -1669,7 +1697,7 @@ public class VoltCompiler {
             Database database = getCatalogDatabase();
 
             outputStream.println("------------------------------------------");
-            outputStream.println("Successfully created " + m_jarOutputPath);
+            outputStream.println("Successfully created " + m_outputPath);
 
             for (String ddl : m_ddlFilePaths.keySet()) {
                 outputStream.println("Includes schema: " + m_ddlFilePaths.get(ddl));
@@ -1818,9 +1846,11 @@ public class VoltCompiler {
                         "\tfor best performance. For information on VoltDB partitioning, see:\n"+
                         "\thttp://voltdb.com/docs/UsingVoltDB/ChapAppDesign.php\n\n");
             }
-            outputStream.println("------------------------------------------\n");
-            outputStream.println("Full catalog report can be found at file://" + m_reportPath + "\n" +
-                        "\t or can be viewed at \"http://localhost:8080\" when the server is running.\n");
+            if (m_reportPath != null) {
+                outputStream.println("------------------------------------------\n");
+                outputStream.println("Full catalog report can be found at file://" + m_reportPath + "\n" +
+                            "\t or can be viewed at \"http://localhost:8080\" when the server is running.\n");
+            }
             outputStream.println("------------------------------------------\n");
         }
         if (feedbackStream != null) {

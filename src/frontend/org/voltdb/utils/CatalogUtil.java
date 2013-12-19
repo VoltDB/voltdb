@@ -21,6 +21,7 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
@@ -52,6 +53,7 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONStringer;
 import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -1679,5 +1681,377 @@ public abstract class CatalogUtil {
         }
 
         return indexSize;
+    }
+
+    /**
+     * Generate JSON string representing the database catalog.
+     * @param dbCatalog  database catalog
+     * @return  JSON string
+     * @throws JSONException
+     */
+    public static String generateCatalogJSON(Database dbCatalog) throws JSONException
+    {
+        DatabaseJSONGenerator jsonGenerator = new DatabaseJSONGenerator(dbCatalog);
+        return jsonGenerator.generate();
+    }
+
+    /**
+     * Generate JSON file representing the database catalog.
+     * @param jsonPath  output JSON file path
+     * @param dbCatalog  database catalog
+     * @throws JSONException
+     * @throws IOException
+     */
+    public static void generateCatalogJSONFile(String jsonPath, Database dbCatalog)
+            throws JSONException, IOException
+    {
+        DatabaseJSONGenerator jsonGenerator = new DatabaseJSONGenerator(dbCatalog);
+        String jsonString = jsonGenerator.generate();
+        File jsonFile = new File(jsonPath);
+        FileWriter jsonWriter = new FileWriter(jsonFile);
+        jsonWriter.write(jsonString);
+        jsonWriter.close();
+    }
+
+    /**
+     * Implementation class for catalog JSON generation.
+     */
+    private static class DatabaseJSONGenerator
+    {
+        final Database m_db;
+        final JSONStringer m_stringer = new JSONStringer();
+
+        DatabaseJSONGenerator(Database db)
+        {
+            assert(db != null);
+            m_db = db;
+        }
+
+        String generate() throws JSONException
+        {
+            m_stringer.object();
+            {
+                m_stringer.key("tables").array();
+                {
+                    final CatalogMap<Table> tables = m_db.getTables();
+                    for (Table table: tables) {
+                        if (table.getMaterializer() == null) {
+                            catalogTableToJSON(table);
+                        }
+                    }
+                }
+                m_stringer.endArray();
+                m_stringer.key("views").array();
+                {
+                    final CatalogMap<Table> tables = m_db.getTables();
+                    for (Table table: tables) {
+                        if (table.getMaterializer() != null) {
+                            catalogTableToJSON(table);
+                        }
+                    }
+                }
+                m_stringer.endArray();
+            }
+            m_stringer.endObject();
+            return m_stringer.toString();
+        }
+
+        private void catalogTableToJSON(Table table) throws JSONException
+        {
+            m_stringer.object();
+            {
+                m_stringer.key("name").value(table.getTypeName());
+                m_stringer.key("columns").array();
+                {
+                    final CatalogMap<Column> columns = table.getColumns();
+                    for (Column column: columns) {
+                        m_stringer.object();
+                        {
+                            m_stringer.key("name").value(column.getTypeName());
+                            VoltType columnType = VoltType.get((byte)column.getType());
+                            m_stringer.key("type").value(columnType.name());
+                            // Is this the best way to distinguish VAR... types.
+                            if (columnType.getMaxLengthInBytes() != VoltType.MAX_VALUE_LENGTH) {
+                                m_stringer.key("size").value(column.getSize());
+                            }
+                        }
+                        m_stringer.endObject();
+                    }
+                    m_stringer.endArray();
+                }
+                m_stringer.key("indexes").array();
+                {
+                    final CatalogMap<Index> indexes = table.getIndexes();
+                    for (Index index: indexes) {
+                        m_stringer.object();
+                        {
+                            m_stringer.key("name").value(index.getTypeName());
+                            VoltType indexType = VoltType.get((byte)index.getType());
+                            m_stringer.key("type").value(indexType.name());
+                            m_stringer.key("columns").array();
+                            {
+                                final CatalogMap<ColumnRef> columnRefs = index.getColumns();
+                                for (ColumnRef columnRef: columnRefs) {
+                                    m_stringer.value(columnRef.getTypeName());
+                                }
+                                m_stringer.endArray();
+                            }
+                        }
+                        m_stringer.endObject();
+                    }
+                    m_stringer.endArray();
+                }
+            }
+            m_stringer.endObject();
+        }
+    }
+
+    /**
+     * Base class for raw catalog sizes.
+     */
+    public static class CatalogItemSizeBase
+    {
+        public long widthMin;
+        public long widthMax;
+
+        public CatalogItemSizeBase()
+        {
+            this(0, 0);
+        }
+
+        public CatalogItemSizeBase(long widthMin, long widthMax)
+        {
+            this.widthMin = widthMin;
+            this.widthMax = widthMax;
+        }
+    }
+
+    /**
+     * Catalog sizes and cardinality estimate.
+     */
+    public static class CatalogItemSize extends CatalogItemSizeBase
+    {
+        public final long cardinality;
+
+        public CatalogItemSize(long cardinality)
+        {
+            super();
+            this.cardinality = cardinality;
+        }
+
+        public CatalogItemSize(long widthMin, long widthMax, long cardinality)
+        {
+            super(widthMin, widthMax);
+            this.cardinality = cardinality;
+        }
+
+        public long getItemCount()
+        {
+            return 1;
+        }
+    }
+
+    public static class CatalogItemSizeRollup extends CatalogItemSize
+    {
+        public long itemCount;
+
+        public CatalogItemSizeRollup(long cardinality, long itemCount)
+        {
+            super(cardinality);
+            this.itemCount = itemCount;
+        }
+
+        @Override
+        public long getItemCount()
+        {
+            return itemCount;
+        }
+    }
+
+    /**
+     * Raw index sizes.
+     */
+    public static class IndexSize extends CatalogItemSize
+    {
+        public final Index index;
+        public final String name;
+
+        public IndexSize(Index index, long widthMin, long widthMax, long cardinality)
+        {
+            super(widthMin, widthMax, cardinality);
+            this.index = index;
+            this.name = index.getTypeName().toLowerCase();
+        }
+    }
+
+    /**
+     * List of catalog item sizes with roll-up support.
+     *
+     * @param <T>
+     */
+    public static class CatalogItemSizeList<T extends CatalogItemSize> extends ArrayList<T>
+    {
+        private static final long serialVersionUID = -6846163291201059792L;
+
+        public CatalogItemSizeRollup rollup(long cardinality)
+        {
+            CatalogItemSizeRollup rollupSize = new CatalogItemSizeRollup(cardinality, 0);
+            for (T size: this) {
+                rollupSize.widthMin  += (size.widthMin * size.cardinality);
+                rollupSize.widthMax  += (size.widthMax * size.cardinality);
+                rollupSize.itemCount += size.getItemCount();
+            }
+            return rollupSize;
+        }
+    }
+
+    /**
+     * Raw table sizes.
+     */
+    public static class TableSize extends CatalogItemSize
+    {
+        public final Table table;
+        public final String name;
+        public final boolean isView;
+        public final CatalogItemSizeList<IndexSize> indexSizes;
+
+        public TableSize(
+                Table table,
+                boolean isView,
+                long widthMin,
+                long widthMax,
+                long cardinality)
+        {
+            super(widthMin, widthMax, cardinality);
+            this.table = table;
+            this.name = table.getTypeName().toLowerCase();
+            this.isView = isView;
+            this.indexSizes = new CatalogItemSizeList<IndexSize>();
+        }
+
+        public void addIndex(Index index, long widthMin, long widthMax)
+        {
+            this.indexSizes.add(new IndexSize(index, widthMin, widthMax, 1));
+        }
+
+        public CatalogItemSizeRollup indexRollup()
+        {
+            return this.indexSizes.rollup(this.cardinality);
+        }
+    }
+
+    /**
+     * Container of raw database size numbers.
+     */
+    public static class DatabaseSizes
+    {
+        public final CatalogItemSizeList<TableSize> tableSizes = new CatalogItemSizeList<TableSize>();
+        public final CatalogItemSizeList<TableSize> viewSizes = new CatalogItemSizeList<TableSize>();
+        public long indexCount = 0;
+
+        public void addTable(TableSize tableSize)
+        {
+            if (tableSize.isView) {
+                this.viewSizes.add(tableSize);
+            }
+            else {
+                this.tableSizes.add(tableSize);
+            }
+            this.indexCount += tableSize.indexSizes.size();
+        }
+
+        public CatalogItemSizeRollup tableRollup()
+        {
+            return this.tableSizes.rollup(1);
+        }
+
+        public CatalogItemSizeRollup viewRollup()
+        {
+            return this.viewSizes.rollup(1);
+        }
+
+        public CatalogItemSizeRollup indexRollup()
+        {
+            CatalogItemSizeList<IndexSize> indexSizes = new CatalogItemSizeList<IndexSize>();
+            for (TableSize tsize: this.tableSizes) {
+                for (IndexSize isize: tsize.indexSizes) {
+                    indexSizes.add(isize);
+                }
+            }
+            for (TableSize vsize: this.viewSizes) {
+                for (IndexSize isize: vsize.indexSizes) {
+                    indexSizes.add(isize);
+                }
+            }
+            return indexSizes.rollup(1);
+        }
+    }
+
+    private static CatalogItemSizeBase getColumnsSize(List<Column> columns)
+    {
+        CatalogItemSizeBase csize = new CatalogItemSizeBase();
+        for (Column column: columns) {
+            VoltType ctype = VoltType.get((byte)column.getType());
+            if (ctype.getMaxLengthInBytes() == VoltType.MAX_VALUE_LENGTH) {
+                // Variable type - use the dimension.
+                // csize.widthMin += ???;
+                csize.widthMax += column.getSize();
+            }
+            else {
+                // Fixed type - use the fixed size.
+                csize.widthMin += ctype.getLengthInBytesForFixedTypes();
+                csize.widthMax += ctype.getLengthInBytesForFixedTypes();
+            }
+        }
+        return csize;
+    }
+
+    private static TableSize getTableSize(Table table)
+    {
+        // The cardinality is the estimated tuple count or an arbitrary number
+        // if not estimated.
+        long cardinality = table.getEstimatedtuplecount();
+        if (cardinality <= 0) {
+            cardinality = 1000;
+        }
+
+        // Add up the column widths.
+        CatalogMap<Column> columnsMap = table.getColumns();
+        List<Column> columns = new ArrayList<Column>(columnsMap.size());
+        for (Column column: columnsMap) {
+            columns.add(column);
+        }
+        CatalogItemSizeBase csize = getColumnsSize(columns);
+
+        boolean isView = table.getMaterializer() != null;
+        TableSize tsize = new TableSize(table, isView, csize.widthMin, csize.widthMax, cardinality);
+
+        // Add the table indexes.
+        CatalogMap<Index> indexes = table.getIndexes();
+        for (Index index: indexes) {
+            CatalogMap<ColumnRef> columnRefsMap = index.getColumns();
+            List<Column> indexColumns = new ArrayList<Column>(columnRefsMap.size());
+            for (ColumnRef columnRef: columnRefsMap) {
+                indexColumns.add(columnRef.getColumn());
+            }
+            CatalogItemSizeBase isize = getColumnsSize(indexColumns);
+            tsize.addIndex(index, isize.widthMin, isize.widthMax);
+        }
+
+        return tsize;
+    }
+
+    /**
+     * Produce a sizing of all significant database objects.
+     * @param dbCatalog  database catalog
+     * @return  database size result object tree
+     */
+    public static DatabaseSizes getCatalogSizes(Database dbCatalog)
+    {
+        DatabaseSizes dbSizes = new DatabaseSizes();
+        for (Table table: dbCatalog.getTables()) {
+            dbSizes.addTable(getTableSize(table));
+        }
+        return dbSizes;
     }
 }
