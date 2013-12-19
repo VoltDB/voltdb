@@ -199,7 +199,7 @@ AbstractExpression::buildExpressionTree_recurse(PlannerDomValue obj)
     assert(value_type != VALUE_TYPE_INVALID);
 
     // add the value size
-    int valueSize;
+    int valueSize = 0;
     if (obj.hasNonNullKey("VALUE_SIZE")) {
         valueSize = obj.valueForKey("VALUE_SIZE").asInt();
     } else {
