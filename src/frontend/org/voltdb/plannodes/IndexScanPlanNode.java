@@ -562,9 +562,18 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             stringer.key(Members.DETERMINISM_ONLY.name()).value(true);
         }
         stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_targetIndexName);
-        stringer.key(Members.END_EXPRESSION.name());
-        stringer.value(m_endExpression);
-
+        if (m_searchkeyExpressions.size() > 0) {
+            stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array();
+            for (AbstractExpression ae : m_searchkeyExpressions) {
+                assert (ae instanceof JSONString);
+                stringer.value(ae);
+            }
+            stringer.endArray();
+        }
+        if (m_endExpression != null) {
+            stringer.key(Members.END_EXPRESSION.name());
+            stringer.value(m_endExpression);
+        }
         if (m_initialExpression != null) {
             stringer.key(Members.INITIAL_EXPRESSION.name()).value(m_initialExpression);
         }
@@ -572,13 +581,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         if (m_skip_null_predicate != null) {
             stringer.key(Members.SKIP_NULL_PREDICATE.name()).value(m_skip_null_predicate);
         }
-
-        stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array();
-        for (AbstractExpression ae : m_searchkeyExpressions) {
-            assert (ae instanceof JSONString);
-            stringer.value(ae);
-        }
-        stringer.endArray();
     }
 
     //all members loaded

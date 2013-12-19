@@ -109,30 +109,6 @@ AbstractPlanNode::getChildren() const
     return m_children;
 }
 
-void
-AbstractPlanNode::addParent(AbstractPlanNode* parent)
-{
-    m_parents.push_back(parent);
-}
-
-vector<AbstractPlanNode*>&
-AbstractPlanNode::getParents()
-{
-    return m_parents;
-}
-
-vector<int32_t>&
-AbstractPlanNode::getParentIds()
-{
-    return m_parentIds;
-}
-
-const vector<AbstractPlanNode*>&
-AbstractPlanNode::getParents() const
-{
-    return m_parents;
-}
-
 // ------------------------------------------------------------------
 // INLINE PLANNODE METHODS
 // ------------------------------------------------------------------
@@ -360,12 +336,6 @@ AbstractPlanNode::fromJSONObject(PlannerDomValue obj) {
         // As long as newNode is not NULL, this will not throw.
         assert(newNode);
         node->addInlinePlanNode(newNode);
-    }
-
-    PlannerDomValue parentIdsArray = obj.valueForKey("PARENT_IDS");
-    for (int i = 0; i < parentIdsArray.arrayLen(); i++) {
-        int32_t parentNodeId = parentIdsArray.valueAtIndex(i).asInt();
-        node->m_parentIds.push_back(parentNodeId);
     }
 
     PlannerDomValue childNodeIdsArray = obj.valueForKey("CHILDREN_IDS");

@@ -47,7 +47,6 @@
 
 #include "common/debuglog.h"
 #include "common/serializeio.h"
-#include "common/types.h"
 #include "expressions/expressionutil.h"
 
 #include <sstream>
@@ -200,7 +199,25 @@ AbstractExpression::buildExpressionTree_recurse(PlannerDomValue obj)
     assert(value_type != VALUE_TYPE_INVALID);
 
     // add the value size
-    int valueSize = obj.valueForKey("VALUE_SIZE").asInt();
+    int valueSize;
+    if (obj.hasNonNullKey("VALUE_SIZE")) {
+        valueSize = obj.valueForKey("VALUE_SIZE").asInt();
+    } else {
+        // Use a hash map to get the length for common type
+        if (value_type == VALUE_TYPE_INTEGER) {
+            valueSize = 4;
+        } else if (value_type == VALUE_TYPE_BIGINT) {
+            valueSize = 8;
+        } else if (value_type == VALUE_TYPE_SMALLINT) {
+            valueSize = 2;
+        } else if (value_type == VALUE_TYPE_TINYINT) {
+            valueSize = 1;
+        } else if ( value_type == VALUE_TYPE_DOUBLE || value_type == VALUE_TYPE_TIMESTAMP) {
+            valueSize = 8;
+        } else {
+            assert(false);
+        }
+    }
 
     // recurse to children
     try {
