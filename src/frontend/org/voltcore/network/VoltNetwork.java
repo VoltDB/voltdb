@@ -306,8 +306,9 @@ class VoltNetwork implements Runnable
                         }
 
                         if (m_networkId == 0) {
-                            if (EstTimeUpdater.update(System.currentTimeMillis())) {
-                                m_logger.warn("Network was more than two seconds late in updating the estimated time");
+                            Long delta = EstTimeUpdater.update(System.currentTimeMillis());
+                            if ( delta != null ) {
+                                m_logger.warn("Network was " + delta + " milliseconds late in updating the estimated time");
                             }
                         }
                     }
