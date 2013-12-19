@@ -450,6 +450,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (VoltType.getFixedLengthInBytes(m_valueType) == null) {
             stringer.key(Members.VALUE_SIZE.name()).value(m_valueSize);
             // Size for fixed types are certain.
+        } else {
             assert(VoltType.getFixedLengthInBytes(m_valueType)  == m_valueSize);
         }
 
