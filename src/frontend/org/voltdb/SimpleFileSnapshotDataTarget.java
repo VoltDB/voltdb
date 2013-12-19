@@ -50,14 +50,14 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
      * and keeping the disk working on a regular basis.
      *
      * The two roles are split, one thread syncs periodically to keep the disk busy
-     * and the main thread writing to the file syncs every 256 megabytes to bound
-     * the number of outstanding bytes.
+     * and the main thread writing will only stop on syncing if it has written
+     * 256 megabytes past what the sync thread is doing
      *
      * This removes the messy coordination you see in DefaultSnapshotDataTarget
-     * where the two threads have to coordinate.
+     * where the two threads use a semaphore to keep track of permits
      */
     private static final int m_bytesAllowedBeforeSync = (1024 * 1024) * 256;
-    private int m_bytesSinceLastSync = 0;
+    private AtomicInteger m_bytesSinceLastSync = new AtomicInteger(0);
 
     private final ScheduledFuture<?> m_syncTask;
 
@@ -85,14 +85,20 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
         syncTask = DefaultSnapshotDataTarget.m_syncService.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
-                try {
-                    m_fc.force(false);
-                } catch (IOException e) {
-                    SNAP_LOG.error("Error syncing snapshot", e);
-                    throw new RuntimeException("Cancel sync task due to IOException", e);
+                //Only sync for at least 4 megabyte of data, enough to amortize the cost of seeking
+                //on ye olden platters. Since we are appending to a file it's actually 2 seeks.
+                while (m_bytesSinceLastSync.get() > 1024 * 1024 * 4) {
+                    try {
+                        m_fc.force(false);
+                    } catch (IOException e) {
+                        SNAP_LOG.error("Error syncing snapshot", e);
+                    }
+                    //Blind setting to 0 means we could technically write more than
+                    //256 megabytes at a time but 512 is the worst case and that is fine
+                    m_bytesSinceLastSync.set(0);
                 }
             }
-        }, 500, 500, TimeUnit.MILLISECONDS);
+        }, DefaultSnapshotDataTarget.SNAPSHOT_SYNC_FREQUENCY, DefaultSnapshotDataTarget.SNAPSHOT_SYNC_FREQUENCY, TimeUnit.MILLISECONDS);
         m_syncTask = syncTask;
     }
 
@@ -121,16 +127,17 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
                         return null;
                     }
                     try {
+                        int totalWritten = 0;
                         while (data.b.hasRemaining()) {
                             int written = m_fc.write(data.b);
                             if (written > 0) {
                                 m_bytesWritten += written;
-                                m_bytesSinceLastSync += written;
+                                totalWritten += written;
                             }
                         }
-                        if (m_bytesSinceLastSync > m_bytesAllowedBeforeSync) {
+                        if (m_bytesSinceLastSync.addAndGet(totalWritten) > m_bytesAllowedBeforeSync) {
                             m_fc.force(false);
-                            m_bytesSinceLastSync = 0;
+                            m_bytesSinceLastSync.set(0);
                         }
                     } finally {
                         data.discard();
