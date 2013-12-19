@@ -106,7 +106,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     static final ListeningScheduledExecutorService m_syncService = MoreExecutors.listeningDecorator(
             Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("Snapshot sync service")));
 
-    public static final int SNAPSHOT_SYNC_FREQUENCY = Integer.valueOf("SNAPSHOT_SYNC_FREQUENCY", 500);
+    public static final int SNAPSHOT_SYNC_FREQUENCY = Integer.getInteger("SNAPSHOT_SYNC_FREQUENCY", 500);
 
     public DefaultSnapshotDataTarget(
             final File file,
