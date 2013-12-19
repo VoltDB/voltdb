@@ -1863,20 +1863,45 @@ public abstract class CatalogUtil {
         }
     }
 
+    private static double log2 = Math.log(2);
+
+    private static int getVariableColumnSize(int capacity, int dataSize)
+    {
+        // Smaller capacities get fully consumed (plus 1 byte).
+        if (capacity < 64) {
+            return capacity + 1;
+        }
+        // Larger capacities use a power of 2 buffer size plus overhead.
+        int content = 4 + 8 + dataSize;
+        double power = Math.ceil(Math.log(content) / log2);
+        int bufferSize = (int)Math.pow(2, power);
+        return bufferSize + 8 + 24;
+    }
+
     private static CatalogItemSizeBase getColumnsSize(List<Column> columns)
     {
+        // See http://voltdb.com/docs/PlanningGuide/ChapMemoryRecs.php
         CatalogItemSizeBase csize = new CatalogItemSizeBase();
         for (Column column: columns) {
             VoltType ctype = VoltType.get((byte)column.getType());
-            if (ctype.getMaxLengthInBytes() == VoltType.MAX_VALUE_LENGTH) {
-                // Variable type - use the dimension.
-                // csize.widthMin += ???;
-                csize.widthMax += column.getSize();
+            switch(ctype) {
+            case STRING: {
+                int capacity = column.getSize();
+                csize.widthMin += getVariableColumnSize(capacity, 0);
+                csize.widthMax += getVariableColumnSize(capacity, capacity);
+                break;
             }
-            else {
+            case VARBINARY: {
+                int capacity = column.getSize();
+                csize.widthMin += getVariableColumnSize(capacity, 0);
+                csize.widthMax += getVariableColumnSize(capacity, capacity);
+                break;
+            }
+            default: {
                 // Fixed type - use the fixed size.
                 csize.widthMin += ctype.getLengthInBytesForFixedTypes();
                 csize.widthMax += ctype.getLengthInBytesForFixedTypes();
+            }
             }
         }
         return csize;

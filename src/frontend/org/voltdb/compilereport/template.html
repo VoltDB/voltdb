@@ -139,6 +139,13 @@
         <div id='z' class='reportpage' style='display: none;'>
             <a name='z'></a><h1>Size Worksheet</h1><br/>
 
+            <ul>
+            <li>Replace row counts with more accurate estimates to get better results.</li>
+            <li>Calculated fields are updated after leaving any count field.</li>
+            <li>Index size is based on the sum of referenced column sizes.
+                This is inaccurate and doesn't work at all for some index types.</li>
+            <li>Page refresh will reset all count fields.</li>
+            </ul>
             <table class="table tableL3 tablesorter" id='sizetable'>
                 <thead>
 	                <tr>
@@ -147,8 +154,8 @@
                         <th>Count</th>
 	                    <th>Row Min</th>
 	                    <th>Row Max</th>
-	                    <th>Index Min</th>
-	                    <th>Index Max</th>
+	                    <th>Index Min *</th>
+	                    <th>Index Max *</th>
 	                    <th>Table Min</th>
 	                    <th>Table Max</th>
                     </tr>
@@ -160,6 +167,7 @@
 
             <h4>Size Analysis Summary</h4>
             ##SIZESUMMARY##
+            
         </div>
 
       <hr>
