@@ -21,8 +21,12 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
 
@@ -31,12 +35,31 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
+    private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
+
     private final File m_tempFile;
     private final File m_file;
     private final FileChannel m_fc;
     private long m_bytesWritten = 0;
     private Runnable m_onCloseTask;
     private boolean m_needsFinalClose;
+
+    /*
+     * Remember to sync regularly. SimpleFileSnapshotDataTarget
+     * takes a simpler approach to bounding the number of bytes synced
+     * and keeping the disk working on a regular basis.
+     *
+     * The two roles are split, one thread syncs periodically to keep the disk busy
+     * and the main thread writing to the file syncs every 256 megabytes to bound
+     * the number of outstanding bytes.
+     *
+     * This removes the messy coordination you see in DefaultSnapshotDataTarget
+     * where the two threads have to coordinate.
+     */
+    private static final int m_bytesAllowedBeforeSync = (1024 * 1024) * 256;
+    private int m_bytesSinceLastSync = 0;
+
+    private final ScheduledFuture<?> m_syncTask;
 
     /*
      * If a write fails then this snapshot is hosed.
@@ -58,6 +81,19 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
         m_needsFinalClose = needsFinalClose;
 
         m_es = CoreUtils.getSingleThreadExecutor("Snapshot write thread for " + m_file);
+        ScheduledFuture<?> syncTask = null;
+        syncTask = DefaultSnapshotDataTarget.m_syncService.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    m_fc.force(false);
+                } catch (IOException e) {
+                    SNAP_LOG.error("Error syncing snapshot", e);
+                    throw new RuntimeException("Cancel sync task due to IOException", e);
+                }
+            }
+        }, 500, 500, TimeUnit.MILLISECONDS);
+        m_syncTask = syncTask;
     }
 
     private final ListeningExecutorService m_es;
@@ -89,7 +125,12 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
                             int written = m_fc.write(data.b);
                             if (written > 0) {
                                 m_bytesWritten += written;
+                                m_bytesSinceLastSync += written;
                             }
+                        }
+                        if (m_bytesSinceLastSync > m_bytesAllowedBeforeSync) {
+                            m_fc.force(false);
+                            m_bytesSinceLastSync = 0;
                         }
                     } finally {
                         data.discard();
@@ -115,6 +156,7 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
         try {
             m_es.shutdown();
             m_es.awaitTermination(356, TimeUnit.DAYS);
+            m_syncTask.cancel(false);
             m_fc.force(false);
             m_fc.close();
             m_tempFile.renameTo(m_file);
