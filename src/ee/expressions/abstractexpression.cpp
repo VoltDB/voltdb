@@ -55,6 +55,9 @@
 
 namespace voltdb {
 
+const std::map<ValueType, int> AbstractExpression::valueTypeSizeInBytes =
+        AbstractExpression::create_map_valueTypeSizeInBytes();
+
 // ------------------------------------------------------------------
 // AbstractExpression
 // ------------------------------------------------------------------
@@ -204,19 +207,7 @@ AbstractExpression::buildExpressionTree_recurse(PlannerDomValue obj)
         valueSize = obj.valueForKey("VALUE_SIZE").asInt();
     } else {
         // Use a hash map to get the length for common type
-        if (value_type == VALUE_TYPE_INTEGER) {
-            valueSize = 4;
-        } else if (value_type == VALUE_TYPE_BIGINT) {
-            valueSize = 8;
-        } else if (value_type == VALUE_TYPE_SMALLINT) {
-            valueSize = 2;
-        } else if (value_type == VALUE_TYPE_TINYINT) {
-            valueSize = 1;
-        } else if ( value_type == VALUE_TYPE_DOUBLE || value_type == VALUE_TYPE_TIMESTAMP) {
-            valueSize = 8;
-        } else {
-            assert(false);
-        }
+        valueSize = AbstractExpression::valueTypeSizeInBytes.find(value_type)->second;
     }
 
     // recurse to children
