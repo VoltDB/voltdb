@@ -38,10 +38,12 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.types.JoinType;
 
 public class ParsedSelectStmt extends AbstractParsedStmt {
 
@@ -201,7 +203,124 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             processAvgPushdownOptimization(displayElement, orderbyElement, groupbyElement, havingElement);
         }
 
+        // Now that the SQL is fully parsed try to perform some join order simplifications
+        // like convert outer joins to inner if possible
+        // Simplify the outer join if possible
+        simplifyOuterJoins();
+
         prepareMVBasedQueryFix();
+    }
+    /**
+     * Outer join simplification using null rejection.
+     * http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.43.2531
+     * Outerjoin Simplification and Reordering for Query Optimization
+     * by Cesar A. Galindo-Legaria , Arnon Rosenthal
+     * Algorithm:
+     * Traverse the join tree top-down:
+     *  For each join node n1 do:
+     *    For each expression expr (join and where) at the node n1
+     *      For each join node n2 descended from n1 do:
+     *          If expr rejects nulls introduced by n2 inner table,
+     *          then convert n2 to an inner join. If n2 is a full join then need repeat this step
+     *          for n2 inner and outer tables
+     */
+    private void simplifyOuterJoins() {
+        assert(joinTree != null);
+        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+        JoinNode leftNode = joinTree.getLeftNode();
+        JoinNode rightNode = joinTree.getRightNode();
+        // For the top level node only WHERE expressions need to be evaluated for NULL-rejection
+        if (leftNode != null && leftNode.getWhereExpression() != null) {
+            exprs.add(leftNode.getWhereExpression());
+        }
+        if (rightNode != null && rightNode.getWhereExpression() != null) {
+            exprs.add(rightNode.getWhereExpression());
+        }
+        simplifyOuterJoinRecursively(joinTree, exprs);
+
+        // The execution engine expects to see the outer table on the left side only
+        // which means that RIGHT joins need to be converted to the LEFT ones
+        joinTree.toLeftJoin();
+    }
+
+    private void simplifyOuterJoinRecursively(JoinNode joinNode, List<AbstractExpression> exprs) {
+        assert (joinNode != null);
+        if (joinNode.getNodeType() != JoinNode.NodeType.JOIN) {
+            // End of the recursion. Nothing to simplify
+            return;
+        }
+        JoinNode leftNode = joinNode.getLeftNode();
+        JoinNode rightNode = joinNode.getRightNode();
+        JoinNode innerNode = null;
+        JoinNode outerNode = null;
+        if (joinNode.getJoinType() == JoinType.LEFT) {
+            innerNode = rightNode;
+            outerNode = leftNode;
+        } else if (joinNode.getJoinType() == JoinType.RIGHT) {
+            innerNode = leftNode;
+            outerNode = rightNode;
+        } else if (joinNode.getJoinType() == JoinType.FULL) {
+            // Full joins are not supported
+            assert(false);
+        }
+        if (innerNode != null) {
+            for (AbstractExpression expr : exprs) {
+                if (innerNode.getTableAliasIndex() != StmtTableScan.NULL_ALIAS_INDEX) {
+                    String tableAlias = stmtCache.get(innerNode.getTableAliasIndex()).getTableAlias();
+                    if (ExpressionUtil.isNullRejectingExpression(expr, tableAlias)) {
+                        // We are done at this level
+                        joinNode.setJoinType(JoinType.INNER);
+                        break;
+                    }
+                } else {
+                    // This is a join node itself. Get all the tables underneath this node and
+                    // see if the expression is NULL-rejecting for any of them
+                    List<Integer> tableAliasIdxs = innerNode.generateTableJoinOrder();
+                    boolean rejectNull = false;
+                    for (int aliasIdx : tableAliasIdxs) {
+                        assert(aliasIdx != StmtTableScan.NULL_ALIAS_INDEX);
+                        String tableAlias = stmtCache.get(aliasIdx).getTableAlias();
+                        if (ExpressionUtil.isNullRejectingExpression(expr, tableAlias)) {
+                            // We are done at this level
+                            joinNode.setJoinType(JoinType.INNER);
+                            rejectNull = true;
+                            break;
+                        }
+                    }
+                    if (rejectNull) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Now add this node expression to the list and descend
+        // In case of outer join, the inner node adds its WHERE and JOIN expressions, while
+        // the outer node adds its WHERE ones only - the outer node does not introduce NULLs
+        List<AbstractExpression> newExprs = new ArrayList<AbstractExpression>(exprs);
+        if (leftNode.getJoinExpression() != null) {
+            newExprs.add(leftNode.getJoinExpression());
+        }
+        if (rightNode.getJoinExpression() != null) {
+            newExprs.add(rightNode.getJoinExpression());
+        }
+
+        if (leftNode.getWhereExpression() != null) {
+            exprs.add(leftNode.getWhereExpression());
+        }
+        if (rightNode.getWhereExpression() != null) {
+            exprs.add(rightNode.getWhereExpression());
+        }
+
+        if (joinNode.getJoinType() == JoinType.INNER) {
+            exprs.addAll(newExprs);
+            simplifyOuterJoinRecursively(leftNode, exprs);
+            simplifyOuterJoinRecursively(rightNode, exprs);
+        } else {
+            newExprs.addAll(exprs);
+            simplifyOuterJoinRecursively(innerNode, newExprs);
+            simplifyOuterJoinRecursively(outerNode, exprs);
+        }
     }
 
     private void processAvgPushdownOptimization (VoltXMLElement displayElement,

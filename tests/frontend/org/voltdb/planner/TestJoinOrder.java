@@ -27,6 +27,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.types.JoinType;
 
 public class TestJoinOrder extends PlannerTestCase {
     public void testBasicJoinOrder() {
@@ -86,13 +87,26 @@ public class TestJoinOrder extends PlannerTestCase {
         assertTrue(((SeqScanPlanNode)n.getChild(0)).getTargetTableName().equals("T1"));
         assertTrue(((SeqScanPlanNode)n.getChild(1)).getTargetTableName().equals("T2"));
 
+        pn = compileWithJoinOrder("select * FROM T1 RIGHT JOIN T2 ON T1.A = T2.B", "T2, T1");
+        n = pn.getChild(0).getChild(0);
+        assertEquals(JoinType.LEFT, ((NestLoopPlanNode) n).getJoinType());
+        assertTrue(((SeqScanPlanNode)n.getChild(0)).getTargetTableName().equals("T2"));
+        assertTrue(((SeqScanPlanNode)n.getChild(1)).getTargetTableName().equals("T1"));
+
         try {
             compileWithInvalidJoinOrder("select * FROM T1 LEFT JOIN T2 ON T1.A = T2.B", "T2, T1");
             fail();
         } catch (Exception ex) {
-            assertTrue("The specified join order is invalid for the given query".equals(ex.getMessage()));
+            ex.getMessage().startsWith("The specified join order is invalid for the given query");
         }
-    }
+
+        try {
+            compileWithInvalidJoinOrder("select * FROM T1 RIGHT JOIN T2 ON T1.A = T2.B", "T1, T2");
+            fail();
+        } catch (Exception ex) {
+            ex.getMessage().startsWith("The specified join order is invalid for the given query");
+        }
+}
 
     public void testMicroOptimizationJoinOrder() {
         AbstractPlanNode pn = compileWithJoinOrder("select * from J1, P2 where A=B", "J1, P2");
@@ -126,7 +140,15 @@ public class TestJoinOrder extends PlannerTestCase {
                     "T2, T6, T3, T4, T5, T7, T1");
             fail();
         } catch (Exception ex) {
-            assertTrue("The specified join order is invalid for the given query".equals(ex.getMessage()));
+            ex.getMessage().startsWith("The specified join order is invalid for the given query");
+       }
+
+        try {
+            // The first RIGHT join is converted to the INNER because of the null rejection
+            compileWithJoinOrder("select * FROM T1, T2, T3 RIGHT JOIN T4 ON T3.C = T4.D RIGHT JOIN T5 ON T3.C = T5.E, T6,T7",
+                    "T4, T2, T3, T1, T5, T6, T7");
+        } catch (Exception ex) {
+            fail();
         }
 
         try {
@@ -134,7 +156,7 @@ public class TestJoinOrder extends PlannerTestCase {
                     "T1, T2, T4, T3, T5, T7, T6");
             fail();
         } catch (Exception ex) {
-            assertTrue("The specified join order is invalid for the given query".equals(ex.getMessage()));
+            ex.getMessage().startsWith("The specified join order is invalid for the given query");
         }
 
         try {
