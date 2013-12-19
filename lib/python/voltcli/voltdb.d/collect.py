@@ -57,4 +57,4 @@
 
 def collect(runner):
     runner.args.extend([runner.opts.voltdbroot, runner.opts.prefix, runner.opts.host, runner.opts.username, runner.opts.password, runner.opts.noprompt, runner.opts.dryrun, runner.opts.skipheapdump])
-    runner.java.execute('org.voltdb.utils.Collector', None, *runner.args)
+    runner.java_execute('org.voltdb.utils.Collector', None, *runner.args)

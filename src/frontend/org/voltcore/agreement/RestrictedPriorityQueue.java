@@ -23,6 +23,8 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.PriorityQueue;
 
+import org.apache.zookeeper_voltpatches.ZooDefs.OpCode;
+import org.voltcore.agreement.AgreementSite.AgreementTransactionState;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HeartbeatResponseMessage;
 import org.voltcore.messaging.Mailbox;
@@ -351,6 +353,22 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
         }
 
         assert (newState == QueueState.UNBLOCKED);
+
+        if (ts instanceof AgreementTransactionState) {
+            AgreementTransactionState ats = (AgreementTransactionState)ts;
+            switch (ats.m_request.type) {
+                //For reads see if we can skip global agreement and just do the read
+                case OpCode.exists:
+                case OpCode.getChildren:
+                case OpCode.getChildren2:
+                case OpCode.getData:
+                    newState = QueueState.UNBLOCKED;
+                    executeStateChange(newState, ts, lid);
+                    return newState;
+                default:
+                    break;
+            }
+        }
 
         // Sufficient ordering established?
         if (ts.txnId > m_newestCandidateTransaction) {

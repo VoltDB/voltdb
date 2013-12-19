@@ -190,6 +190,13 @@ JAVA COMPILATION
 <target name="compile" description="Compile all Java client source">
     <mkdir dir='${build.client.dir}' />
 
+    <!-- copy resources needed -->
+    <copy todir="${build.client.dir}">
+        <fileset dir="${src.gpl.dir}" includes="org/voltdb/jdbc/**/*.properties"/>
+        <fileset dir="${src.gpl.dir}" includes="org/voltdb/client/**/*.properties"/>
+        <fileset dir="${src.gpl.dir}" includes="org/voltdb/*.properties"/>
+    </copy>
+
     <invoke-javac16
         srcdir="${src.gpl.dir}:${vendor.src.dir}"
         includes="com/google_voltpatches/**/*.java

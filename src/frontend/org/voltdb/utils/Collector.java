@@ -326,7 +326,7 @@ public class Collector {
                     entryPath = "syslog" + File.separator + file.getName();
                 }
 
-                if (file.length() > 0) {
+                if (file.isFile() && file.canRead() && file.length() > 0) {
                     tarGenerator.queueEntry(entryPath, file);
                 }
             }

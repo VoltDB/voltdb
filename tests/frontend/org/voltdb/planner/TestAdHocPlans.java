@@ -71,7 +71,7 @@ public class TestAdHocPlans extends AdHocQueryTester {
     public int runQueryTest(String query, int hash, int spPartialSoFar,
             int expected, int validatingSPresult) throws IOException,
             NoConnectionsException, ProcCallException {
-        AdHocPlannedStatement result = m_pt.planSql(query, null, true, false);
+        AdHocPlannedStatement result = m_pt.planSqlForTest(query);
         boolean spPlan = result.toString().contains("ALL: null");
         if ((validatingSPresult == VALIDATING_SP_RESULT) != spPlan) {
             System.out.println("Missed: "+ query);
@@ -80,7 +80,7 @@ public class TestAdHocPlans extends AdHocQueryTester {
             // to set this debugging flag and step into the planner,
             // for a do-over after getting an unexpected result.
             if (m_debugging_set_this_to_retry_failures) {
-                result = m_pt.planSql(query, null, true, false);
+                result = m_pt.planSqlForTest(query);
             }
         }
         assertEquals((validatingSPresult == VALIDATING_SP_RESULT), spPlan);

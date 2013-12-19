@@ -20,8 +20,8 @@ package org.voltdb.planner.microoptimizations;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DeterminismMode;
+import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
 
 public class MicroOptimizationRunner {
@@ -37,8 +37,8 @@ public class MicroOptimizationRunner {
     }
 
     public static List<CompiledPlan> applyAll(CompiledPlan plan,
-                                              Database db,
-                                              DeterminismMode detMode)
+                                              DeterminismMode detMode,
+                                              AbstractParsedStmt parsedStmt)
     {
         ArrayList<CompiledPlan> input = new ArrayList<CompiledPlan>();
         ArrayList<CompiledPlan> retval = new ArrayList<CompiledPlan>();
@@ -59,7 +59,7 @@ public class MicroOptimizationRunner {
             retval.clear();
 
             for (CompiledPlan inPlan : input) {
-                List<CompiledPlan> newPlans = opt.apply(inPlan, db);
+                List<CompiledPlan> newPlans = opt.apply(inPlan, parsedStmt);
                 assert(newPlans != null);
                 assert(newPlans.size() >= 1);
                 retval.addAll(newPlans);

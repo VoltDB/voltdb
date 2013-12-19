@@ -51,6 +51,8 @@ public enum LogKeys {
     host_VoltDB_ExportInitFailure,
     host_VoltDB_CatalogReadFailure,
     host_VoltDB_StartupString,
+    host_VoltDB_StayTunedForLogging,
+    host_VoltDB_StayTunedForNoLogging,
     host_TheHashinator_ExceptionHashingString,
     host_TheHashinator_AttemptedToHashinateNonLongOrString,
     host_Initialiazion_InvalidDDL,

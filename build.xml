@@ -141,6 +141,7 @@
 
     <!-- Specifig exclude community tests -->
     <exclude name="org/voltdb/regressionsuites/TestMaliciousClientSuite.class" /> <!-- fails legacy -->
+    <exclude name="org/voltdb/regressionsuites/TestIV2BlacklistSaveRestoreSysprocSuite.class" />
     <!-- Recorded as ENG-4423 -->
     <exclude name="**/TestRejoinFuzz.class" />
     <exclude name="**/TestRejoinFuzz2.class" />
@@ -473,6 +474,23 @@ DISTRIBUTION
     <!-- add the Project and Deployment file schemas to the dist -->
     <copy todir="${dist.dir}/tools" file="src/frontend/org/voltdb/compiler/ProjectFileSchema.xsd"/>
     <copy todir="${dist.dir}/tools" file="src/frontend/org/voltdb/compiler/DeploymentFileSchema.xsd"/>
+
+    <!-- add misc. other tools in the tools directory -->
+    <copy todir="${dist.dir}/tools" >
+        <fileset dir="tools" defaultexcludes="yes">
+            <include name="toolrunner.py" />
+            <include name="voltify" />
+            <include name="voltify.d/**" />
+            <include name="lib/**" />
+        </fileset>
+    </copy>
+
+    <!-- 3rd party libraries copied to the same location in the dist -->
+    <copy todir="${dist.dir}/third_party" >
+        <fileset dir="third_party" defaultexcludes="yes">
+            <include name="python/**" />
+        </fileset>
+    </copy>
 
     <!-- OS-specific preparation of libvoltdb* -->
     <antcall target="dist_libvoltdb" />
