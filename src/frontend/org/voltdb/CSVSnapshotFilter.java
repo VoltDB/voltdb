@@ -81,7 +81,6 @@ public class CSVSnapshotFilter implements SnapshotDataFilter {
                         }
                     };
                 } finally {
-                    cont.discard();
                     if (cont != null) {
                         cont.discard();
                     }
