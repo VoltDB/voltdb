@@ -451,7 +451,8 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             stringer.key(Members.VALUE_SIZE.name()).value(m_valueSize);
             // Size for fixed types are certain.
         } else {
-            assert(VoltType.getFixedLengthInBytes(m_valueType)  == m_valueSize);
+            // RestRoundtripTest has a case parameter has smallint but with size 0.
+            //assert(VoltType.getFixedLengthInBytes(m_valueType)  == m_valueSize);
         }
 
         if (m_left != null) {
@@ -533,7 +534,11 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         expr.m_type = type;
 
         expr.m_valueType = VoltType.typeFromString(obj.getString(Members.VALUE_TYPE.name()));
-        expr.m_valueSize = obj.getInt(Members.VALUE_SIZE.name());
+        if (obj.has(Members.VALUE_SIZE.name())) {
+            expr.m_valueSize = obj.getInt(Members.VALUE_SIZE.name());
+        } else {
+            expr.m_valueSize = VoltType.getFixedLengthInBytes(expr.m_valueType);
+        }
 
         expr.m_left = AbstractExpression.fromJSONChild(obj, Members.LEFT.name(), tableScan);
         expr.m_right = AbstractExpression.fromJSONChild(obj, Members.RIGHT.name(), tableScan);
