@@ -114,7 +114,8 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
         assert(m_inputTuple.sizeInValues() == m_inputTable->columnCount());
         assert(m_targetTuple.sizeInValues() == m_targetTable->columnCount());
         TableIterator inputIterator = m_inputTable->iterator();
-        while (inputIterator.next(m_inputTuple)) {
+        assert(!inputIterator.isTempTableIterator());
+        while (inputIterator.persistentNext(m_inputTuple)) {
             //
             // OPTIMIZATION: Single-Sited Query Plans
             // If our beloved DeletePlanNode is apart of a single-site query plan,

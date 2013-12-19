@@ -138,18 +138,19 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
     //
     TableIterator iterator = input_table->iterator();
     assert (tuple.sizeInValues() == input_table->columnCount());
-    while (iterator.next(tuple)) {
+    assert(iterator.isTempTableIterator());
+    while (iterator.tempNext(tuple)) {
         //
         // Project (or replace) values from input tuple
         //
         TableTuple &temp_tuple = output_table->tempTuple();
         if (all_tuple_array != NULL) {
-            VOLT_TRACE("sweet, all tuples");
+            VOLT_DEBUG("sweet, all tuples");
             for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
                 temp_tuple.setNValue(ctr, tuple.getNValue(all_tuple_array[ctr]));
             }
         } else if (all_param_array != NULL) {
-            VOLT_TRACE("sweet, all params");
+            VOLT_DEBUG("sweet, all params");
             for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
                 temp_tuple.setNValue(ctr, params[all_param_array[ctr]]);
             }
@@ -160,16 +161,8 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
         }
         output_table->insertTupleNonVirtual(temp_tuple);
 
-        VOLT_TRACE("OUTPUT TABLE: %s\n", output_table->debug().c_str());
-
-        /*if (!output_table->insertTupleNonVirtual(temp_tuple)) {
-            // TODO: DEBUG
-            VOLT_ERROR("Failed to insert projection tuple from input table '%s' into output table '%s'", input_table->name().c_str(), output_table->name().c_str());
-            return (false);
-        }*/
+        VOLT_DEBUG("OUTPUT TABLE: %s\n", output_table->debug().c_str());
     }
-
-    //VOLT_TRACE("PROJECTED TABLE: %s\n", output_table->debug().c_str());
 
     return (true);
 }

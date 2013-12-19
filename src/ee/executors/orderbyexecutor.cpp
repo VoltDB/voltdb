@@ -164,7 +164,8 @@ OrderByExecutor::p_execute(const NValueArray &params)
     TableIterator iterator = input_table->iterator();
     TableTuple tuple(input_table->schema());
     vector<TableTuple> xs;
-    while (iterator.next(tuple))
+    assert(iterator.isTempTableIterator());
+    while (iterator.tempNext(tuple))
     {
         m_engine->noteTuplesProcessedForProgressMonitoring(1);
         assert(tuple.isActive());

@@ -106,7 +106,8 @@ LimitExecutor::p_execute(const NValueArray &params)
     int offset = -1;
     node->getLimitAndOffsetByReference(params, limit, offset);
 
-    while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
+    assert(iterator.isTempTableIterator());
+    while ((limit == -1 || tuple_ctr < limit) && iterator.tempNext(tuple))
     {
         // TODO: need a way to skip / iterate N items.
         if (tuples_skipped < offset)
