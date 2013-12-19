@@ -34,7 +34,6 @@ import org.voltdb.compiler.CodeBlockCompilerException;
  * is preconfigured to make each script a {@link VoltProcedure} delegate, and garnish it with
  * predefined includes.
  *
- * @author ssantoro
  *
  */
 public class GroovyCodeBlockCompiler  {
@@ -93,16 +92,17 @@ public class GroovyCodeBlockCompiler  {
         try {
             groovyOut = File.createTempFile("groovyout", ".tmp");
         } catch (IOException e) {
-            throw new RuntimeException("Cannot create groovy procedure compiler output directory", e);
+            String tmpDN = System.getProperty("java.io.tmpdir", "[temp file system]");
+            throw new RuntimeException("Groovy procedure compiler requires but lacks write access to \"" + tmpDN + "\"",e);
         }
         if (!groovyOut.delete() || !groovyOut.mkdir()) {
-            throw new RuntimeException("Cannot create directory\"" + groovyOut + "\"");
+            throw new RuntimeException("Cannot create groovy procedure compiler output directory\"" + groovyOut + "\"");
         }
         if (   !groovyOut.isDirectory()
             || !groovyOut.canRead()
             || !groovyOut.canWrite()
             || !groovyOut.canExecute()) {
-            throw new RuntimeException("Cannot access directory\"" + groovyOut + "\"");
+            throw new RuntimeException("Cannot access groovy procedure compiler output directory\"" + groovyOut + "\"");
         }
         return groovyOut;
     }

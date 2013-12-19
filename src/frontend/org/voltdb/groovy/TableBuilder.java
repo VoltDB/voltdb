@@ -34,7 +34,6 @@ import org.voltdb.VoltType;
  *     row 2, Claire
  *   }
  *   </pre></code>
- * @author stefano
  *
  */
 public class TableBuilder {

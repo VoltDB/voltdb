@@ -51,8 +51,6 @@ import com.google_voltpatches.common.collect.ImmutableSortedMap;
  *
  * </code></pre>
  *
- * @author stefano
- *
  */
 public class Tuplerator extends GroovyObjectSupport {
 
