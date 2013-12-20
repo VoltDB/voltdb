@@ -93,7 +93,7 @@ class Plot:
         plt.ylim((ymin-(ymax-ymin)*0.1, ymax+(ymax-ymin)*0.1))
         #xmax = datetime.datetime.today().toordinal()
         #plt.xlim((xmax-self.ndays, xmax))
-        plt.legend(prop={'size': 10}, loc=0)
+        plt.legend(prop={'size': 10}, loc=2)
         plt.savefig(self.filename, format="png", transparent=False,
                     bbox_inches="tight", pad_inches=0.2)
         plt.close('all')
