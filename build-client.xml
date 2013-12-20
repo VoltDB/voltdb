@@ -209,6 +209,7 @@ JAVA COMPILATION
                   org/apache/zookeeper_voltpatches/KeeperException.java
                   org/cliffc_voltpatches/**/*.java
                   org/json_voltpatches/**/*.java
+                  jsr166y/**/*.java
 
                   org/voltcore/logging/Level.java
                   org/voltcore/logging/VoltLogger.java
