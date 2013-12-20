@@ -99,7 +99,13 @@ public class LoadedProcedureSet {
             if (proc.getHasjava()) {
                 final String className = proc.getClassname();
 
-                final Language lang = Language.valueOf(proc.getLanguage());
+                Language lang;
+                try {
+                    lang = Language.valueOf(proc.getLanguage());
+                } catch (IllegalArgumentException e) {
+                    // default to java for earlier compiled catalogs
+                    lang = Language.JAVA;
+                }
 
                 Class<?> procClass = null;
                 try {
