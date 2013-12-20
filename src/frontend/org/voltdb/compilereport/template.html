@@ -23,9 +23,25 @@
       td.invert>p>a {
         color: #eeeeee;
       }
-      // Does not work!
-      .ecount {
+      .table th.right-cell, .table td.right-cell {
+		text-align: right;
+      }
+      .table th.calculated-cell, .table td.calculated-cell {
+        font-weight: bold;
+        background-color: #e6ebf0;
+      }
+      .table th.min-max-header {
+        font-size: smaller;
+      }
+      td.table-view-name {
+        font-weight: bold;
+      }
+      table.size-summary-table {
+        width: auto;
+      }
+      input.count-input {
         width: 100px;
+        text-align: right;
       }
     </style>
     <link href="http://assets.voltdb.com/b/css/bootstrap-responsive.css" rel="stylesheet">
@@ -60,7 +76,7 @@
               <li id='s-nav'> <a href="#s">Schema</a></li>
               <li id='p-nav'> <a href="#p">Procedures &amp; SQL</a></li>
               <li id='r-nav'> <a href="#r">System Report</a></li>
-              <li id='s-nav'> <a href="#z">Size Worksheet</a></li>
+              <li id='z-nav'> <a href="#z">Size Worksheet</a></li>
             <!--##RESOURCES
               <li id='m-nav'> <a href='/memory/'>Memory Report</a></li>
             ##RESOURCES-->
@@ -140,11 +156,12 @@
             <a name='z'></a><h1>Size Worksheet</h1><br/>
 
             <ul>
-            <li>Replace row counts with more accurate estimates to get better results.</li>
-            <li>Calculated fields are updated after leaving any count field.</li>
-            <li>Index size is based on the sum of referenced column sizes.
-                This is inaccurate and doesn't work at all for some index types.</li>
-            <li>Page refresh will reset all count fields.</li>
+                <li>Sizes are in bytes.</li>
+                <li>For more useful results replace row counts with better estimates.</li>
+                <li>All calculated fields update after leaving any input field.</li>
+                <li>Warning: Page refresh resets all input fields.</li>
+                <li>Caveat: Index size is currently based on a sum of referenced column sizes.
+                    This is inaccurate at best and wrong for some index types.</li>
             </ul>
             <table class="table tableL3 tablesorter" id='sizetable'>
                 <thead>
@@ -152,12 +169,12 @@
 	                    <th>Name</th>
 	                    <th>Type</th>
                         <th>Count</th>
-	                    <th>Row Min</th>
-	                    <th>Row Max</th>
-	                    <th>Index Min *</th>
-	                    <th>Index Max *</th>
-	                    <th>Table Min</th>
-	                    <th>Table Max</th>
+	                    <th class='min-max-header'>Row Min</th>
+	                    <th class='min-max-header'>Row Max</th>
+	                    <th class='min-max-header'>Index Min</th>
+	                    <th class='min-max-header'>Index Max</th>
+	                    <th class='min-max-header'>Table Min</th>
+	                    <th class='min-max-header'>Table Max</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -379,6 +396,11 @@
             
             sizes_update_all();
         });
+        
+        function numberWithCommas(n) {
+            var parts=n.toString().split(".");
+            return parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (parts[1] ? "." + parts[1] : "");
+        }
 
         function size_table_element(name, nrow) {
         	var id = "s-size-".concat(nrow, '-', name);
@@ -394,7 +416,7 @@
 
         function size_table_update(name, nrow, value) {
             var elem = size_table_element(name, nrow);
-            elem.innerHTML = value;
+            elem.innerHTML = numberWithCommas(value);
         }
 
         function size_summary_element(type, name) {
@@ -411,7 +433,7 @@
 
         function size_summary_update(type, name, value) {
             var elem = size_summary_element(type, name);
-            elem.innerHTML = value;
+            elem.innerHTML = numberWithCommas(value);
         }
 
         function sizes_get_row(nrow) {

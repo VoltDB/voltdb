@@ -569,13 +569,11 @@ public class ReportMaker {
         StringBuilder sb = new StringBuilder();
         sb.append("<tr class='primaryrow'>");
 
-        // column 1: table name (with drop-down chevron)
+        // column 1: table name
         String anchor = String.format("size-%d", nrow);
-        sb.append(
-            "<td style='white-space: nowrap;'>").append(String.format(
-                "<i id='s-%s--icon' class='icon-chevron-right'>", anchor)).append(
-                "</i>").append(String.format(
-                "<a href='#' id='s-%s' class='togglex'>%s</a>", anchor, tsize.name)).append(
+        sb.append(String.format(
+            "<td class='table-view-name' id='s-%s'>", anchor)).append(
+                tsize.name).append(
             "</td>\n");
 
         // column 2: type
@@ -593,7 +591,7 @@ public class ReportMaker {
         sb.append(
             "<td>").append(
                 "<div class='ecount'>").append(
-                    "<input type='text' class='form-control'").append(String.format(
+                    "<input type='text' class='form-control count-input'").append(String.format(
                             " id='s-%s-count'", anchor)).append(String.format(
                             " onblur='%s'", updateCode)).append(String.format(
                             " value='%d'", tsize.cardinality)).append(
@@ -605,29 +603,29 @@ public class ReportMaker {
             "</td>\n");
 
         // column 4: row min size
-        sb.append(String.format("<td id='s-%s-rmin'>%d</td>\n", anchor, tsize.widthMin));
+        sb.append(String.format("<td id='s-%s-rmin' class='right-cell'>%d</td>\n", anchor, tsize.widthMin));
 
         // column 5: row max size
-        sb.append(String.format("<td id='s-%s-rmax'>%d</td>\n", anchor, tsize.widthMax));
+        sb.append(String.format("<td id='s-%s-rmax' class='right-cell'>%d</td>\n", anchor, tsize.widthMax));
 
         // Roll up index sizes since a table can have multiple indexes.
         CatalogItemSizeRollup indexSizeRollup = tsize.indexRollup();
 
         // column 6: index min size
-        sb.append(String.format("<td id='s-%s-imin'>%d</td>\n", anchor, indexSizeRollup.widthMin));
+        sb.append(String.format("<td id='s-%s-imin' class='right-cell'>%d</td>\n", anchor, indexSizeRollup.widthMin));
 
         // column 7: index max size
-        sb.append(String.format("<td id='s-%s-imax'>%d</td>\n", anchor, indexSizeRollup.widthMax));
+        sb.append(String.format("<td id='s-%s-imax' class='right-cell'>%d</td>\n", anchor, indexSizeRollup.widthMax));
 
         // column 8: table min size (including index min size)
         // Updated by Javascript and this initial number is thrown away.
         long tmin = (tsize.widthMin + indexSizeRollup.widthMin) * tsize.cardinality;
-        sb.append(String.format("<td id='s-%s-tmin'>%d</td>\n", anchor, tmin));
+        sb.append(String.format("<td id='s-%s-tmin' class='right-cell calculated-cell'>%d</td>\n", anchor, tmin));
 
         // column 9: table max size (including index max size)
         // Updated by Javascript and this initial number is thrown away.
         long tmax = (tsize.widthMax + indexSizeRollup.widthMax) * tsize.cardinality;
-        sb.append(String.format("<td id='s-%s-tmax'>%d</td>\n", anchor, tmax));
+        sb.append(String.format("<td id='s-%s-tmax' class='right-cell calculated-cell'>%d</td>\n", anchor, tmax));
 
         sb.append("</tr>\n");
 
@@ -665,7 +663,7 @@ public class ReportMaker {
 
     static String generateSizeSummary(CatalogUtil.DatabaseSizes dbSizes) {
         StringBuilder sb = new StringBuilder();
-        sb.append("<table class='table table-condensed'>\n");
+        sb.append("<table class='table table-condensed size-summary-table'>\n");
         CatalogItemSizeList<CatalogItemSizeRollup> rollups =
                 new CatalogItemSizeList<CatalogItemSizeRollup>();
         rollups.add(dbSizes.tableRollup());
@@ -689,16 +687,16 @@ public class ReportMaker {
         String prefix = String.format("s-size-summary-%s", label);
         sb.append(
             "<tr>").append(String.format(
-                "<td>%s: Count</td>", name)).append(String.format(
-                "<td id='%s-count'>%d</td>", prefix, rollup.itemCount)).append(
+                "<td>%s (count):</td>", name)).append(String.format(
+                "<td id='%s-count' class='right-cell'>%d</td>", prefix, rollup.itemCount)).append(
             "</tr>\n").append(
             "<tr>").append(String.format(
-                "<td>%s: Size - Minimum</td>", name)).append(String.format(
-                "<td id='%s-min'>%d</td>", prefix, rollup.widthMin)).append(
+                "<td>%s (minimum size):</td>", name)).append(String.format(
+                "<td id='%s-min' class='right-cell calculated-cell'>%d</td>", prefix, rollup.widthMin)).append(
             "</tr>\n").append(
             "<tr>").append(String.format(
-                "<td>%s: Size - Maximum</td>", name)).append(String.format(
-                "<td id='%s-max'>%d</td>", prefix, rollup.widthMax)).append(
+                "<td>%s (maximum size):</td>", name)).append(String.format(
+                "<td id='%s-max' class='right-cell calculated-cell'>%d</td>", prefix, rollup.widthMax)).append(
             "</tr>\n");
     }
 
