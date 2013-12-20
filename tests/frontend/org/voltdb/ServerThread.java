@@ -150,12 +150,16 @@ public class ServerThread extends Thread {
     }
 
     public void shutdown() throws InterruptedException {
-        assert Thread.currentThread() != this;
-        VoltDB.instance().shutdown(this);
-        this.join();
-        while (VoltDB.instance().isRunning()) {
-            Thread.sleep(1);
-        }
+        boolean oldVal = VoltDB.ignoreCrash;
+        VoltDB.ignoreCrash = true;
+        try {
+            assert Thread.currentThread() != this;
+            VoltDB.instance().shutdown(this);
+            this.join();
+            while (VoltDB.instance().isRunning()) {
+                Thread.sleep(1);
+            }
+        } finally { VoltDB.ignoreCrash = oldVal;}
     }
 
     /**
