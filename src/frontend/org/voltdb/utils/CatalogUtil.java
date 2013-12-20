@@ -1865,11 +1865,15 @@ public abstract class CatalogUtil {
 
     private static double log2 = Math.log(2);
 
-    private static int getVariableColumnSize(int capacity, int dataSize)
+    private static int getVariableColumnSize(int capacity, int dataSize, boolean forIndex)
     {
         // Smaller capacities get fully consumed (plus 1 byte).
         if (capacity < 64) {
             return capacity + 1;
+        }
+        // Indexes get 8 byte pointers rather than replicate large data.
+        if (forIndex) {
+            return 8;
         }
         // Larger capacities use a power of 2 buffer size plus overhead.
         int content = 4 + 8 + dataSize;
@@ -1878,7 +1882,7 @@ public abstract class CatalogUtil {
         return bufferSize + 8 + 24;
     }
 
-    private static CatalogItemSizeBase getColumnsSize(List<Column> columns)
+    private static CatalogItemSizeBase getColumnsSize(List<Column> columns, boolean forIndex)
     {
         // See http://voltdb.com/docs/PlanningGuide/ChapMemoryRecs.php
         CatalogItemSizeBase csize = new CatalogItemSizeBase();
@@ -1887,14 +1891,14 @@ public abstract class CatalogUtil {
             switch(ctype) {
             case STRING: {
                 int capacity = column.getSize();
-                csize.widthMin += getVariableColumnSize(capacity, 0);
-                csize.widthMax += getVariableColumnSize(capacity, capacity);
+                csize.widthMin += getVariableColumnSize(capacity, 0, forIndex);
+                csize.widthMax += getVariableColumnSize(capacity, capacity, forIndex);
                 break;
             }
             case VARBINARY: {
                 int capacity = column.getSize();
-                csize.widthMin += getVariableColumnSize(capacity, 0);
-                csize.widthMax += getVariableColumnSize(capacity, capacity);
+                csize.widthMin += getVariableColumnSize(capacity, 0, forIndex);
+                csize.widthMax += getVariableColumnSize(capacity, capacity, forIndex);
                 break;
             }
             default: {
@@ -1905,6 +1909,36 @@ public abstract class CatalogUtil {
             }
         }
         return csize;
+    }
+
+    private static CatalogItemSizeBase getIndexSize(Index index)
+    {
+        // All index types consume the space taken by the column data,
+        // except that 8 byte pointers references replace large var... data.
+        // Additional overhead is determined by the index type.
+        CatalogMap<ColumnRef> columnRefsMap = index.getColumns();
+        List<Column> indexColumns = new ArrayList<Column>(columnRefsMap.size());
+        for (ColumnRef columnRef: columnRefsMap) {
+            indexColumns.add(columnRef.getColumn());
+        }
+        CatalogItemSizeBase isize = getColumnsSize(indexColumns, true);
+        if (index.getType() == IndexType.HASH_TABLE.getValue()) {
+            // Hash index overhead follows this documented formula:
+            //   w=column width, r=row count
+            //      (((2 * r) + 1) * 8) + ((w + 32) * r)
+            // This can be reduced to the following:
+            //      (w + 48) * r + 8
+            // For approximation purposes the constant +8 is ignorable.
+            isize.widthMin += 48;
+            isize.widthMax += 48;
+        }
+        else {
+            // Tree indexes have a 40 byte overhead per row.
+            isize.widthMin += 40;
+            isize.widthMax += 40;
+        }
+
+        return isize;
     }
 
     private static TableSize getTableSize(Table table)
@@ -1922,7 +1956,7 @@ public abstract class CatalogUtil {
         for (Column column: columnsMap) {
             columns.add(column);
         }
-        CatalogItemSizeBase csize = getColumnsSize(columns);
+        CatalogItemSizeBase csize = getColumnsSize(columns, false);
 
         boolean isView = table.getMaterializer() != null;
         TableSize tsize = new TableSize(table, isView, csize.widthMin, csize.widthMax, cardinality);
@@ -1930,12 +1964,7 @@ public abstract class CatalogUtil {
         // Add the table indexes.
         CatalogMap<Index> indexes = table.getIndexes();
         for (Index index: indexes) {
-            CatalogMap<ColumnRef> columnRefsMap = index.getColumns();
-            List<Column> indexColumns = new ArrayList<Column>(columnRefsMap.size());
-            for (ColumnRef columnRef: columnRefsMap) {
-                indexColumns.add(columnRef.getColumn());
-            }
-            CatalogItemSizeBase isize = getColumnsSize(indexColumns);
+            CatalogItemSizeBase isize = getIndexSize(index);
             tsize.addIndex(index, isize.widthMin, isize.widthMax);
         }
 

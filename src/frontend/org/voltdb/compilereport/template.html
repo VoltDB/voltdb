@@ -160,8 +160,6 @@
                 <li>For more useful results replace row counts with better estimates.</li>
                 <li>All calculated fields update after leaving any input field.</li>
                 <li>Warning: Page refresh resets all input fields.</li>
-                <li>Caveat: Index size is currently based on a sum of referenced column sizes.
-                    This is inaccurate at best and wrong for some index types.</li>
             </ul>
             <table class="table tableL3 tablesorter" id='sizetable'>
                 <thead>
@@ -500,12 +498,8 @@
             // Use the summary counts to determine the number of table rows.
             var ntables = size_summary_value("table", "count");
             var nviews = size_summary_value("view", "count");
-            var nrow = 0;
-            for (var ntable = 0; ntable < ntables; ++ntable) {
-                sizes_update_row(++nrow);
-            }
-            for (var nview = 0; nview < nviews; ++nview) {
-                sizes_update_row(++nrow);
+            for (var nrow = 1; nrow <= ntables + nviews; ++nrow) {
+                sizes_update_row(nrow);
             }
             sizes_update_summary();
         }
