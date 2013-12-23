@@ -70,7 +70,7 @@
         <include name='commons-cli-1.2.jar' />
     </fileset>
     <fileset dir='${vendor.lib.dir}'>
-        <include name='javaee-api-7.0.jar' />
+        <include name='javaee-api-6.0.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>
 </path>
@@ -209,6 +209,7 @@ JAVA COMPILATION
                   org/apache/zookeeper_voltpatches/KeeperException.java
                   org/cliffc_voltpatches/**/*.java
                   org/json_voltpatches/**/*.java
+                  jsr166y/**/*.java
 
                   org/voltcore/logging/Level.java
                   org/voltcore/logging/VoltLogger.java
