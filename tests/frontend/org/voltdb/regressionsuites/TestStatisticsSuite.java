@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import junit.framework.Test;
 
@@ -1030,6 +1031,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
     }
 
     public void testRebalanceStats() throws Exception {
+        System.out.println("testRebalanceStats");
         // Test constants
         final int DURATION_SECONDS = 10;
         final int INVOCATION_SLEEP_MILLIS = 500;
@@ -1053,7 +1055,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
             int ranges = r.nextInt(RANGES_TO_MOVE / loopCount);
             int bytes = r.nextInt(BYTES_TO_MOVE / loopCount);
             int rows = r.nextInt(ROWS_TO_MOVE / loopCount);
-            bps.logBalanceEnds(ranges, bytes, invocationTimeMS, rows);
+            bps.logBalanceEnds(ranges, bytes, TimeUnit.MILLISECONDS.toNanos(invocationTimeMS), TimeUnit.MILLISECONDS.toNanos(invocationTimeMS), rows);
             checker.update(ranges, bytes, rows);
             checker.check(bps.getLastStatsPoint());
             int idleTimeMS = r.nextInt(IDLE_SLEEP_MILLIS);

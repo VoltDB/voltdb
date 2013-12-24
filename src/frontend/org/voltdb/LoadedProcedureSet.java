@@ -26,6 +26,8 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.compiler.Language;
+import org.voltdb.groovy.GroovyScriptProcedureDelegate;
 import org.voltdb.utils.LogKeys;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -96,6 +98,15 @@ public class LoadedProcedureSet {
             VoltProcedure procedure = null;
             if (proc.getHasjava()) {
                 final String className = proc.getClassname();
+
+                Language lang;
+                try {
+                    lang = Language.valueOf(proc.getLanguage());
+                } catch (IllegalArgumentException e) {
+                    // default to java for earlier compiled catalogs
+                    lang = Language.JAVA;
+                }
+
                 Class<?> procClass = null;
                 try {
                     procClass = catalogContext.classForProcedure(className);
@@ -112,13 +123,9 @@ public class LoadedProcedureSet {
                     }
                 }
                 try {
-                    procedure = (VoltProcedure) procClass.newInstance();
+                    procedure = lang.accept(procedureInstantiator, procClass);
                 }
-                catch (final InstantiationException e) {
-                    hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
-                                    new Object[] { m_siteId, m_siteIndex }, e);
-                }
-                catch (final IllegalAccessException e) {
+                catch (final Exception e) {
                     hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
                                     new Object[] { m_siteId, m_siteIndex }, e);
                 }
@@ -133,6 +140,18 @@ public class LoadedProcedureSet {
         }
         return builder;
     }
+
+    private static Language.CheckedExceptionVisitor<VoltProcedure, Class<?>, Exception> procedureInstantiator =
+            new Language.CheckedExceptionVisitor<VoltProcedure, Class<?>, Exception>() {
+                @Override
+                public VoltProcedure visitJava(Class<?> p) throws Exception {
+                    return (VoltProcedure)p.newInstance();
+                }
+                @Override
+                public VoltProcedure visitGroovy(Class<?> p) throws Exception {
+                    return new GroovyScriptProcedureDelegate(p);
+                }
+            };
 
     private void loadSystemProcedures(
             CatalogContext catalogContext,
