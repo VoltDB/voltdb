@@ -58,8 +58,7 @@ public abstract class AbstractParsedStmt {
 
     protected HashMap<Long, ParameterValueExpression> m_paramsById = new HashMap<Long, ParameterValueExpression>();
 
-    public ArrayList<Table> tableList = new ArrayList<Table>();
-    public ArrayList<TempTable> tempTableList = new ArrayList<TempTable>();
+    public ArrayList<StmtTableScan> tableList = new ArrayList<StmtTableScan>();
     private Table m_DDLIndexedTable = null;
 
     public void setTable(Table tbl) {
@@ -436,7 +435,7 @@ public abstract class AbstractParsedStmt {
      * @param tableAlias
      * @return index into the cache array
      */
-    private int addTableToStmtCache(String tableName, String tableAlias) {
+    protected int addTableToStmtCache(String tableName, String tableAlias) {
         return addTableToStmtCache(tableName, tableAlias, null);
     }
 
@@ -645,15 +644,7 @@ public abstract class AbstractParsedStmt {
         AbstractExpression whereExpr = parseWhereCondition(tableNode);
 
         StmtTableScan tableCache = stmtCache.get(aliasIdx);
-        if (tableCache.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TARGET_TABLE_SCAN) {
-            Table table = tableCache.getTargetTable();
-            assert(table != null);
-            tableList.add(table);
-        } else {
-            TempTable tempTable = tableCache.getTempTable();
-            assert(tempTable != null);
-            tempTableList.add(tempTable);
-        }
+        tableList.add(tableCache);
 
         // The join type of the leaf node is always INNER
         // For a new tree its node's ids start with 0 and keep incrementing by 1
@@ -1015,8 +1006,8 @@ public abstract class AbstractParsedStmt {
         }
 
         retval += "\nTABLE SOURCES:\n\t";
-        for (Table table : tableList) {
-            retval += table.getTypeName() + " ";
+        for (StmtTableScan table : tableList) {
+            retval += table.getTableName() + " ";
         }
 
         retval += "\nSCAN COLUMNS:\n";
@@ -1098,4 +1089,12 @@ public abstract class AbstractParsedStmt {
         return m_paramList;
     }
 
+    public boolean hasSubqueries() {
+        for (StmtTableScan table : tableList) {
+            if (table.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TEMP_TABLE_SCAN) {
+                return true;
+            }
+        }
+        return false;
+    }
 }

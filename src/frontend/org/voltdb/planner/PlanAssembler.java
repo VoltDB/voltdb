@@ -45,6 +45,7 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.planner.parseinfo.TempTable;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -164,10 +165,22 @@ public class PlanAssembler {
     /**
      * Return true if tableList includes at least one matview.
      */
-    private boolean tableListIncludesView(List<Table> tableList) {
-        for (Table table : tableList) {
-            if (table.getMaterializer() != null) {
-                return true;
+    private boolean tableListIncludesView(List<StmtTableScan> tableList) {
+        for (StmtTableScan tableScan : tableList) {
+            if (tableScan.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TARGET_TABLE_SCAN) {
+                Table table = tableScan.getTargetTable();
+                assert(table != null);
+                if (table.getMaterializer() != null) {
+                    return true;
+                }
+            } else if (tableScan.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TEMP_TABLE_SCAN) {
+                TempTable tempTable = tableScan.getTempTable();
+                assert(tempTable != null);
+                if (tableListIncludesView(tempTable.getSubQuery().tableList)) {
+                    return true;
+                }
+            } else {
+                assert(false);
             }
         }
         return false;
@@ -176,7 +189,7 @@ public class PlanAssembler {
     /**
      * Return true if tableList includes at least one export table.
      */
-    private boolean tableListIncludesExportOnly(List<Table> tableList) {
+    private boolean tableListIncludesExportOnly(List<StmtTableScan> tableList) {
         // the single well-known connector
         Connector connector = m_catalogDb.getConnectors().get("0");
 
@@ -190,13 +203,23 @@ public class PlanAssembler {
         // this loop is O(number-of-joins * number-of-export-tables)
         // which seems acceptable if not great. Probably faster than
         // re-hashing the export only tables for faster lookup.
-        for (Table table : tableList) {
-            for (ConnectorTableInfo ti : tableinfo) {
-                if (ti.getAppendonly() &&
-                    ti.getTable().getTypeName().equalsIgnoreCase(table.getTypeName()))
-                {
+        for (StmtTableScan tableScan : tableList) {
+            if (tableScan.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TARGET_TABLE_SCAN) {
+                String tableName = tableScan.getTableName();
+                for (ConnectorTableInfo ti : tableinfo) {
+                    if (ti.getAppendonly() &&
+                            ti.getTable().getTypeName().equalsIgnoreCase(tableName)) {
+                        return true;
+                    }
+                }
+            } else if (tableScan.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TEMP_TABLE_SCAN) {
+                TempTable tempTable = tableScan.getTempTable();
+                assert(tempTable != null);
+                if (tableListIncludesExportOnly(tempTable.getSubQuery().tableList)) {
                     return true;
                 }
+            } else {
+                assert(false);
             }
         }
 
@@ -210,7 +233,7 @@ public class PlanAssembler {
      */
     void setupForNewPlans(AbstractParsedStmt parsedStmt) {
         m_bestAndOnlyPlanWasGenerated = false;
-        m_partitioning.analyzeTablePartitioning(parsedStmt.stmtCache);
+        m_partitioning.analyzeTablePartitioning(parsedStmt.tableList);
 
         if (parsedStmt instanceof ParsedUnionStmt) {
             m_parsedUnion = (ParsedUnionStmt) parsedStmt;
@@ -225,9 +248,6 @@ public class PlanAssembler {
             subAssembler = new SelectSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
             return;
         }
-
-// @TODO
-// Need to use StmtTableScan instead
         //TODO: eliminate this redundant "else after a return" and un-indent this block.
         else {
             // check that no modification happens to views
@@ -239,7 +259,8 @@ public class PlanAssembler {
             // Check that only multi-partition writes are made to replicated tables.
             // figure out which table we're updating/deleting
             assert (parsedStmt.tableList.size() == 1);
-            Table targetTable = parsedStmt.tableList.get(0);
+            Table targetTable = parsedStmt.tableList.get(0).getTargetTable();
+            assert(targetTable != null);
             if (targetTable.getIsreplicated()) {
                 if (m_partitioning.wasSpecifiedAsSingle()) {
                     String msg = "Trying to write to replicated table '" + targetTable.getTypeName()
@@ -535,7 +556,6 @@ public class PlanAssembler {
         // Make sure that next child's plans won't override current ones.
         parsedResult.m_planId = selector.m_planId;
 
-//        parsedResult = setCommonPartitioning(partitioning, parsedResult);
         return parsedResult;
     }
 
@@ -780,7 +800,7 @@ public class PlanAssembler {
 
         // figure out which table we're deleting from
         assert (m_parsedDelete.tableList.size() == 1);
-        Table targetTable = m_parsedDelete.tableList.get(0);
+        StmtTableScan targetTable = m_parsedDelete.tableList.get(0);
 
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
         if (subSelectRoot == null) {
@@ -796,7 +816,7 @@ public class PlanAssembler {
 
         // generate the delete node with the right target table
         DeletePlanNode deleteNode = new DeletePlanNode();
-        deleteNode.setTargetTableName(targetTable.getTypeName());
+        deleteNode.setTargetTableName(targetTable.getTableName());
 
         ProjectionPlanNode projectionNode = new ProjectionPlanNode();
         AbstractExpression addressExpr = new TupleAddressExpression();
@@ -857,7 +877,8 @@ public class PlanAssembler {
         }
 
         UpdatePlanNode updateNode = new UpdatePlanNode();
-        Table targetTable = m_parsedUpdate.tableList.get(0);
+        Table targetTable = m_parsedUpdate.tableList.get(0).getTargetTable();
+        assert(targetTable != null);
         updateNode.setTargetTableName(targetTable.getTypeName());
         // set this to false until proven otherwise
         updateNode.setUpdateIndexes(false);
@@ -936,7 +957,8 @@ public class PlanAssembler {
 
         // figure out which table we're inserting into
         assert (m_parsedInsert.tableList.size() == 1);
-        Table targetTable = m_parsedInsert.tableList.get(0);
+        Table targetTable = m_parsedInsert.tableList.get(0).getTargetTable();
+        assert(targetTable != null);
 
         // the root of the insert plan is always an InsertPlanNode
         InsertPlanNode insertNode = new InsertPlanNode();
@@ -1209,7 +1231,12 @@ public class PlanAssembler {
         // TODO: In theory, it is possible to analyze the join criteria and/or projected columns
         // to determine whether the particular join preserves the uniqueness of its index-scanned input.
         boolean allScansAreDeterministic = true;
-        for (Table table : m_parsedSelect.tableList) {
+        for (StmtTableScan tableScan : m_parsedSelect.tableList) {
+            Table table = tableScan.getTargetTable();
+            if (table == null) {
+                // This is a sub-query. Indexes are not supported yet. Skip it
+                continue;
+            }
 
             allScansAreDeterministic = false;
             // search indexes for one that makes the order by deterministic

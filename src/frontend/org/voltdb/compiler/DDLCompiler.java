@@ -1604,7 +1604,8 @@ public class DDLCompiler {
             }
 
             // create the materializedviewinfo catalog node for the source table
-            Table srcTable = stmt.tableList.get(0);
+            Table srcTable = stmt.tableList.get(0).getTargetTable();
+            assert(srcTable != null);
             MaterializedViewInfo matviewinfo = srcTable.getViews().add(viewName);
             matviewinfo.setDest(destTable);
             AbstractExpression where = stmt.getSingleTableFilterExpression();
@@ -1863,7 +1864,7 @@ public class DDLCompiler {
             throw m_compiler.new VoltCompilerException(msg);
         }
 
-        if (!stmt.tempTableList.isEmpty()) {
+        if (stmt.hasSubqueries()) {
             msg += "with sub-query is not supported.";
             throw m_compiler.new VoltCompilerException(msg);
         }

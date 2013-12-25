@@ -56,7 +56,8 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
         super(db, parsedStmt, partitioning);
 
         assert(m_parsedStmt.tableList.size() == 1);
-        m_targetTable = m_parsedStmt.tableList.get(0);
+        m_targetTable = m_parsedStmt.tableList.get(0).getTargetTable();
+        assert(m_targetTable != null);
     }
 
     /**

@@ -25,6 +25,7 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.planner.parseinfo.StmtTableScan;
 
 /**
  *
@@ -54,10 +55,12 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         assert(tableList.isEmpty());
 
         String tableName = stmtNode.attributes.get("table");
-        Table table = getTableFromDB(tableName);
+        int idx = addTableToStmtCache(tableName, tableName);
+        StmtTableScan tableCache = stmtCache.get(idx);
+        tableList.add(tableCache);
 
-        tableList.add(table);
-
+        Table table = tableCache.getTargetTable();
+        assert(table != null);
         for (VoltXMLElement node : stmtNode.children) {
             if (node.name.equalsIgnoreCase("columns")) {
                 parseTargetColumns(node, table, columns);
