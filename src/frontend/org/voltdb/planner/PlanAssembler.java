@@ -1232,13 +1232,15 @@ public class PlanAssembler {
         // to determine whether the particular join preserves the uniqueness of its index-scanned input.
         boolean allScansAreDeterministic = true;
         for (StmtTableScan tableScan : m_parsedSelect.tableList) {
+            allScansAreDeterministic = false;
+
             Table table = tableScan.getTargetTable();
             if (table == null) {
-                // This is a sub-query. Indexes are not supported yet. Skip it
-                continue;
+                // This is a sub-query. Indexes are not supported yet.
+                // Assuming that the results are not ordered for now.
+                break;
             }
 
-            allScansAreDeterministic = false;
             // search indexes for one that makes the order by deterministic
             for (Index index : table.getIndexes()) {
                 // skip non-unique indexes
