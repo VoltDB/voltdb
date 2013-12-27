@@ -49,6 +49,7 @@
 #include <string>
 #include <vector>
 #include <cassert>
+#include <iostream>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include "common/types.h"
@@ -136,6 +137,8 @@ public:
     boost::shared_ptr<ElasticIndexTupleRangeIterator>
             getIndexTupleRangeIterator(const ElasticIndexHashRange &range);
     void activateSnapshot();
+    void printIndex(std::ostream &os, int32_t limit) const;
+    ElasticHash generateTupleHash(TableTuple &tuple) const;
 
 private:
 
@@ -583,6 +586,15 @@ inline void PersistentTableSurgeon::clearIndex() {
     assert (m_index != NULL);
     m_index->clear();
     m_indexingComplete = false;
+}
+
+inline void PersistentTableSurgeon::printIndex(std::ostream &os, int32_t limit) const {
+    assert (m_index != NULL);
+    m_index->printKeys(os,limit,m_table.m_schema,m_table);
+}
+
+inline ElasticHash PersistentTableSurgeon::generateTupleHash(TableTuple &tuple) const {
+    return tuple.getNValue(m_table.partitionColumn()).murmurHash3();
 }
 
 inline bool PersistentTableSurgeon::indexHas(TableTuple &tuple) const {

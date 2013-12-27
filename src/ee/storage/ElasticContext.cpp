@@ -23,6 +23,8 @@
 #include "expressions/hashrangeexpression.h"
 #include "logging/LogManager.h"
 #include <cassert>
+#include <sstream>
+#include <limits>
 
 namespace voltdb {
 
@@ -76,9 +78,22 @@ ElasticContext::handleActivation(TableStreamType streamType)
     if (streamType == TABLE_STREAM_ELASTIC_INDEX_CLEAR) {
         if (m_surgeon.hasIndex()) {
             if (!m_surgeon.isIndexEmpty()) {
-                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR,
-                    "Elastic index clear is not allowed while an index is "
-                    "present that has not been completely consumed.");
+
+                std::ostringstream os;
+                os << "Elastic index clear is not allowed while an index is "
+                   << "present that has not been completely consumed."
+                   << std::endl
+                   << "Remaining index elements count is "
+                   << m_surgeon.indexSize()
+                   << std::endl;
+                os << "the index contains: " << std::endl;
+                const int32_t printUpTo = 1024;
+                m_surgeon.printIndex(os, printUpTo);
+                if (m_surgeon.indexSize() > printUpTo) {
+                    os << "... " << (m_surgeon.indexSize() - printUpTo) << " more elements" << std::endl;
+                }
+                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, os.str().c_str());
+
                 return ACTIVATION_FAILED;
             }
             //Clear the predicates so when we are activated again we won't

@@ -18,6 +18,7 @@
 #define ELASTIC_INDEX_H_
 
 #include <iostream>
+#include <limits>
 #include <stx/btree.h>
 #include <boost/iterator/iterator_facade.hpp>
 #include "storage/TupleBlock.h"
@@ -166,6 +167,11 @@ class ElasticIndex : public stx::btree_set<ElasticIndexKey, ElasticIndexComparat
      * Get partial const_iterator based on upper bound.
      */
     const_iterator createUpperBoundIterator(ElasticHash upperBound) const;
+
+    /**
+     * Print the keys in the index
+     */
+    void printKeys(std::ostream &os, int32_t limit, const TupleSchema *schema, const PersistentTable &table) const;
 
   private:
 
@@ -447,11 +453,34 @@ inline ElasticIndex::const_iterator ElasticIndex::createUpperBoundIterator(Elast
 }
 
 /**
+ * Print the keys in the index
+ */
+inline void ElasticIndex::printKeys(std::ostream &os, int32_t limit, const TupleSchema *schema, const PersistentTable &table) const {
+    if (limit < 0) {
+        limit = std::numeric_limits<int32_t>::max();
+    }
+    int32_t upto = 0;
+    for (const_iterator itr = begin(); itr != end() && upto < limit; ++itr) {
+
+        TableTuple tuple = TableTuple(itr->getTupleAddress(), schema);
+        ElasticHash tupleHash = generateHash(table, tuple);
+
+        os << *itr << ", does ";
+        if (itr->getHash() != tupleHash) {
+            os << "NOT ";
+        }
+        os << "match tuple address of " << tupleHash << std::endl;
+
+        ++upto;
+    }
+}
+
+/**
  * ElasticIndexKey streaming operator.
  */
 inline std::ostream &operator<<(std::ostream &os, const ElasticIndexKey &key)
 {
-    os << std::hex << key.m_hash << ':' << key.m_ptrVal;
+    os << key.m_hash << ':' << key.m_ptrVal;
     return os;
 }
 
