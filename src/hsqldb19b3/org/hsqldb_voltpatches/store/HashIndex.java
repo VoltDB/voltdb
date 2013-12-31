@@ -65,11 +65,11 @@ class HashIndex {
 
     HashIndex(int hashTableSize, int capacity, boolean fixedSize) {
 
-        // A VoltDB extension to prevent a flaky crash case
+        // CHERRY PICK to prevent a flaky crash case
         if (capacity < hashTableSize) {
             capacity = hashTableSize;
         }
-        // End of VoltDB extension
+        // End of CHERRY PICK
         reset(hashTableSize, capacity);
 
         this.fixedSize = fixedSize;

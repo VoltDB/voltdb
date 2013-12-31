@@ -60,7 +60,7 @@ public final class DateTimeType extends DTIType {
 
     public DateTimeType(int typeGroup, int type, int scale) {
 
-        // A VoltDB extension to disable 
+        // A VoltDB extension -- mysterious (BACKOUT?)
         super(typeGroup, type, 8, scale);
         /* disable 1 line ...
         super(typeGroup, type, 0, scale);

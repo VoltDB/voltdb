@@ -4074,10 +4074,10 @@ public class ParserDQL extends ParserBase {
                 // But better late than sorry.
                 throw e;
             }
-        /* disable 1 line ...
+            /* disable 1 line ...
             readExpression(exprList, parseList, 0, parseList.length, false);
-        ... disabled 1 line */
-        // End of VoltDB extension
+            ... disabled 1 line */
+            // End of VoltDB extension
         }
 
         Expression[] expr = new Expression[exprList.size()];
@@ -4279,11 +4279,11 @@ public class ParserDQL extends ParserBase {
                 case Tokens.COMMA :
                 default :
                     if (token.tokenType != exprType) {
-        // A VoltDB extension to avoid using exceptions for flow control.
+                        // A VoltDB extension to avoid using exceptions for flow control.
                         if ( ! preferToThrow) {
                             return unexpectedToken();
                         }
-        // End of VoltDB extension
+                        // End of VoltDB extension
                         throw unexpectedToken();
                     }
 

@@ -101,15 +101,6 @@ public class FunctionSQL extends Expression {
     protected final static int FUNC_USER                             = 60;
     private final static int   FUNC_VALUE                            = 61;
 
-    // FunctionCustom adds a few values to this range that should probaby be kept unique.
-    // types.DTIType and Types add a few values to the range used by VoltDB for implementing EXTRACT variants.
-    // These are based on other ranges of constants that DO overlap with these FUNC_ constant, so they
-    // are dynamically adjusted with the following fixed offset.
-    private final static int   SQL_EXTRACT_VOLT_FUNC_OFFSET = 1000;
-
-    // Assume that 10000-19999 are available for VoltDB-specific use in specialized implementations of existing HSQL functions.
-    private final static int   FUNC_VOLT_SUBSTRING_CHAR_FROM = 10000;
-
     //
     static final short[] noParamList              = new short[]{};
     static final short[] emptyParamList           = new short[] {
@@ -220,9 +211,12 @@ public class FunctionSQL extends Expression {
     short[] parseList;
     short[] parseListAlt;
     boolean isValueFunction;
+    // A VoltDB extension to control SQL functions,
+    // their types and whether they are implemented in VoltDB.
     protected int parameterArg = -1;
     protected String voltDisabled;
     private static String DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR = "SQL Function";
+    // End of VoltDB extension
 
     public static FunctionSQL newSQLFunction(String token,
             CompileContext context) {
@@ -1669,7 +1663,7 @@ public class FunctionSQL extends Expression {
                 break;
             }
             case FUNC_CURRENT_TIMESTAMP : {
-                // A VoltDB extension to disable
+                // A VoltDB extension to disable TIME ZONE support
                 dataType = Type.SQL_TIMESTAMP;
                 /* disable 8 lines ...
                 int precision = DateTimeType.defaultTimestampFractionPrecision;
@@ -2040,6 +2034,17 @@ public class FunctionSQL extends Expression {
     }
 
     /************************* Volt DB Extensions *************************/
+
+    // FunctionCustom adds a few values to the range of FUNC_ constants above that should probaby be
+    // kept unique. types.DTIType and Types add a few values to the range used by VoltDB for
+    // implementing EXTRACT variants. These are based on other ranges of constants that
+    // DO overlap with these FUNC_ constant, so they are dynamically adjusted with the
+    // following fixed offset when used as function ids.
+    private final static int   SQL_EXTRACT_VOLT_FUNC_OFFSET = 1000;
+
+    // Assume that 10000-19999 are available for VoltDB-specific use
+    // in specialized implementations of existing HSQL functions.
+    private final static int   FUNC_VOLT_SUBSTRING_CHAR_FROM = 10000;
 
     /**
      * VoltDB added method to get a non-catalog-dependent

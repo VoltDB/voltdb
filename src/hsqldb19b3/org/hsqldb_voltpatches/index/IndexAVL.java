@@ -1547,7 +1547,6 @@ public class IndexAVL implements Index {
             return nextnode != null;
         }
 
-        @Override
         public Row getNextRow() {
 
             if (nextnode == null) {
