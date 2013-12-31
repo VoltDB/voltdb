@@ -103,8 +103,10 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             m_outstandingWriteTasksLock.newCondition();
 
     private static final ListeningExecutorService m_es = CoreUtils.getSingleThreadExecutor("Snapshot write service ");
-    private static final ListeningScheduledExecutorService m_syncService = MoreExecutors.listeningDecorator(
+    static final ListeningScheduledExecutorService m_syncService = MoreExecutors.listeningDecorator(
             Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("Snapshot sync service")));
+
+    public static final int SNAPSHOT_SYNC_FREQUENCY = Integer.getInteger("SNAPSHOT_SYNC_FREQUENCY", 500);
 
     public DefaultSnapshotDataTarget(
             final File file,
@@ -249,8 +251,10 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         syncTask = m_syncService.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
-                int bytesSinceLastSync = 0;
-                while ((bytesSinceLastSync = m_bytesWrittenSinceLastSync.getAndSet(0)) > 0) {
+                //Only sync for at least 4 megabyte of data, enough to amortize the cost of seeking
+                //on ye olden platters. Since we are appending to a file it's actually 2 seeks.
+                while (m_bytesWrittenSinceLastSync.get() > (1024 * 1024 * 4)) {
+                    final int bytesSinceLastSync = m_bytesWrittenSinceLastSync.getAndSet(0);
                     try {
                         m_channel.force(false);
                     } catch (IOException e) {
@@ -259,7 +263,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     m_bytesAllowedBeforeSync.release(bytesSinceLastSync);
                 }
             }
-        }, 1, 1, TimeUnit.SECONDS);
+        }, SNAPSHOT_SYNC_FREQUENCY, SNAPSHOT_SYNC_FREQUENCY, TimeUnit.MILLISECONDS);
         m_syncTask = syncTask;
     }
 

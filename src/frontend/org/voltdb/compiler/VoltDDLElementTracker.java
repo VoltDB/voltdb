@@ -128,8 +128,9 @@ public class VoltDDLElementTracker {
             // the longer form costructor asserts on singleStatement
             descriptor = m_compiler.new ProcedureDescriptor(
                     descriptor.m_authGroups,
-                    descriptor.m_className,
-                    partitionInfo);
+                    descriptor.m_class,
+                    partitionInfo,
+                    descriptor.m_language);
         }
         else {
             descriptor = m_compiler.new ProcedureDescriptor(
@@ -138,7 +139,9 @@ public class VoltDDLElementTracker {
                     descriptor.m_singleStmt,
                     descriptor.m_joinOrder,
                     partitionInfo,
-                    false);
+                    false,
+                    descriptor.m_language,
+                    descriptor.m_class);
         }
         m_procedureMap.put(procedureName, descriptor);
     }

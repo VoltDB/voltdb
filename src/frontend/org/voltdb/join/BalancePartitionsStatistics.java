@@ -54,7 +54,7 @@ public class BalancePartitionsStatistics extends StatsSource {
     // Keyed by nanosecond timestamp.
     TreeMap<Long, Long> bytesTransferredInLastSec = Maps.newTreeMap();
     long throughput = 0;
-    long lastTransferTimeMS = 0;
+    long lastTransferTimeNanos = 0;
 
     private volatile StatsPoint statsPoint;
     private StatsPoint intervalStats;
@@ -78,7 +78,6 @@ public class BalancePartitionsStatistics extends StatsSource {
         this.totalRangeSize = totalRangeSize;
         this.lastReportTime = overallStats.getStartTimeNanos();
         this.lastBalanceDuration = 0;
-        this.balanceStart = 0;
 
         startInterval();
 
@@ -92,7 +91,7 @@ public class BalancePartitionsStatistics extends StatsSource {
         balanceStart = System.nanoTime();
     }
 
-    public void logBalanceEnds(long rangeSizeMoved, long bytesTransferred, long transferTimeMS, long rowsTransferred)
+    public void logBalanceEnds(long rangeSizeMoved, long bytesTransferred, long callTimeNanos, long transferTimeNanos, long rowsTransferred)
     {
         final long balanceEnd = System.nanoTime();
         lastBalanceDuration = balanceEnd - balanceStart;
@@ -107,12 +106,24 @@ public class BalancePartitionsStatistics extends StatsSource {
             throughput -= bytesTransferredInLastSec.pollFirstEntry().getValue();
         }
 
-        lastTransferTimeMS = transferTimeMS;
+        lastTransferTimeNanos = transferTimeNanos;
 
-        overallStats = overallStats.update(balanceEnd, lastBalanceDuration, rangeSizeMoved,
-                                           rowsTransferred, bytesTransferred, 1);
-        intervalStats = intervalStats.update(balanceEnd, lastBalanceDuration, rangeSizeMoved,
-                                             rowsTransferred, bytesTransferred, 1);
+        overallStats = overallStats.update(balanceEnd,
+                                           lastBalanceDuration,
+                                           callTimeNanos,
+                                           transferTimeNanos,
+                                           rangeSizeMoved,
+                                           rowsTransferred,
+                                           bytesTransferred,
+                                           1);
+        intervalStats = intervalStats.update(balanceEnd,
+                                             lastBalanceDuration,
+                                             callTimeNanos,
+                                             transferTimeNanos,
+                                             rangeSizeMoved,
+                                             rowsTransferred,
+                                             bytesTransferred,
+                                             1);
 
         markStatsPoint();
 
@@ -194,6 +205,8 @@ public class BalancePartitionsStatistics extends StatsSource {
         public final static String MEGABYTES_PER_SECOND = "MEGABYTES_PER_SECOND";
         public final static String CALLS_PER_SECOND = "CALLS_PER_SECOND";
         public final static String CALLS_LATENCY = "CALLS_LATENCY";
+        public final static String CALLS_TIME = "CALLS_TIME";
+        public final static String CALLS_TRANSFER_TIME = "CALLS_TRANSFER_TIME";
     }
 
     @Override
@@ -207,6 +220,8 @@ public class BalancePartitionsStatistics extends StatsSource {
         columns.add(new ColumnInfo(Constants.MEGABYTES_PER_SECOND, VoltType.FLOAT));
         columns.add(new ColumnInfo(Constants.CALLS_PER_SECOND, VoltType.FLOAT));
         columns.add(new ColumnInfo(Constants.CALLS_LATENCY, VoltType.FLOAT));
+        columns.add(new ColumnInfo(Constants.CALLS_TIME, VoltType.FLOAT));
+        columns.add(new ColumnInfo(Constants.CALLS_TRANSFER_TIME, VoltType.FLOAT));
     }
 
     @Override
@@ -214,14 +229,16 @@ public class BalancePartitionsStatistics extends StatsSource {
     {
         final StatsPoint point = statsPoint;
 
-        rowValues[columnNameToIndex.get(Constants.TIMESTAMP)] = point.getEndTimeMillis();
+        rowValues[columnNameToIndex.get(Constants.TIMESTAMP)] = System.currentTimeMillis();
         rowValues[columnNameToIndex.get(Constants.PERCENTAGE_MOVED)] = point.getPercentageMoved();
         rowValues[columnNameToIndex.get(Constants.MOVED_ROWS)] = point.getMovedRows();
         rowValues[columnNameToIndex.get(Constants.ROWS_PER_SECOND)] = point.getRowsPerSecond();
         rowValues[columnNameToIndex.get(Constants.ESTIMATED_REMAINING)] = point.getEstimatedRemaining();
         rowValues[columnNameToIndex.get(Constants.MEGABYTES_PER_SECOND)] = point.getMegabytesPerSecond();
         rowValues[columnNameToIndex.get(Constants.CALLS_PER_SECOND)] = point.getInvocationsPerSecond();
-        rowValues[columnNameToIndex.get(Constants.CALLS_LATENCY)] = point.getAverageInvocationTime();
+        rowValues[columnNameToIndex.get(Constants.CALLS_LATENCY)] = point.getAverageInvocationLatency();
+        rowValues[columnNameToIndex.get(Constants.CALLS_TIME)] = point.getAverageInvocationTime();
+        rowValues[columnNameToIndex.get(Constants.CALLS_TRANSFER_TIME)] = point.getAverageInvocationTransferTime();
     }
 
     @Override
@@ -257,8 +274,12 @@ public class BalancePartitionsStatistics extends StatsSource {
         private final long movedBytes;
         /// # of calls.
         private final long invocationCount;
-        /// Nanoseconds spent inside sysproc call.
+        // Nanoseconds waiting on sysproc call
+        private final long invocationLatencyNanos;
+        // Nanoseconds spent executing sysproc
         private final long invocationTimeNanos;
+        // Nanosecond spent transferring data in sysproc
+        private final long invocationTransferTimeNanos;
 
         /**
          * Scratch constructor.
@@ -268,7 +289,7 @@ public class BalancePartitionsStatistics extends StatsSource {
          */
         public StatsPoint(String name, long totalRanges)
         {
-            this(name, null, null, totalRanges, 0, 0, 0, 0, 0);
+            this(name, null, null, totalRanges, 0, 0, 0, 0, 0, 0, 0);
         }
 
         /**
@@ -281,7 +302,7 @@ public class BalancePartitionsStatistics extends StatsSource {
          * @param movedRows            moved row count
          * @param movedBytes           moved byte count
          * @param invocationCount      invocation count
-         * @param invocationTimeNanos  time spent in sysproc
+         * @param invocationLatencyNanos  time spent waiting on sysproc
          */
         public StatsPoint(
                 String name,
@@ -292,7 +313,9 @@ public class BalancePartitionsStatistics extends StatsSource {
                 long movedRows,
                 long movedBytes,
                 long invocationCount,
-                long invocationTimeNanos)
+                long invocationLatencyNanos,
+                long invocationTimeNanos,
+                long invocationTransferTimeNanos)
         {
             // Substitute the current time for null start or end times
             long nowNanos = System.nanoTime();
@@ -304,7 +327,9 @@ public class BalancePartitionsStatistics extends StatsSource {
             this.movedRows = movedRows;
             this.movedBytes = movedBytes;
             this.invocationCount = invocationCount;
+            this.invocationLatencyNanos = invocationLatencyNanos;
             this.invocationTimeNanos = invocationTimeNanos;
+            this.invocationTransferTimeNanos = invocationTransferTimeNanos;
         }
 
         long getStartTimeMillis()
@@ -322,29 +347,9 @@ public class BalancePartitionsStatistics extends StatsSource {
             return endTimeNanos / TimeUnit.MILLISECONDS.toNanos(1);
         }
 
-        long getEndTimeNanos()
-        {
-            return endTimeNanos;
-        }
-
-        long getTotalRanges()
-        {
-            return totalRanges;
-        }
-
-        long getMovedRanges()
-        {
-            return movedRanges;
-        }
-
         long getMovedRows()
         {
             return movedRows;
-        }
-
-        long getMovedBytes()
-        {
-            return movedBytes;
         }
 
         // Derive duration from start/end times.
@@ -363,9 +368,9 @@ public class BalancePartitionsStatistics extends StatsSource {
             return invocationCount;
         }
 
-        double getInvocationTimeMillis()
+        double getInvocationLatencyMillis()
         {
-            return invocationTimeNanos / (double)TimeUnit.MILLISECONDS.toNanos(1);
+            return invocationLatencyNanos / (double)TimeUnit.MILLISECONDS.toNanos(1);
         }
 
         double getThroughput()
@@ -426,10 +431,18 @@ public class BalancePartitionsStatistics extends StatsSource {
             return getDurationMillis() == 0 ? 0.0 : invocationCount / durationInSecs;
         }
 
-        public double getAverageInvocationTime()
+        public double getAverageInvocationLatency()
         {
             //Convert to floating point millis
-            return invocationCount == 0 ? 0.0 :getInvocationTimeMillis() / invocationCount;
+            return invocationCount == 0 ? 0.0 : getInvocationLatencyMillis() / (double)invocationCount;
+        }
+
+        public double getAverageInvocationTime() {
+            return invocationCount == 0 ? 0.0 : TimeUnit.NANOSECONDS.toMillis(invocationTimeNanos) / (double)invocationCount;
+        }
+
+        public double getAverageInvocationTransferTime() {
+            return invocationCount == 0 ? 0.0 : TimeUnit.NANOSECONDS.toMillis(invocationTransferTimeNanos) / (double)invocationCount;
         }
 
         public final static String formatTimeInterval(double dms)
@@ -458,7 +471,7 @@ public class BalancePartitionsStatistics extends StatsSource {
         /**
          * Update statistics.
          * @param lastTimeNanos           time in nanoseconds
-         * @param lastInvocationTimeNanos time spent while invoking the sysproc
+         * @param lastInvocationLatencyNanos time spent while invoking the sysproc
          * @param lastMovedRanges         moved range count
          * @param lastMovedRows           moved row count
          * @param lastMovedBytes          moved byte count
@@ -466,7 +479,9 @@ public class BalancePartitionsStatistics extends StatsSource {
          */
         public StatsPoint update(
                 Long lastTimeNanos,
+                long lastInvocationLatencyNanos,
                 long lastInvocationTimeNanos,
+                long lastInvocationTransferTimeNanos,
                 long lastMovedRanges,
                 long lastMovedRows,
                 long lastMovedBytes,
@@ -481,7 +496,9 @@ public class BalancePartitionsStatistics extends StatsSource {
                     this.movedRows + lastMovedRows,
                     this.movedBytes + lastMovedBytes,
                     this.invocationCount + lastInvocationCount,
-                    this.invocationTimeNanos + lastInvocationTimeNanos);
+                    this.invocationLatencyNanos + lastInvocationLatencyNanos,
+                    this.invocationTimeNanos + lastInvocationTimeNanos,
+                    this.invocationTransferTimeNanos + lastInvocationTransferTimeNanos);
         }
 
         /**
@@ -501,7 +518,9 @@ public class BalancePartitionsStatistics extends StatsSource {
                     movedRows,
                     movedBytes,
                     invocationCount,
-                    invocationTimeNanos);
+                    invocationLatencyNanos,
+                    invocationTimeNanos,
+                    invocationTransferTimeNanos);
 
         }
 
@@ -513,13 +532,14 @@ public class BalancePartitionsStatistics extends StatsSource {
                     + ", percent=%.2f%% (%s)"
                     + ", rows=%d @ %.2f rows/second"
                     + ", bytes=%d @ %.2f MB/second"
-                    + ", invocation=%.2f ms (%d @ %.2f ms latency)",
+                    + ", invocation=%.2f ms (%d @ %.2f ms latency %.2f ms execution time %.2f ms transfer time)",
                     name,
                     getDurationMillis() / 1000.0,
                     getPercentageMoved(), getFormattedPercentageMovedRate(),
                     movedRows, getRowsPerSecond(),
                     movedBytes, getMegabytesPerSecond(),
-                    getInvocationTimeMillis(), invocationCount, getAverageInvocationTime());
+                    getInvocationLatencyMillis(), invocationCount,
+                    getAverageInvocationLatency(), getAverageInvocationTime(), getAverageInvocationTransferTime());
         }
     }
 }

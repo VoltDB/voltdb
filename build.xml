@@ -793,7 +793,8 @@ JAR BUILDING
             <include name="javax/servlet_voltpatches/**" />
             <include name="au/com/bytecode/opencsv_voltpatches/**" />
             <include name="org/cliffc_voltpatches/**" />
-	        <include name="org/supercsv_voltpatches/tokenizer/*" />
+            <include name="groovy_voltpatches/**"/>
+	    <include name="org/supercsv_voltpatches/tokenizer/*" />
             <include name="org/hsqldb_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
             <include name="org/mindrot/**" />
@@ -1023,7 +1024,8 @@ JAVA COMPILATION
                   javax/annotation_voltpatches/**/*.java
                   com/google_voltpatches/**/*.java
                   org/cliffc_voltpatches/**
-		          org/supercsv_voltpatches/tokenizer/*.java"/>
+                  groovy_voltpatches/**
+		  org/supercsv_voltpatches/tokenizer/*.java"/>
     <!-- non-voltcore voltdb code -->
     <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java" />
 
@@ -1509,13 +1511,13 @@ TEST CASES
 </target>
 
 <target name="junit_lite_sql" description="lightweight junit tests for sql">
-	<run_junit>
-		<tests>
-			<fileset dir='${build.test.dir}'>
-		    	<include name="org/voltdb/regressionsuites/TestSQLFeaturesSuite.class"/>
-			</fileset>
-		</tests>
-	</run_junit>
+  <run_junit>
+    <tests>
+      <fileset dir='${build.test.dir}'>
+          <include name="org/voltdb/regressionsuites/TestSQLFeaturesSuite.class"/>
+      </fileset>
+    </tests>
+  </run_junit>
 </target>
 
 <target name="junit_quarantine" description="Run testcases which fail unpredictably.">
@@ -2185,7 +2187,7 @@ DEBIAN PACKAGE CREATION
 -->
 
 <target name="debian_package"
-	    depends="buildinfo"
+      depends="buildinfo"
         description="Create Debian/Ubuntu package. Uses sudo, so it may prompt for a password.">
     <exec executable="sudo" failonerror="true">
         <arg value="python" />
@@ -2197,7 +2199,7 @@ DEBIAN PACKAGE CREATION
 
 <!-- This debian package cleaning target is safe. It doesn't run as root. -->
 <target name="clean_debian_package"
-	    depends=""
+      depends=""
         description="Remove all Debian/Ubuntu package build artifacts.">
     <exec dir='.' executable='/bin/sh' failonerror='false'>
         <arg line="-c 'rm -rfv ${debian.package.dir}'" />
@@ -2206,7 +2208,7 @@ DEBIAN PACKAGE CREATION
 
 <!-- Use this if permissions are messed up by interrupted package building as root. -->
 <target name="force_clean_debian_package"
-	    depends=""
+      depends=""
         description="Forceably remove all Debian/Ubuntu package build artifacts as root.">
     <exec dir="." executable="sudo" failonerror="false">
         <arg line="/bin/sh -c 'rm -rfv ${debian.package.dir}'" />
@@ -2231,7 +2233,7 @@ RPM PACKAGE CREATION
 
 <!-- This cleaning target is safe. It doesn't run as root. -->
 <target name="clean_rpm_package"
-	    depends=""
+      depends=""
         description="Remove all RPM build artifacts.">
     <exec dir='.' executable='/bin/sh' failonerror='false'>
         <arg line="-c 'rm -rfv ${rpm.package.dir}'" />
