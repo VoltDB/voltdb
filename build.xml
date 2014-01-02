@@ -2107,7 +2107,7 @@ UTILITIES
 </target>
 
 <target name='setversion' depends='setversion-changestrings, setversion-recompile-mockjars'
-        description="Set the version string and recompile some test catalogsin VOLTPRO. Specify version as -Dversion=4.1.1">
+        description="Set the version string and recompile some test catalogsin VOLTPRO. Specify version as -Dnewversion=4.1.1">
     <echo message='Be sure to commit both repositories'/>
 </target>
 
