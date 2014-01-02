@@ -258,7 +258,11 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     try {
                         m_channel.force(false);
                     } catch (IOException e) {
-                        SNAP_LOG.error("Error syncing snapshot", e);
+                        if (!(e instanceof java.nio.channels.AsynchronousCloseException )) {
+                            SNAP_LOG.error("Error syncing snapshot", e);
+                        } else {
+                            SNAP_LOG.debug("Asynchronous close syncing snasphot data, presumably graceful", e);
+                        }
                     }
                     m_bytesAllowedBeforeSync.release(bytesSinceLastSync);
                 }

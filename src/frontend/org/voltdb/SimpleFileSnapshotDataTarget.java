@@ -91,7 +91,11 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
                     try {
                         m_fc.force(false);
                     } catch (IOException e) {
-                        SNAP_LOG.error("Error syncing snapshot", e);
+                        if (!(e instanceof java.nio.channels.AsynchronousCloseException )) {
+                            SNAP_LOG.error("Error syncing snapshot", e);
+                        } else {
+                            SNAP_LOG.debug("Asynchronous close syncing snapshot data, presumably graceful", e);
+                        }
                     }
                     //Blind setting to 0 means we could technically write more than
                     //256 megabytes at a time but 512 is the worst case and that is fine
