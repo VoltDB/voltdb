@@ -53,21 +53,28 @@ public class JDBC4Statement implements java.sql.Statement
         private final String[] sql;
         private final int parameterCount;
         private final byte type;
+        private final byte queryType;   // Type of query EXEC'd by @AdHoc
         private final Object[] parameters;
 
         private VoltSQL(String[] sql, int parameterCount, byte type)
         {
             this.sql = sql;
             this.parameterCount = parameterCount;
-            this.type = type;
+            this.type = this.queryType = type;
             this.parameters = null;
         }
 
         private VoltSQL(String[] sql, int parameterCount, byte type, Object[] parameters)
         {
+            this(sql, parameterCount, type, type, parameters);
+        }
+
+        private VoltSQL(String[] sql, int parameterCount, byte type, byte queryType, Object[] parameters)
+        {
             this.sql = sql;
             this.parameterCount = parameterCount;
             this.type = type;
+            this.queryType = queryType;
             this.parameters = parameters;
         }
 
@@ -94,10 +101,21 @@ public class JDBC4Statement implements java.sql.Statement
             return false;
         }
 
+        public boolean isQueryOfType(int... types)
+        {
+            for(int i=0;i<types.length;i++)
+                if (this.queryType == types[i])
+                    return true;
+            return false;
+        }
+
         protected VoltTable[] execute(JDBC4ClientConnection connection, long timeout) throws SQLException {
             try
             {
-                return connection.execute(this.sql[0], timeout, this.parameters).getResults();
+                if (this.type == TYPE_EXEC)
+                    return connection.execute(this.sql[0], timeout, this.parameters).getResults();
+                else
+                    return connection.execute("@AdHoc", timeout, this.sql[0]).getResults();
             }
             catch(ProcCallException e)
             {
@@ -155,7 +173,7 @@ public class JDBC4Statement implements java.sql.Statement
                 for (int i = 0; i < params.length; ++i) {
                     paramsOut[i+1] = params[i];
                 }
-                return new VoltSQL(new String[] {"@AdHoc"}, this.parameterCount, this.type, paramsOut);
+                return new VoltSQL(new String[] {"@AdHoc"}, this.parameterCount, TYPE_EXEC, this.type, paramsOut);
             }
         }
 
@@ -388,7 +406,7 @@ public class JDBC4Statement implements java.sql.Statement
     protected boolean execute(VoltSQL query) throws SQLException
     {
         checkClosed();
-        if (query.isOfType(VoltSQL.TYPE_SELECT,VoltSQL.TYPE_EXEC))
+        if (query.isQueryOfType(VoltSQL.TYPE_SELECT,VoltSQL.TYPE_EXEC))
         {
             setCurrentResult(query.execute(this.sourceConnection.NativeConnection, this.m_timeout), -1);
             return true;

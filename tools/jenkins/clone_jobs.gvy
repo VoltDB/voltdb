@@ -10,12 +10,15 @@ def str_search_1 = "system-test-" + str_nextrelease
 def str_search_2 = "performance-" + str_nextrelease
 def str_search_3 = "endurance-" + str_nextrelease
 def str_oldbranch = "master"
+def str_viewname="system tests-elastic"
+//def str_viewname="system tests-noelastic"
 
-def str_branch = "ENG-5057-csvloader"
+def str_branch = "ENG-5154"
 boolean enable_performance = false
-boolean enable_systemtest = false
+boolean enable_systemtest = true
+boolean enable_cl_truncation = false
 boolean enable_supers = false
-boolean replace = true // delete existing jobs, if any dont change there is a bug -pr
+boolean makenew = false // true=delete existing jobs, false=keep existing jobs but change job enable/disable settings
 
 def workspace_name = str_search_1.replace("nextrelease", str_branch)
 //whitespace separated list of email addresses
@@ -26,7 +29,7 @@ downstream = ""
 
 alljobs = []
 
-def view = Hudson.instance.getView("system tests")
+def view = Hudson.instance.getView(str_viewname)
 
 /*
 for (item in Hudson.instance.items) {
@@ -52,16 +55,30 @@ for(item in alljobs)
 
       // delete existing job with new name
       if (Hudson.instance.getJob(newName))
-            if (replace)
+            if (makenew)
                 Hudson.instance.getJob(newName).delete()
-            else
-                continue
 
-      // copy the job, disable and save it
-      def job = Hudson.instance.copy(item, newName)
-      job.disabled = true
+      if ( ! Hudson.instance.getJob(newName))
+            // copy the job, save it
+            def job = Hudson.instance.copy(item, newName)
+      else
+            job = Hudson.instance.getJob(newName)
 
       AbstractProject project = job
+
+      if (project.getName().startsWith("performance-"))
+          project.disabled = !enable_performance
+      else if (project.getName().endsWith("-cl-truncation"))
+          project.disabled = !enable_cl_truncation
+      else if (project.getName().startsWith("system-test-"))
+          project.disabled = !enable_systemtest
+      else if (project.getName().startsWith("test-"))
+          project.disabled = !enable_supers
+     else
+          project.disabled = false
+
+     if ( ! makenew)
+          continue
 
       // save the kit-build project ref
       if (job.getName().startsWith("kit-")) kit = project
@@ -118,16 +135,6 @@ for(item in alljobs)
           p.recipients = recipientlist
         }
     }
-
-      if (project.getName().startsWith("performance-"))
-          project.disabled = !enable_performance
-      else if (project.getName().startsWith("system-test-"))
-          project.disabled = !enable_systemtest
-      else if (project.getName().startsWith("test-"))
-          project.disabled = !enable_supers
-     else
-          project.disabled = false
-
 
       project.save()
 

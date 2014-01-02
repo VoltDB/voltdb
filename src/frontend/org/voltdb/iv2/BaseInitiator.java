@@ -67,13 +67,12 @@ public abstract class BaseInitiator implements Initiator
         m_messenger = messenger;
         m_partitionId = partition;
         m_scheduler = scheduler;
-        boolean isLiveRejoin = startAction == StartAction.LIVE_REJOIN;
         JoinProducerBase joinProducer;
 
         if (startAction == StartAction.JOIN) {
             joinProducer = new ElasticJoinProducer(m_partitionId, scheduler.m_tasks);
         } else if (startAction.doesRejoin()) {
-            joinProducer = new RejoinProducer(m_partitionId, scheduler.m_tasks, isLiveRejoin);
+            joinProducer = new RejoinProducer(m_partitionId, scheduler.m_tasks);
         } else {
             joinProducer = null;
         }
