@@ -123,7 +123,7 @@ public class SystemProcedureCatalog {
 
     public static final ImmutableMap<String, Config> listing;
 
-    static {                                                                                            // SP     RO     Every  Param ParamType Pro  (DR: kill, skip, replica-ok)
+    static {                                                                                            // SP     RO     Every  Param ParamType Pro  (DR: kill, skip, replica-ok, durable?)
         ImmutableMap.Builder<String, Config> builder = ImmutableMap.builder();
         builder.put("@AdHoc_RW_MP",             new Config("org.voltdb.sysprocs.AdHoc_RW_MP",              false, false, false, 0, VoltType.INVALID,   false, false, false, true, true));
         builder.put("@AdHoc_RW_SP",             new Config("org.voltdb.sysprocs.AdHoc_RW_SP",              true,  false, false, 0, VoltType.VARBINARY, false, false, false, true, true));
