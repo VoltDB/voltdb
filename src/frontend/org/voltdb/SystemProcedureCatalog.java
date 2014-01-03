@@ -89,7 +89,7 @@ public class SystemProcedureCatalog {
         public boolean isDurable() {
             return durable;
         }
-        
+
         public boolean getEverysite() {
             return everySite;
         }
