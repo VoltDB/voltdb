@@ -86,6 +86,10 @@ public class SystemProcedureCatalog {
             this.durable = durable;
         }
 
+        public boolean isDurable() {
+            return durable;
+        }
+        
         public boolean getEverysite() {
             return everySite;
         }
