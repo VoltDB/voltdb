@@ -27,7 +27,6 @@ import java.io.File;
 import java.net.URL;
 
 import org.voltcore.utils.InstanceId;
-
 import org.voltdb.utils.MiscUtils;
 
 /**
@@ -45,7 +44,6 @@ public class ServerThread extends Thread {
         }
 
         if (!m_config.validate()) {
-            m_config.usage();
             System.exit(-1);
         }
 
@@ -84,7 +82,6 @@ public class ServerThread extends Thread {
         m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
 
         if (!m_config.validate()) {
-            m_config.usage();
             System.exit(-1);
         }
 
@@ -120,7 +117,6 @@ public class ServerThread extends Thread {
         m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
 
         if (!m_config.validate()) {
-            m_config.usage();
             System.exit(-1);
         }
 
