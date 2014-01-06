@@ -447,9 +447,11 @@ public class Collector {
         }
         // If we dont have anything in stdout look in stderr.
         if (tempFile.length() <= 0) {
-            while ((line = ereader.readLine()) != null) {
-                writer.write(line);
-                writer.newLine();
+            if (ereader != null) {
+                while ((line = ereader.readLine()) != null) {
+                    writer.write(line);
+                    writer.newLine();
+                }
             }
         }
         writer.close();
