@@ -437,12 +437,20 @@ public class Collector {
 
         Process p = Runtime.getRuntime().exec(command);
         BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+        BufferedReader ereader = new BufferedReader(new InputStreamReader(p.getErrorStream()));
         BufferedWriter writer = new BufferedWriter(new FileWriter(tempFile));
 
         String line = null;
         while ((line = reader.readLine()) != null) {
             writer.write(line);
             writer.newLine();
+        }
+        // If we dont have anything in stdout look in stderr.
+        if (tempFile.length() <= 0) {
+            while ((line = ereader.readLine()) != null) {
+                writer.write(line);
+                writer.newLine();
+            }
         }
         writer.close();
 
