@@ -111,6 +111,37 @@ CREATE TABLE export_skinny_partitioned_table
 , rowid                     BIGINT        NOT NULL
 );
 
+-- For loadsinglepartition
+CREATE TABLE loadp
+(
+  cid    BIGINT NOT NULL
+, txnid  BIGINT NOT NULL
+, rowid  BIGINT NOT NULL
+);
+PARTITION TABLE loadp ON COLUMN cid;
+CREATE TABLE cploadp
+(
+  cid    BIGINT NOT NULL
+, txnid  BIGINT NOT NULL
+, rowid  BIGINT NOT NULL
+);
+PARTITION TABLE cploadp ON COLUMN cid;
+
+
+-- For loadmultiplepartition
+CREATE TABLE loadmp
+(
+  cid    BIGINT NOT NULL
+, txnid  BIGINT NOT NULL
+, rowid  BIGINT NOT NULL
+);
+CREATE TABLE cploadmp
+(
+  cid    BIGINT NOT NULL
+, txnid  BIGINT NOT NULL
+, rowid  BIGINT NOT NULL
+);
+
 PARTITION TABLE export_skinny_partitioned_table ON COLUMN rowid;
 EXPORT TABLE export_skinny_partitioned_table;
 
@@ -141,3 +172,6 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonSP;
 PARTITION PROCEDURE PoisonSP ON TABLE partitioned COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PopulateDimension;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CopyLoadPartitionedSP;
+PARTITION PROCEDURE CopyLoadPartitionedSP ON TABLE cploadp COLUMN cid;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CopyLoadPartitionedMP;

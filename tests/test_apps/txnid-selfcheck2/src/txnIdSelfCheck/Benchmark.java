@@ -485,6 +485,17 @@ public class Benchmark {
                          (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits);
         replicatedLoader.start();
 
+        LoadTableLoader plt = new LoadTableLoader(client, "loadp",
+                (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits);
+        while (((ClientImpl) client).isHashinatorInitialized() == false) {
+            Thread.sleep(1000);
+            System.out.println("Wait for hashinator..");
+        }
+        plt.start();
+        LoadTableLoader rlt = new LoadTableLoader(client, "loadmp",
+                (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, 3, permits);
+        rlt.start();
+
         ReadThread readThread = new ReadThread(client, config.threads, config.threadoffset,
                 config.allowinprocadhoc, config.mpratio, permits);
         readThread.start();
@@ -522,6 +533,10 @@ public class Benchmark {
         readThread.join();
         adHocMayhemThread.join();
         idpt.join();
+
+        rlt.join();
+        plt.join();
+
         for (ClientThread clientThread : clientThreads) {
             clientThread.join();
         }
