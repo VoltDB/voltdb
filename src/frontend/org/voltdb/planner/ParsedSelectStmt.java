@@ -286,7 +286,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (columns != null) {
                 mvNewScanColumns.addAll(columns);
             }
-            if (mvFixInfo.processMVBasedQueryFix(mvTableScan, mvNewScanColumns, joinTree, displayColumns(), groupByColumns())) {
+            // ENG-5669: HAVING aggregation and order by aggregation also need to be checked.
+            if (mvFixInfo.processMVBasedQueryFix(mvTableScan, mvNewScanColumns, joinTree, aggResultColumns, groupByColumns())) {
                 break;
             }
         }
