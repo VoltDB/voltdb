@@ -56,6 +56,18 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     protected VoltType m_valueType = null;
     protected int m_valueSize = 0;
 
+    // Keep this flag turned off in production or when testing user-accessible EXPLAIN output or when
+    // using EXPLAIN output to validate plans.
+    protected static boolean m_verboseExplainForDebugging = false; // CODE REVIEWER! this SHOULD be false!
+    public static void enableVerboseExplainForDebugging() { m_verboseExplainForDebugging = true; }
+    public static boolean disableVerboseExplainForDebugging()
+    {
+        boolean was = m_verboseExplainForDebugging;
+        m_verboseExplainForDebugging = false;
+        return was;
+    }
+    public static void restoreVerboseExplainForDebugging(boolean was) { m_verboseExplainForDebugging = was; }
+
     public AbstractExpression(ExpressionType type) {
         m_type = type;
     }
