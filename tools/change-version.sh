@@ -32,16 +32,16 @@ showchange
 
 # Change RealVoltDB.java
 file="src/frontend/org/voltdb/RealVoltDB.java"
-sed -i "s/m_defaultVersionString = \".*\"/m_defaultVersionString = \"${version}\"/" $file
+sed -i ''  "s/m_defaultVersionString = \".*\"/m_defaultVersionString = \"${version}\"/" $file
 showchange
 
 # Change verify_kits.py
 file="tools/kit_tools/verify_kits.py"
-sed -i "s/version = \".*\"/version = \"${version}\"/" $file
+sed -i '' "s/version = \".*\"/version = \"${version}\"/" $file
 showchange
 
 # Change mainui.js
 file="src/frontend/org/voltdb/studio/js/mainui.js"
-sed -i "s/var \$volt_version = '.*'/var \$volt_version = '${version}'/" $file
+sed -i '' "s/var \$volt_version = '.*'/var \$volt_version = '${version}'/" $file
 showchange
 
