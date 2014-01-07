@@ -222,8 +222,9 @@ public class SnapshotSaveAPI
                         if (block != 0) {
                             runPostTasks = true;
                             earlyResultTable = SnapshotUtil.constructPartitionResultsTable();
-                        }
-                        else {
+                            earlyResultTable.addRow(context.getHostId(), hostname,
+                                    CoreUtils.getSiteIdFromHSId(context.getSiteId()), "SUCCESS", "");
+                        } else {
                             earlyResultTable = SnapshotUtil.constructNodeResultsTable();
                         }
                     }

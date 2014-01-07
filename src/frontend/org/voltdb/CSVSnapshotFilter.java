@@ -53,7 +53,7 @@ public class CSVSnapshotFilter implements SnapshotDataFilter {
         return new Callable<BBContainer>() {
             @Override
             public BBContainer call() throws Exception {
-                final BBContainer cont = input.call();
+                BBContainer cont = input.call();
                 if (cont == null) {
                     return null;
                 }
@@ -72,9 +72,18 @@ public class CSVSnapshotFilter implements SnapshotDataFilter {
                                             m_fullDelimiters,
                                             m_lastNumCharacters);
                     m_lastNumCharacters = p.getFirst();
-                    return DBBPool.wrapBB(ByteBuffer.wrap(p.getSecond()));
+                    final BBContainer origin = cont;
+                    cont = null;
+                    return new BBContainer( ByteBuffer.wrap(p.getSecond()), 0L) {
+                        @Override
+                        public void discard() {
+                            origin.discard();
+                        }
+                    };
                 } finally {
-                    cont.discard();
+                    if (cont != null) {
+                        cont.discard();
+                    }
                 }
             }
         };

@@ -82,7 +82,7 @@ public:
         // If any stream handles the notification, it's "handled".
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
             assert(streamPtr != NULL);
-            handled |= streamPtr->m_context->notifyTupleInsert(tuple);
+            handled = handled || streamPtr->m_context->notifyTupleInsert(tuple);
         }
         return handled;
     }
@@ -96,7 +96,7 @@ public:
         // If any context handles the notification, it's "handled".
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
             assert(streamPtr != NULL);
-            handled |= streamPtr->m_context->notifyTupleUpdate(tuple);
+            handled = handled || streamPtr->m_context->notifyTupleUpdate(tuple);
         }
         return handled;
     }
@@ -110,7 +110,7 @@ public:
         // Any active stream can reject freeing the tuple.
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
             assert(streamPtr != NULL);
-            freeable &= streamPtr->m_context->notifyTupleDelete(tuple);
+            freeable = freeable && streamPtr->m_context->notifyTupleDelete(tuple);
         }
         return freeable;
     }
