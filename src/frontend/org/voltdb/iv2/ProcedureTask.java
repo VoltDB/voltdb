@@ -78,8 +78,9 @@ abstract public class ProcedureTask extends TransactionTask
                 response.setResults(
                         new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
                             new VoltTable[] {},
-                            "Exception while deserializing procedure params\n" +
-                            result.toString()));
+                                "Exception while deserializing procedure params, procedure="
+                                + m_procName + "\n"
+                                + result.toString()));
             }
             if (callerParams != null) {
                 ClientResponseImpl cr = null;
@@ -104,7 +105,7 @@ abstract public class ProcedureTask extends TransactionTask
                     return response;
                 }
 
-                // Check partitioning of the invocation
+                // Check partitioning of single-partition and n-partition transactions.
                 if (runner.checkPartition(m_txnState)) {
                     runner.setupTransaction(m_txnState);
                     cr = runner.call(task.getParameters());

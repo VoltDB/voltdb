@@ -56,10 +56,11 @@
 <!-- import the pro build.xml if it exists and is requested -->
 <import file="${voltpro}/build.xml" optional="true"/>
 
-<property name='base.dir'                   location='.' />
+<property name='base.dir'                    location='.' />
 <property name='build.dir'                   location='obj/${build}' />
 <property name='build.prod.dir'              location='${build.dir}/prod' />
 <property name='build.test.dir'              location='${build.dir}/test' />
+<property name='build.client.dir'            location='${build.dir}/clientobj' />
 <property name='build.admin.dir'             location='${build.dir}/admin' />
 <property name='raw.dist.dir'                location='${build.dir}' />
 <property name='dist.dir'                    location='${build.dir}/dist' />
@@ -116,6 +117,7 @@
 
 <path id='project.classpath'>
     <pathelement location='${build.instr.dir}' />
+    <pathelement location='${build.client.dir}' />
     <pathelement location='${build.prod.dir}' />
     <pathelement location='${build.test.dir}' />
     <fileset dir='${lib.dir}'>
@@ -139,6 +141,7 @@
 
     <!-- Specifig exclude community tests -->
     <exclude name="org/voltdb/regressionsuites/TestMaliciousClientSuite.class" /> <!-- fails legacy -->
+    <exclude name="org/voltdb/regressionsuites/TestIV2BlacklistSaveRestoreSysprocSuite.class" />
     <!-- Recorded as ENG-4423 -->
     <exclude name="**/TestRejoinFuzz.class" />
     <exclude name="**/TestRejoinFuzz2.class" />
@@ -418,37 +421,9 @@ DISTRIBUTION
     </javadoc>
 
     <!-- populate selected client javadoc documentation -->
-    <javadoc
-        destdir="doc/javadoc/java-client-api"
-        access="protected"
-        version="true"
-        use="true"
-        nodeprecated="true"
-        Overview='${src.gpl.dir}/overview-public.html'
-        Windowtitle='VoltDB Client APIs'>
-        <link href="${j2se_api}"/>
-        <classpath refid='project.classpath' />
-        <fileset dir="." defaultexcludes="yes">
-            <include name="src/frontend/org/voltdb/VoltTable.java" />
-            <include name="src/frontend/org/voltdb/VoltTableRow.java" />
-            <include name="src/frontend/org/voltdb/VoltClient.java" />
-            <include name="src/frontend/org/voltdb/VoltType.java" />
-            <include name="src/frontend/org/voltdb/client/Client.java" />
-            <include name="src/frontend/org/voltdb/client/NoConnectionsException.java" />
-            <include name="src/frontend/org/voltdb/client/ProcedureCallback.java" />
-            <include name="src/frontend/org/voltdb/client/ClientConfig.java" />
-            <include name="src/frontend/org/voltdb/client/ClientFactory.java" />
-            <include name="src/frontend/org/voltdb/client/SyncCallback.java" />
-            <include name="src/frontend/org/voltdb/client/NullCallback.java" />
-            <include name="src/frontend/org/voltdb/client/ProcCallException.java" />
-            <include name="src/frontend/org/voltdb/client/ClientStatusListener.java" />
-            <include name="src/frontend/org/voltdb/client/ClientStatusListenerExt.java" />
-            <include name="src/frontend/org/voltdb/client/ClientResponse.java" />
-            <include name="src/frontend/org/voltdb/client/ClientStats.java" />
-            <include name="src/frontend/org/voltdb/client/ClientStatsContext.java" />
-            <include name="src/frontend/org/voltdb/types/TimestampType.java" />
-        </fileset>
-    </javadoc>
+    <ant antfile="build-client.xml" target="javadoc" inheritAll="false">
+        <property name="build" value="${build}"/>
+    </ant>
 </target>
 
 <!-- dist_internal_core populates the core distribution components needed by all
@@ -499,6 +474,23 @@ DISTRIBUTION
     <!-- add the Project and Deployment file schemas to the dist -->
     <copy todir="${dist.dir}/tools" file="src/frontend/org/voltdb/compiler/ProjectFileSchema.xsd"/>
     <copy todir="${dist.dir}/tools" file="src/frontend/org/voltdb/compiler/DeploymentFileSchema.xsd"/>
+
+    <!-- add misc. other tools in the tools directory -->
+    <copy todir="${dist.dir}/tools" >
+        <fileset dir="tools" defaultexcludes="yes">
+            <include name="toolrunner.py" />
+            <include name="voltify" />
+            <include name="voltify.d/**" />
+            <include name="lib/**" />
+        </fileset>
+    </copy>
+
+    <!-- 3rd party libraries copied to the same location in the dist -->
+    <copy todir="${dist.dir}/third_party" >
+        <fileset dir="third_party" defaultexcludes="yes">
+            <include name="python/**" />
+        </fileset>
+    </copy>
 
     <!-- OS-specific preparation of libvoltdb* -->
     <antcall target="dist_libvoltdb" />
@@ -711,7 +703,8 @@ CLEANING
 
 <target name='clean'
 	description="Remove all compiled and generated files."
-	depends="cleantmp, clean_project_gen, clean_deployment_gen, clean_debian_package, clean_rpm_package, clean_bindoc, clean_other_gen">
+	depends="cleantmp, clean_client, clean_project_gen, clean_deployment_gen,
+	         clean_debian_package, clean_rpm_package, clean_bindoc, clean_other_gen">
   <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='examples/voltcache' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
@@ -740,6 +733,12 @@ CLEANING
   <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf doc/javadoc/procedure-api/* doc/javadoc/java-client-api/*'"/>
   </exec>
+</target>
+
+<target name="clean_client">
+    <ant antfile="build-client.xml" target="clean" inheritAll="false">
+        <property name="build" value="${build}"/>
+    </ant>
 </target>
 
 <target name='cleanugh' description="Remove stack traces and crash dumps dropped by tests">
@@ -777,8 +776,11 @@ JAR BUILDING
 </target>
 
 <target name="voltdb.jar" depends="compile, buildinfo">
-    <jar destfile="voltdb/voltdb-${dist.version}.jar">
-        <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
+    <jar destfile="voltdb/voltdb-${dist.version}.jar" duplicate="preserve">
+        <fileset dir="${build.client.dir}" defaultexcludes="yes">
+            <include name="**"/>
+        </fileset>
+        <fileset dir="${build.prod.dir}" defaultexcludes="yes">
             <include name="org/voltdb/**"/>
             <include name="org/voltcore/**"/>
             <include name="org/hsqldb_voltpatches/**" />
@@ -791,6 +793,7 @@ JAR BUILDING
             <include name="javax/servlet_voltpatches/**" />
             <include name="au/com/bytecode/opencsv_voltpatches/**" />
             <include name="org/cliffc_voltpatches/**" />
+            <include name="groovy_voltpatches/**"/>
 	    <include name="org/supercsv_voltpatches/tokenizer/*" />
             <include name="org/hsqldb_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
@@ -857,33 +860,9 @@ JAR BUILDING
 </target>
 
 <target name="voltdbclient.jar" depends="compile, buildinfo">
-    <jar destfile="voltdb/voltdbclient-${dist.version}.jar">
-        <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
-            <include name="org/voltcore/**" />
-            <include name="org/voltdb/**" />
-            <include name="org/json_voltpatches/**" />
-            <include name="javax/annotation_voltpatches/**" />
-            <include name="com/google_voltpatches/**" />
-            <include name="org/cliffc_voltpatches/**" />
-            <include name="org/apache/hadoop_voltpatches/**" />
-            <include name="org/apache/cassandra_voltpatches/MurmurHash3.class"/>
-            <include name="vanilla/**" />
-            <include name="jsr166y/**" />
-        </fileset>
-        <fileset dir="."><include name="buildstring.txt"/></fileset>
-        <manifest>
-            <section name="Credits">
-                <attribute name="Author" value="VoltDB Inc." />
-            </section>
-            <section name="Shared">
-                <attribute
-                    name="Title"
-                    value="VoltDB client interface libraries"
-                />
-                <attribute name="Date" value="${TODAY}" />
-            </section>
-        </manifest>
-    </jar>
+    <ant antfile="build-client.xml" target="voltdbclient.jar" inheritAll="false">
+        <property name="build" value="${build}"/>
+    </ant>
 </target>
 
 <target name="voltdbthin.jar" depends="compile"
@@ -943,7 +922,13 @@ JAVA COMPILATION
 <target name="compile" depends="catalog, project_gen, deployment_gen, compile_core, compile_pro"
         description="Compile all Java source and test classes"/>
 
-<target name="compile_core">
+<target name="compile_client">
+    <ant antfile="build-client.xml" target="compile" inheritAll="false">
+        <property name="build" value="${build}"/>
+    </ant>
+</target>
+
+<target name="compile_core" depends="compile_client">
     <mkdir dir='${build.prod.dir}' />
     <mkdir dir='${build.test.dir}' />
     <exec
@@ -1039,7 +1024,8 @@ JAVA COMPILATION
                   javax/annotation_voltpatches/**/*.java
                   com/google_voltpatches/**/*.java
                   org/cliffc_voltpatches/**
-		          org/supercsv_voltpatches/tokenizer/*.java"/>
+                  groovy_voltpatches/**
+		  org/supercsv_voltpatches/tokenizer/*.java"/>
     <!-- non-voltcore voltdb code -->
     <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java" />
 
@@ -1525,13 +1511,13 @@ TEST CASES
 </target>
 
 <target name="junit_lite_sql" description="lightweight junit tests for sql">
-	<run_junit>
-		<tests>
-			<fileset dir='${build.test.dir}'>
-		    	<include name="org/voltdb/regressionsuites/TestSQLFeaturesSuite.class"/>
-			</fileset>
-		</tests>
-	</run_junit>
+  <run_junit>
+    <tests>
+      <fileset dir='${build.test.dir}'>
+          <include name="org/voltdb/regressionsuites/TestSQLFeaturesSuite.class"/>
+      </fileset>
+    </tests>
+  </run_junit>
 </target>
 
 <target name="junit_quarantine" description="Run testcases which fail unpredictably.">
@@ -2101,36 +2087,6 @@ UTILITIES
 ***************************************
 -->
 
-<target name='dumper' description="Ask a running voltdb to dump state.">
-    <java fork="true" classname="org.voltdb.utils.DumpManager">
-        <jvmarg value="-server"/>
-        <classpath refid="project.classpath"/>
-        <arg value='${hostname}' />
-    </java>
-</target>
-
-<target name='dumpcluster' description="Ask a running voltdb on the default cluster to dump state.">
-    <java fork="true" classname="org.voltdb.utils.DumpManager">
-        <jvmarg value="-server"/>
-        <classpath refid="project.classpath"/>
-        <arg value='volt3a' />
-        <arg value='volt3b' />
-        <arg value='volt3c' />
-        <arg value='volt3d' />
-        <arg value='volt3e' />
-        <arg value='volt3f' />
-    </java>
-</target>
-
-<target name='exportsinkserver'
-    description="Run the Export sink test server.">
-    <java fork="true" failonerror="true"
-        classname="org.voltdb.export.ExportSinkServer">
-        <classpath refid='project.classpath' />
-        <assertions><enable/></assertions>
-    </java>
-</target>
-
 <target name='setversion-changestrings'
         description="Set the version string and recompile some test catalogs">
     <fail unless="newversion" message="ERROR: -Dnewversion=n.m must be set"/>
@@ -2151,7 +2107,7 @@ UTILITIES
 </target>
 
 <target name='setversion' depends='setversion-changestrings, setversion-recompile-mockjars'
-        description="Set the version string and recompile some test catalogsin VOLTPRO. Specify version as -Dversion=4.1.1">
+        description="Set the version string and recompile some test catalogsin VOLTPRO. Specify version as -Dnewversion=4.1.1">
     <echo message='Be sure to commit both repositories'/>
 </target>
 
@@ -2231,7 +2187,7 @@ DEBIAN PACKAGE CREATION
 -->
 
 <target name="debian_package"
-	    depends="buildinfo"
+      depends="buildinfo"
         description="Create Debian/Ubuntu package. Uses sudo, so it may prompt for a password.">
     <exec executable="sudo" failonerror="true">
         <arg value="python" />
@@ -2243,7 +2199,7 @@ DEBIAN PACKAGE CREATION
 
 <!-- This debian package cleaning target is safe. It doesn't run as root. -->
 <target name="clean_debian_package"
-	    depends=""
+      depends=""
         description="Remove all Debian/Ubuntu package build artifacts.">
     <exec dir='.' executable='/bin/sh' failonerror='false'>
         <arg line="-c 'rm -rfv ${debian.package.dir}'" />
@@ -2252,7 +2208,7 @@ DEBIAN PACKAGE CREATION
 
 <!-- Use this if permissions are messed up by interrupted package building as root. -->
 <target name="force_clean_debian_package"
-	    depends=""
+      depends=""
         description="Forceably remove all Debian/Ubuntu package build artifacts as root.">
     <exec dir="." executable="sudo" failonerror="false">
         <arg line="/bin/sh -c 'rm -rfv ${debian.package.dir}'" />
@@ -2277,7 +2233,7 @@ RPM PACKAGE CREATION
 
 <!-- This cleaning target is safe. It doesn't run as root. -->
 <target name="clean_rpm_package"
-	    depends=""
+      depends=""
         description="Remove all RPM build artifacts.">
     <exec dir='.' executable='/bin/sh' failonerror='false'>
         <arg line="-c 'rm -rfv ${rpm.package.dir}'" />

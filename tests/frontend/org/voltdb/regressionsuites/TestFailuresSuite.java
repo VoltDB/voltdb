@@ -33,7 +33,6 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.exceptions.ConstraintFailureException;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.failureprocs.BadDecimalToVarcharCompare;
 import org.voltdb_testprocs.regressionsuites.failureprocs.BadFloatToVarcharCompare;
@@ -248,16 +247,9 @@ public class TestFailuresSuite extends RegressionSuite {
         } catch (ProcCallException e) {
             threwException = true;
             assertTrue(e.getMessage().contains("CONSTRAINT VIOLATION"));
-            assertTrue(e.getCause().getMessage().toUpperCase().contains("UNIQUE"));
-            if (!isHSQL()) {
-                VoltTable table = ((ConstraintFailureException)e.getCause()).getTuples();
-                table.resetRowPosition();
-                assertTrue(table.advanceRow());
-                assertTrue(java.util.Arrays.equals(stringData, table.getStringAsBytes(2)));
-                ConstraintFailureException cfe = (ConstraintFailureException)e.getCause();
-                assertTrue(cfe.getTableName().equalsIgnoreCase("FIVEK_STRING"));
-
-            }
+            assertTrue(e.getClientResponse().getStatusString().toUpperCase().contains("UNIQUE"));
+            String msg = e.getClientResponse().getStatusString();
+            System.err.println(msg);
         }
         assertTrue(threwException);
     }

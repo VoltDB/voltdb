@@ -48,7 +48,14 @@ import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
 import java.util.SortedMap;
-import java.util.concurrent.*;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.cassandra_voltpatches.GCInspector;
@@ -155,7 +162,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    private static final String m_defaultVersionString = "4.0";
+    private static final String m_defaultVersionString = "4.0.2";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final List<ClientInterface> m_clientInterfaces = new CopyOnWriteArrayList<ClientInterface>();
@@ -579,6 +586,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
              * If sync command log is on, not initializing the command log before the initiators
              * are up would cause deadlock.
              */
+            if ((m_commandLog != null) && (m_commandLog.needsInitialization())) {
+                consoleLog.l7dlog(Level.INFO, LogKeys.host_VoltDB_StayTunedForLogging.name(), null);
+            }
+            else {
+                consoleLog.l7dlog(Level.INFO, LogKeys.host_VoltDB_StayTunedForNoLogging.name(), null);
+            }
             if (m_commandLog != null && (isRejoin || m_joining)) {
                 //On rejoin the starting IDs are all 0 so technically it will load any snapshot
                 //but the newest snapshot will always be the truncation snapshot taken after rejoin

@@ -39,6 +39,9 @@ from voltcli import utility
 
 re_voltdb_jar = re.compile('^voltdb(client)?-[.0-9]+[.]jar$')
 
+config_name = 'volt.cfg'
+config_name_local = 'volt_local.cfg'
+
 # Filled in during startup.
 standalone   = None
 version      = None
@@ -70,7 +73,7 @@ if 'VOLTDB_OPTS' in os.environ:
 if 'JAVA_OPTS' in os.environ:
     java_opts.extend(shlex.split(os.environ['JAVA_OPTS']))
 if not [opt for opt in java_opts if opt.startswith('-Xmx')]:
-    java_opts.append('-Xmx1024m')
+    java_opts.append('-Xmx2048m')
 
 def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
     """

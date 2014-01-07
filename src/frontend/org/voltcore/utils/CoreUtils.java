@@ -14,6 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.voltcore.utils;
 
 import java.io.ByteArrayOutputStream;
@@ -37,19 +38,33 @@ import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.concurrent.*;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.google_voltpatches.common.base.*;
+import jsr166y.LinkedTransferQueue;
 
-import com.google_voltpatches.common.util.concurrent.*;
 import org.voltcore.logging.VoltLogger;
-
 import org.voltcore.network.ReverseDNSCache;
-import vanilla.java.affinity.impl.PosixJNAAffinity;
 
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.MoreExecutors;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public class CoreUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -251,7 +266,9 @@ public class CoreUtils {
                     @Override
                     public void run() {
                         if (core != null) {
-                            PosixJNAAffinity.INSTANCE.setAffinity(core);
+                            // Remove Affinity for now to make this dependency dissapear from the client.
+                            // Goal is to remove client dependency on this class in the medium term.
+                            //PosixJNAAffinity.INSTANCE.setAffinity(core);
                         }
                         try {
                             r.run();

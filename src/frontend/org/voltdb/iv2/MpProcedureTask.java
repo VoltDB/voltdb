@@ -113,6 +113,10 @@ public class MpProcedureTask extends ProcedureTask
         // Right now this is adhoc and catalog update. Since these are treated specially
         // in a few places (here, recovery, dr), maybe we should add another metadata
         // property the sysproc registry about whether a proc can be restarted/recovered/dr-ed
+        //
+        // Note that we don't restart @BalancePartitions transactions, because they do
+        // partition to master HSID lookups in the run() method. When transactions are
+        // restarted, the run() method is not rerun. Let the elastic join coordinator reissue it.
         if (m_isRestart &&
                 spName.startsWith("@") &&
                 !spName.startsWith("@AdHoc") &&

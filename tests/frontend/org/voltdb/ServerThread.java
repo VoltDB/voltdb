@@ -61,6 +61,8 @@ public class ServerThread extends Thread {
         m_config.m_backend = target;
         m_config.m_pathToLicense = getTestLicensePath();
         m_config.m_leader = "";
+        VoltDB.instance().setMode(OperationMode.INITIALIZING);
+
 
         // Disable loading the EE if running against HSQL.
         m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
@@ -75,6 +77,8 @@ public class ServerThread extends Thread {
         m_config.m_backend = target;
         m_config.m_pathToLicense = getTestLicensePath();
         m_config.m_leader = "";
+        VoltDB.instance().setMode(OperationMode.INITIALIZING);
+
 
         // Disable loading the EE if running against HSQL.
         m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
@@ -110,6 +114,7 @@ public class ServerThread extends Thread {
         m_config.m_leader = MiscUtils.getHostnameColonPortString("localhost", leaderPort);
         m_config.m_internalPort = internalPort;
         m_config.m_zkInterface = "127.0.0.1:" + zkPort;
+        VoltDB.instance().setMode(OperationMode.INITIALIZING);
 
         // Disable loading the EE if running against HSQL.
         m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
@@ -148,6 +153,9 @@ public class ServerThread extends Thread {
         assert Thread.currentThread() != this;
         VoltDB.instance().shutdown(this);
         this.join();
+        while (VoltDB.instance().isRunning()) {
+            Thread.sleep(1);
+        }
     }
 
     /**

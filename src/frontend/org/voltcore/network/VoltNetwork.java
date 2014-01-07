@@ -63,7 +63,10 @@ package org.voltcore.network;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.CancelledKeyException;
+import java.nio.channels.ClosedByInterruptException;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
@@ -79,8 +82,6 @@ import java.util.concurrent.FutureTask;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.EstTimeUpdater;
 import org.voltcore.utils.Pair;
-
-import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 /** Produces work for registered ports that are selected for read, write */
 class VoltNetwork implements Runnable
@@ -270,7 +271,9 @@ class VoltNetwork implements Runnable
     @Override
     public void run() {
         if (m_coreBindId != null) {
-            PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindId);
+            // Remove Affinity for now to make this dependency dissapear from the client.
+            // Goal is to remove client dependency on this class in the medium term.
+            //PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindId);
         }
         try {
             while (m_shouldStop == false) {
@@ -306,8 +309,9 @@ class VoltNetwork implements Runnable
                         }
 
                         if (m_networkId == 0) {
-                            if (EstTimeUpdater.update(System.currentTimeMillis())) {
-                                m_logger.warn("Network was more than two seconds late in updating the estimated time");
+                            Long delta = EstTimeUpdater.update(System.currentTimeMillis());
+                            if ( delta != null ) {
+                                m_logger.warn("Network was " + delta + " milliseconds late in updating the estimated time");
                             }
                         }
                     }
@@ -394,8 +398,11 @@ class VoltNetwork implements Runnable
             // shutdown makes more sense
         } catch (Exception e) {
             port.die();
-            if (e instanceof IOException) {
-                m_logger.trace( "VoltPort died, probably of natural causes", e);
+            if ((e instanceof IOException && e.getMessage().equalsIgnoreCase("Connection reset by peer".trim())) ||
+                    e instanceof AsynchronousCloseException ||
+                    e instanceof ClosedChannelException ||
+                    e instanceof ClosedByInterruptException) {
+                m_logger.debug( "VoltPort died, probably of natural causes", e);
             } else {
                 e.printStackTrace();
                 networkLog.error( "VoltPort died due to an unexpected exception", e);

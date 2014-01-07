@@ -1135,13 +1135,13 @@ public class TestFixedSQLSuite extends RegressionSuite {
         catch (Exception e) {
             assertTrue(e.getMessage().contains("invalid format for a constant"));
         }
-        // test that parameters don't work (ENG-1000)
+        // test that missing parameters don't work (ENG-1000)
         try {
             client.callProcedure("@AdHoc", "insert into P1 (ID,DESC,NUM,RATIO) VALUES(?,?,?,?);");
             fail();
         }
         catch (Exception e) {
-            assertTrue(e.getMessage().contains("PARAMETERIZATION"));
+            assertTrue(e.getMessage().contains("Number of arguments provided was 0 where 4 was expected"));
         }
         //VoltTable results = client.callProcedure("@AdHoc", "select * from P1;").getResults()[0];
         //System.out.println(results.toJSONString());

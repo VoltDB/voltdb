@@ -63,4 +63,4 @@ def sql(runner):
         args.append('--output-skip-metadata')
     if runner.opts.exception_stacks:
         args.append('--debug')
-    runner.java.execute('org.voltdb.utils.SQLCommand', None, *args)
+    runner.java_execute('org.voltdb.utils.SQLCommand', None, *args)

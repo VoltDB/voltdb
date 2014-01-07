@@ -175,6 +175,8 @@ public class SysProcFragmentId
     public static final long PF_balancePartitions = 230;
     public static final long PF_balancePartitionsAggregate = 231;
     public static final long PF_balancePartitionsData = 232;
+    public static final long PF_balancePartitionsClearIndex = 233;
+    public static final long PF_balancePartitionsClearIndexAggregate = 234;
 
     public static final long PF_validatePartitioning = 240;
     public static final long PF_validatePartitioningResults = 241;
