@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
-    <classpathentry kind="lib" path="third_party/java/jars/hamcrest-all-1.3.jar"/>
     <classpathentry kind="src" path="src/frontend"/>
     <classpathentry kind="src" path="tests/frontend"/>
     <classpathentry kind="src" path="tests/hsqldb"/>
@@ -13,9 +12,11 @@
     <classpathentry kind="src" path="tests/test_apps/adhocbenchmark/src"/>
     <classpathentry kind="src" path="src/hsqldb19b3"/>
     <classpathentry kind="src" path="third_party/java/src"/>
+
     <classpathentry kind="lib" path="lib/commons-lang3-3.0.jar"/>
     <classpathentry kind="lib" path="lib/commons-cli-1.2.jar"/>
     <classpathentry kind="lib" path="lib/jline-2.10.jar"/>
+    <classpathentry kind="lib" path="third_party/java/jars/hamcrest-all-1.3.jar"/>
     <classpathentry kind="lib" path="third_party/java/jars/ant_doxygen.jar"/>
     <classpathentry kind="lib" path="third_party/java/jars/ant-junit.jar"/>
     <classpathentry kind="lib" path="third_party/java/jars/ant-testability-explorer.jar"/>
@@ -46,10 +47,13 @@
     <classpathentry kind="lib" path="third_party/java/jars/mockito-all-1.9.0.jar"/>
     <classpathentry kind="lib" path="third_party/java/jars/make-it-easy-3.1.0.jar"/>
     <classpathentry kind="lib" path="third_party/java/jars/javaee-api-6.0.jar"/>
+    <classpathentry kind="lib" path="lib/groovy-all-2.1.7-indy.jar"/>
+
     <classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER">
         <attributes>
             <attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY" value="voltdb/voltdb"/>
         </attributes>
     </classpathentry>
+
     <classpathentry kind="output" path="obj/eclipse"/>
 </classpath>
