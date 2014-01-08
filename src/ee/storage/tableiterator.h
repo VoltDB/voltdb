@@ -178,6 +178,8 @@ inline bool TableIterator::hasNext() {
     return m_foundTuples < m_activeTuples;
 }
 
+// This function should be replaced by specific iteration functions
+// when the caller knows the table type.
 inline bool TableIterator::next(TableTuple &out) {
     if (!m_tempTableIterator) {
         return persistentNext(out);
