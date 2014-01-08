@@ -36,7 +36,13 @@ public class CopyLoadPartitionedMP extends VoltProcedure {
         // Get row for cid and copy to new table.
         voltQueueSQL(selectStmt, cid);
         VoltTable[] results = voltExecuteSQL();
+        if (results == null || results.length != 1) {
+            throw new VoltAbortException("Failed to find cid that should exist.");
+        }
         VoltTable data = results[0];
+        if (data == null) {
+            throw new VoltAbortException("Failed to find cid that should exist.");
+        }
         data.advanceRow();
         long rcid = data.getLong(0);
         long txnid = data.getLong(1);

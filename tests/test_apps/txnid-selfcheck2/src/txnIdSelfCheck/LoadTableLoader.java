@@ -176,6 +176,35 @@ public class LoadTableLoader extends Thread {
         }
     }
 
+    class InsertCopyCallback implements ProcedureCallback {
+
+        CountDownLatch latch;
+
+        InsertCopyCallback(CountDownLatch latch) {
+            this.latch = latch;
+        }
+
+        @Override
+        public void clientCallback(ClientResponse clientResponse) throws Exception {
+            byte status = clientResponse.getStatus();
+            if (status == ClientResponse.GRACEFUL_FAILURE) {
+                // log what happened
+                log.error("LoadTableLoader gracefully failed to copy from table " + m_tableName + " and this shoudn't happen. Exiting.");
+                log.error(((ClientResponseImpl) clientResponse).toJSONString());
+                // stop the world
+                System.exit(-1);
+            }
+            if (status != ClientResponse.SUCCESS) {
+                // log what happened
+                log.error("LoadTableLoader ungracefully failed to copy from table " + m_tableName);
+                log.error(((ClientResponseImpl) clientResponse).toJSONString());
+                // stop the loader
+                m_shouldContinue.set(false);
+            }
+            latch.countDown();
+        }
+    }
+
     /**
      * Add rows data to VoltTable given fields values.
      *
@@ -239,14 +268,14 @@ public class LoadTableLoader extends Thread {
                 if (!m_isMP) {
                     CountDownLatch clatch = new CountDownLatch(cpList.size());
                     for (Long lcid : cpList) {
-                        client.callProcedure(new InsertCallback(clatch), "CopyLoadPartitionedSP", lcid);
+                        client.callProcedure(new InsertCopyCallback(clatch), "CopyLoadPartitionedSP", lcid);
                     }
                     clatch.await(10, TimeUnit.SECONDS);
                     cpList.clear();
                 } else {
                     CountDownLatch clatch = new CountDownLatch(cpList.size());
                     for (Long lcid : cpList) {
-                        client.callProcedure(new InsertCallback(clatch), "CopyLoadPartitionedMP", lcid);
+                        client.callProcedure(new InsertCopyCallback(clatch), "CopyLoadPartitionedMP", lcid);
                     }
                     clatch.await(10, TimeUnit.SECONDS);
                     cpList.clear();
