@@ -124,14 +124,14 @@ public class TupleValueExpression extends AbstractValueExpression {
     /**
      * @return the column index
      */
-    public Integer getColumnIndex() {
+    public int getColumnIndex() {
         return m_columnIndex;
     }
 
     /**
      * @param columnIndex The index of the column to set
      */
-    public void setColumnIndex(Integer columnIndex) {
+    public void setColumnIndex(int columnIndex) {
         m_columnIndex = columnIndex;
     }
 

@@ -343,7 +343,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
     // lookup aggCol up to min((filterSize + 1), indexedColIdx.size())
     // aggCol can be one of equality comparison key (then a constant value),
     // or all filters compose the complete set of prefix key components
-    private boolean checkPureColumnIndex(Index index, Integer aggCol, List<AbstractExpression> filterExprs) {
+    private boolean checkPureColumnIndex(Index index, int aggCol, List<AbstractExpression> filterExprs) {
 
         boolean found = false;
 
