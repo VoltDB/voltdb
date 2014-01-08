@@ -175,3 +175,5 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PopulateDimension;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CopyLoadPartitionedSP;
 PARTITION PROCEDURE CopyLoadPartitionedSP ON TABLE cploadp COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CopyLoadPartitionedMP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteLoadPartitionedSP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteLoadPartitionedMP;

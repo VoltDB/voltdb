@@ -477,6 +477,10 @@ public class Benchmark {
         // Run the benchmark loop for the requested duration
         // The throughput may be throttled depending on client configuration
         log.info("Running benchmark...");
+        while (((ClientImpl) client).isHashinatorInitialized() == false) {
+            Thread.sleep(1000);
+            System.out.println("Wait for hashinator..");
+        }
 
         BigTableLoader partitionedLoader = new BigTableLoader(client, "bigp",
                          (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits);
@@ -487,10 +491,6 @@ public class Benchmark {
 
         LoadTableLoader plt = new LoadTableLoader(client, "loadp",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits);
-        while (((ClientImpl) client).isHashinatorInitialized() == false) {
-            Thread.sleep(1000);
-            System.out.println("Wait for hashinator..");
-        }
         plt.start();
         LoadTableLoader rlt = new LoadTableLoader(client, "loadmp",
                 (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, 3, permits);

@@ -26,7 +26,6 @@ package txnIdSelfCheck;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
@@ -34,6 +33,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
@@ -60,8 +60,6 @@ public class LoadTableLoader extends Thread {
     final boolean m_isMP;
     final Semaphore m_permits;
 
-    //Types of columns
-    private List<VoltType> m_typeList = new ArrayList<VoltType>();
     //Column information
     private VoltTable.ColumnInfo m_colInfo[];
     //Column types
@@ -72,13 +70,12 @@ public class LoadTableLoader extends Thread {
     private int m_partitionedColumnIndex = -1;
     //Partitioned column type
     private VoltType m_partitionColumnType = VoltType.NULL;
-    //Number of columns
-    private int m_columnCnt = 0;
     //proc name
     final String m_procName;
     //Table that keeps building.
     final VoltTable m_table;
     final Random m_random = new Random();
+    final AtomicLong currentRowCount = new AtomicLong(0);
 
 
     LoadTableLoader(Client client, String tableName, int targetCount, int batchSize, Semaphore permits)
@@ -115,11 +112,9 @@ public class LoadTableLoader extends Thread {
         }
 
         if (m_columnTypes.isEmpty()) {
-            //csvloader will exit.
             log.error("Table " + m_tableName + " Not found");
             throw new RuntimeException("Table Not found: " + m_tableName);
         }
-        m_columnCnt = m_columnTypes.size();
         //Build column info so we can build VoltTable
         m_colInfo = new VoltTable.ColumnInfo[m_columnTypes.size()];
         for (int i = 0; i < m_columnTypes.size(); i++) {
@@ -128,12 +123,11 @@ public class LoadTableLoader extends Thread {
             VoltTable.ColumnInfo ci = new VoltTable.ColumnInfo(cname, type);
             m_colInfo[i] = ci;
         }
-        m_typeList = new ArrayList<VoltType>(m_columnTypes.values());
         m_isMP = (m_partitionedColumnIndex == -1 ? true : false);
         m_procName = (m_isMP ? "@LoadMultipartitionTable" : "@LoadSinglepartitionTable");
         m_table = new VoltTable(m_colInfo);
 
-        System.out.println("Table " + m_tableName + " Is : " + (m_isMP ? "MP" : "SP"));
+        System.out.println("LoadTableLoader Table " + m_tableName + " Is : " + (m_isMP ? "MP" : "SP"));
         // make this run more than other threads
         setPriority(getPriority() + 1);
     }
@@ -201,6 +195,43 @@ public class LoadTableLoader extends Thread {
                 // stop the loader
                 m_shouldContinue.set(false);
             }
+            currentRowCount.incrementAndGet();
+            latch.countDown();
+        }
+    }
+
+    class DeleteCallback implements ProcedureCallback {
+
+        CountDownLatch latch;
+
+        DeleteCallback(CountDownLatch latch) {
+            this.latch = latch;
+        }
+
+        @Override
+        public void clientCallback(ClientResponse clientResponse) throws Exception {
+            byte status = clientResponse.getStatus();
+            if (status == ClientResponse.GRACEFUL_FAILURE) {
+                // log what happened
+                log.error("LoadTableLoader gracefully failed to copy from table " + m_tableName + " and this shoudn't happen. Exiting.");
+                log.error(((ClientResponseImpl) clientResponse).toJSONString());
+                // stop the world
+                System.exit(-1);
+            }
+            if (status != ClientResponse.SUCCESS) {
+                // log what happened
+                log.error("LoadTableLoader ungracefully failed to copy from table " + m_tableName);
+                log.error(((ClientResponseImpl) clientResponse).toJSONString());
+                // stop the loader
+                m_shouldContinue.set(false);
+            }
+            long cnt = clientResponse.getResults()[0].asScalarLong();
+            if (cnt != 2) {
+                log.error("LoadTableLoader ungracefully failed to delete: " + m_tableName + " count=" + cnt);
+                log.error(((ClientResponseImpl) clientResponse).toJSONString());
+                // stop the loader
+                m_shouldContinue.set(false);
+            }
             latch.countDown();
         }
     }
@@ -231,11 +262,10 @@ public class LoadTableLoader extends Thread {
     public void run() {
 
         try {
-            long currentRowCount = getRowCount();
             ArrayList<Long> cpList = new ArrayList<Long>();
-            while ((currentRowCount < targetCount) && (m_shouldContinue.get())) {
-                //1 in 5 gets copied
-                byte shouldCopy = (byte) (m_random.nextInt(5) == 0 ? 1 : 0);
+            while ((currentRowCount.get() < targetCount) && (m_shouldContinue.get())) {
+                //1 in 3 gets copied and then deleted after leaving some data
+                byte shouldCopy = (byte) (m_random.nextInt(3) == 0 ? 1 : 0);
                 CountDownLatch latch = new CountDownLatch(batchSize);
                 // try to insert batchSize random rows
                 String fields[] = new String[3];
@@ -259,10 +289,10 @@ public class LoadTableLoader extends Thread {
                         client.callProcedure(new InsertCallback(latch), m_procName, m_tableName, m_table);
                     }
                 }
-                latch.await(10, TimeUnit.SECONDS);
+                latch.await(60, TimeUnit.SECONDS);
                 long nextRowCount = getRowCount();
                 // if no progress, throttle a bit
-                if (nextRowCount == currentRowCount) {
+                if (nextRowCount == currentRowCount.get()) {
                     Thread.sleep(1000);
                 }
                 if (!m_isMP) {
@@ -271,6 +301,11 @@ public class LoadTableLoader extends Thread {
                         client.callProcedure(new InsertCopyCallback(clatch), "CopyLoadPartitionedSP", lcid);
                     }
                     clatch.await(10, TimeUnit.SECONDS);
+                    CountDownLatch dlatch = new CountDownLatch(cpList.size());
+                    for (Long lcid : cpList) {
+                        client.callProcedure(new DeleteCallback(dlatch), "DeleteLoadPartitionedSP", lcid);
+                    }
+                    dlatch.await(10, TimeUnit.SECONDS);
                     cpList.clear();
                 } else {
                     CountDownLatch clatch = new CountDownLatch(cpList.size());
@@ -278,9 +313,13 @@ public class LoadTableLoader extends Thread {
                         client.callProcedure(new InsertCopyCallback(clatch), "CopyLoadPartitionedMP", lcid);
                     }
                     clatch.await(10, TimeUnit.SECONDS);
+                    CountDownLatch dlatch = new CountDownLatch(cpList.size());
+                    for (Long lcid : cpList) {
+                        client.callProcedure(new DeleteCallback(dlatch), "DeleteLoadPartitionedMP", lcid);
+                    }
+                    dlatch.await(10, TimeUnit.SECONDS);
                     cpList.clear();
                 }
-                currentRowCount = nextRowCount;
             }
 
         }
