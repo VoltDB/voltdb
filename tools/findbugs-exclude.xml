@@ -8,6 +8,9 @@ Exclusion file for findbugs ant task in build.xml
     <Package name="~org\.\w+_voltpatches.*" />
   </Match>
   <Match>
+    <Package name="~com\.\w+_voltpatches.*" />
+  </Match>
+  <Match>
     <Package name="~org\.apache\..*" />
   </Match>
   <Match>
