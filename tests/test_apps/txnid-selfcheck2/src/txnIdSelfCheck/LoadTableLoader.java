@@ -128,6 +128,7 @@ public class LoadTableLoader extends Thread {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
+            latch.countDown();
             byte status = clientResponse.getStatus();
             if (status == ClientResponse.GRACEFUL_FAILURE) {
                 // log what happened
@@ -143,7 +144,6 @@ public class LoadTableLoader extends Thread {
                 // stop the loader
                 m_shouldContinue.set(false);
             }
-            latch.countDown();
         }
     }
 
@@ -157,6 +157,8 @@ public class LoadTableLoader extends Thread {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
+            currentRowCount.incrementAndGet();
+            latch.countDown();
             byte status = clientResponse.getStatus();
             if (status == ClientResponse.GRACEFUL_FAILURE) {
                 // log what happened
@@ -172,8 +174,6 @@ public class LoadTableLoader extends Thread {
                 // stop the loader
                 m_shouldContinue.set(false);
             }
-            currentRowCount.incrementAndGet();
-            latch.countDown();
         }
     }
 
@@ -189,6 +189,7 @@ public class LoadTableLoader extends Thread {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
+            latch.countDown();
             byte status = clientResponse.getStatus();
             if (status == ClientResponse.GRACEFUL_FAILURE) {
                 // log what happened
@@ -211,7 +212,6 @@ public class LoadTableLoader extends Thread {
                 // stop the loader
                 m_shouldContinue.set(false);
             }
-            latch.countDown();
         }
     }
 
