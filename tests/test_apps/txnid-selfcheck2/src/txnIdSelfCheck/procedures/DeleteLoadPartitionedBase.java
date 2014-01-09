@@ -33,13 +33,13 @@ public class DeleteLoadPartitionedBase extends VoltProcedure {
 
         voltQueueSQL(delete, cid);
         VoltTable[] results = voltExecuteSQL();
-        if (results == null || results.length != 1) {
-            throw new VoltAbortException("Failed to delete cid that should exist.: ");
+        if (results[0].asScalarLong() != 1) {
+            throw new VoltAbortException("Failed to delete cid that should exist: cid=" + cid);
         }
         voltQueueSQL(deletecp, cid);
         results = voltExecuteSQL();
-        if (results == null || results.length != 1) {
-            throw new VoltAbortException("Failed to delete cid that should exist.: ");
+        if (results[0].asScalarLong() != 1) {
+            throw new VoltAbortException("Failed to delete cpcid that should exist: cpcid=" + cid);
         }
         return 2;
     }
