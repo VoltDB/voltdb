@@ -62,10 +62,12 @@ public class LoadTableLoader extends Thread {
     private int m_partitionedColumnIndex = -1;
     //proc name
     final String m_procName;
-    //proc name
+    //proc name for copy
     final String m_cpprocName;
-    //proc name
+    //proc name for 2 delete
     final String m_delprocName;
+    //proc name for load table row delete
+    final String m_onlydelprocName;
     //Table that keeps building.
     final VoltTable m_table;
     final Random m_random = new Random();
@@ -92,6 +94,7 @@ public class LoadTableLoader extends Thread {
         m_procName = (m_isMP ? "@LoadMultipartitionTable" : "@LoadSinglepartitionTable");
         m_cpprocName = (m_isMP ? "CopyLoadPartitionedMP" : "CopyLoadPartitionedSP");
         m_delprocName = (m_isMP ? "DeleteLoadPartitionedMP" : "DeleteLoadPartitionedSP");
+        m_onlydelprocName = (m_isMP ? "DeleteOnlyLoadTableMP" : "DeleteOnlyLoadTableSP");
         m_table = new VoltTable(m_colInfo);
 
         System.out.println("LoadTableLoader Table " + m_tableName + " Is : " + (m_isMP ? "MP" : "SP") + " Target Count: " + targetCount);
@@ -169,10 +172,12 @@ public class LoadTableLoader extends Thread {
 
     class DeleteCallback implements ProcedureCallback {
 
-        CountDownLatch latch;
+        final CountDownLatch latch;
+        final int expected_delete;
 
-        DeleteCallback(CountDownLatch latch) {
+        DeleteCallback(CountDownLatch latch, int expected_delete) {
             this.latch = latch;
+            this.expected_delete = expected_delete;
         }
 
         @Override
@@ -180,7 +185,7 @@ public class LoadTableLoader extends Thread {
             byte status = clientResponse.getStatus();
             if (status == ClientResponse.GRACEFUL_FAILURE) {
                 // log what happened
-                log.error("LoadTableLoader gracefully failed to copy from table " + m_tableName + " and this shoudn't happen. Exiting.");
+                log.error("LoadTableLoader gracefully failed to delete from table " + m_tableName + " and this shoudn't happen. Exiting.");
                 log.error(((ClientResponseImpl) clientResponse).toJSONString());
                 // stop the world
                 System.exit(-1);
@@ -193,7 +198,7 @@ public class LoadTableLoader extends Thread {
                 m_shouldContinue.set(false);
             }
             long cnt = clientResponse.getResults()[0].asScalarLong();
-            if (cnt != 2) {
+            if (cnt != expected_delete) {
                 log.error("LoadTableLoader ungracefully failed to delete: " + m_tableName + " count=" + cnt);
                 log.error(((ClientResponseImpl) clientResponse).toJSONString());
                 // stop the loader
@@ -203,23 +208,12 @@ public class LoadTableLoader extends Thread {
         }
     }
 
-    /**
-     * Add rows data to VoltTable given fields values.
-     *
-     * @param table
-     * @param fields
-     * @return
-     */
-    private void addRowToVoltTableFromLine(VoltTable table, long cid, long txnid, long rowid)
-            throws Exception {
-
-    }
-
     @Override
     public void run() {
 
         try {
             ArrayList<Long> cpList = new ArrayList<Long>();
+            ArrayList<Long> onlyDeleteList = new ArrayList<Long>();
             while (m_shouldContinue.get()) {
                 //1 in 3 gets copied and then deleted after leaving some data
                 byte shouldCopy = (byte) (m_random.nextInt(3) == 0 ? 1 : 0);
@@ -239,8 +233,12 @@ public class LoadTableLoader extends Thread {
                     } else {
                         success = client.callProcedure(new InsertCallback(latch), m_procName, m_tableName, m_table);
                     }
-                    if (shouldCopy != 0 && success) {
-                        cpList.add(p);
+                    if (success) {
+                        if (shouldCopy != 0) {
+                            cpList.add(p);
+                        } else {
+                            onlyDeleteList.add(p);
+                        }
                     }
                 }
                 latch.await();
@@ -256,12 +254,21 @@ public class LoadTableLoader extends Thread {
                 clatch.await();
                 CountDownLatch dlatch = new CountDownLatch(cpList.size());
                 for (Long lcid : cpList) {
-                    client.callProcedure(new DeleteCallback(dlatch), m_delprocName, lcid);
+                    client.callProcedure(new DeleteCallback(dlatch, 2), m_delprocName, lcid);
                 }
                 dlatch.await();
                 cpList.clear();
+                if (onlyDeleteList.size() > 100) {
+                    CountDownLatch odlatch = new CountDownLatch(cpList.size());
+                    for (Long lcid : onlyDeleteList) {
+                        client.callProcedure(new DeleteCallback(odlatch, 1), m_onlydelprocName, lcid);
+                    }
+                    odlatch.await();
+                    onlyDeleteList.clear();
+                }
             }
-
+            System.out.println("LoadTableLoader left : " + onlyDeleteList.size() + " At load end.");
+            //Any accumulated in p/mp tables are left behind.
         }
         catch (Exception e) {
             // on exception, log and end the thread, but don't kill the process
