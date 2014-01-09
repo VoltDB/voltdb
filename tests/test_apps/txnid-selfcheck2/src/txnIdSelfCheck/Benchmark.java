@@ -490,10 +490,10 @@ public class Benchmark {
         replicatedLoader.start();
 
         LoadTableLoader plt = new LoadTableLoader(client, "loadp",
-                (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits);
+                (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits, false, 0);
         plt.start();
         LoadTableLoader rlt = new LoadTableLoader(client, "loadmp",
-                (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, 3, permits);
+                (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, 3, permits, true, -1);
         rlt.start();
 
         ReadThread readThread = new ReadThread(client, config.threads, config.threadoffset,

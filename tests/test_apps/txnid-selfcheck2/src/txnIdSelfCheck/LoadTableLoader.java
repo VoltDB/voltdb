@@ -26,9 +26,7 @@ package txnIdSelfCheck;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Map;
 import java.util.Random;
-import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -37,7 +35,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.ParameterConverter;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -62,14 +59,8 @@ public class LoadTableLoader extends Thread {
 
     //Column information
     private VoltTable.ColumnInfo m_colInfo[];
-    //Column types
-    final private Map<Integer, VoltType> m_columnTypes;
-    //Column Names
-    final private Map<Integer, String> m_colNames;
     //Zero based index of the partitioned column
     private int m_partitionedColumnIndex = -1;
-    //Partitioned column type
-    private VoltType m_partitionColumnType = VoltType.NULL;
     //proc name
     final String m_procName;
     //Table that keeps building.
@@ -78,7 +69,7 @@ public class LoadTableLoader extends Thread {
     final AtomicLong currentRowCount = new AtomicLong(0);
 
 
-    LoadTableLoader(Client client, String tableName, int targetCount, int batchSize, Semaphore permits)
+    LoadTableLoader(Client client, String tableName, int targetCount, int batchSize, Semaphore permits, boolean isMp, int pcolIdx)
             throws IOException, ProcCallException {
         setName("LoadTableLoader-" + tableName);
         setDaemon(true);
@@ -88,42 +79,13 @@ public class LoadTableLoader extends Thread {
         this.targetCount = targetCount;
         this.batchSize = batchSize;
         m_permits = permits;
-
-        VoltTable procInfo = client.callProcedure("@SystemCatalog",
-                "COLUMNS").getResults()[0];
-        m_columnTypes = new TreeMap<Integer, VoltType>();
-        m_colNames = new TreeMap<Integer, String>();
-        while (procInfo.advanceRow()) {
-            String table = procInfo.getString("TABLE_NAME");
-            if (tableName.equalsIgnoreCase(table)) {
-                VoltType vtype = VoltType.typeFromString(procInfo.getString("TYPE_NAME"));
-                int idx = (int) procInfo.getLong("ORDINAL_POSITION") - 1;
-                m_columnTypes.put(idx, vtype);
-                m_colNames.put(idx, procInfo.getString("COLUMN_NAME"));
-                String remarks = procInfo.getString("REMARKS");
-                if (remarks != null && remarks.equalsIgnoreCase("PARTITION_COLUMN")) {
-                    m_partitionColumnType = vtype;
-                    m_partitionedColumnIndex = idx;
-                    log.debug("Table " + tableName + " Partition Column Name is: "
-                            + procInfo.getString("COLUMN_NAME"));
-                    log.debug("Table " + tableName + " Partition Column Type is: " + vtype.toString());
-                }
-            }
-        }
-
-        if (m_columnTypes.isEmpty()) {
-            log.error("Table " + m_tableName + " Not found");
-            throw new RuntimeException("Table Not found: " + m_tableName);
-        }
+        m_partitionedColumnIndex = pcolIdx;
+        m_isMP = isMp;
         //Build column info so we can build VoltTable
-        m_colInfo = new VoltTable.ColumnInfo[m_columnTypes.size()];
-        for (int i = 0; i < m_columnTypes.size(); i++) {
-            VoltType type = m_columnTypes.get(i);
-            String cname = m_colNames.get(i);
-            VoltTable.ColumnInfo ci = new VoltTable.ColumnInfo(cname, type);
-            m_colInfo[i] = ci;
-        }
-        m_isMP = (m_partitionedColumnIndex == -1 ? true : false);
+        m_colInfo = new VoltTable.ColumnInfo[3];
+        m_colInfo[0] = new VoltTable.ColumnInfo("cid", VoltType.BIGINT);
+        m_colInfo[1] = new VoltTable.ColumnInfo("txnid", VoltType.BIGINT);
+        m_colInfo[2] = new VoltTable.ColumnInfo("rowid", VoltType.BIGINT);
         m_procName = (m_isMP ? "@LoadMultipartitionTable" : "@LoadSinglepartitionTable");
         m_table = new VoltTable(m_colInfo);
 
@@ -243,19 +205,9 @@ public class LoadTableLoader extends Thread {
      * @param fields
      * @return
      */
-    private boolean addRowToVoltTableFromLine(VoltTable table, String fields[])
+    private void addRowToVoltTableFromLine(VoltTable table, long cid, long txnid, long rowid)
             throws Exception {
 
-        if (fields == null || fields.length <= 0) {
-            return false;
-        }
-        Object row_args[] = new Object[fields.length];
-        for (int i = 0; i < fields.length; i++) {
-            final VoltType type = m_columnTypes.get(i);
-            row_args[i] = ParameterConverter.tryToMakeCompatible(type.classFromType(), fields[i]);
-        }
-        table.addRow(row_args);
-        return true;
     }
 
     @Override
@@ -268,22 +220,18 @@ public class LoadTableLoader extends Thread {
                 byte shouldCopy = (byte) (m_random.nextInt(3) == 0 ? 1 : 0);
                 CountDownLatch latch = new CountDownLatch(batchSize);
                 // try to insert batchSize random rows
-                String fields[] = new String[3];
                 for (int i = 0; i < batchSize; i++) {
                     m_table.clearRowData();
                     m_permits.acquire();
                     long p = Math.abs(r.nextLong());
-                    fields[0] = Long.toString(p);
-                    fields[1] = Long.toString(p);
-                    fields[2] = Long.toString(Calendar.getInstance().getTimeInMillis());
-                    addRowToVoltTableFromLine(m_table, fields);
+                    m_table.addRow(p, p, Calendar.getInstance().getTimeInMillis());
                     if (shouldCopy != 0) {
                         cpList.add(p);
                     }
                     if (!m_isMP) {
                         Object rpartitionParam
                                 = TheHashinator.valueToBytes(m_table.fetchRow(0).get(
-                                                m_partitionedColumnIndex, m_partitionColumnType));
+                                                m_partitionedColumnIndex, VoltType.BIGINT));
                         client.callProcedure(new InsertCallback(latch), m_procName, rpartitionParam, m_tableName, m_table);
                     } else {
                         client.callProcedure(new InsertCallback(latch), m_procName, m_tableName, m_table);
