@@ -246,7 +246,6 @@ VoltDBEngine::~VoltDBEngine() {
         tidPair.second->decrementRefcount();
     }
 
-    delete m_topend;
     delete m_executorContext;
 }
 
