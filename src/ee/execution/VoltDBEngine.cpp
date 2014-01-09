@@ -92,7 +92,6 @@
 #include "storage/TableCatalogDelegate.hpp"
 #include "org_voltdb_jni_ExecutionEngine.h" // to use static values
 #include "stats/StatsAgent.h"
-#include "voltdbipc.h"
 #include "common/FailureInjection.h"
 
 #include <iostream>
