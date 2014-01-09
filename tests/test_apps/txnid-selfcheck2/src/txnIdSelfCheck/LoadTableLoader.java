@@ -70,7 +70,7 @@ public class LoadTableLoader extends Thread {
     final String m_onlydelprocName;
     //Table that keeps building.
     final VoltTable m_table;
-    final Random m_random = new Random();
+    final Random m_random;
     final AtomicLong currentRowCount = new AtomicLong(0);
 
 
@@ -96,6 +96,7 @@ public class LoadTableLoader extends Thread {
         m_delprocName = (m_isMP ? "DeleteLoadPartitionedMP" : "DeleteLoadPartitionedSP");
         m_onlydelprocName = (m_isMP ? "DeleteOnlyLoadTableMP" : "DeleteOnlyLoadTableSP");
         m_table = new VoltTable(m_colInfo);
+        m_random = new Random(Calendar.getInstance().getTimeInMillis());
 
         System.out.println("LoadTableLoader Table " + m_tableName + " Is : " + (m_isMP ? "MP" : "SP") + " Target Count: " + targetCount);
         // make this run more than other threads
