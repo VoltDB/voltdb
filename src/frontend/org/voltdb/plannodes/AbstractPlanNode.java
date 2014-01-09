@@ -49,6 +49,18 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      */
     private static int NEXT_PLAN_NODE_ID = 1;
 
+    // Keep this flag turned off in production or when testing user-accessible EXPLAIN output or when
+    // using EXPLAIN output to validate plans.
+    protected static boolean m_verboseExplainForDebugging = false; // CODE REVIEWER! this SHOULD be false!
+    public static void enableVerboseExplainForDebugging() { m_verboseExplainForDebugging = true; }
+    public static boolean disableVerboseExplainForDebugging()
+    {
+        boolean was = m_verboseExplainForDebugging;
+        m_verboseExplainForDebugging = false;
+        return was;
+    }
+    public static void restoreVerboseExplainForDebugging(boolean was) { m_verboseExplainForDebugging = was; }
+
     /*
      * IDs only need to be unique for a single plan.
      * Reset between plans
@@ -768,11 +780,14 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
         stringer.endArray(); //end inlineNodes
 
+        outputSchemaToJSON(stringer);
+    }
+
+    private void outputSchemaToJSON(JSONStringer stringer) throws JSONException {
         if (m_hasSignificantOutputSchema) {
             stringer.key(Members.OUTPUT_SCHEMA.name());
             stringer.array();
-            for (int col = 0; col < m_outputSchema.getColumns().size(); col++) {
-                SchemaColumn column = m_outputSchema.getColumns().get(col);
+            for (SchemaColumn column : m_outputSchema.getColumns()) {
                 column.toJSONString(stringer);
             }
             stringer.endArray();
@@ -786,9 +801,28 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     public void explainPlan_recurse(StringBuilder sb, String indent) {
-        // skip projection nodes basically (they're boring as all get out)
+        if (m_verboseExplainForDebugging && m_hasSignificantOutputSchema) {
+            sb.append(indent + "Detailed Output Schema: ");
+            JSONStringer stringer = new JSONStringer();
+            try
+            {
+                outputSchemaToJSON(stringer);
+                sb.append(stringer.toString());
+            }
+            catch (Exception e)
+            {
+                sb.append(indent + "CORRUPTED beyond the ability to format? " + e);
+                e.printStackTrace();
+            }
+            sb.append(indent + "from\n");
+        }
         String extraIndent = " ";
+        // Except when verbosely debugging,
+        // skip projection nodes basically (they're boring as all get out)
         if (getPlanNodeType() == PlanNodeType.PROJECTION) {
+            if (m_verboseExplainForDebugging) {
+                sb.append(indent + "PROJECTION\n");
+            }
             extraIndent = "";
         }
         else {
