@@ -259,7 +259,7 @@ public class LoadTableLoader extends Thread {
                 dlatch.await();
                 cpList.clear();
                 if (onlyDeleteList.size() > 100) {
-                    CountDownLatch odlatch = new CountDownLatch(cpList.size());
+                    CountDownLatch odlatch = new CountDownLatch(onlyDeleteList.size());
                     for (Long lcid : onlyDeleteList) {
                         client.callProcedure(new DeleteCallback(odlatch, 1), m_onlydelprocName, lcid);
                     }
