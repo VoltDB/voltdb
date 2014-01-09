@@ -149,6 +149,8 @@ EXPORT TABLE export_skinny_partitioned_table;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReplicatedUpdateBaseProc;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonBaseProc;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CopyLoadPartitionedBase;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteLoadPartitionedBase;
 
 -- real procedures
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.SetupAdHocTables;

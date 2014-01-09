@@ -24,13 +24,28 @@
 package txnIdSelfCheck.procedures;
 
 import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-public class DeleteLoadPartitionedMP extends DeleteLoadPartitionedBase {
+public class DeleteLoadPartitionedBase extends VoltProcedure {
 
-    private final SQLStmt deleteStmt = new SQLStmt("DELETE FROM loadmp WHERE cid=?;");
-    private final SQLStmt deletecpStmt = new SQLStmt("DELETE FROM cploadmp WHERE cid=?;");
+    public long doWork(SQLStmt delete, SQLStmt deletecp, long cid) {
 
-    public long run(long cid) {
-        return doWork(deleteStmt, deletecpStmt, cid);
+        voltQueueSQL(delete, cid);
+        VoltTable[] results = voltExecuteSQL();
+        if (results == null || results.length != 1) {
+            throw new VoltAbortException("Failed to delete cid that should exist.: ");
+        }
+        voltQueueSQL(deletecp, cid);
+        results = voltExecuteSQL();
+        if (results == null || results.length != 1) {
+            throw new VoltAbortException("Failed to delete cid that should exist.: ");
+        }
+        return 2;
     }
+
+    public long run() {
+        return 0; // never called in base procedure
+    }
+
 }
