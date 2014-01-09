@@ -24,30 +24,14 @@
 package txnIdSelfCheck.procedures;
 
 import org.voltdb.SQLStmt;
-import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-public class CopyLoadPartitionedMP extends VoltProcedure {
+public class CopyLoadPartitionedMP extends CopyLoadPartitionedBase {
 
-    private final SQLStmt selectStmt = new SQLStmt("SELECT cid,txnid,rowid from loadmp WHERE cid=? ORDER BY cid;");
+    private final SQLStmt selectStmt = new SQLStmt("SELECT cid,txnid,rowid from loadmp WHERE cid=? ORDER BY cid LIMIT 1;");
     private final SQLStmt insertStmt = new SQLStmt("INSERT INTO  cploadmp VALUES (?, ?, ?);");
 
     public VoltTable[] run(long cid) {
-        // Get row for cid and copy to new table.
-        voltQueueSQL(selectStmt, cid);
-        VoltTable[] results = voltExecuteSQL();
-        if (results == null || results.length != 1) {
-            throw new VoltAbortException("Failed to find cid that should exist.");
-        }
-        VoltTable data = results[0];
-        if (data == null) {
-            throw new VoltAbortException("Failed to find cid that should exist.");
-        }
-        data.advanceRow();
-        long rcid = data.getLong(0);
-        long txnid = data.getLong(1);
-        long rowid = data.getLong(2);
-        voltQueueSQL(insertStmt, rcid, txnid, rowid);
-        return voltExecuteSQL();
+        return doWork(selectStmt, insertStmt, cid);
     }
 }
