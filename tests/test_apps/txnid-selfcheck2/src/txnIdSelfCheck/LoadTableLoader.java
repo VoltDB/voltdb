@@ -29,7 +29,6 @@ import java.util.Calendar;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -63,6 +62,10 @@ public class LoadTableLoader extends Thread {
     private int m_partitionedColumnIndex = -1;
     //proc name
     final String m_procName;
+    //proc name
+    final String m_cpprocName;
+    //proc name
+    final String m_delprocName;
     //Table that keeps building.
     final VoltTable m_table;
     final Random m_random = new Random();
@@ -87,9 +90,11 @@ public class LoadTableLoader extends Thread {
         m_colInfo[1] = new VoltTable.ColumnInfo("txnid", VoltType.BIGINT);
         m_colInfo[2] = new VoltTable.ColumnInfo("rowid", VoltType.BIGINT);
         m_procName = (m_isMP ? "@LoadMultipartitionTable" : "@LoadSinglepartitionTable");
+        m_cpprocName = (m_isMP ? "CopyLoadPartitionedMP" : "CopyLoadPartitionedSP");
+        m_delprocName = (m_isMP ? "DeleteLoadPartitionedMP" : "DeleteLoadPartitionedSP");
         m_table = new VoltTable(m_colInfo);
 
-        System.out.println("LoadTableLoader Table " + m_tableName + " Is : " + (m_isMP ? "MP" : "SP"));
+        System.out.println("LoadTableLoader Table " + m_tableName + " Is : " + (m_isMP ? "MP" : "SP") + " Target Count: " + targetCount);
         // make this run more than other threads
         setPriority(getPriority() + 1);
     }
@@ -225,49 +230,36 @@ public class LoadTableLoader extends Thread {
                     m_permits.acquire();
                     long p = Math.abs(r.nextLong());
                     m_table.addRow(p, p, Calendar.getInstance().getTimeInMillis());
-                    if (shouldCopy != 0) {
-                        cpList.add(p);
-                    }
+                    boolean success = false;
                     if (!m_isMP) {
                         Object rpartitionParam
                                 = TheHashinator.valueToBytes(m_table.fetchRow(0).get(
                                                 m_partitionedColumnIndex, VoltType.BIGINT));
-                        client.callProcedure(new InsertCallback(latch), m_procName, rpartitionParam, m_tableName, m_table);
+                        success = client.callProcedure(new InsertCallback(latch), m_procName, rpartitionParam, m_tableName, m_table);
                     } else {
-                        client.callProcedure(new InsertCallback(latch), m_procName, m_tableName, m_table);
+                        success = client.callProcedure(new InsertCallback(latch), m_procName, m_tableName, m_table);
+                    }
+                    if (shouldCopy != 0 && success) {
+                        cpList.add(p);
                     }
                 }
-                latch.await(60, TimeUnit.SECONDS);
+                latch.await();
                 long nextRowCount = getRowCount();
                 // if no progress, throttle a bit
                 if (nextRowCount == currentRowCount.get()) {
                     Thread.sleep(1000);
                 }
-                if (!m_isMP) {
-                    CountDownLatch clatch = new CountDownLatch(cpList.size());
-                    for (Long lcid : cpList) {
-                        client.callProcedure(new InsertCopyCallback(clatch), "CopyLoadPartitionedSP", lcid);
-                    }
-                    clatch.await(10, TimeUnit.SECONDS);
-                    CountDownLatch dlatch = new CountDownLatch(cpList.size());
-                    for (Long lcid : cpList) {
-                        client.callProcedure(new DeleteCallback(dlatch), "DeleteLoadPartitionedSP", lcid);
-                    }
-                    dlatch.await(10, TimeUnit.SECONDS);
-                    cpList.clear();
-                } else {
-                    CountDownLatch clatch = new CountDownLatch(cpList.size());
-                    for (Long lcid : cpList) {
-                        client.callProcedure(new InsertCopyCallback(clatch), "CopyLoadPartitionedMP", lcid);
-                    }
-                    clatch.await(10, TimeUnit.SECONDS);
-                    CountDownLatch dlatch = new CountDownLatch(cpList.size());
-                    for (Long lcid : cpList) {
-                        client.callProcedure(new DeleteCallback(dlatch), "DeleteLoadPartitionedMP", lcid);
-                    }
-                    dlatch.await(10, TimeUnit.SECONDS);
-                    cpList.clear();
+                CountDownLatch clatch = new CountDownLatch(cpList.size());
+                for (Long lcid : cpList) {
+                    client.callProcedure(new InsertCopyCallback(clatch), m_cpprocName, lcid);
                 }
+                clatch.await();
+                CountDownLatch dlatch = new CountDownLatch(cpList.size());
+                for (Long lcid : cpList) {
+                    client.callProcedure(new DeleteCallback(dlatch), m_delprocName, lcid);
+                }
+                dlatch.await();
+                cpList.clear();
             }
 
         }
