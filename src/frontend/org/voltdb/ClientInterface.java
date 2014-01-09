@@ -2113,7 +2113,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }, 200, 200, TimeUnit.MILLISECONDS);
     }
 
-    private static final long CLIENT_HANGUP_TIMEOUT = Long.getLong("CLIENT_HANGUP_TIMEOUT", 4000);
+    private static final long CLIENT_HANGUP_TIMEOUT = Long.getLong("CLIENT_HANGUP_TIMEOUT", 30000);
 
     /**
      * Check for dead connections by providing each connection with the current
