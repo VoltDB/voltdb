@@ -51,7 +51,7 @@ public class LoadTableLoader extends Thread {
     final long targetCount;
     final String m_tableName;
     final int batchSize;
-    final Random r = new Random(0);
+    final Random r;
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
     final boolean m_isMP;
     final Semaphore m_permits;
@@ -97,6 +97,12 @@ public class LoadTableLoader extends Thread {
         m_onlydelprocName = (m_isMP ? "DeleteOnlyLoadTableMP" : "DeleteOnlyLoadTableSP");
         m_table = new VoltTable(m_colInfo);
         m_random = new Random(Calendar.getInstance().getTimeInMillis());
+        try {
+            Thread.sleep(1);
+        } catch (InterruptedException ex) {
+            ;
+        }
+        r = new Random(Calendar.getInstance().getTimeInMillis());
 
         System.out.println("LoadTableLoader Table " + m_tableName + " Is : " + (m_isMP ? "MP" : "SP") + " Target Count: " + targetCount);
         // make this run more than other threads
