@@ -457,6 +457,10 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkMVFix_TopAgg_ReAgg("SELECT SUM(V_SUM_C1) FROM V_P1 WHERE V_SUM_C1 > 3", 0, 1, 2, 1);
         checkMVFix_TopAgg_ReAgg("SELECT V_SUM_C1, MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_SUM_C1", 1, 1, 2, 2);
 
+        // ENG-5669 HAVING edge cases.
+        checkMVFix_TopAgg_ReAgg_with_TopProjection("SELECT SUM(V_SUM_C1) FROM V_P1 HAVING MAX(V_SUM_D1) > 3", 0, 2, 2, 2);
+        checkMVNoFix_NoAgg("SELECT SUM(V_SUM_C1) FROM V_P1 HAVING SUM(V_SUM_D1) > 3", 0, 2, false, true, true);
+
         // No disctinct will be pushed down.
         // ENG-5364.
         // In future,  a little efficient way is to push down distinct for part of group by columns only.
