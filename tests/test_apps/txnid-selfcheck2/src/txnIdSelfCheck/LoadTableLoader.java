@@ -220,7 +220,7 @@ public class LoadTableLoader extends Thread {
 
         try {
             ArrayList<Long> cpList = new ArrayList<Long>();
-            while ((currentRowCount.get() < targetCount) && (m_shouldContinue.get())) {
+            while (m_shouldContinue.get()) {
                 //1 in 3 gets copied and then deleted after leaving some data
                 byte shouldCopy = (byte) (m_random.nextInt(3) == 0 ? 1 : 0);
                 CountDownLatch latch = new CountDownLatch(batchSize);

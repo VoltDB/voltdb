@@ -534,6 +534,9 @@ public class Benchmark {
         adHocMayhemThread.join();
         idpt.join();
 
+        //Shutdown LoadTableLoader
+        rlt.shutdown();
+        plt.shutdown();
         rlt.join();
         plt.join();
 
