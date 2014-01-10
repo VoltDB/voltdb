@@ -462,22 +462,10 @@ public class VoltDB {
             }
 
             // check if start action is not valid in community
-            if ((!m_isEnterprise) && (m_startAction != StartAction.CREATE)) {
+            if ((!m_isEnterprise) && (m_startAction.isEnterpriseOnly())) {
                 isValid = false;
                 hostLog.fatal("VoltDB Community Edition only supports the \"create\" start action.");
-                String msg = null;
-                switch (m_startAction) {
-                case JOIN:
-                    msg = " Elastic Cluster Sizing"; break;
-                case LIVE_REJOIN:
-                case REJOIN:
-                    msg = " K-Safety / Node Rejoin"; break;
-                case RECOVER:
-                case SAFE_RECOVER:
-                    msg = " Command Log Recovery"; break;
-                case CREATE:
-                    assert(false); /* can't get here */ break;
-                }
+                String msg = m_startAction.featureNameForErrorString();
                 msg += " is an Enterprise Edition feature. An evaluation edition is availibale at http://voltdb.com.";
                 hostLog.fatal(msg);
             }
