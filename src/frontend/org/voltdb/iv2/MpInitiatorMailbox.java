@@ -83,21 +83,25 @@ public class MpInitiatorMailbox extends InitiatorMailbox
     @Override
     public void setRepairAlgo(final RepairAlgo algo)
     {
-        final CountDownLatch cdl = new CountDownLatch(1);
-        m_taskQueue.offer(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    setRepairAlgoInternal(algo);
-                } finally {
-                    cdl.countDown();
+        if (Thread.currentThread().getId() != m_taskThreadId) {
+            final CountDownLatch cdl = new CountDownLatch(1);
+            m_taskQueue.offer(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        setRepairAlgoInternal(algo);
+                    } finally {
+                        cdl.countDown();
+                    }
                 }
+            });
+            try {
+                cdl.await();
+            } catch (InterruptedException e) {
+                Throwables.propagate(e);
             }
-        });
-        try {
-            cdl.await();
-        } catch (InterruptedException e) {
-            Throwables.propagate(e);
+        } else {
+            setRepairAlgoInternal(algo);
         }
     }
 
