@@ -487,12 +487,6 @@ public class VoltDB {
                         m_startAction = StartAction.CREATE;
                     }
                 }
-            } else {
-                if (!m_isEnterprise && m_startAction == StartAction.LIVE_REJOIN) {
-                    // pauseless rejoin is only available in pro
-                    isValid = false;
-                    hostLog.fatal("Live rejoin is only available in the Enterprise Edition");
-                }
             }
 
             return isValid;
