@@ -17,7 +17,6 @@
 package org.voltdb;
 
 import org.voltdb.AuthSystem.AuthUser;
-import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.utils.Encoder;
 
