@@ -26,8 +26,11 @@ package txnIdSelfCheck;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.List;
 import java.util.Random;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -62,17 +65,13 @@ public class LoadTableLoader extends Thread {
     private int m_partitionedColumnIndex = -1;
     //proc name
     final String m_procName;
-    //proc name for copy
-    final String m_cpprocName;
-    //proc name for 2 delete
-    final String m_delprocName;
     //proc name for load table row delete
     final String m_onlydelprocName;
     //Table that keeps building.
     final VoltTable m_table;
     final Random m_random;
     final AtomicLong currentRowCount = new AtomicLong(0);
-
+    final BlockingQueue<Long> cpDelQueue = new LinkedBlockingQueue<Long>();
 
     LoadTableLoader(Client client, String tableName, int targetCount, int batchSize, Semaphore permits, boolean isMp, int pcolIdx)
             throws IOException, ProcCallException {
@@ -92,8 +91,6 @@ public class LoadTableLoader extends Thread {
         m_colInfo[1] = new VoltTable.ColumnInfo("txnid", VoltType.BIGINT);
         m_colInfo[2] = new VoltTable.ColumnInfo("rowid", VoltType.BIGINT);
         m_procName = (m_isMP ? "@LoadMultipartitionTable" : "@LoadSinglepartitionTable");
-        m_cpprocName = (m_isMP ? "CopyLoadPartitionedMP" : "CopyLoadPartitionedSP");
-        m_delprocName = (m_isMP ? "DeleteLoadPartitionedMP" : "DeleteLoadPartitionedSP");
         m_onlydelprocName = (m_isMP ? "DeleteOnlyLoadTableMP" : "DeleteOnlyLoadTableSP");
         m_table = new VoltTable(m_colInfo);
         m_random = new Random(Calendar.getInstance().getTimeInMillis());
@@ -215,11 +212,65 @@ public class LoadTableLoader extends Thread {
         }
     }
 
+    //Local task thread doing copy and delete under the loadtable tables.
+    class CopyAndDeleteDataTask extends Thread {
+
+        final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
+        int m_copyDeleteDoneCount = 0;
+        //proc name for copy
+        final String m_cpprocName;
+        //proc name for 2 delete
+        final String m_delprocName;
+
+        void shutdown() {
+            m_shouldContinue.set(false);
+        }
+
+        public CopyAndDeleteDataTask() {
+            setName("CopyAndDeleteDataTask-" + m_tableName);
+            setDaemon(true);
+            m_cpprocName = (m_isMP ? "CopyLoadPartitionedMP" : "CopyLoadPartitionedSP");
+            m_delprocName = (m_isMP ? "DeleteLoadPartitionedMP" : "DeleteLoadPartitionedSP");
+        }
+
+        @Override
+        public void run() {
+            System.out.println("Starting Copy Delete Task for table: " + m_tableName);
+            try {
+                List<Long> workList = new ArrayList<Long>();
+                while (m_shouldContinue.get()) {
+                    cpDelQueue.drainTo(workList, 10);
+                    if (workList.size() <= 0) {
+                        Thread.sleep(2000);
+                    }
+                    CountDownLatch clatch = new CountDownLatch(workList.size());
+                    for (Long lcid : workList) {
+                        client.callProcedure(new InsertCopyCallback(clatch), m_cpprocName, lcid);
+                    }
+                    clatch.await();
+                    CountDownLatch dlatch = new CountDownLatch(workList.size());
+                    for (Long lcid : workList) {
+                        client.callProcedure(new DeleteCallback(dlatch, 2), m_delprocName, lcid);
+                    }
+                    dlatch.await();
+                    m_copyDeleteDoneCount += workList.size();
+                    workList.clear();
+                }
+                System.out.println("CopyAndDeleteTask row count: " + m_copyDeleteDoneCount);
+            } catch (Exception e) {
+                // on exception, log and end the thread, but don't kill the process
+                log.error("CopyAndDeleteDataTask failed a procedure call for table " + m_tableName
+                        + " and the thread will now stop.", e);
+            }
+        }
+    }
+
     @Override
     public void run() {
 
+        CopyAndDeleteDataTask cdtask = new CopyAndDeleteDataTask();
+        cdtask.start();
         try {
-            ArrayList<Long> cpList = new ArrayList<Long>();
             ArrayList<Long> onlyDeleteList = new ArrayList<Long>();
             while (m_shouldContinue.get()) {
                 //1 in 3 gets copied and then deleted after leaving some data
@@ -242,7 +293,7 @@ public class LoadTableLoader extends Thread {
                     }
                     if (success) {
                         if (shouldCopy != 0) {
-                            cpList.add(p);
+                            cpDelQueue.add(p);
                         } else {
                             onlyDeleteList.add(p);
                         }
@@ -254,17 +305,6 @@ public class LoadTableLoader extends Thread {
                 if (nextRowCount == currentRowCount.get()) {
                     Thread.sleep(1000);
                 }
-                CountDownLatch clatch = new CountDownLatch(cpList.size());
-                for (Long lcid : cpList) {
-                    client.callProcedure(new InsertCopyCallback(clatch), m_cpprocName, lcid);
-                }
-                clatch.await();
-                CountDownLatch dlatch = new CountDownLatch(cpList.size());
-                for (Long lcid : cpList) {
-                    client.callProcedure(new DeleteCallback(dlatch, 2), m_delprocName, lcid);
-                }
-                dlatch.await();
-                cpList.clear();
                 if (onlyDeleteList.size() > 100) {
                     CountDownLatch odlatch = new CountDownLatch(onlyDeleteList.size());
                     for (Long lcid : onlyDeleteList) {
@@ -274,13 +314,19 @@ public class LoadTableLoader extends Thread {
                     onlyDeleteList.clear();
                 }
             }
-            System.out.println("LoadTableLoader left : " + onlyDeleteList.size() + " At load end.");
             //Any accumulated in p/mp tables are left behind.
         }
         catch (Exception e) {
             // on exception, log and end the thread, but don't kill the process
             log.error("LoadTableLoader failed a procedure call for table " + m_tableName
                     + " and the thread will now stop.", e);
+        } finally {
+            cdtask.shutdown();
+            try {
+                cdtask.join();
+            } catch (InterruptedException ex) {
+                log.error("CopyDelete Task was stopped.", ex);
+            }
         }
     }
 

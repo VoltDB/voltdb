@@ -24,13 +24,15 @@
 package txnIdSelfCheck.procedures;
 
 import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-public class DeleteOnlyLoadTableMP extends DeleteOnlyLoadTableBase {
+public class DeleteOnlyLoadTableMP extends VoltProcedure {
 
     private final SQLStmt deleteStmt = new SQLStmt("DELETE FROM loadmp WHERE cid=?;");
 
     public VoltTable[] run(long cid) {
-        return doWork(deleteStmt, cid);
+        voltQueueSQL(deleteStmt, cid);
+        return voltExecuteSQL();
     }
 }
