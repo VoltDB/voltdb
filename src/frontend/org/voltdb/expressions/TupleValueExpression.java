@@ -337,21 +337,42 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     @Override
     public String explain(String impliedTableName) {
-        if (m_tableName == null) {
-            String tableName = "";
+        String tableName = m_tableName;
+        String columnName = m_columnName;
+        if (columnName == null || columnName.equals("")) {
+            columnName = "column#" + m_columnIndex;
+        }
+        if (m_verboseExplainForDebugging) {
+            columnName += " (as JSON: ";
+            JSONStringer stringer = new JSONStringer();
+            try
+            {
+                stringer.object();
+                toJSONString(stringer);
+                stringer.endObject();
+                columnName += stringer.toString();
+            }
+            catch (Exception e)
+            {
+                columnName += "CORRUPTED beyond the ability to format? " + e;
+                e.printStackTrace();
+            }
+            columnName += ")";
+        }
+        if (tableName == null) {
             if (m_tableIdx != 0) {
                 assert(m_tableIdx == 1);
                 // This is join inner table
-                tableName += "inner table.";
+                return "inner-table." + columnName;
             }
-            return tableName + "column:" + m_columnIndex;
         }
-
-        if (m_tableName.equals(impliedTableName)) {
-            return m_columnName;
-        } else {
-            return m_tableName + "." + m_columnName;
+        else if ( ! tableName.equals(impliedTableName)) {
+            return tableName + "." + columnName;
+        } else if (m_verboseExplainForDebugging) {
+            // In verbose mode, always show an "implied' tableName that would normally be left off.
+            return "{" + tableName + "}." + columnName;
         }
+        return columnName;
     }
 
 }
