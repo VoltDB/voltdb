@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.util.List;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -116,10 +117,15 @@ public class MpInitiator extends BaseInitiator implements Promotable
 
                 m_initiatorMailbox.setRepairAlgo(repair);
                 // term syslogs the start of leader promotion.
-                Pair<Boolean, Long> result = repair.start().get();
-                success = result.getFirst();
+                Long txnid = Long.MIN_VALUE;
+                try {
+                    txnid = repair.start().get();
+                    success = true;
+                } catch (CancellationException e) {
+                    success = false;
+                }
                 if (success) {
-                    m_initiatorMailbox.setLeaderState(result.getSecond());
+                    m_initiatorMailbox.setLeaderState(txnid);
                     List<Iv2InitiateTaskMessage> restartTxns = ((MpPromoteAlgo)repair).getInterruptedTxns();
                     if (!restartTxns.isEmpty()) {
                         // Should only be one restarting MP txn

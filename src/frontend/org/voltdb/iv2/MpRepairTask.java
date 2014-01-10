@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CancellationException;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
@@ -67,8 +68,12 @@ public class MpRepairTask extends SiteTasker
                         CoreUtils.hsIdToString(m_mailbox.getHSId()) + " ";
                     RepairAlgo algo = new MpPromoteAlgo(m_spMasters, m_mailbox, whoami);
                     m_mailbox.setRepairAlgo(algo);
-                    Pair<Boolean, Long> result = algo.start().get();
-                    boolean success = result.getFirst();
+                    Long txnid = Long.MIN_VALUE;
+                    boolean success = false;
+                    try {
+                        txnid = algo.start().get();
+                        success = true;
+                    } catch (CancellationException e) {}
                     if (success) {
                         tmLog.info(whoami + "finished repair.");
                     }
