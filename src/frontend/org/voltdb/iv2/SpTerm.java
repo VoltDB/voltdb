@@ -58,7 +58,16 @@ public class SpTerm implements Term
             tmLog.debug(m_whoami
                       + "replica change handler updating replica list to: "
                       + CoreUtils.hsIdCollectionToString(replicas));
-            m_mailbox.updateReplicas(replicas, null);
+            /*
+             * These use updates are used to track failures during repair
+             * A settable future is used to track when an in progress repair should
+             * be cancelled. Synchronization is necessary to construct and publish
+             * each settable future atomically WRT to the delivery of cancellation messages
+             * via updated replicas
+             */
+            synchronized (m_mailbox) {
+                m_mailbox.updateReplicas(replicas, null);
+            }
         }
     };
 

@@ -72,7 +72,16 @@ public class MpTerm implements Term
                       + CoreUtils.hsIdCollectionToString(leaders));
             m_knownLeaders.clear();
             m_knownLeaders.addAll(updatedLeaders);
-            m_mailbox.updateReplicas(leaders, cache);
+            /*
+             * These use updates are used to track failures during repair
+             * A settable future is used to track when an in progress repair should
+             * be cancelled. Synchronization is necessary to construct and publish
+             * each settable future atomically WRT to the delivery of cancellation messages
+             * via updated replicas
+             */
+            synchronized (m_mailbox) {
+                m_mailbox.updateReplicas(leaders, cache);
+            }
         }
     };
 
