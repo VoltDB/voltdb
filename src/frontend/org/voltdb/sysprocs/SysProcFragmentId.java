@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -175,8 +175,6 @@ public class SysProcFragmentId
     public static final long PF_balancePartitions = 230;
     public static final long PF_balancePartitionsAggregate = 231;
     public static final long PF_balancePartitionsData = 232;
-    public static final long PF_balancePartitionsClearIndex = 233;
-    public static final long PF_balancePartitionsClearIndexAggregate = 234;
 
     public static final long PF_validatePartitioning = 240;
     public static final long PF_validatePartitioningResults = 241;

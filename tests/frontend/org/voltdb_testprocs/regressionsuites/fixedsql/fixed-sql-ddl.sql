@@ -118,3 +118,17 @@ CREATE TABLE NO_JSON (
 );
 CREATE INDEX test_field ON NO_JSON (var2, field(var3,'color'));
 
+CREATE TABLE P3 (
+  ID INTEGER NOT NULL,
+  WAGE SMALLINT,
+  DEPT SMALLINT,
+  AGE SMALLINT,
+  RENT SMALLINT,
+  PRIMARY KEY (ID)
+);
+PARTITION TABLE P3 ON COLUMN ID;
+--
+CREATE VIEW V_P3 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) AS 
+SELECT wage, dept, count(*), sum(age), sum(rent) FROM P3
+GROUP BY wage, dept;
+

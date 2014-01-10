@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -105,7 +105,7 @@ abstract public class ProcedureTask extends TransactionTask
                     return response;
                 }
 
-                // Check partitioning of single-partition and n-partition transactions.
+                // Check partitioning of the invocation
                 if (runner.checkPartition(m_txnState)) {
                     runner.setupTransaction(m_txnState);
                     cr = runner.call(task.getParameters());

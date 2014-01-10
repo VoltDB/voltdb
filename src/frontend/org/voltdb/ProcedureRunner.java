@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -447,12 +447,6 @@ public class ProcedureRunner {
             }
             return false;
         } else {
-            // For n-partition transactions, we need to rehash the partitioning values and check
-            // if they still hash to the assigned partitions.
-            //
-            // Note that when n-partition transaction runs, it's run on the MPI site, so calling
-            // m_site.getCorrespondingPartitionId() will return the MPI's partition ID. We need
-            // another way of getting what partitions were assigned to this transaction.
             return true;
         }
     }
