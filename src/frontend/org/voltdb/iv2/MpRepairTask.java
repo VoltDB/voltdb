@@ -52,11 +52,17 @@ public class MpRepairTask extends SiteTasker
     private List<Long> m_spMasters;
     private Object m_lock = new Object();
     private boolean m_repairRan = false;
+    private final String whoami;
+    private final RepairAlgo algo;
 
     public MpRepairTask(InitiatorMailbox mailbox, List<Long> spMasters)
     {
         m_mailbox = mailbox;
         m_spMasters = new ArrayList<Long>(spMasters);
+        whoami = "MP leader repair " +
+                CoreUtils.hsIdToString(m_mailbox.getHSId()) + " ";
+        algo = new MpPromoteAlgo(m_spMasters, m_mailbox, whoami);
+        m_mailbox.setRepairAlgo(algo);
     }
 
     @Override
@@ -64,10 +70,6 @@ public class MpRepairTask extends SiteTasker
         synchronized (m_lock) {
             if (!m_repairRan) {
                 try {
-                    String whoami = "MP leader repair " +
-                        CoreUtils.hsIdToString(m_mailbox.getHSId()) + " ";
-                    RepairAlgo algo = new MpPromoteAlgo(m_spMasters, m_mailbox, whoami);
-                    m_mailbox.setRepairAlgo(algo);
                     Long txnid = Long.MIN_VALUE;
                     boolean success = false;
                     try {
