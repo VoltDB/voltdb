@@ -106,7 +106,8 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
                    (int)m_targetTable->allocatedTupleCount());
 
         // actually delete all the tuples
-        m_targetTable->deleteAllTuples(true);
+//        m_targetTable->deleteAllTuples(true);
+        m_targetTable->truncateTable(m_engine);
     }
     else
     {

@@ -44,6 +44,7 @@
  */
 
 #include <sstream>
+#include <vector>
 #include "tablefactory.h"
 #include "common/executorcontext.hpp"
 #include "common/debuglog.h"
@@ -82,6 +83,31 @@ Table* TableFactory::getPersistentTable(
     configureStats(databaseId, name, table);
 
     return dynamic_cast<Table*>(table);
+}
+
+PersistentTable * TableFactory::getSinglePersistentTableWithIndexes(PersistentTable * tb) {
+    TupleSchema * newSchema = TupleSchema::createTupleSchema(tb->schema());
+
+    Table * table = getPersistentTable(
+            tb->databaseId(), tb->name(),
+            newSchema, tb->columnNames(),
+            tb->partitionColumn(), tb->exportEnabled(),
+            false);
+
+    // add indexes
+    std::vector<TableIndex*> indexes = tb->allIndexes();
+    for (std::vector<TableIndex*>::iterator it = indexes.begin(); it != indexes.end(); ++it) {
+        TableIndex * originalIndex = *it;
+        TableIndexScheme scheme = originalIndex->getTableIndexScheme();
+        TableIndex *index = TableIndexFactory::getInstance(scheme);
+        assert(index);
+        table->addIndex(index);
+        if (tb->primaryKeyIndex() == originalIndex) {
+            table->setPrimaryKeyIndex(index);
+        }
+    }
+
+    return dynamic_cast<PersistentTable*>(table);
 }
 
 TempTable* TableFactory::getTempTable(

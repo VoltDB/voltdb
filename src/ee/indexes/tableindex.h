@@ -422,6 +422,10 @@ public:
         return m_scheme.name;
     }
 
+    const TableIndexScheme& getTableIndexScheme() const {
+        return m_scheme;
+    }
+
     void rename(std::string name) {
         if (m_scheme.name.compare(name) != 0) {
             m_scheme.name = name;

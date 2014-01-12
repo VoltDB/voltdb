@@ -56,6 +56,9 @@
 #include "common/ids.h"
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
+#include "execution/VoltDBEngine.h"
+#include "storage/CopyOnWriteIterator.h"
+#include "storage/ElasticIndex.h"
 #include "storage/table.h"
 #include "storage/TupleStreamWrapper.h"
 #include "storage/TableStats.h"
@@ -89,6 +92,7 @@ class RecoveryProtoMsg;
 class TupleOutputStreamProcessor;
 class ReferenceSerializeInput;
 class PersistentTable;
+class TableCatalogDelegate;
 
 /**
  * Interface used by contexts, scanners, iterators, and undo actions to access
@@ -110,6 +114,10 @@ public:
     void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
     void deleteTupleRelease(char* tuple);
     void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
+
+    void truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable);
+    void truncateTableRelease(PersistentTable *originalTable);
+
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock);
     uint32_t getTupleCount() const;
 
@@ -231,6 +239,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
     virtual void deleteAllTuples(bool freeAllocatedStrings);
+    virtual void truncateTable(VoltDBEngine* engine);
     // The fallible flag is used to denote a change to a persistent table
     // which is part of a long transaction that has been vetted and can
     // never fail (e.g. violate a constraint).
@@ -291,6 +300,15 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     static TBPtr findBlock(char *tuple, TBMap &blocks, int blockSize);
 
     int partitionColumn() const { return m_partitionColumn; }
+
+    bool exportEnabled() const { return m_exportEnabled; }
+
+    std::vector<MaterializedViewMetadata *> views() const {
+        return m_views;
+    }
+
+    PersistentTable * getViewTable(std::string name) const;
+
     /** inlined here because it can't be inlined in base Table, as it
      *  uses Tuple.copy.
      */
@@ -373,6 +391,10 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     virtual int64_t validatePartitioning(TheHashinator *hashinator, int32_t partitionId);
 
+    virtual voltdb::PersistentTableSurgeon * getTableSurgeon() {
+        return &m_surgeon;
+    }
+
   private:
 
     /**
@@ -444,6 +466,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
      * In the memcheck build it will return the storage to the heap.
      */
     void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
+
+    void truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable);
+    void truncateTableRelease(PersistentTable *originalTable);
 
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom
@@ -540,6 +565,13 @@ inline void PersistentTableSurgeon::deleteTupleRelease(char* tuple) {
 
 inline void PersistentTableSurgeon::deleteTupleStorage(TableTuple &tuple, TBPtr block) {
     m_table.deleteTupleStorage(tuple, block);
+}
+
+inline void PersistentTableSurgeon::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable) {
+    m_table.truncateTableForUndo(engine, tcd, originalTable);
+}
+inline void PersistentTableSurgeon::truncateTableRelease(PersistentTable *originalTable) {
+    m_table.truncateTableRelease(originalTable);
 }
 
 inline void PersistentTableSurgeon::snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {

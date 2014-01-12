@@ -83,6 +83,7 @@ class StreamBlock;
 class Topend;
 class TupleBlock;
 class PersistentTableUndoDeleteAction;
+class PersistentTableUndoTruncateTableAction;
 
 const size_t COLUMN_DESCRIPTOR_SIZE = 1 + 4 + 4; // type, name offset, name length
 
@@ -103,6 +104,7 @@ class Table {
     friend class StatsSource;
     friend class TupleBlock;
     friend class PersistentTableUndoDeleteAction;
+    friend class PersistentTableUndoTruncateTableAction;
 
   private:
     Table();
@@ -197,7 +199,7 @@ class Table {
     }
 
 
-    inline const TupleSchema* schema() const {
+    inline TupleSchema* schema() const {
         return m_schema;
     }
 
@@ -249,6 +251,11 @@ class Table {
     CatalogId databaseId() const {
         return m_databaseId;
     }
+
+    const std::vector<std::string>& columnNames() const {
+        return m_columnNames;
+    }
+
 
     virtual std::string tableType() const = 0;
     virtual std::string debug();

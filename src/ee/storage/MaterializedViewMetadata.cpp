@@ -53,6 +53,8 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
     // best not to have to worry about the destination table disappearing out from under the source table that feeds it.
     VOLT_TRACE("construct materializedViewMetadata...");
 
+    m_mvInfo = mvInfo;
+
     m_target->incrementRefcount();
     srcTable->addMaterializedView(this);
 

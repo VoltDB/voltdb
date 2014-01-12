@@ -19,7 +19,6 @@
 #define TABLECATALOGDELEGATE_HPP
 
 #include "common/CatalogDelegate.hpp"
-//#include "indexes/tableindex.h"
 #include "catalog/table.h"
 #include "catalog/index.h"
 
@@ -57,7 +56,6 @@ class TableCatalogDelegate : public CatalogDelegate {
     // Delegate interface
     virtual void deleteCommand();
 
-
     // table specific
     int init(catalog::Database const &catalogDatabase,
              catalog::Table const &catalogTable);
@@ -87,6 +85,10 @@ class TableCatalogDelegate : public CatalogDelegate {
     // ADXXX: should be const
     Table *getTable() {
         return m_table;
+    }
+
+    void setTable(Table * tb) {
+        m_table = tb;
     }
 
     bool exportEnabled() {
