@@ -45,6 +45,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# USAGE
+#
+# ENTERPRISE EDITION:
+# Usage: voltdb3 create catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml>
+#        voltdb3 replica catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml>
+#        voltdb3 recover [host <hostname>] [deployment <deployment.xml>] license <license.xml>
+#        voltdb3 [live] rejoin host <hostname>
+#        voltdb3 add host <hostname>
+#
+# COMMUNITY EDITION:
+# Usage: voltdb3 create  catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>
+#        voltdb3 recover [host <hostname>] [deployment <deployment.xml>]
+#        voltdb3 rejoin host <hostname>
+#
+# OTHER:
+# voltdb3 collect [<option> ...] <path-to-voltdbroot> (run voltdb3 collect -h for more details)
+# voltdb3 compile [<option> ...] [<ddl-file> ...]  (run voltdb3 compile -h for more details)
+#
+# If no deployment is specified, a default 1 node cluster deployment will be configured.
+
+
 # list of commands handled by tools/volt
 declare -a VOLT_KEYWORDS=(compile mask collect)
 

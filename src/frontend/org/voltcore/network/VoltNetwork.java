@@ -398,7 +398,8 @@ class VoltNetwork implements Runnable
             // shutdown makes more sense
         } catch (Exception e) {
             port.die();
-            if ((e instanceof IOException && e.getMessage().equalsIgnoreCase("Connection reset by peer".trim())) ||
+            final String trimmed = e.getMessage().trim();
+            if ((e instanceof IOException && (trimmed.equalsIgnoreCase("Connection reset by peer") || trimmed.equalsIgnoreCase("broken pipe"))) ||
                     e instanceof AsynchronousCloseException ||
                     e instanceof ClosedChannelException ||
                     e instanceof ClosedByInterruptException) {
