@@ -44,7 +44,7 @@ import org.voltdb.utils.VoltFile;
  * cluster. All cluster processes run locally (keep this in
  * mind if building memory or load intensive tests.)
  */
-public class LocalCluster implements VoltServerConfig {
+public class LocalCluster implements VoltServerConfig, VoltServerConfigDeployment {
 
     public enum FailureState {
         ALL_RUNNING,
@@ -1252,5 +1252,23 @@ public class LocalCluster implements VoltServerConfig {
      */
     public void setExpectedToInitialize(boolean expectedToInitialize) {
         this.m_expectedToInitialize = expectedToInitialize;
+    }
+
+    @Override
+    public int getHostCount()
+    {
+        return m_hostCount;
+    }
+
+    @Override
+    public int getSiteCount()
+    {
+        return m_siteCount;
+    }
+
+    @Override
+    public int getKFactor()
+    {
+        return m_kfactor;
     }
 }
