@@ -200,7 +200,13 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public void updateHashinator(TheHashinator.HashinatorConfig config)
+        public TheHashinator getCurrentHashinator()
+        {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
+        public void updateHashinator(TheHashinator hashinator)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -472,7 +478,13 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public void updateHashinator(HashinatorConfig config) {
+    public TheHashinator getCurrentHashinator()
+    {
+        return null;
+    }
+
+    @Override
+    public void updateHashinator(TheHashinator hashinator) {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 

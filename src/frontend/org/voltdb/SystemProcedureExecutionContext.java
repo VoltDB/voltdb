@@ -66,10 +66,12 @@ public interface SystemProcedureExecutionContext {
     public boolean updateCatalog(String catalogDiffCommands, CatalogContext context,
             CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation);
 
+    public TheHashinator getCurrentHashinator();
+
     /**
      * Update the EE hashinator with the given configuration.
      */
-    public void updateHashinator(HashinatorConfig config);
+    public void updateHashinator(TheHashinator hashinator);
 
     boolean activateTableStream(int tableId, TableStreamType type, boolean undo, byte[] predicates);
 

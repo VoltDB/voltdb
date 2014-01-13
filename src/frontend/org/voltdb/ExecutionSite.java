@@ -616,8 +616,15 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             return ExecutionSite.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation);
         }
 
+
         @Override
-        public void updateHashinator(TheHashinator.HashinatorConfig config)
+        public TheHashinator getCurrentHashinator()
+        {
+            return null;
+        }
+
+        @Override
+        public void updateHashinator(TheHashinator hashinator)
         {
         }
 
@@ -1689,7 +1696,13 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     }
 
     @Override
-    public void updateHashinator(HashinatorConfig config) {
+    public TheHashinator getCurrentHashinator()
+    {
+        return null;
+    }
+
+    @Override
+    public void updateHashinator(TheHashinator hashinator) {
 
     }
 

@@ -400,8 +400,8 @@ public class ProcedureRunner {
      * @param txnState
      * @return true if the txn hashes to the current partition, false otherwise
      */
-    public boolean checkPartition(TransactionState txnState) {
-        TheHashinator.HashinatorType hashinatorType = TheHashinator.getConfiguredHashinatorType();
+    public boolean checkPartition(TransactionState txnState, TheHashinator hashinator) {
+        TheHashinator.HashinatorType hashinatorType = hashinator.getConfigurationType();
         if (hashinatorType == TheHashinator.HashinatorType.LEGACY) {
             // Legacy hashinator is not used for elastic, no need to check partitioning. In fact,
             // since SP sysprocs all pass partitioning parameters as bytes,
@@ -432,7 +432,7 @@ public class ProcedureRunner {
             // before we initiate the proc (like adhocs).
 
             try {
-                int partition = TheHashinator.getPartitionForParameter(parameterType, parameterAtIndex);
+                int partition = hashinator.getPartitionForParameter(parameterType, parameterAtIndex);
                 if (partition == m_site.getCorrespondingPartitionId()) {
                     return true;
                 } else {
