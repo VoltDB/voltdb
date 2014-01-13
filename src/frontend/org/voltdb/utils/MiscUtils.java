@@ -410,8 +410,14 @@ public class MiscUtils {
         return "";
     }
 
+    // cache whether we're running pro code
+    private static Boolean m_isPro = null;
+    // check if we're running pro code
     public static boolean isPro() {
-        return null != MiscUtils.loadProClass("org.voltdb.CommandLogImpl", "Command logging", true);
+        if (m_isPro == null) {
+            m_isPro = null != MiscUtils.loadProClass("org.voltdb.CommandLogImpl", "Command logging", true);
+        }
+        return m_isPro.booleanValue();
     }
 
     /**

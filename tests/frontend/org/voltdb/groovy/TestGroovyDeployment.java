@@ -100,7 +100,7 @@ public class TestGroovyDeployment extends RegressionSuite {
          * compile the catalog all tests start with
          */
         config = new LocalCluster("groovy-ddl-cluster-rep.jar", 2, 1, 0,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, true, null);
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, null);
         boolean compile = config.compile(project);
         assertTrue(compile);
         config.setHasLocalServer(false);
