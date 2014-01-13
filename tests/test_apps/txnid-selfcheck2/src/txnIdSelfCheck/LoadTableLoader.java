@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -46,6 +46,14 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 
+/**
+ * The LoadTableLoader gets passed in with tableName for which the thread does loading of data using sysproc. For MP
+ * LoadMultiPartitionTable is used and for SP LaodSinglePartitionTable is used. The thread also launches a CopyAndDelete
+ * thread which copies and deletes data from Load*Table tables 1/3rd of the time. This is to sprinkle other
+ * transactions. The CopyAndDelete also servers the purpose of verification that the Load*Table data got indeed loaded.
+ *
+ * Any procedure failure will fail the test and exit.
+ */
 public class LoadTableLoader extends Thread {
 
     static VoltLogger log = new VoltLogger("HOST");
@@ -93,13 +101,9 @@ public class LoadTableLoader extends Thread {
         m_procName = (m_isMP ? "@LoadMultipartitionTable" : "@LoadSinglepartitionTable");
         m_onlydelprocName = (m_isMP ? "DeleteOnlyLoadTableMP" : "DeleteOnlyLoadTableSP");
         m_table = new VoltTable(m_colInfo);
-        m_random = new Random(Calendar.getInstance().getTimeInMillis());
-        try {
-            Thread.sleep(1);
-        } catch (InterruptedException ex) {
-            ;
-        }
-        r = new Random(Calendar.getInstance().getTimeInMillis());
+        long curtmms = Calendar.getInstance().getTimeInMillis();
+        m_random = new Random(curtmms);
+        r = new Random(curtmms + 1);
 
         System.out.println("LoadTableLoader Table " + m_tableName + " Is : " + (m_isMP ? "MP" : "SP") + " Target Count: " + targetCount);
         // make this run more than other threads
