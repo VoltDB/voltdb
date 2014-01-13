@@ -306,6 +306,72 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             m_thread.join();
         }
 
+        //Thread for Running authentication of client.
+        class AuthRunnable implements Runnable {
+            final SocketChannel m_socket;
+
+            AuthRunnable(SocketChannel socket) {
+                this.m_socket = socket;
+            }
+
+            @Override
+            public void run() {
+                if (m_socket != null) {
+                    boolean success = false;
+                    //Populated on timeout
+                    AtomicReference<String> timeoutRef = new AtomicReference<String>();
+                    try {
+                        final InputHandler handler = authenticate(m_socket, timeoutRef);
+                        if (handler != null) {
+                            m_socket.configureBlocking(false);
+                            if (handler instanceof ClientInputHandler) {
+                                m_socket.socket().setTcpNoDelay(true);
+                            }
+                            m_socket.socket().setKeepAlive(true);
+
+                            if (handler instanceof ClientInputHandler) {
+                                final Connection c
+                                        = m_network.registerChannel(
+                                                m_socket,
+                                                handler,
+                                                0,
+                                                ReverseDNSPolicy.ASYNCHRONOUS);
+                                /*
+                                 * If IV2 is enabled the logic initially enabling read is
+                                 * in the started method of the InputHandler
+                                 */
+                            } else {
+                                m_network.registerChannel(
+                                        m_socket,
+                                        handler,
+                                        SelectionKey.OP_READ,
+                                        ReverseDNSPolicy.ASYNCHRONOUS);
+                            }
+                            success = true;
+                        }
+                    } catch (Exception e) {
+                        try {
+                            m_socket.close();
+                        } catch (IOException e1) {
+                            //Don't care connection is already lost anyways
+                        }
+                        if (m_running) {
+                            if (timeoutRef.get() != null) {
+                                hostLog.warn(timeoutRef.get());
+                            } else {
+                                hostLog.warn("Exception authenticating and "
+                                        + "registering user in ClientAcceptor", e);
+                            }
+                        }
+                    } finally {
+                        if (!success) {
+                            m_numConnections.decrementAndGet();
+                        }
+                    }
+                }
+            }
+        }
+
         @Override
         public void run() {
             try {
@@ -359,67 +425,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                      */
                     m_numConnections.incrementAndGet();
 
-                    final Runnable authRunnable = new Runnable() {
-                        @Override
-                        public void run() {
-                            if (socket != null) {
-                                boolean success = false;
-                                //Populated on timeout
-                                AtomicReference<String> timeoutRef = new AtomicReference<String>();
-                                try {
-                                    final InputHandler handler = authenticate(socket, timeoutRef);
-                                    if (handler != null) {
-                                        socket.configureBlocking(false);
-                                        if (handler instanceof ClientInputHandler) {
-                                            socket.socket().setTcpNoDelay(true);
-                                        }
-                                        socket.socket().setKeepAlive(true);
-
-                                        if (handler instanceof ClientInputHandler) {
-                                            final Connection c =
-                                                    m_network.registerChannel(
-                                                            socket,
-                                                            handler,
-                                                            0,
-                                                            ReverseDNSPolicy.ASYNCHRONOUS);
-                                            /*
-                                             * If IV2 is enabled the logic initially enabling read is
-                                             * in the started method of the InputHandler
-                                             */
-                                        } else {
-                                            m_network.registerChannel(
-                                                    socket,
-                                                    handler,
-                                                    SelectionKey.OP_READ,
-                                                    ReverseDNSPolicy.ASYNCHRONOUS);
-                                        }
-                                        success = true;
-                                    }
-                                } catch (IOException e) {
-                                    try {
-                                        socket.close();
-                                    } catch (IOException e1) {
-                                        //Don't care connection is already lost anyways
-                                    }
-                                    if (m_running) {
-                                        if (timeoutRef.get() != null) {
-                                            hostLog.warn(timeoutRef.get());
-                                        } else {
-                                            hostLog.warn("Exception authenticating and " +
-                                                         "registering user in ClientAcceptor", e);
-                                        }
-                                    }
-                                } finally {
-                                    if (!success) {
-                                        m_numConnections.decrementAndGet();
-                                    }
-                                }
-                            }
-                        }
-                    };
+                    final AuthRunnable authRunnable = new AuthRunnable(socket);
                     while (true) {
                         try {
-                            m_executor.execute(authRunnable);
+                            //If before we are in finally connection got accepted.
+                            synchronized (this) {
+                                if (!m_executor.isShutdown()) {
+                                    m_executor.execute(authRunnable);
+                                }
+                            }
                             break;
                         } catch (RejectedExecutionException e) {
                             Thread.sleep(1);
