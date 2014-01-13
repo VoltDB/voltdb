@@ -30,7 +30,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.voltcore.logging.VoltLogger;
+import org.apache.log4j.Logger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -41,7 +41,7 @@ import org.voltdb.client.ProcedureCallback;
 
 public class BigTableLoader extends Thread {
 
-    static VoltLogger log = new VoltLogger("HOST");
+    static Logger log = Logger.getLogger(BigTableLoader.class);
 
     final Client client;
     final long targetCount;

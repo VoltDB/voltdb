@@ -22,7 +22,7 @@ fi
 CLASSPATH=$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
-CLIENTLOG4J="$VOLTDB_VOLTDB/../tests/log4j-allconsole.xml"
+CLIENTLOG4J=client/log4j.xml
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 
@@ -32,12 +32,20 @@ function clean() {
     rm -rf obj debugoutput $APPNAME-alt.jar voltdbroot voltdbroot
 }
 
-# compile the source code for procedures and the client
+# compile the source code for procedures
 function srccompile() {
     mkdir -p obj
     javac -target 1.7 -source 1.7 -classpath $CLASSPATH -d obj \
-        src/txnIdSelfCheck/*.java \
         src/txnIdSelfCheck/procedures/*.java
+    # stop if compilation fails
+    if [ $? != 0 ]; then exit; fi
+}
+
+function clientcompile() {
+    mkdir -p client/obj
+    CP=$(ls -x "$VOLTDB_VOLTDB"/voltdbclient*.jar | tr '[:space:]' ':'):client/lib/*:$VOLTDB_LIB/*
+    javac -classpath $CP -d client/obj \
+        client/src/txnIdSelfCheck/*.java \
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -85,8 +93,9 @@ function benchmark-help() {
 }
 
 function benchmark() {
-    srccompile
-    java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
+    rm -rf client/obj 2>/dev/null
+    clientcompile
+    java -ea -classpath $CP:$VOLTDB_LIB/*:client/obj -Dlog4j.configuration=file:///$PWD/$CLIENTLOG4J \
         txnIdSelfCheck.Benchmark \
         --displayinterval=1 \
         --duration=120 \

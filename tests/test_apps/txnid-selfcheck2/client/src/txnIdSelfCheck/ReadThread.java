@@ -27,19 +27,18 @@ import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.voltcore.logging.VoltLogger;
+import org.apache.log4j.Logger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcedureCallback;
-
-import txnIdSelfCheck.procedures.UpdateBaseProc;
+import txnIdSelfCheck.Txnid2Utils;
 
 public class ReadThread extends Thread {
 
-    static VoltLogger log = new VoltLogger("HOST");
+    static Logger log = Logger.getLogger(ReadThread.class);
 
     Random r = new Random(0);
     long counter = 0;
@@ -84,7 +83,7 @@ public class ReadThread extends Thread {
             // validate the data
             try {
                 VoltTable data = clientResponse.getResults()[0];
-                UpdateBaseProc.validateCIDData(data, ReadThread.class.getName());
+                Txnid2Utils.validateCIDData(data, ReadThread.class.getName());
             }
             catch (Exception e) {
                 log.error("ReadThread got a bad response", e);

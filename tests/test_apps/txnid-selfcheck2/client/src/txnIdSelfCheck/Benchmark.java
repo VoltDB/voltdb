@@ -42,7 +42,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.io.FileWriter;
 import java.io.IOException;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
@@ -53,11 +52,13 @@ import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.utils.MiscUtils;
+import org.apache.log4j.Logger;
+import org.apache.log4j.BasicConfigurator;
 
 public class Benchmark {
 
-    static VoltLogger log = new VoltLogger("HOST");
+    static Logger log = Logger.getLogger(Benchmark.class);
+
 
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE =
@@ -253,7 +254,7 @@ public class Benchmark {
             }
 
             // setup for retry
-            final String server = MiscUtils.getHostnameColonPortString(hostname, port);
+            final String server = hostname + ":" + port;
             es.execute(new Runnable() {
                 @Override
                 public void run() {

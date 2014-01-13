@@ -30,20 +30,18 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.voltcore.logging.VoltLogger;
+import org.apache.log4j.Logger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.VoltProcedure.VoltAbortException;
-
-import txnIdSelfCheck.procedures.UpdateBaseProc;
+import txnIdSelfCheck.Txnid2Utils;
 
 public class ClientThread extends Thread {
 
-    static VoltLogger log = new VoltLogger("HOST");
+    static Logger log = Logger.getLogger(ClientThread.class);
 
     static enum Type {
         PARTITIONED_SP, PARTITIONED_MP, REPLICATED, HYBRID, ADHOC_MP;
@@ -189,9 +187,10 @@ public class ClientThread extends Thread {
             }
             VoltTable data = results[2];
             try {
-                UpdateBaseProc.validateCIDData(data, "ClientThread:" + m_cid);
+                Txnid2Utils.validateCIDData(data, "ClientThread:" + m_cid);
+
             }
-            catch (VoltAbortException vae) {
+            catch (Exception vae) {
                 log.error("validateCIDData failed on: " + procName + ", shouldRollback: " +
                         shouldRollback + " data: " + data);
                 throw vae;

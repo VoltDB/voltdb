@@ -1,0 +1,3 @@
+Client requires a log4j appender to be defined. Place your log4j.xml into the
+run time classpath or specify it with the system property
+-Dlog4j.configuration=file://log4j.xml.

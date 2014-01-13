@@ -28,7 +28,7 @@ import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.voltcore.logging.VoltLogger;
+import org.apache.log4j.Logger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
@@ -37,7 +37,7 @@ import org.voltdb.client.ProcedureCallback;
 
 public class AdHocMayhemThread extends Thread {
 
-    static VoltLogger log = new VoltLogger("HOST");
+    static Logger log = Logger.getLogger(AdHocMayhemThread.class);
 
     Random r = new Random(0);
     long counter = 0;
@@ -45,7 +45,7 @@ public class AdHocMayhemThread extends Thread {
     final float mpRatio;
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
     final AtomicBoolean m_needsBlock = new AtomicBoolean(false);
-    final Semaphore txnsOutstanding = new Semaphore(100);
+    final Semaphore txnsOutstanding = new Semaphore(10);
     final Semaphore m_permits;
 
     public AdHocMayhemThread(Client client, float mpRatio, Semaphore permits) {
