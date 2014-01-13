@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 
+import com.google_voltpatches.common.base.Suppliers;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
@@ -61,8 +62,7 @@ public class MpRepairTask extends SiteTasker
         m_spMasters = new ArrayList<Long>(spMasters);
         whoami = "MP leader repair " +
                 CoreUtils.hsIdToString(m_mailbox.getHSId()) + " ";
-        algo = new MpPromoteAlgo(m_spMasters, m_mailbox, whoami);
-        m_mailbox.setRepairAlgo(algo);
+        algo = mailbox.constructRepairAlgo(Suppliers.ofInstance(m_spMasters), whoami);
     }
 
     @Override

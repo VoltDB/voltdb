@@ -17,6 +17,8 @@
 
 package org.voltdb.iv2;
 
+import com.google_voltpatches.common.base.Supplier;
+
 import java.util.List;
 
 // Some comments on threading and organization.
@@ -42,5 +44,5 @@ public interface Term
     public void shutdown();
 
     /** Get the current set of HSIds which we're monitoring */
-    public List<Long> getInterestingHSIds();
+    public Supplier<List<Long>> getInterestingHSIds();
 }

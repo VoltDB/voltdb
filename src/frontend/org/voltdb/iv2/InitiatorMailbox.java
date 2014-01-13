@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 
+import com.google_voltpatches.common.base.Supplier;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
@@ -71,11 +72,6 @@ public class InitiatorMailbox implements Mailbox
     public static final CopyOnWriteArrayList<InitiatorMailbox> m_allInitiatorMailboxes
                                                                          = new CopyOnWriteArrayList<InitiatorMailbox>();
 
-    synchronized public void setRepairAlgo(RepairAlgo algo)
-    {
-        setRepairAlgoInternal(algo);
-    }
-
     synchronized public void setLeaderState(long maxSeenTxnId)
     {
         setLeaderStateInternal(maxSeenTxnId);
@@ -92,6 +88,12 @@ public class InitiatorMailbox implements Mailbox
 
     synchronized public void enableWritingIv2FaultLog() {
         enableWritingIv2FaultLogInternal();
+    }
+
+    synchronized public RepairAlgo constructRepairAlgo(Supplier<List<Long>> survivors, String whoami) {
+        RepairAlgo ra = new SpPromoteAlgo( survivors.get(), this, whoami, m_partitionId);
+        setRepairAlgoInternal(ra);
+        return ra;
     }
 
     protected void setRepairAlgoInternal(RepairAlgo algo)

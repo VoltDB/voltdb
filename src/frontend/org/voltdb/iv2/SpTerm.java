@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.util.concurrent.ExecutionException;
 import java.util.List;
 
+import com.google_voltpatches.common.base.Supplier;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
 import org.voltcore.logging.VoltLogger;
@@ -58,16 +59,8 @@ public class SpTerm implements Term
             tmLog.debug(m_whoami
                       + "replica change handler updating replica list to: "
                       + CoreUtils.hsIdCollectionToString(replicas));
-            /*
-             * These use updates are used to track failures during repair
-             * A settable future is used to track when an in progress repair should
-             * be cancelled. Synchronization is necessary to construct and publish
-             * each settable future atomically WRT to the delivery of cancellation messages
-             * via updated replicas
-             */
-            synchronized (m_mailbox) {
-                m_mailbox.updateReplicas(replicas, null);
-            }
+
+            m_mailbox.updateReplicas(replicas, null);
         }
     };
 
@@ -112,10 +105,15 @@ public class SpTerm implements Term
     }
 
     @Override
-    public List<Long> getInterestingHSIds()
+    public Supplier<List<Long>> getInterestingHSIds()
     {
-        List<String> survivorsNames = m_babySitter.lastSeenChildren();
-        List<Long> survivors =  VoltZK.childrenToReplicaHSIds(survivorsNames);
-        return survivors;
+        return new Supplier<List<Long>>() {
+            @Override
+            public List<Long> get() {
+                List<String> survivorsNames = m_babySitter.lastSeenChildren();
+                List<Long> survivors =  VoltZK.childrenToReplicaHSIds(survivorsNames);
+                return survivors;
+            }
+        };
     }
 }

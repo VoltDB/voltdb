@@ -17,16 +17,8 @@
 
 package org.voltdb.iv2;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -216,7 +208,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     public void updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters)
     {
         // First - correct the official replica set.
-        m_replicaHSIds = replicas;
+        m_replicaHSIds = new ArrayList<Long>(replicas);
         // Update the list of remote replicas that we'll need to send to
         List<Long> sendToHSIds = new ArrayList<Long>(m_replicaHSIds);
         sendToHSIds.remove(m_mailbox.getHSId());

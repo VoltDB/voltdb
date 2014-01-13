@@ -111,18 +111,9 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     m_whoami);
             m_term.start();
             while (!success) {
-                RepairAlgo repair = null;
-                /*
-                 * Synchronization to atomically construct and publish the repair algo
-                 * with a specific list of HSIds so as not to miss notices
-                 * when those IDs change
-                 */
-                synchronized (m_initiatorMailbox) {
-                    repair = createPromoteAlgo(m_term.getInterestingHSIds(),
-                            m_initiatorMailbox, m_whoami);
+                final RepairAlgo repair =
+                        m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami);
 
-                    m_initiatorMailbox.setRepairAlgo(repair);
-                }
                 // term syslogs the start of leader promotion.
                 Long txnid = Long.MIN_VALUE;
                 try {
@@ -146,7 +137,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                             tmLog.fatal("This node will fail.  Please contact VoltDB support with your cluster's " +
                                     "log files.");
                             m_initiatorMailbox.send(
-                                    com.google_voltpatches.common.primitives.Longs.toArray(m_term.getInterestingHSIds()),
+                                    com.google_voltpatches.common.primitives.Longs.toArray(m_term.getInterestingHSIds().get()),
                                     new DumpMessage());
                             throw new RuntimeException("Failing promoted MPI node with unresolvable repair condition.");
                         }
@@ -193,13 +184,6 @@ public class MpInitiator extends BaseInitiator implements Promotable
             String whoami)
     {
         return new MpTerm(zk, initiatorHSId, mailbox, whoami);
-    }
-
-    @Override
-    public RepairAlgo createPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
-            String whoami)
-    {
-        return new MpPromoteAlgo(m_term.getInterestingHSIds(), m_initiatorMailbox, m_whoami);
     }
 
     /**

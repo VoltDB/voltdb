@@ -66,10 +66,6 @@ public interface Initiator
     public Term createTerm(ZooKeeper zk, int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
             String whoami);
 
-    /** Create a Promotion implementation appropriate for the subclass */
-    public RepairAlgo createPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
-            String whoami);
-
     /** Write a viable replay set to the command log */
     public void enableWritingIv2FaultLog();
 }
