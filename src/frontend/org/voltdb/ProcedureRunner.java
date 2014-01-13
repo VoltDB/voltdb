@@ -401,15 +401,15 @@ public class ProcedureRunner {
      * @return true if the txn hashes to the current partition, false otherwise
      */
     public boolean checkPartition(TransactionState txnState, TheHashinator hashinator) {
-        TheHashinator.HashinatorType hashinatorType = hashinator.getConfigurationType();
-        if (hashinatorType == TheHashinator.HashinatorType.LEGACY) {
-            // Legacy hashinator is not used for elastic, no need to check partitioning. In fact,
-            // since SP sysprocs all pass partitioning parameters as bytes,
-            // they will hash to different partitions using the legacy hashinator. So don't do it.
-            return true;
-        }
-
         if (m_catProc.getSinglepartition()) {
+            TheHashinator.HashinatorType hashinatorType = hashinator.getConfigurationType();
+            if (hashinatorType == TheHashinator.HashinatorType.LEGACY) {
+                // Legacy hashinator is not used for elastic, no need to check partitioning. In fact,
+                // since SP sysprocs all pass partitioning parameters as bytes,
+                // they will hash to different partitions using the legacy hashinator. So don't do it.
+                return true;
+            }
+
             StoredProcedureInvocation invocation = txnState.getInvocation();
             int parameterType;
             Object parameterAtIndex;
