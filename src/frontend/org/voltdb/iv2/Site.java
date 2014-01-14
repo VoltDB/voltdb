@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.google_voltpatches.common.base.Preconditions;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -340,7 +341,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public void updateHashinator(TheHashinator hashinator)
         {
-            m_hashinator = hashinator;
             Site.this.updateHashinator(hashinator);
         }
 
@@ -961,7 +961,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                              Integer partitionId, String tableSignature)
     {
         m_ee.exportAction(syncAction, ackOffset, sequenceNumber,
-                          partitionId, tableSignature);
+                partitionId, tableSignature);
     }
 
     @Override
@@ -1140,6 +1140,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void updateHashinator(TheHashinator hashinator)
     {
+        Preconditions.checkNotNull(hashinator);
         m_hashinator = hashinator;
         m_ee.updateHashinator(hashinator.pGetCurrentConfig());
     }

@@ -26,17 +26,13 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google_voltpatches.common.base.*;
 import com.google_voltpatches.common.collect.MapMaker;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
-
-import com.google_voltpatches.common.base.Charsets;
-import com.google_voltpatches.common.base.Supplier;
-import com.google_voltpatches.common.base.Suppliers;
-import com.google_voltpatches.common.base.Throwables;
 
 /**
  * Class that maps object values to partitions. It's rather simple
@@ -112,6 +108,7 @@ public abstract class TheHashinator {
      */
     public static void initialize(Class<? extends TheHashinator> hashinatorImplementation, byte config[]) {
         TheHashinator hashinator = constructHashinator( hashinatorImplementation, config, false);
+        Preconditions.checkNotNull(hashinator);
         m_cachedHashinators.put(0L, hashinator);
         instance.set(Pair.of(0L, hashinator));
     }
@@ -368,20 +365,24 @@ public abstract class TheHashinator {
             long version,
             byte configBytes[],
             boolean cooked) {
-        //Use a cached hashinator if possible
+        //Use a cached/canonical hashinator if possible
         TheHashinator existingHashinator = m_cachedHashinators.get(version);
         if (existingHashinator == null) {
-            TheHashinator newHashinator = constructHashinator(hashinatorImplementation, configBytes, cooked);
-            TheHashinator tempVal = m_cachedHashinators.putIfAbsent( version, newHashinator);
+            existingHashinator = constructHashinator(hashinatorImplementation, configBytes, cooked);
+            Preconditions.checkNotNull(existingHashinator);
+            TheHashinator tempVal = m_cachedHashinators.putIfAbsent( version, existingHashinator);
             if (tempVal != null) existingHashinator = tempVal;
+            Preconditions.checkNotNull(existingHashinator);
         }
+
+        Preconditions.checkNotNull(existingHashinator);
 
         //Do a CAS loop to maintain a global instance
         while (true) {
             final Pair<Long, ? extends TheHashinator> snapshot = instance.get();
             if (version > snapshot.getFirst()) {
                 final Pair<Long, ? extends TheHashinator> update =
-                        Pair.of(version, constructHashinator(hashinatorImplementation, configBytes, cooked));
+                        Pair.of(version, existingHashinator);
                 if (instance.compareAndSet(snapshot, update)) {
                     return Pair.of(new UndoAction() {
                         @Override
