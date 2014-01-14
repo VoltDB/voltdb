@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -35,16 +35,18 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestSystemProcedureSuite extends RegressionSuite {
 
     private static int SITES = 3;
-    private static int HOSTS = 2;
-    private static int KFACTOR = 1;
+    private static int HOSTS = MiscUtils.isPro() ? 2 : 1;
+    private static int KFACTOR = MiscUtils.isPro() ? 1 : 0;
     private static boolean hasLocalServer = false;
 
     static final Class<?>[] PROCEDURES =
@@ -60,6 +62,45 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         Client client = getClient();
         ClientResponse cr = client.callProcedure("@Ping");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+    }
+
+    private void checkProSysprocError(Client client, String name, int paramCount)
+            throws NoConnectionsException, IOException
+    {
+        // make some dummy params... real ones aren't needed for this test
+        Object[] params = new Object[paramCount];
+        for (int i = 0; i < paramCount; i++) {
+            params[i] = i;
+        }
+
+        try {
+            client.callProcedure("@UpdateApplicationCatalog", params);
+            fail();
+        }
+        catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            if (!e.getClientResponse().getStatusString().contains("Enterprise Edition")) {
+                System.out.println("sup");
+            }
+            assertTrue(e.getClientResponse().getStatusString().contains("Enterprise"));
+        }
+    }
+
+    public void testProSysprocErrorOnCommunity() throws Exception {
+        // this test only applies to community edition
+        if (MiscUtils.isPro()) {
+            return;
+        }
+
+        Client client = getClient();
+
+        checkProSysprocError(client, "@UpdateApplicationCatalog", 2);
+        checkProSysprocError(client, "@SnapshotSave", 3);
+        checkProSysprocError(client, "@SnapshotRestore", 2);
+        checkProSysprocError(client, "@SnapshotStatus", 0);
+        checkProSysprocError(client, "@SnapshotScan", 2);
+        checkProSysprocError(client, "@SnapshotDelete", 2);
+        checkProSysprocError(client, "@Promote", 0);
     }
 
     public void testInvalidProcedureName() throws IOException {
@@ -241,7 +282,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                     assertEquals(20, results[0].getLong("TUPLE_COUNT"));
                 }
             }
-            assertEquals(6, foundItem);
+            assertEquals(MiscUtils.isPro() ? 6 : 3, foundItem);
 
             // Table finally loaded fully should mean that index is okay on first read.
             VoltTable indexStats =
