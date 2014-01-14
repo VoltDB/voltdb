@@ -108,7 +108,6 @@ public abstract class TheHashinator {
      */
     public static void initialize(Class<? extends TheHashinator> hashinatorImplementation, byte config[]) {
         TheHashinator hashinator = constructHashinator( hashinatorImplementation, config, false);
-        Preconditions.checkNotNull(hashinator);
         m_cachedHashinators.put(0L, hashinator);
         instance.set(Pair.of(0L, hashinator));
     }
@@ -369,13 +368,9 @@ public abstract class TheHashinator {
         TheHashinator existingHashinator = m_cachedHashinators.get(version);
         if (existingHashinator == null) {
             existingHashinator = constructHashinator(hashinatorImplementation, configBytes, cooked);
-            Preconditions.checkNotNull(existingHashinator);
             TheHashinator tempVal = m_cachedHashinators.putIfAbsent( version, existingHashinator);
             if (tempVal != null) existingHashinator = tempVal;
-            Preconditions.checkNotNull(existingHashinator);
         }
-
-        Preconditions.checkNotNull(existingHashinator);
 
         //Do a CAS loop to maintain a global instance
         while (true) {
