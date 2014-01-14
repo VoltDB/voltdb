@@ -37,10 +37,6 @@ private:
      */
     virtual void undo() {
         m_emptyTable->truncateTableForUndo(m_engine, m_tcd, m_originalTable);
-        m_emptyTable->decrementRefcount();
-
-        m_tcd->setTable(m_originalTable);
-        m_engine->rebuildSingleTableCollection(m_tcd);
     }
 
     /*
@@ -49,7 +45,6 @@ private:
      */
     virtual void release() {
         m_originalTable->truncateTableRelease();
-        m_originalTable->decrementRefcount();
     }
 
 private:

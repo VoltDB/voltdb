@@ -481,14 +481,8 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
     // clear the tuple that will be built to insert or overwrite
     memset(m_updatedTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
 
-    //printf("  Existing tuple: %s.\n", m_existingTuple.debugNoHeader().c_str());
-    //fflush(stdout);
-
     // set up the first column, which is a count
     NValue count = m_existingTuple.getNValue((int)m_groupByColumnCount).op_decrement();
-
-    //printf("  Count is: %ld.\n", (long)(count.getBigInt()));
-    //fflush(stdout);
 
     // check if we should remove the tuple
     if (count.isZero()) {
