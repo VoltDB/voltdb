@@ -112,8 +112,7 @@ public abstract class TheHashinator {
      */
     public static void initialize(Class<? extends TheHashinator> hashinatorImplementation, byte config[]) {
         TheHashinator hashinator = constructHashinator( hashinatorImplementation, config, false);
-        TheHashinator tempVal = m_cachedHashinators.putIfAbsent(0L, hashinator);
-        if (tempVal != null) hashinator = tempVal;
+        m_cachedHashinators.put(0L, hashinator);
         instance.set(Pair.of(0L, hashinator));
     }
 
