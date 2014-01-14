@@ -227,10 +227,6 @@ void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDe
         }
     }
 
-    tcd->deleteCommand();
-
-    tcd->setTable(originalTable);
-    engine->rebuildSingleTableCollection(tcd);
 }
 
 void PersistentTable::truncateTableRelease() {
@@ -274,6 +270,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine) {
         targetTcd->setTable(targetEmptyTable);
         engine->rebuildSingleTableCollection(targetTcd);
     }
+    this->incrementRefcount();
     tcd->setTable(emptyTable);
     engine->rebuildSingleTableCollection(tcd);
 
