@@ -961,7 +961,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                              Integer partitionId, String tableSignature)
     {
         m_ee.exportAction(syncAction, ackOffset, sequenceNumber,
-                partitionId, tableSignature);
+                          partitionId, tableSignature);
     }
 
     @Override
