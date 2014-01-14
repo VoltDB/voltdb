@@ -428,12 +428,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     final AuthRunnable authRunnable = new AuthRunnable(socket);
                     while (true) {
                         try {
-                            //If before we are in finally connection got accepted.
-                            synchronized (this) {
-                                if (!m_executor.isShutdown()) {
-                                    m_executor.execute(authRunnable);
-                                }
-                            }
+                            m_executor.execute(authRunnable);
                             break;
                         } catch (RejectedExecutionException e) {
                             Thread.sleep(1);
@@ -441,9 +436,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
                 } while (m_running);
             }  catch (Exception e) {
-                if (m_running) {
-                    hostLog.fatal("Exception in ClientAcceptor. The acceptor has died", e);
-                }
+                hostLog.error("Exception in ClientAcceptor. The acceptor has died", e);
             } finally {
                 try {
                     m_serverSocket.close();
@@ -455,7 +448,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     Thread.interrupted();
                     m_executor.shutdownNow();
                     try {
-                        m_executor.awaitTermination( 1, TimeUnit.DAYS);
+                        m_executor.awaitTermination(5, TimeUnit.MINUTES);
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);
                     }
