@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.util.List;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -132,9 +133,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     m_whoami);
             m_term.start();
             while (!success) {
-                RepairAlgo repair = null;
-                repair = createPromoteAlgo(m_term.getInterestingHSIds(),
-                        m_initiatorMailbox, m_whoami);
+                RepairAlgo repair =
+                        m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami);
 
                 // if rejoining, a promotion can not be accepted. If the rejoin is
                 // in-progress, the loss of the master will terminate the rejoin
@@ -147,12 +147,17 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     VoltDB.crashLocalVoltDB("A rejoining site can not be promoted to leader.", false, null);
                     return;
                 }
-                m_initiatorMailbox.setRepairAlgo(repair);
+
                 // term syslogs the start of leader promotion.
-                Pair<Boolean, Long> result = repair.start().get();
-                success = result.getFirst();
+                Long txnid = Long.MIN_VALUE;
+                try {
+                    txnid = repair.start().get();
+                    success = true;
+                } catch (CancellationException e) {
+                    success = false;
+                }
                 if (success) {
-                    m_initiatorMailbox.setLeaderState(result.getSecond());
+                    m_initiatorMailbox.setLeaderState(txnid);
                     tmLog.info(m_whoami
                              + "finished leader promotion. Took "
                              + (System.currentTimeMillis() - startTime) + " ms.");
@@ -195,13 +200,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
             String whoami)
     {
         return new SpTerm(zk, partitionId, initiatorHSId, mailbox, whoami);
-    }
-
-    @Override
-    public RepairAlgo createPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
-            String whoami)
-    {
-        return new SpPromoteAlgo(m_term.getInterestingHSIds(), m_initiatorMailbox, m_whoami, m_partitionId);
     }
 
     @Override

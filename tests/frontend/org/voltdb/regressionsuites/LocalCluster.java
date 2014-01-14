@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -116,41 +116,60 @@ public class LocalCluster implements VoltServerConfig {
     // instance.
     private final CommandLine templateCmdLine = new CommandLine(StartAction.CREATE);
 
-    public LocalCluster(String jarFileName, int siteCount,
-            int hostCount, int kfactor, BackendTarget target, Map<String, String> env) {
-        this(jarFileName, siteCount,
-                hostCount, kfactor, target,
-                FailureState.ALL_RUNNING, false, false, false, env);
-
+    public LocalCluster(String jarFileName,
+                        int siteCount,
+                        int hostCount,
+                        int kfactor,
+                        BackendTarget target)
+    {
+        this(jarFileName, siteCount, hostCount, kfactor, target, null);
     }
 
-    public LocalCluster(String jarFileName, int siteCount,
-            int hostCount, int kfactor, BackendTarget target) {
-        this(jarFileName, siteCount,
-             hostCount, kfactor, target,
-                FailureState.ALL_RUNNING, false, false, false, null);
-    }
-
-    public LocalCluster(String jarFileName, int siteCount,
-                        int hostCount, int kfactor, BackendTarget target,
-                        boolean isRejoinTest, boolean enableIv2) {
-        this(jarFileName, siteCount,
-             hostCount, kfactor, target,
-                FailureState.ALL_RUNNING, false, isRejoinTest, enableIv2, null);
-    }
-
-    public LocalCluster(String jarFileName, int siteCount,
-                        int hostCount, int kfactor, BackendTarget target,
-                        FailureState failureState,
-                        boolean debug) {
+    public LocalCluster(String jarFileName,
+                        int siteCount,
+                        int hostCount,
+                        int kfactor,
+                        BackendTarget target,
+                        Map<String, String> env)
+    {
         this(jarFileName, siteCount, hostCount, kfactor, target,
-                failureState, debug, false, false, null);
+                FailureState.ALL_RUNNING, false, false, env);
+
     }
 
-    public LocalCluster(String jarFileName, int siteCount,
-                        int hostCount, int kfactor, BackendTarget target,
+    public LocalCluster(String jarFileName,
+                        int siteCount,
+                        int hostCount,
+                        int kfactor,
+                        BackendTarget target,
+                        boolean isRejoinTest)
+    {
+        this(jarFileName, siteCount, hostCount, kfactor, target,
+                FailureState.ALL_RUNNING, false, isRejoinTest, null);
+    }
+
+    public LocalCluster(String jarFileName,
+                        int siteCount,
+                        int hostCount,
+                        int kfactor,
+                        BackendTarget target,
                         FailureState failureState,
-            boolean debug, boolean isRejoinTest, boolean enableIv2, Map<String, String> env)    {
+                        boolean debug)
+    {
+        this(jarFileName, siteCount, hostCount, kfactor, target,
+                failureState, debug, false, null);
+    }
+
+    public LocalCluster(String jarFileName,
+                        int siteCount,
+                        int hostCount,
+                        int kfactor,
+                        BackendTarget target,
+                        FailureState failureState,
+                        boolean debug,
+                        boolean isRejoinTest,
+                        Map<String, String> env)
+    {
         assert (jarFileName != null);
         assert (siteCount > 0);
         assert (hostCount > 0);
