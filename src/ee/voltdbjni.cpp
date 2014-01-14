@@ -238,7 +238,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDestr
     topend->updateJNIEnv(env);
     updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
     delete engine;
-    delete topend;    
+    delete topend;
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
 }
 
