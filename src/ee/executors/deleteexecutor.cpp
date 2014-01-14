@@ -69,7 +69,9 @@ bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node,
     m_node = dynamic_cast<DeletePlanNode*>(abstract_node);
     assert(m_node);
     assert(m_node->getTargetTable());
-    m_targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable()); //target table should be persistenttable
+
+    //target table should be persistenttable
+    m_targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
     assert(m_targetTable);
 
     setDMLCountOutputTable(limits);
@@ -91,7 +93,12 @@ bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node,
 }
 
 bool DeleteExecutor::p_execute(const NValueArray &params) {
+    // target table should be persistenttable
+    // update target table reference from table delegate
+    m_targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
     assert(m_targetTable);
+    m_targetTuple = TableTuple(m_targetTable->schema());
+
     int64_t modified_tuples = 0;
 
     if (m_truncate) {

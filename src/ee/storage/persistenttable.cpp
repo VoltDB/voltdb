@@ -203,6 +203,8 @@ void PersistentTable::deleteAllTuples(bool freeAllocatedStrings) {
 }
 
 void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable) {
+    VOLT_DEBUG("**** Truncate table undo *****\n");
+
     // (1) delete new constructed indexes first
     for (std::vector<TableIndex*>::iterator it = m_indexes.begin(); it != m_indexes.end(); ++it) {
         TableIndex * index = *it;
@@ -241,6 +243,8 @@ void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDe
 }
 
 void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
+    VOLT_DEBUG("**** Truncate table release *****\n");
+
     TableIterator ti(this, m_data.begin());
     TableTuple tuple(m_schema);
     while (ti.next(tuple)) {
@@ -277,9 +281,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine) {
     BOOST_FOREACH(MaterializedViewMetadata * originalView, m_views) {
         PersistentTable * targetTable = originalView->targetTable();
         PersistentTable * targetEmptyTable = TableFactory::getSinglePersistentTableWithIndexes(targetTable);
-        MaterializedViewMetadata * newView = new MaterializedViewMetadata(emptyTable, targetEmptyTable,
-                originalView->getMaterializedViewInfo());
-        emptyTable->addMaterializedView(newView);
+        new MaterializedViewMetadata(emptyTable, targetEmptyTable, originalView->getMaterializedViewInfo());
 
         TableCatalogDelegate * targetTcd =  engine->getTableDelegate(targetTable->name());
         targetTcd->setTable(targetEmptyTable);

@@ -532,7 +532,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
     assert(m_catalog != NULL);
     VOLT_DEBUG("Loading catalog...");
 
-    VOLT_TRACE("Catalog string contents:\n%s\n",catalogPayload.c_str());
+
     m_catalog->execute(catalogPayload);
 
 
@@ -1003,7 +1003,22 @@ void VoltDBEngine::rebuildTableCollections()
     BOOST_FOREACH (LabeledCDPair cdPair, m_catalogDelegates) {
         TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(cdPair.second);
         if (tcd) {
-            rebuildSingleTableCollection(tcd);
+            catalog::Table *catTable = m_database->tables().get(tcd->getTable()->name());
+            m_tables[catTable->relativeIndex()] = tcd->getTable();
+            m_tablesByName[tcd->getTable()->name()] = tcd->getTable();
+
+            getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
+                    catTable->relativeIndex(),
+                    tcd->getTable()->getTableStats());
+
+            // add all of the indexes to the stats source
+            const std::vector<TableIndex*>& tindexes = tcd->getTable()->allIndexes();
+            for (int i = 0; i < tindexes.size(); i++) {
+                TableIndex *index = tindexes[i];
+                getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
+                        catTable->relativeIndex(),
+                        index->getIndexStats());
+            }
         }
     }
 }
@@ -1013,7 +1028,7 @@ void VoltDBEngine::rebuildSingleTableCollection(TableCatalogDelegate * tcd) {
     m_tables[catTable->relativeIndex()] = tcd->getTable();
     m_tablesByName[tcd->getTable()->name()] = tcd->getTable();
 
-    getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
+    getStatsManager().updateRegisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
             catTable->relativeIndex(),
             tcd->getTable()->getTableStats());
 
@@ -1021,7 +1036,7 @@ void VoltDBEngine::rebuildSingleTableCollection(TableCatalogDelegate * tcd) {
     const std::vector<TableIndex*>& tindexes = tcd->getTable()->allIndexes();
     for (int i = 0; i < tindexes.size(); i++) {
         TableIndex *index = tindexes[i];
-        getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
+        getStatsManager().updateRegisterStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
                 catTable->relativeIndex(),
                 index->getIndexStats());
     }

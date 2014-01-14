@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-
+#include "storage/MaterializedViewMetadata.h"
 #include <cassert>
 #include <cstdio>
 #include <vector>
@@ -26,7 +26,6 @@
 #include "catalog/columnref.h"
 #include "catalog/column.h"
 #include "catalog/table.h"
-#include "catalog/materializedviewinfo.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/tuplevalueexpression.h"
 #include "expressions/constantvalueexpression.h"
@@ -34,7 +33,6 @@
 #include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
 #include "storage/persistenttable.h"
-#include "storage/MaterializedViewMetadata.h"
 #include "boost/foreach.hpp"
 #include "boost/shared_array.hpp"
 

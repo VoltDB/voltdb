@@ -107,6 +107,10 @@ PersistentTable * TableFactory::getSinglePersistentTableWithIndexes(PersistentTa
         }
     }
 
+    // configure for stats tables
+    table->configureIndexStats(tb->databaseId());
+    table->incrementRefcount();
+
     return dynamic_cast<PersistentTable*>(table);
 }
 

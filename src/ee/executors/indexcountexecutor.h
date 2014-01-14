@@ -52,6 +52,8 @@ private:
 
     long countNulls(AbstractExpression * countNullExpr);
 
+    void updateTargetTableAndIndex();
+
     // Data in this class is arranged roughly in the order it is read for
     // p_execute(). Please don't reshuffle it only in the name of beauty.
 
