@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -268,7 +269,12 @@ public class TestSpPromoteAlgo
             @Override
             public void run() {
                 try {
-                    promotionResult.set(term.start().get().getFirst());
+                    boolean success = false;
+                    try {
+                        term.start().get();
+                        success = true;
+                    } catch (CancellationException e) {}
+                    promotionResult.set(success);
                 } catch (Exception e) {
                     System.out.println("Promotion thread threw: " + e);
                     throw new RuntimeException(e);
@@ -286,7 +292,7 @@ public class TestSpPromoteAlgo
     }
 
     @Test
-    public void testFuzz()
+    public void testFuzz() throws Exception
     {
         InitiatorMailbox mbox = mock(InitiatorMailbox.class);
         Map<Long, List<TransactionInfoBaseMessage>> finalStreams =
@@ -339,7 +345,7 @@ public class TestSpPromoteAlgo
         survivors.add(1l);
         survivors.add(2l);
         SpPromoteAlgo dut = new SpPromoteAlgo(survivors, mbox, "bleh ", 0);
-        Future<Pair<Boolean, Long>> result = dut.start();
+        Future<Long> result = dut.start();
         for (int i = 0; i < 3; i++) {
             List<Iv2RepairLogResponseMessage> stuff = logs[i].contents(dut.getRequestId(), false);
             System.out.println("Repair log size from: " + i + ": " + stuff.size());
@@ -355,6 +361,7 @@ public class TestSpPromoteAlgo
                 }
             }
         }
+        result.get();
         assertFalse(result.isCancelled());
         assertTrue(result.isDone());
         // Unfortunately, it's painful to try to stub things to make repairSurvivors() work, so we'll

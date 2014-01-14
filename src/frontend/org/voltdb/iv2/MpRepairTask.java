@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,7 +20,9 @@ package org.voltdb.iv2;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CancellationException;
 
+import com.google_voltpatches.common.base.Suppliers;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
@@ -51,11 +53,16 @@ public class MpRepairTask extends SiteTasker
     private List<Long> m_spMasters;
     private Object m_lock = new Object();
     private boolean m_repairRan = false;
+    private final String whoami;
+    private final RepairAlgo algo;
 
     public MpRepairTask(InitiatorMailbox mailbox, List<Long> spMasters)
     {
         m_mailbox = mailbox;
         m_spMasters = new ArrayList<Long>(spMasters);
+        whoami = "MP leader repair " +
+                CoreUtils.hsIdToString(m_mailbox.getHSId()) + " ";
+        algo = mailbox.constructRepairAlgo(Suppliers.ofInstance(m_spMasters), whoami);
     }
 
     @Override
@@ -63,12 +70,12 @@ public class MpRepairTask extends SiteTasker
         synchronized (m_lock) {
             if (!m_repairRan) {
                 try {
-                    String whoami = "MP leader repair " +
-                        CoreUtils.hsIdToString(m_mailbox.getHSId()) + " ";
-                    RepairAlgo algo = new MpPromoteAlgo(m_spMasters, m_mailbox, whoami);
-                    m_mailbox.setRepairAlgo(algo);
-                    Pair<Boolean, Long> result = algo.start().get();
-                    boolean success = result.getFirst();
+                    Long txnid = Long.MIN_VALUE;
+                    boolean success = false;
+                    try {
+                        txnid = algo.start().get();
+                        success = true;
+                    } catch (CancellationException e) {}
                     if (success) {
                         tmLog.info(whoami + "finished repair.");
                     }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -64,10 +64,6 @@ public interface Initiator
 
     /** Create a Term implementation appropriate for the subclass */
     public Term createTerm(ZooKeeper zk, int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
-            String whoami);
-
-    /** Create a Promotion implementation appropriate for the subclass */
-    public RepairAlgo createPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
             String whoami);
 
     /** Write a viable replay set to the command log */
