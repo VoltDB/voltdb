@@ -53,7 +53,7 @@ public interface RepairAlgo
      * leadership has been fully assumed and all surviving replicas have been
      * repaired.
      */
-    public Future<Pair<Boolean, Long>> start();
+    public Future<Long> start();
 
     public boolean cancel();
 
