@@ -115,9 +115,6 @@ public:
     void deleteTupleRelease(char* tuple);
     void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
 
-    void truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable);
-    void truncateTableRelease(PersistentTable *originalTable);
-
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock);
     uint32_t getTupleCount() const;
 
@@ -395,6 +392,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return &m_surgeon;
     }
 
+    void truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable);
+    void truncateTableRelease();
+
   private:
 
     /**
@@ -466,9 +466,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
      * In the memcheck build it will return the storage to the heap.
      */
     void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
-
-    void truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable);
-    void truncateTableRelease(PersistentTable *originalTable);
 
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom
@@ -565,13 +562,6 @@ inline void PersistentTableSurgeon::deleteTupleRelease(char* tuple) {
 
 inline void PersistentTableSurgeon::deleteTupleStorage(TableTuple &tuple, TBPtr block) {
     m_table.deleteTupleStorage(tuple, block);
-}
-
-inline void PersistentTableSurgeon::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable) {
-    m_table.truncateTableForUndo(engine, tcd, originalTable);
-}
-inline void PersistentTableSurgeon::truncateTableRelease(PersistentTable *originalTable) {
-    m_table.truncateTableRelease(originalTable);
 }
 
 inline void PersistentTableSurgeon::snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {

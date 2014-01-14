@@ -206,10 +206,9 @@ void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDe
     VOLT_DEBUG("**** Truncate table undo *****\n");
 
     // (1) delete new constructed indexes first
-    for (std::vector<TableIndex*>::iterator it = m_indexes.begin(); it != m_indexes.end(); ++it) {
-        TableIndex * index = *it;
+    BOOST_FOREACH(TableIndex *index, m_indexes) {
         if (index) {
-            removeIndex(index);
+            this->removeIndex(index);
         }
     }
 
@@ -221,20 +220,12 @@ void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDe
             std::string targetTableName = view->targetTable()->name();
             ptb->dropMaterializedView(view);
 
-            // free schema storage
-            TupleSchema * matViewSchema = view->targetTable()->schema();
-            TupleSchema::freeTupleSchema(matViewSchema);
-            matViewSchema = NULL;
-
             TableCatalogDelegate * targetTcd = engine->getTableDelegate(targetTableName);
             PersistentTable * originalView = originalTable->getViewTable(targetTableName);
             targetTcd->setTable(originalView);
             engine->rebuildSingleTableCollection(targetTcd);
         }
     }
-    TupleSchema * schema = ptb->schema();
-    TupleSchema::freeTupleSchema(schema);
-    schema = NULL;
 
     tcd->deleteCommand();
 
@@ -242,7 +233,7 @@ void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDe
     engine->rebuildSingleTableCollection(tcd);
 }
 
-void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
+void PersistentTable::truncateTableRelease() {
     VOLT_DEBUG("**** Truncate table release *****\n");
 
     TableIterator ti(this, m_data.begin());
@@ -263,11 +254,7 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
 
         // Here, for reasons of infallibility or no active UndoLog, there is no undo, there is only DO.
         deleteTupleFinalize(tuple);
-        return ;
     }
-
-    // Delete myself ?
-    // Call destructor maybe?
 }
 
 
@@ -295,15 +282,11 @@ void PersistentTable::truncateTable(VoltDBEngine* engine) {
         emptyTable->m_tuplesPinnedByUndo = emptyTable->m_tupleCount;
         emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
         // Create and register an undo action.
-        uq->registerUndoAction(
-                new (*uq) PersistentTableUndoTruncateTableAction(engine,
-                        tcd,this,emptyTable->getTableSurgeon()
-                        ),
-                this);
+        uq->registerUndoAction(new (*uq) PersistentTableUndoTruncateTableAction(engine, tcd, this, emptyTable),this);
         return;
     }
 
-    truncateTableRelease(this);
+    truncateTableRelease();
 }
 
 

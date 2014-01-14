@@ -24,8 +24,9 @@ namespace voltdb {
 
 class PersistentTableUndoTruncateTableAction: public UndoAction {
 public:
-    inline PersistentTableUndoTruncateTableAction(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable, PersistentTableSurgeon *table)
-    :  m_engine(engine), m_tcd(tcd), m_originalTable(originalTable), m_table(table)
+    inline PersistentTableUndoTruncateTableAction(VoltDBEngine * engine, TableCatalogDelegate * tcd,
+            PersistentTable *originalTable, PersistentTable *emptyTable)
+    :  m_engine(engine), m_tcd(tcd), m_originalTable(originalTable), m_emptyTable(emptyTable)
     {}
 
 private:
@@ -35,7 +36,7 @@ private:
      * Undo whatever this undo action was created to undo. In this case reinsert the tuple into the table.
      */
     virtual void undo() {
-        m_table->truncateTableForUndo(m_engine, m_tcd, m_originalTable);
+        m_emptyTable->truncateTableForUndo(m_engine, m_tcd, m_originalTable);
     }
 
     /*
@@ -43,14 +44,16 @@ private:
      * In this case free the strings associated with the tuple.
      */
     virtual void release() {
-        m_table->truncateTableRelease(m_originalTable);
+        m_originalTable->truncateTableRelease();
+        m_originalTable->decrementRefcount();
+        m_originalTable = NULL;
     }
 
 private:
     VoltDBEngine * m_engine;
     TableCatalogDelegate * m_tcd;
     PersistentTable *m_originalTable;
-    PersistentTableSurgeon *m_table;
+    PersistentTable *m_emptyTable;
 };
 
 }
