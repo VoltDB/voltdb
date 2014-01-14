@@ -20,7 +20,6 @@ package org.voltdb.iv2;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.SortedSet;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
