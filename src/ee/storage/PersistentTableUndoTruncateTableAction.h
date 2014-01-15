@@ -30,7 +30,7 @@ public:
     {}
 
 private:
-    virtual ~PersistentTableUndoTruncateTableAction() { }
+    virtual ~PersistentTableUndoTruncateTableAction() {}
 
     /*
      * Undo whatever this undo action was created to undo. In this case delete the newly constructed table,
@@ -47,7 +47,7 @@ private:
      * tuple in the original table.
      */
     virtual void release() {
-        m_originalTable->truncateTableRelease();
+        m_emptyTable->truncateTableRelease(m_originalTable);
     }
 
 private:

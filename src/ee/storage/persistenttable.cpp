@@ -205,39 +205,16 @@ void PersistentTable::deleteAllTuples(bool freeAllocatedStrings, bool fallible) 
 void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable) {
     VOLT_DEBUG("**** Truncate table undo *****\n");
 
-//    // (1) delete new constructed indexes first
-//    BOOST_FOREACH(TableIndex *index, m_indexes) {
-//        if (index) {
-//            this->removeIndex(index);
-//        }
-//    }
-//
-//    // (2) delete new constructed MatView
-//    PersistentTable * ptb = dynamic_cast<PersistentTable *> (tcd->getTable());
-//    if (ptb) {
-//        std::vector<MaterializedViewMetadata *> views = ptb->views();
-//        BOOST_FOREACH(MaterializedViewMetadata * view, m_views) {
-//            PersistentTable * viewEmptyTable = view->targetTable();
-//            std::string targetTableName = viewEmptyTable->name();
-//            ptb->dropMaterializedView(view);
-//
-//            TableCatalogDelegate * targetTcd = engine->getTableDelegate(targetTableName);
-//            PersistentTable * originalView = originalTable->getViewTable(targetTableName);
-//            targetTcd->setTable(originalView);
-//            engine->rebuildSingleTableCollection(targetTcd);
-//        }
-//    }
-
     tcd->setTable(originalTable);
     engine->rebuildSingleTableCollection(tcd);
-
-//    this->decrementRefcount();
 }
 
-void PersistentTable::truncateTableRelease() {
+void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
     VOLT_DEBUG("**** Truncate table release *****\n");
 
-    deleteAllTuples(true, false);
+    originalTable->deleteAllTuples(true, false);
+    m_tuplesPinnedByUndo = 0;
+    m_invisibleTuplesPendingDeleteCount = 0;
 }
 
 
@@ -270,7 +247,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine) {
         return;
     }
 
-    truncateTableRelease();
+    deleteAllTuples(true, false);
 }
 
 

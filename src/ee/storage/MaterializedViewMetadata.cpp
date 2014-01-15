@@ -486,7 +486,7 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
 
     // check if we should remove the tuple
     if (count.isZero()) {
-        m_target->deleteTuple(m_existingTuple, true);
+        m_target->deleteTuple(m_existingTuple, fallible);
         return;
     }
     // assume from here that we're just updating the existing row

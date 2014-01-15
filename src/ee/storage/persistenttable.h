@@ -393,7 +393,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     }
 
     void truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable);
-    void truncateTableRelease();
+    void truncateTableRelease(PersistentTable *originalTable);
 
   private:
 
