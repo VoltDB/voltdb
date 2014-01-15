@@ -323,8 +323,19 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                                " updating partition count with new partitions: " + m_newPartitions);
             }
 
+            //Exploit the fact that when adding partitions the highest partition id will
+            //always be the number of partitions - 1. This works around the issue
+            //where previously we were always incrementing by the number of new partitions
+            //which when we failed a join resulted in an inaccurate large number of partitions
+            //because there was no corresponding decrement when we cleaned out and then re-added
+            //the partitions that were being joined.
+            int max = Integer.MIN_VALUE;
+            for (Integer partition : m_newPartitions) {
+                max = Math.max(max, partition);
+            }
+
             // Update partition count stored on this site
-            context.setNumberOfPartitions(context.getNumberOfPartitions() + m_newPartitions.size());
+            context.setNumberOfPartitions(max + 1);
         }
     }
 
