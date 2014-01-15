@@ -98,11 +98,11 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         if (config.shouldTruncate) {
             Preconditions.checkNotNull(newPartitionCount);
             coalesceTruncationSnapshotPlan(file_path, file_nonce, txnId, partitionTransactionIds,
-                    jsData, context, hostname, result,
-                    exportSequenceNumbers, tracker,
-                    hashinatorData,
-                    timestamp,
-                    newPartitionCount);
+                                           jsData, context, hostname, result,
+                                           exportSequenceNumbers, tracker,
+                                           hashinatorData,
+                                           timestamp,
+                                           newPartitionCount);
         }
 
         // Create post snapshot update hashinator work
