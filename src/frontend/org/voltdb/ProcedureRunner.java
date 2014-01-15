@@ -432,7 +432,7 @@ public class ProcedureRunner {
             // before we initiate the proc (like adhocs).
 
             try {
-                int partition = hashinator.getPartitionForParameter(parameterType, parameterAtIndex);
+                int partition = hashinator.getHashedPartitionForParameter(parameterType, parameterAtIndex);
                 if (partition == m_site.getCorrespondingPartitionId()) {
                     return true;
                 } else {
