@@ -23,6 +23,7 @@ import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.google_voltpatches.common.base.Preconditions;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
@@ -75,26 +76,39 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             filterRemoteStreams(config.streams, Longs.asList(tracker.getLocalSites()));
         final Set<Integer> partitionsToAdd = getPartitionsToAdd(localStreams);
 
+        /*
+         * The snapshot (if config.shouldTruncate) will only contain existing partitions. Write the new partition count
+         * down in the digest so that we can check if enough command log is collected on
+         * replay.
+         *
+         * When calculating the new number of partitions
+         * Exploit the fact that when adding partitions the highest partition id will
+         * always be the number of partitions - 1. This works around the issue
+         * where previously we were always incrementing by the number of new partitions
+         * which when we failed a join resulted in an inaccurate large number of partitions
+         * because there was no corresponding decrement when we cleaned out and then re-added
+         * the partitions that were being joined. Now it will increment once and stay incremented
+         * after the first attempt which is less than ideal because it means you are stuck trying
+         * to restart with the additional partitions even if you may have operated for a long time without
+         * them.
+         *
+         */
+        final Integer newPartitionCount = partitionsToAdd.isEmpty() ? null : Collections.max(partitionsToAdd) + 1;
         // Coalesce a truncation snapshot if shouldTruncate is true
         if (config.shouldTruncate) {
-            /*
-             * The snapshot will only contain existing partitions. Write the new partition count
-             * down in the digest so that we can check if enough command log is collected on
-             * replay.
-             */
-            final int newPartitionCount = context.getNumberOfPartitions() + partitionsToAdd.size();
+            Preconditions.checkNotNull(newPartitionCount);
             coalesceTruncationSnapshotPlan(file_path, file_nonce, txnId, partitionTransactionIds,
-                                           jsData, context, hostname, result,
-                                           exportSequenceNumbers, tracker,
-                                           hashinatorData,
-                                           timestamp,
-                                           newPartitionCount);
+                    jsData, context, hostname, result,
+                    exportSequenceNumbers, tracker,
+                    hashinatorData,
+                    timestamp,
+                    newPartitionCount);
         }
 
         // Create post snapshot update hashinator work
         List<Integer> localPartitions = tracker.getPartitionsForHost(context.getHostId());
         if (!partitionsToAdd.isEmpty()) {
-            createUpdatePartitionCountTasksForSites(localPartitions, partitionsToAdd);
+            createUpdatePartitionCountTasksForSites(localPartitions, newPartitionCount);
         }
 
         // Mark snapshot start in registry
@@ -287,9 +301,10 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     }
 
     private static void createUpdatePartitionCountTasksForSites(Collection<Integer> localPartitions,
-                                                                Set<Integer> partitionsToAdd)
+                                                                Integer newPartitionCount)
     {
-        PostSnapshotTask task = new UpdatePartitionCount(partitionsToAdd);
+        Preconditions.checkNotNull(newPartitionCount);
+        PostSnapshotTask task = new UpdatePartitionCount(newPartitionCount);
         assert !localPartitions.isEmpty();
         Iterator<Integer> iter = localPartitions.iterator();
         while (iter.hasNext()) {
@@ -302,11 +317,11 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
      * A post-snapshot site task that updates the partition count on each site.
      */
     private static class UpdatePartitionCount implements PostSnapshotTask {
-        private final Set<Integer> m_newPartitions;
+        private final int m_newPartitionCount;
 
-        public UpdatePartitionCount(Set<Integer> newPartitions)
+        public UpdatePartitionCount(int newPartitionCount)
         {
-            m_newPartitions = newPartitions;
+            m_newPartitionCount = newPartitionCount;
         }
 
         @Override
@@ -314,17 +329,11 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         {
             if (SNAP_LOG.isDebugEnabled()) {
                 SNAP_LOG.debug("P" + context.getPartitionId() +
-                               " updating partition count with new partitions: " + m_newPartitions);
+                               " updating partition count to: " + m_newPartitionCount);
             }
 
-            //Exploit the fact that when adding partitions the highest partition id will
-            //always be the number of partitions - 1. This works around the issue
-            //where previously we were always incrementing by the number of new partitions
-            //which when we failed a join resulted in an inaccurate large number of partitions
-            //because there was no corresponding decrement when we cleaned out and then re-added
-            //the partitions that were being joined.
             // Update partition count stored on this site
-            context.setNumberOfPartitions(Collections.max(m_newPartitions) + 1);
+            context.setNumberOfPartitions(m_newPartitionCount);
         }
     }
 
