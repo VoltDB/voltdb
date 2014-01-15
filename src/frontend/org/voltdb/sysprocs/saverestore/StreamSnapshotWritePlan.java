@@ -19,14 +19,8 @@ package org.voltdb.sysprocs.saverestore;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.json_voltpatches.JSONObject;
@@ -329,13 +323,8 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             //which when we failed a join resulted in an inaccurate large number of partitions
             //because there was no corresponding decrement when we cleaned out and then re-added
             //the partitions that were being joined.
-            int max = Integer.MIN_VALUE;
-            for (Integer partition : m_newPartitions) {
-                max = Math.max(max, partition);
-            }
-
             // Update partition count stored on this site
-            context.setNumberOfPartitions(max + 1);
+            context.setNumberOfPartitions(Collections.max(m_newPartitions) + 1);
         }
     }
 
