@@ -119,6 +119,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             public void run() {
                 try {
                     onDrain.run();
+                    m_polledBlockSize = 0;
                 } finally {
                     m_onDrain = null;
                     forwardAckToOtherReplicas(Long.MIN_VALUE);
@@ -594,6 +595,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 if (m_onDrain != null) {
                     m_onDrain.run();
                 }
+                m_polledBlockSize = 0;
                 return;
             }
             //Assemble a list of blocks to delete so that they can be deleted
@@ -620,6 +622,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 if (e.getCause() instanceof IOException) {
                     VoltDB.crashLocalVoltDB("Error attempting to find unpolled export data", true, e);
                 } else {
+                    m_polledBlockSize = 0;
                     throw e;
                 }
             } finally {
