@@ -539,7 +539,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             m_onDrain.run();
                         }
                     }
-                    m_polledBlockSize = 0;
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Error while trying to truncate export to txnid " + txnId, true, e);
                 }
@@ -553,7 +552,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             public void run() {
                 try {
                     m_committedBuffers.close();
-                    m_polledBlockSize = 0;
                 } catch (IOException e) {
                     exportLog.error(e);
                 } finally {
