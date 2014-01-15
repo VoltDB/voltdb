@@ -165,7 +165,7 @@ public class ExportManager
 
                     m_generationGhosts.add(m_generations.remove(m_generations.firstEntry().getKey()).m_timestamp);
                     exportLog.info("Finished draining generation " + oldGeneration.m_timestamp);
-                    
+
                     exportLog.info("Creating connector " + m_loaderClass);
                     final Class<?> loaderClass = Class.forName(m_loaderClass);
                     //Make it so
