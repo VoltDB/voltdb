@@ -186,19 +186,6 @@ public abstract class TheHashinator {
     }
 
     /**
-     * Given a long value, pick a partition to store the data. It's only called for legacy
-     * hashinator, elastic hashinator hashes all types the same way through hashinateBytes().
-     *
-     * @param value The value to hash.
-     * @param partitionCount The number of partitions to choose from.
-     * @return A value between 0 and partitionCount-1, hopefully pretty evenly
-     * distributed.
-     */
-    static int hashinateLong(long value) {
-        return instance.get().getSecond().pHashinateLong(value);
-    }
-
-    /**
      * Given an byte[] bytes, pick a partition to store the data.
      *
      * @param value The value to hash.
