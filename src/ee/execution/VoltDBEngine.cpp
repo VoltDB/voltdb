@@ -274,10 +274,7 @@ TableCatalogDelegate* VoltDBEngine::getTableDelegate(string name) const
 {
     // Caller responsible for checking null return value.
     CatalogDelegate * delegate = findInMapOrNull(name, m_delegatesByName);
-    if (delegate) {
-        return dynamic_cast<TableCatalogDelegate*>(delegate);
-    }
-    return NULL;
+    return dynamic_cast<TableCatalogDelegate*>(delegate);
 }
 
 bool VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput* out) const {

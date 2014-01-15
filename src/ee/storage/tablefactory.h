@@ -85,7 +85,7 @@ public:
         bool exportOnly = false,
         int tableAllocationTargetSize = 0);
 
-    static PersistentTable * getSinglePersistentTableWithIndexes(PersistentTable * tb);
+    static PersistentTable * cloneEmptyPersistentTableWithIndexes(PersistentTable * tb);
 
     /**
     * Creates an empty temp table with given name and columns.

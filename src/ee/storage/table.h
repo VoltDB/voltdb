@@ -198,8 +198,7 @@ class Table {
         return m_columnNames;
     }
 
-
-    inline TupleSchema* schema() const {
+    inline const TupleSchema* schema() const {
         return m_schema;
     }
 
@@ -251,11 +250,6 @@ class Table {
     CatalogId databaseId() const {
         return m_databaseId;
     }
-
-    const std::vector<std::string>& columnNames() const {
-        return m_columnNames;
-    }
-
 
     virtual std::string tableType() const = 0;
     virtual std::string debug();

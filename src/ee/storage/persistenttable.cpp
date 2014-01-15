@@ -238,30 +238,19 @@ void PersistentTable::truncateTableRelease() {
     VOLT_DEBUG("**** Truncate table release *****\n");
 
     deleteAllTuples(true, false);
-
-//    BOOST_FOREACH(TableIndex *index, m_indexes) {
-//        if (index) {
-//            this->removeIndex(index);
-//        }
-//    }
-//
-//    BOOST_FOREACH(MaterializedViewMetadata * view, m_views) {
-//        this->dropMaterializedView(view);
-//    }
-//
 }
 
 
 void PersistentTable::truncateTable(VoltDBEngine* engine) {
     TableCatalogDelegate * tcd = engine->getTableDelegate(m_name);
     assert(tcd);
-    PersistentTable * emptyTable = TableFactory::getSinglePersistentTableWithIndexes(this);
+    PersistentTable * emptyTable = TableFactory::cloneEmptyPersistentTableWithIndexes(this);
     assert(emptyTable->views().size() == 0);
 
     // add matView
     BOOST_FOREACH(MaterializedViewMetadata * originalView, m_views) {
         PersistentTable * targetTable = originalView->targetTable();
-        PersistentTable * targetEmptyTable = TableFactory::getSinglePersistentTableWithIndexes(targetTable);
+        PersistentTable * targetEmptyTable = TableFactory::cloneEmptyPersistentTableWithIndexes(targetTable);
         new MaterializedViewMetadata(emptyTable, targetEmptyTable, originalView->getMaterializedViewInfo());
 
         TableCatalogDelegate * targetTcd =  engine->getTableDelegate(targetTable->name());

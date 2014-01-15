@@ -33,7 +33,9 @@ private:
     virtual ~PersistentTableUndoTruncateTableAction() { }
 
     /*
-     * Undo whatever this undo action was created to undo. In this case reinsert the tuple into the table.
+     * Undo whatever this undo action was created to undo. In this case delete the newly constructed table,
+     * and assign the table delegate with the original table.
+     *
      */
     virtual void undo() {
         m_emptyTable->truncateTableForUndo(m_engine, m_tcd, m_originalTable);
@@ -41,7 +43,8 @@ private:
 
     /*
      * Release any resources held by the undo action. It will not need to be undone in the future.
-     * In this case free the strings associated with the tuple.
+     * In this case delete all tuples from indexes, views and free the strings associated with each
+     * tuple in the original table.
      */
     virtual void release() {
         m_originalTable->truncateTableRelease();

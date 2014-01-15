@@ -57,6 +57,9 @@
 #include "indexes/tableindexfactory.h"
 #include "common/Pool.hpp"
 
+#include <boost/foreach.hpp>
+#include <boost/scoped_ptr.hpp>
+
 namespace voltdb {
 Table* TableFactory::getPersistentTable(
             voltdb::CatalogId databaseId,
@@ -85,20 +88,19 @@ Table* TableFactory::getPersistentTable(
     return dynamic_cast<Table*>(table);
 }
 
-PersistentTable * TableFactory::getSinglePersistentTableWithIndexes(PersistentTable * tb) {
+PersistentTable * TableFactory::cloneEmptyPersistentTableWithIndexes(PersistentTable * tb) {
     TupleSchema * newSchema = TupleSchema::createTupleSchema(tb->schema());
 
     Table * table = getPersistentTable(
             tb->databaseId(), tb->name(),
-            newSchema, tb->columnNames(),
+            newSchema, tb->m_columnNames,
             tb->partitionColumn(), tb->exportEnabled(),
             false);
 
     // add indexes
-    std::vector<TableIndex*> indexes = tb->allIndexes();
-    for (std::vector<TableIndex*>::iterator it = indexes.begin(); it != indexes.end(); ++it) {
-        TableIndex * originalIndex = *it;
-        TableIndexScheme scheme = originalIndex->getTableIndexScheme();
+    const std::vector<TableIndex*> &indexes = tb->allIndexes();
+    BOOST_FOREACH(TableIndex *originalIndex, indexes) {
+        const TableIndexScheme &scheme = originalIndex->getTableIndexScheme();
         TableIndex *index = TableIndexFactory::getInstance(scheme);
         assert(index);
         table->addIndex(index);
