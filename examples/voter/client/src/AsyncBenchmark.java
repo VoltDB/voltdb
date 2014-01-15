@@ -59,9 +59,12 @@ import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcedureCallback;
 
-import voter.procedures.Vote;
-
 public class AsyncBenchmark {
+
+    // Vote procedures return codes
+    public static final long VOTE_SUCCESSFUL = 0;
+    public static final long ERR_INVALID_CONTESTANT = 1;
+    public static final long ERR_VOTER_OVER_VOTE_LIMIT = 2;
 
     // Initialize some common constants and variables
     static final String CONTESTANT_NAMES_CSV =
@@ -345,14 +348,14 @@ public class AsyncBenchmark {
         public void clientCallback(ClientResponse response) throws Exception {
             if (response.getStatus() == ClientResponse.SUCCESS) {
                 long resultCode = response.getResults()[0].asScalarLong();
-                if (resultCode == Vote.ERR_INVALID_CONTESTANT) {
+                if (resultCode == ERR_INVALID_CONTESTANT) {
                     badContestantVotes.incrementAndGet();
                 }
-                else if (resultCode == Vote.ERR_VOTER_OVER_VOTE_LIMIT) {
+                else if (resultCode == ERR_VOTER_OVER_VOTE_LIMIT) {
                     badVoteCountVotes.incrementAndGet();
                 }
                 else {
-                    assert(resultCode == Vote.VOTE_SUCCESSFUL);
+                    assert(resultCode == VOTE_SUCCESSFUL);
                     acceptedVotes.incrementAndGet();
                 }
             }
@@ -381,7 +384,7 @@ public class AsyncBenchmark {
         client.callProcedure("Initialize", config.contestants, CONTESTANT_NAMES_CSV);
 
         System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Starting Benchmark");
+        System.out.println(" Starting Async Benchmark");
         System.out.println(HORIZONTAL_RULE);
 
         // Run the benchmark loop for the requested warmup time

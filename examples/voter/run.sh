@@ -32,26 +32,24 @@ APPCLASSPATH=$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
-CLIENTCLASSPATH=$CLASSPATH:$({ \
+CLIENTCLASSPATH=$CLASSPATH:client/obj:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
     \ls -1 "$VOLTDB_LIB"/commons-cli-1.2.jar; \
 } 2> /dev/null | paste -sd ':' - )
 VOLTDB="$VOLTDB_BIN/voltdb"
-LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput $APPNAME.jar voltdbroot
 }
 
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
     javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH -d obj \
-        src/voter/*.java \
-        src/voter/procedures/*.java
+        procedures/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -90,6 +88,18 @@ function rejoin() {
     $VOLTDB rejoin -H $HOST -d deployment.xml -l $LICENSE
 }
 
+# compile the source code for procedures and the client
+function clientcompile() {
+    echo "cleaning client build area..."
+    rm -rf client/obj 2>/dev/null
+    echo "compiling client..."
+    mkdir -p client/obj
+    javac -classpath $CLIENTCLASSPATH -d client/obj \
+        client/src/*.java
+    # stop if compilation fails
+    if [ $? != 0 ]; then exit; fi
+}
+
 # run the client that drives the example
 function client() {
     async-benchmark
@@ -98,16 +108,16 @@ function client() {
 # Asynchronous benchmark sample
 # Use this target for argument help
 function async-benchmark-help() {
-    srccompile
-    java -classpath obj:$CLIENTCLASSPATH:obj voter.AsyncBenchmark --help
+    clientcompile
+    java -classpath $CLIENTCLASSPATH voter.AsyncBenchmark --help
 }
 
 # latencyreport: default is OFF
 # ratelimit: must be a reasonable value if lantencyreport is ON
 # Disable the comments to get latency report
 function async-benchmark() {
-    srccompile
-    java -classpath obj:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    clientcompile
+    java -classpath $CLIENTCLASSPATH \
         voter.AsyncBenchmark \
         --displayinterval=5 \
         --warmup=5 \
@@ -120,21 +130,21 @@ function async-benchmark() {
 }
 
 function simple-benchmark() {
-    srccompile
-    java -classpath obj:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    clientcompile
+    java -classpath $CLIENTCLASSPATH \
         voter.SimpleBenchmark localhost
 }
 
 # Multi-threaded synchronous benchmark sample
 # Use this target for argument help
 function sync-benchmark-help() {
-    srccompile
-    java -classpath obj:$CLIENTCLASSPATH:obj voter.SyncBenchmark --help
+    clientcompile
+    java -classpath $CLIENTCLASSPATH voter.SyncBenchmark --help
 }
 
 function sync-benchmark() {
-    srccompile
-    java -classpath obj:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    clientcompile
+    java -classpath $CLIENTCLASSPATH \
         voter.SyncBenchmark \
         --displayinterval=5 \
         --warmup=5 \
@@ -148,13 +158,13 @@ function sync-benchmark() {
 # JDBC benchmark sample
 # Use this target for argument help
 function jdbc-benchmark-help() {
-    srccompile
-    java -classpath obj:$CLIENTCLASSPATH:obj voter.JDBCBenchmark --help
+    clientcompile
+    java -classpath $CLIENTCLASSPATH voter.JDBCBenchmark --help
 }
 
 function jdbc-benchmark() {
-    srccompile
-    java -classpath obj:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    clientcompile
+    java -classpath $CLIENTCLASSPATH \
         voter.JDBCBenchmark \
         --displayinterval=5 \
         --duration=120 \
