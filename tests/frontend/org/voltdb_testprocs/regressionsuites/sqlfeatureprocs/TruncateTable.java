@@ -33,15 +33,15 @@ import org.voltdb.VoltTable;
 )
 public class TruncateTable extends VoltProcedure {
 
-//    public final SQLStmt truncateRTable = new SQLStmt("TRUNCATE TABLE RTABLE;");
     public final SQLStmt truncateRTable = new SQLStmt("DELETE from RTABLE;");
-//    public final SQLStmt truncatePTable = new SQLStmt("TRUNCATE TABLE FROM PTABLE;");
+    public final SQLStmt truncatePTable = new SQLStmt("DELETE from PTABLE;");
 
     public final SQLStmt insertRTable = new SQLStmt("INSERT INTO RTABLE VALUES(6,  30,  1.1, 'Jedi',  'Winchester');");
 
     public VoltTable[] run() {
 
         voltQueueSQL(truncateRTable);
+        voltQueueSQL(truncatePTable);
 
         voltQueueSQL(insertRTable);
         voltQueueSQL(insertRTable);

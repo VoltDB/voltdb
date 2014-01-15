@@ -70,7 +70,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         super(name);
     }
 
-    public void notestUpdates() throws Exception {
+    public void testUpdates() throws Exception {
         Client client = getClient();
 
         client.callProcedure("ORDER_LINE.insert", (byte)1, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1.5, "poo");
@@ -93,7 +93,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         assertTrue(true);
     }
 
-    public void notestSelfJoins() throws Exception {
+    public void testSelfJoins() throws Exception {
         Client client = getClient();
 
         client.callProcedure("NEW_ORDER.insert", (byte)1, 3L, 1L);
@@ -109,7 +109,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
     }
 
     /** Verify that non-latin-1 characters can be stored and retrieved */
-    public void notestUTF8() throws IOException {
+    public void testUTF8() throws IOException {
         Client client = getClient();
         final String testString = "並丧";
         try {
@@ -152,7 +152,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         }
     }
 
-    public void notestBatchedMultipartitionTxns() throws IOException, ProcCallException {
+    public void testBatchedMultipartitionTxns() throws IOException, ProcCallException {
         Client client = getClient();
 
         VoltTable[] results = client.callProcedure("BatchedMultiPartitionTest").getResults();
@@ -164,7 +164,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         assertEquals(1, results[4].getRowCount());
     }
 
-    public void notestLongStringUsage() throws IOException {
+    public void testLongStringUsage() throws IOException {
         final int STRLEN = 5000;
 
         Client client = getClient();
@@ -190,7 +190,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         assertEquals(0, row.getString(2).compareTo(longString));
     }
 
-    public void notestStringAsByteArrayParam() throws Exception {
+    public void testStringAsByteArrayParam() throws Exception {
         final int STRLEN = 5000;
 
         Client client = getClient();
@@ -211,7 +211,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         assertEquals(0, row.getString(2).compareTo(longString));
     }
 
-    public void notestPassAllArgTypes() throws IOException {
+    public void testPassAllArgTypes() throws IOException {
         byte b = 100;
         byte bArray[] = new byte[] { 100, 101, 102 };
         short s = 32000;
@@ -356,7 +356,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         assert(caught);
     }
 
-    public void notestJoinOrder() throws Exception {
+    public void testJoinOrder() throws Exception {
         if (isHSQL() || isValgrind()) return;
 
         Client client = getClient();
@@ -402,7 +402,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
 
     }
 
-    public void notestSetOpsThatFail() throws Exception {
+    public void testSetOpsThatFail() throws Exception {
         Client client = getClient();
 
         boolean caught;
@@ -436,11 +436,11 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
     private void loadTableForTruncateTest(Client client, String[] procs) throws Exception {
         for (String proc: procs) {
             client.callProcedure(proc, 1,  10,  1.1, "Luke",  "WOBURN");
-            client.callProcedure(proc, 2,  20,  1.1, "Leia",  "Bedfor");
-            client.callProcedure(proc, 3,  30,  1.1, "Anakin","Concord");
-            client.callProcedure(proc, 4,  40,  1.1, "Padme", "Burlington");
-            client.callProcedure(proc, 5,  10,  1.1, "Obiwan","Lexington");
-            client.callProcedure(proc, 6,  30,  1.1, "Jedi",  "Winchester");
+            client.callProcedure(proc, 2,  20,  2.1, "Leia",  "Bedfor");
+            client.callProcedure(proc, 3,  30,  3.1, "Anakin","Concord");
+            client.callProcedure(proc, 4,  20,  4.1, "Padme", "Burlington");
+            client.callProcedure(proc, 5,  10,  2.1, "Obiwan","Lexington");
+            client.callProcedure(proc, 6,  30,  3.1, "Jedi",  "Winchester");
         }
     }
 
@@ -450,30 +450,47 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         VoltTable vt = null;
 
         String[] procs = {"RTABLE.insert", "PTABLE.insert"};
-        String[] tbs = {"RTABLE"};
+        String[] tbs = {"RTABLE", "PTABLE"};
         // Insert data
         loadTableForTruncateTest(client, procs);
 
         vt = client.callProcedure("@AdHoc", "select count(*) from RTABLE;").getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {6});
 
+        if (isHSQL()) {
+            return;
+        }
+
+        Exception e = null;
         try {
             client.callProcedure("TruncateTable");
         } catch (ProcCallException ex) {
             System.out.println(ex.getMessage());
+            e = ex;
             assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
+        } finally {
+            assertNotNull(e);
         }
+        for (String tb: tbs) {
+            vt = client.callProcedure("@AdHoc", "select count(*) from " + tb).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {6});
 
-        vt = client.callProcedure("@AdHoc", "select count(*) from RTABLE;").getResults()[0];
-        validateTableOfScalarLongs(vt, new long[] {6});
+            client.callProcedure("@AdHoc", "INSERT INTO "+ tb +" VALUES (7,  30,  1.1, 'Jedi','Winchester');");
 
-//        for (String tb: tbs) {
-//            vt = client.callProcedure("@AdHoc", "Truncate table " + tb + ";").getResults()[0];
-//            System.out.println(vt);
-//
-//            vt = client.callProcedure("@AdHoc", "select count(*) from " + tb + ";").getResults()[0];
-//            validateTableOfScalarLongs(vt, new long[] {0});
-//        }
+            vt = client.callProcedure("@AdHoc", "select count(ID) from " + tb).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {7});
+
+
+            vt = client.callProcedure("@AdHoc", "Truncate table " + tb).getResults()[0];
+            System.out.println(vt);
+
+            vt = client.callProcedure("@AdHoc", "select count(*) from " + tb).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {0});
+
+            client.callProcedure("@AdHoc", "INSERT INTO "+ tb +" VALUES (7,  30,  1.1, 'Jedi','Winchester');");
+            vt = client.callProcedure("@AdHoc", "select ID from " + tb).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {7});
+        }
 
     }
 
@@ -510,7 +527,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         // get a server config for the native backend with one sites/partitions
-        config = new LocalCluster("sqlfeatures-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
+        config = new LocalCluster("sqlfeatures-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
         // build the jarfile
         success = config.compile(project);
@@ -523,22 +540,22 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         // CONFIG #2: 1 Local Site/Partition running on HSQL backend
         /////////////////////////////////////////////////////////////
 
-//        config = new LocalCluster("sqlfeatures-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-//        success = config.compile(project);
-//        assert(success);
-//        builder.addServerConfig(config);
+        config = new LocalCluster("sqlfeatures-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        success = config.compile(project);
+        assert(success);
+        builder.addServerConfig(config);
 
         /////////////////////////////////////////////////////////////
         // CONFIG #3: Local Cluster (of processes)
         /////////////////////////////////////////////////////////////
 
-//        config = new LocalCluster("sqlfeatures-cluster-rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-//        // Commented out until ENG-3076, ENG-3434 are resolved.
-//        //config = new LocalCluster("sqlfeatures-cluster-rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI,
-//        //                          LocalCluster.FailureState.ONE_FAILURE, false);
-//        success = config.compile(project);
-//        assert(success);
-//        builder.addServerConfig(config);
+        config = new LocalCluster("sqlfeatures-cluster-rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        // Commented out until ENG-3076, ENG-3434 are resolved.
+        //config = new LocalCluster("sqlfeatures-cluster-rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI,
+        //                          LocalCluster.FailureState.ONE_FAILURE, false);
+        success = config.compile(project);
+        assert(success);
+        builder.addServerConfig(config);
 
         /*/ // ... ELSE (DEBUG config) ... [ FRAGILE! This is a structured comment. Do not break it. ]
 
