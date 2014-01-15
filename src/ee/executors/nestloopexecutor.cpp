@@ -50,6 +50,7 @@
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
+#include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/tuplevalueexpression.h"
 #include "storage/table.h"
@@ -161,9 +162,13 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     TableIterator iterator0 = outer_table->iterator();
     int tuple_ctr = 0;
     int tuple_skipped = 0;
-    m_engine->setLastAccessedTable(inner_table);
+    int64_t progressCountdown = 0;
+    ProgressMonitorProxy pmp(m_engine, inner_table, progressCountdown);
+
     while ((limit == -1 || tuple_ctr < limit) && iterator0.next(outer_tuple)) {
-        m_engine->noteTuplesProcessedForProgressMonitoring(1);
+        if (--progressCountdown == 0) {
+            pmp.reportProgress();
+        }
         // did this loop body find at least one match for this tuple?
         bool match = false;
         // For outer joins if outer tuple fails pre-join predicate
@@ -178,7 +183,9 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
 
             TableIterator iterator1 = inner_table->iterator();
             while ((limit == -1 || tuple_ctr < limit) && iterator1.next(inner_tuple)) {
-                m_engine->noteTuplesProcessedForProgressMonitoring(1);
+                if (--progressCountdown == 0) {
+                    pmp.reportProgress();
+                }
                 // Apply join filter to produce matches for each outer that has them,
                 // then pad unmatched outers, then filter them all
                 if (joinPredicate == NULL || joinPredicate->eval(&outer_tuple, &inner_tuple).isTrue()) {
@@ -194,6 +201,9 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
                         // Matched! Complete the joined tuple with the inner column values.
                         joined.setNValues(outer_cols, inner_tuple, 0, inner_cols);
                         output_table->insertTupleNonVirtual(joined);
+                        if (--progressCountdown == 0) {
+                            pmp.reportProgress();
+                        }
                     }
                 }
             }
@@ -212,6 +222,9 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
                 ++tuple_ctr;
                 joined.setNValues(outer_cols, null_tuple, 0, inner_cols);
                 output_table->insertTupleNonVirtual(joined);
+                if (--progressCountdown == 0) {
+                    pmp.reportProgress();
+                }
             }
         }
     }

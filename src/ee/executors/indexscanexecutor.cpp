@@ -49,6 +49,7 @@
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
+#include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
@@ -327,7 +328,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     }
 
     Table* targetTable = m_targetTable;
-    m_engine->setLastAccessedTable(targetTable);
+    int64_t progressCountdown = 0;
+    ProgressMonitorProxy pmp(m_engine, targetTable, progressCountdown);
     //
     // An index scan has three parts:
     //  (1) Lookup tuples using the search key
@@ -365,7 +367,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                 m_index->moveToEnd(false);
             } else {
                 while (!(tuple = m_index->nextValue()).isNullTuple()) {
-                    m_engine->noteTuplesProcessedForProgressMonitoring(1);
+                    if (--progressCountdown == 0) {
+                        pmp.reportProgress();
+                    }
                     if (initial_expression != NULL && !initial_expression->eval(&tuple, NULL).isTrue()) {
                         // just passed the first failed entry, so move 2 backward
                         m_index->moveToBeforePriorEntry();
@@ -402,8 +406,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
            ((localLookupType != INDEX_LOOKUP_TYPE_EQ || activeNumOfSearchKeys == 0) &&
             !(tuple = m_index->nextValue()).isNullTuple()))) {
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", tuple.debug("tablename").c_str());
-
-        m_engine->noteTuplesProcessedForProgressMonitoring(1);
+        if (--progressCountdown == 0) {
+            pmp.reportProgress();
+        }
         //
         // First check to eliminate the null index rows for UNDERFLOW case only
         //
@@ -463,6 +468,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                 // Try to put the tuple into our output table
                 //
                 m_outputTable->insertTupleNonVirtual(tuple);
+            }
+            if (--progressCountdown == 0) {
+                pmp.reportProgress();
             }
         }
     }

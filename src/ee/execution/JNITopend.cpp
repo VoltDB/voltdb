@@ -97,7 +97,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
-    m_fragmentProgressUpdateMID = m_jniEnv->GetMethodID(jniClass, "fragmentProgressUpdate", "(ILjava/lang/String;Ljava/lang/String;JJ)Z");
+    m_fragmentProgressUpdateMID = m_jniEnv->GetMethodID(jniClass, "fragmentProgressUpdate", "(ILjava/lang/String;Ljava/lang/String;JJ)J");
     if (m_fragmentProgressUpdateMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_fragmentProgressUpdateMID != 0);
@@ -221,7 +221,7 @@ int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
     }
 }
 
-bool JNITopend::fragmentProgressUpdate(int32_t batchIndex,
+int64_t JNITopend::fragmentProgressUpdate(int32_t batchIndex,
                 std::string planNodeName,
                 std::string targetTableName,
                 int64_t targetTableSize,
@@ -243,9 +243,9 @@ bool JNITopend::fragmentProgressUpdate(int32_t batchIndex,
                 throw std::exception();
         }
 
-    jboolean isInterrupt = m_jniEnv->CallBooleanMethod(m_javaExecutionEngine,m_fragmentProgressUpdateMID,
+    jlong nextStep = m_jniEnv->CallLongMethod(m_javaExecutionEngine,m_fragmentProgressUpdateMID,
                 batchIndex, jPlanNodeName, jTargetTableName, targetTableSize, tuplesProcessed);
-    return (bool)(isInterrupt == JNI_TRUE);
+    return (int64_t)nextStep;
 }
 
 

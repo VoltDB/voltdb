@@ -50,6 +50,7 @@
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
+#include "execution/ProgressMonitorProxy.h"
 #include "plannodes/orderbynode.h"
 #include "plannodes/limitnode.h"
 #include "storage/table.h"
@@ -138,7 +139,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
 {
     OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(m_abstractNode);
     assert(node);
-    Table* output_table = node->getOutputTable();
+    TempTable* output_table = dynamic_cast<TempTable*>(node->getOutputTable());
     assert(output_table);
     Table* input_table = node->getInputTables()[0];
     assert(input_table);
@@ -164,9 +165,13 @@ OrderByExecutor::p_execute(const NValueArray &params)
     TableIterator iterator = input_table->iterator();
     TableTuple tuple(input_table->schema());
     vector<TableTuple> xs;
+    int64_t progressCountdown = 0;
+    ProgressMonitorProxy pmp(m_engine, NULL, progressCountdown);
     while (iterator.next(tuple))
     {
-        m_engine->noteTuplesProcessedForProgressMonitoring(1);
+        if (--progressCountdown == 0) {
+            pmp.reportProgress();
+        }
         assert(tuple.isActive());
         xs.push_back(tuple);
     }
@@ -189,13 +194,9 @@ OrderByExecutor::p_execute(const NValueArray &params)
 
         VOLT_TRACE("\n***** Input Table PostSort:\n '%s'",
                    input_table->debug().c_str());
-        if (!output_table->insertTuple(*it))
-        {
-            VOLT_ERROR("Failed to insert order-by tuple from input table '%s'"
-                       " into output table '%s'",
-                       input_table->name().c_str(),
-                       output_table->name().c_str());
-            return false;
+        output_table->insertTupleNonVirtual(*it);
+        if (--progressCountdown == 0) {
+            pmp.reportProgress();
         }
         //
         // Check whether we have gone past our limit
