@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.google_voltpatches.common.base.Preconditions;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -204,6 +205,20 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     long m_currentTxnId = Long.MIN_VALUE;
     long m_lastTxnTime = System.currentTimeMillis();
 
+    /*
+     * The version of the hashinator currently in use at the site will be consistent
+     * across the node because balance partitions runs everywhere and all sites update.
+     *
+     * There is a corner case with live rejoin where sites replay their log and some sites
+     * can pull ahead and update the global hashinator to ones further ahead causing transactions
+     * to not be applied correctly during replay at the other sites. To avoid this each site
+     * maintains a reference to it's own hashinator (which will be shared if possible).
+     *
+     * When two partition transactions come online they will diverge for pretty much the entire rebalance,
+     * but will converge at the end when the final hash function update is issued everywhere
+     */
+    TheHashinator m_hashinator;
+
     SiteProcedureConnection getSiteProcedureConnection()
     {
         return this;
@@ -228,11 +243,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public long getSpHandleForSnapshotDigest() {
             return m_spHandleForSnapshotDigest;
-        }
-
-        @Override
-        public long getCurrentTxnId() {
-            return m_currentTxnId;
         }
 
         @Override
@@ -318,9 +328,15 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public void updateHashinator(HashinatorConfig config)
+        public TheHashinator getCurrentHashinator()
         {
-            Site.this.updateHashinator(config);
+            return m_hashinator;
+        }
+
+        @Override
+        public void updateHashinator(TheHashinator hashinator)
+        {
+            Site.this.updateHashinator(hashinator);
         }
 
         @Override
@@ -372,6 +388,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_coreBindIds = coreBindIds;
         m_rejoinTaskLog = rejoinTaskLog;
         m_drGateway = drGateway;
+        m_hashinator = TheHashinator.getCurrentHashinator();
 
         if (agent != null) {
             m_tableStats = new TableStats(m_siteId);
@@ -546,6 +563,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_initiatorMailbox, m.getStoredProcedureName(),
                         null, m, m_drGateway);
                 if (!filter(tibm)) {
+                    m_currentTxnId = t.getTxnId();
+                    m_lastTxnTime = EstTime.currentTimeMillis();
                     t.runFromTaskLog(this);
                 }
             }
@@ -567,6 +586,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 }
 
                 if (!filter(tibm)) {
+                    m_currentTxnId = t.getTxnId();
+                    m_lastTxnTime = EstTime.currentTimeMillis();
                     t.runFromTaskLog(this);
                 }
             }
@@ -1111,9 +1132,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void updateHashinator(HashinatorConfig config)
+    public TheHashinator getCurrentHashinator() {
+        return m_hashinator;
+    }
+
+    @Override
+    public void updateHashinator(TheHashinator hashinator)
     {
-        m_ee.updateHashinator(config);
+        Preconditions.checkNotNull(hashinator);
+        m_hashinator = hashinator;
+        m_ee.updateHashinator(hashinator.pGetCurrentConfig());
     }
 
     /**

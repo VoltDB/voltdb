@@ -281,7 +281,7 @@ public class ElasticHashinator extends TheHashinator {
     }
 
     @Override
-    protected HashinatorConfig pGetCurrentConfig() {
+    public HashinatorConfig pGetCurrentConfig() {
         return new HashinatorConfig(HashinatorType.ELASTIC, m_configBytes.get(), m_tokens, m_tokenCount) {
             //Store a reference to this hashinator in the config so it doesn't get GCed and release
             //the pointer to the config data that is off heap

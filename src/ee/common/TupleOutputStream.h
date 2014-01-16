@@ -75,6 +75,13 @@ public:
         return m_totalBytesSerialized;
     }
 
+    /**
+     * Access the serialized row counter
+     */
+    int32_t getSerializedRowCount() const {
+        return m_rowCount;
+    }
+
 private:
 
     int32_t     m_rowCount;
