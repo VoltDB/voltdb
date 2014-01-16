@@ -580,6 +580,10 @@ public class ExportGeneration {
             //        " signature " + signature);
             return 0;
         }
+        if (source.isClosed()) {
+            exportLog.info("Stats asking for closed data source stats.");
+            return 0;
+        }
         return source.sizeInBytes();
     }
 

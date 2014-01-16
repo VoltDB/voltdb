@@ -520,6 +520,7 @@ public class ExportManager
     public void shutdown() {
         ExportDataProcessor proc = m_processor.getAndSet(null);
         if (proc != null) {
+            exportLog.info("Shutting down the ExportDataProcessor without drain.");
             proc.shutdown();
         }
         for (ExportGeneration generation : m_generations.values()) {
