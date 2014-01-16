@@ -94,7 +94,7 @@ PersistentTable * TableFactory::cloneEmptyPersistentTableWithIndexes(PersistentT
     Table * table = getPersistentTable(
             tb->databaseId(), tb->name(),
             newSchema, tb->m_columnNames,
-            tb->partitionColumn(), tb->exportEnabled(),
+            tb->partitionColumn(), tb->m_exportEnabled,
             false);
 
     // add indexes

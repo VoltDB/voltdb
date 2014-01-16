@@ -202,28 +202,16 @@ void PersistentTable::deleteAllTuples(bool freeAllocatedStrings, bool fallible) 
     }
 }
 
-void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable) {
-    VOLT_DEBUG("**** Truncate table undo *****\n");
-
-    tcd->setTable(originalTable);
-    engine->rebuildSingleTableCollection(tcd);
-}
-
-void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
-    VOLT_DEBUG("**** Truncate table release *****\n");
-
+void PersistentTable::setCounterForTruncateTableRelease() {
     m_tuplesPinnedByUndo = 0;
     m_invisibleTuplesPendingDeleteCount = 0;
-
 }
 
 
-void PersistentTable::truncateTable(VoltDBEngine* engine) {
+bool PersistentTable::truncateTable(VoltDBEngine* engine) {
     TableCatalogDelegate * tcd = engine->getTableDelegate(m_name);
     assert(tcd);
     PersistentTable * emptyTable = TableFactory::cloneEmptyPersistentTableWithIndexes(this);
-    emptyTable->incrementRefcount();
-
     assert(emptyTable->views().size() == 0);
 
     // add matView
@@ -245,10 +233,11 @@ void PersistentTable::truncateTable(VoltDBEngine* engine) {
         emptyTable->m_tuplesPinnedByUndo = emptyTable->m_tupleCount;
         emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
         // Create and register an undo action.
-        uq->registerUndoAction(new (*uq) PersistentTableUndoTruncateTableAction(engine, tcd, this, emptyTable),this);
-        return;
+        uq->registerUndoAction(new (*uq) PersistentTableUndoTruncateTableAction(engine, tcd, this, emptyTable));
+        return true;
     }
 
+    return false;
 }
 
 
@@ -908,16 +897,6 @@ std::string PersistentTable::debug() {
     }
 
     return buffer.str();
-}
-
-PersistentTable * PersistentTable::getViewTable(std::string name) const {
-    BOOST_FOREACH(MaterializedViewMetadata * view, m_views) {
-        if (view->targetTable()->name() == name) {
-            return view->targetTable();
-        }
-    }
-
-    return NULL;
 }
 
 void PersistentTable::onSetColumns() {

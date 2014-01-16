@@ -38,7 +38,11 @@ private:
      *
      */
     virtual void undo() {
-        m_emptyTable->truncateTableForUndo(m_engine, m_tcd, m_originalTable);
+        //m_emptyTable->decrementRefcount();
+        m_emptyTable->deleteAllTuples(true, false);
+
+        m_tcd->setTable(m_originalTable);
+        m_engine->rebuildSingleTableCollection(m_tcd);
     }
 
     /*
@@ -47,7 +51,10 @@ private:
      * tuple in the original table.
      */
     virtual void release() {
-        m_emptyTable->truncateTableRelease(m_originalTable);
+        m_emptyTable->setCounterForTruncateTableRelease();
+
+        m_originalTable->deleteAllTuples(true, false);
+        //m_originalTable->decrementRefcount();
     }
 
 private:

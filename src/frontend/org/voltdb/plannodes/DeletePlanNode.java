@@ -65,6 +65,6 @@ public class DeletePlanNode extends AbstractOperationPlanNode {
         if (m_truncate) {
             return "TRUNCATE TABLE " + m_targetTableName;
         }
-        return "DELETE" + m_targetTableName;
+        return "DELETE " + m_targetTableName;
     }
 }

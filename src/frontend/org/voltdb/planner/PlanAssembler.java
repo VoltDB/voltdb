@@ -683,10 +683,6 @@ public class PlanAssembler {
         if ( (subSelectRoot instanceof SeqScanPlanNode) &&
                 (((SeqScanPlanNode) subSelectRoot).getPredicate() == null)) {
             deleteNode.setTruncate(true);
-
-            if (m_partitioning.wasSpecifiedAsSingle()) {
-                return deleteNode;
-            }
         } else {
             // connect the nodes to build the graph
             deleteNode.addAndLinkChild(subSelectRoot);

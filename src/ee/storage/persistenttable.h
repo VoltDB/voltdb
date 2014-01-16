@@ -236,7 +236,11 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
     virtual void deleteAllTuples(bool freeAllocatedStrings, bool fallible=true);
-    virtual void truncateTable(VoltDBEngine* engine);
+
+    // Return false means there is no undo logging, caller needs to destroy this persistent outside.
+    virtual bool truncateTable(VoltDBEngine* engine);
+    void setCounterForTruncateTableRelease();
+
     // The fallible flag is used to denote a change to a persistent table
     // which is part of a long transaction that has been vetted and can
     // never fail (e.g. violate a constraint).
@@ -298,13 +302,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     int partitionColumn() const { return m_partitionColumn; }
 
-    bool exportEnabled() const { return m_exportEnabled; }
-
     std::vector<MaterializedViewMetadata *> views() const {
         return m_views;
     }
-
-    PersistentTable * getViewTable(std::string name) const;
 
     /** inlined here because it can't be inlined in base Table, as it
      *  uses Tuple.copy.
@@ -387,13 +387,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     }
 
     virtual int64_t validatePartitioning(TheHashinator *hashinator, int32_t partitionId);
-
-    virtual voltdb::PersistentTableSurgeon * getTableSurgeon() {
-        return &m_surgeon;
-    }
-
-    void truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable);
-    void truncateTableRelease(PersistentTable *originalTable);
 
   private:
 
