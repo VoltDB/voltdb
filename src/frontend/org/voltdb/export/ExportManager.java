@@ -158,13 +158,14 @@ public class ExportManager
         ExportDataProcessor oldProcessor = null;
         ExportGeneration oldGeneration = null;
         synchronized (ExportManager.this) {
-             oldGeneration = m_generations.firstEntry().getValue();
-
-            m_generationGhosts.add(m_generations.remove(m_generations.firstEntry().getKey()).m_timestamp);
-            exportLog.info("Finished draining generation " + oldGeneration.m_timestamp);
 
             try {
                 if (m_loaderClass != null && !m_generations.isEmpty()) {
+                    oldGeneration = m_generations.firstEntry().getValue();
+
+                    m_generationGhosts.add(m_generations.remove(m_generations.firstEntry().getKey()).m_timestamp);
+                    exportLog.info("Finished draining generation " + oldGeneration.m_timestamp);
+
                     exportLog.info("Creating connector " + m_loaderClass);
                     final Class<?> loaderClass = Class.forName(m_loaderClass);
                     //Make it so
@@ -199,14 +200,18 @@ public class ExportManager
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error creating next export processor", true, e);
             }
-            oldProcessor = m_processor.getAndSet(newProcessor);
+            if (newProcessor != null) {
+                oldProcessor = m_processor.getAndSet(newProcessor);
+            }
         }
 
-                    /*
-                     * The old processor should not be null since this shutdown task
-                     * is running for this processor
-                     */
-        oldProcessor.shutdown();
+        /*
+         * The old processor should not be null since this shutdown task
+         * is running for this processor
+         */
+        if (oldProcessor != null) {
+            oldProcessor.shutdown();
+        }
         try {
             if (oldGeneration != null)
                 oldGeneration.closeAndDelete();
@@ -515,6 +520,7 @@ public class ExportManager
     public void shutdown() {
         ExportDataProcessor proc = m_processor.getAndSet(null);
         if (proc != null) {
+            exportLog.info("Shutting down the ExportDataProcessor without drain.");
             proc.shutdown();
         }
         for (ExportGeneration generation : m_generations.values()) {

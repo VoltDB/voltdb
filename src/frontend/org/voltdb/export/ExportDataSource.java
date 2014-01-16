@@ -119,6 +119,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             public void run() {
                 try {
                     onDrain.run();
+                    m_polledBlockSize = 0;
                 } finally {
                     m_onDrain = null;
                     forwardAckToOtherReplicas(Long.MIN_VALUE);
@@ -505,11 +506,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ListenableFuture<?> closeAndDelete() {
+        m_closed = true;
         return m_es.submit(new Callable<Object>() {
             @Override
             public Object call() throws Exception {
                 try {
                     m_committedBuffers.closeAndDelete();
+                    m_polledBlockSize = 0;
                     return null;
                 } finally {
                     m_es.shutdown();
@@ -544,7 +547,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }));
     }
 
+    private boolean m_closed = false;
+    public boolean isClosed() {
+        if (m_closed) {
+            System.out.println("Closed DataSource for " + this.m_tableName + " For partition: " + m_partitionId + " Closed");
+        } else {
+            System.out.println("Closed DataSource for " + this.m_tableName + " For partition: " + m_partitionId + " Closed");
+        }
+        return m_closed;
+    }
+
     public ListenableFuture<?> close() {
+        m_closed = true;
         return runExportDataSourceRunner((new Runnable() {
             @Override
             public void run() {
@@ -591,6 +605,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 if (m_onDrain != null) {
                     m_onDrain.run();
                 }
+                m_polledBlockSize = 0;
                 return;
             }
             //Assemble a list of blocks to delete so that they can be deleted
@@ -617,6 +632,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 if (e.getCause() instanceof IOException) {
                     VoltDB.crashLocalVoltDB("Error attempting to find unpolled export data", true, e);
                 } else {
+                    m_polledBlockSize = 0;
                     throw e;
                 }
             } finally {
@@ -639,6 +655,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_pollFuture = null;
             }
         } catch (Throwable t) {
+            t.printStackTrace();
+            System.out.println("Data Source EOS status: " + this.m_endOfStream + " Size in buffers: " + m_committedBuffers.sizeInBytes());
+            m_polledBlockSize = 0;
             fut.setException(t);
         }
     }
