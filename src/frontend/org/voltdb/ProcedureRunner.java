@@ -447,6 +447,12 @@ public class ProcedureRunner {
             }
             return false;
         } else {
+            // For n-partition transactions, we need to rehash the partitioning values and check
+            // if they still hash to the assigned partitions.
+            //
+            // Note that when n-partition transaction runs, it's run on the MPI site, so calling
+            // m_site.getCorrespondingPartitionId() will return the MPI's partition ID. We need
+            // another way of getting what partitions were assigned to this transaction.
             return true;
         }
     }
