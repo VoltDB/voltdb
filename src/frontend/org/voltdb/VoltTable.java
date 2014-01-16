@@ -124,10 +124,6 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     public static final String MAX_SERIALIZED_TABLE_LENGTH_STR =
             String.valueOf(MAX_SERIALIZED_TABLE_LENGTH / 1024) + "k";
 
-    // Strings used to indicate NULL value in CSV files
-    public static final String CSV_NULL = "\\N";
-    public static final String QUOTED_CSV_NULL = "\"\\N\"";
-
     static final int NULL_STRING_INDICATOR = -1;
     static final Charset METADATA_ENCODING = Constants.US_ASCII_ENCODING;
     static final Charset ROWDATA_ENCODING = Constants.UTF8ENCODING;
@@ -347,19 +343,6 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             }
         }
         assert(verifyTableInvariants());
-    }
-
-    /**
-     * End users should not call this method.
-     * Obtain a reference to the table's underlying buffer.
-     * The returned reference's position and mark are independent of
-     * the table's buffer position and mark. The returned buffer has
-     * no mark and is at position 0.
-     */
-    public ByteBuffer getTableDataReference() {
-        ByteBuffer buf = m_buffer.duplicate();
-        buf.rewind();
-        return buf;
     }
 
     /**
@@ -1031,9 +1014,13 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                         buffer.append(bd.toString());
                     }
                     break;
+                default:
+                    // should never get here
+                    throw new RuntimeException("Invalid type of table column.");
                 }
-                if (i < m_colCount - 1)
+                if (i < m_colCount - 1) {
                     buffer.append(",");
+                }
             }
             buffer.append("\n");
         }
@@ -1448,14 +1435,6 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     }
 
     /**
-     * End users should not call this method.
-     * @return Underlying buffer size
-     */
-    public int getUnderlyingBufferSize() {
-        return m_buffer.position();
-    }
-
-    /**
      * Set the status code associated with this table. Default value is 0.
      * @return Status code
      */
@@ -1514,18 +1493,6 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         ByteBuffer buf = m_buffer.asReadOnlyBuffer();
         buf.position(0);
         return buf;
-    }
-
-    public byte[] getSchemaBytes() {
-        if (getRowCount() > 0) {
-            throw new RuntimeException("getSchemaBytes() Only works if the table is empty");
-        }
-        ByteBuffer dup = m_buffer.duplicate();
-        dup.limit(dup.limit() - 4);
-        dup.position(0);
-        byte retvalBytes[] = new byte[dup.remaining()];
-        dup.get(retvalBytes);
-        return retvalBytes;
     }
 
     public ColumnInfo[] getTableSchema()

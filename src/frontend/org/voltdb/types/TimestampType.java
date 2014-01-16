@@ -37,7 +37,7 @@ public class TimestampType implements JSONString, Comparable<TimestampType> {
     /**
      * Create a TimestampType from a Java Date class.
      * Microseconds will be rounded to zero.
-     * @param Java Date instance.
+     * @param date Java Date instance.
      */
     public TimestampType(Date date) {
         m_usecs = 0;

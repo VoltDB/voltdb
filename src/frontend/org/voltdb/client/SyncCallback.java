@@ -16,13 +16,14 @@
  */
 
 package org.voltdb.client;
+
 import java.util.concurrent.Semaphore;
 
 /**
- * A utility class that allows a client to queue a stored procedure invocation asynchronously and then poll
+ * <p>A utility class that allows a client to queue a stored procedure invocation asynchronously and then poll
  * or join on the response. Useful when invoking multiple stored procedures synchronously
  * from a single thread. Queue each of the invocations asynchronously with a different <code>SyncCallback</code> and
- * then call {@link #waitForResponse} on each of the <code>SyncCallback</code>s to join on the responses.
+ * then call {@link #waitForResponse} on each of the <code>SyncCallback</code>s to join on the responses.</p>
  *
  */
 public final class SyncCallback extends AbstractProcedureArgumentCacher implements ProcedureCallback {
@@ -42,8 +43,9 @@ public final class SyncCallback extends AbstractProcedureArgumentCacher implemen
     }
 
     /**
-     * Non-blocking poll method that checks for the response to the invocation associated with this callback.
-     * Call getResponse to retrieve the response or result() to retrieve the just the results.
+     * <p>Non-blocking poll method that checks for the response to the invocation associated with this callback.
+     * Call getResponse to retrieve the response or result() to retrieve the just the results.</p>
+     *
      * @return True if the response is available, false otherwise
      */
     public boolean checkForResponse() {
@@ -51,7 +53,8 @@ public final class SyncCallback extends AbstractProcedureArgumentCacher implemen
     }
 
     /**
-     * Retrieve the ClientResponse returned for this procedure invocation
+     * <p>Retrieve the ClientResponse returned for this procedure invocation.</p>
+     *
      * @return ClientResponse for this invocation
      */
     public ClientResponse getResponse() {
@@ -59,8 +62,9 @@ public final class SyncCallback extends AbstractProcedureArgumentCacher implemen
     }
 
     /**
-     * Block until a response has been received for the invocation associated with this callback. Call getResponse
-     * to retrieve the response or result() to retrieve the just the results.
+     * <p>Block until a response has been received for the invocation associated with this callback. Call getResponse
+     * to retrieve the response or result() to retrieve the just the results.</p>
+     *
      * @throws InterruptedException
      */
     public void waitForResponse() throws InterruptedException {
@@ -69,7 +73,7 @@ public final class SyncCallback extends AbstractProcedureArgumentCacher implemen
     }
 
     /**
-     * Return the arguments provided with the procedure invocation
+     * <p>Return the arguments provided with the procedure invocation.</p>
      * @return Object array containing procedure arguments
      */
     @Override

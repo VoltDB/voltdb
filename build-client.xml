@@ -58,6 +58,7 @@
 <property name='vendor.cpp.dir'              location='third_party/cpp' />
 <property name='depcache'                    value='.depcache' />
 
+<property name="j2se_api" value="http://docs.oracle.com/javase/7/docs/api/"/>
 
 <!-- os.mac is set when build is running on Mac OSX -->
 <condition property="os.mac">
@@ -93,13 +94,15 @@ DISTRIBUTION
 -->
 
 <target name="javadoc">
+    <echo message="Building Client API JavaDoc"/>
     <!-- populate selected client javadoc documentation -->
     <javadoc
         destdir="${doc.dir}/javadoc/java-client-api"
         access="protected"
         version="true"
         use="true"
-        nodeprecated="true"
+        failonerror="true"
+        additionalparam="-quiet"
         Overview='${src.gpl.dir}/overview-public.html'
         Windowtitle='VoltDB Client APIs'>
         <link href="${j2se_api}"/>

@@ -34,6 +34,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.PostSnapshotTask;
+import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SnapshotDataFilter;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
@@ -118,7 +119,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         Map<Integer, byte[]> schemas = new HashMap<Integer, byte[]>();
         for (final Table table : config.tables) {
             VoltTable schemaTable = CatalogUtil.getVoltTable(table);
-            schemas.put(table.getRelativeIndex(), schemaTable.getSchemaBytes());
+            schemas.put(table.getRelativeIndex(), PrivateVoltTableFactory.getSchemaBytes(schemaTable));
         }
 
         List<DataTargetInfo> sdts = createDataTargets(localStreams, hashinatorData, schemas);
