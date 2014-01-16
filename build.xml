@@ -1210,8 +1210,8 @@ LICENSING
 -->
 
 <target name='licensecheck' description="make sure all source files have approved licenses">
-    <exec dir='tools' executable='python' failonerror='true'>
-        <arg line="licensescheck.py" />
+    <exec dir='.' executable='python' failonerror='true'>
+        <arg line="tools/licensescheck.py" />
         <arg line="${voltpro}"/>
     </exec>
 </target>
