@@ -251,6 +251,13 @@ public:
      */
     void reset();
 
+    /**
+     * access the range into which this iterator is built on
+     */
+    const ElasticIndexHashRange range() const {
+        return m_range;
+    }
+
 private:
 
     ElasticIndex &m_index;
@@ -465,11 +472,13 @@ inline void ElasticIndex::printKeys(std::ostream &os, int32_t limit, const Tuple
         TableTuple tuple = TableTuple(itr->getTupleAddress(), schema);
         ElasticHash tupleHash = generateHash(table, tuple);
 
-        os << *itr << ", does ";
+        os << *itr << ", is ";
         if (itr->getHash() != tupleHash) {
             os << "NOT ";
         }
-        os << "match tuple address of " << tupleHash << std::endl;
+        os << "a correct hash for its tuple address (pending delete: "
+           << (tuple.isPendingDelete() ? "true)" : "false)")
+           << std::endl;
 
         ++upto;
     }
