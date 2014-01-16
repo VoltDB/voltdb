@@ -122,12 +122,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
 
-        // Needed for adhoc queries
-        @Override
-        public long getCurrentTxnId() {
-            return m_currentTxnId;
-        }
-
         @Override
         public long getSiteId() {
             throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");

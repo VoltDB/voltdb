@@ -246,11 +246,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public long getCurrentTxnId() {
-            return m_currentTxnId;
-        }
-
-        @Override
         public long getSiteId() {
             return m_siteId;
         }
@@ -568,6 +563,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_initiatorMailbox, m.getStoredProcedureName(),
                         null, m, m_drGateway);
                 if (!filter(tibm)) {
+                    m_currentTxnId = t.getTxnId();
+                    m_lastTxnTime = EstTime.currentTimeMillis();
                     t.runFromTaskLog(this);
                 }
             }
@@ -589,6 +586,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 }
 
                 if (!filter(tibm)) {
+                    m_currentTxnId = t.getTxnId();
+                    m_lastTxnTime = EstTime.currentTimeMillis();
                     t.runFromTaskLog(this);
                 }
             }
