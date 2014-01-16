@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.Pair;
@@ -34,7 +35,7 @@ public class StartupAlgo implements RepairAlgo
 
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
-    private final InaugurationFuture m_promotionResult = new InaugurationFuture();
+    private final SettableFuture<Long> m_promotionResult = SettableFuture.create();
 
     /**
      * Setup a new StartupAlgo but don't take any action to take responsibility.
@@ -52,14 +53,13 @@ public class StartupAlgo implements RepairAlgo
     }
 
     @Override
-    public Future<Pair<Boolean, Long>> start()
+    public Future<Long> start()
     {
         try {
             prepareForStartup();
         } catch (Exception e) {
             tmLog.error(m_whoami + "failed leader promotion:", e);
             m_promotionResult.setException(e);
-            m_promotionResult.done(Long.MIN_VALUE);
         }
         return m_promotionResult;
     }
@@ -82,7 +82,7 @@ public class StartupAlgo implements RepairAlgo
         // block here until the babysitter thread provides all replicas.
         // then initialize the mailbox's replica set and proceed as leader.
         m_missingStartupSites.await();
-        m_promotionResult.done(TxnEgo.makeZero(m_partitionId).getTxnId());
+        m_promotionResult.set(TxnEgo.makeZero(m_partitionId).getTxnId());
     }
 
     /** Process a new repair log response */

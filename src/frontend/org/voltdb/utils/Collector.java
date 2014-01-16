@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -437,12 +437,22 @@ public class Collector {
 
         Process p = Runtime.getRuntime().exec(command);
         BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+        BufferedReader ereader = new BufferedReader(new InputStreamReader(p.getErrorStream()));
         BufferedWriter writer = new BufferedWriter(new FileWriter(tempFile));
 
         String line = null;
         while ((line = reader.readLine()) != null) {
             writer.write(line);
             writer.newLine();
+        }
+        // If we dont have anything in stdout look in stderr.
+        if (tempFile.length() <= 0) {
+            if (ereader != null) {
+                while ((line = ereader.readLine()) != null) {
+                    writer.write(line);
+                    writer.newLine();
+                }
+            }
         }
         writer.close();
 
