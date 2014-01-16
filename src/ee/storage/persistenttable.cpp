@@ -212,9 +212,9 @@ void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDe
 void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
     VOLT_DEBUG("**** Truncate table release *****\n");
 
-    originalTable->deleteAllTuples(true, false);
     m_tuplesPinnedByUndo = 0;
     m_invisibleTuplesPendingDeleteCount = 0;
+
 }
 
 
@@ -222,6 +222,8 @@ void PersistentTable::truncateTable(VoltDBEngine* engine) {
     TableCatalogDelegate * tcd = engine->getTableDelegate(m_name);
     assert(tcd);
     PersistentTable * emptyTable = TableFactory::cloneEmptyPersistentTableWithIndexes(this);
+    emptyTable->incrementRefcount();
+
     assert(emptyTable->views().size() == 0);
 
     // add matView
@@ -247,7 +249,6 @@ void PersistentTable::truncateTable(VoltDBEngine* engine) {
         return;
     }
 
-    deleteAllTuples(true, false);
 }
 
 
