@@ -1293,7 +1293,7 @@ TEST CASES
             failureproperty="junit.failures"
             printsummary="false"
             timeout="${junit.timeout}"
-            maxmemory='1024M'
+            maxmemory='2048M'
             showoutput="${junit.showoutput}"
         >
             <classpath refid='project.classpath' />
