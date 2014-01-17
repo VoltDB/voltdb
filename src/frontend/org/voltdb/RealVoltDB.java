@@ -2455,11 +2455,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             builder.append(String.format("The configuration of %d tables, %d sites-per-host, and k-factor of %d requires at least %d MB of Java heap memory. ", tableCount, sitesPerHost, kfactor, crazyThresh));
             builder.append(String.format("The maximum amount of heap memory available to the JVM is %d MB. ", maxMemory));
             builder.append("Please increase the maximum heap size using the VOLTDB_HEAPMAX environment variable and then restart VoltDB.");
-            // Try not to crash if we know this is a junit test.  Will only know this for a subset of
-            // some configs.
-            if (!VoltDB.isThisATest()) {
-                VoltDB.crashLocalVoltDB(builder.toString(), false, null);
-            }
+            consoleLog.warn(builder.toString());
         }
         else if (maxMemory < warnThresh) {
             StringBuilder builder = new StringBuilder();
