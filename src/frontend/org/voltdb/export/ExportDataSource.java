@@ -639,6 +639,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_pollFuture = null;
             }
         } catch (Throwable t) {
+            m_polledBlockSize = 0;
             fut.setException(t);
         }
     }
