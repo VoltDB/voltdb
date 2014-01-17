@@ -1212,8 +1212,8 @@ LICENSING
 -->
 
 <target name='licensecheck' description="make sure all source files have approved licenses">
-    <exec dir='tools' executable='python' failonerror='true'>
-        <arg line="licensescheck.py" />
+    <exec dir='.' executable='python' failonerror='true'>
+        <arg line="tools/licensescheck.py" />
         <arg line="${voltpro}"/>
     </exec>
 </target>
@@ -1295,7 +1295,7 @@ TEST CASES
             failureproperty="junit.failures"
             printsummary="false"
             timeout="${junit.timeout}"
-            maxmemory='1024M'
+            maxmemory='2048M'
             showoutput="${junit.showoutput}"
         >
             <classpath refid='project.classpath' />
@@ -1863,7 +1863,7 @@ TEST CASES
     <property name='classpath' refid='project.classpath' />
     <property name='simpleserver.command' value='java
     -Djava.library.path=${build.dir}${build.dir.suffix}/nativelibs -classpath
-    ${classpath} -Dlog4j.configuration=file://${log4j.configuration} -server -Xmx512m -XX:+AggressiveOpts -ea
+    ${classpath} -Dlog4j.configuration=file://${log4j.configuration} -server -Xmx640m -XX:+AggressiveOpts -ea
     org.voltdb.sqlgenerator.SimpleServer create hosts=${hosts}
     sitesperhost=${sitesperhost} replicas=${replicas}
     ${debug_output}' />
