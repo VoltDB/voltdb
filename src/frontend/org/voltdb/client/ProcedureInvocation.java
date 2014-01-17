@@ -81,6 +81,10 @@ public class ProcedureInvocation {
         return size;
     }
 
+    public int getPassedParamCount() {
+        return m_parameters.size();
+    }
+
     public Object getPartitionParamValue(int index) {
         return m_parameters.toArray()[index];
     }
