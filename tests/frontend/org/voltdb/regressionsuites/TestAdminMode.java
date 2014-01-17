@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -332,6 +332,9 @@ public class TestAdminMode extends RegressionSuite
 
     @SuppressWarnings("deprecation")
     static public Test suite() throws IOException {
+        // Set system property for 4sec CLIENT_HANGUP_TIMEOUT
+        System.setProperty("CLIENT_HANGUP_TIMEOUT", "4000");
+
         // the suite made here will all be using the tests from this class
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestAdminMode.class);
 

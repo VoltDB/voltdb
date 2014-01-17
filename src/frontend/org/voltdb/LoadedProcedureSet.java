@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -115,10 +115,12 @@ public class LoadedProcedureSet {
                     if (className.startsWith("org.voltdb.")) {
                         VoltDB.crashLocalVoltDB("VoltDB does not support procedures with package names " +
                                                         "that are prefixed with \"org.voltdb\". Please use a different " +
-                                                        "package name and retry.", false, null);
+                                                        "package name and retry. Procedure name was " + className + ".",
+                                                        false, null);
                     }
                     else {
-                        VoltDB.crashLocalVoltDB("VoltDB was unable to load a procedure it expected to be in the " +
+                        VoltDB.crashLocalVoltDB("VoltDB was unable to load a procedure (" +
+                                                 className + ") it expected to be in the " +
                                                 "catalog jarfile and will now exit.", false, null);
                     }
                 }

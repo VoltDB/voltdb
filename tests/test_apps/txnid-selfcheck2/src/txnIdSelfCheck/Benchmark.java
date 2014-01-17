@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -477,6 +477,10 @@ public class Benchmark {
         // Run the benchmark loop for the requested duration
         // The throughput may be throttled depending on client configuration
         log.info("Running benchmark...");
+        while (((ClientImpl) client).isHashinatorInitialized() == false) {
+            Thread.sleep(1000);
+            System.out.println("Wait for hashinator..");
+        }
 
         BigTableLoader partitionedLoader = new BigTableLoader(client, "bigp",
                          (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits);
@@ -484,6 +488,13 @@ public class Benchmark {
         BigTableLoader replicatedLoader = new BigTableLoader(client, "bigr",
                          (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits);
         replicatedLoader.start();
+
+        LoadTableLoader plt = new LoadTableLoader(client, "loadp",
+                (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits, false, 0);
+        plt.start();
+        LoadTableLoader rlt = new LoadTableLoader(client, "loadmp",
+                (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, 3, permits, true, -1);
+        rlt.start();
 
         ReadThread readThread = new ReadThread(client, config.threads, config.threadoffset,
                 config.allowinprocadhoc, config.mpratio, permits);
@@ -522,6 +533,13 @@ public class Benchmark {
         readThread.join();
         adHocMayhemThread.join();
         idpt.join();
+
+        //Shutdown LoadTableLoader
+        rlt.shutdown();
+        plt.shutdown();
+        rlt.join();
+        plt.join();
+
         for (ClientThread clientThread : clientThreads) {
             clientThread.join();
         }

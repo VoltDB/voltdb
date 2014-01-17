@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2013 VoltDB Inc.
+# Copyright (C) 2008-2014 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -138,7 +138,7 @@ def display_messages(msgs, f = sys.stdout, tag = None, level = 0):
     Low level message display.
     """
     if tag:
-        stag = '%8s: ' % tag
+        stag = '%s: ' % tag
     else:
         stag = ''
     # Special case to allow a string instead of an iterable.
@@ -212,15 +212,20 @@ def error(*msgs):
     display_messages(msgs, tag = 'ERROR')
 
 #===============================================================================
-def abort(*msgs):
+def abort(*msgs, **kwargs):
 #===============================================================================
     """
     Display ERROR messages and then abort.
+    :Keywords:
+    return_code: integer result returned to the OS (default=1)
     """
+    keys = kwargs.keys()
+    bad_keywords = [k for k in kwargs.keys() if k != 'return_code']
+    if bad_keywords:
+        warning('Bad keyword(s) passed to abort(): %s' % ' '.join(bad_keywords))
+    return_code = kwargs.get('return_code', 1)
     error(*msgs)
-    sys.stderr.write('\n')
-    display_messages('Exiting.', f = sys.stderr, tag = 'FATAL')
-    sys.exit(1)
+    sys.exit(return_code)
 
 #===============================================================================
 def find_in_path(name):
@@ -436,7 +441,7 @@ def run_cmd(cmd, *args):
             verbose_info('Run: %s' % fullcmd)
         retcode = os.system(fullcmd)
         if retcode != 0:
-            abort('Command "%s ..." failed with return code %d.' % (cmd, retcode))
+            abort(return_code=retcode)
 
 #===============================================================================
 def pipe_cmd(*args):

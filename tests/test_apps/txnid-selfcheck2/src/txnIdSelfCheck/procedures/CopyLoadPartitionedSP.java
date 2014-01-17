@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -21,33 +21,17 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb_testprocs.regressionsuites.executionsitekillers;
+package txnIdSelfCheck.procedures;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "NEW_ORDER.NO_W_ID: 0",
-    singlePartition = true
-)
-public class SinglePartitionKiller extends VoltProcedure {
+public class CopyLoadPartitionedSP extends CopyLoadPartitionedBase {
 
-    public final SQLStmt insert = new SQLStmt("INSERT INTO NEW_ORDER VALUES (?, ?, ?);");
+    private final SQLStmt selectStmt = new SQLStmt("SELECT cid,txnid,rowid from loadp WHERE cid=? ORDER BY cid LIMIT 1;");
+    private final SQLStmt insertStmt = new SQLStmt("INSERT INTO  cploadp VALUES (?, ?, ?);");
 
-    public VoltTable[] run(byte w_id) throws VoltAbortException {
-        voltQueueSQL(insert, w_id, w_id, w_id);
-        VoltTable[] results = voltExecuteSQL();
-
-        // SCARY!  DON'T TRY THIS AT HOME!  Need a way to kill only one
-        // replica and had to resort to this.  ABSOLUTELY POSITIVELY NOT
-        // ADVISED AND DEFINITELY FROWNED UPON FOR A REAL APPLICATION.
-        int host_id = VoltDB.instance().getHostMessenger().getHostId();
-        if ((host_id % 2) == 0)
-        {
-            throw new AssertionError("Site-co killer, q'est que c'est");
-        }
-        else
-        {
-            return results;
-        }
+    public VoltTable[] run(long cid) {
+        return doWork(selectStmt, insertStmt, cid);
     }
 }

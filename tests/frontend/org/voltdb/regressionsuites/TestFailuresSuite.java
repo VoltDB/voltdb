@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -33,6 +33,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.failureprocs.BadDecimalToVarcharCompare;
 import org.voltdb_testprocs.regressionsuites.failureprocs.BadFloatToVarcharCompare;
 import org.voltdb_testprocs.regressionsuites.failureprocs.BadVarcharCompare;
@@ -322,12 +323,26 @@ public class TestFailuresSuite extends RegressionSuite {
             totalBytes += STRLEN;
         }
 
+        // Some tests are run with a different effective partition count on community builds,
+        // due to a k-factor downgrade, so allow for a possible per partition row count scale difference.
+        int kFactorScaleDown;
+        if (MiscUtils.isPro()) {
+            kFactorScaleDown = 1;
+        } else {
+            kFactorScaleDown = 2;
+        }
+
         for (int ii = 0; ii < 4; ii++) {
             results = client.callProcedure("SelectBigString", ii).getResults();
             System.out.println(results[0].getRowCount());
             long rowCount = results[0].getRowCount();
             //With elastic hashing the numbers are a little fuzzy
-            assertTrue(rowCount > 800 && rowCount < 950);
+            if ( ! ((rowCount > 800 && rowCount < 950) ||
+                    (rowCount > 800/kFactorScaleDown && rowCount < 950/kFactorScaleDown))) {
+                System.out.println("Unexpected row count: " + rowCount);
+            }
+            assertTrue((rowCount > 800 && rowCount < 950) ||
+                (rowCount > 800/kFactorScaleDown && rowCount < 950/kFactorScaleDown));
         }
 
         //System.out.printf("Fail Bytes: %d, Expected Rows %d\n", totalBytes, expectedRows);

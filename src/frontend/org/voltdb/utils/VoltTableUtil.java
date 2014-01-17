@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -194,5 +194,20 @@ public class VoltTableUtil {
         }
 
         return result;
+    }
+
+    /**
+     * Extract a table's schema.
+     * @param vt  input table with source schema
+     * @return  schema as column info array
+     */
+    public static VoltTable.ColumnInfo[] extractTableSchema(VoltTable vt)
+    {
+        VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[vt.getColumnCount()];
+        for (int ii = 0; ii < vt.getColumnCount(); ii++) {
+            columns[ii] = new VoltTable.ColumnInfo(vt.getColumnName(ii),
+                    vt.getColumnType(ii));
+        }
+        return columns;
     }
 }

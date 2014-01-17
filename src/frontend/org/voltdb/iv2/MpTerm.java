@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,14 +19,13 @@ package org.voltdb.iv2;
 
 import java.lang.InterruptedException;
 
-import java.util.ArrayList;
+import java.util.*;
 
 import java.util.concurrent.ExecutionException;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.TreeSet;
 
+import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
 import org.voltcore.logging.VoltLogger;
@@ -45,7 +44,7 @@ public class MpTerm implements Term
 
     private final InitiatorMailbox m_mailbox;
     private final ZooKeeper m_zk;
-    private final TreeSet<Long> m_knownLeaders = new TreeSet<Long>();
+    private volatile SortedSet<Long> m_knownLeaders = ImmutableSortedSet.of();
 
     // Initialized in start() -- when the term begins.
     protected LeaderCache m_leaderCache;
@@ -61,18 +60,18 @@ public class MpTerm implements Term
         @Override
         public void run(ImmutableMap<Integer, Long> cache)
         {
-            Set<Long> updatedLeaders = new HashSet<Long>();
+            ImmutableSortedSet.Builder<Long> builder = ImmutableSortedSet.naturalOrder();
             for (Long HSId : cache.values()) {
-                updatedLeaders.add(HSId);
+                builder.add(HSId);
             }
-            List<Long> leaders = new ArrayList<Long>(updatedLeaders);
-            tmLog.debug(m_whoami + "updating leaders: " + CoreUtils.hsIdCollectionToString(leaders));
+            final SortedSet<Long> updatedLeaders = builder.build();
+            tmLog.debug(m_whoami + "updating leaders: " + CoreUtils.hsIdCollectionToString(updatedLeaders));
             tmLog.debug(m_whoami
                       + "LeaderCache change handler updating leader list to: "
-                      + CoreUtils.hsIdCollectionToString(leaders));
-            m_knownLeaders.clear();
-            m_knownLeaders.addAll(updatedLeaders);
-            m_mailbox.updateReplicas(leaders, cache);
+                      + CoreUtils.hsIdCollectionToString(updatedLeaders));
+            m_knownLeaders = updatedLeaders;
+
+            m_mailbox.updateReplicas(new ArrayList<Long>(m_knownLeaders), cache);
         }
     };
 
@@ -118,8 +117,13 @@ public class MpTerm implements Term
     }
 
     @Override
-    public List<Long> getInterestingHSIds()
+    public Supplier<List<Long>> getInterestingHSIds()
     {
-        return new ArrayList<Long>(m_knownLeaders);
+        return new Supplier<List<Long>>() {
+            @Override
+            public List<Long> get() {
+                return new ArrayList<Long>(m_knownLeaders);
+            }
+        };
     }
 }
