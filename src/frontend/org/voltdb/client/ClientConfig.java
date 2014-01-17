@@ -169,7 +169,8 @@ public class ClientConfig {
      * Multiple server connections are required for more threads to be involved, a connection
      * is assigned exclusively to a connection.</p>
      *
-     * @param heavyweight Whether to create additional
+     * @param heavyweight Whether to create additional threads for high IO or
+     * high processing workloads.
      */
     public void setHeavyweight(boolean heavyweight) {
         m_heavyweight = heavyweight;
@@ -205,7 +206,7 @@ public class ClientConfig {
 
     /**
      * <p>Set the maximum number of transactions that can be run in 1 second. Note this
-     * specified a rate, not a ceiling. If the limit is set to 10, you can't send 10 in
+     * specifies a rate, not a ceiling. If the limit is set to 10, you can't send 10 in
      * the first half of the second and 5 in the later half; the client will let you send
      * about 1 transaction every 100ms. Default is {link Integer#MAX_VALUE}.</p>
      *
@@ -237,7 +238,7 @@ public class ClientConfig {
      *
      * <p>If you are using persistent connections you definitely want this.</p>
      *
-     * @param on Value to set the client affinity enabled or disabled.
+     * @param on Enable or disable the affinity feature.
      */
     public void setClientAffinity(boolean on) {
         m_useClientAffinity = on;

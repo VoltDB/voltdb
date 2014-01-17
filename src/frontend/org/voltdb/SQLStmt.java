@@ -199,23 +199,6 @@ public class SQLStmt {
         return sqlTextStr;
     }
 
-    /*public byte[] getSQLBytes() {
-        if (sqlText == null) {
-            sqlText = sqlTextStr.getBytes(Constants.UTF8ENCODING);
-        }
-        return sqlText;
-    }
-
-    public void setSQLBytes(byte[] sql) {
-        sqlText = sql;
-        sqlTextStr = null;
-    }
-
-    public void setSQLStr(String sql) {
-        sqlText = null;
-        sqlTextStr = sql;
-    }*/
-
     /**
      * Get the join order hint supplied in the constructor.
      *

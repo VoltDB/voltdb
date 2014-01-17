@@ -39,7 +39,7 @@ public class ClientStatusListenerExt {
     /**
      * Notify listeners that a connection to a host was lost.
      * @param hostname Name of the host the connection was lost from.
-     * @param port Port number of the host the connection was lost from.
+     * @param port Port number of the connection to the lost host.
      * @param connectionsLeft Number of remaining connections this client has to the DB
      * @param cause The reason why this callback is being called
      */

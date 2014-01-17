@@ -34,14 +34,14 @@ import java.util.List;
 public interface Client {
 
     /**
-     * Default port number for volt cluster instances.
+     * Default non-admin port number for volt cluster instances.
      */
     public static final int VOLTDB_SERVER_PORT = 21212;
 
     /**
      * <p>Create a connection to a VoltDB node and add it to the set of connections.</p>
      *
-     * <p>This is a syncrhonous operation.</p>
+     * <p>This is a synchronous operation.</p>
      *
      * @param host Hostname or IP address of the host to connect to including
      * optional port in the hostname:port format.
@@ -54,7 +54,7 @@ public interface Client {
     /**
      * <p>Create a connection to a VoltDB node.</p>
      *
-     * <p>This is a syncrhonous operation.</p>
+     * <p>This is a synchronous operation.</p>
      *
      * @param host Hostname or IP address of the host to connect to.
      * @param port Port number on remote host to connect to.
@@ -81,7 +81,7 @@ public interface Client {
     /**
      * <p>Asynchronously invoke a replicated procedure. If there is backpressure
      * this call will block until the invocation is queued. If configureBlocking(false) is invoked
-     * then it will return immediately. Check the return value to determine if queuing actually took place.</p>
+     * then it will return immediately. Check the return value to determine if queueing actually took place.</p>
      *
      * @param callback {@link ProcedureCallback} that will be invoked with procedure results.
      * @param procName class name (not qualified by package) of the procedure to execute.
@@ -235,7 +235,7 @@ public interface Client {
     public String getBuildString();
 
     /**
-     * <p>The default behavior for queuing of asynchronous procedure invocations is to block until
+     * <p>The default behavior for queueing of asynchronous procedure invocations is to block until
      * it is possible to queue the invocation. If blocking is set to false callProcedure will always return
      * immediately if it is not possible to queue the procedure invocation due to backpressure.</p>
      *

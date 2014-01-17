@@ -74,14 +74,14 @@ public class VoltTableUtil {
                         || type == VoltType.TINYINT) {
                     final long value = vt.getLong(ii);
                     if (vt.wasNull()) {
-                        fields[ii] = Constants. CSV_NULL;
+                        fields[ii] = Constants.CSV_NULL;
                     } else {
                         fields[ii] = Long.toString(value);
                     }
                 } else if (type == VoltType.FLOAT) {
                     final double value = vt.getDouble(ii);
                     if (vt.wasNull()) {
-                        fields[ii] = Constants. CSV_NULL;
+                        fields[ii] = Constants.CSV_NULL;
                     } else {
                         fields[ii] = Double.toString(value);
                     }
