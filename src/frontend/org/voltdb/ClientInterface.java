@@ -450,7 +450,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     try {
                         m_executor.awaitTermination(5, TimeUnit.MINUTES);
                     } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
+                        String msg = "Client Listener Interrupted while shutting down "
+                                + (m_isAdmin ? " Admin " : " ") + "port: " + m_port;
+                        VoltDB.crashLocalVoltDB(msg, false, e);
                     }
                 }
             }
