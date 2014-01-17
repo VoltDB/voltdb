@@ -709,7 +709,10 @@ class Distributer {
 
                 if (procedureInfo != null) {
                     hashedPartition = Constants.MP_INIT_PID;
-                    if (!procedureInfo.multiPart) {
+                    if (( ! procedureInfo.multiPart) &&
+                        // User may have passed too few parameters to allow dispatching.
+                        // Avoid an indexing error here to fall through to the proper ProcCallException.
+                            (procedureInfo.partitionParameter < invocation.getPassedParamCount())) {
                         hashedPartition = m_hashinator.getHashedPartitionForParameter(
                                 procedureInfo.partitionParameterType,
                                 invocation.getPartitionParamValue(procedureInfo.partitionParameter));
