@@ -1259,8 +1259,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                             row[j] = VoltDecimalHelper.deserializeBigDecimalFromString(decVal);
                         break;
                     default:
-                        // should not get here ever
-                        throw new IllegalStateException("Table column has unexpected type.");
+                        // empty fallthrough to make the warning go away
                     }
                 }
             }
