@@ -464,7 +464,6 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
 
         // get a server config for the native backend with one sites/partitions
         config = new LocalCluster("sqlfeatures-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        config.setHasLocalServer(false);
         config.setMaxHeap(3300);
 
         // build the jarfile
@@ -479,7 +478,6 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         config = new LocalCluster("sqlfeatures-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        config.setHasLocalServer(false);
         config.setMaxHeap(3300);
         success = config.compile(project);
         assert(success);
@@ -490,7 +488,6 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         config = new LocalCluster("sqlfeatures-cluster-rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        config.setHasLocalServer(false);
         config.setMaxHeap(3800);
         // Commented out until ENG-3076, ENG-3434 are resolved.
         //config = new LocalCluster("sqlfeatures-cluster-rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI,

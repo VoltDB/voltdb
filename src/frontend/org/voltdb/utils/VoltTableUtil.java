@@ -195,4 +195,19 @@ public class VoltTableUtil {
 
         return result;
     }
+
+    /**
+     * Extract a table's schema.
+     * @param vt  input table with source schema
+     * @return  schema as column info array
+     */
+    public static VoltTable.ColumnInfo[] extractTableSchema(VoltTable vt)
+    {
+        VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[vt.getColumnCount()];
+        for (int ii = 0; ii < vt.getColumnCount(); ii++) {
+            columns[ii] = new VoltTable.ColumnInfo(vt.getColumnName(ii),
+                    vt.getColumnType(ii));
+        }
+        return columns;
+    }
 }
