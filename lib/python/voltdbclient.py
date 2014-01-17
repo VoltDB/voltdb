@@ -260,6 +260,9 @@ class FastSerializer:
         # A length, version number, and status code is returned
         try:
             self.bufferForRead()
+        except IOError, e:
+            print "ERROR: Connection failed. Please check that the host and port are correct."
+            raise e
         except socket.timeout:
             raise SystemExit("Authentication timed out after %d seconds."
                                 % self.socket.gettimeout())
