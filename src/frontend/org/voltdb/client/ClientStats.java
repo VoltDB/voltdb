@@ -443,6 +443,11 @@ public class ClientStats {
         return m_latencyBy100ms.msPerBucket * m_latencyBy100ms.numberOfBuckets * 2;
     }
 
+    /**
+     * Generate a human-readable report of latencies in the form of a histogram.
+     *
+     * @return String containing human-readable report.
+     */
     public String latencyHistoReport() {
         StringBuilder sb = new StringBuilder();
 

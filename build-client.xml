@@ -110,7 +110,6 @@ DISTRIBUTION
         <fileset dir="." defaultexcludes="yes">
             <include name="src/frontend/org/voltdb/VoltTable.java" />
             <include name="src/frontend/org/voltdb/VoltTableRow.java" />
-            <include name="src/frontend/org/voltdb/VoltClient.java" />
             <include name="src/frontend/org/voltdb/VoltType.java" />
             <include name="src/frontend/org/voltdb/client/Client.java" />
             <include name="src/frontend/org/voltdb/client/NoConnectionsException.java" />
@@ -124,6 +123,7 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/client/ClientStatusListenerExt.java" />
             <include name="src/frontend/org/voltdb/client/ClientResponse.java" />
             <include name="src/frontend/org/voltdb/client/ClientStats.java" />
+            <include name="src/frontend/org/voltdb/client/ClientAffinityStats.java" />
             <include name="src/frontend/org/voltdb/client/ClientStatsContext.java" />
             <include name="src/frontend/org/voltdb/types/TimestampType.java" />
         </fileset>

@@ -21,7 +21,7 @@ package org.voltdb.client;
  * Listener that a client application can provide to a {@link Client} in order to receive notifications
  * when a connection is lost or backpressure occurs
  *
- * @deprecated
+ * @deprecated Use {@link ClientStatusListenerExt} instead.
  */
 @Deprecated
 public interface ClientStatusListener {
@@ -40,5 +40,12 @@ public interface ClientStatusListener {
      */
     void backpressure(boolean status);
 
+    /**
+     * Called when a {@link ProcedureCallback#clientCallback(ClientResponse)} invocation throws
+     * an exception.
+     * @param callback The callback that threw an exception.
+     * @param r The response object passed to the callback.
+     * @param e The exception thrown by the callback.
+     */
     void uncaughtException(ProcedureCallback callback, ClientResponse r, Throwable e);
 }

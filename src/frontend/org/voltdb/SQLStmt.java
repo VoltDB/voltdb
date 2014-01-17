@@ -50,8 +50,8 @@ public class SQLStmt {
     }
 
     // Used for uncompiled SQL.
-    private byte[] sqlText;
-    private String sqlTextStr;
+    byte[] sqlText;
+    String sqlTextStr;
     String joinOrder;
     // hash of the sql string for determinism checks
     byte[] sqlCRC;
@@ -199,7 +199,7 @@ public class SQLStmt {
         return sqlTextStr;
     }
 
-    public byte[] getSQLBytes() {
+    /*public byte[] getSQLBytes() {
         if (sqlText == null) {
             sqlText = sqlTextStr.getBytes(Constants.UTF8ENCODING);
         }
@@ -214,7 +214,7 @@ public class SQLStmt {
     public void setSQLStr(String sql) {
         sqlText = null;
         sqlTextStr = sql;
-    }
+    }*/
 
     /**
      * Get the join order hint supplied in the constructor.

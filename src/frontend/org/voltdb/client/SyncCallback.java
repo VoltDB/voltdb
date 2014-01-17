@@ -30,6 +30,9 @@ public final class SyncCallback extends AbstractProcedureArgumentCacher implemen
     private final Semaphore m_lock;
     private ClientResponse m_response;
 
+    /**
+     * Create a SyncCallback instance.
+     */
     public SyncCallback() {
         m_response = null;
         m_lock = new Semaphore(1);
@@ -65,7 +68,7 @@ public final class SyncCallback extends AbstractProcedureArgumentCacher implemen
      * <p>Block until a response has been received for the invocation associated with this callback. Call getResponse
      * to retrieve the response or result() to retrieve the just the results.</p>
      *
-     * @throws InterruptedException
+     * @throws InterruptedException on interruption.
      */
     public void waitForResponse() throws InterruptedException {
         m_lock.acquire();

@@ -24,7 +24,10 @@ import java.lang.annotation.Target;
 
 /**
  * Annotates a stored procedure with information needed by the stored
- * procedure compiler.
+ * procedure compiler. This is not deprecated, but this information is
+ * commonly provided in DDL rather than using this annotation. The compiler
+ * will complain if this annotation and DDL partitioning info is provided
+ * for the same procedure, even if it doesn't conflict.
  *
  * @see VoltProcedure
  * @see ProcInfoData
