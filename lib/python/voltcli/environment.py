@@ -73,7 +73,7 @@ if 'VOLTDB_OPTS' in os.environ:
 if 'JAVA_OPTS' in os.environ:
     java_opts.extend(shlex.split(os.environ['JAVA_OPTS']))
 if not [opt for opt in java_opts if opt.startswith('-Xmx')]:
-    java_opts.append('-Xmx2048m')
+    java_opts.append('-Xmx128m')
 
 def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
     """
