@@ -1,4 +1,4 @@
-<project name="voltkv" default="compile" basedir=".">
+<project name="txnIdSelfCheck2" default="compile" basedir=".">
     <description>
         volt sample application
     </description>
