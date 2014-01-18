@@ -206,7 +206,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         container.b.putInt(container.b.remaining() - 4);
         container.b.position(0);
 
-        final byte schemaBytes[] = schemaTable.getSchemaBytes();
+        final byte schemaBytes[] = PrivateVoltTableFactory.getSchemaBytes(schemaTable);
 
         final PureJavaCrc32 crc = new PureJavaCrc32();
         ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b.remaining() + schemaBytes.length);

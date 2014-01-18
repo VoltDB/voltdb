@@ -353,7 +353,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         if (LOG.isTraceEnabled()) {
             LOG.trace("loading table id=" + tableId + "...");
         }
-        byte[] serialized_table = table.getTableDataReference().array();
+        byte[] serialized_table = PrivateVoltTableFactory.getTableDataReference(table).array();
         if (LOG.isTraceEnabled()) {
             LOG.trace("passing " + serialized_table.length + " bytes to EE...");
         }

@@ -15,10 +15,11 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.voltdb;
-import org.voltdb.VoltTable.ColumnInfo;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+
+import org.voltdb.VoltTable.ColumnInfo;
 
 /**
  * Abstract superclass of all sources of statistical information inside the Java frontend.

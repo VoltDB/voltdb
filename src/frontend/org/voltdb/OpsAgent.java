@@ -22,10 +22,9 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-
-import java.util.Map.Entry;
 
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
@@ -35,7 +34,6 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
 import org.voltcore.utils.CoreUtils;
-
 import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.utils.CompressionService;

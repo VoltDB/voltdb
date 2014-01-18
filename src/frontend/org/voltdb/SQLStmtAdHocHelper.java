@@ -17,6 +17,8 @@
 
 package org.voltdb;
 
+import org.voltdb.common.Constants;
+
 
 /**
  * Provides access to some non-public SQLStmt methods needed for ad hoc queries.
@@ -53,5 +55,22 @@ public class SQLStmtAdHocHelper {
                 aggFragId, aggPlanHash, isAggTransactional,
                 collectorFragId, collectorPlanHash, isCollectorTransactional,
                 isReplicatedTableDML, isReadOnly, params, site);
+    }
+
+    public static byte[] getSQLBytes(SQLStmt sqlStmt) {
+        if (sqlStmt.sqlText == null) {
+            sqlStmt.sqlText = sqlStmt.sqlTextStr.getBytes(Constants.UTF8ENCODING);
+        }
+        return sqlStmt.sqlText;
+    }
+
+    public static void setSQLBytes(SQLStmt sqlStmt, byte[] sql) {
+        sqlStmt.sqlText = sql;
+        sqlStmt.sqlTextStr = null;
+    }
+
+    public static void setSQLStr(SQLStmt sqlStmt, String sql) {
+        sqlStmt.sqlText = null;
+        sqlStmt.sqlTextStr = sql;
     }
 }

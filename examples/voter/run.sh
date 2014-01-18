@@ -79,7 +79,7 @@ function server() {
     echo
     echo "$VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar"
     echo
-    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+    VOLTDB_HEAPSIZE=64 $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
 # run the voltdb server locally

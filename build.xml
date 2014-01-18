@@ -113,7 +113,7 @@
 
 <!-- Overridden in the Hudson test script. -->
 <property name='junit.haltonfailure'    value='false' />
-<property name="j2se_api" value="http://download.oracle.com/javase/6/docs/api/"/>
+<property name="j2se_api" value="http://docs.oracle.com/javase/7/docs/api/"/>
 
 <path id='project.classpath'>
     <pathelement location='${build.instr.dir}' />
@@ -398,13 +398,15 @@ DISTRIBUTION
 -->
 
 <target name="javadoc">
+    <echo message="Building Stored Procedure JavaDoc"/>
     <!-- populate selected server/compiler javadoc documentation -->
     <javadoc
         destdir="doc/javadoc/procedure-api"
         Public="true"
         version="true"
         use="true"
-        nodeprecated="true"
+        failonerror="true"
+        additionalparam="-quiet"
         Overview='${src.gpl.dir}/overview-public.html'
         Windowtitle='VoltDB Server APIs'>
         <link href="${j2se_api}"/>
