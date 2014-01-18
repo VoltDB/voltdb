@@ -249,7 +249,7 @@ public class JDBCBenchmark
             // Statistics manager objects from the connection, used to generate latency histogram
             ClientStatsContext fullStatsContext = ((IVoltDBConnection) Con).createStatsContext();
 
-            System.out.println("Connected.  Starting benchmark.");
+            System.out.println("Connected.  Starting JDBC benchmark.");
 
             // Get a payload generator to create random Key-Value pairs to store in the database and process (uncompress) pairs retrieved from the database.
             final PayloadProcessor processor = new PayloadProcessor(
