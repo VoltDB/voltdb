@@ -6,7 +6,6 @@
   <property name="src" location="src"/>
   <property name="build" location="obj"/>
   <property name="dist"  location="dist"/>
-  <property name="procedures"  location="../procedures"/>
 
   <target name="init">
     <!-- Create the time stamp -->
