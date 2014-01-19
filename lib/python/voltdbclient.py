@@ -1020,13 +1020,14 @@ class VoltProcedure:
         original_timeout = self.fser.socket.gettimeout()
         self.fser.socket.settimeout(timeout)
         try:
-            res = VoltResponse(self.fser)
-        except socket.timeout:
-            res = VoltResponse(None)
-            res.statusString = "timeout: procedure call took longer than %d seconds" % timeout
-        except IOError, err:
-            res = VoltResponse(None)
-            res.statusString = str(err)
+            try:
+                res = VoltResponse(self.fser)
+            except socket.timeout:
+                res = VoltResponse(None)
+                res.statusString = "timeout: procedure call took longer than %d seconds" % timeout
+            except IOError, err:
+                res = VoltResponse(None)
+                res.statusString = str(err)
         finally:
             self.fser.socket.settimeout(original_timeout)
         return response and res or None
