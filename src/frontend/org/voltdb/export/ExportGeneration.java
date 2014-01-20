@@ -100,8 +100,11 @@ public class ExportGeneration {
             exportLog.info("Drained source in generation " + m_timestamp + " with " + numSourcesDrained + " of " + m_numSources + " drained");
             if (numSourcesDrained == m_numSources) {
                 if (m_partitionLeaderZKName.isEmpty()) {
+                    exportLog.info("Drained All Data Sources....run listener " + m_timestamp + " with " + numSourcesDrained + " of " + m_numSources + " drained");
                     m_onAllSourcesDrained.run();
                 } else {
+                    exportLog.info("Drained All Data Sources....partitionLeaderZK name not empty. " + m_timestamp
+                            + " with " + numSourcesDrained + " of " + m_numSources + " drained. partitionLeaderZKName: " + m_partitionLeaderZKName);
                     ListenableFuture<?> removeLeadership = m_childUpdatingThread.submit(new Runnable() {
                         @Override
                         public void run() {
