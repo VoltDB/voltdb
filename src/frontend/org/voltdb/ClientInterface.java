@@ -435,8 +435,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         }
                     }
                 } while (m_running);
-            }  catch (Exception e) {
-                hostLog.error("Exception in ClientAcceptor. The acceptor has died", e);
+            } catch (Exception e) {
+                if (m_running) {
+                    hostLog.error("Exception in ClientAcceptor. The acceptor has died", e);
+                }
             } finally {
                 try {
                     m_serverSocket.close();
