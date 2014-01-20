@@ -104,7 +104,7 @@ public class TestGroovyDeployment extends RegressionSuite {
         boolean compile = config.compile(project);
         assertTrue(compile);
         config.setHasLocalServer(false);
-        config.setMaxHeap(256);
+        config.setMaxHeap(512);
         builder.addServerConfig(config);
 
         return builder;

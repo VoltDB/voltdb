@@ -570,8 +570,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         @Override
         public long getSpHandleForSnapshotDigest()                     { return lastCommittedTxnId; }
         @Override
-        public long getCurrentTxnId()                           { return m_currentTransactionState.txnId; }
-        @Override
         public long getSiteId()                                 { return m_siteId; }
         @Override
         public boolean isLowestSiteId()                         { return m_siteId == m_tracker.getLowestSiteForHost(getHostId()); }
@@ -616,8 +614,15 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             return ExecutionSite.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation);
         }
 
+
         @Override
-        public void updateHashinator(TheHashinator.HashinatorConfig config)
+        public TheHashinator getCurrentHashinator()
+        {
+            return null;
+        }
+
+        @Override
+        public void updateHashinator(TheHashinator hashinator)
         {
         }
 
@@ -1689,7 +1694,13 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     }
 
     @Override
-    public void updateHashinator(HashinatorConfig config) {
+    public TheHashinator getCurrentHashinator()
+    {
+        return null;
+    }
+
+    @Override
+    public void updateHashinator(TheHashinator hashinator) {
 
     }
 

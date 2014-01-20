@@ -32,6 +32,7 @@ import org.voltdb.SiteProcedureConnection;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.dtxn.UndoAction;
 import org.voltdb.utils.CachedByteBufferAllocator;
 import org.voltdb.utils.FixedDBBPool;
 
@@ -81,10 +82,11 @@ public class StreamSnapshotSink {
             rejoinLog.debug("Updating the hashinator to version " + version);
 
             // Update the Java hashinator
-            TheHashinator.updateConfiguredHashinator(version, hashinatorConfig);
+            Pair<? extends UndoAction, TheHashinator> hashinatorPair =
+                    TheHashinator.updateConfiguredHashinator(version, hashinatorConfig);
 
             // Update the EE hashinator
-            connection.updateHashinator(TheHashinator.getCurrentConfig());
+            connection.updateHashinator(hashinatorPair.getSecond());
         }
     }
 

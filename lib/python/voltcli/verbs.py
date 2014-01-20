@@ -558,7 +558,7 @@ class BaseClientBundle(ConnectionBundle):
                     kwargs['password'] = runner.opts.password
             runner.client = FastSerializer(runner.opts.host.host, runner.opts.host.port, **kwargs)
         except Exception, e:
-            utility.abort('Client connection failed.', e)
+            utility.abort(e)
 
     def stop(self, verb, runner):
         runner.client.close()

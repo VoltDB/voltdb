@@ -177,6 +177,7 @@ public interface SiteProcedureConnection {
     public Future<?> doSnapshotWork();
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds, boolean skipMultiPart);
 
-    public void updateHashinator(HashinatorConfig config);
+    public TheHashinator getCurrentHashinator();
+    public void updateHashinator(TheHashinator hashinator);
     public long[] validatePartitioning(long tableIds[], int hashinatorType, byte hashinatorConfig[]);
 }
