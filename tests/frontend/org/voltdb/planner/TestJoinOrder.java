@@ -66,8 +66,11 @@ public class TestJoinOrder extends PlannerTestCase {
     }
 
     public void testAliasJoinOrder() {
-        List<AbstractPlanNode> pns = compileWithJoinOrderToFragments("select * from P1 X, P2 Y where A=B", "X,Y");
-        AbstractPlanNode n = pns.get(1).getChild(0);
+        List<AbstractPlanNode> pns;
+        AbstractPlanNode n;
+
+        pns = compileWithJoinOrderToFragments("select * from P1 X, P2 Y where A=B", "X,Y");
+        n = pns.get(1).getChild(0);
         assertEquals("P1", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
         assertEquals("P2", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
 
@@ -80,6 +83,24 @@ public class TestJoinOrder extends PlannerTestCase {
         n = pns.get(1).getChild(0);
         assertEquals("P1", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
         assertEquals("P1", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
+
+        // Test case insensitivity in table and alias names
+
+        pns = compileWithJoinOrderToFragments("select * from P1 x, P2 Y where A=B", "X,y");
+        n = pns.get(1).getChild(0);
+        assertEquals("P1", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
+        assertEquals("P2", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
+
+        pns = compileWithJoinOrderToFragments("select * from P1 , P1 YY where P1.A=YY.A", "P1,yY");
+        n = pns.get(1).getChild(0);
+        assertEquals("P1", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
+        assertEquals("P1", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
+
+        pns = compileWithJoinOrderToFragments("select * from P1 , P1 Yy where P1.A=Yy.A", "p1,YY");
+        n = pns.get(1).getChild(0);
+        assertEquals("P1", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
+        assertEquals("P1", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
+
     }
 
     public void testOuterJoinOrder() {
@@ -144,7 +165,7 @@ public class TestJoinOrder extends PlannerTestCase {
                     "T1, T2, T3, T4, T5, T7");
             fail();
         } catch (Exception ex) {
-            assertTrue(ex.getMessage().indexOf("does not contain the correct number of tables") != -1);
+            assertTrue(ex.getMessage().indexOf("does not contain the correct number of elements") != -1);
         }
 
         try {
@@ -152,7 +173,7 @@ public class TestJoinOrder extends PlannerTestCase {
                     "T1, T2, T3, T4, T5, T7, T6, T8");
             fail();
         } catch (Exception ex) {
-            assertTrue(ex.getMessage().indexOf("does not contain the correct number of tables") != -1);
+            assertTrue(ex.getMessage().indexOf("does not contain the correct number of elements") != -1);
         }
     }
 
