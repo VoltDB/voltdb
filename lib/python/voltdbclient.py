@@ -1016,7 +1016,7 @@ class VoltProcedure:
         # a timeout exception. Restores the original timeout value when done.
         # This default argument usage does not allow overriding with None.
         if timeout is None:
-            timeout = self.procedure_timeout
+            timeout = self.fser.procedure_timeout
         original_timeout = self.fser.socket.gettimeout()
         self.fser.socket.settimeout(timeout)
         try:
