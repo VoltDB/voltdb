@@ -56,4 +56,9 @@ public class Constants
 
     // from MP Initiator
     public static final int MP_INIT_PID = PARTITIONID_MAX_VALUE;
+
+    /** String that can be used to indicate NULL value in CSV files */
+    public static final String CSV_NULL = "\\N";
+    /** String that can be used to indicate NULL value in CSV files */
+    public static final String QUOTED_CSV_NULL = "\"\\N\"";
 }

@@ -924,7 +924,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putLong(undoToken);
         m_data.putInt(returnUniqueViolations ? 1 : 0);
 
-        final ByteBuffer tableBytes = table.getTableDataReference();
+        final ByteBuffer tableBytes = PrivateVoltTableFactory.getTableDataReference(table);
         if (m_data.remaining() < tableBytes.remaining()) {
             m_data.flip();
             final ByteBuffer newBuffer = ByteBuffer.allocate(m_data.remaining()
