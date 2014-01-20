@@ -113,7 +113,7 @@
 
 <!-- Overridden in the Hudson test script. -->
 <property name='junit.haltonfailure'    value='false' />
-<property name="j2se_api" value="http://download.oracle.com/javase/6/docs/api/"/>
+<property name="j2se_api" value="http://docs.oracle.com/javase/7/docs/api/"/>
 
 <path id='project.classpath'>
     <pathelement location='${build.instr.dir}' />
@@ -398,13 +398,15 @@ DISTRIBUTION
 -->
 
 <target name="javadoc">
+    <echo message="Building Stored Procedure JavaDoc"/>
     <!-- populate selected server/compiler javadoc documentation -->
     <javadoc
         destdir="doc/javadoc/procedure-api"
         Public="true"
         version="true"
         use="true"
-        nodeprecated="true"
+        failonerror="true"
+        additionalparam="-quiet"
         Overview='${src.gpl.dir}/overview-public.html'
         Windowtitle='VoltDB Server APIs'>
         <link href="${j2se_api}"/>
@@ -1210,8 +1212,8 @@ LICENSING
 -->
 
 <target name='licensecheck' description="make sure all source files have approved licenses">
-    <exec dir='tools' executable='python' failonerror='true'>
-        <arg line="licensescheck.py" />
+    <exec dir='.' executable='python' failonerror='true'>
+        <arg line="tools/licensescheck.py" />
         <arg line="${voltpro}"/>
     </exec>
 </target>
@@ -1293,7 +1295,7 @@ TEST CASES
             failureproperty="junit.failures"
             printsummary="false"
             timeout="${junit.timeout}"
-            maxmemory='1024M'
+            maxmemory='2048M'
             showoutput="${junit.showoutput}"
         >
             <classpath refid='project.classpath' />
@@ -1861,7 +1863,7 @@ TEST CASES
     <property name='classpath' refid='project.classpath' />
     <property name='simpleserver.command' value='java
     -Djava.library.path=${build.dir}${build.dir.suffix}/nativelibs -classpath
-    ${classpath} -Dlog4j.configuration=file://${log4j.configuration} -server -Xmx512m -XX:+AggressiveOpts -ea
+    ${classpath} -Dlog4j.configuration=file://${log4j.configuration} -server -Xmx640m -XX:+AggressiveOpts -ea
     org.voltdb.sqlgenerator.SimpleServer create hosts=${hosts}
     sitesperhost=${sitesperhost} replicas=${replicas}
     ${debug_output}' />

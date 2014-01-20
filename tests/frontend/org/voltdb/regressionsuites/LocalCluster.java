@@ -37,6 +37,7 @@ import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CommandLine;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
 /**
@@ -198,10 +199,14 @@ public class LocalCluster implements VoltServerConfig {
 
         m_siteCount = siteCount;
         m_hostCount = hostCount;
-        m_kfactor = kfactor;
+        if (kfactor > 0 && !MiscUtils.isPro()) {
+            m_kfactor = 0;
+        } else {
+            m_kfactor = kfactor;
+        }
         m_debug = debug;
         m_jarFileName = jarFileName;
-        m_failureState = kfactor < 1 ? FailureState.ALL_RUNNING : failureState;
+        m_failureState = m_kfactor < 1 ? FailureState.ALL_RUNNING : failureState;
         m_pipes = new ArrayList<PipeToFile>();
         m_cmdLines = new ArrayList<CommandLine>();
 

@@ -23,9 +23,12 @@ package org.voltdb.client;
  * stored procedure invocation.
  */
 public interface ProcedureCallback {
+
     /**
-     * Implementation of callback to be provided by client applications
+     * Implementation of callback to be provided by client applications.
+     *
      * @param clientResponse Response to the stored procedure invocation this callback is associated with
+     * @throws Exception on any Exception.
      */
     abstract public void clientCallback(ClientResponse clientResponse) throws Exception;
 }

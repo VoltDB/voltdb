@@ -156,6 +156,21 @@ int64_t ElasticIndexReadContext::handleStreamMore(
             outputStreams.close();
         }
 
+        /**
+         * Un-comment this section when you need to do more detailed forensics
+         * on balance partition transactions. Don't forget to include both
+         * <string> and <sstream>
+         */
+        /*
+        std::ostringstream os;
+        ElasticIndexHashRange range = m_iter->range();
+        os << "Moved " << outputStreams.at(0).getSerializedRowCount() << " rows for range ["
+           << range.getLowerBound() << ", " << range.getUpperBound()
+           << "], elastic index size is " << m_surgeon.indexSize();
+
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, os.str().c_str());
+         */
+
         // If more was streamed copy current position for return (exactly one stream).
         retPositions.push_back((int)outputStreams.at(0).position());
 

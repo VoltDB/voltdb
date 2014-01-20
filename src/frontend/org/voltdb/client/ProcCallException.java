@@ -40,6 +40,11 @@ public class ProcCallException extends Exception {
        return m_message;
    }
 
+   /**
+    * When a ProcCallException has a response from the server, retrieve it with this method.
+    *
+    * @return A {@link ClientResponse} associated with this exception or null.
+    */
    public ClientResponse getClientResponse() {
        return m_response;
    }

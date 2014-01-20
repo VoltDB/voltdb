@@ -106,7 +106,7 @@ abstract public class ProcedureTask extends TransactionTask
                 }
 
                 // Check partitioning of the invocation
-                if (runner.checkPartition(m_txnState)) {
+                if (runner.checkPartition(m_txnState, siteConnection.getCurrentHashinator())) {
                     runner.setupTransaction(m_txnState);
                     cr = runner.call(task.getParameters());
 

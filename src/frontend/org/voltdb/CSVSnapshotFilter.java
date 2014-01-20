@@ -20,7 +20,6 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.concurrent.Callable;
 
-import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.utils.VoltTableUtil;
@@ -45,7 +44,7 @@ public class CSVSnapshotFilter implements SnapshotDataFilter {
         }
         m_fullDelimiters = fullDelimiters;
         m_delimiter = delimiter;
-        m_schemaBytes = vt.getSchemaBytes();
+        m_schemaBytes = PrivateVoltTableFactory.getSchemaBytes(vt);
     }
 
     @Override

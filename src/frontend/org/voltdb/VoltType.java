@@ -507,12 +507,19 @@ public enum VoltType {
         return m_sqlString;
     }
 
+    /**
+     * <p>Is this type visible to JDBC</p>
+     *
+     * @return JDBC visibility.
+     */
     public boolean isJdbcVisible() {
         return m_jdbcVisible;
     }
 
     /**
-     * Get the java.sql.Types type of this type.  Type.  Type you, typing typer.
+     * Get the java.sql.Types type of this type.
+     *
+     * @return int representing SQL type of the VoltDB type.
      */
     public int getJdbcSqlType() {
         return m_dataType;
