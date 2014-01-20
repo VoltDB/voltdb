@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import com.google_voltpatches.common.base.Objects;
 import org.voltdb.VoltProcedure.VoltAbortException;
 
 public class Expectation {
@@ -122,4 +123,30 @@ public class Expectation {
         if (table.getColumnType(0) != VoltType.BIGINT) return false;
         return true;
     }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(m_type, m_scalar);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        final Expectation other = (Expectation) obj;
+        return Objects.equal(this.m_type, other.m_type) && Objects.equal(this.m_scalar, other.m_scalar);
+    }
+
+    @Override
+    public String toString() {
+        return Objects.toStringHelper(this)
+                .add("m_type", m_type)
+                .add("m_scalar", m_scalar)
+                .toString();
+    }
+
 }
