@@ -108,6 +108,7 @@ class SerializeOutput;
 class PersistentTable;
 class Table;
 class CatalogDelegate;
+class TableCatalogDelegate;
 class PlanNodeFragment;
 class ExecutorContext;
 class RecoveryProtoMsg;
@@ -161,6 +162,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         Table* getTable(std::string name) const;
         // Serializes table_id to out. Returns true if successful.
         bool serializeTable(int32_t tableId, SerializeOutput* out) const;
+
+        TableCatalogDelegate* getTableDelegate(std::string name) const;
 
         // -------------------------------------------------
         // Execution Functions
@@ -430,6 +433,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * Returns serialized representation of the results
          */
         void executeTask(TaskType taskType, const char* taskParams);
+
+        void rebuildSingleTableCollection(TableCatalogDelegate * tcd);
     private:
 
         /*

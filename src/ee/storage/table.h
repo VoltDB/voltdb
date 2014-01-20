@@ -83,6 +83,7 @@ class StreamBlock;
 class Topend;
 class TupleBlock;
 class PersistentTableUndoDeleteAction;
+class PersistentTableUndoTruncateTableAction;
 
 const size_t COLUMN_DESCRIPTOR_SIZE = 1 + 4 + 4; // type, name offset, name length
 
@@ -103,6 +104,7 @@ class Table {
     friend class StatsSource;
     friend class TupleBlock;
     friend class PersistentTableUndoDeleteAction;
+    friend class PersistentTableUndoTruncateTableAction;
 
   private:
     Table();
@@ -140,7 +142,7 @@ class Table {
     // ------------------------------------------------------------------
     // OPERATIONS
     // ------------------------------------------------------------------
-    virtual void deleteAllTuples(bool freeAllocatedStrings) = 0;
+    virtual void deleteAllTuples(bool freeAllocatedStrings, bool fallible=true) = 0;
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     // The fallible flag is used to denote a change to a persistent table
     // which is part of a long transaction that has been vetted and can
@@ -195,7 +197,6 @@ class Table {
     const std::vector<std::string>& getColumnNames() const {
         return m_columnNames;
     }
-
 
     inline const TupleSchema* schema() const {
         return m_schema;

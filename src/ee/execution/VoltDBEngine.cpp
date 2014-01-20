@@ -268,6 +268,13 @@ Table* VoltDBEngine::getTable(string name) const
     return findInMapOrNull(name, m_tablesByName);
 }
 
+TableCatalogDelegate* VoltDBEngine::getTableDelegate(string name) const
+{
+    // Caller responsible for checking null return value.
+    CatalogDelegate * delegate = findInMapOrNull(name, m_delegatesByName);
+    return dynamic_cast<TableCatalogDelegate*>(delegate);
+}
+
 bool VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput* out) const {
     // Just look in our list of tables
     Table* table = getTable(tableId);
@@ -520,7 +527,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
     assert(m_catalog != NULL);
     VOLT_DEBUG("Loading catalog...");
 
-    VOLT_TRACE("Catalog string contents:\n%s\n",catalogPayload.c_str());
+
     m_catalog->execute(catalogPayload);
 
 
@@ -996,18 +1003,37 @@ void VoltDBEngine::rebuildTableCollections()
             m_tablesByName[tcd->getTable()->name()] = tcd->getTable();
 
             getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
-                                                  catTable->relativeIndex(),
-                                                  tcd->getTable()->getTableStats());
+                    catTable->relativeIndex(),
+                    tcd->getTable()->getTableStats());
 
             // add all of the indexes to the stats source
             const std::vector<TableIndex*>& tindexes = tcd->getTable()->allIndexes();
             for (int i = 0; i < tindexes.size(); i++) {
                 TableIndex *index = tindexes[i];
                 getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
-                                                      catTable->relativeIndex(),
-                                                      index->getIndexStats());
+                        catTable->relativeIndex(),
+                        index->getIndexStats());
             }
         }
+    }
+}
+
+void VoltDBEngine::rebuildSingleTableCollection(TableCatalogDelegate * tcd) {
+    catalog::Table *catTable = m_database->tables().get(tcd->getTable()->name());
+    m_tables[catTable->relativeIndex()] = tcd->getTable();
+    m_tablesByName[tcd->getTable()->name()] = tcd->getTable();
+
+    getStatsManager().updateRegisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
+            catTable->relativeIndex(),
+            tcd->getTable()->getTableStats());
+
+    // add all of the indexes to the stats source
+    const std::vector<TableIndex*>& tindexes = tcd->getTable()->allIndexes();
+    for (int i = 0; i < tindexes.size(); i++) {
+        TableIndex *index = tindexes[i];
+        getStatsManager().updateRegisterStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
+                catTable->relativeIndex(),
+                index->getIndexStats());
     }
 }
 

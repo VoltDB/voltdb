@@ -44,6 +44,7 @@
  */
 
 #include <sstream>
+#include <vector>
 #include "tablefactory.h"
 #include "common/executorcontext.hpp"
 #include "common/debuglog.h"
@@ -55,6 +56,9 @@
 #include "storage/TempTableLimits.h"
 #include "indexes/tableindexfactory.h"
 #include "common/Pool.hpp"
+
+#include <boost/foreach.hpp>
+#include <boost/scoped_ptr.hpp>
 
 namespace voltdb {
 Table* TableFactory::getPersistentTable(
@@ -82,6 +86,34 @@ Table* TableFactory::getPersistentTable(
     configureStats(databaseId, name, table);
 
     return dynamic_cast<Table*>(table);
+}
+
+PersistentTable * TableFactory::cloneEmptyPersistentTableWithIndexes(PersistentTable * tb) {
+    TupleSchema * newSchema = TupleSchema::createTupleSchema(tb->schema());
+
+    Table * table = getPersistentTable(
+            tb->databaseId(), tb->name(),
+            newSchema, tb->m_columnNames,
+            tb->partitionColumn(), tb->m_exportEnabled,
+            false);
+
+    // add indexes
+    const std::vector<TableIndex*> &indexes = tb->allIndexes();
+    BOOST_FOREACH(TableIndex *originalIndex, indexes) {
+        const TableIndexScheme &scheme = originalIndex->getTableIndexScheme();
+        TableIndex *index = TableIndexFactory::getInstance(scheme);
+        assert(index);
+        table->addIndex(index);
+        if (tb->primaryKeyIndex() == originalIndex) {
+            table->setPrimaryKeyIndex(index);
+        }
+    }
+
+    // configure for stats tables
+    table->configureIndexStats(tb->databaseId());
+    table->incrementRefcount();
+
+    return dynamic_cast<PersistentTable*>(table);
 }
 
 TempTable* TableFactory::getTempTable(

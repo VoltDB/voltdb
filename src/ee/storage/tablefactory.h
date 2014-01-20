@@ -85,6 +85,8 @@ public:
         bool exportOnly = false,
         int tableAllocationTargetSize = 0);
 
+    static PersistentTable * cloneEmptyPersistentTableWithIndexes(PersistentTable * tb);
+
     /**
     * Creates an empty temp table with given name and columns.
     * Every TempTable must be instantiated via these factory methods.

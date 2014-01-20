@@ -46,9 +46,11 @@
 #include <sstream>
 #include <cassert>
 #include <cstdio>
+#include <algorithm>    // std::find
 #include <boost/foreach.hpp>
 #include <boost/scoped_ptr.hpp>
 #include "storage/persistenttable.h"
+
 #include "common/debuglog.h"
 #include "common/serializeio.h"
 #include "common/FailureInjection.h"
@@ -62,20 +64,17 @@
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
 #include "logging/LogManager.h"
-#include "storage/table.h"
 #include "storage/tableiterator.h"
-#include "storage/TupleStreamWrapper.h"
-#include "storage/TableStats.h"
+#include "storage/tablefactory.h"
+#include "storage/TableCatalogDelegate.hpp"
 #include "storage/PersistentTableStats.h"
 #include "storage/PersistentTableUndoInsertAction.h"
 #include "storage/PersistentTableUndoDeleteAction.h"
+#include "storage/PersistentTableUndoTruncateTableAction.h"
 #include "storage/PersistentTableUndoUpdateAction.h"
 #include "storage/ConstraintFailureException.h"
-#include "storage/MaterializedViewMetadata.h"
 #include "storage/CopyOnWriteContext.h"
-#include "storage/tableiterator.h"
-
-#include <algorithm>    // std::find
+#include "storage/MaterializedViewMetadata.h"
 
 namespace voltdb {
 
@@ -194,14 +193,53 @@ void PersistentTable::nextFreeTuple(TableTuple *tuple) {
     }
 }
 
-void PersistentTable::deleteAllTuples(bool freeAllocatedStrings) {
+void PersistentTable::deleteAllTuples(bool freeAllocatedStrings, bool fallible) {
     // nothing interesting
     TableIterator ti(this, m_data.begin());
     TableTuple tuple(m_schema);
     while (ti.next(tuple)) {
-        deleteTuple(tuple, true);
+        deleteTuple(tuple, fallible);
     }
 }
+
+void PersistentTable::setCounterForTruncateTableRelease() {
+    m_tuplesPinnedByUndo = 0;
+    m_invisibleTuplesPendingDeleteCount = 0;
+}
+
+
+bool PersistentTable::truncateTable(VoltDBEngine* engine) {
+    TableCatalogDelegate * tcd = engine->getTableDelegate(m_name);
+    assert(tcd);
+    PersistentTable * emptyTable = TableFactory::cloneEmptyPersistentTableWithIndexes(this);
+    assert(emptyTable->views().size() == 0);
+
+    // add matView
+    BOOST_FOREACH(MaterializedViewMetadata * originalView, m_views) {
+        PersistentTable * targetTable = originalView->targetTable();
+        PersistentTable * targetEmptyTable = TableFactory::cloneEmptyPersistentTableWithIndexes(targetTable);
+        new MaterializedViewMetadata(emptyTable, targetEmptyTable, originalView->getMaterializedViewInfo());
+
+        TableCatalogDelegate * targetTcd =  engine->getTableDelegate(targetTable->name());
+        targetTcd->setTable(targetEmptyTable);
+        engine->rebuildSingleTableCollection(targetTcd);
+    }
+
+    tcd->setTable(emptyTable);
+    engine->rebuildSingleTableCollection(tcd);
+
+    UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+    if (uq) {
+        emptyTable->m_tuplesPinnedByUndo = emptyTable->m_tupleCount;
+        emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
+        // Create and register an undo action.
+        uq->registerUndoAction(new (*uq) PersistentTableUndoTruncateTableAction(engine, tcd, this, emptyTable));
+        return true;
+    }
+
+    return false;
+}
+
 
 void setSearchKeyFromTuple(TableTuple &source) {
     keyTuple.setNValue(0, source.getNValue(1));

@@ -56,6 +56,9 @@
 #include "common/ids.h"
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
+#include "execution/VoltDBEngine.h"
+#include "storage/CopyOnWriteIterator.h"
+#include "storage/ElasticIndex.h"
 #include "storage/table.h"
 #include "storage/TupleStreamWrapper.h"
 #include "storage/TableStats.h"
@@ -89,6 +92,7 @@ class RecoveryProtoMsg;
 class TupleOutputStreamProcessor;
 class ReferenceSerializeInput;
 class PersistentTable;
+class TableCatalogDelegate;
 
 /**
  * Interface used by contexts, scanners, iterators, and undo actions to access
@@ -110,6 +114,7 @@ public:
     void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
     void deleteTupleRelease(char* tuple);
     void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
+
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock);
     uint32_t getTupleCount() const;
 
@@ -230,7 +235,12 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
-    virtual void deleteAllTuples(bool freeAllocatedStrings);
+    virtual void deleteAllTuples(bool freeAllocatedStrings, bool fallible=true);
+
+    // Return false means there is no undo logging, caller needs to destroy this persistent outside.
+    virtual bool truncateTable(VoltDBEngine* engine);
+    void setCounterForTruncateTableRelease();
+
     // The fallible flag is used to denote a change to a persistent table
     // which is part of a long transaction that has been vetted and can
     // never fail (e.g. violate a constraint).
@@ -291,6 +301,11 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     static TBPtr findBlock(char *tuple, TBMap &blocks, int blockSize);
 
     int partitionColumn() const { return m_partitionColumn; }
+
+    std::vector<MaterializedViewMetadata *> views() const {
+        return m_views;
+    }
+
     /** inlined here because it can't be inlined in base Table, as it
      *  uses Tuple.copy.
      */

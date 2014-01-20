@@ -52,6 +52,8 @@ public:
      */
     void unregisterStatsSource(voltdb::StatisticsSelectorType sst);
 
+    void updateRegisterStatsSource(voltdb::StatisticsSelectorType sst, voltdb::CatalogId catalogId, voltdb::StatsSource* statsSource);
+
     /**
      * Get statistics for the specified resources
      * @param sst StatisticsSelectorType of the resources

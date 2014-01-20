@@ -110,7 +110,14 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     assert(m_node);
     assert(m_inputTable == dynamic_cast<TempTable*>(m_node->getInputTables()[0]));
     assert(m_inputTable);
+
+    // Target table can be StreamedTable or PersistentTable and must not be NULL
+    // Update target table reference from table delegate
+    m_targetTable = m_node->getTargetTable();
     assert(m_targetTable);
+    assert((m_targetTable == dynamic_cast<PersistentTable*>(m_targetTable)) ||
+            (m_targetTable == dynamic_cast<StreamedTable*>(m_targetTable)));
+
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
 #ifdef DEBUG
     //

@@ -78,11 +78,13 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
     assert(m_node);
     assert(m_node->getTargetTable());
     assert(m_node->getInputTables().size() == 1);
-    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]); //input table should be temptable
+    // input table should be temptable
+    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]);
     assert(m_inputTable);
-    m_targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable()); //target table should be persistenttable
+
+    // target table should be persistenttable
+    m_targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
     assert(m_targetTable);
-    assert(m_node->getTargetTable());
 
     setDMLCountOutputTable(limits);
 
@@ -157,7 +159,11 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
 
 bool UpdateExecutor::p_execute(const NValueArray &params) {
     assert(m_inputTable);
+
+    // target table should be persistenttable
+    m_targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
     assert(m_targetTable);
+    m_targetTuple = TableTuple(m_targetTable->schema());
 
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
     VOLT_TRACE("TARGET TABLE - BEFORE: %s\n", m_targetTable->debug().c_str());
