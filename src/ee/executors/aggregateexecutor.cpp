@@ -580,12 +580,9 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
     TableTuple nxtTuple(input_table->schema());
     PoolBackedTupleStorage nextGroupByKeyStorage(m_groupByKeySchema, &m_memoryPool);
     TableTuple& nextGroupByKeyTuple = nextGroupByKeyStorage;
-    int64_t progressCountdown = 0;
-    ProgressMonitorProxy pmp(m_engine, NULL, progressCountdown);
+    ProgressMonitorProxy pmp(m_engine);
     while (it.next(nxtTuple)) {
-        if (--progressCountdown == 0) {
-            pmp.reportProgress();
-        }
+        pmp.countdownProgress();
         initGroupByKeyTuple(nextGroupByKeyStorage, nxtTuple);
         AggregateRow *aggregateRow;
         // Search for the matching group.
@@ -613,9 +610,7 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
     for (HashAggregateMapType::const_iterator iter = hash.begin(); iter != hash.end(); iter++) {
         AggregateRow *aggregateRow = iter->second;
         if (insertOutputTuple(aggregateRow)) {
-            if (--progressCountdown == 0) {
-                pmp.reportProgress();
-            }
+            pmp.countdownProgress();
         }
         delete aggregateRow;
     }
@@ -647,8 +642,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     TableTuple nxtTuple(input_table->schema());
     PoolBackedTupleStorage nextGroupByKeyStorage(m_groupByKeySchema, &m_memoryPool);
     TableTuple& nextGroupByKeyTuple = nextGroupByKeyStorage;
-    int64_t progressCountdown = 0;
-    ProgressMonitorProxy pmp(m_engine, NULL, progressCountdown);
+    ProgressMonitorProxy pmp(m_engine, NULL);
     VOLT_TRACE("looping..");
     // Use the first input tuple to "prime" the system.
     // ENG-1565: for this special case, can have only one input row, apply the predicate here
@@ -668,9 +662,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
             VOLT_TRACE("no input row, but output an empty result row for the whole table.");
             initAggInstances(aggregateRow);
             if (insertOutputTuple(aggregateRow)) {
-                if (--progressCountdown == 0) {
-                    pmp.reportProgress();
-                }
+                pmp.countdownProgress();
             }
         }
         return true;
@@ -678,9 +670,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
 
     TableTuple inProgressGroupByKeyTuple(m_groupByKeySchema);
     while (it.next(nxtTuple)) {
-        if (--progressCountdown == 0) {
-            pmp.reportProgress();
-        }
+        pmp.countdownProgress();
         // The nextGroupByKeyTuple now stores the key(s) of the current group in progress.
         // Swap its storage with that of the inProgressGroupByKeyTuple.
         // The inProgressGroupByKeyTuple will be null initially, until the first call to initGroupByKeyTuple below
@@ -705,9 +695,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
                 VOLT_TRACE("new group!");
                 // Output old row.
                 if (insertOutputTuple(aggregateRow)) {
-                    if (--progressCountdown == 0) {
-                        pmp.reportProgress();
-                    }
+                    pmp.countdownProgress();
                 }
                 // Recycle the aggs to start a new row.
                 aggregateRow->resetAggs();
@@ -721,9 +709,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     VOLT_TRACE("finalizing..");
     // There's one last group (or table) row in progress that needs to be output.
     if (insertOutputTuple(aggregateRow)) {
-        if (--progressCountdown == 0) {
-            pmp.reportProgress();
-        }
+        pmp.countdownProgress();
     }
     return true;
 }

@@ -165,13 +165,10 @@ OrderByExecutor::p_execute(const NValueArray &params)
     TableIterator iterator = input_table->iterator();
     TableTuple tuple(input_table->schema());
     vector<TableTuple> xs;
-    int64_t progressCountdown = 0;
-    ProgressMonitorProxy pmp(m_engine, NULL, progressCountdown);
+    ProgressMonitorProxy pmp(m_engine);
     while (iterator.next(tuple))
     {
-        if (--progressCountdown == 0) {
-            pmp.reportProgress();
-        }
+        pmp.countdownProgress();
         assert(tuple.isActive());
         xs.push_back(tuple);
     }
@@ -195,9 +192,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
         VOLT_TRACE("\n***** Input Table PostSort:\n '%s'",
                    input_table->debug().c_str());
         output_table->insertTupleNonVirtual(*it);
-        if (--progressCountdown == 0) {
-            pmp.reportProgress();
-        }
+        pmp.countdownProgress();
         //
         // Check whether we have gone past our limit
         //

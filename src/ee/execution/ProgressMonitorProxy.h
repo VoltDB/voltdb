@@ -24,19 +24,19 @@ namespace voltdb {
 
 class ProgressMonitorProxy {
 public:
-    ProgressMonitorProxy(VoltDBEngine* engine, Table* target_table, int64_t &countDown)
+    ProgressMonitorProxy(VoltDBEngine* engine, Table* target_table = NULL)
         : m_engine(engine)
         , m_tuplesRemainingUntilReport(engine->pullTuplesRemainingUntilProgressReport(target_table))
-        , m_countDown(countDown)
-    {
-        m_countDown = m_tuplesRemainingUntilReport;
-    }
+        , m_countDown(m_tuplesRemainingUntilReport)
+    { }
 
-    void reportProgress()
+    void countdownProgress()
     {
-        m_tuplesRemainingUntilReport =
-            m_engine->pushTuplesProcessedForProgressMonitoring(m_tuplesRemainingUntilReport);
-        m_countDown = m_tuplesRemainingUntilReport;
+        if (--m_countDown == 0) {
+            m_tuplesRemainingUntilReport =
+                m_engine->pushTuplesProcessedForProgressMonitoring(m_tuplesRemainingUntilReport);
+            m_countDown = m_tuplesRemainingUntilReport;
+        }
     }
 
     ~ProgressMonitorProxy()
@@ -48,7 +48,7 @@ public:
 private:
     VoltDBEngine* const m_engine;
     int64_t m_tuplesRemainingUntilReport;
-    int64_t& m_countDown;
+    int64_t m_countDown;
 };
 
 } // namespace voltdb

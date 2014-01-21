@@ -328,8 +328,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     }
 
     Table* targetTable = m_targetTable;
-    int64_t progressCountdown = 0;
-    ProgressMonitorProxy pmp(m_engine, targetTable, progressCountdown);
+    ProgressMonitorProxy pmp(m_engine, targetTable);
     //
     // An index scan has three parts:
     //  (1) Lookup tuples using the search key
@@ -367,9 +366,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                 m_index->moveToEnd(false);
             } else {
                 while (!(tuple = m_index->nextValue()).isNullTuple()) {
-                    if (--progressCountdown == 0) {
-                        pmp.reportProgress();
-                    }
+                    pmp.countdownProgress();
                     if (initial_expression != NULL && !initial_expression->eval(&tuple, NULL).isTrue()) {
                         // just passed the first failed entry, so move 2 backward
                         m_index->moveToBeforePriorEntry();
@@ -406,9 +403,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
            ((localLookupType != INDEX_LOOKUP_TYPE_EQ || activeNumOfSearchKeys == 0) &&
             !(tuple = m_index->nextValue()).isNullTuple()))) {
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", tuple.debug("tablename").c_str());
-        if (--progressCountdown == 0) {
-            pmp.reportProgress();
-        }
+        pmp.countdownProgress();
         //
         // First check to eliminate the null index rows for UNDERFLOW case only
         //
@@ -469,9 +464,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                 //
                 m_outputTable->insertTupleNonVirtual(tuple);
             }
-            if (--progressCountdown == 0) {
-                pmp.reportProgress();
-            }
+            pmp.countdownProgress();
         }
     }
 
