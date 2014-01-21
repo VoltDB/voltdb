@@ -637,8 +637,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
         else if (tibm instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage) tibm;
-            //If proc is durable we dont filter except for UpdateApplicationCatalog which should not come here
-            //as when in rejoin UpdateApplicationCatalog wont be allowed.
+            //sysproc LoadSinglePartitionTable is durable which will come here. Other durable sysprocs wont be visiting.
             if ((itm.getStoredProcedureName().startsWith("@") == false)
                     || itm.getStoredProcedureName().equals("@LoadSinglePartitionTable")) {
                 return false;
