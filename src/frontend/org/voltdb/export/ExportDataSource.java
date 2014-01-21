@@ -752,6 +752,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         try {
             m_es.execute(new ExportDataSourceRunnable(runner));
         } catch (RejectedExecutionException rej) {
+            rej.printStackTrace();
             exportLog.warn("Failed to execute Export Data Source task.");
             Throwables.propagate(rej);
         }
@@ -767,6 +768,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         try {
             return m_es.submit((Runnable) new ExportDataSourceRunnable(runner));
         } catch (RejectedExecutionException rej) {
+            rej.printStackTrace();
             exportLog.warn("Failed to submit Export Data Source task.");
             Throwables.propagate(rej);
         }
