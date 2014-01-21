@@ -46,9 +46,6 @@ public class TestSite {
         // @LoadSinglePartitionTable a durable sysproc
         assertFalse(Site.filter(makeInit("@LoadSinglePartitionTable")));
 
-        // @LoadSinglePartitionTable
-        assertFalse(Site.filter(makeInit("@LoadSinglePartitionTable")));
-
         // Replay a sysproc thats not durable
         assertTrue(Site.filter(makeInit("@Quiesce")));
 
@@ -58,7 +55,7 @@ public class TestSite {
         assertFalse(Site.filter(makeFrag(true, SysProcFragmentId.PF_balancePartitionsData)));
         // Replay @LoadMultipartitionTable fragments
         assertFalse(Site.filter(makeFrag(true, SysProcFragmentId.PF_distribute)));
-        // Replay @SnapshotRestore fragments
+        // Replay filter rejects @SnapshotRestore fragments
         assertTrue(Site.filter(makeFrag(true, SysProcFragmentId.PF_restoreAsyncRunLoop)));
 
         // Replay complete msgs

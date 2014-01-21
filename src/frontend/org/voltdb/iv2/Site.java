@@ -55,6 +55,7 @@ import org.voltdb.SnapshotTableTask;
 import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
+import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStats;
 import org.voltdb.TableStreamType;
@@ -631,15 +632,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         // original live rejoin code for ExecutionSite...
         // Multi part AdHoc Does not need to be chacked because its an alias and runs procedure as planned.
         if (tibm instanceof FragmentTaskMessage && ((FragmentTaskMessage)tibm).isSysProcTask()) {
-            if (!SysProcFragmentId.isDurablePartitionFragment(((FragmentTaskMessage) tibm).getPlanHash(0))) {
+            if (!SysProcFragmentId.isDurableFragment(((FragmentTaskMessage) tibm).getPlanHash(0))) {
                 return true;
             }
         }
         else if (tibm instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage) tibm;
-            //sysproc LoadSinglePartitionTable is durable which will come here. Other durable sysprocs wont be visiting.
-            if ((itm.getStoredProcedureName().startsWith("@") == false)
-                    || itm.getStoredProcedureName().equals("@LoadSinglePartitionTable")) {
+            //All durable sysprocs and non sysprocs should not get filtered.
+            if (SystemProcedureCatalog.isDurableProc(itm.getStoredProcedureName())) {
                 return false;
             } else {
                 return true;
