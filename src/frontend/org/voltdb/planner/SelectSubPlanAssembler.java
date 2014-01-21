@@ -76,7 +76,13 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             ArrayList<String> tableAliases = new ArrayList<String>();
             //Don't allow dups for now since self joins aren't supported
             HashSet<String> dupCheck = new HashSet<String>();
-            for (String element : parsedStmt.joinOrder.split(",")) {
+            // Calling trim() up front is important only in the case of a trailing comma.
+            // It allows a trailing comma followed by whitespace as in "A,B, " to be ignored
+            // like a normal trailing comma as in "A,B,". The alternatives would be to treat
+            // these as different cases (strange) or to complain about both -- which could be
+            // accomplished by appending an additional space to the join order here
+            // instead of calling trim.
+            for (String element : parsedStmt.joinOrder.trim().split(",")) {
                 String alias = element.trim().toUpperCase();
                 tableAliases.add(alias);
                 if (!dupCheck.add(alias)) {
