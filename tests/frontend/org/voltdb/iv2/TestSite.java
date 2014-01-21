@@ -56,6 +56,10 @@ public class TestSite {
         assertFalse(Site.filter(makeFrag(true, SysProcFragmentId.PF_prepBalancePartitions)));
         assertFalse(Site.filter(makeFrag(true, SysProcFragmentId.PF_balancePartitions)));
         assertFalse(Site.filter(makeFrag(true, SysProcFragmentId.PF_balancePartitionsData)));
+        // Replay @LoadMultipartitionTable fragments
+        assertFalse(Site.filter(makeFrag(true, SysProcFragmentId.PF_distribute)));
+        // Replay @SnapshotRestore fragments
+        assertTrue(Site.filter(makeFrag(true, SysProcFragmentId.PF_restoreAsyncRunLoop)));
 
         // Replay complete msgs
         assertFalse(Site.filter(makeComplete()));
