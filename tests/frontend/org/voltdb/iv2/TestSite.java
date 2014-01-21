@@ -41,10 +41,16 @@ public class TestSite {
     public void testReplayFilter()
     {
         // Replay normal SPs
-        assertFalse(Site.filter(makeInit(false)));
+        assertFalse(Site.filter(makeInit("Blah")));
 
-        // Replay SP Adhoc
-        assertFalse(Site.filter(makeInit(true)));
+        // @LoadSinglePartitionTable a durable sysproc
+        assertFalse(Site.filter(makeInit("@LoadSinglePartitionTable")));
+
+        // @LoadSinglePartitionTable
+        assertFalse(Site.filter(makeInit("@LoadSinglePartitionTable")));
+
+        // Replay a sysproc thats not durable
+        assertTrue(Site.filter(makeInit("@Quiesce")));
 
         // Replay @BalancePartitions fragments
         assertFalse(Site.filter(makeFrag(true, SysProcFragmentId.PF_prepBalancePartitions)));
@@ -67,14 +73,9 @@ public class TestSite {
         return msg;
     }
 
-    private static Iv2InitiateTaskMessage makeInit(boolean adhoc)
-    {
+    private static Iv2InitiateTaskMessage makeInit(String procName)    {
         Iv2InitiateTaskMessage msg = mock(Iv2InitiateTaskMessage.class);
-        if (adhoc) {
-            doReturn("@AdHoc").when(msg).getStoredProcedureName();
-        } else {
-            doReturn("Blah").when(msg).getStoredProcedureName();
-        }
+        doReturn(procName).when(msg).getStoredProcedureName();
         return msg;
     }
 

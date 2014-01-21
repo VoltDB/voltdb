@@ -55,6 +55,7 @@ import org.voltdb.SnapshotTableTask;
 import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
+import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStats;
 import org.voltdb.TableStreamType;
@@ -635,9 +636,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             }
         }
         else if (tibm instanceof Iv2InitiateTaskMessage) {
-            Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage)tibm;
-            if ((itm.getStoredProcedureName().startsWith("@") == false) ||
-                (itm.getStoredProcedureName().startsWith("@AdHoc") == true)) {
+            Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage) tibm;
+            //If proc is durable we dont filter except for UpdateApplicationCatalog which sgould not come here
+            //as when in rejoin UpdateApplicationCatalog wont be allowed.
+            if (SystemProcedureCatalog.isDurableProc(itm.getStoredProcedureName())
+                    && !itm.getStoredProcedureName().equals("@UpdateApplicationCatalog")) {
                 return false;
             }
             else {

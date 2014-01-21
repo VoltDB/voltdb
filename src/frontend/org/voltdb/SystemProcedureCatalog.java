@@ -156,4 +156,23 @@ public class SystemProcedureCatalog {
         builder.put("@GetHashinatorConfig",     new Config("org.voltdb.sysprocs.GetHashinatorConfig",      false, true,  false, 0, VoltType.INVALID,   true,  false, true,  true, false));
         listing = builder.build();
     }
+
+    /**
+     * Return if given sysproc is durable as defined in sysproc catalog.
+     * All non sys procs are all durable.
+     *
+     * @param procName
+     * @return true if proc is durable for non sys procs return true (durable)
+     */
+    public static boolean isDurableProc(String procName) {
+        //For sysprocs look at sysproc catalog.
+        if (procName.charAt(0) == '@') {
+            SystemProcedureCatalog.Config sysProc = SystemProcedureCatalog.listing.get(procName);
+            if (sysProc != null) {
+                return sysProc.isDurable();
+            }
+        }
+        return true;
+    }
+
 }
