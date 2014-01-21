@@ -639,11 +639,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         else if (tibm instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage) tibm;
             //All durable sysprocs and non-sysprocs should not get filtered.
-            if (CatalogUtil.isDurableProc(itm.getStoredProcedureName())) {
-                return false;
-            } else {
-                return true;
-            }
+            return !CatalogUtil.isDurableProc(itm.getStoredProcedureName());
         }
         return false;
     }
