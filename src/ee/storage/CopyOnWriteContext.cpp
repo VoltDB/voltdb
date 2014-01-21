@@ -75,7 +75,7 @@ CopyOnWriteContext::handleActivation(TableStreamType streamType)
     }
 
     if (m_surgeon.hasIndex() && !m_surgeon.isIndexingComplete()) {
-        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR,
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_WARN,
             "COW context activation is not allowed while elastic indexing is in progress.");
         return ACTIVATION_FAILED;
     }
