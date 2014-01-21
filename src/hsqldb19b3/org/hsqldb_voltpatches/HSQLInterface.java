@@ -244,8 +244,6 @@ public class HSQLInterface {
             }
             else if (child.name.equals("tablesubquery")) {
                 subqueryCount++;
-                // This is a temporary plug to disable IN(SELECT....) expressions
-                throw new HSQLParseException("VoltDB does not support subqueries");
             }
             else if (child.name.equals("value")) {
                 valueCount++;
@@ -288,7 +286,6 @@ public class HSQLInterface {
                 valueElem = child;
             }
         }
-        assert(rowElem.children.size() == 1);
 
         VoltXMLElement inlist;
         if (tableElem != null) {
@@ -306,9 +303,11 @@ public class HSQLInterface {
             inlist = valueElem;
         }
 
+        assert(rowElem != null);
+        assert(inlist != null);
         inElement.children.clear();
-        // short out the row expression
-        inElement.children.addAll(rowElem.children);
+        // add the row
+        inElement.children.add(rowElem);
         // add the inlist
         inElement.children.add(inlist);
     }

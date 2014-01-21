@@ -21,6 +21,7 @@ import java.util.ArrayList;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
+import org.voltdb.expressions.AbstractExpression;
 
 public class ParsedUnionStmt extends AbstractParsedStmt {
 
@@ -104,5 +105,35 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         this.joinOrder = joinOrder;
     }
 
-
+    /**
+    * Converts each child from the IN union subquery into the equivalent EXISTS
+    *
+    * @param unionStmt set operations subquery from the IN expression
+    * @param inListExpr TVE for the columns from the IN list
+    * @return modified subquery
+    */
+    protected static ParsedUnionStmt rewriteInSubqueryAsExists(ParsedUnionStmt unionStmt, AbstractExpression inListExpr) {
+        if (unionStmt.m_unionType == UnionType.UNION || unionStmt.m_unionType == UnionType.UNION_ALL) {
+            // rewrite for all children
+            for (AbstractParsedStmt childStmt : unionStmt.m_children) {
+                if (childStmt instanceof ParsedSelectStmt) {
+                    ParsedSelectStmt.rewriteInSubqueryAsExists((ParsedSelectStmt) childStmt, inListExpr);
+                } else {
+                    assert(childStmt instanceof ParsedUnionStmt);
+                    ParsedUnionStmt.rewriteInSubqueryAsExists((ParsedUnionStmt) childStmt, inListExpr);
+                }
+            }
+        } else {
+            // for everything else it's enough to rewirite the left operand only
+            assert(!unionStmt.m_children.isEmpty());
+            AbstractParsedStmt childStmt = unionStmt.m_children.get(0);
+            if (childStmt instanceof ParsedSelectStmt) {
+                ParsedSelectStmt.rewriteInSubqueryAsExists((ParsedSelectStmt) childStmt, inListExpr);
+            } else {
+                assert(childStmt instanceof ParsedUnionStmt);
+                ParsedUnionStmt.rewriteInSubqueryAsExists((ParsedUnionStmt) childStmt, inListExpr);
+            }
+        }
+        return unionStmt;
+    }
 }

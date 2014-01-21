@@ -41,6 +41,7 @@ public class TupleValueExpression extends AbstractValueExpression {
         TABLE_ALIAS,
         COLUMN_NAME,
         TABLE_IDX,  // used for JOIN queries only, 0 for outer table, 1 for inner table
+        PARENT_IND,
     }
 
     protected int m_columnIndex = -1;
@@ -51,6 +52,8 @@ public class TupleValueExpression extends AbstractValueExpression {
     protected int m_tableIdx = 0;
 
     private boolean m_hasAggregate = false;
+    /** True if this TVE is referenced from a subquery */
+    private boolean m_tveFromParentStmt = false;
 
     /**
      * Create a new TupleValueExpression
@@ -197,6 +200,21 @@ public class TupleValueExpression extends AbstractValueExpression {
         m_tableIdx = idx;
     }
 
+    /**
+     *  Set the parent TVE indicator
+     * @param parentTve
+     */
+    public void setParentTve(boolean parentTve) {
+        m_tveFromParentStmt = parentTve;
+    }
+
+    /**
+     * @return parent TVE indicator
+     */
+    public boolean getParentTve() {
+        return m_tveFromParentStmt;
+    }
+
     @Override
     public boolean equals(Object obj) {
         if (obj instanceof TupleValueExpression == false) {
@@ -259,6 +277,9 @@ public class TupleValueExpression extends AbstractValueExpression {
             stringer.key(Members.TABLE_IDX.name()).value(m_tableIdx);
             //System.out.println("TVE: toJSONString(), tableIdx = " + m_tableIdx);
         }
+        if (m_tveFromParentStmt == true) {
+            stringer.key(Members.PARENT_IND.name()).value(m_tveFromParentStmt);
+        }
     }
 
     @Override
@@ -271,6 +292,9 @@ public class TupleValueExpression extends AbstractValueExpression {
         if (obj.has(Members.TABLE_IDX.name())) {
             m_tableIdx = obj.getInt(Members.TABLE_IDX.name());
             //System.out.println("TVE: loadFromJSONObject(), tableIdx = " + m_tableIdx);
+        }
+        if (obj.has(Members.PARENT_IND.name())) {
+            m_tveFromParentStmt = obj.getBoolean(Members.PARENT_IND.name());
         }
     }
 
@@ -317,6 +341,8 @@ public class TupleValueExpression extends AbstractValueExpression {
      * expressions.
      */
     public int resolveColumnIndexesUsingSchema(NodeSchema inputSchema) {
+        // TODO if this a TVE from a parent schema?
+        // need an access to the parent schema somehow.
         int index = inputSchema.getIndexOfTve(this);
         if (getValueType() == null && index != -1) {
             // In case of sub-queries the TVE may not have its value type and size

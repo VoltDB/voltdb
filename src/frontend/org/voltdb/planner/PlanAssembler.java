@@ -1238,6 +1238,7 @@ public class PlanAssembler {
             if (table == null) {
                 // This is a sub-query. Indexes are not supported yet.
                 // Assuming that the results are not ordered for now.
+                // TODO ENG-451 Allow indexes for a subquery
                 break;
             }
 
