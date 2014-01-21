@@ -55,7 +55,6 @@ import org.voltdb.SnapshotTableTask;
 import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
-import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStats;
 import org.voltdb.TableStreamType;
@@ -630,20 +629,20 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         // if it wants to be filtered for rejoin and eliminate this
         // horrible introspection. This implementation mimics the
         // original live rejoin code for ExecutionSite...
+        // Multi part AdHoc Does not need to be chacked because its an alias and runs procedure as planned.
         if (tibm instanceof FragmentTaskMessage && ((FragmentTaskMessage)tibm).isSysProcTask()) {
-            if (!SysProcFragmentId.isBalancePartitionsFragment(((FragmentTaskMessage) tibm).getPlanHash(0))) {
+            if (!SysProcFragmentId.isDurablePartitionFragment(((FragmentTaskMessage) tibm).getPlanHash(0))) {
                 return true;
             }
         }
         else if (tibm instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage) tibm;
-            //If proc is durable we dont filter except for UpdateApplicationCatalog which sgould not come here
+            //If proc is durable we dont filter except for UpdateApplicationCatalog which should not come here
             //as when in rejoin UpdateApplicationCatalog wont be allowed.
-            if (SystemProcedureCatalog.isDurableProc(itm.getStoredProcedureName())
-                    && !itm.getStoredProcedureName().equals("@UpdateApplicationCatalog")) {
+            if ((itm.getStoredProcedureName().startsWith("@") == false)
+                    || itm.getStoredProcedureName().equals("@LoadSinglePartitionTable")) {
                 return false;
-            }
-            else {
+            } else {
                 return true;
             }
         }
