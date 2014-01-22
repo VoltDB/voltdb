@@ -70,10 +70,6 @@ bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node,
     assert(m_node);
     assert(m_node->getTargetTable());
 
-    //target table should be persistenttable
-    m_targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
-    assert(m_targetTable);
-
     setDMLCountOutputTable(limits);
 
     m_truncate = m_node->getTruncate();
@@ -87,40 +83,37 @@ bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node,
     assert(m_inputTable);
 
     m_inputTuple = TableTuple(m_inputTable->schema());
-    m_targetTuple = TableTuple(m_targetTable->schema());
-
     return true;
 }
 
 bool DeleteExecutor::p_execute(const NValueArray &params) {
     // target table should be persistenttable
     // update target table reference from table delegate
-    m_targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
-    assert(m_targetTable);
-    m_targetTuple = TableTuple(m_targetTable->schema());
+    PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
+    assert(targetTable);
+    TableTuple targetTuple = TableTuple(targetTable->schema());
 
     int64_t modified_tuples = 0;
 
     if (m_truncate) {
-        VOLT_TRACE("truncating table %s...", m_targetTable->name().c_str());
+        VOLT_TRACE("truncating table %s...", targetTable->name().c_str());
         // count the truncated tuples as deleted
-        modified_tuples = m_targetTable->visibleTupleCount();
+        modified_tuples = targetTable->visibleTupleCount();
 
         VOLT_TRACE("Delete all rows from table : %s with %d active, %d visible, %d allocated",
-                   m_targetTable->name().c_str(),
-                   (int)m_targetTable->activeTupleCount(),
-                   (int)m_targetTable->visibleTupleCount(),
-                   (int)m_targetTable->allocatedTupleCount());
+                   targetTable->name().c_str(),
+                   (int)targetTable->activeTupleCount(),
+                   (int)targetTable->visibleTupleCount(),
+                   (int)targetTable->allocatedTupleCount());
 
-        // actually delete all the tuples
-//        m_targetTable->deleteAllTuples(true);
-        m_targetTable->truncateTable(m_engine);
+        // actually delete all the tuples: undo by table not by each tuple.
+        targetTable->truncateTable(m_engine);
     }
     else
     {
         assert(m_inputTable);
         assert(m_inputTuple.sizeInValues() == m_inputTable->columnCount());
-        assert(m_targetTuple.sizeInValues() == m_targetTable->columnCount());
+        assert(targetTuple.sizeInValues() == targetTable->columnCount());
         TableIterator inputIterator = m_inputTable->iterator();
         while (inputIterator.next(m_inputTuple)) {
             //
@@ -131,22 +124,22 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
             // us the trouble of having to do an index lookup
             //
             void *targetAddress = m_inputTuple.getNValue(0).castAsAddress();
-            m_targetTuple.move(targetAddress);
+            targetTuple.move(targetAddress);
 
             // Delete from target table
-            if (!m_targetTable->deleteTuple(m_targetTuple, true)) {
+            if (!targetTable->deleteTuple(targetTuple, true)) {
                 VOLT_ERROR("Failed to delete tuple from table '%s'",
-                           m_targetTable->name().c_str());
+                           targetTable->name().c_str());
                 return false;
             }
         }
         modified_tuples = m_inputTable->tempTableTupleCount();
         VOLT_TRACE("Deleted %d rows from table : %s with %d active, %d visible, %d allocated",
                    (int)modified_tuples,
-                   m_targetTable->name().c_str(),
-                   (int)m_targetTable->activeTupleCount(),
-                   (int)m_targetTable->visibleTupleCount(),
-                   (int)m_targetTable->allocatedTupleCount());
+                   targetTable->name().c_str(),
+                   (int)targetTable->activeTupleCount(),
+                   (int)targetTable->visibleTupleCount(),
+                   (int)targetTable->allocatedTupleCount());
 
     }
 

@@ -61,6 +61,10 @@
 #include "common/types.h"
 #include "common/RecoveryProtoMessage.h"
 #include "common/StreamPredicateList.h"
+#include "catalog/catalog.h"
+#include "catalog/database.h"
+#include "catalog/table.h"
+#include "catalog/materializedviewinfo.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
 #include "logging/LogManager.h"
@@ -120,6 +124,7 @@ PersistentTable::~PersistentTable()
         delete m_views[i];
     }
 
+    // Indexes are deleted in parent class Table destructor.
 }
 
 // ------------------------------------------------------------------
@@ -193,49 +198,83 @@ void PersistentTable::nextFreeTuple(TableTuple *tuple) {
     }
 }
 
-void PersistentTable::deleteAllTuples(bool freeAllocatedStrings, bool fallible) {
+void PersistentTable::deleteAllTuples(bool freeAllocatedStrings) {
     // nothing interesting
     TableIterator ti(this, m_data.begin());
     TableTuple tuple(m_schema);
     while (ti.next(tuple)) {
-        deleteTuple(tuple, fallible);
+        deleteTuple(tuple, true);
     }
 }
 
-void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable) {
+void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd,
+        PersistentTable *originalTable) {
     VOLT_DEBUG("**** Truncate table undo *****\n");
 
+    std::vector<MaterializedViewMetadata *> views = originalTable->views();
+    // reset all view table pointers
+    BOOST_FOREACH(MaterializedViewMetadata * originalView, views) {
+        PersistentTable * targetTable = originalView->targetTable();
+        TableCatalogDelegate * targetTcd =  engine->getTableDelegate(targetTable->name());
+        // call decrement reference count on the newly constructed view table
+        targetTcd->deleteCommand();
+        // update the view table pointer with the original view
+        targetTcd->setTable(targetTable);
+        engine->rebuildSingleTableCollection(targetTcd);
+    }
+    this->decrementRefcount();
+
+    // reset base table pointer
     tcd->setTable(originalTable);
     engine->rebuildSingleTableCollection(tcd);
 }
 
 void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
     VOLT_DEBUG("**** Truncate table release *****\n");
-
-    originalTable->deleteAllTuples(true, false);
     m_tuplesPinnedByUndo = 0;
     m_invisibleTuplesPendingDeleteCount = 0;
+
+    std::vector<MaterializedViewMetadata *> views = originalTable->views();
+    // reset all view table pointers
+    BOOST_FOREACH(MaterializedViewMetadata * originalView, views) {
+        PersistentTable * targetTable = originalView->targetTable();
+        targetTable->decrementRefcount();
+    }
+    originalTable->decrementRefcount();
 }
 
 
 void PersistentTable::truncateTable(VoltDBEngine* engine) {
     TableCatalogDelegate * tcd = engine->getTableDelegate(m_name);
     assert(tcd);
-    PersistentTable * emptyTable = TableFactory::cloneEmptyPersistentTableWithIndexes(this);
+
+    catalog::Table *catalogTable = engine->getCatalogTable(m_name);
+    if (tcd->init(*engine->getDatabase(), *catalogTable) != 0) {
+        VOLT_ERROR("Failed to initialize table '%s' from catalog",m_name.c_str());
+        return ;
+    }
+    assert(!tcd->exportEnabled());
+    PersistentTable * emptyTable = tcd->getPersistentTable();
+    assert(emptyTable);
     assert(emptyTable->views().size() == 0);
 
     // add matView
     BOOST_FOREACH(MaterializedViewMetadata * originalView, m_views) {
         PersistentTable * targetTable = originalView->targetTable();
-        PersistentTable * targetEmptyTable = TableFactory::cloneEmptyPersistentTableWithIndexes(targetTable);
+        TableCatalogDelegate * targetTcd =  engine->getTableDelegate(targetTable->name());
+        catalog::Table *catalogViewTable = engine->getCatalogTable(targetTable->name());
+
+        if (targetTcd->init(*engine->getDatabase(), *catalogViewTable) != 0) {
+            VOLT_ERROR("Failed to initialize table '%s' from catalog",targetTable->name().c_str());
+            return ;
+        }
+        PersistentTable * targetEmptyTable = targetTcd->getPersistentTable();
+        assert(targetEmptyTable);
         new MaterializedViewMetadata(emptyTable, targetEmptyTable, originalView->getMaterializedViewInfo());
 
-        TableCatalogDelegate * targetTcd =  engine->getTableDelegate(targetTable->name());
-        targetTcd->setTable(targetEmptyTable);
         engine->rebuildSingleTableCollection(targetTcd);
     }
 
-    tcd->setTable(emptyTable);
     engine->rebuildSingleTableCollection(tcd);
 
     UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
@@ -243,11 +282,11 @@ void PersistentTable::truncateTable(VoltDBEngine* engine) {
         emptyTable->m_tuplesPinnedByUndo = emptyTable->m_tupleCount;
         emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
         // Create and register an undo action.
-        uq->registerUndoAction(new (*uq) PersistentTableUndoTruncateTableAction(engine, tcd, this, emptyTable),this);
+        uq->registerUndoAction(new (*uq) PersistentTableUndoTruncateTableAction(engine, tcd, this, emptyTable));
         return;
     }
 
-    deleteAllTuples(true, false);
+    this->decrementRefcount();
 }
 
 
@@ -907,16 +946,6 @@ std::string PersistentTable::debug() {
     }
 
     return buffer.str();
-}
-
-PersistentTable * PersistentTable::getViewTable(std::string name) const {
-    BOOST_FOREACH(MaterializedViewMetadata * view, m_views) {
-        if (view->targetTable()->name() == name) {
-            return view->targetTable();
-        }
-    }
-
-    return NULL;
 }
 
 void PersistentTable::onSetColumns() {

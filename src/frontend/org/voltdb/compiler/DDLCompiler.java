@@ -220,7 +220,7 @@ public class DDLCompiler {
             "AS" +                                  // AS token
             "\\s+" +                                // one or more spaces
             "(" +                                   // (3) begin SELECT or DML statement
-            "(?:SELECT|INSERT|UPDATE|DELETE)" +     //   valid DML start tokens (not captured)
+            "(?:SELECT|INSERT|UPDATE|DELETE|TRUNCATE)" +     //   valid DML start tokens (not captured)
             "\\s+" +                                //   one or more spaces
             ".+)" +                                 //   end SELECT or DML statement
             ";" +                                   // semi-colon terminator

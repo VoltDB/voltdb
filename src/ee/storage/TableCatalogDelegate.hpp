@@ -21,6 +21,7 @@
 #include "common/CatalogDelegate.hpp"
 #include "catalog/table.h"
 #include "catalog/index.h"
+#include "storage/persistenttable.h"
 
 namespace catalog {
 class Database;
@@ -85,6 +86,10 @@ class TableCatalogDelegate : public CatalogDelegate {
     // ADXXX: should be const
     Table *getTable() {
         return m_table;
+    }
+
+    PersistentTable *getPersistentTable() {
+        return dynamic_cast<PersistentTable *> (m_table);
     }
 
     void setTable(Table * tb) {
