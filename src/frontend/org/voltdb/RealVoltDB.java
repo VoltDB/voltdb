@@ -531,6 +531,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             Inits inits = new Inits(this, 1);
             inits.doInitializationWork();
 
+            // Need the catalog so that we know how many tables so we can guess at the necessary heap size
+            // This is done under Inits.doInitializationWork(), so need to wait until we get here.
+            // Current calculation needs pro/community knowledge, number of tables, and the sites/host,
+            // which is the number of initiators (minus the possibly idle MPI initiator)
+            checkHeapSanity(MiscUtils.isPro(), m_catalogContext.tables.size(),
+                    (m_iv2Initiators.size() - 1), m_configuredReplicationFactor);
+
             if (m_joining && m_config.m_replicationRole == ReplicationRole.REPLICA) {
                 VoltDB.crashLocalVoltDB("Elastic join is prohibited on a replica cluster.", false, null);
             }
@@ -1494,6 +1501,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         javamaxheapmem /= (1024 * 1024);
         hostLog.info(String.format("Maximum usable Java heap set to %d mb.", javamaxheapmem));
 
+        // Computed minimum heap requirement
+        long minRqt = computeMinimumHeapRqt(MiscUtils.isPro(), m_catalogContext.tables.size(),
+                (m_iv2Initiators.size() - 1), m_configuredReplicationFactor);
+        hostLog.info("Minimum required Java heap for catalog and server config is " + minRqt + " MB.");
+
         SortedMap<String, String> dbgMap = m_catalogContext.getDebuggingInfoFromCatalog();
         for (String line : dbgMap.values()) {
             hostLog.info(line);
@@ -2428,5 +2440,41 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         } else {
             return m_periodicPriorityWorkThread.schedule(work, initialDelay, unit);
         }
+    }
+
+    private void checkHeapSanity(boolean isPro, int tableCount, int sitesPerHost, int kfactor)
+    {
+        long megabytes = 1024 * 1024;
+        long maxMemory = Runtime.getRuntime().maxMemory() / megabytes;
+        long drRqt = isPro ? 128 * sitesPerHost : 0;
+        long crazyThresh = computeMinimumHeapRqt(isPro, tableCount, sitesPerHost, kfactor);
+        long warnThresh = crazyThresh + drRqt;
+
+        if (maxMemory < crazyThresh) {
+            StringBuilder builder = new StringBuilder();
+            builder.append(String.format("The configuration of %d tables, %d sites-per-host, and k-factor of %d requires at least %d MB of Java heap memory. ", tableCount, sitesPerHost, kfactor, crazyThresh));
+            builder.append(String.format("The maximum amount of heap memory available to the JVM is %d MB. ", maxMemory));
+            builder.append("Please increase the maximum heap size using the VOLTDB_HEAPMAX environment variable and then restart VoltDB.");
+            consoleLog.warn(builder.toString());
+        }
+        else if (maxMemory < warnThresh) {
+            StringBuilder builder = new StringBuilder();
+            builder.append(String.format("The configuration of %d tables, %d sites-per-host, and k-factor of %d requires at least %d MB of Java heap memory. ", tableCount, sitesPerHost, kfactor, crazyThresh));
+            builder.append(String.format("The maximum amount of heap memory available to the JVM is %d MB. ", maxMemory));
+            builder.append("The system has enough memory for normal operation but is in danger of running out of Java heap space if the DR feature is used. ");
+            builder.append("Use the VOLTDB_HEAPMAX environment variable to adjust the Java max heap size before starting VoltDB, as necessary.");
+            consoleLog.warn(builder.toString());
+        }
+    }
+
+    // Compute the minimum required heap to run this configuration.  This comes from the documentation,
+    // http://voltdb.com/docs/PlanningGuide/MemSizeServers.php#MemSizeHeapGuidelines
+    // Any changes there should get reflected here and vice versa.
+    private long computeMinimumHeapRqt(boolean isPro, int tableCount, int sitesPerHost, int kfactor)
+    {
+        long baseRqt = 384;
+        long tableRqt = 10 * tableCount;
+        long rejoinRqt = (isPro && kfactor > 0) ? 128 * sitesPerHost : 0;
+        return baseRqt + tableRqt + rejoinRqt;
     }
 }

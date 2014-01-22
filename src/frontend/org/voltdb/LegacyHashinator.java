@@ -71,7 +71,7 @@ public class LegacyHashinator extends TheHashinator {
     }
 
     @Override
-    protected HashinatorConfig pGetCurrentConfig() {
+    public HashinatorConfig pGetCurrentConfig() {
         return new HashinatorConfig(HashinatorType.LEGACY, m_configBytes, 0, 0);
     }
 

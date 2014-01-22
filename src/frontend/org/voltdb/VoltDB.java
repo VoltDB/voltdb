@@ -578,6 +578,8 @@ public class VoltDB {
             PrintWriter writer = new PrintWriter(root + "host" + hostId + "-" + dateString + ".txt");
             writer.println(message);
             printStackTraces(writer);
+            writer.flush();
+            writer.close();
         } catch (Exception e) {
             try
             {

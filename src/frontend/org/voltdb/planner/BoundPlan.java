@@ -17,6 +17,8 @@
 
 package org.voltdb.planner;
 
+import java.util.Arrays;
+
 
 /**
  * BoundPlan is an immutable representation of a SQL execution plan.
@@ -69,7 +71,7 @@ public class BoundPlan {
                 return false;
             }
         }
-        else if ( ! constants.equals(other.constants)) {
+        else if ( ! Arrays.equals(constants, other.constants)) {
             return false;
         }
         return true;

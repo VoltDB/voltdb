@@ -56,7 +56,7 @@ ElasticContext::handleActivation(TableStreamType streamType)
     if (streamType == TABLE_STREAM_ELASTIC_INDEX) {
         // Can't activate an indexing stream during a snapshot.
         if (m_surgeon.hasStreamType(TABLE_STREAM_SNAPSHOT)) {
-            LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR,
+            LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_WARN,
                 "Elastic context activation is not allowed while a snapshot is in progress.");
             return ACTIVATION_FAILED;
         }
