@@ -66,7 +66,6 @@ public:
         : AbstractExecutor(engine, abstract_node)
     {
         m_inputTable = NULL;
-        m_targetTable = NULL;
         m_node = NULL;
         m_engine = engine;
         m_partitionColumn = -1;
@@ -81,11 +80,8 @@ public:
         virtual bool needsOutputTableClear() { return true; };
 
         InsertPlanNode* m_node;
-
         TempTable* m_inputTable;
-        Table* m_targetTable;
 
-        TableTuple m_tuple;
         int m_partitionColumn;
         bool m_partitionColumnIsString;
         bool m_multiPartition;

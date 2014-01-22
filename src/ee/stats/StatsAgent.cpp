@@ -84,6 +84,14 @@ void StatsAgent::unregisterStatsSource(StatisticsSelectorType sst)
     it1->second.clear();
 }
 
+void StatsAgent::updateRegisterStatsSource(StatisticsSelectorType sst, CatalogId catalogId, StatsSource* statsSource)
+{
+    std::multimap<voltdb::CatalogId, voltdb::StatsSource*>::iterator it = m_statsCategoryByStatsSelector[sst].find(catalogId);
+    if (it != m_statsCategoryByStatsSelector[sst].end()) {
+        it->second = statsSource;
+    }
+}
+
 /**
  * Get statistics for the specified resources
  * @param sst StatisticsSelectorType of the resources

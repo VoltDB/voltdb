@@ -62,8 +62,14 @@ TempTable::~TempTable() {}
 // ------------------------------------------------------------------
 // OPERATIONS
 // ------------------------------------------------------------------
-void TempTable::deleteAllTuples(bool freeAllocatedStrings) { deleteAllTuplesNonVirtual(freeAllocatedStrings); }
-bool TempTable::insertTuple(TableTuple &source) { insertTempTuple(source); return true; }
+void TempTable::deleteAllTuples(bool freeAllocatedStrings) {
+    deleteAllTuplesNonVirtual(freeAllocatedStrings);
+}
+
+bool TempTable::insertTuple(TableTuple &source) {
+    insertTempTuple(source);
+    return true;
+}
 
 bool TempTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
                                                TableTuple &sourceTupleWithNewValues,

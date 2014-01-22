@@ -90,7 +90,7 @@ public enum QueryType {
         else if (stmt.startsWith("update")) {
             return QueryType.UPDATE;
         }
-        else if (stmt.startsWith("delete")) {
+        else if (stmt.startsWith("delete") || stmt.startsWith("trunca")) {
             return QueryType.DELETE;
         }
         else if (stmt.startsWith("select")) {

@@ -80,18 +80,23 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
             m_endKeyArrayPtr[ctr] = m_node->getEndKeyExpressions()[ctr];
         }
     }
-
-    //
-    // Initialize local variables
-    //
-
     //output table should be temptable
     m_outputTable = static_cast<TempTable*>(m_node->getOutputTable());
+    m_numOfColumns = static_cast<int>(m_outputTable->columnCount());
+    assert(m_numOfColumns == 1);
+
+    // Miscellanous Information
+    m_lookupType = INDEX_LOOKUP_TYPE_INVALID;
+    if (m_numOfSearchkeys != 0) {
+        m_lookupType = m_node->getLookupType();
+    }
+
+    if (m_numOfEndkeys != 0) {
+        m_endType = m_node->getEndType();
+    }
+
     //target table should be persistenttable
     m_targetTable = static_cast<PersistentTable*>(m_node->getTargetTable());
-    m_numOfColumns = static_cast<int>(m_outputTable->columnCount());
-
-    assert(m_numOfColumns == 1);
     //
     // Grab the Index from our inner table
     // We'll throw an error if the index is missing
@@ -114,23 +119,30 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
         m_endKey.moveNoHeader(m_endKeyBackingStore);
     }
 
-    // Miscellanous Information
-    m_lookupType = INDEX_LOOKUP_TYPE_INVALID;
-    if (m_numOfSearchkeys != 0) {
-        m_lookupType = m_node->getLookupType();
-    }
-
-    if (m_numOfEndkeys != 0) {
-        m_endType = m_node->getEndType();
-    }
-
     // Need to move GTE to find (x,_) when doing a partial covering search.
     // The planner sometimes used to lie in this case: index_lookup_type_eq is incorrect.
     // Index_lookup_type_gte is necessary.
     assert(m_lookupType != INDEX_LOOKUP_TYPE_EQ ||
-           m_searchKey.getSchema()->columnCount() == m_numOfSearchkeys ||
-           m_searchKey.getSchema()->columnCount() == m_numOfEndkeys);
+            m_searchKey.getSchema()->columnCount() == m_numOfSearchkeys ||
+            m_searchKey.getSchema()->columnCount() == m_numOfEndkeys);
+
+
+    VOLT_DEBUG("IndexCount: %s.%s\n", m_targetTable->name().c_str(),
+            m_index->getName().c_str());
+
     return true;
+}
+
+void IndexCountExecutor::updateTargetTableAndIndex() {
+    //target table should be persistenttable
+    m_targetTable = static_cast<PersistentTable*>(m_node->getTargetTable());
+    assert(m_targetTable);
+    //
+    // Grab the Index from our inner table
+    // We'll throw an error if the index is missing
+    //
+    m_index = m_targetTable->index(m_node->getTargetIndexName());
+    assert (m_index != NULL);
 }
 
 bool IndexCountExecutor::p_execute(const NValueArray &params)
@@ -139,10 +151,9 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     assert(m_node == dynamic_cast<IndexCountPlanNode*>(m_abstractNode));
     assert(m_outputTable);
     assert(m_outputTable == static_cast<TempTable*>(m_node->getOutputTable()));
-    assert(m_targetTable);
-    assert(m_targetTable == m_node->getTargetTable());
-    VOLT_DEBUG("IndexCount: %s.%s\n", m_targetTable->name().c_str(),
-               m_index->getName().c_str());
+
+    // update local target table with its most recent reference
+    updateTargetTableAndIndex();
 
     int activeNumOfSearchKeys = m_numOfSearchkeys;
     IndexLookupType localLookupType = m_lookupType;
