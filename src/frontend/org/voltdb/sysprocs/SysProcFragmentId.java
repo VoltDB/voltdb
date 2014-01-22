@@ -89,11 +89,14 @@ public class SysProcFragmentId
                 fragId == PF_snapshotSaveQuiesce);
     }
 
-    public static boolean isBalancePartitionsFragment(byte[] planHash) {
+    //This method exists because there is no procedure name in fragment task message
+    // for sysprocs and we cant distinguish if this needs to be replayed or not.
+    public static boolean isDurableFragment(byte[] planHash) {
         long fragId = VoltSystemProcedure.hashToFragId(planHash);
         return (fragId == PF_prepBalancePartitions  ||
                 fragId == PF_balancePartitions ||
-                fragId == PF_balancePartitionsData);
+                fragId == PF_balancePartitionsData ||
+                fragId == PF_distribute);
     }
 
     // @LoadMultipartitionTable
