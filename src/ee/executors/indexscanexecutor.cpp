@@ -137,6 +137,11 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     m_targetTable = static_cast<PersistentTable*>(m_node->getTargetTable());
     m_numOfColumns = static_cast<int>(m_outputTable->columnCount());
 
+    m_index = m_targetTable->index(m_node->getTargetIndexName());
+    m_searchKey = TableTuple(m_index->getKeySchema());
+    m_searchKeyBackingStore = new char[m_index->getKeySchema()->tupleLength()];
+    m_searchKey.moveNoHeader(m_searchKeyBackingStore);
+
     //
     // Miscellanous Information
     //
@@ -150,14 +155,10 @@ void IndexScanExecutor::updateTargetTableAndIndex() {
     // Target table should be persistenttable
     // Update target table reference from table delegate, and its index reference
     m_targetTable = static_cast<PersistentTable*>(m_node->getTargetTable());
-    //
+
+    m_index = m_targetTable->index(m_node->getTargetIndexName());
     // Grab the Index from our inner table
     // We'll throw an error if the index is missing
-    //
-    m_index = m_targetTable->index(m_node->getTargetIndexName());
-    m_searchKey = TableTuple(m_index->getKeySchema());
-    m_searchKeyBackingStore = new char[m_index->getKeySchema()->tupleLength()];
-    m_searchKey.moveNoHeader(m_searchKeyBackingStore);
     if (m_index == NULL)
     {
         VOLT_ERROR("Failed to retreive index '%s' from table '%s' for PlanNode"
@@ -168,6 +169,9 @@ void IndexScanExecutor::updateTargetTableAndIndex() {
         return ;
     }
     VOLT_TRACE("Index key schema: '%s'", m_index->getKeySchema()->debug().c_str());
+
+    m_searchKey = TableTuple(m_index->getKeySchema());
+    m_searchKey.moveNoHeader(m_searchKeyBackingStore);
 
     // Need to move GTE to find (x,_) when doing a partial covering search.
     // the planner sometimes used to lie in this case: index_lookup_type_eq is incorrect.

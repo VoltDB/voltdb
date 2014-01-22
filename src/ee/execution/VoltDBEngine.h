@@ -164,6 +164,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         bool serializeTable(int32_t tableId, SerializeOutput* out) const;
 
         TableCatalogDelegate* getTableDelegate(std::string name) const;
+        catalog::Database* getDatabase() const { return m_database; }
+        catalog::Table* getCatalogTable(std::string name) const;
 
         // -------------------------------------------------
         // Execution Functions

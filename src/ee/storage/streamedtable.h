@@ -57,7 +57,7 @@ class StreamedTable : public Table {
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
-    virtual void deleteAllTuples(bool freeAllocatedStrings, bool fallible=true);
+    virtual void deleteAllTuples(bool freeAllocatedStrings);
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     // The bool argument is irrelevent to StreamedTable.
     virtual bool deleteTuple(TableTuple &tuple, bool=true);
