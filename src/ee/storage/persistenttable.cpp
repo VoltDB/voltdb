@@ -220,13 +220,13 @@ void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDe
         targetTcd->deleteCommand();
         // update the view table pointer with the original view
         targetTcd->setTable(targetTable);
-        engine->rebuildSingleTableCollection(targetTcd);
     }
     this->decrementRefcount();
 
     // reset base table pointer
     tcd->setTable(originalTable);
-    engine->rebuildSingleTableCollection(tcd);
+
+    engine->rebuildTableCollections();
 }
 
 void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
@@ -271,11 +271,8 @@ void PersistentTable::truncateTable(VoltDBEngine* engine) {
         PersistentTable * targetEmptyTable = targetTcd->getPersistentTable();
         assert(targetEmptyTable);
         new MaterializedViewMetadata(emptyTable, targetEmptyTable, originalView->getMaterializedViewInfo());
-
-        engine->rebuildSingleTableCollection(targetTcd);
     }
-
-    engine->rebuildSingleTableCollection(tcd);
+    engine->rebuildTableCollections();
 
     UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
     if (uq) {

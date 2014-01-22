@@ -1019,37 +1019,18 @@ void VoltDBEngine::rebuildTableCollections()
             m_tablesByName[tcd->getTable()->name()] = tcd->getTable();
 
             getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
-                    catTable->relativeIndex(),
-                    tcd->getTable()->getTableStats());
+                                                  catTable->relativeIndex(),
+                                                  tcd->getTable()->getTableStats());
 
             // add all of the indexes to the stats source
             const std::vector<TableIndex*>& tindexes = tcd->getTable()->allIndexes();
             for (int i = 0; i < tindexes.size(); i++) {
                 TableIndex *index = tindexes[i];
                 getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
-                        catTable->relativeIndex(),
-                        index->getIndexStats());
+                                                      catTable->relativeIndex(),
+                                                      index->getIndexStats());
             }
         }
-    }
-}
-
-void VoltDBEngine::rebuildSingleTableCollection(TableCatalogDelegate * tcd) {
-    catalog::Table *catTable = m_database->tables().get(tcd->getTable()->name());
-    m_tables[catTable->relativeIndex()] = tcd->getTable();
-    m_tablesByName[tcd->getTable()->name()] = tcd->getTable();
-
-    getStatsManager().updateRegisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
-            catTable->relativeIndex(),
-            tcd->getTable()->getTableStats());
-
-    // add all of the indexes to the stats source
-    const std::vector<TableIndex*>& tindexes = tcd->getTable()->allIndexes();
-    for (int i = 0; i < tindexes.size(); i++) {
-        TableIndex *index = tindexes[i];
-        getStatsManager().updateRegisterStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
-                catTable->relativeIndex(),
-                index->getIndexStats());
     }
 }
 
