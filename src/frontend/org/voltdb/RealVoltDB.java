@@ -305,16 +305,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 hostLog.fatal("You are running on an unsupported (probably 32 bit) JVM. Exiting.");
                 System.exit(-1);
             }
-
-            String logo = "Initializing VoltDB...\n\n" +
-            "______                                 _____            _    \n" +
-            "| ___ \\                               /  ___|          | |   \n" +
-            "| |_/ /_ __ ___  _ __   ___ ___  ___  \\ `--. _   _  ___| | __\n" +
-            "| ___ \\ '__/ _ \\| '_ \\ / __/ _ \\/ __|  `--. \\ | | |/ __| |/ /\n" +
-            "| |_/ / | | (_) | | | | (_| (_) \\__ \\ /\\__/ / |_| | (__|   < \n" +
-            "\\____/|_|  \\___/|_| |_|\\___\\___/|___/ \\____/ \\__,_|\\___|_|\\_\\\n";
-
-            consoleLog.info(logo);
+            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
 
             // If there's no deployment provide a default and put it under voltdbroot.
             if (config.m_pathToDeployment == null) {

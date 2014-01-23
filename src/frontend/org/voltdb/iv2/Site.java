@@ -81,6 +81,7 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.sysprocs.SysProcFragmentId;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.LogKeys;
 
 import vanilla.java.affinity.impl.PosixJNAAffinity;
@@ -629,20 +630,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         // if it wants to be filtered for rejoin and eliminate this
         // horrible introspection. This implementation mimics the
         // original live rejoin code for ExecutionSite...
+        // Multi part AdHoc Does not need to be chacked because its an alias and runs procedure as planned.
         if (tibm instanceof FragmentTaskMessage && ((FragmentTaskMessage)tibm).isSysProcTask()) {
-            if (!SysProcFragmentId.isBalancePartitionsFragment(((FragmentTaskMessage) tibm).getPlanHash(0))) {
+            if (!SysProcFragmentId.isDurableFragment(((FragmentTaskMessage) tibm).getPlanHash(0))) {
                 return true;
             }
         }
         else if (tibm instanceof Iv2InitiateTaskMessage) {
-            Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage)tibm;
-            if ((itm.getStoredProcedureName().startsWith("@") == false) ||
-                (itm.getStoredProcedureName().startsWith("@AdHoc") == true)) {
-                return false;
-            }
-            else {
-                return true;
-            }
+            Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage) tibm;
+            //All durable sysprocs and non-sysprocs should not get filtered.
+            return !CatalogUtil.isDurableProc(itm.getStoredProcedureName());
         }
         return false;
     }
