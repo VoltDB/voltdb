@@ -1894,6 +1894,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // 1. update the export manager.
             ExportManager.instance().updateCatalog(m_catalogContext, partitions);
 
+            // 1.1 Update the elastic join throughput settings
+            if (m_elasticJoinService != null) m_elasticJoinService.updateConfig(m_catalogContext);
+
             // 1.5 update the dead host timeout
             if (m_catalogContext.cluster.getHeartbeattimeout() * 1000 != m_config.m_deadHostTimeoutMS) {
                 m_config.m_deadHostTimeoutMS = m_catalogContext.cluster.getHeartbeattimeout() * 1000;

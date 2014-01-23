@@ -274,6 +274,19 @@ public class VoltProjectBuilder {
 
     private Integer m_deadHostTimeout = null;
 
+    private Integer m_elasticTargetThroughput = null;
+    private Integer m_elasticTargetPauseTime = null;
+
+    public VoltProjectBuilder setElasticTargetThroughput(int target) {
+        m_elasticTargetThroughput = target;
+        return this;
+    }
+
+    public VoltProjectBuilder setElasticTargetPauseTime(int target) {
+        m_elasticTargetPauseTime = target;
+        return this;
+    }
+
     public void setDeadHostTimeout(Integer deadHostTimeout) {
         m_deadHostTimeout = deadHostTimeout;
     }
@@ -1019,6 +1032,12 @@ public class VoltProjectBuilder {
             SystemSettingsType.Snapshot snapshot = factory.createSystemSettingsTypeSnapshot();
             snapshot.setPriority(m_snapshotPriority);
             systemSettingType.setSnapshot(snapshot);
+        }
+        if (m_elasticTargetThroughput != null || m_elasticTargetPauseTime != null) {
+            SystemSettingsType.Elastic elastic = factory.createSystemSettingsTypeElastic();
+            if (m_elasticTargetThroughput != null) elastic.setThroughput(m_elasticTargetThroughput);
+            if (m_elasticTargetPauseTime != null) elastic.setDuration(m_elasticTargetPauseTime);
+            systemSettingType.setElastic(elastic);
         }
         deployment.setSystemsettings(systemSettingType);
 
