@@ -402,7 +402,7 @@ class VerbRunner(object):
             args2 = [verb_name] + list(args[1:])
             self._run_command(verbspace, *args2, **kwargs)
 
-    def call_proc(self, sysproc_name, types, args, check_status=True, timeout=60):
+    def call_proc(self, sysproc_name, types, args, check_status=True, timeout=None):
         if self.client is None:
             utility.abort('Command is not set up as a client.',
                           'Add an appropriate admin or client bundle to @VOLT.Command().')

@@ -72,7 +72,7 @@ public:
      */
     char *retrieveDependency(int32_t dependencyId, size_t *dependencySz);
 
-    bool fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
+    int64_t fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
             std::string lastAccessedTable, int64_t lastAccessedTableSize, int64_t tuplesProcessed);
 
     /**

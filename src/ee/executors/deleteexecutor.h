@@ -68,7 +68,6 @@ public:
         : AbstractExecutor(engine, abstract_node)
     {
         m_inputTable = NULL;
-        m_targetTable = NULL;
         m_engine = engine;
     }
 
@@ -83,9 +82,7 @@ protected:
         don't need PK to delete tuples. */
     bool m_truncate;
     TempTable* m_inputTable;
-    PersistentTable* m_targetTable;
     TableTuple m_inputTuple;
-    TableTuple m_targetTuple;
 
     /** reference to the engine/context to store the number of
         modified tuples */

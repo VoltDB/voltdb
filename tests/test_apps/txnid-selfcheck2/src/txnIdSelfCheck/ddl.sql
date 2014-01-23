@@ -183,3 +183,7 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteLoadPartitionedMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteOnlyLoadTableSP;
 PARTITION PROCEDURE DeleteOnlyLoadTableSP ON TABLE loadp COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteOnlyLoadTableMP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGPTruncateTableSP;
+PARTITION PROCEDURE BIGPTruncateTableSP ON TABLE bigp COLUMN p;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGPTruncateTableMP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGRTruncateTable;

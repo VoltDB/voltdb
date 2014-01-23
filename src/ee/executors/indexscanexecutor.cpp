@@ -49,6 +49,7 @@
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
+#include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
@@ -118,13 +119,6 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
         (new AbstractExpression*[m_numOfSearchkeys]);
     m_searchKeyArray = m_searchKeyArrayPtr.get();
 
-    //printf ("<INDEX SCAN> num of seach key: %d\n", m_numOfSearchkeys);
-    // if (m_numOfSearchkeys == 0)
-    // {
-    //     VOLT_ERROR("There are no search key expressions for PlanNode '%s'",
-    //                m_node->debug().c_str());
-    //     return false;
-    // }
     for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++)
     {
         if (m_node->getSearchKeyExpressions()[ctr] == NULL)
@@ -138,34 +132,16 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
             m_node->getSearchKeyExpressions()[ctr];
     }
 
-    //
-    // Initialize local variables
-    //
-
     //output table should be temptable
     m_outputTable = static_cast<TempTable*>(m_node->getOutputTable());
     //target table should be persistenttable
     m_targetTable = static_cast<PersistentTable*>(m_node->getTargetTable());
     m_numOfColumns = static_cast<int>(m_outputTable->columnCount());
 
-    //
-    // Grab the Index from our inner table
-    // We'll throw an error if the index is missing
-    //
     m_index = m_targetTable->index(m_node->getTargetIndexName());
     m_searchKey = TableTuple(m_index->getKeySchema());
     m_searchKeyBackingStore = new char[m_index->getKeySchema()->tupleLength()];
     m_searchKey.moveNoHeader(m_searchKeyBackingStore);
-    if (m_index == NULL)
-    {
-        VOLT_ERROR("Failed to retreive index '%s' from table '%s' for PlanNode"
-                   " '%s'", m_node->getTargetIndexName().c_str(),
-                   m_targetTable->name().c_str(), m_node->debug().c_str());
-        delete [] m_searchKeyBackingStore;
-        delete [] m_projectionExpressions;
-        return false;
-    }
-    VOLT_TRACE("Index key schema: '%s'", m_index->getKeySchema()->debug().c_str());
 
     //
     // Miscellanous Information
@@ -173,12 +149,32 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     m_lookupType = m_node->getLookupType();
     m_sortDirection = m_node->getSortDirection();
 
+    return true;
+}
+
+void IndexScanExecutor::updateTargetTableAndIndex() {
+    // Target table should be persistenttable
+    // Update target table reference from table delegate, and its index reference
+    m_targetTable = static_cast<PersistentTable*>(m_node->getTargetTable());
+
+    m_index = m_targetTable->index(m_node->getTargetIndexName());
+    assert(m_index);
+    // Grab the Index from our inner table
+    // We'll throw an error if the index is missing
+    VOLT_TRACE("Index key schema: '%s'", m_index->getKeySchema()->debug().c_str());
+
+    m_searchKey = TableTuple(m_index->getKeySchema());
+    m_searchKey.moveNoHeader(m_searchKeyBackingStore);
+
     // Need to move GTE to find (x,_) when doing a partial covering search.
     // the planner sometimes used to lie in this case: index_lookup_type_eq is incorrect.
     // Index_lookup_type_gte is necessary.
     assert(m_lookupType != INDEX_LOOKUP_TYPE_EQ ||
-           m_searchKey.getSchema()->columnCount() == m_numOfSearchkeys);
-    return true;
+            m_searchKey.getSchema()->columnCount() == m_numOfSearchkeys);
+
+    assert(m_targetTable);
+    assert(m_targetTable == m_node->getTargetTable());
+    VOLT_DEBUG("IndexScan: %s.%s\n", m_targetTable->name().c_str(), m_index->getName().c_str());
 }
 
 bool IndexScanExecutor::p_execute(const NValueArray &params)
@@ -187,10 +183,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     assert(m_node == dynamic_cast<IndexScanPlanNode*>(m_abstractNode));
     assert(m_outputTable);
     assert(m_outputTable == static_cast<TempTable*>(m_node->getOutputTable()));
-    assert(m_targetTable);
-    assert(m_targetTable == m_node->getTargetTable());
-    VOLT_DEBUG("IndexScan: %s.%s\n", m_targetTable->name().c_str(),
-               m_index->getName().c_str());
+
+    // update local target table with its most recent reference
+    updateTargetTableAndIndex();
 
     int activeNumOfSearchKeys = m_numOfSearchkeys;
     IndexLookupType localLookupType = m_lookupType;
@@ -327,7 +322,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     }
 
     Table* targetTable = m_targetTable;
-    m_engine->setLastAccessedTable(targetTable);
+    ProgressMonitorProxy pmp(m_engine, targetTable);
     //
     // An index scan has three parts:
     //  (1) Lookup tuples using the search key
@@ -365,7 +360,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                 m_index->moveToEnd(false);
             } else {
                 while (!(tuple = m_index->nextValue()).isNullTuple()) {
-                    m_engine->noteTuplesProcessedForProgressMonitoring(1);
+                    pmp.countdownProgress();
                     if (initial_expression != NULL && !initial_expression->eval(&tuple, NULL).isTrue()) {
                         // just passed the first failed entry, so move 2 backward
                         m_index->moveToBeforePriorEntry();
@@ -402,8 +397,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
            ((localLookupType != INDEX_LOOKUP_TYPE_EQ || activeNumOfSearchKeys == 0) &&
             !(tuple = m_index->nextValue()).isNullTuple()))) {
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", tuple.debug("tablename").c_str());
-
-        m_engine->noteTuplesProcessedForProgressMonitoring(1);
+        pmp.countdownProgress();
         //
         // First check to eliminate the null index rows for UNDERFLOW case only
         //
@@ -464,6 +458,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                 //
                 m_outputTable->insertTupleNonVirtual(tuple);
             }
+            pmp.countdownProgress();
         }
     }
 

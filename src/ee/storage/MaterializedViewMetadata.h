@@ -22,6 +22,7 @@
 
 #include "common/types.h"
 #include "common/tabletuple.h"
+#include "indexes/tableindex.h"
 #include "catalog/materializedviewinfo.h"
 
 namespace voltdb {
@@ -59,6 +60,10 @@ public:
 
     void setTargetTable(PersistentTable * target);
     void setIndexForMinMax(std::string index);
+
+    catalog::MaterializedViewInfo* getMaterializedViewInfo() {
+        return m_mvInfo;
+    }
 private:
 
     void freeBackedTuples();
@@ -94,6 +99,9 @@ private:
     PersistentTable *m_srcTable;
     // the materialized view table
     PersistentTable *m_target;
+
+    catalog::MaterializedViewInfo *m_mvInfo;
+
     // the primary index on the view table whose columns
     // are the same as the group by in the view query
     TableIndex *m_index;
