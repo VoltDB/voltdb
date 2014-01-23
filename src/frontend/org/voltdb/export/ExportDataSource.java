@@ -446,7 +446,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         assert(!m_endOfStream);
         if (buffer != null) {
-            if (buffer.capacity() > 0 && (uso + buffer.capacity() < m_lastReleaseOffset)) {
+            if (buffer.capacity() > 0) {
+                if (m_lastReleaseOffset > 0 && m_lastReleaseOffset > (uso + buffer.capacity())) {
+                    //What
+                    exportLog.info("Dropping already acked USO: " + m_lastReleaseOffset + " Buffer info: " + uso + " Size: " + buffer.capacity());
+                    return;
+                }
                 try {
                     m_committedBuffers.offer(new StreamBlock(
                             new BBContainer(buffer, bufferPtr) {
