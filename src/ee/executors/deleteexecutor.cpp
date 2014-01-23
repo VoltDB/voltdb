@@ -91,7 +91,7 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
     // update target table reference from table delegate
     PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
     assert(targetTable);
-    TableTuple targetTuple = TableTuple(targetTable->schema());
+    TableTuple targetTuple(targetTable->schema());
 
     int64_t modified_tuples = 0;
 

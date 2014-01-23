@@ -122,13 +122,12 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     output_table = dynamic_cast<TempTable*>(node->getOutputTable());
     assert(output_table);
 
-    inner_table = dynamic_cast<PersistentTable*>(inline_node->getTargetTable());
-    assert(inner_table);
-
     assert(node->getInputTables().size() == 1);
     outer_table = node->getInputTables()[0];
     assert(outer_table);
 
+    inner_table = dynamic_cast<PersistentTable*>(inline_node->getTargetTable());
+    assert(inner_table);
     //
     // Grab the Index from our inner table
     // We'll throw an error if the index is missing
@@ -157,12 +156,40 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     return true;
 }
 
+void NestLoopIndexExecutor::updateTargetTableAndIndex() {
+	inner_table = dynamic_cast<PersistentTable*>(inline_node->getTargetTable());
+	assert(inner_table);
+	//
+	// Grab the Index from our inner table
+	// We'll throw an error if the index is missing
+	//
+	index = inner_table->index(inline_node->getTargetIndexName());
+	if (index == NULL) {
+		VOLT_ERROR("Failed to retreive index '%s' from inner table '%s' for"
+				" internal PlanNode '%s'",
+				inline_node->getTargetIndexName().c_str(),
+				inner_table->name().c_str(), inline_node->debug().c_str());
+		return ;
+	}
+
+	// NULL tuple for outer join
+	if (node->getJoinType() == JOIN_TYPE_LEFT) {
+		Table* inner_out_table = inline_node->getOutputTable();
+		assert(inner_out_table);
+		m_null_tuple.init(inner_out_table->schema());
+	}
+
+	index_values = TableTuple(index->getKeySchema());
+	index_values.move( index_values_backing_store - TUPLE_HEADER_SIZE);
+	index_values.setAllNulls();
+}
+
 bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
 {
     assert (node == dynamic_cast<NestLoopIndexPlanNode*>(m_abstractNode));
     assert(node);
-    assert (inline_node == dynamic_cast<IndexScanPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_INDEXSCAN)));
-    assert(inline_node);
+
+    updateTargetTableAndIndex();
 
     assert (output_table == dynamic_cast<TempTable*>(node->getOutputTable()));
     assert(output_table);
