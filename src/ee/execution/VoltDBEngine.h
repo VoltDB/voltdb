@@ -115,7 +115,7 @@ class RecoveryProtoMsg;
 
 const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
 const size_t PLAN_CACHE_SIZE = 1024 * 10;
-// how many tuples to scan before calling into java
+// how many initial tuples to scan before calling into java
 const int64_t LONG_OP_THRESHOLD = 10000;
 
 /**
@@ -131,6 +131,14 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         /** Constructor for test code: this does not enable JNI callbacks. */
         VoltDBEngine() :
+          m_currentIndexInBatch(0),
+          m_allTuplesScanned(0),
+          m_tuplesProcessedInBatch(0),
+          m_tuplesProcessedInFragment(0),
+          m_tuplesProcessedSinceReport(0),
+          m_tupleReportThreshold(LONG_OP_THRESHOLD),
+          m_lastAccessedTable(NULL),
+          m_lastAccessedPlanNodeName(NULL),
           m_currentUndoQuantum(NULL),
           m_hashinator(NULL),
           m_staticParams(MAX_PARAM_COUNT),
@@ -198,18 +206,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         inline int getUsedParamcnt() const { return m_usedParamcnt;}
 
         /** index of the batch piece being executed */
-        int m_currentIndexInBatch;
-        int64_t m_allTuplesScanned;
-        int64_t m_tuplesProcessedInBatch;
-        int64_t m_tuplesProcessedInFragment;
-        Table *m_lastAccessedTable;
-        std::string *m_lastAccessedPlanNodeName;
-
         inline int getIndexInBatch() {
             return m_currentIndexInBatch;
-        }
-        inline void setLastAccessedTable(Table *table) {
-            m_lastAccessedTable = table;
         }
         inline void setLastAccessedPlanNodeName(std::string *name) {
             m_lastAccessedPlanNodeName = name;
@@ -221,7 +219,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         // Executors can call this to note a certain number of tuples have been
         // scanned or processed.index
-        inline void noteTuplesProcessedForProgressMonitoring(int tuplesProcessed);
+        inline int64_t pullTuplesRemainingUntilProgressReport(Table* target_table);
+        inline int64_t pushTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed);
 
         // -------------------------------------------------
         // Dependency Transfer Functions
@@ -504,7 +503,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                 >
             >
         > PlanSet;
-        PlanSet m_plans;
 
         /**
          * Get a vector of executors for a given fragment id.
@@ -514,12 +512,22 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         ExecutorVector *getExecutorVectorForFragmentId(const int64_t fragId);
 
-        voltdb::UndoLog m_undoLog;
-        voltdb::UndoQuantum *m_currentUndoQuantum;
-
         // -------------------------------------------------
         // Data Members
         // -------------------------------------------------
+        int m_currentIndexInBatch;
+        int64_t m_allTuplesScanned;
+        int64_t m_tuplesProcessedInBatch;
+        int64_t m_tuplesProcessedInFragment;
+        int64_t m_tuplesProcessedSinceReport;
+        int64_t m_tupleReportThreshold;
+        Table *m_lastAccessedTable;
+        std::string *m_lastAccessedPlanNodeName;
+
+        PlanSet m_plans;
+        voltdb::UndoLog m_undoLog;
+        voltdb::UndoQuantum *m_currentUndoQuantum;
+
         int64_t m_siteId;
         int32_t m_partitionId;
         int32_t m_clusterIndex;
@@ -653,13 +661,19 @@ inline void VoltDBEngine::resetReusedResultOutputBuffer(const size_t headerSize)
  * Track total tuples accessed for this query.
  * Set up statistics for long running operations thru m_engine if total tuples accessed passes the threshold.
  */
-inline void VoltDBEngine::noteTuplesProcessedForProgressMonitoring(int tuplesProcessed) {
-#ifndef ENABLE_POST_4_0
-    m_tuplesProcessedInFragment += tuplesProcessed;
-    if((m_tuplesProcessedInFragment % LONG_OP_THRESHOLD) == 0) {
+inline int64_t VoltDBEngine::pullTuplesRemainingUntilProgressReport(Table* target_table) {
+    if (target_table) {
+        m_lastAccessedTable = target_table;
+    }
+    return m_tupleReportThreshold - m_tuplesProcessedSinceReport;
+}
+
+inline int64_t VoltDBEngine::pushTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed) {
+    m_tuplesProcessedSinceReport += tuplesProcessed;
+    if (m_tuplesProcessedSinceReport >= m_tupleReportThreshold) {
         reportProgessToTopend();
     }
-#endif
+    return m_tupleReportThreshold; // size of next batch
 }
 
 } // namespace voltdb

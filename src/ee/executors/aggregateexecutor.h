@@ -84,7 +84,7 @@ protected:
     /// Helper method responsible for inserting the results of the
     /// aggregation into a new tuple in the output table as well as passing
     /// through any additional columns from the input table.
-    void insertOutputTuple(AggregateRow* aggregateRow);
+    bool insertOutputTuple(AggregateRow* aggregateRow);
 
     void advanceAggs(AggregateRow* aggregateRow);
 
