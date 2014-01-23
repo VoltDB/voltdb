@@ -276,6 +276,29 @@ Table* VoltDBEngine::getTable(string name) const
     return findInMapOrNull(name, m_tablesByName);
 }
 
+TableCatalogDelegate* VoltDBEngine::getTableDelegate(string name) const
+{
+    // Caller responsible for checking null return value.
+    CatalogDelegate * delegate = findInMapOrNull(name, m_delegatesByName);
+    return dynamic_cast<TableCatalogDelegate*>(delegate);
+}
+
+catalog::Table* VoltDBEngine::getCatalogTable(std::string name) const {
+    // iterate over all of the tables in the new catalog
+    std::map<string, catalog::Table*>::const_iterator catTableIter;
+    for (catTableIter = m_database->tables().begin();
+            catTableIter != m_database->tables().end();
+            catTableIter++)
+    {
+        catalog::Table *catalogTable = catTableIter->second;
+
+        if (catalogTable->name() == name) {
+            return catalogTable;
+        }
+    }
+    return NULL;
+}
+
 bool VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput* out) const {
     // Just look in our list of tables
     Table* table = getTable(tableId);
@@ -528,7 +551,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
     assert(m_catalog != NULL);
     VOLT_DEBUG("Loading catalog...");
 
-    VOLT_TRACE("Catalog string contents:\n%s\n",catalogPayload.c_str());
+
     m_catalog->execute(catalogPayload);
 
 

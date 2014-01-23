@@ -55,13 +55,13 @@ using namespace voltdb;
 AbstractScanPlanNode::AbstractScanPlanNode(int32_t id)
     : AbstractPlanNode(id), m_predicate(NULL)
 {
-    m_targetTable = NULL;
+    m_tcd = NULL;
 }
 
 AbstractScanPlanNode::AbstractScanPlanNode()
     : AbstractPlanNode(), m_predicate(NULL)
 {
-    m_targetTable = NULL;
+    m_tcd = NULL;
 }
 
 AbstractScanPlanNode::~AbstractScanPlanNode()
@@ -89,13 +89,16 @@ AbstractScanPlanNode::getPredicate() const
 Table*
 AbstractScanPlanNode::getTargetTable() const
 {
-    return m_targetTable;
+    if (m_tcd == NULL) {
+        return NULL;
+    }
+    return m_tcd->getTable();
 }
 
 void
-AbstractScanPlanNode::setTargetTable(Table* table)
+AbstractScanPlanNode::setTargetTableDelegate(TableCatalogDelegate* tcd)
 {
-    m_targetTable = table;
+    m_tcd = tcd;
 }
 
 string
