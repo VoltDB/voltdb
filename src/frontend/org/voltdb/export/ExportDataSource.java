@@ -92,6 +92,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private final int m_nullArrayLength;
     private long m_polledBlockSize = 0;
+    private long m_lastReleaseOffset = 0;
 
     /**
      * Create a new data source.
@@ -290,6 +291,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 break;
             }
         }
+        m_lastReleaseOffset = releaseOffset;
         m_firstUnpolledUso = Math.max(m_firstUnpolledUso, lastUso);
     }
 
@@ -444,7 +446,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         assert(!m_endOfStream);
         if (buffer != null) {
-            if (buffer.capacity() > 0) {
+            if (buffer.capacity() > 0 && (uso + buffer.capacity() < m_lastReleaseOffset)) {
                 try {
                     m_committedBuffers.offer(new StreamBlock(
                             new BBContainer(buffer, bufferPtr) {
@@ -466,7 +468,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                  * over an empty stream block. The block will be deleted
                  * on the native side when this method returns
                  */
-                exportLog.info("Syncing first unpolled USO to " + uso + " for table "
+                exportLog.debug("Syncing first unpolled USO to " + uso + " for table "
                         + m_tableName + " partition " + m_partitionId);
                 m_firstUnpolledUso = uso;
             }
