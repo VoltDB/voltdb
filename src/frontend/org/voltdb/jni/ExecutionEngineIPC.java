@@ -863,10 +863,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     String lastAccessedTable = m_connection.readString(size);
                     long lastAccessedTableSize = m_connection.readLong();
                     long tuplesFound = m_connection.readLong();
-                    boolean isCancel = fragmentProgressUpdate(batchIndex, planNodeName, lastAccessedTable, lastAccessedTableSize, tuplesFound);
-                    short isCancelInt = isCancel ? (short)1 : 0;
+                    long nextStep = fragmentProgressUpdate(batchIndex, planNodeName, lastAccessedTable, lastAccessedTableSize, tuplesFound);
                     m_data.clear();
-                    m_data.putShort(isCancelInt);
+                    m_data.putLong(nextStep);
                     m_data.flip();
                     m_connection.write();
                 }

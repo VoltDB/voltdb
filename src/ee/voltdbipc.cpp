@@ -778,56 +778,66 @@ char *VoltDBIPC::retrieveDependency(int32_t dependencyId, size_t *dependencySz) 
     return dependencyData;
 }
 
-bool VoltDBIPC::fragmentProgressUpdate(int32_t batchIndex,
+int64_t VoltDBIPC::fragmentProgressUpdate(int32_t batchIndex,
         std::string planNodeName,
         std::string targetTableName,
         int64_t targetTableSize,
         int64_t tuplesProcessed) {
-    char message[sizeof(int8_t) + sizeof(int32_t) + sizeof(planNodeName) + sizeof(targetTableName) +
-                 sizeof(targetTableSize) + sizeof(tuplesProcessed)];
+    char message[sizeof(int8_t) +
+                 sizeof(int16_t) +
+                 planNodeName.size() +
+                 sizeof(int16_t) +
+                 targetTableName.size() +
+                 sizeof(targetTableSize) +
+                 sizeof(tuplesProcessed)];
     message[0] = static_cast<int8_t>(kErrorCode_progressUpdate);
-    *reinterpret_cast<int32_t*>(&message[1]) = htonl(batchIndex);
+    size_t offset = 1;
+
+    *reinterpret_cast<int32_t*>(&message[offset]) = htonl(batchIndex);
+    offset += sizeof(batchIndex);
 
     int16_t strSize = static_cast<int16_t>(planNodeName.size());
-    *reinterpret_cast<int16_t*>(&message[5]) = htons(strSize);
-    ::memcpy( &message[7], planNodeName.c_str(), strSize);
-    int offset = 7 + strSize;
+    *reinterpret_cast<int16_t*>(&message[offset]) = htons(strSize);
+    offset += sizeof(strSize);
+    ::memcpy( &message[offset], planNodeName.c_str(), strSize);
+    offset += strSize;
 
     strSize = static_cast<int16_t>(targetTableName.size());
     *reinterpret_cast<int16_t*>(&message[offset]) = htons(strSize);
-    offset += 2;
+    offset += sizeof(strSize);
     ::memcpy( &message[offset], targetTableName.c_str(), strSize);
     offset += strSize;
 
     *reinterpret_cast<int64_t*>(&message[offset]) = htonll(targetTableSize);
-    offset += 8;
+    offset += sizeof(targetTableSize);
 
     *reinterpret_cast<int64_t*>(&message[offset]) = htonll(tuplesProcessed);
+    offset += sizeof(tuplesProcessed);
 
     int32_t length;
     ssize_t bytes = read(m_fd, &length, sizeof(int32_t));
-    if (bytes != sizeof(int32_t)) {
+    if (bytes != sizeof(length)) {
         printf("Error - blocking read failed. %jd read %jd attempted",
-                (intmax_t)bytes, (intmax_t)sizeof(int32_t));
+                (intmax_t)bytes, (intmax_t)sizeof(length));
         fflush(stdout);
         assert(false);
         exit(-1);
     }
-    length = static_cast<int32_t>(ntohl(length) - sizeof(int32_t));
+    length = static_cast<int32_t>(ntohl(length) - sizeof(length));
     assert(length > 0);
 
-    int16_t isCancel;
-    bytes = read(m_fd, &isCancel, sizeof(int16_t));
-    if (bytes != sizeof(int16_t)) {
+    int64_t nextStep;
+    bytes = read(m_fd, &nextStep, sizeof(nextStep));
+    if (bytes != sizeof(nextStep)) {
         printf("Error - blocking read failed. %jd read %jd attempted",
-                (intmax_t)bytes, (intmax_t)sizeof(int16_t));
+                (intmax_t)bytes, (intmax_t)sizeof(nextStep));
         fflush(stdout);
         assert(false);
         exit(-1);
     }
-    isCancel = static_cast<int16_t>(ntohs(isCancel));
+    nextStep = ntohll(nextStep);
 
-    return (isCancel == 1);
+    return nextStep;
 }
 
 std::string VoltDBIPC::planForFragmentId(int64_t fragmentId) {

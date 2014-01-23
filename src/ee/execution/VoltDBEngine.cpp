@@ -111,7 +111,15 @@ namespace voltdb {
 const int64_t AD_HOC_FRAG_ID = -1;
 
 VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
-    : m_currentUndoQuantum(NULL),
+    : m_currentIndexInBatch(0),
+      m_allTuplesScanned(0),
+      m_tuplesProcessedInBatch(0),
+      m_tuplesProcessedInFragment(0),
+      m_tuplesProcessedSinceReport(0),
+      m_tupleReportThreshold(LONG_OP_THRESHOLD),
+      m_lastAccessedTable(NULL),
+      m_lastAccessedPlanNodeName(NULL),
+      m_currentUndoQuantum(NULL),
       m_hashinator(NULL),
       m_staticParams(MAX_PARAM_COUNT),
       m_currentInputDepId(-1),
@@ -1692,11 +1700,14 @@ void VoltDBEngine::reportProgessToTopend() {
         tableSize = m_lastAccessedTable->activeTupleCount();
     }
     //Update stats in java and let java determine if we should cancel this query.
-    if(m_topend->fragmentProgressUpdate(m_currentIndexInBatch,
+    m_tuplesProcessedInFragment += m_tuplesProcessedSinceReport;
+    m_tupleReportThreshold = m_topend->fragmentProgressUpdate(m_currentIndexInBatch,
                                         *m_lastAccessedPlanNodeName,
                                         tableName,
                                         tableSize,
-                                        m_tuplesProcessedInBatch + m_tuplesProcessedInFragment)){
+                                        m_tuplesProcessedInBatch + m_tuplesProcessedInFragment);
+    m_tuplesProcessedSinceReport = 0;
+    if (m_tupleReportThreshold == 0) {
         VOLT_DEBUG("Interrupt query.");
         throw InterruptException("Query interrupted.");
     }
