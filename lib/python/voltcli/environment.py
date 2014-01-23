@@ -67,7 +67,10 @@ if not java:
     utility.abort('Could not find java in environment, set JAVA_HOME or put java in the path.')
 java_opts = []
 if 'VOLTDB_HEAPMAX' in os.environ:
-    java_opts.append(os.environ.get('VOLTDB_HEAPMAX'))
+    try:
+        java_opts.append('-Xmx%dm' % int(os.environ.get('VOLTDB_HEAPMAX')))
+    except ValueError:
+        java_opts.append(os.environ.get('VOLTDB_HEAPMAX'))
 if 'VOLTDB_OPTS' in os.environ:
     java_opts.extend(shlex.split(os.environ['VOLTDB_OPTS']))
 if 'JAVA_OPTS' in os.environ:
