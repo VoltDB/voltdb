@@ -158,17 +158,9 @@ void IndexScanExecutor::updateTargetTableAndIndex() {
     m_targetTable = static_cast<PersistentTable*>(m_node->getTargetTable());
 
     m_index = m_targetTable->index(m_node->getTargetIndexName());
+    assert(m_index);
     // Grab the Index from our inner table
     // We'll throw an error if the index is missing
-    if (m_index == NULL)
-    {
-        VOLT_ERROR("Failed to retreive index '%s' from table '%s' for PlanNode"
-                " '%s'", m_node->getTargetIndexName().c_str(),
-                m_targetTable->name().c_str(), m_node->debug().c_str());
-        delete [] m_searchKeyBackingStore;
-        delete [] m_projectionExpressions;
-        return ;
-    }
     VOLT_TRACE("Index key schema: '%s'", m_index->getKeySchema()->debug().c_str());
 
     m_searchKey = TableTuple(m_index->getKeySchema());

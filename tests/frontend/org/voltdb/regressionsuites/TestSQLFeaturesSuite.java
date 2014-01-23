@@ -70,7 +70,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         super(name);
     }
 
-    public void notestUpdates() throws Exception {
+    public void testUpdates() throws Exception {
         Client client = getClient();
 
         client.callProcedure("ORDER_LINE.insert", (byte)1, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1.5, "poo");
@@ -93,7 +93,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         assertTrue(true);
     }
 
-    public void notestSelfJoins() throws Exception {
+    public void testSelfJoins() throws Exception {
         Client client = getClient();
 
         client.callProcedure("NEW_ORDER.insert", (byte)1, 3L, 1L);
@@ -109,7 +109,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
     }
 
     /** Verify that non-latin-1 characters can be stored and retrieved */
-    public void notestUTF8() throws IOException {
+    public void testUTF8() throws IOException {
         Client client = getClient();
         final String testString = "並丧";
         try {
@@ -152,7 +152,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         }
     }
 
-    public void notestBatchedMultipartitionTxns() throws IOException, ProcCallException {
+    public void testBatchedMultipartitionTxns() throws IOException, ProcCallException {
         Client client = getClient();
 
         VoltTable[] results = client.callProcedure("BatchedMultiPartitionTest").getResults();
@@ -164,7 +164,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         assertEquals(1, results[4].getRowCount());
     }
 
-    public void notestLongStringUsage() throws IOException {
+    public void testLongStringUsage() throws IOException {
         final int STRLEN = 5000;
 
         Client client = getClient();
@@ -190,7 +190,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         assertEquals(0, row.getString(2).compareTo(longString));
     }
 
-    public void notestStringAsByteArrayParam() throws Exception {
+    public void testStringAsByteArrayParam() throws Exception {
         final int STRLEN = 5000;
 
         Client client = getClient();
@@ -211,7 +211,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         assertEquals(0, row.getString(2).compareTo(longString));
     }
 
-    public void notestPassAllArgTypes() throws IOException {
+    public void testPassAllArgTypes() throws IOException {
         byte b = 100;
         byte bArray[] = new byte[] { 100, 101, 102 };
         short s = 32000;
@@ -356,7 +356,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         assert(caught);
     }
 
-    public void notestJoinOrder() throws Exception {
+    public void testJoinOrder() throws Exception {
         if (isHSQL() || isValgrind()) return;
 
         Client client = getClient();
@@ -402,7 +402,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
 
     }
 
-    public void notestSetOpsThatFail() throws Exception {
+    public void testSetOpsThatFail() throws Exception {
         Client client = getClient();
 
         boolean caught;
@@ -497,28 +497,28 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
 
         // insert the data back
         loadTableForTruncateTest(client, procs);
+        String nestedLoopIndexJoin = "select count(*) from rtable r join ptable p on r.age = p.age";
+
         // Test nested loop index join
         for (String tb: tbs) {
             vt = client.callProcedure("@AdHoc", "select count(*) from " + tb).getResults()[0];
             validateTableOfScalarLongs(vt, new long[] {6});
         }
 
-        vt = client.callProcedure("@Explain",
-                "select count(*) from rtable r join ptable p on r.age = p.age").getResults()[0];
+        vt = client.callProcedure("@Explain", nestedLoopIndexJoin).getResults()[0];
         System.err.println(vt);
         assertTrue(vt.toString().contains("NESTLOOP INDEX INNER JOIN"));
-        assertTrue(vt.toString().contains("INDEX SCAN of \"PTABLE\""));
+        assertTrue(vt.toString().contains("inline INDEX SCAN of \"PTABLE\""));
+        assertTrue(vt.toString().contains("SEQUENTIAL SCAN of \"RTABLE\""));
 
-        vt = client.callProcedure("@AdHoc",
-                "select count(*) from rtable r join ptable p on r.age = p.age").getResults()[0];
+        vt = client.callProcedure("@AdHoc",nestedLoopIndexJoin).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {8});
 
         vt = client.callProcedure("@AdHoc", "Truncate table ptable").getResults()[0];
         vt = client.callProcedure("@AdHoc", "select count(*) from ptable").getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {0});
 
-        vt = client.callProcedure("@AdHoc",
-                "select count(*) from rtable r join ptable p on r.age = p.age").getResults()[0];
+        vt = client.callProcedure("@AdHoc",nestedLoopIndexJoin).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {0});
     }
 
