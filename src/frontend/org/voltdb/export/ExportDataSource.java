@@ -447,7 +447,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         assert(!m_endOfStream);
         if (buffer != null) {
             if (buffer.capacity() > 0) {
-                if (m_lastReleaseOffset > 0 && m_lastReleaseOffset > (uso + buffer.capacity())) {
+                if (m_lastReleaseOffset > 0 && m_lastReleaseOffset >= (uso + buffer.capacity())) {
                     //What ack from future is known?
                     exportLog.info("Dropping already acked USO: " + m_lastReleaseOffset
                             + " Buffer info: " + uso + " Size: " + buffer.capacity());
