@@ -44,7 +44,6 @@ import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorProperty;
 import org.voltdb.catalog.Database;
 import org.voltdb.utils.LogKeys;
-import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
@@ -263,23 +262,6 @@ public class ExportManager
         }
     }
 
-    private static void deleteExportOverflowData(CatalogContext context) {
-        File exportOverflowDirectory = new File(context.cluster.getExportoverflow());
-        exportLog.info("Deleting export overflow data from " + exportOverflowDirectory);
-        if (!exportOverflowDirectory.exists()) {
-            return;
-        }
-        File files[] = exportOverflowDirectory.listFiles();
-        if (files != null) {
-            for (File f : files) {
-                try {
-                    VoltFile.recursivelyDelete(f);
-                } catch (IOException e) {
-                    VoltDB.crashLocalVoltDB("Error deleting export overflow data", true, e);
-                }
-            }
-        }
-    }
     /**
      * Get the global instance of the ExportManager.
      * @return The global single instance of the ExportManager.
