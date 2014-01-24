@@ -474,7 +474,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                  * over an empty stream block. The block will be deleted
                  * on the native side when this method returns
                  */
-                exportLog.debug("Syncing first unpolled USO to " + uso + " for table "
+                exportLog.info("Syncing first unpolled USO to " + uso + " for table "
                         + m_tableName + " partition " + m_partitionId);
                 m_firstUnpolledUso = uso;
             }
@@ -760,7 +760,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         try {
             m_es.execute(new ExportDataSourceRunnable(runner));
         } catch (RejectedExecutionException rej) {
-            rej.printStackTrace();
             exportLog.warn("Failed to execute Export Data Source task.");
             Throwables.propagate(rej);
         }
@@ -777,7 +776,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return m_es.submit((Runnable) new ExportDataSourceRunnable(runner));
         } catch (RejectedExecutionException rej) {
             rej.printStackTrace();
-            exportLog.warn("Failed to submit Export Data Source task.");
             Throwables.propagate(rej);
         }
         return null;

@@ -182,7 +182,6 @@ public class ExportManager
                          * For those use a naive leader election strategy that is implemented
                          * by export generation.
                          */
-                        exportLog.info("Kicking off leader election");
                         nextGeneration.kickOffLeaderElection();
                     } else {
                         /*
@@ -193,7 +192,6 @@ public class ExportManager
                          * in m_masterOfPartitions
                          */
                         for( Integer partitionId: m_masterOfPartitions) {
-                            exportLog.info("Accepting mastership of: " + partitionId);
                             nextGeneration.acceptMastershipTask(partitionId);
                         }
                     }
