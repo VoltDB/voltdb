@@ -234,7 +234,7 @@ public class ExportManager
 
         m_self = em;
         if (connector != null && connector.getEnabled() == true) {
-            em.createInitialExportProcessor(catalogContext, connector, true, partitions);
+            em.createInitialExportProcessor(catalogContext, connector, true, partitions, isRejoin);
         }
     }
 
@@ -323,7 +323,8 @@ public class ExportManager
             CatalogContext catalogContext,
             final Connector conn,
             boolean startup,
-            List<Pair<Integer, Long>> partitions) {
+            List<Pair<Integer, Long>> partitions,
+            boolean isRejoin) {
         try {
             exportLog.info("Creating connector " + m_loaderClass);
             ExportDataProcessor newProcessor = null;
@@ -353,7 +354,7 @@ public class ExportManager
                 final ExportGeneration currentGeneration = new ExportGeneration(
                             catalogContext.m_uniqueId,
                             m_onGenerationDrained,
-                            exportOverflowDirectory);
+                        exportOverflowDirectory, isRejoin);
                 currentGeneration.initializeGenerationFromCatalog(conn, m_hostId, m_messenger, partitions);
                 m_generations.put( catalogContext.m_uniqueId, currentGeneration);
             }
@@ -470,7 +471,7 @@ public class ExportManager
             newGeneration = new ExportGeneration(
                     catalogContext.m_uniqueId,
                     m_onGenerationDrained,
-                    exportOverflowDirectory);
+                    exportOverflowDirectory, false);
         } catch (IOException e1) {
             VoltDB.crashLocalVoltDB("Error processing catalog update in export system", true, e1);
         }
@@ -483,7 +484,7 @@ public class ExportManager
          * This occurs when export is turned on/off at runtime.
          */
         if (m_processor.get() == null) {
-            createInitialExportProcessor(catalogContext, conn, false, partitions);
+            createInitialExportProcessor(catalogContext, conn, false, partitions, false);
         }
     }
 
