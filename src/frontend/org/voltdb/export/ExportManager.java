@@ -230,13 +230,6 @@ public class ExportManager
             List<Pair<Integer, Long>> partitions)
     throws ExportManager.SetupException
     {
-        /*
-         * If a node is rejoining it is because it crashed. Export overflow isn't crash safe so it isn't possible
-         * to recover the data. Delete it instead.
-         */
-        if (isRejoin) {
-            deleteExportOverflowData(catalogContext);
-        }
         ExportManager em = new ExportManager(myHostId, catalogContext, messenger, partitions);
         Connector connector = getConnector(catalogContext);
 
