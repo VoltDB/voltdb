@@ -4,7 +4,8 @@
 ## Introduction
 
 VoltDB Voltify provides a quick start for users with existing non-VoltDB
-databases.
+databases. The most important sections to read in order to get started
+are Prerequisites and Basic Usage.
 
 Voltify ports foreign schemas to VoltDB and creates simple working
 starter projects. Starter projects run out of the box on a single host,
@@ -26,6 +27,20 @@ should provide enough information to get started.
 ## Prerequisites
 
 Similar to "voltadmin", Voltify requires Python 2.6 or 2.7.
+
+The mysql-python module needs the MySQL client library, the mysql_config
+command, and the Python headers (for compiled C code).  The necessary
+packages can installed using the system package manager, e.g. on
+Ubuntu/Debian the following command should pull in these requirements.
+
+    sudo apt-get install mysql-client libmysqlclient-dev python-dev
+
+Existing MySQL development environments are likely to already have some
+or all of these packages installed.
+
+All other Python library requirements are automatically installed by
+voltify into the virtual environment during the first run. No user
+action is required.
 
 
 ## How Voltify Works
