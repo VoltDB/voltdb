@@ -104,6 +104,7 @@ public class ClientThread extends Thread {
             }
             catch (Exception e) {
                 log.warn("ClientThread threw exception in initialization, will retry", e);
+                try { Thread.sleep(3000); } catch (Exception e2) {}
             }
         }
 
