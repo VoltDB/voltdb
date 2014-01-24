@@ -398,12 +398,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return m_es.submit(new Callable<Long>() {
                 @Override
                 public Long call() throws Exception {
-                    if (m_committedBuffers.sizeInBytes() > 0) {
-                        exportLog.debug("Committed Buffers Size: " + m_committedBuffers.sizeInBytes());
-                    }
-                    if (m_polledBlockSize > 0) {
-                        exportLog.debug("In Flight Block Size: " + m_polledBlockSize);
-                    }
                     return m_committedBuffers.sizeInBytes() + m_polledBlockSize;
                 }
             }).get();
@@ -760,7 +754,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         try {
             m_es.execute(new ExportDataSourceRunnable(runner));
         } catch (RejectedExecutionException rej) {
-            exportLog.warn("Failed to execute Export Data Source task.");
+            exportLog.warn("Failed to execute Export Data Source task. " + rej);
             Throwables.propagate(rej);
         }
     }
@@ -775,7 +769,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         try {
             return m_es.submit((Runnable) new ExportDataSourceRunnable(runner));
         } catch (RejectedExecutionException rej) {
-            rej.printStackTrace();
+            exportLog.warn("Failed to run Export Data Source task. " + rej);
             Throwables.propagate(rej);
         }
         return null;
