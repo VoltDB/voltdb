@@ -50,6 +50,9 @@ command_name = None
 voltdb_jar   = None
 classpath    = None
 
+# Location of third_party/python if available.
+third_party_python = None
+
 # Assume that we're in a subdirectory of the main volt Python library
 # directory.  Add the containing library directory to the Python module load
 # path so that verb modules can import any module here. E.g.:
@@ -141,6 +144,12 @@ def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
                             if not os.environ.get('VOLTDB_VOLTDB', ''):
                                 os.environ['VOLTDB_VOLTDB'] = os.path.dirname(voltdb_jar)
                                 utility.debug('VOLTDB_VOLTDB=>%s' % os.environ['VOLTDB_VOLTDB'])
+
+            # Capture the base third_party python path?
+            third_party_python_chk = os.path.join(dir, 'third_party', 'python')
+            if os.path.isdir(third_party_python_chk):
+                global third_party_python
+                third_party_python = third_party_python_chk
 
             dir = os.path.dirname(dir)
 
