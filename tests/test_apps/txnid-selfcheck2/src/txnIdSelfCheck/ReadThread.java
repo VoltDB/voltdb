@@ -69,6 +69,7 @@ public class ReadThread extends Thread {
 
     void shutdown() {
         m_shouldContinue.set(false);
+        this.interrupt();
     }
 
     class ReadCallback implements ProcedureCallback {

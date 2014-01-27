@@ -117,6 +117,7 @@ public class AdHocMayhemThread extends Thread {
 
     void shutdown() {
         m_shouldContinue.set(false);
+        this.interrupt();
     }
 
     class AdHocCallback implements ProcedureCallback {
