@@ -49,6 +49,7 @@
 #include "plannodes/abstractoperationnode.h"
 #include "plannodes/abstractscannode.h"
 #include "storage/tablefactory.h"
+#include "storage/TableCatalogDelegate.hpp"
 
 #include <vector>
 
@@ -117,10 +118,12 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
                            m_abstractNode->debug().c_str());
                 return false;
             }
+            TableCatalogDelegate * tcd = engine->getTableDelegate(targetTableName);
+            assert(tcd != NULL);
             if (scan_node) {
-                scan_node->setTargetTable(target_table);
+                scan_node->setTargetTableDelegate(tcd);
             } else if (oper_node) {
-                oper_node->setTargetTable(target_table);
+                oper_node->setTargetTableDelegate(tcd);
             }
         }
     }

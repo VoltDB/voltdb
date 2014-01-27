@@ -70,7 +70,6 @@ public:
     {
         m_inputTargetMapSize = -1;
         m_inputTable = NULL;
-        m_targetTable = NULL;
         m_engine = engine;
         m_partitionColumn = -1;
     }
@@ -86,13 +85,10 @@ protected:
     int m_inputTargetMapSize;
 
     TempTable* m_inputTable;
-    PersistentTable* m_targetTable;
 
     TableTuple m_inputTuple;
-    TableTuple m_targetTuple;
     int m_partitionColumn;
     bool m_partitionColumnIsString;
-    std::vector<TableIndex*> m_indexesToUpdate;
 
     /** reference to the engine/context to store the number of modified tuples */
     VoltDBEngine* m_engine;

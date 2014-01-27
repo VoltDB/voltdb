@@ -35,3 +35,10 @@ Using the generated files
 
 - Running the client:
   ./run.sh client
+
+Other notes
+-----------
+
+- Connection string syntax:
+  mysql://USER[:PASSWORD]@HOST/DATABASE
+  e.g. mysql://myuser:mypassword@myhost/mydatabase

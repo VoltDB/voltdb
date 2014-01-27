@@ -131,4 +131,6 @@ public interface VoltServerConfig {
     public List<File> listFiles(File path) throws IOException;
 
     public File[] getPathInSubroots(File path) throws IOException;
+
+    public void setMaxHeap(int max);
 }

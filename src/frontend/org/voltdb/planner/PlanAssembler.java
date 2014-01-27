@@ -680,23 +680,25 @@ public class PlanAssembler {
         // If the scan matches all rows, we can throw away the scan
         // nodes and use a truncate delete node.
         // Assume all index scans have filters in this context, so only consider seq scans.
-        if (m_partitioning.wasSpecifiedAsSingle() &&
-                (subSelectRoot instanceof SeqScanPlanNode) &&
+        if ( (subSelectRoot instanceof SeqScanPlanNode) &&
                 (((SeqScanPlanNode) subSelectRoot).getPredicate() == null)) {
             deleteNode.setTruncate(true);
-            return deleteNode;
-        }
 
-        // OPTIMIZATION: Projection Inline
-        // If the root node we got back from createSelectTree() is an
-        // AbstractScanNode, then
-        // we put the Projection node we just created inside of it
-        // When we inline this projection into the scan, we're going
-        // to overwrite any original projection that we might have inlined
-        // in order to simply cull the columns from the persistent table.
-        subSelectRoot.addInlinePlanNode(projectionNode);
-        // connect the nodes to build the graph
-        deleteNode.addAndLinkChild(subSelectRoot);
+            if (m_partitioning.wasSpecifiedAsSingle()) {
+                return deleteNode;
+            }
+        } else {
+            // connect the nodes to build the graph
+            deleteNode.addAndLinkChild(subSelectRoot);
+            // OPTIMIZATION: Projection Inline
+            // If the root node we got back from createSelectTree() is an
+            // AbstractScanNode, then
+            // we put the Projection node we just created inside of it
+            // When we inline this projection into the scan, we're going
+            // to overwrite any original projection that we might have inlined
+            // in order to simply cull the columns from the persistent table.
+            subSelectRoot.addInlinePlanNode(projectionNode);
+        }
 
         if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
             return deleteNode;

@@ -220,7 +220,7 @@ class Metadata:
             provides    = 'voltdb',
             conflicts   = 'voltdb',
             replaces    = 'voltdb',
-            depends     = 'default-jdk,libc6',
+            depends     = 'openjdk-7-jdk,libc6',
             priority    = 'extra',
             section     = 'database',
             maintainer  = 'VoltDB',
@@ -289,7 +289,7 @@ SOURCE0 : %%{name}-%%{version}.tar.gz
 Vendor: %(maintainer)s
 URL: http://www.voltdb.com
 Provides: %(provides)s
-Conflicts: %(conflicts)s 
+Conflicts: %(conflicts)s
 Requires: libgcc >= 4.1.2, libstdc++ >= 4.1.2, python >= 2.6
 Requires: java >= 1:1.7.0
 Requires: java7-devel >= 1:1.7.0
@@ -622,11 +622,11 @@ def rpm():
     # also spit out command lists for the %post and %preun sections
     # that will link/unlink the binaries from /usr/bin
     with ChDir(buildroot):
-        files = [] 
+        files = []
         for l in pipe_cmd("find", ".", "-not", "-type", "d"):
             files.append(string.lstrip(l, '.'))
 
-        links = [] 
+        links = []
         for l in pipe_cmd("find", ".", "-type", "l"):
             print l
             links.append(string.lstrip(l, '.'))
@@ -634,7 +634,7 @@ def rpm():
     with open(os.path.join(blddir, "SPECS", "myfiles"), 'w') as fout:
         for f in files:
             fout.write("\"%s\"\n" % f)
-        
+
     with open(os.path.join(blddir, "SPECS", "preuncmd"), 'w') as uout:
         for l in links:
             uout.write("unlink %s\n" % l)
@@ -651,7 +651,7 @@ def rpm():
         run_cmd("rpmbuild", "-bb", "voltdb.spec")
 
     # snag our new package
-    shutil.copy(os.path.join(blddir, "RPMS", "x86_64", 
+    shutil.copy(os.path.join(blddir, "RPMS", "x86_64",
             '%(pkgname)s-%(pkgversion)s-%(pkgrelease)d.%(arch)s.rpm' % syms),
                  meta.output_root)
 

@@ -84,7 +84,7 @@ public class TestFragmentProgressUpdate extends TestCase {
 
         m_ee.loadCatalog( 0, catalog.serialize());
 
-        int tableSize = 10001;
+        int tableSize = 5001;
         int longOpThreshold = 10000;
         VoltTable warehousedata = new VoltTable(
                 new VoltTable.ColumnInfo("W_ID", VoltType.SMALLINT),
@@ -130,6 +130,8 @@ public class TestFragmentProgressUpdate extends TestCase {
                 null,
                 new ParameterSet[] { params },
                 3, 2, 42, Long.MAX_VALUE);
+        // Like many fully successful operations, a single row fetch counts as 2 logical row operations,
+        // one for locating the row and one for retrieving it.
         assertEquals(1, m_ee.m_callsFromEE);
         assertEquals(longOpThreshold, m_ee.m_lastTuplesAccessed);
     }

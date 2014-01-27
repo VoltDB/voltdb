@@ -92,6 +92,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private final int m_nullArrayLength;
     private long m_polledBlockSize = 0;
+    private long m_lastReleaseOffset = 0;
 
     /**
      * Create a new data source.
@@ -290,6 +291,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 break;
             }
         }
+        m_lastReleaseOffset = releaseOffset;
         m_firstUnpolledUso = Math.max(m_firstUnpolledUso, lastUso);
     }
 
@@ -439,6 +441,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         assert(!m_endOfStream);
         if (buffer != null) {
             if (buffer.capacity() > 0) {
+                if (m_lastReleaseOffset > 0 && m_lastReleaseOffset >= (uso + buffer.capacity())) {
+                    //What ack from future is known?
+                    exportLog.info("Dropping already acked USO: " + m_lastReleaseOffset
+                            + " Buffer info: " + uso + " Size: " + buffer.capacity());
+                    return;
+                }
                 try {
                     m_committedBuffers.offer(new StreamBlock(
                             new BBContainer(buffer, bufferPtr) {
@@ -639,6 +647,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_pollFuture = null;
             }
         } catch (Throwable t) {
+            m_polledBlockSize = 0;
             fut.setException(t);
         }
     }
@@ -742,12 +751,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private void executeExportDataSourceRunner(Runnable runner) {
-        if (m_es.isShutdown()) {
-            return;
-        }
         try {
             m_es.execute(new ExportDataSourceRunnable(runner));
         } catch (RejectedExecutionException rej) {
+            exportLog.warn("Failed to execute Export Data Source task. " + rej);
+            Throwables.propagate(rej);
         }
     }
 
@@ -758,12 +766,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * @return ListenableFuture
      */
     private ListenableFuture<?> runExportDataSourceRunner(Runnable runner) {
-        if (m_es.isShutdown()) {
-            return null;
-        }
         try {
             return m_es.submit((Runnable) new ExportDataSourceRunnable(runner));
         } catch (RejectedExecutionException rej) {
+            exportLog.warn("Failed to run Export Data Source task. " + rej);
+            Throwables.propagate(rej);
         }
         return null;
     }
@@ -779,9 +786,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         @Override
         public void run() {
-            if (m_es.isShutdown()) {
-                return;
-            }
             m_runner.run();
         }
     }

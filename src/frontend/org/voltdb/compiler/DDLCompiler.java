@@ -220,7 +220,7 @@ public class DDLCompiler {
             "AS" +                                  // AS token
             "\\s+" +                                // one or more spaces
             "(" +                                   // (3) begin SELECT or DML statement
-            "(?:SELECT|INSERT|UPDATE|DELETE)" +     //   valid DML start tokens (not captured)
+            "(?:SELECT|INSERT|UPDATE|DELETE|TRUNCATE)" +     //   valid DML start tokens (not captured)
             "\\s+" +                                //   one or more spaces
             ".+)" +                                 //   end SELECT or DML statement
             ";" +                                   // semi-colon terminator
@@ -1909,23 +1909,54 @@ public class DDLCompiler {
     }
 
     // if the materialized view has MIN / MAX, try to find an index defined on the source table
-    // covering all group by cols / exprs to avoid expensive tablescan, must be full key coverage
-    private static Index findBestMatchIndexForMatviewMinOrMax(MaterializedViewInfo matviewinfo, Table srcTable, List<AbstractExpression> groupbyExprs) {
+    // covering all group by cols / exprs to avoid expensive tablescan.
+    // For now, the only acceptable index is defined exactly on the group by columns IN ORDER.
+    // This allows the same key to be used to do lookups on the grouped table index and the
+    // base table index.
+    // TODO: More flexible (but usually less optimal*) indexes may be allowed here and supported
+    // in the EE in the future including:
+    //   -- *indexes on the group keys listed out of order
+    //   -- *indexes on the group keys as a prefix before other indexed values.
+    //   -- indexes on the group keys PLUS the MIN/MAX argument value (to eliminate post-filtering)
+    private static Index findBestMatchIndexForMatviewMinOrMax(MaterializedViewInfo matviewinfo,
+            Table srcTable, List<AbstractExpression> groupbyExprs)
+    {
         CatalogMap<Index> allIndexes = srcTable.getIndexes();
+        // Match based on one of two algorithms depending on whether expressions are all simple columns.
+        if (groupbyExprs == null) {
+            for (Index index : allIndexes) {
+                String expressionjson = index.getExpressionsjson();
+                if ( ! expressionjson.isEmpty()) {
+                    continue;
+                }
+                List<ColumnRef> indexedColRefs =
+                        CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
+                List<ColumnRef> groupbyColRefs =
+                        CatalogUtil.getSortedCatalogItems(matviewinfo.getGroupbycols(), "index");
+                if (indexedColRefs.size() != groupbyColRefs.size()) {
+                    continue;
+                }
 
-        ArrayList<Index> candidates = new ArrayList<Index>();
-
-        for (Index index : allIndexes) {
-            String expressionjson = index.getExpressionsjson();
-            if (groupbyExprs == null && !expressionjson.isEmpty() ||
-                    groupbyExprs != null && expressionjson.isEmpty()) {
-                continue;
+                boolean matchedAll = true;
+                for (int i = 0; i < indexedColRefs.size(); ++i) {
+                    int groupbyColIndex = groupbyColRefs.get(i).getColumn().getIndex();
+                    int indexedColIndex = indexedColRefs.get(i).getColumn().getIndex();
+                    if (groupbyColIndex != indexedColIndex) {
+                        matchedAll = false;
+                        break;
+                    }
+                }
+                if (matchedAll) {
+                    return index;
+                }
             }
-            List<AbstractExpression> indexedExprs = null;
-            List<ColumnRef> indexedColRefs = null;
-
-            // complex group by exprs
-            if (groupbyExprs != null) {
+        } else {
+            for (Index index : allIndexes) {
+                String expressionjson = index.getExpressionsjson();
+                if (expressionjson.isEmpty()) {
+                    continue;
+                }
+                List<AbstractExpression> indexedExprs = null;
                 StmtTableScan tableScan = StmtTableScan.getStmtTableScan(srcTable);
                 try {
                     indexedExprs = AbstractExpression.fromJSONArrayString(expressionjson, tableScan);
@@ -1934,55 +1965,23 @@ public class DDLCompiler {
                     assert(false);
                     return null;
                 }
-
-                if (!prefixCompatibleExprs(indexedExprs, groupbyExprs)) {
-                    continue;
-                } else {
-                    candidates.add(index);
-                }
-            }
-            // simple group by cols
-            else {
-                indexedColRefs = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
-                List<ColumnRef> groupbyColRefs = CatalogUtil.getSortedCatalogItems(matviewinfo.getGroupbycols(), "index");
-
-                if (indexedColRefs.size() > groupbyColRefs.size()) {
+                if (indexedExprs.size() != groupbyExprs.size()) {
                     continue;
                 }
 
-                List<Integer> indexedColIds = new ArrayList<Integer>();
-                List<Integer> groupbyColIds = new ArrayList<Integer>();
-
-                for (ColumnRef cr : indexedColRefs) {
-                    indexedColIds.add(cr.getColumn().getIndex());
-                }
-                for (ColumnRef cr : groupbyColRefs) {
-                    groupbyColIds.add(cr.getColumn().getIndex());
-                }
-
-                boolean found = true;
-                for (int i = 0; i < indexedColIds.size(); i++) {
-                    if (!indexedColIds.contains(groupbyColIds.get(i))) {
-                        found = false;
+                boolean matchedAll = true;
+                for (int i = 0; i < indexedExprs.size(); ++i) {
+                    if ( ! indexedExprs.get(i).equals(groupbyExprs.get(i))) {
+                        matchedAll = false;
                         break;
                     }
                 }
-                if (found) {
-                    candidates.add(index);
+                if (matchedAll) {
+                    return index;
                 }
             }
         }
-
-        // return the widest index (match best)
-        Index ret = null;
-        for (Index index : candidates) {
-            if (ret == null) {
-                ret = index;
-            } else if (CatalogUtil.getCatalogIndexSize(index) > CatalogUtil.getCatalogIndexSize(ret)) {
-                ret = index;
-            }
-        }
-        return ret;
+        return null;
     }
 
     // srcExprs is the prefix of destExprs
