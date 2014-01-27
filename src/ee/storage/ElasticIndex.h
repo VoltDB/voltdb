@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,7 @@
 #define ELASTIC_INDEX_H_
 
 #include <iostream>
+#include <limits>
 #include <stx/btree.h>
 #include <boost/iterator/iterator_facade.hpp>
 #include "storage/TupleBlock.h"
@@ -167,6 +168,11 @@ class ElasticIndex : public stx::btree_set<ElasticIndexKey, ElasticIndexComparat
      */
     const_iterator createUpperBoundIterator(ElasticHash upperBound) const;
 
+    /**
+     * Print the keys in the index
+     */
+    void printKeys(std::ostream &os, int32_t limit, const TupleSchema *schema, const PersistentTable &table) const;
+
   private:
 
     static ElasticHash generateHash(const PersistentTable &table, const TableTuple &tuple);
@@ -244,6 +250,13 @@ public:
      * Reset iteration.
      */
     void reset();
+
+    /**
+     * access the range into which this iterator is built on
+     */
+    const ElasticIndexHashRange range() const {
+        return m_range;
+    }
 
 private:
 
@@ -447,11 +460,36 @@ inline ElasticIndex::const_iterator ElasticIndex::createUpperBoundIterator(Elast
 }
 
 /**
+ * Print the keys in the index
+ */
+inline void ElasticIndex::printKeys(std::ostream &os, int32_t limit, const TupleSchema *schema, const PersistentTable &table) const {
+    if (limit < 0) {
+        limit = std::numeric_limits<int32_t>::max();
+    }
+    int32_t upto = 0;
+    for (const_iterator itr = begin(); itr != end() && upto < limit; ++itr) {
+
+        TableTuple tuple = TableTuple(itr->getTupleAddress(), schema);
+        ElasticHash tupleHash = generateHash(table, tuple);
+
+        os << *itr << ", is ";
+        if (itr->getHash() != tupleHash) {
+            os << "NOT ";
+        }
+        os << "a correct hash for its tuple address (pending delete: "
+           << (tuple.isPendingDelete() ? "true)" : "false)")
+           << std::endl;
+
+        ++upto;
+    }
+}
+
+/**
  * ElasticIndexKey streaming operator.
  */
 inline std::ostream &operator<<(std::ostream &os, const ElasticIndexKey &key)
 {
-    os << std::hex << key.m_hash << ':' << key.m_ptrVal;
+    os << key.m_hash << ':' << key.m_ptrVal;
     return os;
 }
 

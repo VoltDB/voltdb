@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -1323,6 +1323,66 @@ public class TestFixedSQLSuite extends RegressionSuite {
                     "where var2 = 'foo' and field(var3,'color') = 'red';").getResults()[0];
             assertTrue(result.getRowCount() == 0);
         }
+    }
+
+    // SQL HAVING bug on partitioned materialized table
+    public void testENG5669() throws IOException, ProcCallException {
+        System.out.println("STARTING testing HAVING......");
+        Client client = getClient();
+        VoltTable vt = null;
+
+        String sqlArray =
+                "INSERT INTO P3 VALUES (0, -5377, 837, -21764, 18749);" +
+                "INSERT INTO P3 VALUES (1, -5377, 837, -21764, 26060);" +
+                "INSERT INTO P3 VALUES (2, -5377, 837, -10291, 30855);" +
+                "INSERT INTO P3 VALUES (3, -5377, 837, -10291, 10718);" +
+                "INSERT INTO P3 VALUES (4, -5377, 24139, -12116, -26619);" +
+                "INSERT INTO P3 VALUES (5, -5377, 24139, -12116, -28421);" +
+                "INSERT INTO P3 VALUES (6, -5377, 24139, 26580, 21384);" +
+                "INSERT INTO P3 VALUES (7, -5377, 24139, 26580, 16131);" +
+                "INSERT INTO P3 VALUES (8, 24862, -32179, 17651, 15165);" +
+                "INSERT INTO P3 VALUES (9, 24862, -32179, 17651, -27633);" +
+                "INSERT INTO P3 VALUES (10, 24862, -32179, 12941, 12036);" +
+                "INSERT INTO P3 VALUES (11, 24862, -32179, 12941, 18363);" +
+                "INSERT INTO P3 VALUES (12, 24862, -25522, 7979, 3903);" +
+                "INSERT INTO P3 VALUES (13, 24862, -25522, 7979, 19380);" +
+                "INSERT INTO P3 VALUES (14, 24862, -25522, 29263, 2730);" +
+                "INSERT INTO P3 VALUES (15, 24862, -25522, 29263, -19078);" +
+
+                "INSERT INTO P3 VALUES (32, 1010, 1010, 1010, 1010);" +
+                "INSERT INTO P3 VALUES (34, 1020, 1020, 1020, 1020);" +
+                "INSERT INTO P3 VALUES (36, -1010, 1010, 1010, 1010);" +
+                "INSERT INTO P3 VALUES (38, -1020, 1020, 1020, 1020);" +
+                "INSERT INTO P3 VALUES (40, 3620, 5836, 10467, 31123);" +
+                "INSERT INTO P3 VALUES (41, 3620, 5836, 10467, -28088);" +
+                "INSERT INTO P3 VALUES (42, 3620, 5836, -29791, -8520);" +
+                "INSERT INTO P3 VALUES (43, 3620, 5836, -29791, 24495);" +
+                "INSERT INTO P3 VALUES (44, 3620, 4927, 18147, -27779);" +
+                "INSERT INTO P3 VALUES (45, 3620, 4927, 18147, -30914);" +
+                "INSERT INTO P3 VALUES (46, 3620, 4927, 8494, -30592);" +
+                "INSERT INTO P3 VALUES (47, 3620, 4927, 8494, 20340);" +
+                "INSERT INTO P3 VALUES (48, -670, 26179, -25323, -23185);" +
+                "INSERT INTO P3 VALUES (49, -670, 26179, -25323, 22429);" +
+                "INSERT INTO P3 VALUES (50, -670, 26179, -17828, 24248);" +
+                "INSERT INTO P3 VALUES (51, -670, 26179, -17828, 4962);" +
+                "INSERT INTO P3 VALUES (52, -670, -14477, -14488, 13599);" +
+                "INSERT INTO P3 VALUES (53, -670, -14477, -14488, -14801);" +
+                "INSERT INTO P3 VALUES (54, -670, -14477, 16827, -12008);" +
+                "INSERT INTO P3 VALUES (55, -670, -14477, 16827, 27722);";
+
+        // Test Default
+        String []sqls = sqlArray.split(";");
+        System.out.println(sqls);
+        for (String sql: sqls) {
+            sql = sql.trim();
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        }
+        vt = client.callProcedure("@AdHoc", "SELECT SUM(V_SUM_RENT), SUM(V_G2) FROM V_P3;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] { {90814,-6200}});
+
+        vt = client.callProcedure("@AdHoc", "SELECT SUM(V_SUM_RENT) FROM V_P3 HAVING SUM(V_G2) < 42").getResults()[0];
+        validateTableOfLongs(vt, new long[][] { {90814}});
+        System.out.println(vt);
     }
 
 

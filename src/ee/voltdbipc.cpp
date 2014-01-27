@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -34,9 +34,10 @@
 #include "common/TheHashinator.h"
 #include "common/LegacyHashinator.h"
 #include "common/ElasticHashinator.h"
-#include "execution/IPCTopend.h"
-#include "execution/VoltDBEngine.h"
+#include "common/Topend.h"
 #include "common/ThreadLocalPool.h"
+#include "execution/VoltDBEngine.h"
+#include "storage/table.h"
 
 #include <cassert>
 #include <cstdlib>
@@ -444,7 +445,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
 
     std::string hostname(cs->data, cs->hostnameLength);
     try {
-        m_engine = new VoltDBEngine(new voltdb::IPCTopend(this), new voltdb::StdoutLogProxy());
+        m_engine = new VoltDBEngine(this, new voltdb::StdoutLogProxy());
         m_engine->getLogManager()->setLogLevels(cs->logLevels);
         m_reusedResultBuffer = new char[MAX_MSG_SZ];
         m_exceptionBuffer = new char[MAX_MSG_SZ];
@@ -677,6 +678,28 @@ int8_t VoltDBIPC::setLogLevels(struct ipc_command *cmd) {
 
 void VoltDBIPC::terminate() {
     m_terminate = true;
+}
+
+int VoltDBIPC::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool, Table* destination) {
+    VOLT_DEBUG("iterating java dependency for id %d\n", dependencyId);
+    size_t dependencySz;
+    char* buf = retrieveDependency(dependencyId, &dependencySz);
+    char *origBuf = buf;
+
+    if (!buf) {
+        return 0;
+    }
+
+    if (dependencySz > 0) {
+        ReferenceSerializeInput serialize_in(buf, dependencySz);
+        destination->loadTuplesFrom(serialize_in, stringPool);
+        delete [] origBuf;
+        return 1;
+    }
+    else {
+        delete [] origBuf;
+        return 0;
+    }
 }
 
 /**

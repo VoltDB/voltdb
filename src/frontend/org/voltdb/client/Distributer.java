@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -34,10 +34,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+
+import jsr166y.ThreadLocalRandom;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -708,7 +709,10 @@ class Distributer {
 
                 if (procedureInfo != null) {
                     hashedPartition = Constants.MP_INIT_PID;
-                    if (!procedureInfo.multiPart) {
+                    if (( ! procedureInfo.multiPart) &&
+                        // User may have passed too few parameters to allow dispatching.
+                        // Avoid an indexing error here to fall through to the proper ProcCallException.
+                            (procedureInfo.partitionParameter < invocation.getPassedParamCount())) {
                         hashedPartition = m_hashinator.getHashedPartitionForParameter(
                                 procedureInfo.partitionParameterType,
                                 invocation.getPartitionParamValue(procedureInfo.partitionParameter));

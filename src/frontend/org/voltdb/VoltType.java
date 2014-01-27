@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -531,12 +531,19 @@ public enum VoltType {
         return m_sqlString;
     }
 
+    /**
+     * <p>Is this type visible to JDBC</p>
+     *
+     * @return JDBC visibility.
+     */
     public boolean isJdbcVisible() {
         return m_jdbcVisible;
     }
 
     /**
-     * Get the java.sql.Types type of this type.  Type.  Type you, typing typer.
+     * Get the java.sql.Types type of this type.
+     *
+     * @return int representing SQL type of the VoltDB type.
      */
     public int getJdbcSqlType() {
         return m_dataType;

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,6 +16,8 @@
  */
 
 package org.voltdb.iv2;
+
+import com.google_voltpatches.common.base.Supplier;
 
 import java.util.List;
 
@@ -42,5 +44,5 @@ public interface Term
     public void shutdown();
 
     /** Get the current set of HSIds which we're monitoring */
-    public List<Long> getInterestingHSIds();
+    public Supplier<List<Long>> getInterestingHSIds();
 }

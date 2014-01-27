@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,7 +20,6 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.concurrent.Callable;
 
-import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.utils.VoltTableUtil;
@@ -45,7 +44,7 @@ public class CSVSnapshotFilter implements SnapshotDataFilter {
         }
         m_fullDelimiters = fullDelimiters;
         m_delimiter = delimiter;
-        m_schemaBytes = vt.getSchemaBytes();
+        m_schemaBytes = PrivateVoltTableFactory.getSchemaBytes(vt);
     }
 
     @Override

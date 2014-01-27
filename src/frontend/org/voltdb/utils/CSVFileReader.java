@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,14 +23,15 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
+
 import org.supercsv.exception.SuperCsvException;
 import org.supercsv.io.ICsvListReader;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.NoConnectionsException;
+import org.voltdb.common.Constants;
 
 /**
  *
@@ -135,7 +136,7 @@ class CSVFileReader implements Runnable {
                     partitionId =
                             clientImpl.getPartitionForParameter(
                             CSVPartitionProcessor.m_partitionColumnType.getValue(),
-                            (Object) lineData.correctedLine[CSVPartitionProcessor.m_partitionedColumnIndex]);
+                            lineData.correctedLine[CSVPartitionProcessor.m_partitionedColumnIndex]);
                 }
                 BlockingQueue<CSVLineWithMetaData> q = m_processorQueues.get(partitionId);
                 if (q == null) {
@@ -248,12 +249,12 @@ class CSVFileReader implements Runnable {
                         && (slot[i].charAt(0) == ' ' || slot[i].charAt(slot[i].length() - 1) == ' ')) {
                     return "Error: White Space Detected in nowhitespace mode.";
                 } else {
-                    slot[i] = ((String) slot[i]).trim();
+                    slot[i] = slot[i].trim();
                 }
                 // treat NULL, \N and "\N" as actual null value
                 if (slot[i].equals("NULL")
-                        || slot[i].equals(VoltTable.CSV_NULL)
-                        || slot[i].equals(VoltTable.QUOTED_CSV_NULL)) {
+                        || slot[i].equals(Constants.CSV_NULL)
+                        || slot[i].equals(Constants.QUOTED_CSV_NULL)) {
                     slot[i] = null;
                 }
             }

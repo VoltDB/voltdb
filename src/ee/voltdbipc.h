@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,13 +24,16 @@
 #include "logging/LogDefs.h"
 #include "logging/LogProxy.h"
 #include "common/FatalException.hpp"
-#include "storage/StreamBlock.h"
+#include "common/Topend.h"
 
 namespace voltdb {
+class Pool;
+class StreamBlock;
+class Table;
 class VoltDBEngine;
 }
 
-class VoltDBIPC {
+class VoltDBIPC : public voltdb::Topend {
 public:
 
     // must match ERRORCODE_SUCCESS|ERROR in ExecutionEngine.java
@@ -54,6 +57,9 @@ public:
     VoltDBIPC(int fd);
 
     ~VoltDBIPC();
+
+    int loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool, voltdb::Table* destination);
+    void fallbackToEEAllocatedBuffer(char *buffer, size_t length) { }
 
     /**
      * Retrieve a dependency from Java via the IPC connection.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2013 VoltDB Inc.
+# Copyright (C) 2008-2014 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -99,15 +99,31 @@ class FastSerializer:
     # that host order is little endian. See isNaN().
 
     def __init__(self, host = None, port = 21212, username = "",
-                 password = "", dump_file = None):
+                 password = "", dump_file_path = None,
+                 connect_timeout = 8,
+                 procedure_timeout = None,
+                 default_timeout = None):
+        """
+        :param host: host string for connection or None
+        :param port: port for connection or None
+        :param username: authentication user name for connection or None
+        :param password: authentication password for connection or None
+        :param dump_file_path: path to optional dump file or None
+        :param connect_timeout: timeout (secs) or None for authentication (default=8)
+        :param procedure_timeout: timeout (secs) or None for procedure calls (default=None)
+        :param default_timeout: default timeout (secs) or None for all other operations (default=None)
+        """
         # connect a socket to host, port and get a file object
         self.wbuf = array.array('c')
         self.rbuf = ""
         self.host = host
         self.port = port
-        self.dump_file = None
-        if dump_file != None:
-            self.dump_file = open(dump_file, "wb")
+        if not dump_file_path is None:
+            self.dump_file = open(dump_file_path, "wb")
+        else:
+            self.dump_file = None
+        self.default_timeout = default_timeout
+        self.procedure_timeout = procedure_timeout
 
         self.socket = None
         if self.host != None and self.port != None:
@@ -191,7 +207,12 @@ class FastSerializer:
                                       None, x)}
 
         if username != None and password != None and host != None:
+            assert not self.socket is None
+            self.socket.settimeout(connect_timeout)
             self.authenticate(username, password)
+
+        if self.socket:
+            self.socket.settimeout(self.default_timeout)
 
     def __compileStructs(self):
         # Compiled structs for each type
@@ -237,7 +258,14 @@ class FastSerializer:
         self.flush()
 
         # A length, version number, and status code is returned
-        self.bufferForRead()
+        try:
+            self.bufferForRead()
+        except IOError, e:
+            print "ERROR: Connection failed. Please check that the host and port are correct."
+            raise e
+        except socket.timeout:
+            raise SystemExit("Authentication timed out after %d seconds."
+                                % self.socket.gettimeout())
         version = self.readByte()
         status = self.readByte()
 
@@ -983,10 +1011,23 @@ class VoltProcedure:
         self.fser.prependLength() # prepend the total length of the invocation
         self.fser.flush()
 
+        # The timeout in effect for the procedure call is the timeout argument
+        # if not None or self.procedure_timeout. Exceeding that time will raise
+        # a timeout exception. Restores the original timeout value when done.
+        # This default argument usage does not allow overriding with None.
+        if timeout is None:
+            timeout = self.fser.procedure_timeout
+        original_timeout = self.fser.socket.gettimeout()
+        self.fser.socket.settimeout(timeout)
         try:
-            self.fser.socket.settimeout(timeout) # timeout exception will be raised
-            res = VoltResponse(self.fser)
-        except IOError, err:
-            res = VoltResponse(None)
-            res.statusString = str(err)
+            try:
+                res = VoltResponse(self.fser)
+            except socket.timeout:
+                res = VoltResponse(None)
+                res.statusString = "timeout: procedure call took longer than %d seconds" % timeout
+            except IOError, err:
+                res = VoltResponse(None)
+                res.statusString = str(err)
+        finally:
+            self.fser.socket.settimeout(original_timeout)
         return response and res or None
