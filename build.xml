@@ -482,6 +482,7 @@ DISTRIBUTION
         <fileset dir="tools" defaultexcludes="yes">
             <include name="toolrunner.py" />
             <include name="voltify" />
+            <include name="voltify-README.md" />
             <include name="voltify.d/**" />
             <include name="lib/**" />
         </fileset>

@@ -198,14 +198,14 @@ The basic sequence is as follows.
 
     You can also edit "volt.cfg" directly in a text editor.
 
-    $ voltify config set connection_string=mysql://root@localhost/demo
-    set voltify.connection_string=mysql://root@localhost/demo
+    $ voltify config set connection_string=mysql://root:password@localhost/employees
+    set voltify.connection_string=mysql://root:password@localhost/employees
 
     $ voltify config set partition_table=Customer
     set voltify.partition_table=Customer
 
     $ voltify config get
-    voltify.connection_string=mysql://root@localhost/employees
+    voltify.connection_string=mysql://root:password@localhost/employees
     voltify.ddl_file=ddl.sql
     voltify.deployment_file=deployment.xml
     voltify.host_count=1
