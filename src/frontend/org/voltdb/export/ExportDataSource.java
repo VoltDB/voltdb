@@ -482,7 +482,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 exportLog.error(e);
             }
         }
-        pollImpl(m_pollFuture);
+        long sz = 0;
+        if (buffer != null) {
+            sz = buffer.capacity();
+        }
+        pollImpl(m_pollFuture, sz);
     }
 
     public void pushExportBuffer(
@@ -581,14 +585,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     fut.setException(new RuntimeException("Should not poll more than once"));
                     return;
                 }
-                pollImpl(fut);
+                pollImpl(fut, 0);
             }
         });
         return fut;
     }
 
-    private void pollImpl(SettableFuture<BBContainer> fut) {
-        if (fut == null) return;
+    private void pollImpl(SettableFuture<BBContainer> fut, long sz) {
+        if (fut == null) {
+            m_polledBlockSize = m_polledBlockSize + sz;
+            return;
+        }
 
         try {
             StreamBlock first_unpolled_block = null;
@@ -637,6 +644,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             //If there are no unpolled blocks return the firstUnpolledUSO with no data
             if (first_unpolled_block == null) {
                 m_pollFuture = fut;
+                m_polledBlockSize = 0;
             } else {
                 //Otherwise return the block with the USO for the end of the block
                 //since the entire remainder of the block is being sent.
