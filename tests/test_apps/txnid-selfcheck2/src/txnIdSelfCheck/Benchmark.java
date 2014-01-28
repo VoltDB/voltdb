@@ -518,7 +518,12 @@ public class Benchmark {
         log.info("All threads started...");
 
         // subtract time spent initializing threads and starting them
-        Thread.sleep((1000l * config.duration) - (System.currentTimeMillis() - benchmarkStartTS));
+        long rt = (1000l * config.duration) - (System.currentTimeMillis() - benchmarkStartTS);
+        if (rt > 0) {
+            Thread.sleep(rt);
+        }
+
+        log.info("Duration completed shutting down threads...");
 
         replicatedLoader.shutdown();
         partitionedLoader.shutdown();

@@ -54,7 +54,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
-import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
