@@ -176,6 +176,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     Table* targetTable = m_node->getTargetTable();
     TableIndex *tableIndex = targetTable->index(m_node->getTargetIndexName());
     assert(tableIndex);
+    m_searchKey = TableTuple(tableIndex->getKeySchema());
+    m_searchKey.moveNoHeader(m_searchKeyBackingStore);
 
     int activeNumOfSearchKeys = m_numOfSearchkeys;
     IndexLookupType localLookupType = m_lookupType;

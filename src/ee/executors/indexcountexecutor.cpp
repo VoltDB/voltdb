@@ -146,6 +146,14 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     // update local target table with its most recent reference
     Table* targetTable = m_node->getTargetTable();
     TableIndex * tableIndex = targetTable->index(m_node->getTargetIndexName());
+    if (m_numOfSearchkeys != 0) {
+        m_searchKey = TableTuple(tableIndex->getKeySchema());
+        m_searchKey.moveNoHeader(m_searchKeyBackingStore);
+    }
+    if (m_numOfEndkeys != 0) {
+        m_endKey = TableTuple(tableIndex->getKeySchema());
+        m_endKey.moveNoHeader(m_endKeyBackingStore);
+    }
 
     int activeNumOfSearchKeys = m_numOfSearchkeys;
     IndexLookupType localLookupType = m_lookupType;
