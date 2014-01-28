@@ -809,6 +809,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                                                                      rebalanceStats,
                                                                      clSnapshotPath,
                                                                      m_deployment.getCluster().getKfactor());
+                    m_elasticJoinService.updateConfig(m_catalogContext);
                 }
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Failed to instantiate elastic join service", false, e);
