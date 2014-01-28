@@ -91,7 +91,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final Semaphore m_bufferPushPermits = new Semaphore(16);
 
     private final int m_nullArrayLength;
-    private long m_polledBlockSize = 0;
     private long m_lastReleaseOffset = 0;
 
     /**
@@ -398,7 +397,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return m_es.submit(new Callable<Long>() {
                 @Override
                 public Long call() throws Exception {
-                    return m_committedBuffers.sizeInBytes() + m_polledBlockSize;
+                    return m_committedBuffers.sizeInBytes();
                 }
             }).get();
         } catch (Throwable t) {
@@ -593,7 +592,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private void pollImpl(SettableFuture<BBContainer> fut, long sz) {
         if (fut == null) {
-            m_polledBlockSize = m_polledBlockSize + sz;
             return;
         }
 
@@ -644,18 +642,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             //If there are no unpolled blocks return the firstUnpolledUSO with no data
             if (first_unpolled_block == null) {
                 m_pollFuture = fut;
-                m_polledBlockSize = 0;
             } else {
-                //Otherwise return the block with the USO for the end of the block
-                //since the entire remainder of the block is being sent.
-                m_polledBlockSize = first_unpolled_block.totalUso();
                 fut.set(
                         new AckingContainer(first_unpolled_block.unreleasedBufferV2(),
                                 first_unpolled_block.uso() + first_unpolled_block.totalUso()));
                 m_pollFuture = null;
             }
         } catch (Throwable t) {
-            m_polledBlockSize = 0;
             fut.setException(t);
         }
     }
@@ -752,10 +745,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         Preconditions.checkNotNull(toBeRunOnMastership, "mastership runnable is null");
 
         m_onMastership = toBeRunOnMastership;
-    }
-
-    public void resetInFlightSize() {
-        m_polledBlockSize = 0;
     }
 
     private void executeExportDataSourceRunner(Runnable runner) {
