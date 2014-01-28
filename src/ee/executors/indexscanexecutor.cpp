@@ -147,6 +147,11 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     // Grab the Index from our inner table
     // We'll throw an error if the index is missing
     VOLT_TRACE("Index key schema: '%s'", tableIndex->getKeySchema()->debug().c_str());
+    //
+    // Miscellanous Information
+    //
+    m_lookupType = m_node->getLookupType();
+    m_sortDirection = m_node->getSortDirection();
 
     // Need to move GTE to find (x,_) when doing a partial covering search.
     // the planner sometimes used to lie in this case: index_lookup_type_eq is incorrect.
@@ -155,12 +160,6 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
             m_searchKey.getSchema()->columnCount() == m_numOfSearchkeys);
 
     VOLT_DEBUG("IndexScan: %s.%s\n", targetTable->name().c_str(), tableIndex->getName().c_str());
-
-    //
-    // Miscellanous Information
-    //
-    m_lookupType = m_node->getLookupType();
-    m_sortDirection = m_node->getSortDirection();
 
     return true;
 }
