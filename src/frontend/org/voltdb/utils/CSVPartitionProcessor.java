@@ -234,8 +234,8 @@ class CSVPartitionProcessor implements Runnable {
         public void clientCallback(ClientResponse response) throws Exception {
             byte status = response.getStatus();
             if (status != ClientResponse.SUCCESS
-                    || status != ClientResponse.USER_ABORT
-                    || status != ClientResponse.GRACEFUL_FAILURE) {
+                    && status != ClientResponse.USER_ABORT
+                    && status != ClientResponse.GRACEFUL_FAILURE) {
                 System.out.println("Fatal Response from server for: " + response.getStatusString()
                         + " for: " + m_csvLine.rawLine.toString());
                 System.exit(1);
@@ -330,8 +330,8 @@ class CSVPartitionProcessor implements Runnable {
         public void clientCallback(ClientResponse response) throws Exception {
             byte status = response.getStatus();
             if (status != ClientResponse.SUCCESS
-                    || status != ClientResponse.USER_ABORT
-                    || status != ClientResponse.GRACEFUL_FAILURE) {
+                    && status != ClientResponse.USER_ABORT
+                    && status != ClientResponse.GRACEFUL_FAILURE) {
                 System.out.println("Fatal Response from server for batch. Please check health of the server. Status: "
                         + response.getStatusString());
                 System.exit(1);
