@@ -241,6 +241,9 @@ public class Collector {
                 if (file.getName().startsWith("voltdb_crash") && file.getName().endsWith(".txt")) {
                     collectionFilesList.add(file.getCanonicalPath());
                 }
+                if (file.getName().startsWith("hs_err_pid") && file.getName().endsWith(".log")) {
+                    collectionFilesList.add(file.getCanonicalPath());
+                }
             }
 
             for (File file: new File(m_workingDir).listFiles()) {

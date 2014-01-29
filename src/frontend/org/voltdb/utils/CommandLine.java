@@ -458,6 +458,10 @@ public class CommandLine extends VoltDB.Configuration
         cmdline.add("-XX:+UseTLAB");
         cmdline.add("-XX:CMSInitiatingOccupancyFraction=75");
         cmdline.add("-XX:+UseCMSInitiatingOccupancyOnly");
+        //If a Volt root is provided such as local cluster or VEM, put the error file in it
+        if ( !volt_root.isEmpty() ) {
+            cmdline.add("-XX:ErrorFile=" + volt_root + "/hs_err_pid%p.log");
+        }
         if (conditionalCardMark) {
             cmdline.add("-XX:+UseCondCardMark");
         }
