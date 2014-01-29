@@ -293,10 +293,10 @@ public class Collector {
             }
             else {
                 TimestampType ts = new TimestampType(new java.util.Date());
-                timestamp = ts.toString().replace(' ', '-');
+                timestamp = ts.toString().replace(' ', '-').replace(':', '-');
 
                 // get rid of microsecond part
-                timestamp = timestamp.substring(0, "YYYY-mm-DD-HH:MM:ss".length());
+                timestamp = timestamp.substring(0, "YYYY-mm-DD-HH-MM-ss".length());
 
                 rootpath = System.getProperty("user.dir");
             }
