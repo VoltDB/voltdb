@@ -1169,7 +1169,7 @@ public abstract class SubPlanAssembler {
      * @param scanNode that needs to be distributed
      * @return return the newly created receive node (which is linked to the new sends)
      */
-    protected AbstractPlanNode addSendReceivePair(AbstractPlanNode scanNode) {
+    static AbstractPlanNode addSendReceivePair(AbstractPlanNode scanNode) {
 
         SendPlanNode sendNode = new SendPlanNode();
         sendNode.addAndLinkChild(scanNode);

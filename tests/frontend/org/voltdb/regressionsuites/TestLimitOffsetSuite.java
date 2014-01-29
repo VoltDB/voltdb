@@ -39,7 +39,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         super(name);
     }
 
-    private void load(Client client)
+    private static void load(Client client)
     throws NoConnectionsException, IOException, InterruptedException {
         for (int i = 0; i < 10; i++) {
             SyncCallback cb = new SyncCallback();
@@ -56,11 +56,8 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         }
     }
 
-    private void doLimitOffsetAndCheck(String proc)
+    private static void doLimitOffsetAndCheck(Client client, String proc)
     throws IOException, InterruptedException, ProcCallException {
-        Client client = this.getClient();
-        load(client);
-
         ClientResponse resp = client.callProcedure(proc, 4, 0);
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         VoltTable[] results = resp.getResults();
@@ -84,39 +81,33 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         assertEquals(4, i);
     }
 
-    public void testMultiPartInlineLimit() throws IOException, InterruptedException, ProcCallException {
-        doLimitOffsetAndCheck("LimitAPKEY");
-    }
-
-    public void testMultiPartLimit() throws IOException, InterruptedException, ProcCallException {
-        doLimitOffsetAndCheck("LimitAI");
-    }
-
-    public void testReplicatedInlineLimit() throws IOException, InterruptedException, ProcCallException {
-        doLimitOffsetAndCheck("LimitBPKEY");
-    }
-
-    public void testReplicatedLimit() throws IOException, InterruptedException, ProcCallException {
-        doLimitOffsetAndCheck("LimitBI");
-    }
-
-    public void testDistinctLimitOffset() throws NoConnectionsException, IOException, ProcCallException {
-        Client client = this.getClient();
-        client.callProcedure("InsertA", 0, 1);
-        client.callProcedure("InsertA", 1, 1);
-        client.callProcedure("InsertA", 2, 2);
-        VoltTable result = null;
-
-        result = client.callProcedure("@AdHoc", "SELECT DISTINCT I FROM A LIMIT 1 OFFSET 1;").getResults()[0];
-        assertEquals(1, result.getRowCount());
-
-        result = client.callProcedure("@AdHoc", "SELECT DISTINCT I FROM A LIMIT 0 OFFSET 1;").getResults()[0];
-        assertEquals(0, result.getRowCount());
-}
-
-    public void testJoinAndLimitOffset() throws IOException, ProcCallException, InterruptedException {
+    public void testBasicLimitOffsets() throws IOException, ProcCallException, InterruptedException {
         Client client = this.getClient();
         load(client);
+        doTestMultiPartInlineLimit(client);
+        doTestMultiPartLimit(client);
+        doTestReplicatedInlineLimit(client);
+        doTestReplicatedLimit(client);
+        doTestJoinAndLimitOffset(client);
+    }
+
+    private static void doTestMultiPartInlineLimit(Client client) throws IOException, InterruptedException, ProcCallException {
+        doLimitOffsetAndCheck(client, "LimitAPKEY");
+    }
+
+    private static void doTestMultiPartLimit(Client client) throws IOException, InterruptedException, ProcCallException {
+        doLimitOffsetAndCheck(client, "LimitAI");
+    }
+
+    private static void doTestReplicatedInlineLimit(Client client) throws IOException, InterruptedException, ProcCallException {
+        doLimitOffsetAndCheck(client, "LimitBPKEY");
+    }
+
+    private static void doTestReplicatedLimit(Client client) throws IOException, InterruptedException, ProcCallException {
+        doLimitOffsetAndCheck(client, "LimitBI");
+    }
+
+    public static void doTestJoinAndLimitOffset(Client client) throws IOException, ProcCallException, InterruptedException {
         int limits[] = new int[] { 1, 2, 5, 10, 12, 25 };
         int offsets[] = new int[] { 0, 1, 2, 5, 10, 12, 25 };
         String selecteds[] = new String[] { "*", "A.PKEY" };
@@ -153,6 +144,20 @@ public class TestLimitOffsetSuite extends RegressionSuite {
                 }
             }
         }
+    }
+
+    public void testDistinctLimitOffset() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = getClient();
+        client.callProcedure("InsertA", 0, 1);
+        client.callProcedure("InsertA", 1, 1);
+        client.callProcedure("InsertA", 2, 2);
+        VoltTable result = null;
+
+        result = client.callProcedure("@AdHoc", "SELECT DISTINCT I FROM A LIMIT 1 OFFSET 1;").getResults()[0];
+        assertEquals(1, result.getRowCount());
+
+        result = client.callProcedure("@AdHoc", "SELECT DISTINCT I FROM A LIMIT 0 OFFSET 1;").getResults()[0];
+        assertEquals(0, result.getRowCount());
     }
 
     public void testENG3487() throws IOException, ProcCallException {

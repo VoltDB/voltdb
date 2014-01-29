@@ -47,7 +47,7 @@ public class MicroOptimizationRunner {
 
         for (MicroOptimization opt : optimizations) {
             // skip optimizations that don't apply at this determinism level
-            if (!opt.shouldRun(detMode)) {
+            if (!opt.shouldRun(detMode, plan.hasDeterministicStatement())) {
                 continue;
             }
 
