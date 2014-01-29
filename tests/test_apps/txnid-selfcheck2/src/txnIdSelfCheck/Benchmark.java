@@ -23,6 +23,7 @@
 
 package txnIdSelfCheck;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -404,7 +405,8 @@ public class Benchmark {
         long diffInSeconds = (now - lastProgressTimestamp) / 1000;
 
         log.info(String.format("Executed %d%s", txnCount.get(),
-                madeProgress ? "" : " (no progress made in " + diffInSeconds + " seconds)"));
+                madeProgress ? "" : " (no progress made in " + diffInSeconds + " seconds, last at " +
+                        (new SimpleDateFormat("yyyy-MM-DD HH:mm:ss.S")).format(new Date(lastProgressTimestamp)) + ")"));
 
         if (diffInSeconds > config.progresstimeout) {
             log.error("No progress was made in over " + diffInSeconds + " seconds while connected to a cluster. Exiting.");
@@ -523,8 +525,9 @@ public class Benchmark {
             Thread.sleep(rt);
         }
 
-        log.info("Duration completed shutting down threads...");
+        log.info("Duration completed shutting down...");
 
+        /* XXX/PSR
         replicatedLoader.shutdown();
         partitionedLoader.shutdown();
         readThread.shutdown();
@@ -548,11 +551,11 @@ public class Benchmark {
         for (ClientThread clientThread : clientThreads) {
             clientThread.join();
         }
-
+        */
         // cancel periodic stats printing
         timer.cancel();
         checkpointTimer.cancel();
-
+        /*
         shutdown.set(true);
         es.shutdownNow();
 
@@ -560,9 +563,11 @@ public class Benchmark {
         client.drain();
         client.close();
         permitsTimer.cancel();
+        */
 
         log.info(HORIZONTAL_RULE);
         log.info("Benchmark Complete");
+        System.exit(0);
     }
 
     /**
