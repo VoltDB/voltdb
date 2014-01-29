@@ -7,7 +7,7 @@ import hudson.slaves.*
 def jenkins = jenkins.model.Jenkins.instance;
 
 
-def stack1 = ["volt12a-controller-of-volt12a-b-c-d-e-f", "volt12a-U12.04","volt12b-RH6","volt12c-U12.04","volt12d-U12.04","volt12e-U10.04","volt12f-U10.04"];
+def stack1 = ["volt12a-controller-of-volt12a-b-c-d-e-f", "volt12a-U12.04","volt12b-RH6","volt12c-RH5","volt12d-U12.04","volt12e-U10.04","volt12f-U10.04"];
 //String controller1 = [ stack1[0] ]
 
 def stack2 = ["volt12i-controller-of-volt12i-j-k-l-m-n", "volt12i-U12.04","volt12j-RH6","volt12k-U12.04","volt12l-U12.04","volt12m-U10.04","volt12n-U10.04"];
