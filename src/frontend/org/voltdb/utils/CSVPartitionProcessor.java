@@ -240,7 +240,7 @@ class CSVPartitionProcessor implements Runnable {
                         + " for: " + m_csvLine.rawLine.toString());
                 System.exit(1);
             }
-            if (status == ClientResponse.RESPONSE_UNKNOWN) {
+            if (status != ClientResponse.SUCCESS) {
                 String[] info = {m_csvLine.rawLine.toString(), response.getStatusString()};
                 if (CSVFileReader.synchronizeErrorInfo(m_csvLine.lineNumber, info)) {
                     m_processor.m_errored = true;
