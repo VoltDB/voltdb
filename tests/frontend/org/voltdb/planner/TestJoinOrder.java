@@ -225,10 +225,22 @@ public class TestJoinOrder extends PlannerTestCase {
     }
 
     public void testMicroOptimizationJoinOrder() {
-        List<AbstractPlanNode> pns = compileWithJoinOrderToFragments("select * from J1, P2 where A=B", "J1, P2");
-        AbstractPlanNode n = pns.get(1).getChild(0);
+		// Microoptimization can be used for determinism only when working with replicated tables or
+		// single-partition queries.
+        List<AbstractPlanNode> pns;
+        AbstractPlanNode n;
+
+        pns = compileWithJoinOrderToFragments("select * from J1, P2 where A=B and A=1", "J1, P2");
+        n = pns.get(0).getChild(0).getChild(0);
         assertTrue(((IndexScanPlanNode)n.getChild(0)).getTargetTableName().equals("J1"));
         assertTrue(((SeqScanPlanNode)n.getChild(1)).getTargetTableName().equals("P2"));
+
+        pns = compileWithJoinOrderToFragments("select * from I1, T2 where A=B", "I1, T2");
+        /*/ to debug */ System.out.println(pns.get(0).toExplainPlanString());
+        n = pns.get(0).getChild(0).getChild(0);
+        assertTrue(((IndexScanPlanNode)n.getChild(0)).getTargetTableName().equals("I1"));
+        assertTrue(((SeqScanPlanNode)n.getChild(1)).getTargetTableName().equals("T2"));
+
     }
 
     public void testInnerOuterJoinOrder() {

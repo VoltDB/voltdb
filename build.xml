@@ -1383,7 +1383,9 @@ TEST CASES
                 <patternset refid="junit.all.path" />
                 <!-- Exclude many tests not directly related to sql functionality -->
                 <exclude name="**/*$*.class"/>
+                <exclude name='org/voltcore/**/*.class'/>
                 <exclude name='org/voltdb/client/TestClientFeatures.class'/>
+                <exclude name='org/voltdb/client/TestDistributer.class'/>
                 <exclude name='org/voltdb/dtxn/Test*.class'/>
                 <exclude name='org/voltdb/iv2/Test*.class'/>
                 <exclude name='org/voltdb/jdbc/Test*.class'/>
