@@ -93,7 +93,6 @@ private:
     AbstractExpression** m_projectionExpressions;
 
     // Search key
-    TableTuple m_searchKey;
     AbstractExpression** m_searchKeyArray;
 
     IndexLookupType m_lookupType;

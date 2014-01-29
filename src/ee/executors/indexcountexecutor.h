@@ -50,7 +50,7 @@ private:
     bool p_init(AbstractPlanNode*, TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
 
-    long countNulls(TableIndex * index, AbstractExpression * countNullExpr);
+    long countNulls(TableIndex * tableIndex, AbstractExpression * countNullExpr);
 
     // Data in this class is arranged roughly in the order it is read for
     // p_execute(). Please don't reshuffle it only in the name of beauty.
@@ -61,8 +61,6 @@ private:
     int m_numOfEndkeys;
 
     // Search key
-    TableTuple m_searchKey;
-    TableTuple m_endKey;
     AbstractExpression** m_searchKeyArray;
     AbstractExpression** m_endKeyArray;
 

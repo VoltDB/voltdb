@@ -141,9 +141,8 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     assert(static_cast<PersistentTable*>(targetTable));
 
     TableIndex *tableIndex = targetTable->index(m_node->getTargetIndexName());
-    m_searchKey = TableTuple(tableIndex->getKeySchema());
     m_searchKeyBackingStore = new char[tableIndex->getKeySchema()->tupleLength()];
-    m_searchKey.moveNoHeader(m_searchKeyBackingStore);
+
     // Grab the Index from our inner table
     // We'll throw an error if the index is missing
     VOLT_TRACE("Index key schema: '%s'", tableIndex->getKeySchema()->debug().c_str());
@@ -152,12 +151,6 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     //
     m_lookupType = m_node->getLookupType();
     m_sortDirection = m_node->getSortDirection();
-
-    // Need to move GTE to find (x,_) when doing a partial covering search.
-    // the planner sometimes used to lie in this case: index_lookup_type_eq is incorrect.
-    // Index_lookup_type_gte is necessary.
-    assert(m_lookupType != INDEX_LOOKUP_TYPE_EQ ||
-            m_searchKey.getSchema()->columnCount() == m_numOfSearchkeys);
 
     VOLT_DEBUG("IndexScan: %s.%s\n", targetTable->name().c_str(), tableIndex->getName().c_str());
 
@@ -175,8 +168,12 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     Table* targetTable = m_node->getTargetTable();
     TableIndex *tableIndex = targetTable->index(m_node->getTargetIndexName());
     assert(tableIndex);
-    m_searchKey = TableTuple(tableIndex->getKeySchema());
-    m_searchKey.moveNoHeader(m_searchKeyBackingStore);
+    TableTuple searchKey = TableTuple(tableIndex->getKeySchema());
+    searchKey = TableTuple(tableIndex->getKeySchema());
+    searchKey.moveNoHeader(m_searchKeyBackingStore);
+
+    assert(m_lookupType != INDEX_LOOKUP_TYPE_EQ ||
+            searchKey.getSchema()->columnCount() == m_numOfSearchkeys);
 
     int activeNumOfSearchKeys = m_numOfSearchkeys;
     IndexLookupType localLookupType = m_lookupType;
@@ -203,13 +200,13 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     //
     // SEARCH KEY
     //
-    m_searchKey.setAllNulls();
-    VOLT_TRACE("Initial (all null) search key: '%s'", m_searchKey.debugNoHeader().c_str());
+    searchKey.setAllNulls();
+    VOLT_TRACE("Initial (all null) search key: '%s'", searchKey.debugNoHeader().c_str());
     for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
         m_searchKeyArray[ctr]->substitute(params);
         NValue candidateValue = m_searchKeyArray[ctr]->eval(NULL, NULL);
         try {
-            m_searchKey.setNValue(ctr, candidateValue);
+            searchKey.setNValue(ctr, candidateValue);
         }
         catch (const SQLException &e) {
             // This next bit of logic handles underflow and overflow while
@@ -272,8 +269,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             break;
         }
     }
-    assert((activeNumOfSearchKeys == 0) || (m_searchKey.getSchema()->columnCount() > 0));
-    VOLT_TRACE("Search key after substitutions: '%s'", m_searchKey.debugNoHeader().c_str());
+    assert((activeNumOfSearchKeys == 0) || (searchKey.getSchema()->columnCount() > 0));
+    VOLT_TRACE("Search key after substitutions: '%s'", searchKey.debugNoHeader().c_str());
 
     //
     // END EXPRESSION
@@ -329,23 +326,23 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     TableTuple tuple;
     if (activeNumOfSearchKeys > 0) {
         VOLT_TRACE("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
-                   localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
+                   localLookupType, activeNumOfSearchKeys, searchKey.debugNoHeader().c_str());
 
         if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
-            tableIndex->moveToKey(&m_searchKey);
+            tableIndex->moveToKey(&searchKey);
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
-            tableIndex->moveToGreaterThanKey(&m_searchKey);
+            tableIndex->moveToGreaterThanKey(&searchKey);
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
-            tableIndex->moveToKeyOrGreater(&m_searchKey);
+            tableIndex->moveToKeyOrGreater(&searchKey);
         } else if (localLookupType == INDEX_LOOKUP_TYPE_LT) {
-            tableIndex->moveToLessThanKey(&m_searchKey);
+            tableIndex->moveToLessThanKey(&searchKey);
         } else if (localLookupType == INDEX_LOOKUP_TYPE_LTE) {
             // find the entry whose key is greater than search key,
             // do a forward scan using initialExpr to find the correct
             // start point to do reverse scan
-            bool isEnd = tableIndex->moveToGreaterThanKey(&m_searchKey);
+            bool isEnd = tableIndex->moveToGreaterThanKey(&searchKey);
             if (isEnd) {
                 tableIndex->moveToEnd(false);
             } else {
