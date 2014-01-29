@@ -481,11 +481,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 exportLog.error(e);
             }
         }
-        long sz = 0;
-        if (buffer != null) {
-            sz = buffer.capacity();
-        }
-        pollImpl(m_pollFuture, sz);
+        pollImpl(m_pollFuture);
     }
 
     public void pushExportBuffer(
@@ -584,13 +580,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     fut.setException(new RuntimeException("Should not poll more than once"));
                     return;
                 }
-                pollImpl(fut, 0);
+                pollImpl(fut);
             }
         });
         return fut;
     }
 
-    private void pollImpl(SettableFuture<BBContainer> fut, long sz) {
+    private void pollImpl(SettableFuture<BBContainer> fut) {
         if (fut == null) {
             return;
         }
