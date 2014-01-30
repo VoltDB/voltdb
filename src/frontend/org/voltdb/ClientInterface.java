@@ -877,6 +877,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         public void cancel() {
         }
 
+        @Override
+        public String toString() {
+            return clientResponse.getClass().getName();
+        }
+
         /**
          * Checks if the transaction needs to be restarted, if so, restart it.
          * @param messageSize the original message size when the invocation first came in
@@ -1706,7 +1711,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             RateLimitedLogger.tryLogForMessage(
                             errorMessage + ". This message is rate limited to once every 60 seconds.",
                             System.currentTimeMillis(),
-                            1000 * 60,
+                            60, TimeUnit.SECONDS,
                             authLog,
                             Level.WARN);
             return new ClientResponseImpl(

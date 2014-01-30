@@ -57,6 +57,7 @@ import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.SelectionKey;
+import java.util.concurrent.atomic.AtomicLong;
 
 import junit.framework.TestCase;
 
@@ -371,6 +372,25 @@ public class TestNIOWriteStream extends TestCase {
         wstream.drainTo( channel );
         assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
         wstream.shutdown();
+    }
+
+    public void testQueueMonitor() throws Exception {
+        final MockChannel channel = new MockChannel(MockChannel.FULL);
+        MockPort port = new MockPort();
+        final AtomicLong queue = new AtomicLong();
+        NIOWriteStream wstream = new NIOWriteStream(port, null, null, new QueueMonitor() {
+
+            @Override
+            public boolean queue(int bytes) {
+                queue.addAndGet(bytes);
+                return false;
+            }
+        });
+        wstream.enqueue(ByteBuffer.allocate(32));
+        wstream.swapAndSerializeQueuedWrites(pool);
+        assertEquals(32, queue.get());
+        wstream.shutdown();
+        assertEquals(0, queue.get());
     }
 
 }
