@@ -30,7 +30,6 @@ import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
-import org.voltdb.VoltDB;
 
 /**
 *
@@ -364,10 +363,8 @@ public class NIOWriteStream implements WriteStream {
                     boolean assertOn = false;
                     assert (assertOn = true);
                     if (assertOn) {
-                        VoltDB.crashLocalVoltDB(
-                                "Sloppy serialization size for message class " + ds,
-                                true,
-                                null);
+                        networkLog.fatal("Sloppy serialization size for message class " + ds);
+                        System.exit(-1);
                     }
                     RateLimitedLogger.tryLogForMessage(
                             "Sloppy serialization size for message class " + ds,
