@@ -169,7 +169,9 @@ public class ExportGeneration {
             }
         } else {
             if (!m_directory.canWrite()) {
-                throw new IOException("Could not write " + m_directory);
+                if (!m_directory.mkdirs()) {
+                    throw new IOException("Could not create " + m_directory);
+                }
             }
         }
         exportLog.info("Creating new export generation " + m_timestamp);
