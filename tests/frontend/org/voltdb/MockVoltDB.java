@@ -50,7 +50,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -63,7 +62,6 @@ public class MockVoltDB implements VoltDBInterface
     final String m_clusterName = "cluster";
     final String m_databaseName = "database";
     StatsAgent m_statsAgent = null;
-    FaultDistributorInterface m_faultDistributor = null;
     HostMessenger m_hostMessenger = new HostMessenger(new HostMessenger.Config());
     private OperationMode m_mode = OperationMode.RUNNING;
     private volatile String m_localMetadata;
@@ -270,17 +268,6 @@ public class MockVoltDB implements VoltDBInterface
         return voltconfig;
     }
 
-    public void setFaultDistributor(FaultDistributorInterface distributor)
-    {
-        m_faultDistributor = distributor;
-    }
-
-    @Override
-    public FaultDistributorInterface getFaultDistributor()
-    {
-        return m_faultDistributor;
-    }
-
     public void setHostMessenger(HostMessenger msg) {
         m_hostMessenger = msg;
     }
@@ -349,9 +336,6 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public boolean shutdown(Thread mainSiteThread) throws InterruptedException
     {
-        if (m_faultDistributor != null) {
-            m_faultDistributor.shutDown();
-        }
         VoltDB.wasCrashCalled = false;
         VoltDB.crashMessage = null;
         m_snapshotCompletionMonitor.shutdown();
@@ -483,7 +467,6 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public void recoveryComplete(String requestId) {
-        // TODO Auto-generated method stub
     }
 
     @Override

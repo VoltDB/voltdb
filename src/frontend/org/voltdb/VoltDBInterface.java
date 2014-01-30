@@ -25,7 +25,6 @@ import java.util.concurrent.TimeUnit;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -78,7 +77,6 @@ public interface VoltDBInterface
     // existing code
     public StatsAgent getStatsAgent();
     public MemoryStats getMemoryStatsSource();
-    public FaultDistributorInterface getFaultDistributor();
     public BackendTarget getBackendTargetType();
     public String getLocalMetadata();
     public SiteTracker getSiteTrackerForSnapshot();

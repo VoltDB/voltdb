@@ -96,10 +96,6 @@ import org.voltdb.dtxn.InitiatorStats;
 import org.voltdb.dtxn.LatencyStats;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportManager;
-import org.voltdb.fault.FaultDistributor;
-import org.voltdb.fault.FaultDistributorInterface;
-import org.voltdb.fault.SiteFailureFault;
-import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Initiator;
 import org.voltdb.iv2.KSafetyStats;
@@ -171,7 +167,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     private AsyncCompilerAgent m_asyncCompilerAgent = new AsyncCompilerAgent();
     public AsyncCompilerAgent getAsyncCompilerAgent() { return m_asyncCompilerAgent; }
-    FaultDistributor m_faultManager;
     private PartitionCountStats m_partitionCountStats = null;
     private IOStats m_ioStats = null;
     private MemoryStats m_memoryStats = null;
@@ -245,8 +240,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // add a random number to the sampler output to make it likely to be unique for this process.
     private final VoltSampler m_sampler = new VoltSampler(10, "sample" + String.valueOf(new Random().nextInt() % 10000) + ".txt");
     private final AtomicBoolean m_hasStartedSampler = new AtomicBoolean(false);
-
-    final VoltDBSiteFailureFaultHandler m_faultHandler = new VoltDBSiteFailureFaultHandler(this);
 
     List<Pair<Integer, Long>> m_partitionsToSitesAtStartupForExportInit;
 
@@ -332,7 +325,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_startMode = null;
             m_opsRegistrar = new OpsRegistrar();
             m_asyncCompilerAgent = new AsyncCompilerAgent();
-            m_faultManager = null;
             m_snapshotCompletionMonitor = null;
             m_catalogContext = null;
             m_partitionCountStats = null;
@@ -391,17 +383,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             if (!isRejoin && !m_joining) {
                 m_messenger.waitForGroupJoin(numberOfNodes);
             }
-
-            m_faultManager = new FaultDistributor(this);
-            m_faultManager.registerFaultHandler(SiteFailureFault.SITE_FAILURE_CATALOG,
-                    m_faultHandler,
-                    FaultType.SITE_FAILURE);
-            if (!m_faultManager.testPartitionDetectionDirectory(
-                    m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"))) {
-                VoltDB.crashLocalVoltDB("Unable to create partition detection snapshot directory at" +
-                        m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"), false, null);
-            }
-
 
             // Create the thread pool here. It's needed by buildClusterMesh()
             m_periodicWorkThread =
@@ -1685,9 +1666,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             if (m_mode != OperationMode.SHUTTINGDOWN) {
                 did_it = true;
                 m_mode = OperationMode.SHUTTINGDOWN;
-                // Things are going pear-shaped, tell the fault distributor to
-                // shut its fat mouth
-                m_faultManager.shutDown();
                 m_snapshotCompletionMonitor.shutdown();
                 m_periodicWorkThread.shutdown();
                 m_periodicPriorityWorkThread.shutdown();
@@ -1984,12 +1962,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public MemoryStats getMemoryStatsSource() {
         return m_memoryStats;
-    }
-
-    @Override
-    public FaultDistributorInterface getFaultDistributor()
-    {
-        return m_faultManager;
     }
 
     @Override
