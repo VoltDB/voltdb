@@ -1808,7 +1808,6 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(ddl, errorMatviewMsg);
     }
 
-
     private static final String msgP = "does not include the partitioning column";
     private static final String msgPR =
             "ASSUMEUNIQUE is not valid for an index that includes the partitioning column. " +
@@ -2013,12 +2012,19 @@ public class TestVoltCompiler extends TestCase {
     public void testDDLCompilerMatView()
     {
         // Test MatView.
-        String ddl = "";
-        String errorMatviewOrderByMsg = "Materialized view \"MY_VIEW\" with ORDER BY clause is not supported.";
+        String ddl;
 
         ddl = "create table t(id integer not null, num integer);\n" +
                 "create view my_view as select num, count(*) from t group by num order by num;";
-        checkDDLErrorMessage(ddl, errorMatviewOrderByMsg);
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with ORDER BY clause is not supported.");
+
+        ddl = "create table t(id integer not null, num integer, wage integer);\n" +
+                "create view my_view1 (num, total, sumwage) " +
+                "as select num, count(*), sum(wage) from t group by num; \n" +
+
+                "create view my_view2 (num, total, sumwage) " +
+                "as select num, count(*), sum(sumwage) from my_view1 group by num; ";
+        checkDDLErrorMessage(ddl, "A materialized view (MY_VIEW2) can not be defined on another view (MY_VIEW1)");
     }
 
     public void testPartitionOnBadType() {
