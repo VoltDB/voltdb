@@ -181,7 +181,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             insertToColumnList(aggResultColumns, groupByColumns);
         }
 
-        if (orderbyElement != null && ! selectsOneRowResult()) {
+        if (orderbyElement != null && ! hasAOneRowResult()) {
             parseOrderColumns(orderbyElement, false);
         }
 
@@ -964,7 +964,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     @Override
     public boolean isOrderDeterministic()
     {
-        if (selectsOneRowResult()) {
+        if (hasAOneRowResult()) {
             return true;
         }
         if ( ! hasOrderByColumns() ) {
@@ -1218,7 +1218,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return result;
     }
 
-    boolean selectsOneRowResult()
+    private boolean hasAOneRowResult()
     {
         if ( ( ! isGrouped() ) && displaysAgg()) {
             return true;
