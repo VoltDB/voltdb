@@ -669,20 +669,26 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             int portOffset = 0;
             for (int i = 0; i < 1; i++) {
                 try {
-                    InetAddress externalInterface = null;
+                    InetAddress clientIntf = null;
+                    InetAddress adminIntf = null;
                     if (!m_config.m_externalInterface.trim().equals("")) {
-                        externalInterface = InetAddress.getByName(m_config.m_externalInterface);
+                        clientIntf = InetAddress.getByName(m_config.m_externalInterface);
+                        adminIntf = clientIntf;
                     }
-                    ClientInterface ci =
-                        ClientInterface.create(m_messenger,
-                                m_catalogContext,
-                                m_config.m_replicationRole,
-                                m_cartographer,
-                                m_configuredNumberOfPartitions,
-                                externalInterface,
-                                config.m_port + portOffset,
-                                config.m_adminPort + portOffset,
-                                m_config.m_timestampTestingSalt);
+                    if (m_config.m_clientInterface != null && m_config.m_clientInterface.trim().length() > 0) {
+                        clientIntf = InetAddress.getByName(m_config.m_clientInterface);
+                    }
+                    if (m_config.m_adminInterface != null && m_config.m_adminInterface.trim().length() > 0) {
+                        adminIntf = InetAddress.getByName(m_config.m_adminInterface);
+                    }
+                    ClientInterface ci = ClientInterface.create(m_messenger, m_catalogContext, m_config.m_replicationRole,
+                            m_cartographer,
+                            m_configuredNumberOfPartitions,
+                            clientIntf,
+                            config.m_port + portOffset,
+                            adminIntf,
+                            config.m_adminPort + portOffset,
+                            m_config.m_timestampTestingSalt);
                     portOffset += 2;
                     m_clientInterfaces.add(ci);
                 } catch (Exception e) {

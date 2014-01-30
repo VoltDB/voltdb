@@ -128,12 +128,15 @@ public class VoltDB {
 
         /** port number for the first client interface for each server */
         public int m_port = DEFAULT_PORT;
+        public String m_clientInterface = "";
 
         /** override for the admin port number in the deployment file */
         public int m_adminPort = -1;
+        public String m_adminInterface = "";
 
         /** port number to use to build intra-cluster mesh */
         public int m_internalPort = DEFAULT_INTERNAL_PORT;
+        public String m_internalPortInterface = DEFAULT_INTERNAL_INTERFACE;
 
         /** interface to listen to clients on (default: any) */
         public String m_externalInterface = DEFAULT_EXTERNAL_INTERFACE;
@@ -143,9 +146,11 @@ public class VoltDB {
 
         /** port number to use for DR channel (override in the deployment file) */
         public int m_drAgentPortStart = -1;
+        public String m_drInterface = "";
 
         /** HTTP port can't be set here, but eventually value will be reflected here */
         public int m_httpPort = Integer.MAX_VALUE;
+        public String m_httpPortInterface = "";
 
         /** running the enterprise version? */
         public final boolean m_isEnterprise = org.voltdb.utils.MiscUtils.isPro();
@@ -260,30 +265,51 @@ public class VoltDB {
                 }
                 // handle from the command line as two strings <catalog> <filename>
                 else if (arg.equals("port")) {
-                    m_port = Integer.parseInt(args[++i]);
-                }
-                else if (arg.startsWith("port ")) {
-                    m_port = Integer.parseInt(arg.substring("port ".length()));
-                }
-                else if (arg.equals("adminport")) {
-                    m_adminPort = Integer.parseInt(args[++i]);
-                }
-                else if (arg.startsWith("adminport ")) {
-                    m_adminPort = Integer.parseInt(arg.substring("adminport ".length()));
-                }
-                else if (arg.equals("internalport")) {
-                    m_internalPort = Integer.parseInt(args[++i]);
-                }
-                else if (arg.startsWith("internalport ")) {
-                    m_internalPort = Integer.parseInt(arg.substring("internalport ".length()));
-                }
-                else if (arg.equals("replicationport")) {
-                    m_drAgentPortStart = Integer.parseInt(args[++i]);
-                }
-                else if (arg.startsWith("replicationport ")) {
-                    m_drAgentPortStart = Integer.parseInt(arg.substring("replicationport ".length()));
-                }
-                else if (arg.startsWith("zkport")) {
+                    String portStr = args[++i];
+                    String portInfo[] = portStr.split(":");
+                    if (portInfo != null && portInfo.length == 2) {
+                        m_clientInterface = portInfo[0];
+                        m_port = Integer.parseInt(portInfo[1]);
+                    } else {
+                        m_port = Integer.parseInt(portStr);
+                    }
+                } else if (arg.equals("adminport")) {
+                    String portStr = args[++i];
+                    String portInfo[] = portStr.split(":");
+                    if (portInfo != null && portInfo.length == 2) {
+                        m_adminInterface = portInfo[0];
+                        m_adminPort = Integer.parseInt(portInfo[1]);
+                    } else {
+                        m_adminPort = Integer.parseInt(portStr);
+                    }
+                } else if (arg.equals("internalport")) {
+                    String portStr = args[++i];
+                    String portInfo[] = portStr.split(":");
+                    if (portInfo != null && portInfo.length == 2) {
+                        m_internalPortInterface = portInfo[0];
+                        m_internalPort = Integer.parseInt(portInfo[1]);
+                    } else {
+                        m_internalPort = Integer.parseInt(portStr);
+                    }
+                } else if (arg.equals("replicationport")) {
+                    String portStr = args[++i];
+                    String portInfo[] = portStr.split(":");
+                    if (portInfo != null && portInfo.length == 2) {
+                        m_drInterface = portInfo[0];
+                        m_drAgentPortStart = Integer.parseInt(portInfo[1]);
+                    } else {
+                        m_drAgentPortStart = Integer.parseInt(portStr);
+                    }
+                } else if (arg.equals("httpport")) {
+                    String portStr = args[++i];
+                    String portInfo[] = portStr.split(":");
+                    if (portInfo != null && portInfo.length == 2) {
+                        m_httpPortInterface = portInfo[0];
+                        m_httpPort = Integer.parseInt(portInfo[1]);
+                    } else {
+                        m_httpPort = Integer.parseInt(portStr);
+                    }
+                } else if (arg.startsWith("zkport")) {
                     m_zkInterface = "127.0.0.1:" + args[++i];
                 }
                 else if (arg.equals("externalinterface")) {
