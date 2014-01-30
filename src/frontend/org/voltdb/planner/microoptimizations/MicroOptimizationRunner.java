@@ -33,7 +33,6 @@ public class MicroOptimizationRunner {
         optimizations.add(new ReplaceWithIndexCounter());
         optimizations.add(new SeqScansToUniqueTreeScans());
         optimizations.add(new ReplaceWithIndexLimit());
-        // optimizations.add(new PushdownReceiveDominators());
     }
 
     public static List<CompiledPlan> applyAll(CompiledPlan plan,

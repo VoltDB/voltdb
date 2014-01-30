@@ -134,47 +134,27 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
 
     //output table should be temptable
     m_outputTable = static_cast<TempTable*>(m_node->getOutputTable());
-    //target table should be persistenttable
-    m_targetTable = static_cast<PersistentTable*>(m_node->getTargetTable());
     m_numOfColumns = static_cast<int>(m_outputTable->columnCount());
 
-    m_index = m_targetTable->index(m_node->getTargetIndexName());
-    m_searchKey = TableTuple(m_index->getKeySchema());
-    m_searchKeyBackingStore = new char[m_index->getKeySchema()->tupleLength()];
-    m_searchKey.moveNoHeader(m_searchKeyBackingStore);
+    Table* targetTable = m_node->getTargetTable();
+    //target table should be persistenttable
+    assert(static_cast<PersistentTable*>(targetTable));
 
+    TableIndex *tableIndex = targetTable->index(m_node->getTargetIndexName());
+    m_searchKeyBackingStore = new char[tableIndex->getKeySchema()->tupleLength()];
+
+    // Grab the Index from our inner table
+    // We'll throw an error if the index is missing
+    VOLT_TRACE("Index key schema: '%s'", tableIndex->getKeySchema()->debug().c_str());
     //
     // Miscellanous Information
     //
     m_lookupType = m_node->getLookupType();
     m_sortDirection = m_node->getSortDirection();
 
+    VOLT_DEBUG("IndexScan: %s.%s\n", targetTable->name().c_str(), tableIndex->getName().c_str());
+
     return true;
-}
-
-void IndexScanExecutor::updateTargetTableAndIndex() {
-    // Target table should be persistenttable
-    // Update target table reference from table delegate, and its index reference
-    m_targetTable = static_cast<PersistentTable*>(m_node->getTargetTable());
-
-    m_index = m_targetTable->index(m_node->getTargetIndexName());
-    assert(m_index);
-    // Grab the Index from our inner table
-    // We'll throw an error if the index is missing
-    VOLT_TRACE("Index key schema: '%s'", m_index->getKeySchema()->debug().c_str());
-
-    m_searchKey = TableTuple(m_index->getKeySchema());
-    m_searchKey.moveNoHeader(m_searchKeyBackingStore);
-
-    // Need to move GTE to find (x,_) when doing a partial covering search.
-    // the planner sometimes used to lie in this case: index_lookup_type_eq is incorrect.
-    // Index_lookup_type_gte is necessary.
-    assert(m_lookupType != INDEX_LOOKUP_TYPE_EQ ||
-            m_searchKey.getSchema()->columnCount() == m_numOfSearchkeys);
-
-    assert(m_targetTable);
-    assert(m_targetTable == m_node->getTargetTable());
-    VOLT_DEBUG("IndexScan: %s.%s\n", m_targetTable->name().c_str(), m_index->getName().c_str());
 }
 
 bool IndexScanExecutor::p_execute(const NValueArray &params)
@@ -185,7 +165,13 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     assert(m_outputTable == static_cast<TempTable*>(m_node->getOutputTable()));
 
     // update local target table with its most recent reference
-    updateTargetTableAndIndex();
+    Table* targetTable = m_node->getTargetTable();
+    TableIndex *tableIndex = targetTable->index(m_node->getTargetIndexName());
+    TableTuple searchKey(tableIndex->getKeySchema());
+    searchKey.moveNoHeader(m_searchKeyBackingStore);
+
+    assert(m_lookupType != INDEX_LOOKUP_TYPE_EQ ||
+            searchKey.getSchema()->columnCount() == m_numOfSearchkeys);
 
     int activeNumOfSearchKeys = m_numOfSearchkeys;
     IndexLookupType localLookupType = m_lookupType;
@@ -212,13 +198,13 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     //
     // SEARCH KEY
     //
-    m_searchKey.setAllNulls();
-    VOLT_TRACE("Initial (all null) search key: '%s'", m_searchKey.debugNoHeader().c_str());
+    searchKey.setAllNulls();
+    VOLT_TRACE("Initial (all null) search key: '%s'", searchKey.debugNoHeader().c_str());
     for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
         m_searchKeyArray[ctr]->substitute(params);
         NValue candidateValue = m_searchKeyArray[ctr]->eval(NULL, NULL);
         try {
-            m_searchKey.setNValue(ctr, candidateValue);
+            searchKey.setNValue(ctr, candidateValue);
         }
         catch (const SQLException &e) {
             // This next bit of logic handles underflow and overflow while
@@ -281,8 +267,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             break;
         }
     }
-    assert((activeNumOfSearchKeys == 0) || (m_searchKey.getSchema()->columnCount() > 0));
-    VOLT_TRACE("Search key after substitutions: '%s'", m_searchKey.debugNoHeader().c_str());
+    assert((activeNumOfSearchKeys == 0) || (searchKey.getSchema()->columnCount() > 0));
+    VOLT_TRACE("Search key after substitutions: '%s'", searchKey.debugNoHeader().c_str());
 
     //
     // END EXPRESSION
@@ -301,8 +287,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         post_expression->substitute(params);
         VOLT_DEBUG("Post Expression:\n%s", post_expression->debug(true).c_str());
     }
-    assert (m_index);
-    assert (m_index == m_targetTable->index(m_node->getTargetIndexName()));
 
     // INITIAL EXPRESSION
     AbstractExpression* initial_expression = m_node->getInitialExpression();
@@ -321,7 +305,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         VOLT_DEBUG("COUNT NULL Expression:\n%s", skipNullExpr->debug(true).c_str());
     }
 
-    Table* targetTable = m_targetTable;
     ProgressMonitorProxy pmp(m_engine, targetTable);
     //
     // An index scan has three parts:
@@ -339,36 +322,36 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     TableTuple tuple;
     if (activeNumOfSearchKeys > 0) {
         VOLT_TRACE("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
-                   localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
+                   localLookupType, activeNumOfSearchKeys, searchKey.debugNoHeader().c_str());
 
         if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
-            m_index->moveToKey(&m_searchKey);
+            tableIndex->moveToKey(&searchKey);
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
-            m_index->moveToGreaterThanKey(&m_searchKey);
+            tableIndex->moveToGreaterThanKey(&searchKey);
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
-            m_index->moveToKeyOrGreater(&m_searchKey);
+            tableIndex->moveToKeyOrGreater(&searchKey);
         } else if (localLookupType == INDEX_LOOKUP_TYPE_LT) {
-            m_index->moveToLessThanKey(&m_searchKey);
+            tableIndex->moveToLessThanKey(&searchKey);
         } else if (localLookupType == INDEX_LOOKUP_TYPE_LTE) {
             // find the entry whose key is greater than search key,
             // do a forward scan using initialExpr to find the correct
             // start point to do reverse scan
-            bool isEnd = m_index->moveToGreaterThanKey(&m_searchKey);
+            bool isEnd = tableIndex->moveToGreaterThanKey(&searchKey);
             if (isEnd) {
-                m_index->moveToEnd(false);
+                tableIndex->moveToEnd(false);
             } else {
-                while (!(tuple = m_index->nextValue()).isNullTuple()) {
+                while (!(tuple = tableIndex->nextValue()).isNullTuple()) {
                     pmp.countdownProgress();
                     if (initial_expression != NULL && !initial_expression->eval(&tuple, NULL).isTrue()) {
                         // just passed the first failed entry, so move 2 backward
-                        m_index->moveToBeforePriorEntry();
+                        tableIndex->moveToBeforePriorEntry();
                         break;
                     }
                 }
                 if (tuple.isNullTuple()) {
-                    m_index->moveToEnd(false);
+                    tableIndex->moveToEnd(false);
                 }
             }
         }
@@ -377,7 +360,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         }
     } else {
         bool toStartActually = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
-        m_index->moveToEnd(toStartActually);
+        tableIndex->moveToEnd(toStartActually);
     }
 
     int tuple_ctr = 0;
@@ -393,9 +376,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     //
     while ((limit == -1 || tuple_ctr < limit) &&
            ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
-             !(tuple = m_index->nextValueAtKey()).isNullTuple()) ||
+             !(tuple = tableIndex->nextValueAtKey()).isNullTuple()) ||
            ((localLookupType != INDEX_LOOKUP_TYPE_EQ || activeNumOfSearchKeys == 0) &&
-            !(tuple = m_index->nextValue()).isNullTuple()))) {
+            !(tuple = tableIndex->nextValue()).isNullTuple()))) {
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", tuple.debug("tablename").c_str());
         pmp.countdownProgress();
         //
