@@ -2019,13 +2019,15 @@ public class TestVoltCompiler extends TestCase {
                 "create view my_view as select num, count(*) from t group by num order by num;";
         checkDDLErrorMessage(ddl, errorMatviewOrderByMsg);
 
+
+        ddl = "";
         ddl = "create table t(id integer not null, num integer, wage integer);\n" +
                 "create view my_view1 (num, total, sumwage) " +
                 "as select num, count(*), sum(wage) from t group by num; \n" +
 
                 "create view my_view2 (num, total, sumwage) " +
                 "as select num, count(*), sum(sumwage) from my_view1 group by num; ";
-        checkDDLErrorMessage(ddl, "A materilized view MY_VIEW2 on view MY_VIEW1 is not supported");
+        checkDDLErrorMessage(ddl, "A materialized view (MY_VIEW2) can not be defined on another view (MY_VIEW1)");
     }
 
     public void testPartitionOnBadType() {

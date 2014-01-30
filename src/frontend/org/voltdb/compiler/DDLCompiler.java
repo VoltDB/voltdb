@@ -1772,7 +1772,7 @@ public class DDLCompiler {
             // create the materializedviewinfo catalog node for the source table
             Table srcTable = stmt.tableList.get(0);
             if (viewTableNames.contains(srcTable.getTypeName())) {
-                String msg = String.format("A materilized view %s on view %s is not supported.",
+                String msg = String.format("A materialized view (%s) can not be defined on another view (%s).",
                         viewName, srcTable.getTypeName());
                 throw m_compiler.new VoltCompilerException(msg);
             }
