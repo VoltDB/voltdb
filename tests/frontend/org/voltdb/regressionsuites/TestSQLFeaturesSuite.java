@@ -522,6 +522,38 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         validateTableOfScalarLongs(vt, new long[] {0});
     }
 
+    public void testTableLimit() throws Exception {
+        System.out.println("STARTING TABLE LIMIT TEST......");
+        Client client = getClient();
+        VoltTable vt = null;
+
+        if(isHSQL()) {
+            return;
+        }
+
+        vt = client.callProcedure("TBNAME_TABLELIMIT_2.insert", 0, 0, 0).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+
+        vt = client.callProcedure("TBNAME_TABLELIMIT_2.insert", 1, 1, 1).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+
+        Exception e = null;
+        try {
+            vt = client.callProcedure("TBNAME_TABLELIMIT_2.insert", 0, 0, 0).getResults()[0];
+        } catch (ProcCallException ex) {
+            System.out.println(ex.getMessage());
+            e = ex;
+            assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
+            assertTrue(ex.getMessage().contains("Table TBNAME_TABLELIMIT_2 exceeds TABLE ROW COUNT LIMIT 2"));
+        } finally {
+            assertNotNull(e);
+        }
+
+        vt = client.callProcedure("@AdHoc", "select count(*) from TBNAME_TABLELIMIT_2").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {2});
+    }
+
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.

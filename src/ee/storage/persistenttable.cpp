@@ -101,6 +101,7 @@ PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetS
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
         m_blocksPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
     }
+    m_tablelimit = -1;
 }
 
 PersistentTable::~PersistentTable()
@@ -304,6 +305,12 @@ bool PersistentTable::insertTuple(TableTuple &source)
 
 void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
 {
+    if (m_tablelimit >= 0 && m_tablelimit <= visibleTupleCount() ) {
+        std::string message = std::string("Table ") + m_name
+                + std::string(" exceeds TABLE ROW COUNT LIMIT ") + std::to_string(m_tablelimit);
+        throw ConstraintFailureException(this, source, message);
+    }
+
     //
     // First get the next free tuple
     // This will either give us one from the free slot list, or

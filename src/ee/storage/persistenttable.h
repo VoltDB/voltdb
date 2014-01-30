@@ -370,7 +370,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     }
 
     // This is a testability feature not intended for use in product logic.
-    int visibleTupleCount() const { return m_tupleCount - m_invisibleTuplesPendingDeleteCount; }
+    inline int visibleTupleCount() const {
+        return m_tupleCount - m_invisibleTuplesPendingDeleteCount;
+    }
 
     bool isPersistentTableEmpty()
     {
@@ -381,6 +383,11 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         // if ALL tuples had been deleted earlier in the current transaction.
         // This should never be the case while updating the catalog.
         return m_tupleCount == 0;
+    }
+
+    int tablelimit() const { return m_tablelimit;}
+    void setTableLimit(int limit) {
+        m_tablelimit = limit;
     }
 
     virtual int64_t validatePartitioning(TheHashinator *hashinator, int32_t partitionId);
@@ -487,6 +494,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // is Export enabled
     bool m_exportEnabled;
 
+    int m_tablelimit;
 
     // STORAGE TRACKING
 
