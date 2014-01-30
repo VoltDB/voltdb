@@ -117,7 +117,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
         m_endKeyBackingStore = new char[tableIndex->getKeySchema()->tupleLength()];
     }
 
-    VOLT_DEBUG("IndexCount: %s.%s\n", m_targetTable->name().c_str(),
+    VOLT_DEBUG("IndexCount: %s.%s\n", targetTable->name().c_str(),
             tableIndex->getName().c_str());
 
     return true;
@@ -125,16 +125,9 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
 
 bool IndexCountExecutor::p_execute(const NValueArray &params)
 {
-    assert(m_node);
-    assert(m_node == dynamic_cast<IndexCountPlanNode*>(m_abstractNode));
-    assert(m_outputTable);
-    assert(m_outputTable == static_cast<TempTable*>(m_node->getOutputTable()));
-
     // update local target table with its most recent reference
     Table* targetTable = m_node->getTargetTable();
     TableIndex * tableIndex = targetTable->index(m_node->getTargetIndexName());
-    assert (tableIndex);
-    assert (tableIndex->isCountableIndex());
 
     TableTuple searchKey, endKey;
     if (m_numOfSearchkeys != 0) {

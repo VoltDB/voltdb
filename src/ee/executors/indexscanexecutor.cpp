@@ -167,9 +167,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     // update local target table with its most recent reference
     Table* targetTable = m_node->getTargetTable();
     TableIndex *tableIndex = targetTable->index(m_node->getTargetIndexName());
-    assert(tableIndex);
-    TableTuple searchKey = TableTuple(tableIndex->getKeySchema());
-    searchKey = TableTuple(tableIndex->getKeySchema());
+    TableTuple searchKey(tableIndex->getKeySchema());
     searchKey.moveNoHeader(m_searchKeyBackingStore);
 
     assert(m_lookupType != INDEX_LOOKUP_TYPE_EQ ||
@@ -289,8 +287,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         post_expression->substitute(params);
         VOLT_DEBUG("Post Expression:\n%s", post_expression->debug(true).c_str());
     }
-    assert (tableIndex);
-    assert (tableIndex == targetTable->index(m_node->getTargetIndexName()));
 
     // INITIAL EXPRESSION
     AbstractExpression* initial_expression = m_node->getInitialExpression();
