@@ -1203,10 +1203,10 @@ public class DDLCompiler {
         Pattern r = Pattern.compile("(.+)(_tablelimit_)(\\d+)");
         Matcher m = r.matcher(name.toLowerCase());
         if (m.find( )) {
-            int tablelimit = Integer.parseInt(m.group(3));
-            table.setTablelimit(tablelimit);
+            int maxRows = Integer.parseInt(m.group(3));
+            table.setMaxrows(maxRows);
         } else {
-            table.setTablelimit(-1);
+            table.setMaxrows(Integer.MAX_VALUE);
         }
 
         // all tables start replicated

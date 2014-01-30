@@ -87,11 +87,12 @@ TableTuple keyTuple;
 
 #define TABLE_BLOCKSIZE 2097152
 
-PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetSize) :
-    Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
+PersistentTable::PersistentTable(int partitionColumn, int maxRows) :
+    Table(TABLE_BLOCKSIZE),
     m_iter(this, m_data.begin()),
     m_allowNulls(),
     m_partitionColumn(partitionColumn),
+    m_maxRows(maxRows),
     stats_(this),
     m_failedCompactionCount(0),
     m_invisibleTuplesPendingDeleteCount(0),
@@ -101,7 +102,6 @@ PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetS
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
         m_blocksPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
     }
-    m_tablelimit = -1;
 }
 
 PersistentTable::~PersistentTable()
@@ -305,9 +305,9 @@ bool PersistentTable::insertTuple(TableTuple &source)
 
 void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
 {
-    if (m_tablelimit >= 0 && m_tablelimit <= visibleTupleCount() ) {
+    if (visibleTupleCount() >= m_maxRows) {
         std::string message = std::string("Table ") + m_name
-                + std::string(" exceeds TABLE ROW COUNT LIMIT ") + std::to_string(m_tablelimit);
+                + std::string(" exceeds table maximum row count ") + std::to_string(m_maxRows);
         throw ConstraintFailureException(this, source, message);
     }
 

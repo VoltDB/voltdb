@@ -526,29 +526,48 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         System.out.println("STARTING TABLE LIMIT TEST......");
         Client client = getClient();
         VoltTable vt = null;
-
+        Exception e = null;
         if(isHSQL()) {
             return;
         }
 
-        vt = client.callProcedure("TBNAME_TABLELIMIT_2.insert", 0, 0, 0).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[] {1});
+        // When table limit feature is fully supported, there needs to be more test cases.
+        // generalize this test within a loop, maybe.
+        // Test max row 0
+        vt = client.callProcedure("@AdHoc", "select count(*) from TBNAME_TABLELIMIT_0").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {0});
 
-        vt = client.callProcedure("TBNAME_TABLELIMIT_2.insert", 1, 1, 1).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[] {1});
-
-        Exception e = null;
+        e = null;
         try {
-            vt = client.callProcedure("TBNAME_TABLELIMIT_2.insert", 0, 0, 0).getResults()[0];
+            vt = client.callProcedure("TBNAME_TABLELIMIT_0.insert", 0, 0, 0).getResults()[0];
         } catch (ProcCallException ex) {
             System.out.println(ex.getMessage());
             e = ex;
             assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
-            assertTrue(ex.getMessage().contains("Table TBNAME_TABLELIMIT_2 exceeds TABLE ROW COUNT LIMIT 2"));
+            assertTrue(ex.getMessage().contains("Table TBNAME_TABLELIMIT_0 exceeds table maximum row count 0"));
         } finally {
             assertNotNull(e);
         }
+        vt = client.callProcedure("@AdHoc", "select count(*) from TBNAME_TABLELIMIT_0").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {0});
 
+        // Test max row 2
+        vt = client.callProcedure("TBNAME_TABLELIMIT_2.insert", 0, 0, 0).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+        vt = client.callProcedure("TBNAME_TABLELIMIT_2.insert", 1, 1, 1).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+
+        e = null;
+        try {
+            vt = client.callProcedure("TBNAME_TABLELIMIT_2.insert", 2, 2, 2).getResults()[0];
+        } catch (ProcCallException ex) {
+            System.out.println(ex.getMessage());
+            e = ex;
+            assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
+            assertTrue(ex.getMessage().contains("Table TBNAME_TABLELIMIT_2 exceeds table maximum row count 2"));
+        } finally {
+            assertNotNull(e);
+        }
         vt = client.callProcedure("@AdHoc", "select count(*) from TBNAME_TABLELIMIT_2").getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {2});
     }

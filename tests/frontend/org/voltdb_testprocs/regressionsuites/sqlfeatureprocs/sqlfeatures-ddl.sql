@@ -1,3 +1,9 @@
+CREATE TABLE tbname_tablelimit_0 (
+id INTEGER NOT NULL, 
+wage INTEGER not null,
+dept INTEGER NOT NULL);
+
+
 CREATE TABLE tbname_tablelimit_2 (
 id INTEGER NOT NULL, 
 wage INTEGER not null,
