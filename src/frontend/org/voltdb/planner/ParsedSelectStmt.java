@@ -100,6 +100,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     public ArrayList<ParsedColInfo> orderColumns = new ArrayList<ParsedColInfo>();
     public AbstractExpression having = null;
     public ArrayList<ParsedColInfo> groupByColumns = new ArrayList<ParsedColInfo>();
+    private boolean groupAndOrderByPermutationWasTested = false;
+    private boolean groupAndOrderByPermutationResult = false;
 
     // It will store the final projection node schema for this plan if it is needed.
     // Calculate once, and use it everywhere else.
@@ -1132,5 +1134,36 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
         }
         return true;
+    }
+
+    boolean groupByIsAnOrderByPermutation() {
+        if (groupAndOrderByPermutationWasTested) {
+            return groupAndOrderByPermutationResult;
+        }
+        groupAndOrderByPermutationWasTested = true;
+
+        int size = groupByColumns.size();
+        if (size != orderColumns.size()) {
+            return false;
+        }
+        Set<AbstractExpression> orderPrefixExprs = new HashSet<>(size);
+        Set<AbstractExpression> groupExprs = new HashSet<>(size);
+        int ii = 0;
+        for (ParsedColInfo gb : groupByColumns) {
+            AbstractExpression gexpr = gb.expression;
+            if (gb.expression == null) {
+                return false;
+            }
+            AbstractExpression oexpr = orderColumns.get(ii).expression;
+            ++ii;
+            // Save some cycles in the common case of matching by position.
+            if (gb.expression.equals(oexpr)) {
+                continue;
+            }
+            groupExprs.add(gexpr);
+            orderPrefixExprs.add(oexpr);
+        }
+        groupAndOrderByPermutationResult = groupExprs.equals(orderPrefixExprs);
+        return groupAndOrderByPermutationResult;
     }
 }

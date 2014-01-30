@@ -806,7 +806,9 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             JSONStringer stringer = new JSONStringer();
             try
             {
+                stringer.object();
                 outputSchemaToJSON(stringer);
+                stringer.endObject();
                 sb.append(stringer.toString());
             }
             catch (Exception e)
