@@ -2012,15 +2012,12 @@ public class TestVoltCompiler extends TestCase {
     public void testDDLCompilerMatView()
     {
         // Test MatView.
-        String ddl = "";
-        String errorMatviewOrderByMsg = "Materialized view \"MY_VIEW\" with ORDER BY clause is not supported.";
+        String ddl;
 
         ddl = "create table t(id integer not null, num integer);\n" +
                 "create view my_view as select num, count(*) from t group by num order by num;";
-        checkDDLErrorMessage(ddl, errorMatviewOrderByMsg);
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with ORDER BY clause is not supported.");
 
-
-        ddl = "";
         ddl = "create table t(id integer not null, num integer, wage integer);\n" +
                 "create view my_view1 (num, total, sumwage) " +
                 "as select num, count(*), sum(wage) from t group by num; \n" +
