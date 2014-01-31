@@ -17,11 +17,10 @@
 
 package org.voltdb.compiler;
 
-import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.LineNumberReader;
+import java.io.Reader;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -439,33 +438,24 @@ public class DDLCompiler {
     }
 
     /**
-     * Compile a DDL schema from a file on disk
-     * @param path
-     * @param db
+     * Compile a DDL schema from an abstract reader
+     * @param reader  abstract DDL reader
+     * @param db  database
      * @throws VoltCompiler.VoltCompilerException
      */
-    public void loadSchema(String path, Database db)
+    public void loadSchema(Reader reader, Database db)
             throws VoltCompiler.VoltCompilerException {
-        File inputFile = new File(path);
-        FileReader reader = null;
-        try {
-            reader = new FileReader(inputFile);
-        } catch (FileNotFoundException e) {
-            throw m_compiler.new VoltCompilerException("Unable to open schema file for reading");
-        }
-
         m_currLineNo = 1;
-        loadSchema(path, db, reader);
+        loadSchemaInternal(db, reader);
     }
 
     /**
      * Compile a file from an open input stream
-     * @param path
-     * @param db
-     * @param reader
+     * @param db  database
+     * @param reader  ddl input stream
      * @throws VoltCompiler.VoltCompilerException
      */
-    private void loadSchema(String path, Database db, FileReader reader)
+    private void loadSchemaInternal(Database db, Reader reader)
             throws VoltCompiler.VoltCompilerException {
 
         DDLStatement stmt = getNextStatement(reader, m_compiler);
@@ -1046,7 +1036,7 @@ public class DDLCompiler {
         return kStateReadingComment;
     }
 
-    DDLStatement getNextStatement(FileReader reader, VoltCompiler compiler)
+    DDLStatement getNextStatement(Reader reader, VoltCompiler compiler)
             throws VoltCompiler.VoltCompilerException {
 
         int state = kStateInvalid;

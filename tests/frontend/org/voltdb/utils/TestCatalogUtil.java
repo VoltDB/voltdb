@@ -766,7 +766,7 @@ public class TestCatalogUtil extends TestCase {
 
         VoltCompiler compiler = new VoltCompiler();
         String x[] = {tmpDdl.getAbsolutePath()};
-        Catalog cat = compiler.compileCatalog(null, x);
+        Catalog cat = compiler.compileCatalogFromDDL(x);
 
         long crc = CatalogUtil.compileDeploymentAndGetCRC(cat, bad_deployment, true, false);
         assertTrue("Deployment file failed to parse", crc != -1);
@@ -781,7 +781,7 @@ public class TestCatalogUtil extends TestCase {
         final File tmpGood = VoltProjectBuilder.writeStringToTempFile(withGoodCustomExport);
         DeploymentType good_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpGood));
 
-        Catalog cat2 = compiler.compileCatalog(null, x);
+        Catalog cat2 = compiler.compileCatalogFromDDL(x);
         crc = CatalogUtil.compileDeploymentAndGetCRC(cat2, good_deployment, true, false);
         assertTrue("Deployment file failed to parse", crc != -1);
 
@@ -800,7 +800,7 @@ public class TestCatalogUtil extends TestCase {
         final File tmpBuiltin = VoltProjectBuilder.writeStringToTempFile(withBuiltinExport);
         DeploymentType builtin_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpBuiltin));
 
-        Catalog cat3 = compiler.compileCatalog(null, x);
+        Catalog cat3 = compiler.compileCatalogFromDDL(x);
         crc = CatalogUtil.compileDeploymentAndGetCRC(cat3, builtin_deployment, true, false);
         assertTrue("Deployment file failed to parse", crc != -1);
 

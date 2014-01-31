@@ -20,17 +20,13 @@ package org.voltdb.compiler;
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -44,7 +40,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
-import java.util.jar.JarInputStream;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -81,7 +76,6 @@ import org.voltdb.compiler.projectfile.DatabaseType;
 import org.voltdb.compiler.projectfile.ExportType;
 import org.voltdb.compiler.projectfile.ExportType.Tables;
 import org.voltdb.compiler.projectfile.GroupsType;
-import org.voltdb.compiler.projectfile.InfoType;
 import org.voltdb.compiler.projectfile.PartitionsType;
 import org.voltdb.compiler.projectfile.ProceduresType;
 import org.voltdb.compiler.projectfile.ProjectType;
@@ -362,12 +356,22 @@ public class VoltCompiler {
      * @param jarOutputPath The location to put the finished JAR to.
      * @param ddlFilePaths The array of DDL files to compile (at least one is required).
      * @return true if successful
+     * @throws VoltCompilerException
      */
     public boolean compileFromDDL(
             final String jarOutputPath,
             final String... ddlFilePaths)
+                    throws VoltCompilerException
     {
-        return compileInternal(null, jarOutputPath, ddlFilePaths);
+        List<DDLReader> ddlReaderList;
+        try {
+            ddlReaderList = DDLPathsToReaderList(ddlFilePaths);
+        }
+        catch (VoltCompilerException e) {
+            compilerLog.error("Unable to open DDL file.", e);;
+            return false;
+        }
+        return compileInternal(null, jarOutputPath, ddlReaderList);
     }
 
     /**
@@ -381,7 +385,7 @@ public class VoltCompiler {
             final String projectFileURL,
             final String jarOutputPath)
     {
-        return compileInternal(projectFileURL, jarOutputPath, new String[] {});
+        return compileInternal(projectFileURL, jarOutputPath, new ArrayList<DDLReader>());
     }
 
     /**
@@ -395,12 +399,12 @@ public class VoltCompiler {
     private boolean compileInternal(
             final String projectFileURL,
             final String jarOutputPath,
-            final String[] ddlFilePaths)
+            final List<DDLReader> ddlReaderList)
     {
         m_projectFileURL = projectFileURL;
         m_jarOutputPath = jarOutputPath;
 
-        if (m_projectFileURL == null && (ddlFilePaths == null || ddlFilePaths.length == 0)) {
+        if (m_projectFileURL == null && (ddlReaderList == null || ddlReaderList.isEmpty())) {
             addErr("One or more DDL files are required.");
             return false;
         }
@@ -415,7 +419,12 @@ public class VoltCompiler {
         m_errors.clear();
 
         // do all the work to get the catalog
-        final Catalog catalog = compileCatalog(projectFileURL, ddlFilePaths);
+        DatabaseType database = getProjectDatabase(projectFileURL);
+        if (database == null) {
+            compilerLog.error("Failed to create catalog database object.");
+            return false;
+        }
+        final Catalog catalog = compileCatalogInternal(database, ddlReaderList);
         if (catalog == null) {
             compilerLog.error("Catalog compilation failed.");
             return false;
@@ -497,14 +506,66 @@ public class VoltCompiler {
         return retval;
     }
 
-    public Catalog compileCatalog(final String projectFileURL, final String... ddlFilePaths)
+    private DDLFileReader createDDLFileReader(String path)
+            throws VoltCompilerException
     {
-        // Compiler instance is reusable. Clear the cache.
-        cachedAddedClasses.clear();
-        m_currentFilename = (projectFileURL != null ? new File(projectFileURL).getName() : "null");
-        m_jarOutput = new InMemoryJarfile();
-        ProjectType project = null;
+        try {
+            return new DDLFileReader(path, m_projectFileURL);
+        }
+        catch (IOException e) {
+            String msg = String.format("Unable to open schema file \"%s\" for reading: %s", path, e.getMessage());
+            throw new VoltCompilerException(msg);
+        }
+    }
 
+    private List<DDLReader> DDLPathsToReaderList(final String... ddlFilePaths)
+            throws VoltCompilerException
+    {
+        List<DDLReader> ddlReaderList = new ArrayList<DDLReader>(ddlFilePaths.length);
+        for (int i = 0; i < ddlFilePaths.length; ++i) {
+            ddlReaderList.add(createDDLFileReader(ddlFilePaths[i]));
+        }
+        return ddlReaderList;
+    }
+
+    /**
+     * Compile from DDL files (only).
+     * @param ddlFilePaths  input ddl files
+     * @return  compiled catalog
+     * @throws VoltCompilerException
+     */
+    public Catalog compileCatalogFromDDL(final String... ddlFilePaths)
+            throws VoltCompilerException
+    {
+        DatabaseType database = getProjectDatabase(null);
+        return compileCatalogInternal(database, DDLPathsToReaderList(ddlFilePaths));
+    }
+
+    /**
+     * Compile from project file and, optionally, additional DDL files.
+     * @param projectFileURL  project file URL/path
+     * @param additionalDDLFilePaths  additional input ddl files
+     * @return  compiled catalog
+     * @throws VoltCompilerException
+     */
+    public Catalog compileCatalogFromProject(
+            final String projectFileURL,
+            final String... additionalDDLFilePaths)
+                    throws VoltCompilerException
+    {
+        DatabaseType database = getProjectDatabase(projectFileURL);
+        return compileCatalogInternal(database, DDLPathsToReaderList(additionalDDLFilePaths));
+    }
+
+    /**
+     * Read the project file and get the database object.
+     * @param projectFileURL  project file URL/path
+     * @return  database for project or null
+     */
+    private DatabaseType getProjectDatabase(final String projectFileURL)
+    {
+        DatabaseType database = null;
+        m_currentFilename = (projectFileURL != null ? new File(projectFileURL).getName() : "null");
         if (projectFileURL != null && !projectFileURL.isEmpty()) {
             try {
                 JAXBContext jc = JAXBContext.newInstance("org.voltdb.compiler.projectfile");
@@ -517,56 +578,60 @@ public class VoltCompiler {
                 unmarshaller.setSchema(schema);
                 @SuppressWarnings("unchecked")
                 JAXBElement<ProjectType> result = (JAXBElement<ProjectType>) unmarshaller.unmarshal(new File(projectFileURL));
-                project = result.getValue();
+                ProjectType project = result.getValue();
+                database = project.getDatabase();
             }
             catch (JAXBException e) {
                 // Convert some linked exceptions to more friendly errors.
                 if (e.getLinkedException() instanceof java.io.FileNotFoundException) {
                     addErr(e.getLinkedException().getMessage());
                     compilerLog.error(e.getLinkedException().getMessage());
-                    return null;
                 }
-
-                DeprecatedProjectElement deprecated = DeprecatedProjectElement.valueOf(e);
-                if( deprecated != null) {
-                    addErr("Found deprecated XML element \"" + deprecated.name() + "\" in project.xml file, "
-                            + deprecated.getSuggestion());
-                    addErr("Error schema validating project.xml file. " + e.getLinkedException().getMessage());
-                    compilerLog.error("Found deprecated XML element \"" + deprecated.name() + "\" in project.xml file");
-                    compilerLog.error(e.getMessage());
-                    compilerLog.error(projectFileURL);
-                    return null;
+                else {
+                    DeprecatedProjectElement deprecated = DeprecatedProjectElement.valueOf(e);
+                    if( deprecated != null) {
+                        addErr("Found deprecated XML element \"" + deprecated.name() + "\" in project.xml file, "
+                                + deprecated.getSuggestion());
+                        addErr("Error schema validating project.xml file. " + e.getLinkedException().getMessage());
+                        compilerLog.error("Found deprecated XML element \"" + deprecated.name() + "\" in project.xml file");
+                        compilerLog.error(e.getMessage());
+                        compilerLog.error(projectFileURL);
+                    }
+                    else if (e.getLinkedException() instanceof org.xml.sax.SAXParseException) {
+                        addErr("Error schema validating project.xml file. " + e.getLinkedException().getMessage());
+                        compilerLog.error("Error schema validating project.xml file: " + e.getLinkedException().getMessage());
+                        compilerLog.error(e.getMessage());
+                        compilerLog.error(projectFileURL);
+                    }
+                    else {
+                        throw new RuntimeException(e);
+                    }
                 }
-
-                if (e.getLinkedException() instanceof org.xml.sax.SAXParseException) {
-                    addErr("Error schema validating project.xml file. " + e.getLinkedException().getMessage());
-                    compilerLog.error("Error schema validating project.xml file: " + e.getLinkedException().getMessage());
-                    compilerLog.error(e.getMessage());
-                    compilerLog.error(projectFileURL);
-                    return null;
-                }
-
-                throw new RuntimeException(e);
             }
             catch (SAXException e) {
                 addErr("Error schema validating project.xml file. " + e.getMessage());
                 compilerLog.error("Error schema validating project.xml file. " + e.getMessage());
-                return null;
             }
         }
         else {
             // No project.xml - create a stub object.
-            project = new ProjectType();
-            project.setInfo(new InfoType());
-            project.setDatabase(new DatabaseType());
+            database = new DatabaseType();
         }
+
+        return database;
+    }
+
+    private Catalog compileCatalogInternal(final DatabaseType database, final List<DDLReader> ddlReaderList)
+    {
+        // Compiler instance is reusable. Clear the cache.
+        cachedAddedClasses.clear();
+        m_jarOutput = new InMemoryJarfile();
 
         m_catalog = new Catalog();
         // Initialize the catalog for one cluster
         m_catalog.execute("add / clusters cluster");
         m_catalog.getClusters().get("cluster").setSecurityenabled(false);
 
-        DatabaseType database = project.getDatabase();
         if (database != null) {
             final String databaseName = database.getName();
             // schema does not verify that the database is named "database"
@@ -578,7 +643,7 @@ public class VoltCompiler {
             }
             // shutdown and make a new hsqldb
             try {
-                compileDatabaseNode(database, ddlFilePaths);
+                compileDatabaseNode(database, ddlReaderList);
             } catch (final VoltCompilerException e) {
                 compilerLog.l7dlog( Level.ERROR, LogKeys.compiler_VoltCompiler_FailedToCompileXML.name(), null);
                 return null;
@@ -649,22 +714,23 @@ public class VoltCompiler {
         m_catalog = new Catalog(); //
         m_catalog.execute("add / clusters cluster");
         Database db = initCatalogDatabase();
-        final List<String> schemas = new ArrayList<String>(Arrays.asList(ddlFilePaths));
+        List<DDLReader> ddlReaderList = new ArrayList<DDLReader>(ddlFilePaths.length);
+        for (String ddlFilePath : ddlFilePaths) {
+            ddlReaderList.add(createDDLFileReader(ddlFilePath));
+        }
         final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
-        compileDatabase(db, hsql, voltDdlTracker, schemas, null, null, whichProcs);
+        compileDatabase(db, hsql, voltDdlTracker, ddlReaderList, null, null, whichProcs);
         return m_catalog;
     }
 
     /**
-     * Legacy interface for loading a ddl file with full support for VoltDB
-     * extensions (partitioning, procedures, export),
-     * AND full support for input via a project xml file's "database" node.
+     * Load a ddl file with full support for VoltDB extensions (partitioning, procedures,
+     * export), AND full support for input via a project xml file's "database" node.
      * @param database catalog-related info parsed from a project file
      * @param ddlFilePaths schema file paths
      * @throws VoltCompilerException
      */
-    void compileDatabaseNode(DatabaseType database, String... ddlFilePaths) throws VoltCompilerException {
-        final List<String> schemas = new ArrayList<String>(Arrays.asList(ddlFilePaths));
+    void compileDatabaseNode(DatabaseType database, List<DDLReader> ddlReaderList) throws VoltCompilerException {
         final ArrayList<Class<?>> classDependencies = new ArrayList<Class<?>>();
         final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
 
@@ -675,7 +741,7 @@ public class VoltCompiler {
             for (SchemasType.Schema schema : database.getSchemas().getSchema()) {
                 compilerLog.l7dlog( Level.INFO, LogKeys.compiler_VoltCompiler_CatalogPath.name(),
                                     new Object[] {schema.getPath()}, null);
-                schemas.add(schema.getPath());
+                ddlReaderList.add(createDDLFileReader(schema.getPath()));
             }
         }
 
@@ -722,7 +788,7 @@ public class VoltCompiler {
 
         // shutdown and make a new hsqldb
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
-        compileDatabase(db, hsql, voltDdlTracker, schemas, database.getExport(), classDependencies,
+        compileDatabase(db, hsql, voltDdlTracker, ddlReaderList, database.getExport(), classDependencies,
                         DdlProceduresToLoad.ALL_DDL_PROCEDURES);
     }
 
@@ -737,7 +803,7 @@ public class VoltCompiler {
      * @param whichProcs indicates which ddl-defined procedures to load: none, single-statement, or all
      */
     private void compileDatabase(Database db, HSQLInterface hsql,
-                                 VoltDDLElementTracker voltDdlTracker, List<String> schemas,
+                                 VoltDDLElementTracker voltDdlTracker, List<DDLReader> schemaReaders,
                                  ExportType export, Collection<Class<?>> classDependencies,
                                  DdlProceduresToLoad whichProcs)
         throws VoltCompilerException
@@ -747,37 +813,11 @@ public class VoltCompiler {
         // and REPLICATE statements.
         final DDLCompiler ddlcompiler = new DDLCompiler(this, hsql, voltDdlTracker);
 
-        for (final String schemaPath : schemas) {
-            File schemaFile = null;
-
-            if (schemaPath.contains(".jar!")) {
-                String ddlText = null;
-                try {
-                    ddlText = readFileFromJarfile(schemaPath);
-                } catch (final Exception e) {
-                    throw new VoltCompilerException(e);
-                }
-                schemaFile = VoltProjectBuilder.writeStringToTempFile(ddlText);
-            }
-            else {
-                schemaFile = new File(schemaPath);
-            }
-
-            if (!schemaFile.isAbsolute()) {
-                // Resolve schemaPath relative to either the database definition xml file
-                // or the working directory.
-                if (m_projectFileURL != null) {
-                    schemaFile = new File(new File(m_projectFileURL).getParent(), schemaPath);
-                }
-                else {
-                    schemaFile = new File(schemaPath);
-                }
-            }
-
+        for (final DDLReader schemaReader : schemaReaders) {
             // add the file object's path to the list of files for the jar
-            m_ddlFilePaths.put(schemaFile.getName(), schemaFile.getPath());
+            m_ddlFilePaths.put(schemaReader.getName(), schemaReader.getPath());
 
-            ddlcompiler.loadSchema(schemaFile.getAbsolutePath(), db);
+            ddlcompiler.loadSchema(schemaReader, db);
         }
 
         ddlcompiler.compileToCatalog(db);
@@ -1681,7 +1721,11 @@ public class VoltCompiler {
                                      + "      .xml and .jar are invalid DDL file extensions.");
                     System.exit(-1);
                 }
-                success = compiler.compileFromDDL(args[0], ArrayUtils.subarray(args, 1, args.length));
+                try {
+                    success = compiler.compileFromDDL(args[0], ArrayUtils.subarray(args, 1, args.length));
+                } catch (VoltCompilerException e) {
+                    System.err.printf("Compiler exception: %s\n", e.getMessage());
+                }
             }
             else {
                 System.err.printf("Usage: %s\n", usageNew);
@@ -2039,45 +2083,6 @@ public class VoltCompiler {
 
         m_jarOutput.put(packagePath, classBytes);
         return true;
-    }
-
-    /**
-     * Read a file from a jar in the form path/to/jar.jar!/path/to/file.ext
-     */
-    static String readFileFromJarfile(String fulljarpath) throws IOException {
-        assert (fulljarpath.contains(".jar!"));
-
-        String[] paths = fulljarpath.split("!");
-        if (paths[0].startsWith("file:"))
-            paths[0] = paths[0].substring("file:".length());
-        paths[1] = paths[1].substring(1);
-
-        return readFileFromJarfile(paths[0], paths[1]);
-    }
-
-    static String readFileFromJarfile(String jarfilePath, String entryPath) throws IOException {
-        InputStream fin = null;
-        try {
-            URL jar_url = new URL(jarfilePath);
-            fin = jar_url.openStream();
-        } catch (MalformedURLException ex) {
-            // Invalid URL. Try as a file.
-            fin = new FileInputStream(jarfilePath);
-        }
-        JarInputStream jarIn = new JarInputStream(fin);
-
-        JarEntry catEntry = jarIn.getNextJarEntry();
-        while ((catEntry != null) && (catEntry.getName().equals(entryPath) == false)) {
-            catEntry = jarIn.getNextJarEntry();
-        }
-        if (catEntry == null) {
-            jarIn.close();
-            return null;
-        }
-
-        byte[] bytes = InMemoryJarfile.readFromJarEntry(jarIn, catEntry);
-
-        return new String(bytes, "UTF-8");
     }
 
     /**

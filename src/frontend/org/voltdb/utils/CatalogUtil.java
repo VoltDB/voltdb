@@ -21,8 +21,10 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -46,6 +48,7 @@ import javax.xml.bind.Unmarshaller;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -55,6 +58,7 @@ import org.json_voltpatches.JSONException;
 import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -113,7 +117,6 @@ import org.voltdb.types.IndexType;
 import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
-import org.voltdb.SystemProcedureCatalog;
 
 /**
  *
@@ -163,11 +166,47 @@ public abstract class CatalogUtil {
 
         // Check if it's compatible
         if (!isCatalogCompatible(voltVersionString)) {
-            throw new IOException("Catalog compiled with '" + voltVersionString + "' is not compatible with the current version of VoltDB (" +
-                    VoltDB.instance().getVersionString() + ") - " + " please build your application using the current version of VoltDB.");
+            upgradeCatalog(jarfile, buildInfoLines, log);
         }
 
         return serializedCatalog;
+    }
+
+    /**
+     * Rebuild and save a compatible catalog for the new volt version.
+     *
+     * @param jarfile
+     * @param buildInfoLines
+     * @param log
+     * @throws FileNotFoundException
+     */
+    private static void upgradeCatalog(
+            InMemoryJarfile jarfile,
+            String[] buildInfoLines,
+            VoltLogger log) throws FileNotFoundException
+    {
+        byte[] buildInfoBytes;
+        // Patch the buildinfo.
+        String version = VoltDB.instance().getVersionString();
+        buildInfoLines[0] = version;
+        buildInfoBytes = StringUtils.join(buildInfoLines, "\n").getBytes();
+        jarfile.put(CATALOG_BUILDINFO_FILENAME, buildInfoBytes);
+        // Save the file to voltdbroot.
+        String voltroot = VoltDB.instance().getCatalogContext().cluster.getVoltroot();
+        File upgradeFile = new File(voltroot, String.format("catalog-%s.jar", version));
+        OutputStream os = new FileOutputStream(upgradeFile);
+        try {
+            log.info(String.format(
+                    "Saving catalog file \"%s\" with version upgraded to \"%s\".",
+                    upgradeFile.getAbsolutePath(), version));
+            jarfile.writeToOutputStream(os);
+            os.close();
+        }
+        catch (IOException e) {
+            log.warn(String.format(
+                "Failed to write upgraded catalog file \"%s\".",
+                upgradeFile.getAbsolutePath()), e);
+        }
     }
 
     /**
