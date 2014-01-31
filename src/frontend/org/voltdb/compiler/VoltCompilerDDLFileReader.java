@@ -18,55 +18,23 @@
 package org.voltdb.compiler;
 
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.IOException;
 
 /**
  * VoltCompiler DDL file-based reader.
  */
-public class DDLFileReader extends DDLReader
+public class VoltCompilerDDLFileReader extends VoltCompilerFileReader
 {
-    private final File m_file;
-    private FileReader m_fileReader;
-
     /**
      * @param path  ddl file path
      * @param projectFilePath  optional path to project.xml
      */
-    public DDLFileReader(String path, String projectFilePath) throws IOException
+    public VoltCompilerDDLFileReader(String path, String projectFilePath) throws IOException
     {
-        m_file = getSchemaFile(projectFilePath, path);
-        try {
-            m_fileReader = new FileReader(m_file);
-        }
-        catch (FileNotFoundException e) {
-            throw new IOException(String.format("Unable to open schema file \"%s\" for reading", path));
-        }
+        super(getSchemaPath(projectFilePath, path));
     }
 
-    /* (non-Javadoc)
-     * @see java.io.Reader#read(char[], int, int)
-     */
-    @Override
-    public int read(char[] cbuf, int off, int len) throws IOException
-    {
-        return m_fileReader.read(cbuf, off, len);
-    }
-
-    /* (non-Javadoc)
-     * @see java.io.Reader#close()
-     */
-    @Override
-    public void close() throws IOException
-    {
-        if (m_fileReader != null) {
-            m_fileReader.close();
-            m_fileReader = null;
-        }
-    }
-
-    private static File getSchemaFile(String projectFilePath, String path) throws IOException
+    private static String getSchemaPath(String projectFilePath, String path) throws IOException
     {
         File file = null;
 
@@ -90,20 +58,6 @@ public class DDLFileReader extends DDLReader
             }
         }
 
-        return file;
-    }
-
-    @Override
-    public String getName()
-    {
-        assert(m_file != null);
-        return m_file.getName();
-    }
-
-    @Override
-    public String getPath()
-    {
-        assert(m_file != null);
-        return m_file.getPath();
+        return file.getPath();
     }
 }

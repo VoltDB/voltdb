@@ -21,10 +21,8 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -48,7 +46,6 @@ import javax.xml.bind.Unmarshaller;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -84,6 +81,7 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.ClusterConfig;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
@@ -141,8 +139,6 @@ public abstract class CatalogUtil {
     public static String loadCatalogFromJar(byte[] catalogBytes, VoltLogger log) throws IOException {
         assert(catalogBytes != null);
 
-        String serializedCatalog = null;
-        String voltVersionString = null;
         InMemoryJarfile jarfile = new InMemoryJarfile(catalogBytes);
         byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
 
@@ -150,63 +146,11 @@ public abstract class CatalogUtil {
             throw new IOException("Database catalog not found - please build your application using the current version of VoltDB.");
         }
 
-        serializedCatalog = new String(serializedCatalogBytes, "UTF-8");
+        // Let VoltCompiler do a version check and upgrade the catalog on the fly.
+        VoltCompiler compiler = new VoltCompiler();
+        compiler.postProcessLoadedCatalog(jarfile);
 
-        // Get Volt version string
-        byte[] buildInfoBytes = jarfile.get(CATALOG_BUILDINFO_FILENAME);
-        if (buildInfoBytes == null) {
-            throw new IOException("Catalog build information not found - please build your application using the current version of VoltDB.");
-        }
-        String buildInfo = new String(buildInfoBytes, "UTF-8");
-        String[] buildInfoLines = buildInfo.split("\n");
-        if (buildInfoLines.length != 5) {
-            throw new IOException("Catalog built with an old version of VoltDB - please build your application using the current version of VoltDB.");
-        }
-        voltVersionString = buildInfoLines[0].trim();
-
-        // Check if it's compatible
-        if (!isCatalogCompatible(voltVersionString)) {
-            upgradeCatalog(jarfile, buildInfoLines, log);
-        }
-
-        return serializedCatalog;
-    }
-
-    /**
-     * Rebuild and save a compatible catalog for the new volt version.
-     *
-     * @param jarfile
-     * @param buildInfoLines
-     * @param log
-     * @throws FileNotFoundException
-     */
-    private static void upgradeCatalog(
-            InMemoryJarfile jarfile,
-            String[] buildInfoLines,
-            VoltLogger log) throws FileNotFoundException
-    {
-        byte[] buildInfoBytes;
-        // Patch the buildinfo.
-        String version = VoltDB.instance().getVersionString();
-        buildInfoLines[0] = version;
-        buildInfoBytes = StringUtils.join(buildInfoLines, "\n").getBytes();
-        jarfile.put(CATALOG_BUILDINFO_FILENAME, buildInfoBytes);
-        // Save the file to voltdbroot.
-        String voltroot = VoltDB.instance().getCatalogContext().cluster.getVoltroot();
-        File upgradeFile = new File(voltroot, String.format("catalog-%s.jar", version));
-        OutputStream os = new FileOutputStream(upgradeFile);
-        try {
-            log.info(String.format(
-                    "Saving catalog file \"%s\" with version upgraded to \"%s\".",
-                    upgradeFile.getAbsolutePath(), version));
-            jarfile.writeToOutputStream(os);
-            os.close();
-        }
-        catch (IOException e) {
-            log.warn(String.format(
-                "Failed to write upgraded catalog file \"%s\".",
-                upgradeFile.getAbsolutePath()), e);
-        }
+        return new String(serializedCatalogBytes, "UTF-8");
     }
 
     /**

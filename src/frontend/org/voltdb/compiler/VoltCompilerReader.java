@@ -20,33 +20,15 @@ package org.voltdb.compiler;
 import java.io.IOException;
 import java.io.Reader;
 
+import org.voltdb.utils.InMemoryJarfile;
+
 /**
  * @author scooper
  *
  */
-public abstract class DDLReader extends Reader
+public abstract class VoltCompilerReader extends Reader
 {
     public abstract String getName();
     public abstract String getPath();
-
-    /* (non-Javadoc)
-     * @see java.io.Reader#read(char[], int, int)
-     */
-    @Override
-    public int read(char[] cbuf, int off, int len) throws IOException
-    {
-        // TODO Auto-generated method stub
-        return 0;
-    }
-
-    /* (non-Javadoc)
-     * @see java.io.Reader#close()
-     */
-    @Override
-    public void close() throws IOException
-    {
-        // TODO Auto-generated method stub
-
-    }
-
+    public abstract void addToJar(InMemoryJarfile jarFile) throws IOException;
 }
