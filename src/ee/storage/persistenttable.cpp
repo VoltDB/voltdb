@@ -306,10 +306,9 @@ bool PersistentTable::insertTuple(TableTuple &source)
 void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
 {
     if (visibleTupleCount() >= m_maxRows) {
-    	char msg[1024];
-    	snprintf(msg, 1024, "Table %s exceeds table maximum row count %d",
-    	                     m_name.c_str(), m_maxRows);
-        throw ConstraintFailureException(this, source, msg);
+        std::stringstream builder;
+        builder << "Table " << m_name << " exceeds table maximum row count " << m_maxRows;
+        throw ConstraintFailureException(this, source, builder.str());
     }
 
     //
