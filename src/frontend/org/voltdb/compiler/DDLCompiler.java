@@ -51,6 +51,7 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
+import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.TableAnnotation;
@@ -445,7 +446,7 @@ public class DDLCompiler {
      * @param db
      * @throws VoltCompiler.VoltCompilerException
      */
-    public void loadSchema(String path, Database db)
+    public void loadSchema(String path, Database db, DdlProceduresToLoad whichProcs)
             throws VoltCompiler.VoltCompilerException {
         File inputFile = new File(path);
         FileReader reader = null;
@@ -456,7 +457,7 @@ public class DDLCompiler {
         }
 
         m_currLineNo = 1;
-        loadSchema(path, db, reader);
+        loadSchema(path, db, reader, whichProcs);
     }
 
     /**
@@ -466,7 +467,7 @@ public class DDLCompiler {
      * @param reader
      * @throws VoltCompiler.VoltCompilerException
      */
-    private void loadSchema(String path, Database db, FileReader reader)
+    private void loadSchema(String path, Database db, FileReader reader, DdlProceduresToLoad whichProcs)
             throws VoltCompiler.VoltCompilerException {
 
         DDLStatement stmt = getNextStatement(reader, m_compiler);
@@ -474,7 +475,7 @@ public class DDLCompiler {
             // Some statements are processed by VoltDB and the rest are handled by HSQL.
             boolean processed = false;
             try {
-                processed = processVoltDBStatement(stmt.statement, db);
+                processed = processVoltDBStatement(stmt.statement, db, whichProcs);
             } catch (VoltCompilerException e) {
                 // Reformat the message thrown by VoltDB DDL processing to have a line number.
                 String msg = "VoltDB DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
@@ -534,7 +535,7 @@ public class DDLCompiler {
 
         int loc = 0;
         do {
-            if( ! Character.isJavaIdentifierStart(identifier.charAt(loc))) {
+            if ( ! Character.isJavaIdentifierStart(identifier.charAt(loc))) {
                 String msg = "Unknown indentifier in DDL: \"" +
                         statement.substring(0,statement.length()-1) +
                         "\" contains invalid identifier \"" + identifier + "\"";
@@ -552,10 +553,14 @@ public class DDLCompiler {
      * CREATE PROCEDURE, and CREATE ROLE.
      * @param statement  DDL statement string
      * @param db
+     * @param whichProcs
      * @return true if statement was handled, otherwise it should be passed to HSQL
      * @throws VoltCompilerException
      */
-    private boolean processVoltDBStatement(String statement, Database db) throws VoltCompilerException {
+    private boolean processVoltDBStatement(String statement, Database db,
+                                           DdlProceduresToLoad whichProcs)
+            throws VoltCompilerException
+    {
         if (statement == null || statement.trim().isEmpty()) {
             return false;
         }
@@ -564,7 +569,7 @@ public class DDLCompiler {
 
         // matches if it is the beginning of a voltDB statement
         Matcher statementMatcher = voltdbStatementPrefixPattern.matcher(statement);
-        if( ! statementMatcher.find()) {
+        if ( ! statementMatcher.find()) {
             return false;
         }
 
@@ -573,7 +578,10 @@ public class DDLCompiler {
 
         // matches if it is CREATE PROCEDURE [ALLOW <role> ...] FROM CLASS <class-name>;
         statementMatcher = procedureClassPattern.matcher(statement);
-        if( statementMatcher.matches()) {
+        if (statementMatcher.matches()) {
+            if (whichProcs != DdlProceduresToLoad.ALL_DDL_PROCEDURES) {
+                return true;
+            }
             String className = checkIdentifierStart(statementMatcher.group(2), statement);
             Class<?> clazz;
             try {
@@ -606,7 +614,7 @@ public class DDLCompiler {
 
         // matches if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] AS <select-or-dml-statement>
         statementMatcher = procedureSingleStatementPattern.matcher(statement);
-        if( statementMatcher.matches()) {
+        if (statementMatcher.matches()) {
             String clazz = checkIdentifierStart(statementMatcher.group(1), statement);
             String sqlStatement = statementMatcher.group(3);
 
@@ -669,16 +677,16 @@ public class DDLCompiler {
 
         // matches if it is the beginning of a partition statement
         statementMatcher = prePartitionPattern.matcher(statement);
-        if( statementMatcher.matches()) {
+        if (statementMatcher.matches()) {
 
             // either TABLE or PROCEDURE
             String partitionee = statementMatcher.group(1).toUpperCase();
-            if( TABLE.equals(partitionee)) {
+            if (TABLE.equals(partitionee)) {
 
                 // matches if it is PARTITION TABLE <table> ON COLUMN <column>
                 statementMatcher = partitionTablePattern.matcher(statement);
 
-                if( ! statementMatcher.matches()) {
+                if ( ! statementMatcher.matches()) {
                     throw m_compiler.new VoltCompilerException(String.format(
                             "Invalid PARTITION statement: \"%s\", " +
                             "expected syntax: PARTITION TABLE <table> ON COLUMN <column>",
@@ -691,14 +699,16 @@ public class DDLCompiler {
                         );
                 return true;
             }
-            else if( PROCEDURE.equals(partitionee)) {
-
+            else if (PROCEDURE.equals(partitionee)) {
+                if (whichProcs != DdlProceduresToLoad.ALL_DDL_PROCEDURES) {
+                    return true;
+                }
                 // matches if it is
                 //   PARTITION PROCEDURE <procedure>
                 //      ON  TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]
                 statementMatcher = partitionProcedurePattern.matcher(statement);
 
-                if( ! statementMatcher.matches()) {
+                if ( ! statementMatcher.matches()) {
                     throw m_compiler.new VoltCompilerException(String.format(
                             "Invalid PARTITION statement: \"%s\", " +
                             "expected syntax: PARTITION PROCEDURE <procedure> ON "+
@@ -714,7 +724,7 @@ public class DDLCompiler {
 
                 // if not specified default parameter index to 0
                 String parameterNo = statementMatcher.group(4);
-                if( parameterNo == null) {
+                if (parameterNo == null) {
                     parameterNo = "0";
                 }
 
@@ -733,7 +743,7 @@ public class DDLCompiler {
 
         // matches if it is REPLICATE TABLE <table-name>
         statementMatcher = replicatePattern.matcher(statement);
-        if( statementMatcher.matches()) {
+        if (statementMatcher.matches()) {
             // group(1) -> table
             m_tracker.put(
                     checkIdentifierStart(statementMatcher.group(1), statement),
@@ -763,7 +773,7 @@ public class DDLCompiler {
         // group 1 is role name
         // group 2 is comma-separated permission list or null if there is no WITH clause
         statementMatcher = createRolePattern.matcher(statement);
-        if( statementMatcher.matches()) {
+        if (statementMatcher.matches()) {
             String roleName = statementMatcher.group(1);
             CatalogMap<Group> groupMap = db.getGroups();
             if (groupMap.get(roleName) != null) {
@@ -803,7 +813,7 @@ public class DDLCompiler {
         }
 
         statementMatcher = exportPattern.matcher(statement);
-        if( statementMatcher.matches()) {
+        if (statementMatcher.matches()) {
 
             // check the table portion
             String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
@@ -817,7 +827,7 @@ public class DDLCompiler {
          * the statement is syntax incorrect
          */
 
-        if( PARTITION.equals(commandPrefix)) {
+        if (PARTITION.equals(commandPrefix)) {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Invalid PARTITION statement: \"%s\", " +
                     "expected syntax: \"PARTITION TABLE <table> ON COLUMN <column>\" or " +
@@ -826,14 +836,14 @@ public class DDLCompiler {
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
 
-        if( REPLICATE.equals(commandPrefix)) {
+        if (REPLICATE.equals(commandPrefix)) {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Invalid REPLICATE statement: \"%s\", " +
                     "expected syntax: REPLICATE TABLE <table>",
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
 
-        if( PROCEDURE.equals(commandPrefix)) {
+        if (PROCEDURE.equals(commandPrefix)) {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Invalid CREATE PROCEDURE statement: \"%s\", " +
                     "expected syntax: \"CREATE PROCEDURE [ALLOW <role> [, <role> ...] FROM CLASS <class-name>\" " +
@@ -842,14 +852,14 @@ public class DDLCompiler {
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
 
-        if( ROLE.equals(commandPrefix)) {
+        if (ROLE.equals(commandPrefix)) {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Invalid CREATE ROLE statement: \"%s\", " +
                     "expected syntax: CREATE ROLE <role>",
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
 
-        if( EXPORT.equals(commandPrefix)) {
+        if (EXPORT.equals(commandPrefix)) {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Invalid EXPORT TABLE statement: \"%s\", " +
                     "expected syntax: EXPORT TABLE <table>",
@@ -1995,19 +2005,6 @@ public class DDLCompiler {
             }
         }
         return null;
-    }
-
-    // srcExprs is the prefix of destExprs
-    private static boolean prefixCompatibleExprs(List<AbstractExpression> srcExprs, List<AbstractExpression> destExprs) {
-        if (srcExprs.size() > destExprs.size()) {
-            return false;
-        }
-        for (int i = 0; i < srcExprs.size(); i ++) {
-            if (!srcExprs.contains(destExprs.get(i))) {
-                return false;
-            }
-        }
-        return true;
     }
 
     /**
