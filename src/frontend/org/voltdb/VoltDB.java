@@ -666,6 +666,7 @@ public class VoltDB {
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
+
         /*
          * InvocationTargetException suppresses information about the cause, so unwrap until
          * we get to the root cause
@@ -829,7 +830,6 @@ public class VoltDB {
     public static void main(String[] args) {
         //Thread.setDefaultUncaughtExceptionHandler(new VoltUncaughtExceptionHandler());
         Configuration config = new Configuration(args);
-
         try {
             if (!config.validate()) {
                 System.exit(-1);

@@ -26,6 +26,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -1723,6 +1724,12 @@ public class DDLCompiler {
      * materialized views.
      */
     void processMaterializedViews(Database db) throws VoltCompiler.VoltCompilerException {
+        HashSet <String> viewTableNames = new HashSet<>();
+        for (Entry<Table, String> entry : matViewMap.entrySet()) {
+            viewTableNames.add(entry.getKey().getTypeName());
+        }
+
+
         for (Entry<Table, String> entry : matViewMap.entrySet()) {
             Table destTable = entry.getKey();
             String query = entry.getValue();
@@ -1764,6 +1771,12 @@ public class DDLCompiler {
 
             // create the materializedviewinfo catalog node for the source table
             Table srcTable = stmt.tableList.get(0);
+            if (viewTableNames.contains(srcTable.getTypeName())) {
+                String msg = String.format("A materialized view (%s) can not be defined on another view (%s).",
+                        viewName, srcTable.getTypeName());
+                throw m_compiler.new VoltCompilerException(msg);
+            }
+
             MaterializedViewInfo matviewinfo = srcTable.getViews().add(viewName);
             matviewinfo.setDest(destTable);
             AbstractExpression where = stmt.getSingleTableFilterExpression();
