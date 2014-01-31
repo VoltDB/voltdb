@@ -171,19 +171,6 @@ public class PlannerTestAideDeCamp {
             catalogParam.setIndex(i);
         }
 
-        // Output Columns
-        int index = 0;
-        for (SchemaColumn col : plan.columns.getColumns())
-        {
-            Column catColumn = catalogStmt.getOutput_columns().add(String.valueOf(index));
-            catColumn.setNullable(false);
-            catColumn.setIndex(index);
-            catColumn.setName(col.getColumnName());
-            catColumn.setType(col.getType().getValue());
-            catColumn.setSize(col.getSize());
-            index++;
-        }
-
         List<PlanNodeList> nodeLists = new ArrayList<PlanNodeList>();
         nodeLists.add(new PlanNodeList(plan.rootPlanGraph));
         if (plan.subPlanGraph != null) {

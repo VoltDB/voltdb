@@ -318,7 +318,6 @@ public class QueryPlanner {
                                                  "to parsed display columns");
             }
         }
-        plan.columns = output_schema;
     }
 
 }
