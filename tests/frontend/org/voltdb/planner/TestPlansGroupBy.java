@@ -92,15 +92,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
         }
     }
 
-    private void checkGroupByOnlyPlan(List<AbstractPlanNode> pns, boolean twoFragments, boolean isHashAggregator, boolean isIndexScan) {
-        for (AbstractPlanNode apn: pns) {
-            System.out.println(apn.toExplainPlanString());
-            while (apn.getChildCount() > 0) {
-                apn = apn.getChild(0);
-                System.out.println(apn.toExplainPlanString());
-            }
-        }
-
+    private void checkGroupByOnlyPlan(List<AbstractPlanNode> pns, boolean twoFragments,
+                                      boolean isHashAggregator, boolean isIndexScan) {
         AbstractPlanNode apn = pns.get(0).getChild(0);
         if (twoFragments) {
             assertTrue(apn.getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
@@ -182,6 +175,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         // SeqScanToIndexScan optimization for deterministic reason
         // use EXPR_F_TREE1 not EXPR_F_TREE2
         pns = compileToFragments("SELECT F_D2 - F_D3, COUNT(*) FROM F GROUP BY F_D2 - F_D3");
+        // debug */ System.out.println(pns.get(0).toExplainPlanString());
         checkGroupByOnlyPlan(pns, true, true, true);
     }
 
@@ -207,7 +201,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
         p = pns.get(1).getChild(0);
         assertTrue(p instanceof AbstractScanPlanNode);
 
-        // Make sure it compile correctly
         pns = compileToFragments("SELECT A1, count(*) as tag FROM P1 group by A1 order by tag, A1 limit 1");
         p = pns.get(0).getChild(0);
 
@@ -220,6 +213,22 @@ public class TestPlansGroupBy extends PlannerTestCase {
         p = pns.get(1).getChild(0);
         assertTrue(p instanceof AggregatePlanNode);
         assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+
+        pns = compileToFragments("SELECT F_D1, count(*) as tag FROM RF group by F_D1 order by tag");
+        p = pns.get(0).getChild(0);
+        /*/ to debug */ System.out.println("DEBUG: " + p.toExplainPlanString());
+        assertTrue(p instanceof ProjectionPlanNode);
+        //assertTrue(p.getChild(0) instanceof LimitPlanNode);
+        assertTrue(p.getChild(0) instanceof OrderByPlanNode);
+        assertTrue(p.getChild(0).getChild(0) instanceof AggregatePlanNode);
+
+        pns = compileToFragments("SELECT F_D1, count(*) FROM RF group by F_D1 order by 2");
+        p = pns.get(0).getChild(0);
+        /*/ to debug */ System.out.println("DEBUG: " + p.toExplainPlanString());
+        assertTrue(p instanceof ProjectionPlanNode);
+        //assertTrue(p.getChild(0) instanceof LimitPlanNode);
+        assertTrue(p.getChild(0) instanceof OrderByPlanNode);
+        assertTrue(p.getChild(0).getChild(0) instanceof AggregatePlanNode);
     }
 
     private void checkHasComplexAgg(List<AbstractPlanNode> pns) {

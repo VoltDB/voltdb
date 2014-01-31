@@ -1059,8 +1059,22 @@ public class PlanAssembler {
 
         // get all of the columns in the sort
         List<AbstractExpression> orderExpressions = orderByNode.getSortExpressions();
-        String fromTableAlias = orderExpressions.get(0).baseTableAlias();
-
+        int intScanIndex = -1;
+        // TODO: stopping at the first table mentioned in the first order by expression is very weak.
+        // A better fix is on its way -- for now just get around a NullPointerException that resulted
+        // when a temp table expression was first.
+        for (AbstractExpression orderExpression : orderExpressions) {
+            String fromTableAlias = orderExpression.baseTableAlias();
+            // temp table expressions like "COUNT(*)" don't help resolve indexed exprs
+            if (m_parsedSelect.tableAliasIndexMap.containsKey(fromTableAlias)) {
+                intScanIndex = m_parsedSelect.tableAliasIndexMap.get(fromTableAlias);
+                break;
+            }
+        }
+        if (intScanIndex == -1) {
+            // no indexable order by expressions were found -- the order by does not help determinism
+            return orderByNode;
+        }
         // In theory, for every table in the query, there needs to exist a uniqueness constraint
         // (primary key or other unique index) on some of the ORDER BY values regardless of whether
         // the associated index is used in the selected plan.
@@ -1107,8 +1121,7 @@ public class PlanAssembler {
                 }
                 // if this is a fancy expression-based index...
                 else {
-                    int idx = m_parsedSelect.tableAliasIndexMap.get(fromTableAlias);
-                    StmtTableScan tableScan = m_parsedSelect.stmtCache.get(idx);
+                    StmtTableScan tableScan = m_parsedSelect.stmtCache.get(intScanIndex);
                     try {
                         indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, tableScan);
                     } catch (JSONException e) {
