@@ -26,8 +26,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
 
@@ -404,6 +404,10 @@ public class NIOWriteStream implements WriteStream {
         int bytesReleased = 0;
         m_isShutdown = true;
         BBContainer c = null;
+        if (m_currentWriteBuffer != null) {
+            bytesReleased += m_currentWriteBuffer.b.remaining();
+            m_currentWriteBuffer.discard();
+        }
         while ((c = m_queuedBuffers.poll()) != null) {
             //Buffer is not flipped after being written to in swap and serialize, need to do it here
             c.b.flip();

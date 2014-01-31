@@ -389,6 +389,11 @@ public class TestNIOWriteStream extends TestCase {
         wstream.enqueue(ByteBuffer.allocate(32));
         wstream.swapAndSerializeQueuedWrites(pool);
         assertEquals(32, queue.get());
+        wstream.drainTo(channel);
+        assertEquals(32, queue.get());
+        wstream.enqueue(ByteBuffer.allocate(32));
+        wstream.swapAndSerializeQueuedWrites(pool);
+        assertEquals(64, queue.get());
         wstream.shutdown();
         assertEquals(0, queue.get());
     }
