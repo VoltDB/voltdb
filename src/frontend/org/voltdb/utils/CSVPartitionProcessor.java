@@ -233,14 +233,12 @@ class CSVPartitionProcessor implements Runnable {
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
             byte status = response.getStatus();
-            if (status != ClientResponse.SUCCESS
-                    && status != ClientResponse.USER_ABORT
-                    && status != ClientResponse.GRACEFUL_FAILURE) {
-                System.out.println("Fatal Response from server for: " + response.getStatusString()
-                        + " for: " + m_csvLine.rawLine.toString());
-                System.exit(1);
-            }
             if (status != ClientResponse.SUCCESS) {
+                if (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE) {
+                    System.out.println("Fatal Response from server for: " + response.getStatusString()
+                            + " for: " + m_csvLine.rawLine.toString());
+                    System.exit(1);
+                }
                 String[] info = {m_csvLine.rawLine.toString(), response.getStatusString()};
                 if (CSVFileReader.synchronizeErrorInfo(m_csvLine.lineNumber, info)) {
                     m_processor.m_errored = true;
@@ -329,14 +327,13 @@ class CSVPartitionProcessor implements Runnable {
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
             byte status = response.getStatus();
-            if (status != ClientResponse.SUCCESS
-                    && status != ClientResponse.USER_ABORT
-                    && status != ClientResponse.GRACEFUL_FAILURE) {
-                System.out.println("Fatal Response from server for batch. Please check health of the server. Status: "
-                        + response.getStatusString());
-                System.exit(1);
-            }
             if (status != ClientResponse.SUCCESS) {
+                if (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE) {
+                    System.out.println("Fatal Response from server for batch. "
+                            + "Please check health of the server. Status: "
+                            + response.getStatusString());
+                    System.exit(1);
+                }
                 // Batch failed queue it for individual processing and find out which actually m_errored.
                 m_log.info("Unable to insert rows in a batch.  Attempting to insert them one-by-one.");
                 m_log.info("Note: this will result in reduced insertion performance.");
