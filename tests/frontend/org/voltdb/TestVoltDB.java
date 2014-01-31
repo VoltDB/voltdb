@@ -70,7 +70,7 @@ public class TestVoltDB extends TestCase {
         VoltDB.Configuration cfg10 = new VoltDB.Configuration(args10);
         assertEquals("ytestystringy", cfg10.m_pathToCatalog);
 
-        String args12[] = { "create", "port 1234" };
+        String args12[] = { "create", "port", "1234" };
         VoltDB.Configuration cfg12 = new VoltDB.Configuration(args12);
         assertEquals(1234, cfg12.m_port);
         String args13[] = { "create", "port", "5678" };
