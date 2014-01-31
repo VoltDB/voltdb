@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import com.google_voltpatches.common.net.HostAndPort;
 import java.io.File;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
@@ -51,6 +52,7 @@ public class VoltDB {
     public static final String DEFAULT_EXTERNAL_INTERFACE = "";
     public static final String DEFAULT_INTERNAL_INTERFACE = "";
     public static final int DEFAULT_DR_PORT = 5555;
+    public static final int DEFAULT_HTTP_PORT = 8080;
     public static final int BACKWARD_TIME_FORGIVENESS_WINDOW_MS = 3000;
     public static final int INITIATOR_SITE_ID = 0;
     public static final int SITES_TO_HOST_DIVISOR = 100;
@@ -266,46 +268,46 @@ public class VoltDB {
                 // handle from the command line as two strings <catalog> <filename>
                 else if (arg.equals("port")) {
                     String portStr = args[++i];
-                    String portInfo[] = portStr.split(":");
-                    if (portInfo != null && portInfo.length == 2) {
-                        m_clientInterface = portInfo[0];
-                        m_port = Integer.parseInt(portInfo[1]);
+                    if (portStr.indexOf(':') != -1) {
+                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, m_port);
+                        m_clientInterface = hap.getHostText();
+                        m_port = hap.getPort();
                     } else {
                         m_port = Integer.parseInt(portStr);
                     }
                 } else if (arg.equals("adminport")) {
                     String portStr = args[++i];
-                    String portInfo[] = portStr.split(":");
-                    if (portInfo != null && portInfo.length == 2) {
-                        m_adminInterface = portInfo[0];
-                        m_adminPort = Integer.parseInt(portInfo[1]);
+                    if (portStr.indexOf(':') != -1) {
+                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, VoltDB.DEFAULT_ADMIN_PORT);
+                        m_adminInterface = hap.getHostText();
+                        m_adminPort = hap.getPort();
                     } else {
                         m_adminPort = Integer.parseInt(portStr);
                     }
                 } else if (arg.equals("internalport")) {
                     String portStr = args[++i];
-                    String portInfo[] = portStr.split(":");
-                    if (portInfo != null && portInfo.length == 2) {
-                        m_internalPortInterface = portInfo[0];
-                        m_internalPort = Integer.parseInt(portInfo[1]);
+                    if (portStr.indexOf(':') != -1) {
+                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, m_internalPort);
+                        m_internalPortInterface = hap.getHostText();
+                        m_internalPort = hap.getPort();
                     } else {
                         m_internalPort = Integer.parseInt(portStr);
                     }
                 } else if (arg.equals("replicationport")) {
                     String portStr = args[++i];
-                    String portInfo[] = portStr.split(":");
-                    if (portInfo != null && portInfo.length == 2) {
-                        m_drInterface = portInfo[0];
-                        m_drAgentPortStart = Integer.parseInt(portInfo[1]);
+                    if (portStr.indexOf(':') != -1) {
+                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, VoltDB.DEFAULT_DR_PORT);
+                        m_drInterface = hap.getHostText();
+                        m_drAgentPortStart = hap.getPort();
                     } else {
                         m_drAgentPortStart = Integer.parseInt(portStr);
                     }
                 } else if (arg.equals("httpport")) {
                     String portStr = args[++i];
-                    String portInfo[] = portStr.split(":");
-                    if (portInfo != null && portInfo.length == 2) {
-                        m_httpPortInterface = portInfo[0];
-                        m_httpPort = Integer.parseInt(portInfo[1]);
+                    if (portStr.indexOf(':') != -1) {
+                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, VoltDB.DEFAULT_HTTP_PORT);
+                        m_httpPortInterface = hap.getHostText();
+                        m_httpPort = hap.getPort();
                     } else {
                         m_httpPort = Integer.parseInt(portStr);
                     }
