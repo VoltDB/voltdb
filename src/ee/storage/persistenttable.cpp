@@ -308,7 +308,7 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
     if (visibleTupleCount() >= m_maxRows) {
     	char msg[1024];
     	snprintf(msg, 1024, "Table %s exceeds table maximum row count %d",
-    	                     m_name, m_maxRows);
+    	                     m_name.c_str(), m_maxRows);
         throw ConstraintFailureException(this, source, msg);
     }
 
