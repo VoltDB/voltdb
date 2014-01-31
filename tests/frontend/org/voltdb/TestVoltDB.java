@@ -91,6 +91,33 @@ public class TestVoltDB extends TestCase {
         VoltDB.Configuration cfg17 = new VoltDB.Configuration(args17);
         assertEquals(ReplicationRole.REPLICA, cfg17.m_replicationRole);
 
+        // test host:port formats
+        String args18[] = {"create", "port", "localhost:5678"};
+        VoltDB.Configuration cfg18 = new VoltDB.Configuration(args18);
+        assertEquals(5678, cfg18.m_port);
+        assertEquals("localhost", cfg18.m_clientInterface);
+
+        String args19[] = {"create", "adminport", "localhost:5678"};
+        VoltDB.Configuration cfg19 = new VoltDB.Configuration(args19);
+        assertEquals(5678, cfg19.m_adminPort);
+        assertEquals("localhost", cfg19.m_adminInterface);
+
+        String args20[] = {"create", "httpport", "localhost:7777"};
+        VoltDB.Configuration cfg20 = new VoltDB.Configuration(args20);
+        assertEquals(7777, cfg20.m_httpPort);
+        assertEquals("localhost", cfg20.m_httpPortInterface);
+
+        String args21[] = {"create", "internalport", "localhost:7777"};
+        VoltDB.Configuration cfg21 = new VoltDB.Configuration(args21);
+        assertEquals(7777, cfg21.m_internalPort);
+        assertEquals("localhost", cfg21.m_internalPortInterface);
+
+        //with override
+        String args22[] = {"create", "internalinterface", "xxxxxx", "internalport", "localhost:7777"};
+        VoltDB.Configuration cfg22 = new VoltDB.Configuration(args22);
+        assertEquals(7777, cfg22.m_internalPort);
+        assertEquals("localhost", cfg22.m_internalPortInterface);
+
         // XXX don't test what happens if port is invalid, because the code
         // doesn't handle that
     }
