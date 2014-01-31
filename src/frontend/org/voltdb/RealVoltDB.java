@@ -673,10 +673,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     InetAddress adminIntf = null;
                     if (!m_config.m_externalInterface.trim().equals("")) {
                         clientIntf = InetAddress.getByName(m_config.m_externalInterface);
-                        //client and admin interfaces are same.
+                        //client and admin interfaces are same by default.
                         adminIntf = clientIntf;
                     }
-                    //If user has specified on command line host:port override client and admin interfacces.
+                    //If user has specified on command line host:port override client and admin interfaces.
                     if (m_config.m_clientInterface != null && m_config.m_clientInterface.trim().length() > 0) {
                         clientIntf = InetAddress.getByName(m_config.m_clientInterface);
                     }
