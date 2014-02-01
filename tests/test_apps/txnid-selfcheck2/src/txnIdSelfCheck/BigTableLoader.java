@@ -83,6 +83,7 @@ public class BigTableLoader extends Thread {
 
     void shutdown() {
         m_shouldContinue.set(false);
+        this.interrupt();
     }
 
     class InsertCallback implements ProcedureCallback {

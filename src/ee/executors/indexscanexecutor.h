@@ -80,7 +80,6 @@ private:
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
 
-    void updateTargetTableAndIndex();
     // Data in this class is arranged roughly in the order it is read for
     // p_execute(). Please don't reshuffle it only in the name of beauty.
 
@@ -94,7 +93,6 @@ private:
     AbstractExpression** m_projectionExpressions;
 
     // Search key
-    TableTuple m_searchKey;
     AbstractExpression** m_searchKeyArray;
 
     IndexLookupType m_lookupType;
@@ -102,9 +100,6 @@ private:
 
     // IndexScan Information
     TempTable* m_outputTable;
-    PersistentTable* m_targetTable;
-
-    TableIndex *m_index;
 
     // arrange the memory mgmt aids at the bottom to try to maximize
     // cache hits (by keeping them out of the way of useful runtime data)

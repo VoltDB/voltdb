@@ -55,6 +55,7 @@ public class InvokeDroppedProcedureThread extends Thread {
 
     void shutdown() {
         m_shouldContinue.set(false);
+        this.interrupt();
     }
 
     class InvokeDroppedCallback implements ProcedureCallback {
