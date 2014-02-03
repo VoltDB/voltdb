@@ -215,6 +215,11 @@ public class ForeignHost {
                      * Can this be removed?
                      */
                 }
+
+                @Override
+                public String toString() {
+                    return message.getClass().getName();
+                }
             });
 
         long current_time = EstTime.currentTimeMillis();
