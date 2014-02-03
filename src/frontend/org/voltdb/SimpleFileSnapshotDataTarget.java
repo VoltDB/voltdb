@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,8 +21,12 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
 
@@ -31,12 +35,31 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
+    private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
+
     private final File m_tempFile;
     private final File m_file;
     private final FileChannel m_fc;
     private long m_bytesWritten = 0;
     private Runnable m_onCloseTask;
     private boolean m_needsFinalClose;
+
+    /*
+     * Remember to sync regularly. SimpleFileSnapshotDataTarget
+     * takes a simpler approach to bounding the number of bytes synced
+     * and keeping the disk working on a regular basis.
+     *
+     * The two roles are split, one thread syncs periodically to keep the disk busy
+     * and the main thread writing will only stop on syncing if it has written
+     * 256 megabytes past what the sync thread is doing
+     *
+     * This removes the messy coordination you see in DefaultSnapshotDataTarget
+     * where the two threads use a semaphore to keep track of permits
+     */
+    private static final int m_bytesAllowedBeforeSync = (1024 * 1024) * 256;
+    private AtomicInteger m_bytesSinceLastSync = new AtomicInteger(0);
+
+    private final ScheduledFuture<?> m_syncTask;
 
     /*
      * If a write fails then this snapshot is hosed.
@@ -58,6 +81,29 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
         m_needsFinalClose = needsFinalClose;
 
         m_es = CoreUtils.getSingleThreadExecutor("Snapshot write thread for " + m_file);
+        ScheduledFuture<?> syncTask = null;
+        syncTask = DefaultSnapshotDataTarget.m_syncService.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                //Only sync for at least 4 megabyte of data, enough to amortize the cost of seeking
+                //on ye olden platters. Since we are appending to a file it's actually 2 seeks.
+                while (m_bytesSinceLastSync.get() > 1024 * 1024 * 4) {
+                    try {
+                        m_fc.force(false);
+                    } catch (IOException e) {
+                        if (!(e instanceof java.nio.channels.AsynchronousCloseException )) {
+                            SNAP_LOG.error("Error syncing snapshot", e);
+                        } else {
+                            SNAP_LOG.debug("Asynchronous close syncing snapshot data, presumably graceful", e);
+                        }
+                    }
+                    //Blind setting to 0 means we could technically write more than
+                    //256 megabytes at a time but 512 is the worst case and that is fine
+                    m_bytesSinceLastSync.set(0);
+                }
+            }
+        }, DefaultSnapshotDataTarget.SNAPSHOT_SYNC_FREQUENCY, DefaultSnapshotDataTarget.SNAPSHOT_SYNC_FREQUENCY, TimeUnit.MILLISECONDS);
+        m_syncTask = syncTask;
     }
 
     private final ListeningExecutorService m_es;
@@ -85,11 +131,17 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
                         return null;
                     }
                     try {
+                        int totalWritten = 0;
                         while (data.b.hasRemaining()) {
                             int written = m_fc.write(data.b);
                             if (written > 0) {
                                 m_bytesWritten += written;
+                                totalWritten += written;
                             }
+                        }
+                        if (m_bytesSinceLastSync.addAndGet(totalWritten) > m_bytesAllowedBeforeSync) {
+                            m_fc.force(false);
+                            m_bytesSinceLastSync.set(0);
                         }
                     } finally {
                         data.discard();
@@ -115,6 +167,7 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
         try {
             m_es.shutdown();
             m_es.awaitTermination(356, TimeUnit.DAYS);
+            m_syncTask.cancel(false);
             m_fc.force(false);
             m_fc.close();
             m_tempFile.renameTo(m_file);

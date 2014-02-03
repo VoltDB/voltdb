@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,13 +17,21 @@
 
 package org.voltcore.network;
 
-import java.util.concurrent.atomic.AtomicLong;
-import java.nio.ByteBuffer;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class VoltProtocolHandler implements InputHandler {
     /** VoltProtocolPorts each have a unique id */
     private static AtomicLong m_globalConnectionCounter = new AtomicLong(0);
+
+    /** The distinct exception class allows better logging of these unexpected errors. */
+    class BadMessageLength extends IOException {
+        private static final long serialVersionUID = 8547352379044459911L;
+        public BadMessageLength(String string) {
+            super(string);
+        }
+    }
 
     /** messages read by this connection */
     private int m_sequenceId;
@@ -31,13 +39,15 @@ public abstract class VoltProtocolHandler implements InputHandler {
     private final long m_connectionId;
     private int m_nextLength;
 
+    private static int MAX_MESSAGE_LENGTH = 52428800;
+
     public VoltProtocolHandler() {
         m_sequenceId = 0;
         m_connectionId = m_globalConnectionCounter.incrementAndGet();
     }
 
     @Override
-    public ByteBuffer retrieveNextMessage(Connection c) throws IOException {
+    public ByteBuffer retrieveNextMessage(Connection c) throws BadMessageLength {
         final NIOReadStream inputStream = c.readStream();
 
         /*
@@ -51,13 +61,13 @@ public abstract class VoltProtocolHandler implements InputHandler {
         if (m_nextLength == 0 && inputStream.dataAvailable() > (Integer.SIZE/8)) {
             m_nextLength = inputStream.getInt();
             if (m_nextLength < 1) {
-                throw new IOException(
+                throw new BadMessageLength(
                         "Next message length is " + m_nextLength + " which is less than 1 and is nonsense");
             }
-            if (m_nextLength > 52428800) {
-                throw new IOException(
+            if (m_nextLength > MAX_MESSAGE_LENGTH) {
+                throw new BadMessageLength(
                         "Next message length is " + m_nextLength + " which is greater then the hard coded " +
-                        "max of 52428800. Break up the work into smaller chunks (2 megabytes is reasonable) " +
+                        "max of " + MAX_MESSAGE_LENGTH + ". Break up the work into smaller chunks (2 megabytes is reasonable) " +
                         "and send as multiple messages or stored procedure invocations");
             }
             assert m_nextLength > 0;

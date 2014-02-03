@@ -58,6 +58,7 @@
 <property name='vendor.cpp.dir'              location='third_party/cpp' />
 <property name='depcache'                    value='.depcache' />
 
+<property name="j2se_api" value="http://docs.oracle.com/javase/7/docs/api/"/>
 
 <!-- os.mac is set when build is running on Mac OSX -->
 <condition property="os.mac">
@@ -70,7 +71,7 @@
         <include name='commons-cli-1.2.jar' />
     </fileset>
     <fileset dir='${vendor.lib.dir}'>
-        <include name='javaee-api-7.0.jar' />
+        <include name='javaee-api-6.0.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>
 </path>
@@ -93,13 +94,15 @@ DISTRIBUTION
 -->
 
 <target name="javadoc">
+    <echo message="Building Client API JavaDoc"/>
     <!-- populate selected client javadoc documentation -->
     <javadoc
         destdir="${doc.dir}/javadoc/java-client-api"
         access="protected"
         version="true"
         use="true"
-        nodeprecated="true"
+        failonerror="true"
+        additionalparam="-quiet"
         Overview='${src.gpl.dir}/overview-public.html'
         Windowtitle='VoltDB Client APIs'>
         <link href="${j2se_api}"/>
@@ -107,7 +110,6 @@ DISTRIBUTION
         <fileset dir="." defaultexcludes="yes">
             <include name="src/frontend/org/voltdb/VoltTable.java" />
             <include name="src/frontend/org/voltdb/VoltTableRow.java" />
-            <include name="src/frontend/org/voltdb/VoltClient.java" />
             <include name="src/frontend/org/voltdb/VoltType.java" />
             <include name="src/frontend/org/voltdb/client/Client.java" />
             <include name="src/frontend/org/voltdb/client/NoConnectionsException.java" />
@@ -121,6 +123,7 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/client/ClientStatusListenerExt.java" />
             <include name="src/frontend/org/voltdb/client/ClientResponse.java" />
             <include name="src/frontend/org/voltdb/client/ClientStats.java" />
+            <include name="src/frontend/org/voltdb/client/ClientAffinityStats.java" />
             <include name="src/frontend/org/voltdb/client/ClientStatsContext.java" />
             <include name="src/frontend/org/voltdb/types/TimestampType.java" />
         </fileset>
@@ -209,6 +212,7 @@ JAVA COMPILATION
                   org/apache/zookeeper_voltpatches/KeeperException.java
                   org/cliffc_voltpatches/**/*.java
                   org/json_voltpatches/**/*.java
+                  jsr166y/**/*.java
 
                   org/voltcore/logging/Level.java
                   org/voltcore/logging/VoltLogger.java

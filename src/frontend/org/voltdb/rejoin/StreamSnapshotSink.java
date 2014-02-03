@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -32,6 +32,7 @@ import org.voltdb.SiteProcedureConnection;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.dtxn.UndoAction;
 import org.voltdb.utils.CachedByteBufferAllocator;
 import org.voltdb.utils.FixedDBBPool;
 
@@ -81,10 +82,11 @@ public class StreamSnapshotSink {
             rejoinLog.debug("Updating the hashinator to version " + version);
 
             // Update the Java hashinator
-            TheHashinator.updateConfiguredHashinator(version, hashinatorConfig);
+            Pair<? extends UndoAction, TheHashinator> hashinatorPair =
+                    TheHashinator.updateConfiguredHashinator(version, hashinatorConfig);
 
             // Update the EE hashinator
-            connection.updateHashinator(TheHashinator.getCurrentConfig());
+            connection.updateHashinator(hashinatorPair.getSecond());
         }
     }
 

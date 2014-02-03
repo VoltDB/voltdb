@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -40,5 +40,38 @@ public abstract class PrivateVoltTableFactory {
         VoltTable vt = new VoltTable();
         vt.initFromBuffer(shared);
         return vt;
+    }
+
+    /**
+     * End users should not call this method.
+     * Obtain a reference to the table's underlying buffer.
+     * The returned reference's position and mark are independent of
+     * the table's buffer position and mark. The returned buffer has
+     * no mark and is at position 0.
+     */
+    public static ByteBuffer getTableDataReference(VoltTable vt) {
+        ByteBuffer buf = vt.m_buffer.duplicate();
+        buf.rewind();
+        return buf;
+    }
+
+    public static byte[] getSchemaBytes(VoltTable vt) {
+        if (vt.getRowCount() > 0) {
+            throw new RuntimeException("getSchemaBytes() Only works if the table is empty");
+        }
+        ByteBuffer dup = vt.m_buffer.duplicate();
+        dup.limit(dup.limit() - 4);
+        dup.position(0);
+        byte retvalBytes[] = new byte[dup.remaining()];
+        dup.get(retvalBytes);
+        return retvalBytes;
+    }
+
+    /**
+     * End users should not call this method.
+     * @return Underlying buffer size
+     */
+    public static int getUnderlyingBufferSize(VoltTable vt) {
+        return vt.m_buffer.position();
     }
 }

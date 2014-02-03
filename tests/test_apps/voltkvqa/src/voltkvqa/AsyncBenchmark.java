@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -42,13 +42,18 @@ package voltkvqa;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.Map.Entry;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -214,6 +219,49 @@ public class AsyncBenchmark {
             if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
             if (latencytarget <= 0) exitWithMessageAndUsage("latencytarget must be > 0");
             if (preloadLowKey < 0) exitWithMessageAndUsage("preloadlowkey must be >= 0");
+        }
+    }
+
+    /**
+     * Fake an internal jstack to the log
+     */
+    static public void printJStack() {
+        prt(new Date().toString() + " Full thread dump");
+
+        Map<String, List<String>> deduped = new HashMap<String, List<String>>();
+
+        // collect all the output, but dedup the identical stack traces
+        for (Entry<Thread, StackTraceElement[]> e : Thread.getAllStackTraces().entrySet()) {
+            Thread t = e.getKey();
+            String header = String.format("\"%s\" %sprio=%d tid=%d %s",
+                    t.getName(),
+                    t.isDaemon() ? "daemon " : "",
+                    t.getPriority(),
+                    t.getId(),
+                    t.getState().toString());
+
+            String stack = "";
+            for (StackTraceElement ste : e.getValue()) {
+                stack += "    at " + ste.toString() + "\n";
+            }
+
+            if (deduped.containsKey(stack)) {
+                deduped.get(stack).add(header);
+            }
+            else {
+                ArrayList<String> headers = new ArrayList<String>();
+                headers.add(header);
+                deduped.put(stack, headers);
+            }
+        }
+
+        for (Entry<String, List<String>> e : deduped.entrySet()) {
+            String logline = "";
+            for (String header : e.getValue()) {
+                logline += header + "\n";
+            }
+            logline += e.getKey();
+            prt(logline);
         }
     }
 
@@ -425,7 +473,9 @@ public class AsyncBenchmark {
             prt(msg);
         }
         if ((System.currentTimeMillis() - lastSuccessfulResponse) > 6*60*1000) {
-            prt("Not making any progress, exiting");
+            prt("Not making any progress, last at " +
+                    (new SimpleDateFormat("yyyy-MM-DD HH:mm:ss.S")).format(new Date(lastSuccessfulResponse)) + ", exiting");
+            printJStack();
             System.exit(1);
         }
     }

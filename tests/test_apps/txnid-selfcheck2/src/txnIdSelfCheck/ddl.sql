@@ -111,6 +111,37 @@ CREATE TABLE export_skinny_partitioned_table
 , rowid                     BIGINT        NOT NULL
 );
 
+-- For loadsinglepartition
+CREATE TABLE loadp
+(
+  cid    BIGINT NOT NULL
+, txnid  BIGINT NOT NULL
+, rowid  BIGINT NOT NULL
+);
+PARTITION TABLE loadp ON COLUMN cid;
+CREATE TABLE cploadp
+(
+  cid    BIGINT NOT NULL
+, txnid  BIGINT NOT NULL
+, rowid  BIGINT NOT NULL
+);
+PARTITION TABLE cploadp ON COLUMN cid;
+
+
+-- For loadmultiplepartition
+CREATE TABLE loadmp
+(
+  cid    BIGINT NOT NULL
+, txnid  BIGINT NOT NULL
+, rowid  BIGINT NOT NULL
+);
+CREATE TABLE cploadmp
+(
+  cid    BIGINT NOT NULL
+, txnid  BIGINT NOT NULL
+, rowid  BIGINT NOT NULL
+);
+
 PARTITION TABLE export_skinny_partitioned_table ON COLUMN rowid;
 EXPORT TABLE export_skinny_partitioned_table;
 
@@ -118,6 +149,8 @@ EXPORT TABLE export_skinny_partitioned_table;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReplicatedUpdateBaseProc;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonBaseProc;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CopyLoadPartitionedBase;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteLoadPartitionedBase;
 
 -- real procedures
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.SetupAdHocTables;
@@ -141,3 +174,16 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonSP;
 PARTITION PROCEDURE PoisonSP ON TABLE partitioned COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PopulateDimension;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CopyLoadPartitionedSP;
+PARTITION PROCEDURE CopyLoadPartitionedSP ON TABLE cploadp COLUMN cid;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CopyLoadPartitionedMP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteLoadPartitionedSP;
+PARTITION PROCEDURE DeleteLoadPartitionedSP ON TABLE cploadp COLUMN cid;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteLoadPartitionedMP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteOnlyLoadTableSP;
+PARTITION PROCEDURE DeleteOnlyLoadTableSP ON TABLE loadp COLUMN cid;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteOnlyLoadTableMP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGPTruncateTableSP;
+PARTITION PROCEDURE BIGPTruncateTableSP ON TABLE bigp COLUMN p;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGPTruncateTableMP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGRTruncateTable;

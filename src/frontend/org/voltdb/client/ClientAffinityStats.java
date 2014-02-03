@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -43,6 +43,13 @@ public class ClientAffinityStats {
         m_rrReads = rrReads;
     }
 
+    /**
+     * Subtract one ClientAffinityStats instance from another to produce a third.
+     *
+     * @param newer More recent ClientAffinityStats instance.
+     * @param older Less recent ClientAffinityStats instance.
+     * @return New instance representing the difference.
+     */
     public static ClientAffinityStats diff(ClientAffinityStats newer, ClientAffinityStats older) {
         if (newer.m_partitionId != older.m_partitionId) {
             throw new IllegalArgumentException("Can't diff these ClientAffinityStats instances.");
@@ -70,6 +77,11 @@ public class ClientAffinityStats {
         m_affinityWrites++;
     }
 
+    /**
+     * Get the number of writes that used affinity for this time period.
+     *
+     * @return The count as a long.
+     */
     public long getAffinityWrites()
     {
         return m_affinityWrites;
@@ -80,6 +92,12 @@ public class ClientAffinityStats {
         m_rrWrites++;
     }
 
+    /**
+     * Get the number of writes that used round-robin distribution
+     * for this time period.
+     *
+     * @return The count as a long.
+     */
     public long getRrWrites()
     {
         return m_rrWrites;
@@ -90,6 +108,11 @@ public class ClientAffinityStats {
         m_affinityReads++;
     }
 
+    /**
+     * Get the number of reads that used affinity for this time period.
+     *
+     * @return The count as a long.
+     */
     public long getAffinityReads()
     {
         return m_affinityReads;
@@ -100,6 +123,12 @@ public class ClientAffinityStats {
         m_rrReads++;
     }
 
+    /**
+     * Get the number of reads that used round-robin distribution
+     * for this time period.
+     *
+     * @return The count as a long.
+     */
     public long getRrReads()
     {
         return m_rrReads;

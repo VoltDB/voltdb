@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,7 +18,6 @@
 package org.voltdb;
 
 import java.io.File;
-import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.text.SimpleDateFormat;
@@ -231,7 +230,12 @@ public class VoltDB {
 
                 // Handle request for help/usage
                 if (arg.equalsIgnoreCase("-h") || arg.equalsIgnoreCase("--help")) {
-                    usage(System.out);
+                    // We used to print usage here but now we have too many ways to start
+                    // VoltDB to offer help that isn't possibly quite wrong.
+                    // You can probably get here using the legacy voltdb3 script. The usage
+                    // is now a comment in that file.
+                    System.out.println("Please refer to VoltDB documentation for command line usage.");
+                    System.out.flush();
                     System.exit(-1);
                 }
 
@@ -395,7 +399,8 @@ public class VoltDB {
                     m_ipcPort = Integer.valueOf(portStr);
                 } else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
-                    usage();
+                    System.out.println("Please refer to VoltDB documentation for command line usage.");
+                    System.out.flush();
                     System.exit(-1);
                 }
             }
@@ -408,7 +413,8 @@ public class VoltDB {
                 {
                     hostLog.fatal("You must specify a startup action, either create, recover, rejoin, collect, or compile.");
                 }
-                usage();
+                System.out.println("Please refer to VoltDB documentation for command line usage.");
+                System.out.flush();
                 System.exit(-1);
             }
 
@@ -455,6 +461,15 @@ public class VoltDB {
                 hostLog.fatal("The hostname is missing.");
             }
 
+            // check if start action is not valid in community
+            if ((!m_isEnterprise) && (m_startAction.isEnterpriseOnly())) {
+                isValid = false;
+                hostLog.fatal("VoltDB Community Edition only supports the \"create\" start action.");
+                String msg = m_startAction.featureNameForErrorString();
+                msg += " is an Enterprise Edition feature. An evaluation edition is availibale at http://voltdb.com.";
+                hostLog.fatal(msg);
+            }
+
             // require deployment file location
             if (m_startAction != StartAction.REJOIN && m_startAction != StartAction.LIVE_REJOIN
                     && m_startAction != StartAction.JOIN) {
@@ -472,48 +487,9 @@ public class VoltDB {
                         m_startAction = StartAction.CREATE;
                     }
                 }
-            } else {
-                if (!m_isEnterprise && m_startAction == StartAction.LIVE_REJOIN) {
-                    // pauseless rejoin is only available in pro
-                    isValid = false;
-                    hostLog.fatal("Live rejoin is only available in the Enterprise Edition");
-                }
             }
 
             return isValid;
-        }
-
-        /**
-         * Prints a usage message on stderr.
-         */
-        public void usage() { usage(System.err); }
-
-        /**
-         * Prints a usage message on the designated output stream.
-         */
-        public void usage(PrintStream os) {
-            // N.B: this text is user visible. It intentionally does NOT reveal options not interesting to, say, the
-            // casual VoltDB operator. Please do not reveal options not documented in the VoltDB documentation set. (See
-            // GettingStarted.pdf).
-            String message = "";
-            if (org.voltdb.utils.MiscUtils.isPro()) {
-                message = "Usage: voltdb3 create catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
-                        + "       voltdb3 replica catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml> \n"
-                        + "       voltdb3 recover [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
-                        + "       voltdb3 [live] rejoin host <hostname>\n"
-                        + "       voltdb3 add host <hostname>\n";
-            } else {
-                message = "Usage: voltdb3 create  catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>]\n"
-                        + "       voltdb3 recover [host <hostname>] [deployment <deployment.xml>]\n"
-                        + "       voltdb3 rejoin host <hostname>\n";
-            }
-            message += "       voltdb3 collect [<option> ...] <path-to-voltdbroot> (run voltdb3 collect -h for more details)\n";
-            message += "       voltdb3 compile [<option> ...] [<ddl-file> ...]  (run voltdb3 compile -h for more details)\n";
-            os.print(message);
-            // Log it to log4j as well, which will capture the output to a file for (hopefully never) cases where VEM has issues (it generates command lines).
-            hostLog.info(message);
-            // Don't bother logging these for log4j, only dump them to the designated stream.
-            os.println("If no deployment is specified, a default 1 node cluster deployment will be configured.");
         }
 
         /**
@@ -602,6 +578,8 @@ public class VoltDB {
             PrintWriter writer = new PrintWriter(root + "host" + hostId + "-" + dateString + ".txt");
             writer.println(message);
             printStackTraces(writer);
+            writer.flush();
+            writer.close();
         } catch (Exception e) {
             try
             {
@@ -660,6 +638,7 @@ public class VoltDB {
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
+
         /*
          * InvocationTargetException suppresses information about the cause, so unwrap until
          * we get to the root cause
@@ -823,10 +802,8 @@ public class VoltDB {
     public static void main(String[] args) {
         //Thread.setDefaultUncaughtExceptionHandler(new VoltUncaughtExceptionHandler());
         Configuration config = new Configuration(args);
-
         try {
             if (!config.validate()) {
-                config.usage();
                 System.exit(-1);
             } else {
                 initialize(config);

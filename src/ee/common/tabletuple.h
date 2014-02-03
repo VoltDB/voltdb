@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -276,7 +276,7 @@ public:
         const voltdb::ValueType columnType = m_schema->columnType(idx);
         const char* dataPtr = getDataPtr(idx);
         const bool isInlined = m_schema->columnIsInlined(idx);
-        return NValue::deserializeFromTupleStorage( dataPtr, columnType, isInlined);
+        return NValue::initFromTupleStorage(dataPtr, columnType, isInlined);
     }
 
     inline const voltdb::TupleSchema* getSchema() const {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -178,6 +178,8 @@ inline bool TableIterator::hasNext() {
     return m_foundTuples < m_activeTuples;
 }
 
+// This function should be replaced by specific iteration functions
+// when the caller knows the table type.
 inline bool TableIterator::next(TableTuple &out) {
     if (!m_tempTableIterator) {
         return persistentNext(out);

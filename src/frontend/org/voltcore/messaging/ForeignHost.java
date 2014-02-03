@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -36,6 +36,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
+import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
 
 public class ForeignHost {
@@ -214,6 +215,11 @@ public class ForeignHost {
                      * Can this be removed?
                      */
                 }
+
+                @Override
+                public String toString() {
+                    return message.getClass().getName();
+                }
             });
 
         long current_time = EstTime.currentTimeMillis();
@@ -300,6 +306,9 @@ public class ForeignHost {
         final long sourceHSId = in.getLong();
         final int destCount = in.getInt();
         if (destCount == -1) {//This is a poison pill
+            //Ignore poison pill during shutdown, in tests we receive crash messages from
+            //leader appointer during shutdown
+            if (VoltDB.instance().getMode() == OperationMode.SHUTTINGDOWN) return;
             byte messageBytes[] = new byte[in.getInt()];
             in.get(messageBytes);
             String message = new String(messageBytes, "UTF-8");

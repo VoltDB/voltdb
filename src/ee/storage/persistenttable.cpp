@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -46,9 +46,11 @@
 #include <sstream>
 #include <cassert>
 #include <cstdio>
+#include <algorithm>    // std::find
 #include <boost/foreach.hpp>
 #include <boost/scoped_ptr.hpp>
 #include "storage/persistenttable.h"
+
 #include "common/debuglog.h"
 #include "common/serializeio.h"
 #include "common/FailureInjection.h"
@@ -59,23 +61,24 @@
 #include "common/types.h"
 #include "common/RecoveryProtoMessage.h"
 #include "common/StreamPredicateList.h"
+#include "catalog/catalog.h"
+#include "catalog/database.h"
+#include "catalog/table.h"
+#include "catalog/materializedviewinfo.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
 #include "logging/LogManager.h"
-#include "storage/table.h"
 #include "storage/tableiterator.h"
-#include "storage/TupleStreamWrapper.h"
-#include "storage/TableStats.h"
+#include "storage/tablefactory.h"
+#include "storage/TableCatalogDelegate.hpp"
 #include "storage/PersistentTableStats.h"
 #include "storage/PersistentTableUndoInsertAction.h"
 #include "storage/PersistentTableUndoDeleteAction.h"
+#include "storage/PersistentTableUndoTruncateTableAction.h"
 #include "storage/PersistentTableUndoUpdateAction.h"
 #include "storage/ConstraintFailureException.h"
-#include "storage/MaterializedViewMetadata.h"
 #include "storage/CopyOnWriteContext.h"
-#include "storage/tableiterator.h"
-
-#include <algorithm>    // std::find
+#include "storage/MaterializedViewMetadata.h"
 
 namespace voltdb {
 
@@ -121,6 +124,7 @@ PersistentTable::~PersistentTable()
         delete m_views[i];
     }
 
+    // Indexes are deleted in parent class Table destructor.
 }
 
 // ------------------------------------------------------------------
@@ -202,6 +206,86 @@ void PersistentTable::deleteAllTuples(bool freeAllocatedStrings) {
         deleteTuple(tuple, true);
     }
 }
+
+void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd,
+        PersistentTable *originalTable) {
+    VOLT_DEBUG("**** Truncate table undo *****\n");
+
+    std::vector<MaterializedViewMetadata *> views = originalTable->views();
+    // reset all view table pointers
+    BOOST_FOREACH(MaterializedViewMetadata * originalView, views) {
+        PersistentTable * targetTable = originalView->targetTable();
+        TableCatalogDelegate * targetTcd =  engine->getTableDelegate(targetTable->name());
+        // call decrement reference count on the newly constructed view table
+        targetTcd->deleteCommand();
+        // update the view table pointer with the original view
+        targetTcd->setTable(targetTable);
+    }
+    this->decrementRefcount();
+
+    // reset base table pointer
+    tcd->setTable(originalTable);
+
+    engine->rebuildTableCollections();
+}
+
+void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
+    VOLT_DEBUG("**** Truncate table release *****\n");
+    m_tuplesPinnedByUndo = 0;
+    m_invisibleTuplesPendingDeleteCount = 0;
+
+    std::vector<MaterializedViewMetadata *> views = originalTable->views();
+    // reset all view table pointers
+    BOOST_FOREACH(MaterializedViewMetadata * originalView, views) {
+        PersistentTable * targetTable = originalView->targetTable();
+        targetTable->decrementRefcount();
+    }
+    originalTable->decrementRefcount();
+}
+
+
+void PersistentTable::truncateTable(VoltDBEngine* engine) {
+    TableCatalogDelegate * tcd = engine->getTableDelegate(m_name);
+    assert(tcd);
+
+    catalog::Table *catalogTable = engine->getCatalogTable(m_name);
+    if (tcd->init(*engine->getDatabase(), *catalogTable) != 0) {
+        VOLT_ERROR("Failed to initialize table '%s' from catalog",m_name.c_str());
+        return ;
+    }
+    assert(!tcd->exportEnabled());
+    PersistentTable * emptyTable = tcd->getPersistentTable();
+    assert(emptyTable);
+    assert(emptyTable->views().size() == 0);
+
+    // add matView
+    BOOST_FOREACH(MaterializedViewMetadata * originalView, m_views) {
+        PersistentTable * targetTable = originalView->targetTable();
+        TableCatalogDelegate * targetTcd =  engine->getTableDelegate(targetTable->name());
+        catalog::Table *catalogViewTable = engine->getCatalogTable(targetTable->name());
+
+        if (targetTcd->init(*engine->getDatabase(), *catalogViewTable) != 0) {
+            VOLT_ERROR("Failed to initialize table '%s' from catalog",targetTable->name().c_str());
+            return ;
+        }
+        PersistentTable * targetEmptyTable = targetTcd->getPersistentTable();
+        assert(targetEmptyTable);
+        new MaterializedViewMetadata(emptyTable, targetEmptyTable, originalView->getMaterializedViewInfo());
+    }
+    engine->rebuildTableCollections();
+
+    UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+    if (uq) {
+        emptyTable->m_tuplesPinnedByUndo = emptyTable->m_tupleCount;
+        emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
+        // Create and register an undo action.
+        uq->registerUndoAction(new (*uq) PersistentTableUndoTruncateTableAction(engine, tcd, this, emptyTable));
+        return;
+    }
+
+    this->decrementRefcount();
+}
+
 
 void setSearchKeyFromTuple(TableTuple &source) {
     keyTuple.setNValue(0, source.getNValue(1));

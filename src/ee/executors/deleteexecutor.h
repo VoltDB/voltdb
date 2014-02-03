@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -68,7 +68,6 @@ public:
         : AbstractExecutor(engine, abstract_node)
     {
         m_inputTable = NULL;
-        m_targetTable = NULL;
         m_engine = engine;
     }
 
@@ -83,9 +82,7 @@ protected:
         don't need PK to delete tuples. */
     bool m_truncate;
     TempTable* m_inputTable;
-    PersistentTable* m_targetTable;
     TableTuple m_inputTuple;
-    TableTuple m_targetTuple;
 
     /** reference to the engine/context to store the number of
         modified tuples */

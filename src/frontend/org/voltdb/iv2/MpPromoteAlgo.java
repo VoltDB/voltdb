@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,6 +26,7 @@ import java.util.Map.Entry;
 import java.util.TreeSet;
 import java.util.concurrent.Future;
 
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
@@ -50,7 +51,7 @@ public class MpPromoteAlgo implements RepairAlgo
     private Pair<Long, byte[]> m_newestHashinatorConfig = Pair.of(Long.MIN_VALUE,new byte[0]);
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
-    private final InaugurationFuture m_promotionResult = new InaugurationFuture();
+    private final SettableFuture<Long> m_promotionResult = SettableFuture.create();
 
     long getRequestId()
     {
@@ -116,14 +117,13 @@ public class MpPromoteAlgo implements RepairAlgo
     }
 
     @Override
-    public Future<Pair<Boolean, Long>> start()
+    public Future<Long> start()
     {
         try {
             prepareForFaultRecovery();
         } catch (Exception e) {
             tmLog.error(m_whoami + "failed leader promotion:", e);
             m_promotionResult.setException(e);
-            m_promotionResult.done(Long.MIN_VALUE);
         }
         return m_promotionResult;
     }
@@ -251,7 +251,7 @@ public class MpPromoteAlgo implements RepairAlgo
             m_mailbox.repairReplicasWith(m_survivors, repairMsg);
         }
 
-        m_promotionResult.done(m_maxSeenTxnId);
+        m_promotionResult.set(m_maxSeenTxnId);
     }
 
     //

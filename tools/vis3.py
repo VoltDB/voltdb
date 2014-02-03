@@ -116,7 +116,7 @@ class Plot:
         plt.ylim((ymin-(ymax-ymin)*0.2, ymax+(ymax-ymin)*0.2))
         xmin, xmax = plt.xlim()
         plt.xlim((xmin-(xmax-xmin)*0.2, xmax+(xmax-xmin)*0.2))
-        plt.legend(prop={'size': 10}, loc=0)
+        plt.legend(prop={'size': 10}, loc=2)
         plt.savefig(self.filename, format="png", transparent=False)
         plt.close('all')
 

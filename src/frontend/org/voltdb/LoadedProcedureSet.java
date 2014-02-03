@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,6 +26,8 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.compiler.Language;
+import org.voltdb.groovy.GroovyScriptProcedureDelegate;
 import org.voltdb.utils.LogKeys;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -96,6 +98,15 @@ public class LoadedProcedureSet {
             VoltProcedure procedure = null;
             if (proc.getHasjava()) {
                 final String className = proc.getClassname();
+
+                Language lang;
+                try {
+                    lang = Language.valueOf(proc.getLanguage());
+                } catch (IllegalArgumentException e) {
+                    // default to java for earlier compiled catalogs
+                    lang = Language.JAVA;
+                }
+
                 Class<?> procClass = null;
                 try {
                     procClass = catalogContext.classForProcedure(className);
@@ -104,21 +115,19 @@ public class LoadedProcedureSet {
                     if (className.startsWith("org.voltdb.")) {
                         VoltDB.crashLocalVoltDB("VoltDB does not support procedures with package names " +
                                                         "that are prefixed with \"org.voltdb\". Please use a different " +
-                                                        "package name and retry.", false, null);
+                                                        "package name and retry. Procedure name was " + className + ".",
+                                                        false, null);
                     }
                     else {
-                        VoltDB.crashLocalVoltDB("VoltDB was unable to load a procedure it expected to be in the " +
+                        VoltDB.crashLocalVoltDB("VoltDB was unable to load a procedure (" +
+                                                 className + ") it expected to be in the " +
                                                 "catalog jarfile and will now exit.", false, null);
                     }
                 }
                 try {
-                    procedure = (VoltProcedure) procClass.newInstance();
+                    procedure = lang.accept(procedureInstantiator, procClass);
                 }
-                catch (final InstantiationException e) {
-                    hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
-                                    new Object[] { m_siteId, m_siteIndex }, e);
-                }
-                catch (final IllegalAccessException e) {
+                catch (final Exception e) {
                     hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
                                     new Object[] { m_siteId, m_siteIndex }, e);
                 }
@@ -133,6 +142,18 @@ public class LoadedProcedureSet {
         }
         return builder;
     }
+
+    private static Language.CheckedExceptionVisitor<VoltProcedure, Class<?>, Exception> procedureInstantiator =
+            new Language.CheckedExceptionVisitor<VoltProcedure, Class<?>, Exception>() {
+                @Override
+                public VoltProcedure visitJava(Class<?> p) throws Exception {
+                    return (VoltProcedure)p.newInstance();
+                }
+                @Override
+                public VoltProcedure visitGroovy(Class<?> p) throws Exception {
+                    return new GroovyScriptProcedureDelegate(p);
+                }
+            };
 
     private void loadSystemProcedures(
             CatalogContext catalogContext,

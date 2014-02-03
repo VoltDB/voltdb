@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -123,10 +123,6 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      */
     public static final String MAX_SERIALIZED_TABLE_LENGTH_STR =
             String.valueOf(MAX_SERIALIZED_TABLE_LENGTH / 1024) + "k";
-
-    // Strings used to indicate NULL value in CSV files
-    public static final String CSV_NULL = "\\N";
-    public static final String QUOTED_CSV_NULL = "\"\\N\"";
 
     static final int NULL_STRING_INDICATOR = -1;
     static final Charset METADATA_ENCODING = Constants.US_ASCII_ENCODING;
@@ -347,19 +343,6 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             }
         }
         assert(verifyTableInvariants());
-    }
-
-    /**
-     * End users should not call this method.
-     * Obtain a reference to the table's underlying buffer.
-     * The returned reference's position and mark are independent of
-     * the table's buffer position and mark. The returned buffer has
-     * no mark and is at position 0.
-     */
-    public ByteBuffer getTableDataReference() {
-        ByteBuffer buf = m_buffer.duplicate();
-        buf.rewind();
-        return buf;
     }
 
     /**
@@ -1031,9 +1014,13 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                         buffer.append(bd.toString());
                     }
                     break;
+                default:
+                    // should not get here ever
+                    throw new IllegalStateException("Table column had unexpected type.");
                 }
-                if (i < m_colCount - 1)
+                if (i < m_colCount - 1) {
                     buffer.append(",");
+                }
             }
             buffer.append("\n");
         }
@@ -1203,8 +1190,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      *
      * @param json String containing JSON-formatted table data.
      * @return Constructed <code>VoltTable</code> instance.
-     * @throws JSONException
-     * @throws IOException
+     * @throws JSONException on JSON-related error.
+     * @throws IOException if thrown by our JSON library.
      */
     public static VoltTable fromJSONString(String json) throws JSONException, IOException {
         JSONObject jsonObj = new JSONObject(json);
@@ -1212,12 +1199,12 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     }
 
     /**
-     * Construct a table from a JSON object. Only parses VoltDB VoltTable JSON format.
+     * <p>Construct a table from a JSON object. Only parses VoltDB VoltTable JSON format.</p>
      *
      * @param json String containing JSON-formatted table data.
      * @return Constructed <code>VoltTable</code> instance.
-     * @throws JSONException
-     * @throws IOException
+     * @throws JSONException on JSON-related error.
+     * @throws IOException if thrown by our JSON library.
      */
     public static VoltTable fromJSONObject(JSONObject json) throws JSONException, IOException {
         // extract the schema and creat an empty table
@@ -1271,6 +1258,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                         else
                             row[j] = VoltDecimalHelper.deserializeBigDecimalFromString(decVal);
                         break;
+                    default:
+                        // empty fallthrough to make the warning go away
                     }
                 }
             }
@@ -1285,6 +1274,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      * This is not {@link java.lang.Object#equals(Object)} because we don't
      * want to provide all of the additional contractual requirements that go
      * along with it, such as implementing {@link java.lang.Object#hashCode()}.
+     *
+     * @param other Table to compare to.
+     * @return Whether the tables have the same contents.
      */
     public boolean hasSameContents(VoltTable other) {
         assert(verifyTableInvariants());
@@ -1305,7 +1297,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     /**
      *  An unreliable version of {@link java.lang.Object#equals(Object)} that should not be used. Only
      *  present for unit testing.
-     *  @deprecated
+     *
+     *  @deprecated Exists for unit testing, but probably shouldn't be called.
      */
     @Deprecated
     @Override
@@ -1317,7 +1310,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     /**
      * Also overrides {@link java.lang.Object#hashCode()}  since we are overriding {@link java.lang.Object#equals(Object)}.
      * Throws an {@link java.lang.UnsupportedOperationException}.
-     * @deprecated
+     *
+     * @deprecated This only throws. Doesn't do anything.
+     * @throws UnsupportedOperationException if called.
      */
     @Deprecated
     @Override
@@ -1328,10 +1323,12 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     }
 
     /**
-     * Generates a duplicate of a table including the column schema. Only works
+     * <p>Generates a duplicate of a table including the column schema. Only works
      * on tables that have no rows, have columns defined, and will not have columns added/deleted/modified
      * later. Useful as way of creating template tables that can be cloned and then populated with
-     * {@link VoltTableRow rows} repeatedly.
+     * {@link VoltTableRow rows} repeatedly.</p>
+     *
+     * @param extraBytes The number of extra bytes to leave for to-be-added rows beyond the header.
      * @return An <tt>VoltTable</tt> with the same column schema as the original and enough space
      *         for the specified number of {@link VoltTableRow rows} and strings.
      */
@@ -1448,14 +1445,6 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     }
 
     /**
-     * End users should not call this method.
-     * @return Underlying buffer size
-     */
-    public int getUnderlyingBufferSize() {
-        return m_buffer.position();
-    }
-
-    /**
      * Set the status code associated with this table. Default value is 0.
      * @return Status code
      */
@@ -1471,10 +1460,22 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         m_buffer.put( 4, code);
     }
 
+    /**
+     * Get the serialized size in bytes of this table. This is used mostly internally by
+     * VoltDB for table serialization purposes.
+     *
+     * @return The size in bytes.
+     */
     public int getSerializedSize() {
         return m_buffer.limit() + 4;
     }
 
+    /**
+     * <p>Serialize this table to a given ByteBuffer. Used mostly internally by VoltDB for
+     * moving tables over the network.</p>
+     *
+     * @param buf Buffer to serialize table to.
+     */
     public void flattenToBuffer(ByteBuffer buf) {
         ByteBuffer dup = m_buffer.duplicate();
         buf.putInt(dup.limit());
@@ -1510,24 +1511,24 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         assert(verifyTableInvariants());
     }
 
+    /**
+     * Directly access the table's underlying {@link ByteBuffer}. This should be avoided if
+     * possible by end users, as there is potential to really mess stuff up. VoltDB mostly
+     * uses it to compute various checksums quickly.
+     *
+     * @return The underlying {@link ByteBuffer} instance.
+     */
     public ByteBuffer getBuffer() {
         ByteBuffer buf = m_buffer.asReadOnlyBuffer();
         buf.position(0);
         return buf;
     }
 
-    public byte[] getSchemaBytes() {
-        if (getRowCount() > 0) {
-            throw new RuntimeException("getSchemaBytes() Only works if the table is empty");
-        }
-        ByteBuffer dup = m_buffer.duplicate();
-        dup.limit(dup.limit() - 4);
-        dup.position(0);
-        byte retvalBytes[] = new byte[dup.remaining()];
-        dup.get(retvalBytes);
-        return retvalBytes;
-    }
-
+    /**
+     * Get the schema of the table. Can be fed into another table's constructor.
+     *
+     * @return An ordered array of {@link ColumnInfo} instances for each table column.
+     */
     public ColumnInfo[] getTableSchema()
     {
         ColumnInfo[] schema = new ColumnInfo[m_colCount];

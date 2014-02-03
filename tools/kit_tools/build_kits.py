@@ -177,43 +177,43 @@ if len(sys.argv) == 3:
 
 print "Building with pro: %s and voltdb: %s" % (proTreeish, voltdbTreeish)
 
-versionVolt5f = "unknown"
+versionCentos = "unknown"
 versionMac = "unknown"
 releaseDir = "unknown"
 
-# get ssh config
-volt5f = getSSHInfoForHost("volt5f")
-voltmini = getSSHInfoForHost("voltmini")
-volt12c = getSSHInfoForHost("volt12c")
+# get ssh config [key_filename, hostname]
+CentosSSHInfo = getSSHInfoForHost("volt5f")
+MacSSHInfo = getSSHInfoForHost("voltmini")
+UbuntuSSHInfo = getSSHInfoForHost("volt12d")
 
 # build kits on 5f
-with settings(user=username,host_string=volt5f[1],disable_known_hosts=True,key_filename=volt5f[0]):
-    versionVolt5f = checkoutCode(voltdbTreeish, proTreeish)
+with settings(user=username,host_string=CentosSSHInfo[1],disable_known_hosts=True,key_filename=CentosSSHInfo[0]):
+    versionCentos = checkoutCode(voltdbTreeish, proTreeish)
     if oneOff:
         releaseDir = "%s/releases/one-offs/%s-%s-%s" % \
-            (os.getenv('HOME'), versionVolt5f, voltdbTreeish, proTreeish)
+            (os.getenv('HOME'), versionCentos, voltdbTreeish, proTreeish)
     else:
         releaseDir = os.getenv('HOME') + "/releases/" + voltdbTreeish
     makeReleaseDir(releaseDir)
-    print "VERSION: " + versionVolt5f
+    print "VERSION: " + versionCentos
     buildCommunity()
-    copyCommunityFilesToReleaseDir(releaseDir, versionVolt5f, "LINUX")
+    copyCommunityFilesToReleaseDir(releaseDir, versionCentos, "LINUX")
     buildPro()
-    copyEnterpriseFilesToReleaseDir(releaseDir, versionVolt5f, "LINUX")
+    copyEnterpriseFilesToReleaseDir(releaseDir, versionCentos, "LINUX")
     makeTrialLicense()
     copyTrialLicenseToReleaseDir(releaseDir)
 
 # build kits on the mini
-with settings(user=username,host_string=voltmini[1],disable_known_hosts=True,key_filename=voltmini[0]):
+with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
     versionMac = checkoutCode(voltdbTreeish, proTreeish)
-    assert versionVolt5f == versionMac
+    assert versionCentos == versionMac
     buildCommunity()
     copyCommunityFilesToReleaseDir(releaseDir, versionMac, "MAC")
     buildPro()
     copyEnterpriseFilesToReleaseDir(releaseDir, versionMac, "MAC")
 
 # build debian kit
-with settings(user=username,host_string=volt12c[1],disable_known_hosts=True,key_filename=volt12c[0]):
+with settings(user=username,host_string=UbuntuSSHInfo[1],disable_known_hosts=True,key_filename=UbuntuSSHInfo[0]):
     debbuilddir = "%s/deb_build/" % builddir
     run("rm -rf " + debbuilddir)
     run("mkdir -p " + debbuilddir)
@@ -221,18 +221,18 @@ with settings(user=username,host_string=volt12c[1],disable_known_hosts=True,key_
     with cd(debbuilddir):
         put ("tools/voltdb-install.py",".")
 
-        commbld = "%s-voltdb-%s.tar.gz" % ('LINUX', versionVolt5f)
+        commbld = "%s-voltdb-%s.tar.gz" % ('LINUX', versionCentos)
         put("%s/%s" % (releaseDir, commbld),".")
         run ("sudo python voltdb-install.py -D " + commbld)
-        get("voltdb_%s-1_amd64.deb" % (versionVolt5f), releaseDir)
+        get("voltdb_%s-1_amd64.deb" % (versionCentos), releaseDir)
 
-        entbld = "%s-voltdb-ent-%s.tar.gz" % ('LINUX', versionVolt5f)
+        entbld = "%s-voltdb-ent-%s.tar.gz" % ('LINUX', versionCentos)
         put("%s/%s" % (releaseDir, entbld),".")
         run ("sudo python voltdb-install.py -D " + entbld)
-        get("voltdb-ent_%s-1_amd64.deb" % (versionVolt5f), releaseDir)
+        get("voltdb-ent_%s-1_amd64.deb" % (versionCentos), releaseDir)
 
 # build rpm kit
-with settings(user=username,host_string=volt5f[1],disable_known_hosts=True,key_filename=volt5f[0]):
+with settings(user=username,host_string=CentosSSHInfo[1],disable_known_hosts=True,key_filename=CentosSSHInfo[0]):
     rpmbuilddir = "%s/rpm_build/" % builddir
     run("rm -rf " + rpmbuilddir)
     run("mkdir -p " + rpmbuilddir)
@@ -240,16 +240,16 @@ with settings(user=username,host_string=volt5f[1],disable_known_hosts=True,key_f
     with cd(rpmbuilddir):
         put ("tools/voltdb-install.py",".")
 
-        commbld = "%s-voltdb-%s.tar.gz" % ('LINUX', versionVolt5f)
+        commbld = "%s-voltdb-%s.tar.gz" % ('LINUX', versionCentos)
         put("%s/%s" % (releaseDir, commbld),".")
         run ("python2.6 voltdb-install.py -R " + commbld)
-        get("voltdb-%s-1.x86_64.rpm" % (versionVolt5f), releaseDir)
+        get("voltdb-%s-1.x86_64.rpm" % (versionCentos), releaseDir)
 
-        entbld = "%s-voltdb-ent-%s.tar.gz" % ('LINUX', versionVolt5f)
+        entbld = "%s-voltdb-ent-%s.tar.gz" % ('LINUX', versionCentos)
         put("%s/%s" % (releaseDir, entbld),".")
         run ("python2.6 voltdb-install.py -R " + entbld)
-        get("voltdb-ent-%s-1.x86_64.rpm" % (versionVolt5f), releaseDir)
+        get("voltdb-ent-%s-1.x86_64.rpm" % (versionCentos), releaseDir)
 
 computeChecksums(releaseDir)
-#archiveDir = os.path.join(os.getenv('HOME'), "releases", "archive", voltdbTreeish, versionVolt5f)
-#backupReleaseDir(releaseDir, archiveDir, versionVolt5f)
+#archiveDir = os.path.join(os.getenv('HOME'), "releases", "archive", voltdbTreeish, versionCentos)
+#backupReleaseDir(releaseDir, archiveDir, versionCentos)

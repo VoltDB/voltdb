@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -206,6 +206,8 @@ public class ClientStatsContext {
 
     /**
      * Get the client affinity stats.  Will only be populated if client affinity is enabled.
+     *
+     * @return A map from an internal partition id to a {@link ClientAffinityStats} instance.
      */
     public Map<Integer, ClientAffinityStats> getAffinityStats()
     {
@@ -223,7 +225,9 @@ public class ClientStatsContext {
 
     /**
      * Roll up the per-partition affinity stats and return the totals for each of the four
-     * categories.
+     * categories. Will only be populated if client affinity is enabled.
+     *
+     * @return A {@link ClientAffinityStats} instance covering all partitions.
      */
     public ClientAffinityStats getAggregateAffinityStats()
     {
@@ -249,6 +253,7 @@ public class ClientStatsContext {
      * {@link ClientStats} instance will apply to the time period
      * currently covered by the context.
      *
+     * @param procedureName Name of the procedure.
      * @return A {@link ClientStats} instance.
      */
     public ClientStats getStatsForProcedure(String procedureName) {

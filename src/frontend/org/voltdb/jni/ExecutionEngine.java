@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -31,6 +31,7 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
+import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
@@ -305,7 +306,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public byte[] nextDependencyAsBytes(final int dependencyId) {
         final VoltTable vt =  m_dependencyTracker.nextDependency(dependencyId);
         if (vt != null) {
-            final ByteBuffer buf2 = vt.getTableDataReference();
+            final ByteBuffer buf2 = PrivateVoltTableFactory.getTableDataReference(vt);
             int pos = buf2.position();
             byte[] bytes = new byte[buf2.limit() - pos];
             buf2.get(bytes);
@@ -317,7 +318,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
     }
 
-    public boolean fragmentProgressUpdate(int batchIndex,
+    static final long LONG_OP_THRESHOLD = 10000;
+    public long fragmentProgressUpdate(int batchIndex,
                                           String planNodeName,
                                           String lastAccessedTable,
                                           long lastAccessedTableSize,
@@ -329,25 +331,46 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         long currentTime = System.currentTimeMillis();
         if (m_startTime == 0) {
             m_startTime = m_lastMsgTime = currentTime;
+            return LONG_OP_THRESHOLD;
         }
-
-        if (currentTime > (m_logDuration + m_lastMsgTime)) {
-            String msg = String.format("Procedure %s is taking a long time to execute -- at least %.1f seconds spent accessing " +
-                    "%d tuples. Current plan fragment %s in call %d to voltExecuteSQL on site %s.",
-                    m_currentProcedureName,
-                    (currentTime - m_startTime) / 1000.0,
-                    tuplesProcessed,
-                    planNodeName,
-                    m_currentBatchIndex,
-                    CoreUtils.hsIdToString(m_siteId));
-            log.info(msg);
-            m_logDuration = (m_logDuration < 30000) ? (2 * m_logDuration) : 30000;
-            m_lastMsgTime = currentTime;
+        if (currentTime <= (m_logDuration + m_lastMsgTime)) {
+            // The callback was triggered earlier than we were ready to log.
+            // If this keeps happening, it might makes sense to ramp up the threshold
+            // to lower the callback frequency to something closer to the log duration
+            // (== the desired log message fequency).
+            // That probably involves keeping more stats to estimate the recent tuple processing rate.
+            // Such a calibration should probably wait until the next "full batch" and NOT immediately
+            // reflected in the current return value which effects the remaining processing of the
+            // current batch.
+            // It might make more sense to adjust the short-term threshold (possibly downward) to
+            // reflect the current tuple processing rate AND the time already elapsed since the last
+            // logged message. The goal would be to specifically synchronize the next callback to fall
+            // just after m_logDuration + m_lastMsgTime.
+            // AFTER the current progress is logged and (possibly) a new log frequency is set, it makes
+            // sense to recalibrate the initial/default threshold batch size to minimize the number of
+            // future callbacks per log entry, ideally so that one callback arrives just in time to log.
+            return LONG_OP_THRESHOLD;
         }
-
-        // Return true if we want to interrupt ee. Otherwise return false
-        // for now, always continue
-        return false;
+        String msg = String.format(
+                "Procedure %s is taking a long time to execute -- at least " +
+                "%.1f seconds spent accessing " +
+                "%d tuples. Current plan fragment " +
+                "%s in call " +
+                "%d to voltExecuteSQL on site " +
+                "%s.",
+                m_currentProcedureName,
+                (currentTime - m_startTime) / 1000.0,
+                tuplesProcessed,
+                planNodeName,
+                m_currentBatchIndex,
+                CoreUtils.hsIdToString(m_siteId));
+        log.info(msg);
+        m_logDuration = (m_logDuration < 30000) ? (2 * m_logDuration) : 30000;
+        m_lastMsgTime = currentTime;
+        // Return 0 if we want to interrupt ee. Otherwise return the number of tuple operations to let
+        // pass before the next call. For now, this is a fixed number. Ideally the threshold would vary
+        // to try to get one callback to arrive just after the log duration interval expires.
+        return LONG_OP_THRESHOLD;
     }
 
     /**

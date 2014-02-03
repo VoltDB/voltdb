@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,25 +23,24 @@
 
 package org.voltdb;
 
-import static org.junit.Assert.*;
-
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.common.Constants;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.VoltTableUtil;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
-import org.mockito.Mockito;
 
 public class TestVoltTableUtil extends Mockito {
     @Test
@@ -73,7 +72,7 @@ public class TestVoltTableUtil extends Mockito {
         String[] values = captor.getValue();
         assertEquals(6, values.length);
         for (String v : values) {
-            assertEquals(VoltTable.CSV_NULL, v);
+            assertEquals(Constants.CSV_NULL, v);
         }
     }
 

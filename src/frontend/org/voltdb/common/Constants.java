@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -56,4 +56,9 @@ public class Constants
 
     // from MP Initiator
     public static final int MP_INIT_PID = PARTITIONID_MAX_VALUE;
+
+    /** String that can be used to indicate NULL value in CSV files */
+    public static final String CSV_NULL = "\\N";
+    /** String that can be used to indicate NULL value in CSV files */
+    public static final String QUOTED_CSV_NULL = "\"\\N\"";
 }
