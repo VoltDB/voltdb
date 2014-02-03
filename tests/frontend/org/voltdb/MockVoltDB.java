@@ -23,7 +23,6 @@
 package org.voltdb;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -250,7 +249,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public ArrayList<ClientInterface> getClientInterfaces()
+    public ClientInterface getClientInterface()
     {
         return null;
     }

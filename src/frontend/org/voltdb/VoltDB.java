@@ -464,15 +464,6 @@ public class VoltDB {
             }
         }
 
-        private void extractHostAndPort(String portStr, String intf, int port) {
-            if (portStr.indexOf(':') != -1) {
-                HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, port);
-                intf = hap.getHostText();
-                port = hap.getPort();
-            } else {
-                port = Integer.parseInt(portStr);
-            }
-        }
         /**
          * Validates configuration settings and logs errors to the host log.
          * You typically want to have the system exit when this fails, but
