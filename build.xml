@@ -1383,6 +1383,7 @@ TEST CASES
                 <patternset refid="junit.all.path" />
                 <!-- Exclude many tests not directly related to sql functionality -->
                 <exclude name="**/*$*.class"/>
+                <exclude name="org/voltcore/**/*.class"/>
                 <exclude name='org/voltdb/client/TestClientFeatures.class'/>
                 <exclude name='org/voltdb/dtxn/Test*.class'/>
                 <exclude name='org/voltdb/iv2/Test*.class'/>
@@ -1390,6 +1391,7 @@ TEST CASES
                 <exclude name='org/voltdb/jni/Test*.class'/>
                 <exclude name='org/voltdb/messaging/Test*.class'/>
                 <exclude name='org/voltdb/regressionsuites/TestAdminMode.class'/>
+                <exclude name='org/voltdb/regressionsuites/TestClientPort*.class'/>
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
                 <exclude name="**/TestCommandLog*.class" />
                 <exclude name="**/TestExport*.class"/>
