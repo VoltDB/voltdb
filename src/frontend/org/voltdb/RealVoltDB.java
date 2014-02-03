@@ -666,37 +666,32 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_opsRegistrar.setDummyMode(false);
 
             // Create the client interface
-            int portOffset = 0;
-            for (int i = 0; i < 1; i++) {
-                try {
-                    InetAddress clientIntf = null;
-                    InetAddress adminIntf = null;
-                    if (!m_config.m_externalInterface.trim().equals("")) {
-                        clientIntf = InetAddress.getByName(m_config.m_externalInterface);
-                        //client and admin interfaces are same by default.
-                        adminIntf = clientIntf;
-                    }
-                    //If user has specified on command line host:port override client and admin interfaces.
-                    if (m_config.m_clientInterface != null && m_config.m_clientInterface.trim().length() > 0) {
-                        clientIntf = InetAddress.getByName(m_config.m_clientInterface);
-                    }
-                    if (m_config.m_adminInterface != null && m_config.m_adminInterface.trim().length() > 0) {
-                        adminIntf = InetAddress.getByName(m_config.m_adminInterface);
-                    }
-                    ClientInterface ci = ClientInterface.create(m_messenger, m_catalogContext, m_config.m_replicationRole,
-                            m_cartographer,
-                            m_configuredNumberOfPartitions,
-                            clientIntf,
-                            config.m_port + portOffset,
-                            adminIntf,
-                            config.m_adminPort + portOffset,
-                            m_config.m_timestampTestingSalt);
-                    portOffset += 2;
-                    m_clientInterfaces.add(ci);
-                } catch (Exception e) {
-                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+            try {
+                InetAddress clientIntf = null;
+                InetAddress adminIntf = null;
+                if (!m_config.m_externalInterface.trim().equals("")) {
+                    clientIntf = InetAddress.getByName(m_config.m_externalInterface);
+                    //client and admin interfaces are same by default.
+                    adminIntf = clientIntf;
                 }
-                portOffset += 2;
+                //If user has specified on command line host:port override client and admin interfaces.
+                if (m_config.m_clientInterface != null && m_config.m_clientInterface.trim().length() > 0) {
+                    clientIntf = InetAddress.getByName(m_config.m_clientInterface);
+                }
+                if (m_config.m_adminInterface != null && m_config.m_adminInterface.trim().length() > 0) {
+                    adminIntf = InetAddress.getByName(m_config.m_adminInterface);
+                }
+                ClientInterface ci = ClientInterface.create(m_messenger, m_catalogContext, m_config.m_replicationRole,
+                        m_cartographer,
+                        m_configuredNumberOfPartitions,
+                        clientIntf,
+                        config.m_port,
+                        adminIntf,
+                        config.m_adminPort,
+                        m_config.m_timestampTestingSalt);
+                m_clientInterfaces.add(ci);
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
 
             // Create the statistics manager and register it to JMX registry
@@ -1328,6 +1323,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
              * marshal them into JSON. Always put the ipv4 address first
              * so that the export client will use it
              */
+
             if (m_config.m_externalInterface.equals("")) {
                 LinkedList<NetworkInterface> interfaces = new LinkedList<NetworkInterface>();
                 try {
@@ -1395,13 +1391,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 stringer.endArray();
             }
             stringer.key("clientPort").value(m_config.m_port);
+            stringer.key("clientInterface").value(m_config.m_clientInterface);
             stringer.key("adminPort").value(m_config.m_adminPort);
+            stringer.key("adminInterface").value(m_config.m_adminInterface);
             stringer.key("httpPort").value(m_config.m_httpPort);
+            stringer.key("httpInterface").value(m_config.m_httpPortInterface);
             stringer.key("drPort").value(m_config.m_drAgentPortStart);
+            stringer.key("drInterface").value(m_config.m_drInterface);
             stringer.endObject();
             JSONObject obj = new JSONObject(stringer.toString());
             // possibly atomic swap from null to realz
             m_localMetadata = obj.toString(4);
+            System.out.println("System Metadata is: " + m_localMetadata);
         } catch (Exception e) {
             hostLog.warn("Failed to collect data about lcoal network interfaces", e);
         }
@@ -1423,7 +1424,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
         hmconfig = new org.voltcore.messaging.HostMessenger.Config(hostname, port);
         hmconfig.internalPort = m_config.m_internalPort;
-        hmconfig.internalInterface = m_config.m_internalInterface;
+        if (m_config.m_internalPortInterface != null && m_config.m_internalPortInterface.trim().length() > 0) {
+            hmconfig.internalInterface = m_config.m_internalPortInterface.trim();
+        } else {
+            hmconfig.internalInterface = m_config.m_internalInterface;
+        }
         hmconfig.zkInterface = m_config.m_zkInterface;
         hmconfig.deadHostTimeout = m_config.m_deadHostTimeoutMS;
         hmconfig.factory = new VoltDbMessageFactory();
