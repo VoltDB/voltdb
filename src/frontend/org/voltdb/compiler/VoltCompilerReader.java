@@ -30,5 +30,5 @@ public abstract class VoltCompilerReader extends Reader
 {
     public abstract String getName();
     public abstract String getPath();
-    public abstract void addToJar(InMemoryJarfile jarFile) throws IOException;
+    public abstract void putInJar(InMemoryJarfile jarFile, String name) throws IOException;
 }

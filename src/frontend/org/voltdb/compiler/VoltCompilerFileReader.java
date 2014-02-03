@@ -80,8 +80,8 @@ public class VoltCompilerFileReader extends VoltCompilerReader
     }
 
     @Override
-    public void addToJar(InMemoryJarfile jarFile) throws IOException
+    public void putInJar(InMemoryJarfile jarFile, String name) throws IOException
     {
-        jarFile.put(m_file.getName(), m_file);
+        jarFile.put(name, m_file);
     }
 }

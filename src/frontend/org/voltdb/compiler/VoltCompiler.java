@@ -478,7 +478,7 @@ public class VoltCompiler {
             m_jarOutput.put("buildinfo.txt", buildinfoBytes);
             m_jarOutput.put("catalog.txt", catalogBytes);
             if (projectReader != null) {
-                projectReader.addToJar(m_jarOutput);
+                projectReader.putInJar(m_jarOutput, "project.xml");
             }
             for (final Entry<String, String> e : m_ddlFilePaths.entrySet())
                 m_jarOutput.put(e.getKey(), new File(e.getValue()));
