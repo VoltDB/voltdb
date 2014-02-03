@@ -341,6 +341,8 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
                 new ColumnInfo("PK_NAME", VoltType.STRING),
                 new ColumnInfo("DEFERRABILITY", VoltType.SMALLINT)
         );
+        //NB: @SystemCatalog(?) will need additional support if we want to
+        // populate the table.
         JDBC4ResultSet res = new JDBC4ResultSet(this.sysCatalog, vtable);
         return res;
     }
@@ -401,6 +403,8 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
                 new ColumnInfo("PK_NAME", VoltType.STRING),
                 new ColumnInfo("DEFERRABILITY", VoltType.SMALLINT)
         );
+        //NB: @SystemCatalog(?) will need additional support if we want to
+        // populate the table.
         JDBC4ResultSet res = new JDBC4ResultSet(this.sysCatalog, vtable);
         return res;
     }
@@ -791,6 +795,8 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
                 new ColumnInfo("PRIVILEGE", VoltType.STRING),
                 new ColumnInfo("IS_GRANTABLE", VoltType.STRING)
         );
+        //NB: @SystemCatalog(?) will need additional support if we want to
+        // populate the table.
         JDBC4ResultSet res = new JDBC4ResultSet(this.sysCatalog, vtable);
         return res;
     }
