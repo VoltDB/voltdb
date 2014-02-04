@@ -96,6 +96,7 @@ public class SysprocFragmentTask extends TransactionTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
+        waitOnDurabilityBackpressureFuture();
         if (!m_txnState.isReadOnly()) {
             if (m_txnState.getBeginUndoToken() == Site.kInvalidUndoToken) {
                 m_txnState.setBeginUndoToken(siteConnection.getLatestUndoToken());
