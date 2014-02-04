@@ -110,6 +110,7 @@ public class LocalCluster implements VoltServerConfig {
     private Map<String, String> m_additionalProcessEnv = null;
     // Produce a (presumably) available IP port number.
     public final PortGeneratorForTest portGenerator = new PortGeneratorForTest();
+    private String m_voltdbroot = "";
 
     // The base command line - each process copies and customizes this.
     // Each local cluster process has a CommandLine instance configured
@@ -302,6 +303,7 @@ public class LocalCluster implements VoltServerConfig {
         if (!m_compiled) {
             m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor);
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
+            m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
         }
         return m_compiled;
     }
@@ -312,6 +314,7 @@ public class LocalCluster implements VoltServerConfig {
             m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor,
                     null, true, snapshotPath, ppdPrefix);
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
+            m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
         }
         return m_compiled;
     }
@@ -330,6 +333,7 @@ public class LocalCluster implements VoltServerConfig {
             m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor,
                     adminPort, adminOnStartup);
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
+            m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
         }
         return m_compiled;
     }
@@ -646,6 +650,7 @@ public class LocalCluster implements VoltServerConfig {
                 subroot = m_subRoots.get(hostId);
             }
             cmdln.voltFilePrefix(subroot.getPath());
+            cmdln.voltRoot(subroot.getPath() + "/" + m_voltdbroot);
 
             m_cmdLines.add(cmdln);
             m_procBuilder.command().clear();
