@@ -431,7 +431,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     bool checkNulls(TableTuple &tuple) const;
 
     // Zero allocation size uses defaults.
-    PersistentTable(int partitionColumn, int tableAllocationTargetSize = 0);
+    PersistentTable(int partitionColumn, int maxRows = INT_MAX);
     void onSetColumns();
 
     void notifyBlockWasCompactedAway(TBPtr block);
@@ -477,6 +477,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // partition key
     const int m_partitionColumn;
 
+    // table row count limit
+    const int m_maxRows;
+
     // list of materialized views that are sourced from this table
     std::vector<MaterializedViewMetadata *> m_views;
 
@@ -486,7 +489,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     // is Export enabled
     bool m_exportEnabled;
-
 
     // STORAGE TRACKING
 

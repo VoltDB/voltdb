@@ -1209,6 +1209,17 @@ public class DDLCompiler {
             matViewMap.put(table, query);
         }
 
+        // FIXME (xin): hack to get table limit info from DDL
+        Pattern r = Pattern.compile("(.+)(_tablelimit_)(\\d+)");
+        Matcher m = r.matcher(name.toLowerCase());
+        if (m.find( )) {
+            int maxRows = Integer.parseInt(m.group(3));
+            table.setMaxrows(maxRows);
+            System.out.println("DEBUG EXPERIMENTAL FEATURE ENABLED: TABLE LIMIT ESTABLISHED ON TABLE " + name + " (" + maxRows + ")");
+        } else {
+            table.setMaxrows(Integer.MAX_VALUE);
+        }
+
         // all tables start replicated
         // if a partition is found in the project file later,
         //  then this is reversed

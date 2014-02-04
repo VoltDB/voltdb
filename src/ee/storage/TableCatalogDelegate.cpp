@@ -360,7 +360,8 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     Table *table = TableFactory::getPersistentTable(databaseId, tableName,
                                                     schema, columnNames,
                                                     partitionColumnIndex, exportEnabled,
-                                                    tableIsExportOnly);
+                                                    tableIsExportOnly,
+                                                    catalogTable.maxrows());
 
     // add a pkey index if one exists
     if (pkey_index_id.size() != 0) {

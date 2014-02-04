@@ -87,11 +87,12 @@ TableTuple keyTuple;
 
 #define TABLE_BLOCKSIZE 2097152
 
-PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetSize) :
-    Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
+PersistentTable::PersistentTable(int partitionColumn, int maxRows) :
+    Table(TABLE_BLOCKSIZE),
     m_iter(this, m_data.begin()),
     m_allowNulls(),
     m_partitionColumn(partitionColumn),
+    m_maxRows(maxRows),
     stats_(this),
     m_failedCompactionCount(0),
     m_invisibleTuplesPendingDeleteCount(0),
@@ -304,6 +305,12 @@ bool PersistentTable::insertTuple(TableTuple &source)
 
 void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
 {
+    if (visibleTupleCount() >= m_maxRows) {
+        std::stringstream builder;
+        builder << "Table " << m_name << " exceeds table maximum row count " << m_maxRows;
+        throw ConstraintFailureException(this, source, builder.str());
+    }
+
     //
     // First get the next free tuple
     // This will either give us one from the free slot list, or
