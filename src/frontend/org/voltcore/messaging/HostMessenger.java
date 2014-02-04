@@ -773,15 +773,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         if (!fhost.isUp())
         {
-            //Throwable t = new Throwable();
-            //java.io.StringWriter sw = new java.io.StringWriter();
-            //java.io.PrintWriter pw = new java.io.PrintWriter(sw);
-            //t.printStackTrace(pw);
-            //pw.flush();
             if (!m_shuttingDown) {
                 m_logger.warn("Attempted delivery of message to failed site: " + CoreUtils.hsIdToString(hsId));
             }
-            //m_logger.warn(sw.toString());
             return null;
         }
         return fhost;
