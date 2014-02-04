@@ -400,8 +400,7 @@ public class SystemInformation extends VoltSystemProcedure
 
         String http_enabled = "false";
         int http_port = VoltDB.instance().getConfig().m_httpPort;
-        if (http_port != -1)
-        {
+        if (http_port != -1 && http_port != Integer.MAX_VALUE) {
             http_enabled = "true";
             results.addRow("httpport", Integer.toString(http_port));
         }

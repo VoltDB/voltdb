@@ -100,6 +100,8 @@ public class MockVoltDB implements VoltDBInterface
             obj.put("adminPort", adminPort);
             obj.put("httpPort", httpPort);
             obj.put("drPort", drPort);
+            obj.put("drInterface", "127.0.0.1");
+
             m_localMetadata = obj.toString(4);
 
             m_catalog = new Catalog();

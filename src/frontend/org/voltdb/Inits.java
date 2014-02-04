@@ -456,6 +456,8 @@ public class Inits {
                 if (mustListen) {
                     System.exit(-1);
                 }
+                m_config.m_httpPort = -1;
+                return;
             }
             m_config.m_httpPort = httpPort;
         }
@@ -472,7 +474,6 @@ public class Inits {
                     m_rvdb.m_jsonEnabled = m_deployment.getHttpd().getJsonapi().isEnabled();
                 }
             }
-
             // if set by cli use that.
             if (m_config.m_httpPort != Integer.MAX_VALUE) {
                 setupHttpServer(m_config.m_httpPortInterface, m_config.m_httpPort, false, true);
@@ -482,6 +483,9 @@ public class Inits {
                 httpPort = 8080;
                 setupHttpServer("", httpPort, true, false);
             } else if (httpPort != -1) {
+                if (!m_deployment.getHttpd().isEnabled()) {
+                    return;
+                }
                 setupHttpServer("", httpPort, false, true);
             }
         }
