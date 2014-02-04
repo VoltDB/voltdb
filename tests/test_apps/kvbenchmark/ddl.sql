@@ -7,10 +7,10 @@ CREATE TABLE store
 
 PARTITION TABLE store ON COLUMN key;
 
-CREATE PROCEDURE FROM CLASS voltkv.procedures.Initialize;
-CREATE PROCEDURE FROM CLASS voltkv.procedures.Get;
+CREATE PROCEDURE FROM CLASS kvbench.procedures.Initialize;
+CREATE PROCEDURE FROM CLASS kvbench.procedures.Get;
 PARTITION PROCEDURE Get ON TABLE store COLUMN key;
-CREATE PROCEDURE FROM CLASS voltkv.procedures.Put;
+CREATE PROCEDURE FROM CLASS kvbench.procedures.Put;
 PARTITION PROCEDURE Put ON TABLE store COLUMN key;
-CREATE PROCEDURE FROM CLASS voltkv.procedures.Remove;
+CREATE PROCEDURE FROM CLASS kvbench.procedures.Remove;
 PARTITION PROCEDURE Remove ON TABLE store COLUMN key;

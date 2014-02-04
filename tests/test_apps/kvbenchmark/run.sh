@@ -46,8 +46,8 @@ function clean() {
 function srccompile() {
     mkdir -p obj
     javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH -d obj \
-        src/voltkv/*.java \
-        src/voltkv/procedures/*.java
+        src/kvbench/*.java \
+        src/kvbench/procedures/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -55,7 +55,7 @@ function srccompile() {
 # build an application catalog
 function catalog() {
     srccompile
-    echo "Compiling the voltkv application catalog."
+    echo "Compiling the kvbenchmark application catalog."
     echo "To perform this action manually, use the command line: "
     echo
     echo "voltdb compile --classpath obj -o $APPNAME.jar ddl.sql"
@@ -97,13 +97,13 @@ function client() {
 # Use this target for argument help
 function sync-benchmark-help() {
     srccompile
-    java -classpath obj:$APPCLASSPATH:obj voltkv.SyncBenchmark --help
+    java -classpath obj:$APPCLASSPATH:obj kvbench.SyncBenchmark --help
 }
 
 function sync-benchmark() {
     srccompile
     java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        voltkv.SyncBenchmark \
+        kvbench.SyncBenchmark \
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
