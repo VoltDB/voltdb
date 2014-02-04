@@ -319,7 +319,6 @@ public class QueryPlanner {
         AbstractPlanNode childNode = recvNode.getChild(0);
         assert(childNode instanceof SendPlanNode);
         SendPlanNode sendNode = (SendPlanNode) childNode;
-
         // disconnect the send and receive nodes
         sendNode.clearParents();
         recvNode.clearChildren();
@@ -327,5 +326,24 @@ public class QueryPlanner {
         plan.subPlanGraph = sendNode;
 
         return;
+    }
+
+    private void checkPlanColumnLeakage(CompiledPlan plan, ParsedSelectStmt stmt) {
+        NodeSchema output_schema = plan.rootPlanGraph.getOutputSchema();
+        // Sanity-check the output NodeSchema columns against the display columns
+        if (stmt.displayColumns.size() != output_schema.size()) {
+            throw new PlanningErrorException("Mismatched plan output cols " +
+            "to parsed display columns");
+        }
+        for (ParsedColInfo display_col : stmt.displayColumns) {
+            SchemaColumn col = output_schema.find(display_col.tableName,
+                                                  display_col.tableAlias,
+                                                  display_col.columnName,
+                                                  display_col.alias);
+            if (col == null) {
+                throw new PlanningErrorException("Mismatched plan output cols " +
+                                                 "to parsed display columns");
+            }
+        }
     }
 }

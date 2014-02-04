@@ -1392,6 +1392,7 @@ TEST CASES
                 <exclude name='org/voltdb/jni/Test*.class'/>
                 <exclude name='org/voltdb/messaging/Test*.class'/>
                 <exclude name='org/voltdb/regressionsuites/TestAdminMode.class'/>
+                <exclude name='org/voltdb/regressionsuites/TestClientPort*.class'/>
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
                 <exclude name="**/TestCommandLog*.class" />
                 <exclude name="**/TestExport*.class"/>
