@@ -23,7 +23,6 @@
 package org.voltdb;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -101,6 +100,8 @@ public class MockVoltDB implements VoltDBInterface
             obj.put("adminPort", adminPort);
             obj.put("httpPort", httpPort);
             obj.put("drPort", drPort);
+            obj.put("drInterface", "127.0.0.1");
+
             m_localMetadata = obj.toString(4);
 
             m_catalog = new Catalog();
@@ -250,7 +251,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public ArrayList<ClientInterface> getClientInterfaces()
+    public ClientInterface getClientInterface()
     {
         return null;
     }

@@ -48,7 +48,6 @@ import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
 import java.util.SortedMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -165,7 +164,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private static final String m_defaultVersionString = "4.0.2.1";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
-    final List<ClientInterface> m_clientInterfaces = new CopyOnWriteArrayList<ClientInterface>();
+    private ClientInterface m_clientInterface = null;
     HTTPAdminListener m_adminListener;
     private OpsRegistrar m_opsRegistrar = new OpsRegistrar();
 
@@ -324,7 +323,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // set a bunch of things to null/empty/new for tests
             // which reusue the process
-            m_clientInterfaces.clear();
+            m_clientInterface = null;
             m_adminListener = null;
             m_commandLog = new DummyCommandLog();
             m_deployment = null;
@@ -666,29 +665,31 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_opsRegistrar.setDummyMode(false);
 
             // Create the client interface
-            int portOffset = 0;
-            for (int i = 0; i < 1; i++) {
-                try {
-                    InetAddress externalInterface = null;
-                    if (!m_config.m_externalInterface.trim().equals("")) {
-                        externalInterface = InetAddress.getByName(m_config.m_externalInterface);
-                    }
-                    ClientInterface ci =
-                        ClientInterface.create(m_messenger,
-                                m_catalogContext,
-                                m_config.m_replicationRole,
-                                m_cartographer,
-                                m_configuredNumberOfPartitions,
-                                externalInterface,
-                                config.m_port + portOffset,
-                                config.m_adminPort + portOffset,
-                                m_config.m_timestampTestingSalt);
-                    portOffset += 2;
-                    m_clientInterfaces.add(ci);
-                } catch (Exception e) {
-                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+            try {
+                InetAddress clientIntf = null;
+                InetAddress adminIntf = null;
+                if (!m_config.m_externalInterface.trim().equals("")) {
+                    clientIntf = InetAddress.getByName(m_config.m_externalInterface);
+                    //client and admin interfaces are same by default.
+                    adminIntf = clientIntf;
                 }
-                portOffset += 2;
+                //If user has specified on command line host:port override client and admin interfaces.
+                if (m_config.m_clientInterface != null && m_config.m_clientInterface.trim().length() > 0) {
+                    clientIntf = InetAddress.getByName(m_config.m_clientInterface);
+                }
+                if (m_config.m_adminInterface != null && m_config.m_adminInterface.trim().length() > 0) {
+                    adminIntf = InetAddress.getByName(m_config.m_adminInterface);
+                }
+                m_clientInterface = ClientInterface.create(m_messenger, m_catalogContext, m_config.m_replicationRole,
+                        m_cartographer,
+                        m_configuredNumberOfPartitions,
+                        clientIntf,
+                        config.m_port,
+                        adminIntf,
+                        config.m_adminPort,
+                        m_config.m_timestampTestingSalt);
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
 
             // Create the statistics manager and register it to JMX registry
@@ -745,7 +746,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
 
             schedulePeriodicWorks();
-            m_clientInterfaces.get(0).schedulePeriodicWorks();
+            m_clientInterface.schedulePeriodicWorks();
 
             // print out a bunch of useful system info
             logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
@@ -782,9 +783,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 //      "corrupted by certain classes of network failures.");
             }
 
-            assert(m_clientInterfaces.size() > 0);
-            ClientInterface ci = m_clientInterfaces.get(0);
-            ci.initializeSnapshotDaemon(m_messenger.getZK(), m_globalServiceElector);
+            assert (m_clientInterface != null);
+            m_clientInterface.initializeSnapshotDaemon(m_messenger.getZK(), m_globalServiceElector);
 
             // Start elastic join service
             try {
@@ -811,8 +811,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                                                            int.class);
                     m_elasticJoinService =
                         (ElasticJoinService) constructor.newInstance(m_messenger,
-                                                                     m_clientInterfaces.get(0),
-                                                                     m_cartographer,
+                                    m_clientInterface,                                                                     m_cartographer,
                                                                      rebalanceStats,
                                                                      clSnapshotPath,
                                                                      m_deployment.getCluster().getKfactor());
@@ -825,7 +824,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // set additional restore agent stuff
             if (m_restoreAgent != null) {
                 m_restoreAgent.setCatalogContext(m_catalogContext);
-                m_restoreAgent.setInitiator(new Iv2TransactionCreator(m_clientInterfaces.get(0)));
+                m_restoreAgent.setInitiator(new Iv2TransactionCreator(m_clientInterface));
             }
 
             m_configLogger = new Thread(new ConfigLogging());
@@ -1321,6 +1320,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
              * marshal them into JSON. Always put the ipv4 address first
              * so that the export client will use it
              */
+
             if (m_config.m_externalInterface.equals("")) {
                 LinkedList<NetworkInterface> interfaces = new LinkedList<NetworkInterface>();
                 try {
@@ -1388,13 +1388,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 stringer.endArray();
             }
             stringer.key("clientPort").value(m_config.m_port);
+            stringer.key("clientInterface").value(m_config.m_clientInterface);
             stringer.key("adminPort").value(m_config.m_adminPort);
+            stringer.key("adminInterface").value(m_config.m_adminInterface);
             stringer.key("httpPort").value(m_config.m_httpPort);
+            stringer.key("httpInterface").value(m_config.m_httpPortInterface);
             stringer.key("drPort").value(m_config.m_drAgentPortStart);
+            stringer.key("drInterface").value(m_config.m_drInterface);
             stringer.endObject();
             JSONObject obj = new JSONObject(stringer.toString());
             // possibly atomic swap from null to realz
             m_localMetadata = obj.toString(4);
+            hostLog.debug("System Metadata is: " + m_localMetadata);
         } catch (Exception e) {
             hostLog.warn("Failed to collect data about lcoal network interfaces", e);
         }
@@ -1416,7 +1421,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
         hmconfig = new org.voltcore.messaging.HostMessenger.Config(hostname, port);
         hmconfig.internalPort = m_config.m_internalPort;
-        hmconfig.internalInterface = m_config.m_internalInterface;
+        if (m_config.m_internalPortInterface != null && m_config.m_internalPortInterface.trim().length() > 0) {
+            hmconfig.internalInterface = m_config.m_internalPortInterface.trim();
+        } else {
+            hmconfig.internalInterface = m_config.m_internalInterface;
+        }
         hmconfig.zkInterface = m_config.m_zkInterface;
         hmconfig.deadHostTimeout = m_config.m_deadHostTimeoutMS;
         hmconfig.factory = new VoltDbMessageFactory();
@@ -1712,8 +1721,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     m_adminListener.stop();
 
                 // shut down the client interface
-                for (ClientInterface ci : m_clientInterfaces) {
-                    ci.shutdown();
+                if (m_clientInterface != null) {
+                    m_clientInterface.shutdown();
+                    m_clientInterface = null;
                 }
 
                 // tell the iv2 sites to stop their runloop
@@ -1766,9 +1776,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     m_asyncCompilerAgent.shutdown();
                     m_asyncCompilerAgent = null;
                 }
-
-                // The network iterates this list. Clear it after network's done.
-                m_clientInterfaces.clear();
 
                 ExportManager.instance().shutdown();
                 m_computationService.shutdown();
@@ -1918,8 +1925,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // 2. update client interface (asynchronously)
             //    CI in turn updates the planner thread.
-            for (ClientInterface ci : m_clientInterfaces) {
-                ci.notifyOfCatalogUpdate();
+            if (m_clientInterface != null) {
+                m_clientInterface.notifyOfCatalogUpdate();
             }
 
             // 3. update HTTPClientInterface (asynchronously)
@@ -1969,8 +1976,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     @Override
-    public List<ClientInterface> getClientInterfaces() {
-        return m_clientInterfaces;
+    public ClientInterface getClientInterface() {
+        return m_clientInterface;
     }
 
     @Override
@@ -2023,8 +2030,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         out.print("Content-type: multipart/mixed; boundary=\"reportsection\"");
 
         out.print("\n\n--reportsection\nContent-Type: text/plain\n\nClientInterface Report\n");
-        for (ClientInterface ci : getClientInterfaces()) {
-            out.print(ci.toString() + "\n");
+        if (m_clientInterface != null) {
+            out.print(m_clientInterface.toString() + "\n");
         }
     }
 
@@ -2055,10 +2062,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         final long delta = ((m_executionSiteRecoveryFinish - m_recoveryStartTime) / 1000);
         final long megabytes = m_executionSiteRecoveryTransferred / (1024 * 1024);
         final double megabytesPerSecond = megabytes / ((m_executionSiteRecoveryFinish - m_recoveryStartTime) / 1000.0);
-        for (ClientInterface intf : getClientInterfaces()) {
-            intf.mayActivateSnapshotDaemon();
+        if (m_clientInterface != null) {
+            m_clientInterface.mayActivateSnapshotDaemon();
             try {
-                intf.startAcceptingConnections();
+                m_clientInterface.startAcceptingConnections();
             } catch (IOException e) {
                 hostLog.l7dlog(Level.FATAL,
                         LogKeys.host_VoltDB_ErrorStartAcceptingConnections.name(),
@@ -2149,8 +2156,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             consoleLog.info("Promoting replication role from replica to master.");
         }
         m_config.m_replicationRole = role;
-        for (ClientInterface ci : m_clientInterfaces) {
-            ci.setReplicationRole(m_config.m_replicationRole);
+        if (m_clientInterface != null) {
+            m_clientInterface.setReplicationRole(m_config.m_replicationRole);
         }
     }
 
@@ -2206,9 +2213,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         }
 
         if (!m_rejoining && !m_joining) {
-            for (ClientInterface ci : m_clientInterfaces) {
+            if (m_clientInterface != null) {
                 try {
-                    ci.startAcceptingConnections();
+                    m_clientInterface.startAcceptingConnections();
                 } catch (IOException e) {
                     hostLog.l7dlog(Level.FATAL,
                                    LogKeys.host_VoltDB_ErrorStartAcceptingConnections.name(),
