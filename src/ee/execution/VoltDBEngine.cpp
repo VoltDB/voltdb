@@ -331,6 +331,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
     // reset these at the start of each batch
     m_tuplesProcessedInBatch = 0;
     m_tuplesProcessedInFragment = 0;
+    m_tuplesProcessedSinceReport = 0;
 
     for (m_currentIndexInBatch = 0; m_currentIndexInBatch < numFragments; ++m_currentIndexInBatch) {
 
@@ -360,6 +361,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         // at the end of each frag, rollup and reset counters
         m_tuplesProcessedInBatch += m_tuplesProcessedInFragment;
         m_tuplesProcessedInFragment = 0;
+        m_tuplesProcessedSinceReport = 0;
     }
 
     m_stringPool.purge();

@@ -116,7 +116,7 @@ class RecoveryProtoMsg;
 const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
 const size_t PLAN_CACHE_SIZE = 1024 * 10;
 // how many initial tuples to scan before calling into java
-const int64_t LONG_OP_THRESHOLD = 10000;
+const int64_t LONG_OP_THRESHOLD = 100;
 
 /**
  * Represents an Execution Engine which holds catalog objects (i.e. table) and executes
@@ -190,18 +190,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                  int64_t lastCommittedSpHandle,
                                  int64_t uniqueId,
                                  int64_t undoToken);
-
-        /**
-         * Execute a single plan fragment.
-         */
-        int executePlanFragment(int64_t planfragmentId,
-                                int64_t inputDependencyId,
-                                const NValueArray &params,
-                                int64_t spHandle,
-                                int64_t lastCommittedSpHandle,
-                                int64_t uniqueId,
-                                bool first,
-                                bool last);
 
         inline int getUsedParamcnt() const { return m_usedParamcnt;}
 
@@ -468,6 +456,18 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * Call into the topend with information about how executing a plan fragment is going.
          */
         void reportProgessToTopend();
+
+        /**
+         * Execute a single plan fragment.
+         */
+        int executePlanFragment(int64_t planfragmentId,
+                                int64_t inputDependencyId,
+                                const NValueArray &params,
+                                int64_t spHandle,
+                                int64_t lastCommittedSpHandle,
+                                int64_t uniqueId,
+                                bool first,
+                                bool last);
 
         /**
          * Keep a list of executors for runtime - intentionally near the top of VoltDBEngine
