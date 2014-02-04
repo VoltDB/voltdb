@@ -29,6 +29,8 @@ end
 begin Systemsettings  "Container for deployment systemsettings element"
   int maxtemptablesize   "The maximum allocation size for temp tables in the EE"
   int snapshotpriority "The priority of snapshot work"
+  int elasticPauseTime "Maximum pause time for rebalancing"
+  int elasticThroughput "Target throughput in megabytes for elasticity"
 end
 
 begin Database          "A set of schema, procedures and other metadata that together comprise an application"
