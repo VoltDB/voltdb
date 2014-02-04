@@ -32,7 +32,7 @@
  * blazing speeds when many clients are connected to it.
  */
 
-package voltkv;
+package kvbench;
 
 import java.io.File;
 import java.io.FileOutputStream;

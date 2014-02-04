@@ -20,18 +20,37 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package voltkv.procedures;
+
+// Put stored procedure
+//
+//   Puts the given Key-Value pair
+
+
+package kvbench.procedures;
 
 import org.voltdb.*;
 
-public class Get extends VoltProcedure
+public class Put extends VoltProcedure
 {
-    // Selects a key/value pair's value
-    public final SQLStmt selectStmt = new SQLStmt("SELECT key, value FROM store WHERE key = ?;");
+    // Checks if key exists
+    public final SQLStmt checkStmt = new SQLStmt("SELECT key FROM store WHERE key = ?;");
 
-    public VoltTable[] run(String key)
+    // Updates a key/value pair
+    public final SQLStmt updateStmt = new SQLStmt("UPDATE store SET value = ? WHERE key = ?;");
+
+    // Inserts a key/value pair
+    public final SQLStmt insertStmt = new SQLStmt("INSERT INTO store (key, value) VALUES (?, ?);");
+
+    public VoltTable[] run(String key, byte[] value)
     {
-        voltQueueSQL(selectStmt, key);
+        // Check whether the pair exists
+        voltQueueSQL(checkStmt, key);
+
+        // Insert new or update existing key depending on result
+        if (voltExecuteSQL()[0].getRowCount() == 0)
+            voltQueueSQL(insertStmt, key, value);
+        else
+            voltQueueSQL(updateStmt, value, key);
         return voltExecuteSQL(true);
     }
 }
