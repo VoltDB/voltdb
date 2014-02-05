@@ -441,6 +441,15 @@ public class MiscUtils {
     /**
      * @param server String containing a hostname/ip, or a hostname/ip:port.
      * @param defaultPort If a port isn't specified, use this one.
+     * @return HostAndPort number.
+     */
+    public static HostAndPort getHostAndPortFromHostnameColonPort(String server, int defaultPort) {
+        return HostAndPort.fromString(server).withDefaultPort(defaultPort);
+    }
+
+    /**
+     * @param server String containing a hostname/ip, or a hostname/ip:port.
+     * @param defaultPort If a port isn't specified, use this one.
      * @return String in hostname/ip:port format.
      */
     public static String getHostnameColonPortString(String server, int defaultPort) {

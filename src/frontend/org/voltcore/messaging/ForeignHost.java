@@ -81,8 +81,10 @@ public class ForeignHost {
             m_isUp = false;
             if (!m_closing)
             {
-                VoltDB.dropStackTrace("Received remote hangup from foreign host " + hostnameAndIPAndPort());
-                hostLog.warn("Received remote hangup from foreign host " + hostnameAndIPAndPort());
+                if (!m_hostMessenger.isShuttingDown()) {
+                    VoltDB.dropStackTrace("Received remote hangup from foreign host " + hostnameAndIPAndPort());
+                    hostLog.warn("Received remote hangup from foreign host " + hostnameAndIPAndPort());
+                }
                 m_hostMessenger.reportForeignHostFailed(m_hostId);
             }
         }
@@ -214,6 +216,11 @@ public class ForeignHost {
                     /*
                      * Can this be removed?
                      */
+                }
+
+                @Override
+                public String toString() {
+                    return message.getClass().getName();
                 }
             });
 

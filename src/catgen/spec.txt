@@ -29,6 +29,8 @@ end
 begin Systemsettings  "Container for deployment systemsettings element"
   int maxtemptablesize   "The maximum allocation size for temp tables in the EE"
   int snapshotpriority "The priority of snapshot work"
+  int elasticPauseTime "Maximum pause time for rebalancing"
+  int elasticThroughput "Target throughput in megabytes for elasticity"
 end
 
 begin Database          "A set of schema, procedures and other metadata that together comprise an application"
@@ -159,7 +161,6 @@ begin Statement             "A parameterized SQL statement embedded in a stored 
   int paramnum              ""
   StmtParameter* parameters "The set of parameters to this SQL statement"
   PlanFragment* fragments   "The set of plan fragments used to execute this statement"
-  Column* output_columns    "The set of columns in the output table"
   int cost                  "The cost of this plan measured in arbitrary units"
   int seqscancount          "The number of sequential table scans in the plan"
   string explainplan        "A human-readable plan description"
