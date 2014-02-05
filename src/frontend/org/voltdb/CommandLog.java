@@ -60,8 +60,8 @@ public interface CommandLog {
      * Returns a listenable future. If the returned future is null, then synchronous command logging
      * is in use and durability will be indicated via the durability listener. If the returned future
      * is not null then async command logging is in use. If the command log isn't falling behind the future
-     * will already be completed, but of the command log is falling behind the future will be completed
-     * when the log successfully fsync
+     * will already be completed, but if the command log is falling behind the future will be completed
+     * when the log successfully writes out enough data to the file (although it won't call fsync since async)
      */
     public abstract ListenableFuture<Object> log(
             Iv2InitiateTaskMessage message,
