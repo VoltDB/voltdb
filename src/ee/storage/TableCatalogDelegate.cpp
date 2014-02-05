@@ -361,6 +361,7 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
                                                     schema, columnNames,
                                                     partitionColumnIndex, exportEnabled,
                                                     tableIsExportOnly,
+                                                    0,
                                                     catalogTable.maxrows());
 
     // add a pkey index if one exists

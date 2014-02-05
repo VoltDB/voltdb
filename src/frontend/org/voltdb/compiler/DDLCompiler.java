@@ -1215,6 +1215,7 @@ public class DDLCompiler {
         if (m.find( )) {
             int maxRows = Integer.parseInt(m.group(3));
             table.setMaxrows(maxRows);
+            System.out.println("DEBUG EXPERIMENTAL FEATURE ENABLED: TABLE LIMIT ESTABLISHED ON TABLE " + name + " (" + maxRows + ")");
         } else {
             table.setMaxrows(Integer.MAX_VALUE);
         }

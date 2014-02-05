@@ -83,6 +83,7 @@ public:
         int partitionColumn = -1, // defaults provided for ease of testing.
         bool exportEnabled = false,
         bool exportOnly = false,
+        int tableAllocationTargetSize = 0,
         int maxRows = INT_MAX);
 
     /**

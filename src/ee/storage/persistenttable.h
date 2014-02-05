@@ -431,7 +431,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     bool checkNulls(TableTuple &tuple) const;
 
     // Zero allocation size uses defaults.
-    PersistentTable(int partitionColumn, int maxRows = INT_MAX);
+    PersistentTable(int partitionColumn, int tableAllocationTargetSize = 0, int maxRows = INT_MAX);
     void onSetColumns();
 
     void notifyBlockWasCompactedAway(TBPtr block);

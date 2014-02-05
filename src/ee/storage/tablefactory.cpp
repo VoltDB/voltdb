@@ -65,6 +65,7 @@ Table* TableFactory::getPersistentTable(
             int partitionColumn,
             bool exportEnabled,
             bool exportOnly,
+            int tableAllocationTargetSize,
             int maxRows)
 {
     Table *table = NULL;
@@ -73,7 +74,7 @@ Table* TableFactory::getPersistentTable(
         table = new StreamedTable(exportEnabled);
     }
     else {
-        table = new PersistentTable(partitionColumn, maxRows);
+        table = new PersistentTable(partitionColumn, tableAllocationTargetSize, maxRows);
     }
 
     initCommon(databaseId, table, name, schema, columnNames, true);
