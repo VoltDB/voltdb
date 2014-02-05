@@ -103,7 +103,7 @@ public class TestJDBCQueries {
                         new String[] {"9999999999999", "8888888888888", "7777777777777"},
                         new String[] {"Jan 23 2011"}),
             new Data("FLOAT", 0,
-                        new String[] {"3.1415926", "2.81828", "-9.0"},
+                        new String[] {"1.0", "2.0", "-9.0"},
                         new String[] {"x"}),
             new Data("DECIMAL", 0,
                         new String[] {"1111.2222", "-3333.4444", "+5555.6666"},
@@ -270,6 +270,95 @@ public class TestJDBCQueries {
                         exceptionReceived = true;
                     }
                     assertTrue(exceptionReceived);
+                }
+            }
+        }
+    }
+
+    private void nativeSet(PreparedStatement stmt, String tableName, String value, boolean useAlt)
+            throws NumberFormatException, SQLException
+    {
+        switch (tableName) {
+        case "T_TINYINT":
+            stmt.setByte(1, Byte.parseByte(value));
+            break;
+        case "T_SMALLINT":
+            stmt.setShort(1, Short.parseShort(value));
+            break;
+        case "T_INTEGER":
+            stmt.setInt(1, Integer.parseInt(value));
+            break;
+        case "T_BIGINT":
+            stmt.setLong(1, Long.parseLong(value));
+            break;
+        case "T_FLOAT":
+            if (!useAlt) {
+                stmt.setDouble(1, Double.parseDouble(value));
+            }
+            else {
+                stmt.setFloat(1, (float) Double.parseDouble(value));
+            }
+            break;
+        case "T_DECIMAL":
+        case "T_VARBINARY":
+        case "T_VARCHAR":
+            stmt.setString(1, value);
+            break;
+        case "T_TIMESTAMP":
+            // ALT METHODS FOR TIMESTAMPS DON'T WORK YET
+            //if (!useAlt) {
+                stmt.setString(1, value);
+            //}
+            //else {
+            //    long millis = Long.parseLong(value);
+            //    java.sql.Date date = new java.sql.Date(millis);
+            //    stmt.setDate(1, date);
+            //}
+            break;
+        default:
+            fail();
+        }
+    }
+
+    @Test
+    public void testParameterizedQueriesNative() throws Exception
+    {
+        boolean[] bools = { true, false };
+        for (Data d : data) {
+            for (boolean alt : bools) {
+                String q = String.format("select * from %s where id != ?", d.tablename);
+                try {
+                    PreparedStatement sel = conn.prepareStatement(q);
+                    nativeSet(sel, d.tablename, d.good[0], alt);
+                    sel.execute();
+                    ResultSet rs = sel.getResultSet();
+                    int rowCount = 0;
+                    while (rs.next()) {
+                        rowCount++;
+                    }
+                    assertEquals(d.good.length-1, rowCount);
+                }
+                catch(SQLException e) {
+                    System.err.printf("ERROR(SELECT): %s value='%s': %s\n",
+                                      d.typename, d.good[0], e.getMessage());
+                    fail();
+                }
+                if (d.bad != null) {
+                    for (String value : d.bad) {
+                        boolean exceptionReceived = false;
+                        try {
+                            PreparedStatement sel = conn.prepareStatement(q);
+                            nativeSet(sel, d.tablename, value, alt);
+                            sel.execute();
+                            System.err.printf("ERROR(SELECT): %s value='%s': * should have failed *\n",
+                                              d.typename, value);
+                        }
+                        // unlike with setString, this might not be a sqlexception, but a java format exception
+                        catch(Exception e) {
+                            exceptionReceived = true;
+                        }
+                        assertTrue(exceptionReceived);
+                    }
                 }
             }
         }
