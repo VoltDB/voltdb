@@ -200,6 +200,9 @@ public class VoltDB {
         /** Behavior-less arg used to differentiate command lines from "ps" */
         public String m_tag;
 
+        /** Force catalog upgrade even if version matches. */
+        public boolean m_forceCatalogUpgrade = false;
+
         public int getZKPort() {
             return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, VoltDB.DEFAULT_ZK_PORT);
         }
@@ -397,6 +400,9 @@ public class VoltDB {
                 } else if (arg.equalsIgnoreCase("ipcport")) {
                     String portStr = args[++i];
                     m_ipcPort = Integer.valueOf(portStr);
+                }
+                else if (arg.equals("forcecatalogupgrade")) {
+                    m_forceCatalogUpgrade = true;
                 } else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     System.out.println("Please refer to VoltDB documentation for command line usage.");

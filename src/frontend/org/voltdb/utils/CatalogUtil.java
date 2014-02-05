@@ -136,7 +136,31 @@ public abstract class CatalogUtil {
      *             If the catalog cannot be loaded because it's incompatible, or
      *             if there is no version information in the catalog.
      */
-    public static String loadCatalogFromJar(byte[] catalogBytes, VoltLogger log) throws IOException {
+    public static String loadCatalogFromJar(byte[] catalogBytes, VoltLogger log) throws IOException
+    {
+        InMemoryJarfile jarfile = loadCatalogJar(catalogBytes, log);
+        byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
+        if (null == serializedCatalogBytes) {
+            throw new IOException("Database catalog not found in loaded in-memory jar.");
+        }
+        return new String(serializedCatalogBytes, "UTF-8");
+    }
+
+    /**
+     * Load a catalog from the jar bytes and provide the loaded in-memory jar.
+     * Access at this level is mainly for testing. Most callers only need the
+     * final catalog bytes, and should call loadCatalogFromJar() instead.
+     *
+     * @param catalogBytes
+     * @param log
+     * @return The in-memory jar containing the loaded catalog.
+     * @throws VoltCompilerException
+     * @throws IOException
+     *             If the catalog cannot be loaded because it's incompatible, or
+     *             if there is no version information in the catalog.
+     */
+    public static InMemoryJarfile loadCatalogJar(byte[] catalogBytes, VoltLogger log) throws IOException
+    {
         assert(catalogBytes != null);
 
         InMemoryJarfile jarfile = new InMemoryJarfile(catalogBytes);
@@ -147,10 +171,11 @@ public abstract class CatalogUtil {
         }
 
         // Let VoltCompiler do a version check and upgrade the catalog on the fly.
+        // I.e. jarfile may be modified.
         VoltCompiler compiler = new VoltCompiler();
         compiler.postProcessLoadedCatalog(jarfile);
 
-        return new String(serializedCatalogBytes, "UTF-8");
+        return jarfile;
     }
 
     /**

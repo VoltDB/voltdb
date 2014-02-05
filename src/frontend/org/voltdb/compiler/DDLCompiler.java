@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.LineNumberReader;
 import java.io.Reader;
 import java.math.BigDecimal;
+import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -422,6 +423,9 @@ public class DDLCompiler {
     // any is needed.
     Map<String, String> m_tableNameToDDL = new TreeMap<String, String>();
 
+    // Resolve classes using a custom loader. Needed for catalog version upgrade.
+    final URLClassLoader m_classLoader;
+
     private class DDLStatement {
         public DDLStatement() {
         }
@@ -429,13 +433,17 @@ public class DDLCompiler {
         int lineNo;
     }
 
-    public DDLCompiler(VoltCompiler compiler, HSQLInterface hsql, VoltDDLElementTracker tracker)  {
+    public DDLCompiler(VoltCompiler compiler,
+                       HSQLInterface hsql,
+                       VoltDDLElementTracker tracker,
+                       URLClassLoader classLoader)  {
         assert(compiler != null);
         assert(hsql != null);
         assert(tracker != null);
         this.m_hsql = hsql;
         this.m_compiler = compiler;
         this.m_tracker = tracker;
+        this.m_classLoader = classLoader;
     }
 
     /**
@@ -567,7 +575,7 @@ public class DDLCompiler {
             String className = checkIdentifierStart(statementMatcher.group(2), statement);
             Class<?> clazz;
             try {
-                clazz = Class.forName(className);
+                clazz = Class.forName(className, true, m_classLoader);
             } catch (ClassNotFoundException e) {
                 throw m_compiler.new VoltCompilerException(String.format(
                         "Cannot load class for procedure: %s",
@@ -1987,6 +1995,7 @@ public class DDLCompiler {
         return null;
     }
 
+    /** NOTUSED
     // srcExprs is the prefix of destExprs
     private static boolean prefixCompatibleExprs(List<AbstractExpression> srcExprs, List<AbstractExpression> destExprs) {
         if (srcExprs.size() > destExprs.size()) {
@@ -1999,6 +2008,7 @@ public class DDLCompiler {
         }
         return true;
     }
+    */
 
     /**
      * Verify the materialized view meets our arcane rules about what can and can't

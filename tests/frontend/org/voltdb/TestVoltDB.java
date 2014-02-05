@@ -25,15 +25,18 @@ package org.voltdb;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 
 import junit.framework.TestCase;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 
 public class TestVoltDB extends TestCase {
@@ -247,6 +250,53 @@ public class TestVoltDB extends TestCase {
 
         assertTrue("Deployment file should have been able to validate",
                 CatalogUtil.compileDeploymentAndGetCRC(catalog, project.getPathToDeployment(), true, true) >= 0);
+    }
+
+    private String[] getBuildInfoLines(InMemoryJarfile memCatalog)
+            throws UnsupportedEncodingException
+    {
+        assertNotNull(memCatalog);
+        assertTrue(memCatalog.containsKey(CatalogUtil.CATALOG_BUILDINFO_FILENAME));
+        byte[] buildInfoBytes = memCatalog.get(CatalogUtil.CATALOG_BUILDINFO_FILENAME);
+        assertNotNull(buildInfoBytes);
+        String buildInfo = new String(buildInfoBytes, "UTF-8");
+        String[] buildInfoLines = buildInfo.split("\n");
+        assertTrue(buildInfoLines.length == 5);
+        return buildInfoLines;
+    }
+
+    public void testCatalogAutoUpgrade() throws IOException {
+        TPCCProjectBuilder project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addDefaultProcedures();
+
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        String jarName = "compile-deployment.jar";
+        String catalogJar = testDir + File.separator + jarName;
+        assertTrue("Project failed to compile", project.compile(catalogJar));
+
+        // Load the catalog to an in-memory jar and tweak the version.
+        byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
+        InMemoryJarfile memCatalog = CatalogUtil.loadCatalogJar(bytes, null);
+        String[] bi = getBuildInfoLines(memCatalog);
+
+        // Drop the last version number segment to trigger an upgrade.
+        // May need to tweak if/when the trigger rule changes.
+        bi[0] = bi[0].substring(0, bi[0].lastIndexOf('.'));
+        memCatalog.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, StringUtils.join(bi, '\n').getBytes());
+
+        // Check the (hopefully) upgraded catalog version against the server version.
+        InMemoryJarfile memCatalog2 = CatalogUtil.loadCatalogJar(memCatalog.getFullJarBytes(), null);
+        assertNotNull(memCatalog2);
+        String[] buildInfoLines2 = getBuildInfoLines(memCatalog2);
+        String serverVersion = VoltDB.instance().getVersionString();
+        assertTrue(serverVersion.equals(buildInfoLines2[0]));
+
+        // Make sure the jar file is present.
+        String jarName2 = String.format("catalog-%s.jar", serverVersion);
+        File jar2 = new File(VoltDB.Configuration.getPathToCatalogForTest(jarName2));
+        assertTrue(jar2.exists());
     }
 
 }

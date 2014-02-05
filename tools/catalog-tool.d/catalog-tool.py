@@ -165,8 +165,8 @@ def dump_to_file(runner, path_in, path_out):
         VOLT.BooleanOption('-a', '--a', 'all', 'show all catalog information'),
     ],
 )
-def info(runner):
-    for line in dump(runner, runner.opts.catalog_path, runner.opts.all):
+def dump(runner):
+    for line in iter_catalog_dump(runner, runner.opts.catalog_path, runner.opts.all):
         print line
 
 
