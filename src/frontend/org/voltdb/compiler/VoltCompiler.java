@@ -888,7 +888,7 @@ public class VoltCompiler {
             // add the file object's path to the list of files for the jar
             m_ddlFilePaths.put(schemaReader.getName(), schemaReader.getPath());
 
-            ddlcompiler.loadSchema(schemaReader, db);
+            ddlcompiler.loadSchema(schemaReader, db, whichProcs);
         }
 
         ddlcompiler.compileToCatalog(db);
