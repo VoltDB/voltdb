@@ -50,6 +50,8 @@ public class SysProcFragmentId
     public static final long PF_plannerAggregator = 23;
 
     // @Shutdown
+    public static final long PF_shutdownSync = 26;
+    public static final long PF_shutdownSyncDone = 27;
     public static final long PF_shutdownCommand = 28;
     public static final long PF_procedureDone = 29;
 

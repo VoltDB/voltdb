@@ -293,7 +293,8 @@ public class InitiatorStats extends SiteStatsSource {
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
         ArrayDeque<Iterator<Map.Entry<Long, Map<String, InvocationInfo>>>> d =
                 new ArrayDeque<Iterator<Map.Entry<Long, Map<String, InvocationInfo>>>>();
-        for (ClientInterface ci : VoltDB.instance().getClientInterfaces()) {
+        ClientInterface ci = VoltDB.instance().getClientInterface();
+        if (ci != null) {
             d.addAll(ci.getIV2InitiatorStats());
         }
         return new DummyIterator(
