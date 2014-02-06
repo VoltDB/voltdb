@@ -2250,7 +2250,8 @@ public class VoltCompiler {
         String voltVersionString = buildInfoLines[0].trim();
 
         // Check if it's compatible (or the upgrade is being forced).
-        if (   VoltDB.instance().getConfig().m_forceCatalogUpgrade
+        // getConfig() may return null if it's being mocked for a test.
+        if (   VoltDB.Configuration.m_forceCatalogUpgrade
             || !CatalogUtil.isCatalogCompatible(voltVersionString)) {
 
             // Patch the buildinfo.

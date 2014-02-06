@@ -17,7 +17,6 @@
 
 package org.voltdb;
 
-import com.google_voltpatches.common.net.HostAndPort;
 import java.io.File;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
@@ -37,6 +36,8 @@ import org.voltcore.utils.PortGenerator;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
+
+import com.google_voltpatches.common.net.HostAndPort;
 
 /**
  * VoltDB provides main() for the VoltDB server
@@ -208,7 +209,7 @@ public class VoltDB {
         public String m_tag;
 
         /** Force catalog upgrade even if version matches. */
-        public boolean m_forceCatalogUpgrade = false;
+        public static boolean m_forceCatalogUpgrade = false;
 
         public int getZKPort() {
             return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, VoltDB.DEFAULT_ZK_PORT);
