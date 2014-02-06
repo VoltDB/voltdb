@@ -1382,7 +1382,7 @@ TEST CASES
                 <!-- Standard junit fileset -->
                 <patternset refid="junit.all.path" />
                 <!-- Exclude many tests not directly related to sql functionality -->
-                <exclude name="**/*$*.class"/>
+                <exclude name='**/*$*.class'/>
                 <exclude name='org/voltcore/**/*.class'/>
                 <exclude name='org/voltdb/client/TestClientFeatures.class'/>
                 <exclude name='org/voltdb/client/TestDistributer.class'/>
@@ -1392,17 +1392,18 @@ TEST CASES
                 <exclude name='org/voltdb/jni/Test*.class'/>
                 <exclude name='org/voltdb/messaging/Test*.class'/>
                 <exclude name='org/voltdb/regressionsuites/TestAdminMode.class'/>
-                <exclude name="org/voltdb/quarantine/**/*.class"/>
-                <exclude name="**/TestCommandLog*.class" />
-                <exclude name="**/TestExport*.class"/>
-                <exclude name="**/TestJoin.class"/>
-                <exclude name="**/TestLogReader.class"/>
-                <exclude name="**/TestMaliciousClientSuite.class" />
-                <exclude name="**/Test*Rejoin*.class" />
-                <exclude name="**/Test*Replication*.class" />
-                <exclude name="**/Test*Restore*.class" />
-                <exclude name="**/Test*Snapshot*.class" />
-                <exclude name="**/TestMultipleOuterJoinPlans.class" />
+                <exclude name='org/voltdb/regressionsuites/TestClientPort*.class'/>
+                <exclude name='org/voltdb/quarantine/**/*.class'/>
+                <exclude name='**/TestCommandLog*.class'/>
+                <exclude name='**/TestExport*.class'/>
+                <exclude name='**/TestJoin.class'/>
+                <exclude name='**/TestLogReader.class'/>
+                <exclude name='**/TestMaliciousClientSuite.class'/>
+                <exclude name='**/Test*Rejoin*.class'/>
+                <exclude name='**/Test*Replication*.class'/>
+                <exclude name='**/Test*Restore*.class'/>
+                <exclude name='**/Test*Snapshot*.class'/>
+                <exclude name='**/TestMultipleOuterJoinPlans.class'/>
             </fileset>
         </tests>
     </run_junit>

@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
@@ -94,7 +95,7 @@ abstract public class ProcedureTask extends TransactionTask
                     RateLimitedLogger.tryLogForMessage(
                             error + " This log message is rate limited to once every 60 seconds.",
                             System.currentTimeMillis(),
-                            60 * 1000,
+                            60, TimeUnit.SECONDS,
                             hostLog,
                             Level.WARN);
                     response.setResults(

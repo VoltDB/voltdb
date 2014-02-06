@@ -225,8 +225,8 @@ public class TestJoinOrder extends PlannerTestCase {
     }
 
     public void testMicroOptimizationJoinOrder() {
-		// Microoptimization can be used for determinism only when working with replicated tables or
-		// single-partition queries.
+        // Microoptimization can be used for determinism only when working with replicated tables or
+        // single-partition queries.
         List<AbstractPlanNode> pns;
         AbstractPlanNode n;
 
