@@ -372,6 +372,10 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // This is a testability feature not intended for use in product logic.
     int visibleTupleCount() const { return m_tupleCount - m_invisibleTuplesPendingDeleteCount; }
 
+    int tupleLimit() const {
+        return m_tupleLimit;
+    }
+
     bool isPersistentTableEmpty()
     {
         // The narrow usage of this function (while updating the catalog)
@@ -431,7 +435,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     bool checkNulls(TableTuple &tuple) const;
 
     // Zero allocation size uses defaults.
-    PersistentTable(int partitionColumn, int tableAllocationTargetSize = 0, int maxRows = INT_MAX);
+    PersistentTable(int partitionColumn, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX);
     void onSetColumns();
 
     void notifyBlockWasCompactedAway(TBPtr block);
@@ -478,7 +482,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     const int m_partitionColumn;
 
     // table row count limit
-    const int m_maxRows;
+    const int m_tupleLimit;
 
     // list of materialized views that are sourced from this table
     std::vector<MaterializedViewMetadata *> m_views;

@@ -362,7 +362,7 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
                                                     partitionColumnIndex, exportEnabled,
                                                     tableIsExportOnly,
                                                     0,
-                                                    catalogTable.maxrows());
+                                                    catalogTable.tuplelimit());
 
     // add a pkey index if one exists
     if (pkey_index_id.size() != 0) {

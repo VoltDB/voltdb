@@ -84,7 +84,7 @@ public:
         bool exportEnabled = false,
         bool exportOnly = false,
         int tableAllocationTargetSize = 0,
-        int maxRows = INT_MAX);
+        int tuplelimit = INT_MAX);
 
     /**
     * Creates an empty temp table with given name and columns.

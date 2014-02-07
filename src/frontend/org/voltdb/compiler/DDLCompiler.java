@@ -1213,11 +1213,11 @@ public class DDLCompiler {
         Pattern r = Pattern.compile("(.+)(_tablelimit_)(\\d+)");
         Matcher m = r.matcher(name.toLowerCase());
         if (m.find( )) {
-            int maxRows = Integer.parseInt(m.group(3));
-            table.setMaxrows(maxRows);
-            System.out.println("DEBUG EXPERIMENTAL FEATURE ENABLED: TABLE LIMIT ESTABLISHED ON TABLE " + name + " (" + maxRows + ")");
+            int tupleLimit = Integer.parseInt(m.group(3));
+            table.setTuplelimit(tupleLimit);
+            System.out.println("DEBUG EXPERIMENTAL FEATURE ENABLED: TABLE LIMIT ESTABLISHED ON TABLE " + name + " (" + tupleLimit + ")");
         } else {
-            table.setMaxrows(Integer.MAX_VALUE);
+            table.setTuplelimit(Integer.MAX_VALUE);
         }
 
         // all tables start replicated
