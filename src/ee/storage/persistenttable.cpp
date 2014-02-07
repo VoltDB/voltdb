@@ -332,12 +332,13 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
         FAIL_IF(!checkNulls(target)) {
             throw ConstraintFailureException(this, source, TableTuple(), CONSTRAINT_TYPE_NOT_NULL);
         }
+
         std::string constraintName;
         FAIL_IF(!checkConstraint(target, constraintName)) {
-            std::stringstream builder;
-            builder <<"[INSERT]:" << "Table " << m_name
-                    << " failed on check constraint " << constraintName;
-            throw ConstraintFailureException(this, target, builder.str());
+            char buffer [256];
+            snprintf (buffer, 256, "[INSERT]: Table %s failed on check constraint %s",
+                    m_name.c_str(), constraintName.c_str());
+            throw ConstraintFailureException(this, target, buffer);
         }
     }
 
@@ -450,10 +451,10 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
 
         std::string constraintName;
         FAIL_IF(!checkConstraint(sourceTupleWithNewValues, constraintName)) {
-            std::stringstream builder;
-            builder <<"[UPDATE]:" << "Table " << m_name
-                    << " failed on check constraint " << constraintName;
-            throw ConstraintFailureException(this, sourceTupleWithNewValues, builder.str());
+            char buffer [256];
+            snprintf (buffer, 256, "[UPDATE]: Table %s failed on check constraint %s",
+                    m_name.c_str(), constraintName.c_str());
+            throw ConstraintFailureException(this, sourceTupleWithNewValues, buffer);
         }
 
         uq = ExecutorContext::currentUndoQuantum();

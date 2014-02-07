@@ -105,6 +105,13 @@ Table::~Table() {
     if (m_columnHeaderData)
         delete[] m_columnHeaderData;
     m_columnHeaderData = NULL;
+
+    std::vector<std::pair<AbstractExpression*, std::string> >::const_iterator it;
+
+    for (it = m_checkExprs.begin(); it != m_checkExprs.end(); ++it) {
+        AbstractExpression * expr = it->first;
+        delete expr;
+    }
 }
 
 void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string> &columnNames, bool ownsTupleSchema) {
