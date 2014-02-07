@@ -334,10 +334,10 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
         }
         std::string constraintName;
         FAIL_IF(!checkConstraint(target, constraintName)) {
-        	std::stringstream builder;
-        	builder <<"[INSERT]:" << "Table " << m_name
-        			<< " failed on check constraint " << constraintName;
-        	throw ConstraintFailureException(this, target, builder.str());
+            std::stringstream builder;
+            builder <<"[INSERT]:" << "Table " << m_name
+                    << " failed on check constraint " << constraintName;
+            throw ConstraintFailureException(this, target, builder.str());
         }
     }
 
@@ -450,10 +450,10 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
 
         std::string constraintName;
         FAIL_IF(!checkConstraint(sourceTupleWithNewValues, constraintName)) {
-        	std::stringstream builder;
-        	builder <<"[UPDATE]:" << "Table " << m_name
-        			<< " failed on check constraint " << constraintName;
-        	throw ConstraintFailureException(this, sourceTupleWithNewValues, builder.str());
+            std::stringstream builder;
+            builder <<"[UPDATE]:" << "Table " << m_name
+                    << " failed on check constraint " << constraintName;
+            throw ConstraintFailureException(this, sourceTupleWithNewValues, builder.str());
         }
 
         uq = ExecutorContext::currentUndoQuantum();
@@ -844,13 +844,13 @@ bool PersistentTable::checkConstraint(TableTuple &tuple, std::string &constraint
     std::vector<std::pair<AbstractExpression*, std::string> >::const_iterator it;
 
     for (it = m_checkExprs.begin(); it != m_checkExprs.end(); it++) {
-    	AbstractExpression * expr = it ->first;
-    	std::string name = it->second;
-    	NValue result = expr->eval(&tuple, NULL);
-    	if (!result.isTrue()) {
-    	    constraintName = name;
-    		return false;
-    	}
+        AbstractExpression * expr = it ->first;
+        std::string name = it->second;
+        NValue result = expr->eval(&tuple, NULL);
+        if (!result.isTrue()) {
+            constraintName = name;
+            return false;
+        }
     }
 
     return true;

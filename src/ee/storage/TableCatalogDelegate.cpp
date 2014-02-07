@@ -317,16 +317,16 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
                 break;
             // Unsupported
             case CONSTRAINT_TYPE_CHECK:
-            	{
-            	    std::string name = catalog_constraint->name();
-            	    std::string checkExprJson = catalog_constraint->expressionsjson();
+                {
+                    std::string name = catalog_constraint->name();
+                    std::string checkExprJson = catalog_constraint->expressionsjson();
 
-            	    if (checkExprJson.length() != 0) {
-            	        AbstractExpression * expr = ExpressionUtil::loadSingleExpressionFromJson(checkExprJson);
-            	        check_exprs.push_back(std::make_pair(expr, name));
-            	    }
-            	}
-            	break;
+                    if (checkExprJson.length() != 0) {
+                        AbstractExpression * expr = ExpressionUtil::loadSingleExpressionFromJson(checkExprJson);
+                        check_exprs.push_back(std::make_pair(expr, name));
+                    }
+                }
+                break;
             case CONSTRAINT_TYPE_FOREIGN_KEY:
             case CONSTRAINT_TYPE_MAIN:
                 VOLT_WARN("Unsupported type '%s' for constraint '%s'",
@@ -391,7 +391,7 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     // add check constraint
     std::vector<std::pair<AbstractExpression*, std::string> >::iterator it;
     for (it = check_exprs.begin(); it < check_exprs.end(); it++) {
-    	table->addCheckExpr(*it);
+        table->addCheckExpr(*it);
     }
 
     return table;
