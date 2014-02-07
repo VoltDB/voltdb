@@ -24,6 +24,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.sql.Timestamp;
 
 import junit.framework.Test;
 
@@ -398,9 +399,177 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
             exception = true;
         }
         assertTrue(exception);
-
-
     }
+
+    public void testConstraintCheck() throws Exception {
+        System.out.println("STARTING Constraint Check......");
+        Client client = getClient();
+        VoltTable vt = null;
+        Exception ex = null;
+
+        /**
+         *  CREATE TABLE TableCheck (
+            ID INTEGER DEFAULT 0 NOT NULL,
+            AGE INTEGER,
+            WAGE FLOAT,
+            CITY VARCHAR(300),
+            TM TIMESTAMP DEFAULT NOW,
+            CONSTRAINT PK_PTABLE PRIMARY KEY (ID),
+            CHECK (ID < 100),
+            CONSTRAINT check1  CHECK (ID > 0),
+            CONSTRAINT check2  CHECK (TRUNCATE(YEAR) >= 2014),
+            CONSTRAINT check3  CHECK (age > 0 AND age < 50 AND FLOOR(wage/AGE) > 2)
+        );
+         */
+
+        Timestamp tm = Timestamp.valueOf("2014-02-05 13:56:40.123456");
+        client.callProcedure("TABLECHECK.insert", 1, 1, 3, "bedford", tm);
+        vt = client.callProcedure("@AdHoc", "select count(*) from TABLECHECK where id = 1").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+
+        /**
+         * Test insert constraint check
+         */
+        // test check
+        try {
+            client.callProcedure("TABLECHECK.insert", 101, 1, 3, "bedford", tm);
+        } catch (ProcCallException e) {
+            ex = e;
+            assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint "));
+            assertTrue(e.getMessage().contains("SYS_CT"));
+        } finally {
+            assertNotNull(ex);
+        }
+
+        // test check1
+        ex = null;
+        try {
+            client.callProcedure("TABLECHECK.insert", -1, 1, 3, "bedford", tm);
+        } catch (ProcCallException e) {
+            ex = e;
+            assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK1"));
+        } finally {
+            assertNotNull(ex);
+        }
+
+        // test check2
+        ex = null;
+        try {
+            client.callProcedure("TABLECHECK.insert", 2, 1, 3, "bedford", Timestamp.valueOf("2013-02-05 13:56:40.123456"));
+        } catch (ProcCallException e) {
+            ex = e;
+            assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK2"));
+        } finally {
+            assertNotNull(ex);
+        }
+
+        // test check3
+        ex = null;
+        try {
+            client.callProcedure("TABLECHECK.insert", 2, 51, 300, "bedford", tm);
+        } catch (ProcCallException e) {
+            ex = e;
+            assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK3"));
+        } finally {
+            assertNotNull(ex);
+        }
+
+        ex = null;
+        try {
+            client.callProcedure("TABLECHECK.insert", 2, 1, 1, "bedford", tm);
+        } catch (ProcCallException e) {
+            ex = e;
+            assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK3"));
+        } finally {
+            assertNotNull(ex);
+        }
+
+        // test check3 with null
+        ex = null;
+        try {
+            client.callProcedure("TABLECHECK.insert", 2, 1, null, "bedford", tm);
+        } catch (ProcCallException e) {
+            ex = e;
+            assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK3"));
+        } finally {
+            assertNotNull(ex);
+        }
+
+        vt = client.callProcedure("@AdHoc", "select count(*) from TABLECHECK where id = 1").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+
+
+        /**
+         * Test update constraint check
+         */
+        try {
+            client.callProcedure("@AdHoc", "update TABLECHECK set id = 101 where id = 1");
+        } catch (ProcCallException e) {
+            ex = e;
+            assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint "));
+            assertTrue(e.getMessage().contains("SYS_CT"));
+        } finally {
+            assertNotNull(ex);
+        }
+
+        // test check1
+        ex = null;
+        try {
+            client.callProcedure("@AdHoc", "update TABLECHECK set id = -1 where id = 1");
+        } catch (ProcCallException e) {
+            ex = e;
+            assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK1"));
+        } finally {
+            assertNotNull(ex);
+        }
+
+        // test check2
+        ex = null;
+        try {
+            client.callProcedure("@AdHoc", "update TABLECHECK set tm = '2013-02-05 13:56:40.123456' where id = 1");
+        } catch (ProcCallException e) {
+            ex = e;
+            assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK2"));
+        } finally {
+            assertNotNull(ex);
+        }
+
+        // test check3
+        ex = null;
+        try {
+            client.callProcedure("@AdHoc", "update TABLECHECK set id = 2, age = 51, wage = 300 where id = 1");
+        } catch (ProcCallException e) {
+            ex = e;
+            assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK3"));
+        } finally {
+            assertNotNull(ex);
+        }
+
+        ex = null;
+        try {
+            client.callProcedure("@AdHoc", "update TABLECHECK set id = 2, age = 1, wage = 1 where id = 1");
+        } catch (ProcCallException e) {
+            ex = e;
+            assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK3"));
+        } finally {
+            assertNotNull(ex);
+        }
+
+        // test check3 with null
+        ex = null;
+        try {
+            client.callProcedure("@AdHoc", "update TABLECHECK set id = 2, age = 1, wage = NULL where id = 1");
+        } catch (ProcCallException e) {
+            ex = e;
+            assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK3"));
+        } finally {
+            assertNotNull(ex);
+        }
+
+        vt = client.callProcedure("@AdHoc", "select count(*) from TABLECHECK where id = 1").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+    }
+
 
     public void testSetOpsThatFail() throws Exception {
         Client client = getClient();

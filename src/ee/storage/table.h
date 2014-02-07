@@ -60,9 +60,10 @@
 #include "common/Pool.hpp"
 #include "common/tabletuple.h"
 #include "common/TheHashinator.h"
+#include "common/ThreadLocalPool.h"
+#include "expressions/abstractexpression.h"
 #include "storage/TupleBlock.h"
 #include "stx/btree_set.h"
-#include "common/ThreadLocalPool.h"
 
 namespace voltdb {
 
@@ -239,6 +240,9 @@ class Table {
     virtual void addIndex(TableIndex *index);
     virtual void removeIndex(TableIndex *index);
     virtual void setPrimaryKeyIndex(TableIndex *index);
+
+    virtual void addCheckExpr(std::pair<AbstractExpression*, std::string> &pair);
+
 
     // ------------------------------------------------------------------
     // UTILITY
@@ -441,6 +445,8 @@ protected:
     std::vector<TableIndex*> m_indexes;
     std::vector<TableIndex*> m_uniqueIndexes;
     TableIndex *m_pkeyIndex;
+
+    std::vector<std::pair<AbstractExpression*, std::string> > m_checkExprs;
 
   private:
     int32_t m_refcount;

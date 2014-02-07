@@ -429,6 +429,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                                     std::vector<TableIndex*> const &indexesToUpdate);
 
     bool checkNulls(TableTuple &tuple) const;
+    bool checkConstraint(TableTuple &tuple,std::string &constraintName) const;
 
     // Zero allocation size uses defaults.
     PersistentTable(int partitionColumn, int tableAllocationTargetSize = 0);

@@ -550,4 +550,13 @@ void ExpressionUtil::loadIndexedExprsFromJson(std::vector<AbstractExpression*>& 
     }
 }
 
+AbstractExpression * ExpressionUtil::loadSingleExpressionFromJson(const std::string& jsonstring)
+{
+    PlannerDomRoot domRoot(jsonstring.c_str());
+    PlannerDomValue expressionsArray = domRoot.rootObject();
+
+    return AbstractExpression::buildExpressionTree(expressionsArray);
+}
+
+
 }

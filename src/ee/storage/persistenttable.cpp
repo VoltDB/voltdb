@@ -332,6 +332,13 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
         FAIL_IF(!checkNulls(target)) {
             throw ConstraintFailureException(this, source, TableTuple(), CONSTRAINT_TYPE_NOT_NULL);
         }
+        std::string constraintName;
+        FAIL_IF(!checkConstraint(target, constraintName)) {
+        	std::stringstream builder;
+        	builder <<"[INSERT]:" << "Table " << m_name
+        			<< " failed on check constraint " << constraintName;
+        	throw ConstraintFailureException(this, target, builder.str());
+        }
     }
 
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
@@ -439,6 +446,14 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
                                              sourceTupleWithNewValues,
                                              targetTupleToUpdate,
                                              CONSTRAINT_TYPE_NOT_NULL);
+        }
+
+        std::string constraintName;
+        FAIL_IF(!checkConstraint(sourceTupleWithNewValues, constraintName)) {
+        	std::stringstream builder;
+        	builder <<"[UPDATE]:" << "Table " << m_name
+        			<< " failed on check constraint " << constraintName;
+        	throw ConstraintFailureException(this, sourceTupleWithNewValues, builder.str());
         }
 
         uq = ExecutorContext::currentUndoQuantum();
@@ -820,6 +835,24 @@ bool PersistentTable::checkNulls(TableTuple &tuple) const {
             return false;
         }
     }
+    return true;
+}
+
+bool PersistentTable::checkConstraint(TableTuple &tuple, std::string &constraintName) const {
+    assert (m_columnCount == tuple.sizeInValues());
+
+    std::vector<std::pair<AbstractExpression*, std::string> >::const_iterator it;
+
+    for (it = m_checkExprs.begin(); it != m_checkExprs.end(); it++) {
+    	AbstractExpression * expr = it ->first;
+    	std::string name = it->second;
+    	NValue result = expr->eval(&tuple, NULL);
+    	if (!result.isTrue()) {
+    	    constraintName = name;
+    		return false;
+    	}
+    }
+
     return true;
 }
 

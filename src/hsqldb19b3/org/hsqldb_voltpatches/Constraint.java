@@ -66,6 +66,7 @@
 
 package org.hsqldb_voltpatches;
 
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.RangeVariable.RangeIteratorBase;
 import org.hsqldb_voltpatches.index.Index;
@@ -1056,7 +1057,7 @@ public final class Constraint implements SchemaObject {
      * some names.
      * @return XML, correctly indented, representing this object.
      */
-    VoltXMLElement voltGetConstraintXML()
+    VoltXMLElement voltGetConstraintXML(Session session, Table table)
     {
         // Skip "MAIN" constraints, as they are a side effect of foreign key constraints and add no new info.
         if (this.constType == MAIN) {
@@ -1075,6 +1076,19 @@ public final class Constraint implements SchemaObject {
         if (this.constType != FOREIGN_KEY && core.mainIndex != null) {
             constraint.attributes.put("index", core.mainIndex.getName().name);
         }
+
+        // Add check constraint expression support
+        if (constType == CHECK && !isNotNull()) {
+            assert(check != null);
+            VoltXMLElement checkExpr = null;
+            try {
+                checkExpr = check.voltGetExpressionXML(session, table);
+            } catch (HSQLParseException e) {
+                e.printStackTrace();
+            }
+            constraint.children.add(checkExpr);
+        }
+
         return constraint;
     }
 

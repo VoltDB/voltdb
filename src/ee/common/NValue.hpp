@@ -2084,6 +2084,7 @@ inline bool NValue::isTrue() const {
 }
 
 /**
+ * Use isTrue instead to determine the final boolean expression value. NULL makes it incorrect.
  * Returns C++ false if this NValue is a boolean and is true
  * If it is NULL, return false.
  */

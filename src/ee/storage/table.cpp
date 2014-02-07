@@ -572,6 +572,14 @@ void Table::setPrimaryKeyIndex(TableIndex *index) {
     m_pkeyIndex = index;
 }
 
+void Table::addCheckExpr(std::pair<AbstractExpression*, std::string> &pair) {
+    // silently ignore indexes if they've gotten this far
+    if (isExport()) {
+        return;
+    }
+    m_checkExprs.push_back(pair);
+}
+
 void Table::configureIndexStats(CatalogId databaseId)
 {
     // initialize stats for all the indexes for the table

@@ -2692,7 +2692,7 @@ public class Table extends TableBase implements SchemaObject {
         VoltXMLElement constraints = new VoltXMLElement("constraints");
         table.children.add(constraints);
         for (Constraint constraint : getConstraints()) {
-            VoltXMLElement constraintChild = constraint.voltGetConstraintXML();
+            VoltXMLElement constraintChild = constraint.voltGetConstraintXML(session, this);
             if (constraintChild != null) {
                 constraints.children.add(constraintChild);
             }

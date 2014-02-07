@@ -201,6 +201,7 @@ begin Constraint            "A constraint on a database table"
   Index? index              "The index used by this constraint (if needed)"
   Table? foreignkeytable    "The table referenced by the foreign key (if needed)"
   ColumnRef* foreignkeycols "The columns in the foreign table referenced by the constraint (if needed)"
+  string expressionsjson    "A serialized representation of the check expression trees"
 end
 
 begin ConstraintRef      "A reference to a table constraint"

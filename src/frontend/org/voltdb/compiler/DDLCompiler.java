@@ -1234,6 +1234,9 @@ public class DDLCompiler {
                 }
             }
 
+            AbstractParsedStmt dummy = new ParsedSelectStmt(null, db);
+            dummy.setTable(table);
+
             if (subNode.name.equals("indexes")) {
                 // do non-system indexes first so they get priority when the compiler
                 // starts throwing out duplicate indexes
@@ -1241,7 +1244,7 @@ public class DDLCompiler {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
                     if (indexName.startsWith("SYS_IDX_SYS_") == false) {
-                        addIndexToCatalog(db, table, indexNode, indexReplacementMap);
+                        addIndexToCatalog(dummy, table, indexNode, indexReplacementMap);
                     }
                 }
 
@@ -1250,15 +1253,16 @@ public class DDLCompiler {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
                     if (indexName.startsWith("SYS_IDX_SYS_") == true) {
-                        addIndexToCatalog(db, table, indexNode, indexReplacementMap);
+                        addIndexToCatalog(dummy, table, indexNode, indexReplacementMap);
                     }
                 }
             }
 
             if (subNode.name.equals("constraints")) {
                 for (VoltXMLElement constraintNode : subNode.children) {
-                    if (constraintNode.name.equals("constraint"))
-                        addConstraintToCatalog(table, constraintNode, indexReplacementMap);
+                    if (constraintNode.name.equals("constraint")) {
+                        addConstraintToCatalog(dummy, table, constraintNode, indexReplacementMap);
+                    }
                 }
             }
         }
@@ -1475,7 +1479,7 @@ public class DDLCompiler {
         return false;
     }
 
-    void addIndexToCatalog(Database db, Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
+    void addIndexToCatalog(AbstractParsedStmt dummy, Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
             throws VoltCompilerException
     {
         assert node.name.equals("index");
@@ -1483,9 +1487,6 @@ public class DDLCompiler {
         String name = node.attributes.get("name");
         boolean unique = Boolean.parseBoolean(node.attributes.get("unique"));
         boolean assumeUnique = Boolean.parseBoolean(node.attributes.get("assumeunique"));
-
-        AbstractParsedStmt dummy = new ParsedSelectStmt(null, db);
-        dummy.setTable(table);
 
         // "parse" the expression trees for an expression-based index (vs. a simple column value index)
         List<AbstractExpression> exprs = null;
@@ -1547,20 +1548,14 @@ public class DDLCompiler {
                 }
             }
         }
-
         Index index = table.getIndexes().add(name);
-        index.setCountable(false);
 
         // set the type of the index based on the index name and column types
         // Currently, only int types can use hash or array indexes
         String indexNameNoCase = name.toLowerCase();
-        if (indexNameNoCase.contains("tree"))
+        if (indexNameNoCase.contains("hash"))
         {
-            index.setType(IndexType.BALANCED_TREE.getValue());
-            index.setCountable(true);
-        }
-        else if (indexNameNoCase.contains("hash"))
-        {
+            index.setCountable(false);
             if (!has_nonint_col)
             {
                 index.setType(IndexType.HASH_TABLE.getValue());
@@ -1572,15 +1567,10 @@ public class DDLCompiler {
                 throw m_compiler.new VoltCompilerException(msg);
             }
         } else {
+            // Tree index by default
             index.setType(IndexType.BALANCED_TREE.getValue());
             index.setCountable(true);
         }
-
-        // Countable is always on right now. Fix it when VoltDB can pack memory for TreeNode.
-//        if (indexNameNoCase.contains("NoCounter")) {
-//            index.setType(IndexType.BALANCED_TREE.getValue());
-//            index.setCountable(false);
-//        }
 
         // need to set other index data here (column, etc)
         // For expression indexes, the columns listed in the catalog do not correspond to the values in the index,
@@ -1661,7 +1651,7 @@ public class DDLCompiler {
      * @param node
      * @throws VoltCompilerException
      */
-    void addConstraintToCatalog(Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
+    void addConstraintToCatalog(AbstractParsedStmt dummy, Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
             throws VoltCompilerException
     {
         assert node.name.equals("constraint");
@@ -1670,13 +1660,7 @@ public class DDLCompiler {
         String typeName = node.attributes.get("constrainttype");
         ConstraintType type = ConstraintType.valueOf(typeName);
 
-        if (type == ConstraintType.CHECK) {
-            String msg = "VoltDB does not enforce check constraints. ";
-            msg += "Constraint on table " + table.getTypeName() + " will be ignored.";
-            m_compiler.addWarn(msg);
-            return;
-        }
-        else if (type == ConstraintType.FOREIGN_KEY) {
+        if (type == ConstraintType.FOREIGN_KEY) {
             String msg = "VoltDB does not enforce foreign key references and constraints. ";
             msg += "Constraint on table " + table.getTypeName() + " will be ignored.";
             m_compiler.addWarn(msg);
@@ -1690,42 +1674,53 @@ public class DDLCompiler {
             // these get handled by table metadata inspection
             return;
         }
-        else if (type != ConstraintType.PRIMARY_KEY &&  type != ConstraintType.UNIQUE) {
+        else if (type != ConstraintType.PRIMARY_KEY &&  type != ConstraintType.UNIQUE && type != ConstraintType.CHECK) {
             throw m_compiler.new VoltCompilerException("Invalid constraint type '" + typeName + "'");
         }
 
-        // else, create the unique index below
-        // primary key code is in other places as well
-
-        // The constraint is backed by an index, therefore we need to create it
-        // TODO: We need to be able to use indexes for foreign keys. I am purposely
-        //       leaving those out right now because HSQLDB just makes too many of them.
         Constraint catalog_const = table.getConstraints().add(name);
-        String indexName = node.attributes.get("index");
-        assert(indexName != null);
-        // handle replacements from duplicate index pruning
-        if (indexReplacementMap.containsKey(indexName)) {
-            indexName = indexReplacementMap.get(indexName);
+
+        if (type == ConstraintType.CHECK) {
+            assert(node.children.size() == 1);
+            VoltXMLElement exprNode = node.children.get(0);
+            AbstractExpression expr = dummy.parseExpressionTree(exprNode);
+
+            expr.resolveForTable(table);
+            expr.finalizeValueTypes();
+
+            // Checking for the input check expression
+            catalog_const.setExpressionsjson(expr.toJSONString());
+        } else {
+            // else, create the unique index below
+            // primary key code is in other places as well
+            // The constraint is backed by an index, therefore we need to create it
+            String indexName = node.attributes.get("index");
+            assert(indexName != null);
+            // handle replacements from duplicate index pruning
+            if (indexReplacementMap.containsKey(indexName)) {
+                indexName = indexReplacementMap.get(indexName);
+            }
+
+            Index catalog_index = indexMap.get(indexName);
+
+            // TODO(xin): It seems that indexes have already been set up well, the next whole block is redundant.
+            // Remove them?
+            if (catalog_index != null) {
+                // if the constraint name contains index type hints, exercise them (giant hack)
+                String constraintNameNoCase = name.toLowerCase();
+                if (constraintNameNoCase.contains("tree"))
+                    catalog_index.setType(IndexType.BALANCED_TREE.getValue());
+                if (constraintNameNoCase.contains("hash"))
+                    catalog_index.setType(IndexType.HASH_TABLE.getValue());
+
+                catalog_const.setIndex(catalog_index);
+                catalog_index.setUnique(true);
+
+                boolean assumeUnique = Boolean.parseBoolean(node.attributes.get("assumeunique"));
+                catalog_index.setAssumeunique(assumeUnique);
+            }
         }
 
-        Index catalog_index = indexMap.get(indexName);
-
-        // TODO(xin): It seems that indexes have already been set up well, the next whole block is redundant.
-        // Remove them?
-        if (catalog_index != null) {
-            // if the constraint name contains index type hints, exercise them (giant hack)
-            String constraintNameNoCase = name.toLowerCase();
-            if (constraintNameNoCase.contains("tree"))
-                catalog_index.setType(IndexType.BALANCED_TREE.getValue());
-            if (constraintNameNoCase.contains("hash"))
-                catalog_index.setType(IndexType.HASH_TABLE.getValue());
-
-            catalog_const.setIndex(catalog_index);
-            catalog_index.setUnique(true);
-
-            boolean assumeUnique = Boolean.parseBoolean(node.attributes.get("assumeunique"));
-            catalog_index.setAssumeunique(assumeUnique);
-        }
         catalog_const.setType(type.getValue());
     }
 
