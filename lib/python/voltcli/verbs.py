@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2013 VoltDB Inc.
+# Copyright (C) 2008-2014 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -152,6 +152,7 @@ class CommandVerb(BaseVerb):
         # Allow the bundles to adjust options.
         for bundle in self.bundles:
             bundle.initialize(self)
+        self.add_options(cli.BooleanOption(None, '--dry-run', 'dryrun', None))
 
     def execute(self, runner):
         # Start the bundles, e.g. to create client a connection.
@@ -206,7 +207,7 @@ class PackageVerb(CommandVerb):
         self.set_defaults(description  = 'Create a runnable Python program package.',
                           baseverb     = True,
                           hideverb     = True,
-                          description2 = '''\
+                          description2 = '''
 The optional NAME argument(s) allow package generation for base commands other
 than the current one. If no NAME is provided the current base command is
 packaged.''')
@@ -256,8 +257,8 @@ class MultiVerb(CommandVerb):
                 usage = '%s %s' % (self.name, mod.name)
             rows.append((usage, mod.description))
         caption = '"%s" Command Variations' % self.name
-        description2 = utility.format_table(rows, caption = caption, separator = '  ')
-        self.set_defaults(description2 = description2.strip())
+        other_info = utility.format_table(rows, caption = caption, separator = '  ')
+        self.set_defaults(other_info = other_info.strip())
         args = [
             cli.StringArgument('modifier',
                                'command modifier (valid modifiers: %s)' % valid_modifiers)]
@@ -342,11 +343,12 @@ class VerbSpace(object):
     """
     Manages a collection of Verb objects that support a particular CLI interface.
     """
-    def __init__(self, name, version, description, VOLT, verbs):
+    def __init__(self, name, version, description, VOLT, scan_dirs, verbs):
         self.name        = name
         self.version     = version
         self.description = description.strip()
         self.VOLT        = VOLT
+        self.scan_dirs   = scan_dirs
         self.verbs       = verbs
         self.verb_names  = self.verbs.keys()
         self.verb_names.sort()
@@ -381,10 +383,9 @@ class JavaBundle(object):
     def stop(self, verb, runner):
         pass
 
-    def run_java(self, verb, runner, *args):
+    def run_java(self, verb, runner, *args, **kw):
         opts_override = verb.get_attr('java_opts_override', default = [])
-        kw = {}
-        runner.java.execute(self.java_class, opts_override, *args, **kw)
+        runner.java_execute(self.java_class, opts_override, *args, **kw)
 
 #===============================================================================
 class ServerBundle(JavaBundle):
@@ -394,13 +395,25 @@ class ServerBundle(JavaBundle):
     Supports needing catalog and live keyword option for rejoin.
     All other options are supported as common options.
     """
-    def __init__(self, subcommand, needs_catalog=True, supports_live=False, default_host=True, safemode_available=False):
+    def __init__(self, subcommand,
+                 needs_catalog=True,
+                 supports_live=False,
+                 default_host=True,
+                 safemode_available=False,
+                 supports_daemon=False,
+                 daemon_name=None,
+                 daemon_description=None,
+                 daemon_output=None):
         JavaBundle.__init__(self, 'org.voltdb.VoltDB')
         self.subcommand = subcommand
         self.needs_catalog = needs_catalog
         self.supports_live = supports_live
         self.default_host = default_host
         self.safemode_available = safemode_available
+        self.supports_daemon = supports_daemon
+        self.daemon_name = daemon_name
+        self.daemon_description = daemon_description
+        self.daemon_output = daemon_output
 
     def initialize(self, verb):
         JavaBundle.initialize(self, verb)
@@ -409,17 +422,24 @@ class ServerBundle(JavaBundle):
                              'specify the location of the deployment file',
                              default = None))
         if self.default_host:
-            verb.add_options(cli.StringOption('-H', '--host', 'host', 'HOST[:PORT] (default HOST=localhost, PORT=3021)', default = 'localhost:3021'))
+            verb.add_options(cli.StringOption('-H', '--host', 'host',
+                'HOST[:PORT] (default HOST=localhost, PORT=3021)',
+                default='localhost:3021'))
         else:
-            verb.add_options(cli.StringOption('-H', '--host', 'host', 'HOST[:PORT] host must be specified (default HOST=localhost, PORT=3021)'))
+            verb.add_options(cli.StringOption('-H', '--host', 'host',
+                'HOST[:PORT] host must be specified (default HOST=localhost, PORT=3021)'))
         if self.supports_live:
            verb.add_options(cli.BooleanOption('-b', '--blocking', 'block', 'perform a blocking rejoin'))
         if self.needs_catalog:
             verb.add_arguments(cli.PathArgument('catalog',
-                              'the application catalog jar file path'))
+                               'the application catalog jar file path'))
         # --safemode only used by recover server action.
         if self.safemode_available:
-           verb.add_options(cli.BooleanOption(None, '--safemode', 'safemode', None))
+            verb.add_options(cli.BooleanOption(None, '--safemode', 'safemode', None))
+        if self.supports_daemon:
+            verb.add_options(
+                cli.BooleanOption('-B', '--background', 'daemon',
+                                  'run the VoltDB server in the background (as a daemon process)'))
 
     def start(self, verb, runner):
         # Add appropriate server-ish Java options.
@@ -438,7 +458,7 @@ class ServerBundle(JavaBundle):
                 final_args = [self.subcommand]
             else:
                 final_args = ['live', self.subcommand]
-        else: 
+        else:
             final_args = [self.subcommand]
         if self.safemode_available:
             if runner.opts.safemode:
@@ -474,7 +494,17 @@ class ServerBundle(JavaBundle):
             final_args.extend(['externalinterface', runner.opts.externalinterface])
         if runner.args:
             final_args.extend(runner.args)
-        self.run_java(verb, runner, *final_args)
+        kwargs = {}
+        if self.supports_daemon and runner.opts.daemon:
+            # Provide a default description if not specified.
+            daemon_description = self.daemon_description
+            if daemon_description is None:
+                daemon_description = "VoltDB server"
+            # Initialize all the daemon-related keyword arguments.
+            runner.setup_daemon_kwargs(kwargs, name=self.daemon_name,
+                                               description=daemon_description,
+                                               output=self.daemon_output)
+        self.run_java(verb, runner, *final_args, **kwargs)
 
     def stop(self, verb, runner):
         pass
@@ -528,7 +558,7 @@ class BaseClientBundle(ConnectionBundle):
                     kwargs['password'] = runner.opts.password
             runner.client = FastSerializer(runner.opts.host.host, runner.opts.host.port, **kwargs)
         except Exception, e:
-            utility.abort('Client connection failed.', e)
+            utility.abort(e)
 
     def stop(self, verb, runner):
         runner.client.close()

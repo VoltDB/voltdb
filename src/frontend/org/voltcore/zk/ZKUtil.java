@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,7 +23,10 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayDeque;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Queue;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
@@ -511,5 +514,120 @@ public class ZKUtil {
             }
             zk.delete(dir, -1);
         } catch (KeeperException.NoNodeException ignore) {}
+    }
+
+    public static void asyncDeleteRecursively(ZooKeeper zk, String dirDN) throws KeeperException, InterruptedException {
+        Preconditions.checkArgument(
+                dirDN != null &&
+                ! dirDN.trim().isEmpty() &&
+                ! "/".equals(dirDN) &&
+                dirDN.startsWith("/")
+                );
+
+        int beforeSize = 0;
+        TreeSet<ListingNode> listing = new TreeSet<>();
+        listing.add(new ListingNode(0, dirDN));
+
+        Queue<Pair<ChildrenCallback,ListingNode>> callbacks = new ArrayDeque<>();
+        while (beforeSize < listing.size()) {
+
+            for (ListingNode node: listing) {
+                if (node.childCount == ListingNode.UNPROBED) {
+                    ChildrenCallback cb = new ChildrenCallback();
+                    zk.getChildren(node.node, false, cb, null);
+                    callbacks.offer(Pair.of(cb,node));
+                }
+            }
+
+            beforeSize = listing.size();
+
+            Iterator<Pair<ChildrenCallback,ListingNode>> itr = callbacks.iterator();
+            while (itr.hasNext()) {
+                Pair<ChildrenCallback,ListingNode> callbackPair = itr.next();
+                try {
+                    List<String> children = callbackPair.getFirst().getChildren();
+                    callbackPair.getSecond().childCount = children.size();
+                    for (String child: children) {
+                        listing.add(new ListingNode(callbackPair.getSecond(), child));
+                    }
+                } catch (KeeperException.NoNodeException ignoreIt) {
+                }
+                itr.remove();
+            }
+        }
+        // the last node is the root node (order implied in ListingNode.compareTo(other))
+        VoidCallback lastCallback = null;
+        Iterator<ListingNode> lnitr = listing.iterator();
+        while (lnitr.hasNext()) {
+            ListingNode node = lnitr.next();
+            lastCallback = new VoidCallback();
+            zk.delete(node.node, -1, lastCallback, null);
+            lnitr.remove();
+        }
+        try {
+            lastCallback.get();
+        } catch (KeeperException.NoNodeException ignoreIt) {
+        }
+    }
+
+    private final static class ListingNode implements Comparable<ListingNode> {
+        static final int UNPROBED = -1;
+
+        final int lvl;
+        final String node;
+        int childCount = UNPROBED;
+
+        ListingNode(int lvl, String node) {
+            this.lvl = lvl;
+            this.node = node;
+        }
+
+        ListingNode(ListingNode parent, String child) {
+            this.lvl = parent.lvl + 1;
+            this.node = joinZKPath(parent.node, child);
+        }
+
+        @Override
+        public int compareTo(ListingNode o) {
+            int cmp = o.lvl - lvl;
+            if (cmp == 0) {
+                cmp = node.compareTo(o.node);
+            }
+            return cmp;
+        }
+
+        @Override
+        public int hashCode() {
+            final int prime = 31;
+            int result = 1;
+            result = prime * result + lvl;
+            result = prime * result + ((node == null) ? 0 : node.hashCode());
+            return result;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj)
+                return true;
+            if (obj == null)
+                return false;
+            if (getClass() != obj.getClass())
+                return false;
+            ListingNode other = (ListingNode) obj;
+            if (lvl != other.lvl)
+                return false;
+            if (node == null) {
+                if (other.node != null)
+                    return false;
+            } else if (!node.equals(other.node))
+                return false;
+            return true;
+        }
+
+        @Override
+        public String toString() {
+            return "ListingNode [lvl=" + lvl + ", node=" + node
+                    + ", childCount=" + childCount + "]";
+        }
     }
 }

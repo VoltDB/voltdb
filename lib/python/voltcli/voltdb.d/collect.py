@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2013 VoltDB Inc.
+# Copyright (C) 2008-2014 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -57,4 +57,4 @@
 
 def collect(runner):
     runner.args.extend([runner.opts.voltdbroot, runner.opts.prefix, runner.opts.host, runner.opts.username, runner.opts.password, runner.opts.noprompt, runner.opts.dryrun, runner.opts.skipheapdump])
-    runner.java.execute('org.voltdb.utils.Collector', None, *runner.args)
+    runner.java_execute('org.voltdb.utils.Collector', None, *runner.args)

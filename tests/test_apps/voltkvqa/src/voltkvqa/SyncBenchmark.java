@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -34,10 +34,15 @@
 
 package voltkvqa;
 
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -48,10 +53,12 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ClientAffinityStats;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NullCallback;
+import org.voltdb.utils.MiscUtils;
 
 public class SyncBenchmark {
 
@@ -91,6 +98,16 @@ public class SyncBenchmark {
     final AtomicLong failedPuts = new AtomicLong(0);
     final AtomicLong rawPutData = new AtomicLong(0);
     final AtomicLong networkPutData = new AtomicLong(0);
+
+    // For retry connections
+    private final ExecutorService es = Executors.newCachedThreadPool(new ThreadFactory() {
+        @Override
+        public Thread newThread(Runnable arg0) {
+            Thread thread = new Thread(arg0, "Retry Connection");
+            thread.setDaemon(true);
+            return thread;
+        }
+    });
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -173,6 +190,14 @@ public class SyncBenchmark {
             // if the benchmark is still active
             if (benchmarkComplete.get() == false) {
                 System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
+                // setup for retry
+                final String server = MiscUtils.getHostnameColonPortString(hostname, port);
+                es.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        connectToOneServerWithRetry(server);
+                    }
+                });
             }
         }
     }
@@ -273,15 +298,22 @@ public class SyncBenchmark {
      * periodically during a benchmark.
      */
     public synchronized void printStatistics() {
-        ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
+        ClientStatsContext statscontext = periodicStatsContext.fetchAndResetBaseline();
+        ClientAffinityStats affinityStats = statscontext.getAggregateAffinityStats();
+        ClientStats stats = statscontext.getStats();
         long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
 
         System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
         System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
-        System.out.printf("Avg/95%% Latency %.2f/%dms\n", stats.getAverageLatency(),
+        System.out.printf("Avg/95%% Latency %.2f/%dms, ", stats.getAverageLatency(),
                 stats.kPercentileLatency(0.95));
+        System.out.printf("%d AW, %d AR, %d RRW, %d RRR\n",
+                affinityStats.getAffinityWrites(),
+                affinityStats.getAffinityReads(),
+                affinityStats.getRrWrites(),
+                affinityStats.getRrReads());
     }
 
     /**
@@ -358,7 +390,16 @@ public class SyncBenchmark {
         System.out.println(HORIZONTAL_RULE);
         System.out.println(stats.latencyHistoReport());
 
-        // 3. Write stats to file if requested
+        // 3. Affinity stats
+        System.out.print("\n" + HORIZONTAL_RULE);
+        System.out.println(" Client Affinity Statistics");
+        System.out.print(HORIZONTAL_RULE + "\n");
+        Map<Integer, ClientAffinityStats> affinityStats = fullStatsContext.fetch().getAffinityStats();
+        for (Entry<Integer, ClientAffinityStats> e : affinityStats.entrySet()) {
+            System.out.println(e.getValue());
+        }
+
+        // 4. Write stats to file if requested
         client.writeSummaryCSV(stats, config.statsfile);
     }
 

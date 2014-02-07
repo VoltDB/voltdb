@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -295,7 +295,7 @@ public class TestVoltTable extends TestCase {
          * Test the sync method
          */
         byte decompressedBytes[] = CompressionService
-                .decompressBytes(vt.getCompressedBytes());
+                .decompressBytes(TableCompressor.getCompressedTableBytes(vt));
         vt = PrivateVoltTableFactory.createVoltTableFromBuffer(
                 ByteBuffer.wrap(decompressedBytes), true);
         tempBuf = ByteBuffer.allocate(vt.getSerializedSize());
@@ -309,7 +309,7 @@ public class TestVoltTable extends TestCase {
          */
         vt = PrivateVoltTableFactory.createVoltTableFromBuffer(buf, true);
         decompressedBytes = CompressionService
-                .decompressBytes(vt.getCompressedBytes());
+                .decompressBytes(TableCompressor.getCompressedTableBytes(vt));
         vt = PrivateVoltTableFactory.createVoltTableFromBuffer(
                 ByteBuffer.wrap(decompressedBytes), true);
         tempBuf = ByteBuffer.allocate(vt.getSerializedSize());
@@ -321,7 +321,7 @@ public class TestVoltTable extends TestCase {
 
     public void testCompression() throws Exception {
         testResizedTable();
-        byte compressedBytes[] = t.getCompressedBytes();
+        byte compressedBytes[] = TableCompressor.getCompressedTableBytes(t);
 
         ByteBuffer tempBuf = ByteBuffer.allocate(t.getSerializedSize());
         t.flattenToBuffer(tempBuf);
@@ -329,7 +329,7 @@ public class TestVoltTable extends TestCase {
 
         assertTrue(uncompressedBytes.length > compressedBytes.length);
 
-        compressedBytes = t.getCompressedBytesAsync().get();
+        compressedBytes = TableCompressor.getCompressedTableBytesAsync(t).get();
         assertTrue(uncompressedBytes.length > compressedBytes.length);
 
         byte decompressedBytes[] = CompressionService
@@ -355,14 +355,14 @@ public class TestVoltTable extends TestCase {
         VoltTable tDirect = PrivateVoltTableFactory.createVoltTableFromBuffer(
                 copy, true);
 
-        byte compressedBytes[] = tDirect.getCompressedBytes();
+        byte compressedBytes[] = TableCompressor.getCompressedTableBytes(tDirect);
 
         ByteBuffer tempBuf = ByteBuffer.allocate(t.getSerializedSize());
         t.flattenToBuffer(tempBuf);
         byte uncompressedBytes[] = tempBuf.array().clone();
         assertTrue(uncompressedBytes.length > compressedBytes.length);
 
-        compressedBytes = tDirect.getCompressedBytesAsync().get();
+        compressedBytes = TableCompressor.getCompressedTableBytesAsync(tDirect).get();
         assertTrue(uncompressedBytes.length > compressedBytes.length);
 
         byte decompressedBytes[] = CompressionService

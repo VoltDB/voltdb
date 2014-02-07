@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,9 +22,9 @@ namespace voltdb {
 CopyOnWriteIterator::CopyOnWriteIterator(
         PersistentTable *table,
         PersistentTableSurgeon *surgeon,
-        TBMapI start,
-        TBMapI end) :
-        m_table(table), m_surgeon(surgeon), m_blockIterator(start), m_end(end),
+        TBMap blocks) :
+        m_table(table), m_surgeon(surgeon), m_blocks(blocks),
+        m_blockIterator(m_blocks.begin()), m_end(m_blocks.end()),
         m_tupleLength(table->getTupleLength()),
         m_location(NULL),
         m_blockOffset(0),
@@ -34,7 +34,6 @@ CopyOnWriteIterator::CopyOnWriteIterator(
         m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, m_blockIterator.data());
         m_location = m_blockIterator.key();
         m_currentBlock = m_blockIterator.data();
-        m_blockIterator.data() = TBPtr();
         m_blockIterator++;
     }
     m_blockOffset = 0;
@@ -55,12 +54,23 @@ bool CopyOnWriteIterator::next(TableTuple &out) {
                 break;
             }
             m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, m_blockIterator.data());
+
+            char *finishedBlock = m_currentBlock->address();
+
             m_location = m_blockIterator.key();
             m_currentBlock = m_blockIterator.data();
             assert(m_currentBlock->address() == m_location);
-            m_blockIterator.data() = TBPtr();
             m_blockOffset = 0;
-            m_blockIterator++;
+
+            // Remove the finished block from the map so that it can be released
+            // back to the OS if all tuples in the block is deleted.
+            //
+            // This invalidates the iterators, so we have to get new iterators
+            // using the current block's start address. m_blockIterator has to
+            // point to the next block, hence the upper_bound() call.
+            m_blocks.erase(finishedBlock);
+            m_blockIterator = m_blocks.upper_bound(m_currentBlock->address());
+            m_end = m_blocks.end();
         }
         assert(m_location < m_currentBlock.get()->address() + m_table->getTableAllocationSize());
         assert(m_location < m_currentBlock.get()->address() + (m_table->getTupleLength() * m_table->getTuplesPerBlock()));

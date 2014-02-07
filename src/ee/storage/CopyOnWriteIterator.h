@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -34,8 +34,7 @@ public:
     CopyOnWriteIterator(
         PersistentTable *table,
         PersistentTableSurgeon *surgeon,
-        TBMapI start,
-        TBMapI end);
+        TBMap blocks);
 
     /**
      * When a tuple is "dirty" it is still active, but will never be a "found" tuple
@@ -80,6 +79,7 @@ private:
     /**
      * Index of the current block being iterated over
      */
+    TBMap m_blocks;
     TBMapI m_blockIterator;
     TBMapI m_end;
 

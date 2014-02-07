@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -622,40 +622,28 @@ SnapshotCompletionInterest
                 // If cmdlogmap is null, there were no command log segments, so all snapshots are potentially valid,
                 // don't do any TXN ID consistency checking between command log and snapshot
                 if (cmdlogmap != null) {
-                    if (snapmap == null || cmdlogmap.size() != snapmap.size()) {
-                        m_snapshotLogStr.append("\nRejected snapshot ")
-                                        .append(info.nonce)
-                                        .append(" due to mismatching partition count")
-                                        .append(" command log count: ")
-                                        .append(cmdlogmap.size())
-                                        .append(", snapshot count: ")
-                                        .append(snapmap.size());
-                        info = null;
-                    }
-                    else {
-                        for (Integer cmdpart : cmdlogmap.keySet()) {
-                            Long snaptxnId = snapmap.get(cmdpart);
-                            if (snaptxnId == null) {
-                                m_snapshotLogStr.append("\nRejected snapshot ")
-                                                .append(info.nonce)
-                                                .append(" due to missing partition: ")
-                                                .append(cmdpart);
-                                info = null;
-                                break;
-                            }
-                            else if (snaptxnId < cmdlogmap.get(cmdpart)) {
-                                m_snapshotLogStr.append("\nRejected snapshot ")
-                                                .append(info.nonce)
-                                                .append(" because it does not overlap the command log")
-                                                .append("for partition: ")
-                                                .append(cmdpart)
-                                                .append(" command log txn ID: ")
-                                                .append(cmdlogmap.get(cmdpart))
-                                                .append(" snapshot txn ID: ")
-                                                .append(snaptxnId);
-                                info = null;
-                                break;
-                            }
+                    for (Integer cmdpart : cmdlogmap.keySet()) {
+                        Long snaptxnId = snapmap.get(cmdpart);
+                        if (snaptxnId == null) {
+                            m_snapshotLogStr.append("\nRejected snapshot ")
+                                            .append(info.nonce)
+                                            .append(" due to missing partition: ")
+                                            .append(cmdpart);
+                            info = null;
+                            break;
+                        }
+                        else if (snaptxnId < cmdlogmap.get(cmdpart)) {
+                            m_snapshotLogStr.append("\nRejected snapshot ")
+                                            .append(info.nonce)
+                                            .append(" because it does not overlap the command log")
+                                            .append("for partition: ")
+                                            .append(cmdpart)
+                                            .append(" command log txn ID: ")
+                                            .append(cmdlogmap.get(cmdpart))
+                                            .append(" snapshot txn ID: ")
+                                            .append(snaptxnId);
+                            info = null;
+                            break;
                         }
                     }
                 }

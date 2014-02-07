@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,10 +17,14 @@
 
 package org.voltdb.planner.parseinfo;
 
+import java.util.List;
+
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.types.JoinType;
 
 public class SubqueryLeafNode extends JoinNode{
+
+    private final StmtSubqueryScan m_subqueryScan;
 
     /**
      * Construct a subquery node
@@ -30,11 +34,13 @@ public class SubqueryLeafNode extends JoinNode{
      * @param whereExpr - filter expression
      * @param id - node id
      */
-    public SubqueryLeafNode(int id, int tableAliasIdx, AbstractExpression joinExpr, AbstractExpression  whereExpr) {
+    public SubqueryLeafNode(int id, int tableAliasIdx,
+            AbstractExpression joinExpr, AbstractExpression  whereExpr, StmtSubqueryScan scan) {
         super(id, JoinType.INNER, NodeType.SUBQUERY);
         m_tableAliasIndex = tableAliasIdx;
         m_joinExpr = joinExpr;
         m_whereExpr = whereExpr;
+        m_subqueryScan = scan;
         assert(m_tableAliasIndex != StmtTableScan.NULL_ALIAS_INDEX);
     }
 
@@ -47,7 +53,15 @@ public class SubqueryLeafNode extends JoinNode{
                 (AbstractExpression) m_joinExpr.clone() : null;
         AbstractExpression whereExpr = (m_whereExpr != null) ?
                 (AbstractExpression) m_whereExpr.clone() : null;
-        JoinNode newNode = new SubqueryLeafNode(m_id, m_tableAliasIndex, joinExpr, whereExpr);
+        JoinNode newNode = new SubqueryLeafNode(m_id, m_tableAliasIndex,
+                joinExpr, whereExpr, m_subqueryScan);
+        return newNode;
+    }
+
+    @Override
+    public JoinNode cloneWithoutFilters() {
+        JoinNode newNode = new SubqueryLeafNode(m_id, m_tableAliasIndex,
+                null, null, m_subqueryScan);
         return newNode;
     }
 
@@ -57,4 +71,10 @@ public class SubqueryLeafNode extends JoinNode{
         return m_tableAliasIndex;
     }
 
+    @Override
+    public void extractSubQueries(List<StmtSubqueryScan> subQueries) {
+        subQueries.add(m_subqueryScan);
+    }
+
+    public StmtSubqueryScan getSubqueryScan() { return m_subqueryScan; }
 }

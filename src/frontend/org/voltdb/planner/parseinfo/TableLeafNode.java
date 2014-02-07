@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -48,6 +48,12 @@ public class TableLeafNode extends JoinNode {
         AbstractExpression whereExpr = (m_whereExpr != null) ?
                 (AbstractExpression) m_whereExpr.clone() : null;
         JoinNode newNode = new TableLeafNode(m_id, m_tableAliasIndex, joinExpr, whereExpr);
+        return newNode;
+    }
+
+    @Override
+    public JoinNode cloneWithoutFilters() {
+        JoinNode newNode = new TableLeafNode(m_id, m_tableAliasIndex, null, null);
         return newNode;
     }
 

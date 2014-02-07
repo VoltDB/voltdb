@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -35,9 +35,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.network.ReverseDNSCache;
-import org.voltdb.ClientInterface;
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.messaging.FastSerializer;
+import org.voltdb.common.Constants;
+import org.voltdb.utils.SerializationHelper;
 
 /**
  * A utility class for opening a connection to a Volt server and authenticating as well
@@ -119,24 +119,6 @@ public class ConnectionUtil {
         return getAuthenticatedConnection("database", host, username, hashedPassword, port);
     }
 
-    /**
-     * Create a connection to a Volt server for export and authenticate the connection.
-     * @param host
-     * @param username
-     * @param password
-     * @param port
-     * @throws IOException
-     * @returns An array of objects. The first is an
-     * authenticated socket channel, the second. is an array of 4 longs -
-     * Integer hostId, Long connectionId, Long timestamp (part of instanceId), Int leaderAddress (part of instanceId).
-     * The last object is the build string
-     */
-    public static Object[] getAuthenticatedExportConnection(InetSocketAddress address,
-            String username, byte[] hashedPassword) throws IOException
-            {
-        return getAuthenticatedConnection("export", address, username, hashedPassword);
-            }
-
     private static Object[] getAuthenticatedConnection(
             String service, String host, String username, byte[] hashedPassword, int port)
     throws IOException {
@@ -167,19 +149,26 @@ public class ConnectionUtil {
              */
             aChannel.configureBlocking(true);
             aChannel.socket().setTcpNoDelay(true);
-            FastSerializer fs = new FastSerializer();
-            fs.writeInt(0);             // placeholder for length
-            fs.writeByte(0);            // version
-            fs.writeString(service);    // data service (export|database)
-            fs.writeString(username);
-            fs.write(hashedPassword);
-            final ByteBuffer fsBuffer = fs.getBuffer();
-            final ByteBuffer b = ByteBuffer.allocate(fsBuffer.remaining());
-            b.put(fsBuffer);
-            final int size = fsBuffer.limit() - 4;
+
+            // encode strings
+            byte[] serviceBytes = service == null ? null : service.getBytes(Constants.UTF8ENCODING);
+            byte[] usernameBytes = username == null ? null : username.getBytes(Constants.UTF8ENCODING);
+
+            // get the length of the data to serialize
+            int requestSize = 4 + 1;
+            requestSize += serviceBytes == null ? 4 : 4 + serviceBytes.length;
+            requestSize += usernameBytes == null ? 4 : 4 + usernameBytes.length;
+            requestSize += hashedPassword.length;
+
+            ByteBuffer b = ByteBuffer.allocate(requestSize);
+
+            // serialize it
+            b.putInt(requestSize - 4);                            // length prefix
+            b.put((byte) 0);                                      // version
+            SerializationHelper.writeVarbinary(serviceBytes, b);  // data service (export|database)
+            SerializationHelper.writeVarbinary(usernameBytes, b);
+            b.put(hashedPassword);
             b.flip();
-            b.putInt(size);
-            b.position(0);
 
             boolean successfulWrite = false;
             IOException writeException = null;
@@ -233,16 +222,16 @@ public class ConnectionUtil {
             if (loginResponseCode != 0) {
                 aChannel.close();
                 switch (loginResponseCode) {
-                case ClientInterface.MAX_CONNECTIONS_LIMIT_ERROR:
+                case Constants.MAX_CONNECTIONS_LIMIT_ERROR:
                     throw new IOException("Server has too many connections");
-                case ClientInterface.WIRE_PROTOCOL_TIMEOUT_ERROR:
+                case Constants.WIRE_PROTOCOL_TIMEOUT_ERROR:
                     throw new IOException("Connection timed out during authentication. " +
                     "The VoltDB server may be overloaded.");
-                case ClientInterface.EXPORT_DISABLED_REJECTION:
+                case Constants.EXPORT_DISABLED_REJECTION:
                     throw new IOException("Export not enabled for server");
-                case ClientInterface.WIRE_PROTOCOL_FORMAT_ERROR:
+                case Constants.WIRE_PROTOCOL_FORMAT_ERROR:
                     throw new IOException("Wire protocol format violation error");
-                case ClientInterface.AUTHENTICATION_FAILURE_DUE_TO_REJOIN:
+                case Constants.AUTHENTICATION_FAILURE_DUE_TO_REJOIN:
                     throw new IOException("Failed to authenticate to rejoining node");
                 default:
                     throw new IOException("Authentication rejected");

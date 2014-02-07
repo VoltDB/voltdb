@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -120,14 +120,6 @@ public interface ClientResponse {
      * @return A message or <code>null</code> if there is none.
      */
     public String getAppStatusString();
-
-    /**
-     * Get the <code>Exception</code> that caused the stored procedure to fail and roll back.
-     * There is no guarantee that an <code>Exception</code> will be provided.
-     * @return The <code>Exception</code> that caused the procedure to fail if it is available or <code>null</code>
-     *         if none was provided in the response.
-     */
-    public Exception getException();
 
     /**
      * Get an estimate of the amount of time it took for the database

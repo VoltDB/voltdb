@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.util.List;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -110,16 +111,19 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     m_whoami);
             m_term.start();
             while (!success) {
-                RepairAlgo repair = null;
-                repair = createPromoteAlgo(m_term.getInterestingHSIds(),
-                        m_initiatorMailbox, m_whoami);
+                final RepairAlgo repair =
+                        m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami);
 
-                m_initiatorMailbox.setRepairAlgo(repair);
                 // term syslogs the start of leader promotion.
-                Pair<Boolean, Long> result = repair.start().get();
-                success = result.getFirst();
+                Long txnid = Long.MIN_VALUE;
+                try {
+                    txnid = repair.start().get();
+                    success = true;
+                } catch (CancellationException e) {
+                    success = false;
+                }
                 if (success) {
-                    m_initiatorMailbox.setLeaderState(result.getSecond());
+                    m_initiatorMailbox.setLeaderState(txnid);
                     List<Iv2InitiateTaskMessage> restartTxns = ((MpPromoteAlgo)repair).getInterruptedTxns();
                     if (!restartTxns.isEmpty()) {
                         // Should only be one restarting MP txn
@@ -133,7 +137,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                             tmLog.fatal("This node will fail.  Please contact VoltDB support with your cluster's " +
                                     "log files.");
                             m_initiatorMailbox.send(
-                                    com.google_voltpatches.common.primitives.Longs.toArray(m_term.getInterestingHSIds()),
+                                    com.google_voltpatches.common.primitives.Longs.toArray(m_term.getInterestingHSIds().get()),
                                     new DumpMessage());
                             throw new RuntimeException("Failing promoted MPI node with unresolvable repair condition.");
                         }
@@ -180,13 +184,6 @@ public class MpInitiator extends BaseInitiator implements Promotable
             String whoami)
     {
         return new MpTerm(zk, initiatorHSId, mailbox, whoami);
-    }
-
-    @Override
-    public RepairAlgo createPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
-            String whoami)
-    {
-        return new MpPromoteAlgo(m_term.getInterestingHSIds(), m_initiatorMailbox, m_whoami);
     }
 
     /**

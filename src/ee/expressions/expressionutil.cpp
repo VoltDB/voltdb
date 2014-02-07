@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -338,7 +338,6 @@ tupleValueFactory(PlannerDomValue obj, ExpressionType et,
 {
     // read the tuple value expression specific data
     int columnIndex = obj.valueForKey("COLUMN_IDX").asInt();
-    std::string tableName = obj.valueForKey("TABLE_NAME").asStr();
     int tableIdx = 0;
     if (obj.hasNonNullKey("TABLE_IDX")) {
         tableIdx = obj.valueForKey("TABLE_IDX").asInt();
@@ -347,8 +346,12 @@ tupleValueFactory(PlannerDomValue obj, ExpressionType et,
     // verify input
     if (columnIndex < 0) {
         char message[100]; // enough to hold all numbers up to 64-bits
-        snprintf(message, 100, "tupleValueFactory: invalid column_idx %d for table %s",
-                columnIndex, tableName.c_str());
+        std::string tableName = "";
+        if (tableIdx != 0) {
+            // join inner table
+            tableName = " inner";
+        }
+        snprintf(message, 100, "tupleValueFactory: invalid column_idx %d for%s table", columnIndex, tableName.c_str());
 
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                 std::string(message));

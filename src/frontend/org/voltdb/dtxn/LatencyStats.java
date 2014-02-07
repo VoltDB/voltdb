@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -138,7 +138,8 @@ public class LatencyStats extends SiteStatsSource {
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval)
     {
         m_totals = new LatencyInfo();
-        for (ClientInterface ci : VoltDB.instance().getClientInterfaces()) {
+        ClientInterface ci = VoltDB.instance().getClientInterface();
+        if (ci != null) {
             List<LatencyInfo> thisci = ci.getLatencyStats();
             for (LatencyInfo info : thisci) {
                 m_totals.mergeLatencyInfo(info);

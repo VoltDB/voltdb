@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -53,7 +53,7 @@ public interface RepairAlgo
      * leadership has been fully assumed and all surviving replicas have been
      * repaired.
      */
-    public Future<Pair<Boolean, Long>> start();
+    public Future<Long> start();
 
     public boolean cancel();
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,6 +16,7 @@
  */
 
 package org.voltdb;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
@@ -23,9 +24,9 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.exceptions.SerializableException;
-import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.utils.MiscUtils;
+import org.voltdb.client.ClientUtils;
+import org.voltdb.common.Constants;
+import org.voltdb.utils.SerializationHelper;
 
 /**
  * Packages up the data to be sent back to the client as a stored
@@ -45,7 +46,6 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
 
     private int clusterRoundTripTime = 0;
     private int clientRoundTripTime = 0;
-    private SerializableException m_exception = null;
 
     // JSON KEYS FOR SERIALIZATION
     static final String JSON_STATUS_KEY = "status";
@@ -69,48 +69,27 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
      * Used in the successful procedure invocation case.
      */
     public ClientResponseImpl(byte status, byte appStatus, String appStatusString, VoltTable[] results, String statusString) {
-        this(status, appStatus, appStatusString, results, statusString, -1, null);
+        this(status, appStatus, appStatusString, results, statusString, -1);
     }
 
     /**
      * Constructor used for tests and error responses.
      */
     public ClientResponseImpl(byte status, VoltTable[] results, String statusString) {
-        this(status, ClientResponse.UNINITIALIZED_APP_STATUS_CODE, null, results, statusString, -1, null);
+        this(status, ClientResponse.UNINITIALIZED_APP_STATUS_CODE, null, results, statusString, -1);
     }
 
     /**
      * Another constructor for test and error responses
      */
     public ClientResponseImpl(byte status, VoltTable[] results, String statusString, long handle) {
-        this(status, ClientResponse.UNINITIALIZED_APP_STATUS_CODE, null, results, statusString, handle, null);
+        this(status, ClientResponse.UNINITIALIZED_APP_STATUS_CODE, null, results, statusString, handle);
     }
 
-    /**
-     * And another....
-     * @param status
-     * @param results
-     * @param e
-     */
-    public ClientResponseImpl(byte status, VoltTable[] results, String statusString, SerializableException e) {
-        this(status, ClientResponse.UNINITIALIZED_APP_STATUS_CODE, null, results, statusString, -1, e);
-    }
-
-    /**
-     * Use this when generating an error response in VoltProcedure
-     * @param status
-     * @param results
-     * @param extra
-     * @param e
-     */
-    public ClientResponseImpl(byte status, byte appStatus, String appStatusString, VoltTable results[], String extra, SerializableException e) {
-        this(status, appStatus, appStatusString, results, extra, -1, e);
-    }
-
-    ClientResponseImpl(byte status, byte appStatus, String appStatusString, VoltTable[] results, String statusString, long handle, SerializableException e) {
+    ClientResponseImpl(byte status, byte appStatus, String appStatusString, VoltTable[] results, String statusString, long handle) {
         this.appStatus = appStatus;
         this.appStatusString = appStatusString;
-        setResults(status, results, statusString, e);
+        setResults(status, results, statusString);
         clientHandle = handle;
     }
 
@@ -126,11 +105,6 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         this.results = results;
         this.statusString = statusString;
         this.setProperly = true;
-    }
-
-    private void setResults(byte status, VoltTable[] results, String extra, SerializableException e) {
-        m_exception = e;
-        setResults(status, results, extra);
     }
 
     public void setHash(Integer hash) {
@@ -164,45 +138,37 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         return m_hash;
     }
 
-    @Override
-    public SerializableException getException() {
-        return m_exception;
-    }
-
     public void initFromBuffer(ByteBuffer buf) throws IOException {
-        FastDeserializer in = new FastDeserializer(buf);
-        in.readByte();//Skip version byte
-        clientHandle = in.readLong();
-        byte presentFields = in.readByte();
-        status = in.readByte();
+        buf.get();//Skip version byte
+        clientHandle = buf.getLong();
+        byte presentFields = buf.get();
+        status = buf.get();
         if ((presentFields & (1 << 5)) != 0) {
-            statusString = in.readString();
+            statusString = SerializationHelper.getString(buf);
         } else {
             statusString = null;
         }
-        appStatus = in.readByte();
+        appStatus = buf.get();
         if ((presentFields & (1 << 7)) != 0) {
-            appStatusString = in.readString();
+            appStatusString = SerializationHelper.getString(buf);
         } else {
             appStatusString = null;
         }
-        clusterRoundTripTime = in.readInt();
+        clusterRoundTripTime = buf.getInt();
         if ((presentFields & (1 << 6)) != 0) {
-            m_exception = SerializableException.deserializeFromBuffer(in.buffer());
-        } else {
-            m_exception = null;
+            throw new RuntimeException("Use of deprecated exception in Client Response serialization.");
         }
         if ((presentFields & (1 << 4)) != 0) {
-            m_hash = in.readInt();
+            m_hash = buf.getInt();
         } else {
             m_hash = null;
         }
-        int tableCount = in.readShort();
+        int tableCount = buf.getShort();
         results = new VoltTable[tableCount];
         for (int i = 0; i < tableCount; i++) {
-            int tableSize = in.readInt();
+            int tableSize = buf.getInt();
             byte[] bytes = new byte[tableSize];
-            in.readFully(bytes);
+            buf.get(bytes);
             ByteBuffer tempBuf = ByteBuffer.wrap(bytes);
             results[i] = new VoltTable(tempBuf, false);
         }
@@ -217,27 +183,22 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             + 1 // app status
             + 4 // cluster roundtrip time
             + 2; // number of result tables
-        try {
-            if (appStatusString != null) {
-                encodedAppStatusString = appStatusString.getBytes("UTF-8");
-                msgsize += encodedAppStatusString.length + 4;
-            }
-            if (statusString != null) {
-                encodedStatusString = statusString.getBytes("UTF-8");
-                msgsize += encodedStatusString.length + 4;
-            }
-            if (m_exception != null) {
-                msgsize += m_exception.getSerializedSize();
-            }
-            if (m_hash != null) {
-                msgsize += 4;
-            }
-            for (VoltTable vt : results) {
-                msgsize += vt.getSerializedSize();
-            }
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Error serializing client response", false, e);
+
+        if (appStatusString != null) {
+            encodedAppStatusString = appStatusString.getBytes(Constants.UTF8ENCODING);
+            msgsize += encodedAppStatusString.length + 4;
         }
+        if (statusString != null) {
+            encodedStatusString = statusString.getBytes(Constants.UTF8ENCODING);
+            msgsize += encodedStatusString.length + 4;
+        }
+        if (m_hash != null) {
+            msgsize += 4;
+        }
+        for (VoltTable vt : results) {
+            msgsize += vt.getSerializedSize();
+        }
+
         return msgsize;
     }
 
@@ -251,9 +212,6 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         byte presentFields = 0;
         if (appStatusString != null) {
             presentFields |= 1 << 7;
-        }
-        if (m_exception != null) {
-            presentFields |= 1 << 6;
         }
         if (statusString != null) {
             presentFields |= 1 << 5;
@@ -273,11 +231,6 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             buf.put(encodedAppStatusString);
         }
         buf.putInt(clusterRoundTripTime);
-        if (m_exception != null) {
-            final ByteBuffer b = ByteBuffer.allocate(m_exception.getSerializedSize());
-            m_exception.serializeToBuffer(b);
-            buf.put(b.array());
-        }
         if (m_hash != null) {
             buf.putInt(m_hash.intValue());
         }
@@ -339,13 +292,6 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             js.value(statusString);
             js.key(JSON_APPSTATUSSTRING_KEY);
             js.value(appStatusString);
-            js.key(JSON_EXCEPTION_KEY);
-            if (m_exception != null) {
-                js.value(m_exception);
-            }
-            else {
-                js.value(null);
-            }
             js.key(JSON_RESULTS_KEY);
             js.array();
             for (VoltTable o : results) {
@@ -369,7 +315,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         try {
             long cheesyChecksum = 0;
             for (int i = 0; i < results.length; ++i) {
-                cheesyChecksum += MiscUtils.cheesyBufferCheckSum(results[i].m_buffer);
+                cheesyChecksum += ClientUtils.cheesyBufferCheckSum(results[i].m_buffer);
             }
             return (int)cheesyChecksum;
         } catch (Exception e) {

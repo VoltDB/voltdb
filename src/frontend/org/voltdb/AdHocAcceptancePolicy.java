@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -33,17 +33,16 @@ public class AdHocAcceptancePolicy extends InvocationAcceptancePolicy {
             StoredProcedureInvocation invocation,
             Procedure sysProc) {
 
-        if (!invocation.procName.equals("@AdHoc")) {
+        if ( ! invocation.procName.equals("@AdHoc") &&
+             ! invocation.procName.equals("@AdHocSpForTest")) {
             return null;
         }
 
         ParameterSet params = invocation.getParams();
         // Make sure there is at least 1 parameter!  ENG-4921
-        // Note the second secret param, so 1 or 2 params is legal.
-        if (params.toArray().length < 1 || params.toArray().length > 2) {
+        if (params.toArray().length < 1) {
             return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                    new VoltTable[0], "Adhoc system procedure requires exactly one or two parameters, " +
-                    "the SQL statement to execute with an optional partitioning value.",
+                    new VoltTable[0], "Adhoc system procedure requires at least the query parameter.",
                     invocation.clientHandle);
         }
 
@@ -51,7 +50,7 @@ public class AdHocAcceptancePolicy extends InvocationAcceptancePolicy {
         if ((params.toArray()[0] instanceof String) == false) {
             return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
                     new VoltTable[0],
-                    "Adhoc system procedure requires sql in the String type only.",
+                    "Adhoc system procedure requires the query parameter to be of String type.",
                     invocation.clientHandle);
         }
 

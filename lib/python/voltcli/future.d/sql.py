@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2013 VoltDB Inc.
+# Copyright (C) 2008-2014 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -63,4 +63,4 @@ def sql(runner):
         args.append('--output-skip-metadata')
     if runner.opts.exception_stacks:
         args.append('--debug')
-    runner.java.execute('org.voltdb.utils.SQLCommand', None, *args)
+    runner.java_execute('org.voltdb.utils.SQLCommand', None, *args)

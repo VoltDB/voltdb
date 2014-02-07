@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -49,12 +49,16 @@
 #include <string>
 #include <vector>
 #include <cassert>
+#include <iostream>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include "common/types.h"
 #include "common/ids.h"
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
+#include "execution/VoltDBEngine.h"
+#include "storage/CopyOnWriteIterator.h"
+#include "storage/ElasticIndex.h"
 #include "storage/table.h"
 #include "storage/TupleStreamWrapper.h"
 #include "storage/TableStats.h"
@@ -88,6 +92,7 @@ class RecoveryProtoMsg;
 class TupleOutputStreamProcessor;
 class ReferenceSerializeInput;
 class PersistentTable;
+class TableCatalogDelegate;
 
 /**
  * Interface used by contexts, scanners, iterators, and undo actions to access
@@ -109,6 +114,7 @@ public:
     void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
     void deleteTupleRelease(char* tuple);
     void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
+
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock);
     uint32_t getTupleCount() const;
 
@@ -136,6 +142,8 @@ public:
     boost::shared_ptr<ElasticIndexTupleRangeIterator>
             getIndexTupleRangeIterator(const ElasticIndexHashRange &range);
     void activateSnapshot();
+    void printIndex(std::ostream &os, int32_t limit) const;
+    ElasticHash generateTupleHash(TableTuple &tuple) const;
 
 private:
 
@@ -228,6 +236,8 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
     virtual void deleteAllTuples(bool freeAllocatedStrings);
+
+    virtual void truncateTable(VoltDBEngine* engine);
     // The fallible flag is used to denote a change to a persistent table
     // which is part of a long transaction that has been vetted and can
     // never fail (e.g. violate a constraint).
@@ -282,7 +292,17 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     std::string tableType() const;
     virtual std::string debug();
 
+    /*
+     * Find the block a tuple belongs to. Returns TBPtr(NULL) if no block is found.
+     */
+    static TBPtr findBlock(char *tuple, TBMap &blocks, int blockSize);
+
     int partitionColumn() const { return m_partitionColumn; }
+
+    std::vector<MaterializedViewMetadata *> views() const {
+        return m_views;
+    }
+
     /** inlined here because it can't be inlined in base Table, as it
      *  uses Tuple.copy.
      */
@@ -365,6 +385,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     virtual int64_t validatePartitioning(TheHashinator *hashinator, int32_t partitionId);
 
+    void truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable);
+    void truncateTableRelease(PersistentTable *originalTable);
+
   private:
 
     /**
@@ -436,9 +459,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
      * In the memcheck build it will return the storage to the heap.
      */
     void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
-
-    // helper for deleteTupleStorage
-    TBPtr findBlock(char *tuple);
 
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom
@@ -583,6 +603,15 @@ inline void PersistentTableSurgeon::clearIndex() {
     m_indexingComplete = false;
 }
 
+inline void PersistentTableSurgeon::printIndex(std::ostream &os, int32_t limit) const {
+    assert (m_index != NULL);
+    m_index->printKeys(os,limit,m_table.m_schema,m_table);
+}
+
+inline ElasticHash PersistentTableSurgeon::generateTupleHash(TableTuple &tuple) const {
+    return tuple.getNValue(m_table.partitionColumn()).murmurHash3();
+}
+
 inline bool PersistentTableSurgeon::indexHas(TableTuple &tuple) const {
     assert (m_index != NULL);
     return m_index->has(m_table, tuple);
@@ -685,7 +714,10 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
     }
 
     if (block.get() == NULL) {
-       block = findBlock(tuple.address());
+        block = findBlock(tuple.address(), m_data, m_tableAllocationSize);
+        if (block.get() == NULL) {
+            throwFatalException("Tried to find a tuple block for a tuple but couldn't find one");
+        }
     }
 
     bool transitioningToBlockWithSpace = !block->hasFreeTuples();
@@ -717,25 +749,26 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
     }
 }
 
-inline TBPtr PersistentTable::findBlock(char *tuple) {
-    TBMapI i = m_data.lower_bound(tuple);
-    if (i == m_data.end() && m_data.empty()) {
-        throwFatalException("Tried to find a tuple block for a tuple but couldn't find one");
-    }
-    if (i == m_data.end()) {
-        i--;
-        if (i.key() + m_tableAllocationSize < tuple) {
-            throwFatalException("Tried to find a tuple block for a tuple but couldn't find one");
-        }
-    } else {
-        if (i.key() != tuple) {
+inline TBPtr PersistentTable::findBlock(char *tuple, TBMap &blocks, int blockSize) {
+    if (!blocks.empty()) {
+        TBMapI i = blocks.lower_bound(tuple);
+
+        // Not the first tuple of any known block, move back a block, see if it
+        // belongs to the previous block
+        if (i == blocks.end() || i.key() != tuple) {
             i--;
-            if (i.key() + m_tableAllocationSize < tuple) {
-                throwFatalException("Tried to find a tuple block for a tuple but couldn't find one");
+        }
+
+        // If the tuple is within the block boundaries, we found the block
+        if (i.key() <= tuple && tuple < i.key() + blockSize) {
+            if (i.data().get() == NULL) {
+                throwFatalException("A block has gone missing in the tuple block map.");
             }
+            return i.data();
         }
     }
-    return i.data();
+
+    return TBPtr(NULL);
 }
 
 inline TBPtr PersistentTable::allocateNextBlock() {

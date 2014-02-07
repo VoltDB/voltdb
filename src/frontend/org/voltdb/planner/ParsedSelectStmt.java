@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -287,7 +287,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (columns != null) {
                 mvNewScanColumns.addAll(columns);
             }
-            if (mvFixInfo.processMVBasedQueryFix(mvTableScan, mvNewScanColumns, joinTree, displayColumns(), groupByColumns())) {
+            // ENG-5669: HAVING aggregation and order by aggregation also need to be checked.
+            if (mvFixInfo.processMVBasedQueryFix(mvTableScan, mvNewScanColumns, joinTree, aggResultColumns, groupByColumns())) {
                 break;
             }
         }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,6 +16,8 @@
  */
 
 package org.voltdb;
+
+import org.voltdb.common.Constants;
 
 
 /**
@@ -53,5 +55,22 @@ public class SQLStmtAdHocHelper {
                 aggFragId, aggPlanHash, isAggTransactional,
                 collectorFragId, collectorPlanHash, isCollectorTransactional,
                 isReplicatedTableDML, isReadOnly, params, site);
+    }
+
+    public static byte[] getSQLBytes(SQLStmt sqlStmt) {
+        if (sqlStmt.sqlText == null) {
+            sqlStmt.sqlText = sqlStmt.sqlTextStr.getBytes(Constants.UTF8ENCODING);
+        }
+        return sqlStmt.sqlText;
+    }
+
+    public static void setSQLBytes(SQLStmt sqlStmt, byte[] sql) {
+        sqlStmt.sqlText = sql;
+        sqlStmt.sqlTextStr = null;
+    }
+
+    public static void setSQLStr(SQLStmt sqlStmt, String sql) {
+        sqlStmt.sqlText = null;
+        sqlStmt.sqlTextStr = sql;
     }
 }

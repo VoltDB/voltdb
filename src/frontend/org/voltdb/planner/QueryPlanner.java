@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,7 +20,6 @@ package org.voltdb.planner;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
-import org.voltcore.utils.Pair;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Cluster;
@@ -28,8 +27,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.ScalarValueHints;
-import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.NodeSchema;
@@ -113,7 +110,6 @@ public class QueryPlanner {
         m_HSQL = HSQL;
         m_db = catalogDb;
         m_cluster = catalogCluster;
-        m_partitioning = partitioning;
         m_estimates = estimates;
         m_partitioning = partitioning;
         m_maxTablesPerJoin = maxTablesPerJoin;
@@ -180,6 +176,14 @@ public class QueryPlanner {
         return m_paramzInfo.paramLiteralValues;
     }
 
+    public ParameterSet extractedParamValues(VoltType[] parameterTypes) throws Exception {
+        if (m_paramzInfo == null) {
+            return null;
+        }
+        Object[] paramArray = m_paramzInfo.extractedParamValues(parameterTypes);
+        return ParameterSet.fromArrayNoCopy(paramArray);
+    }
+
     /**
      * Get the best plan for the SQL statement given, assuming the given costModel.
      *
@@ -201,27 +205,20 @@ public class QueryPlanner {
                 CompiledPlan plan = compileFromXML(m_paramzInfo.parameterizedXmlSQL,
                                                    m_paramzInfo.paramLiteralValues);
 
-                Pair<Integer, Object[]> info = buildParameterSetFromExtractedLiteralsAndReturnPartitionIndex(
-                        plan.parameterTypes());
-                plan.partitioningKeyIndex = info.getFirst();
-                if (info.getSecond().length > CompiledPlan.MAX_PARAM_COUNT) {
-                    throw new PlanningErrorException("Throw and catch to force a non-parameterized plan");
+                VoltType[] paramTypes = plan.parameterTypes();
+                if (paramTypes.length <= CompiledPlan.MAX_PARAM_COUNT) {
+                    Object[] params = m_paramzInfo.extractedParamValues(paramTypes);
+                    plan.extractedParamValues = ParameterSet.fromArrayNoCopy(params);
+                    m_wasParameterizedPlan = true;
+                    return plan;
                 }
-                plan.extractedParamValues = ParameterSet.fromArrayNoCopy(info.getSecond());
-
-                // set the partition key value for SP plans
-                if (plan.partitioningKeyIndex >= 0) {
-                    plan.setPartitioningKey(plan.extractedParamValues.toArray()[plan.partitioningKeyIndex]);
-                }
-
-                m_wasParameterizedPlan = true;
-                return plan;
+                // fall through to try replan without parameterization.
             }
             catch (Exception e) {
                 // ignore any errors planning with parameters
                 // fall through to re-planning without them
 
-                // note, real planning errors ignored here should be rethrown below
+                // note, expect real planning errors ignored here to be thrown again below
                 m_recentErrorMsg = null;
             }
         }
@@ -232,45 +229,6 @@ public class QueryPlanner {
             throw new PlanningErrorException(m_recentErrorMsg);
         }
         return plan;
-    }
-
-    /**
-     * After parameterizing a parsed SQL statement, the types of the params are
-     * not always accurate. Once we have the full plan, we can create java
-     * objects that are the right type for the parameter in question.
-     *
-     * This method is separate from the core planner path so that if you get a
-     * parameterized parsed statement from the planner, and have a full plan for
-     * it in the cache, then you can convert the parameters ParameterizationInfo
-     * pulled out into the right types for the plan.
-     */
-    public Pair<Integer, Object[]> buildParameterSetFromExtractedLiteralsAndReturnPartitionIndex(
-            VoltType[] paramTypes) throws Exception
-    {
-        assert(m_paramzInfo.paramLiteralValues.length == paramTypes.length);
-        Object[] params = new Object[m_paramzInfo.paramLiteralValues.length];
-
-        // the extracted params are all strings at first.
-        // after the planner infers their types, fix them up
-        // the only exception is that nulls are Java NULL, and not the string "null".
-        for (int i = 0; i < m_paramzInfo.paramLiteralValues.length; i++) {
-            params[i] = ParameterizationInfo.valueForStringWithType(
-                    m_paramzInfo.paramLiteralValues[i], paramTypes[i]);
-        }
-
-        // handle the case where the statement is partitioned on a newly parameterized value
-        int partitionIndex = -1;
-        if (m_partitioning.effectivePartitioningValue() == null) {
-            AbstractExpression expr = m_partitioning.effectivePartitioningExpression();
-            if (expr != null) {
-                if (expr instanceof ParameterValueExpression) {
-                    ParameterValueExpression pve = (ParameterValueExpression) expr;
-                    partitionIndex = pve.getParameterIndex();
-                }
-            }
-        }
-
-        return new Pair<Integer, Object[]>(partitionIndex, params, false);
     }
 
     /**
@@ -360,7 +318,6 @@ public class QueryPlanner {
                                                  "to parsed display columns");
             }
         }
-        plan.columns = output_schema;
     }
 
 }

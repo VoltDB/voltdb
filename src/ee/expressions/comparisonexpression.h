@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -118,7 +118,14 @@ public:
         assert(m_right != NULL);
 
         NValue lnv = m_left->eval(tuple1, tuple2);
+        if (lnv.isNull()) {
+            return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+        }
+
         NValue rnv = m_right->eval(tuple1, tuple2);
+        if (rnv.isNull()) {
+            return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+        }
 
         // comparisons with null or NaN are always false
         // [This code is commented out because doing the right thing breaks voltdb atm.
@@ -127,10 +134,6 @@ public:
         /*if (lnv.isNull() || lnv.isNaN() || rnv.isNull() || rnv.isNaN()) {
             return NValue::getFalse();
         }*/
-
-        if (lnv.isNull() || rnv.isNull()) {
-            return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
-        }
 
         return compare.cmp(lnv, rnv);
     }
@@ -146,49 +149,13 @@ private:
 };
 
 template <typename C, typename L, typename R>
-class InlinedComparisonExpression : public AbstractExpression {
+class InlinedComparisonExpression : public ComparisonExpression<C> {
 public:
     InlinedComparisonExpression(ExpressionType type,
                                          AbstractExpression *left,
                                          AbstractExpression *right)
-        : AbstractExpression(type, left, right)
-    {
-        m_left = left;
-        m_leftTyped = dynamic_cast<L*>(left);
-        m_right = right;
-        m_rightTyped = dynamic_cast<R*>(right);
-
-        assert (m_leftTyped != NULL);
-        assert (m_rightTyped != NULL);
-    };
-
-    inline NValue eval(const TableTuple *tuple1, const TableTuple *tuple2 ) const {
-        NValue lnv = m_left->eval(tuple1, tuple2);
-        NValue rnv = m_right->eval(tuple1, tuple2);
-
-        // Comparisons with null or NaN are always false
-        // [This code is commented out because doing the right thing breaks voltdb atm.
-        // We need to re-enable after we can verify that all plans in all configs give the
-        // same answer.]
-        /*if (lnv.isNull() || lnv.isNaN() || rnv.isNull() || rnv.isNaN()) {
-            return NValue::getFalse();
-        }*/
-
-        if (lnv.isNull() || rnv.isNull()) {
-            return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
-        }
-
-        return compare.cmp(lnv, rnv);
-    }
-
-    std::string debugInfo(const std::string &spacer) const {
-        return (spacer + "OptimizedInlinedComparisonExpression\n");
-    }
-
-  private:
-    L *m_leftTyped;
-    R *m_rightTyped;
-    C compare;
+        : ComparisonExpression<C>(type, left, right)
+    {}
 };
 
 }

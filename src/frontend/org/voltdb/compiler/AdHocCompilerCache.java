@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -204,10 +204,15 @@ public class AdHocCompilerCache implements Serializable {
      * Note that one goal here is to reduce the number of times two
      * separate plan instances with the same value are input for the
      * same SQL literal.
+     * @param sql               original query text
+     * @param parsedToken       massaged query text, possibly with literals purged
+     * @param planIn
+     * @param extractedLiterals the basis values for any "bound parameter" restrictions to plan re-use
      */
     public synchronized void put(String sql,
                                  String parsedToken,
-                                 AdHocPlannedStatement planIn)
+                                 AdHocPlannedStatement planIn,
+                                 String[] extractedLiterals)
     {
         assert(sql != null);
         assert(parsedToken != null);
@@ -219,7 +224,7 @@ public class AdHocCompilerCache implements Serializable {
         //startPeriodicStatsPrinting();
 
         BoundPlan matched = null;
-        BoundPlan unmatched = new BoundPlan(planIn.core, planIn.parameterBindings());
+        BoundPlan unmatched = new BoundPlan(planIn.core, planIn.parameterBindings(extractedLiterals));
         // deal with the parameterized plan cache first
         List<BoundPlan> boundVariants = m_coreCache.get(parsedToken);
         if (boundVariants == null) {
@@ -243,10 +248,8 @@ public class AdHocCompilerCache implements Serializable {
                 // if a different core is found, reuse it
                 // this is useful when updating the literal cache
                 if (unmatched.core != matched.core) {
-                    plan = new AdHocPlannedStatement(planIn.sql, matched.core,
-                                                     planIn.extractedParamValues, planIn.extractedParamStrings,
-                                                     matched.constants,
-                                                     planIn.partitionParam);
+                    plan = new AdHocPlannedStatement(planIn, matched.core);
+                    plan.setBoundConstants(matched.constants);
                 }
             }
         }

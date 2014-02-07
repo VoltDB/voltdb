@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,8 +24,6 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
@@ -34,8 +32,9 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltZK;
+import org.voltdb.VoltType;
 import org.voltdb.messaging.LocalMailbox;
+import org.voltdb.planner.PartitioningForStatement;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
@@ -152,56 +151,51 @@ public class AsyncCompilerAgent {
 
         final PlannerTool ptool = context.m_ptool;
 
-        AdHocPlannedStmtBatch plannedStmtBatch =
-                new AdHocPlannedStmtBatch(work.sqlBatchText,
-                                          work.partitionParam,
-                                          work.clientHandle,
-                                          work.connectionId,
-                                          work.hostname,
-                                          work.adminConnection,
-                                          work.type,
-                                          work.originalTxnId,
-                                          work.originalUniqueId,
-                                          work.clientData);
-
         List<String> errorMsgs = new ArrayList<String>();
+        List<AdHocPlannedStatement> stmts = new ArrayList<AdHocPlannedStatement>();
+        int partitionParamIndex = -1;
+        VoltType partitionParamType = null;
+        Object partitionParamValue = null;
         assert(work.sqlStatements != null);
         // Take advantage of the planner optimization for inferring single partition work
         // when the batch has one statement.
-        if (work.sqlStatements.length == 1) {
-            // Single statement batch.
+        PartitioningForStatement partitioning = null;
+        boolean inferSP = (work.sqlStatements.length == 1) && work.inferPartitioning;
+        for (final String sqlStatement : work.sqlStatements) {
+            if (inferSP) {
+                partitioning = PartitioningForStatement.inferPartitioning();
+            }
+            else if (work.userPartitionKey == null) {
+                partitioning = PartitioningForStatement.forceMP();
+            } else {
+                partitioning = PartitioningForStatement.forceSP();
+            }
             try {
-                String sqlStatement = work.sqlStatements[0];
-                AdHocPlannedStatement result = ptool.planSql(sqlStatement, work.partitionParam,
-                                                             work.inferSinglePartition, work.allowParameterization);
+                AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning);
                 // The planning tool may have optimized for the single partition case
                 // and generated a partition parameter.
-                plannedStmtBatch.partitionParam = result.partitionParam;
-                plannedStmtBatch.addStatement(result);
+                if (inferSP) {
+                    partitionParamIndex = result.getPartitioningParameterIndex();
+                    partitionParamType = result.getPartitioningParameterType();
+                    partitionParamValue = result.getPartitioningParameterValue();
+                }
+                stmts.add(result);
             }
             catch (Exception e) {
                 errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e);
             }
         }
-        else {
-            // Multi-statement batch.
-            for (final String sqlStatement : work.sqlStatements) {
-                try {
-                    AdHocPlannedStatement result = ptool.planSql(sqlStatement, work.partitionParam,
-                                                                 false, work.allowParameterization);
-                    plannedStmtBatch.addStatement(result);
-                }
-                catch (Exception e) {
-                    errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e);
-                }
-            }
-        }
+        String errorSummary = null;
         if (!errorMsgs.isEmpty()) {
-            plannedStmtBatch.errorMsg = StringUtils.join(errorMsgs, "\n");
+            errorSummary = StringUtils.join(errorMsgs, "\n");
         }
-        if( work.isExplainWork() ) {
-            plannedStmtBatch.setIsExplainWork();
-        }
+        AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(work,
+                                                                           stmts,
+                                                                           partitionParamIndex,
+                                                                           partitionParamType,
+                                                                           partitionParamValue,
+                                                                           errorSummary);
+
         return plannedStmtBatch;
     }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -76,7 +76,9 @@ public abstract class AdHocBase extends VoltSystemProcedure {
 
         ByteBuffer buf = ByteBuffer.wrap(serializedBatchData);
         AdHocPlannedStatement[] statements = null;
+        Object[] userparams = null;
         try {
+            userparams = AdHocPlannedStmtBatch.userParamsFromBuffer(buf);
             statements = AdHocPlannedStmtBatch.planArrayFromBuffer(buf);
         }
         catch (IOException e) {
@@ -93,7 +95,7 @@ public abstract class AdHocBase extends VoltSystemProcedure {
             if (currentCatalogVersion != statement.core.catalogVersion) {
                 String msg = String.format("AdHoc transaction %d wasn't planned " +
                         "against the current catalog version. Statement: %s",
-                        ctx.getCurrentTxnId(),
+                        getVoltPrivateRealTransactionIdDontUseMe(),
                         new String(statement.sql, Constants.UTF8ENCODING));
                 throw new VoltAbortException(msg);
             }
@@ -105,7 +107,6 @@ public abstract class AdHocBase extends VoltSystemProcedure {
                 collectorFragId = ActivePlanRepository.loadOrAddRefPlanFragment(
                         statement.core.collectorHash, statement.core.collectorFragment);
             }
-
             SQLStmt stmt = SQLStmtAdHocHelper.createWithPlan(
                     statement.sql,
                     aggFragId,
@@ -119,7 +120,14 @@ public abstract class AdHocBase extends VoltSystemProcedure {
                     statement.core.parameterTypes,
                     m_site);
 
-            voltQueueSQL(stmt, statement.extractedParamValues.toArray());
+            // When there are no user-provided parameters, statements may have parameterized constants.
+            Object[] params;
+            if (userparams.length > 0) {
+                params = userparams;
+            } else {
+                params = statement.extractedParamArray();
+            }
+            voltQueueSQL(stmt, params);
         }
 
         return voltExecuteSQL(true);

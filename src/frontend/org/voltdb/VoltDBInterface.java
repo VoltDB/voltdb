@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,8 +16,6 @@
  */
 package org.voltdb;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -25,7 +23,6 @@ import java.util.concurrent.TimeUnit;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -72,13 +69,12 @@ public interface VoltDBInterface
     public String getBuildString();
     public String getVersionString();
     public HostMessenger getHostMessenger();
-    public List<ClientInterface> getClientInterfaces();
+    public ClientInterface getClientInterface();
     public OpsAgent getOpsAgent(OpsSelector selector);
     // Keep this method to centralize the cast to StatsAgent for
     // existing code
     public StatsAgent getStatsAgent();
     public MemoryStats getMemoryStatsSource();
-    public FaultDistributorInterface getFaultDistributor();
     public BackendTarget getBackendTargetType();
     public String getLocalMetadata();
     public SiteTracker getSiteTrackerForSnapshot();

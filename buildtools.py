@@ -237,11 +237,10 @@ def buildMakefile(CTX):
     if CTX.LEVEL == "MEMCHECK_NOFREELIST":
         makefile.write("prod/voltdbipc")
     makefile.write("\n\n")
-    makefile.write("objects/volt.a: " + " ".join(jni_objects) + " objects/harness.o objects/execution/IPCTopend.o\n")
+    makefile.write("objects/volt.a: " + " ".join(jni_objects) + " objects/harness.o\n")
     makefile.write("\t$(AR) $(ARFLAGS) $@ $?\n")
     makefile.write("objects/harness.o: ../../" + TEST_PREFIX + "/harness.cpp\n")
     makefile.write("\t$(CCACHE) $(COMPILE.cpp) -o $@ $^\n")
-    makefile.write("objects/execution/IPCTopend.o: ../../" + INPUT_PREFIX + "/execution/IPCTopend.cpp\n")
     makefile.write("\t$(CCACHE) $(COMPILE.cpp) -o $@ $^\n")
     makefile.write("\n")
 

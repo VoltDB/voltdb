@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import org.voltdb.ParameterSet;
+import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CorePlan;
@@ -35,22 +36,9 @@ import org.voltdb.planner.CorePlan;
 public class AdHocPlannedStatement {
     public final CorePlan core;
     public final byte[] sql;
-    public final ParameterSet extractedParamValues;
+    private final ParameterSet extractedParamValues;
     private final int[] boundParamIndexes;
-    public final String[] extractedParamStrings;
     private String[] boundParamStrings;
-    public final Object partitionParam; // not serialized
-
-    AdHocPlannedStatement(CompiledPlan plan, int catalogVersion, String[] extractedLiterals) {
-        sql = plan.sql.getBytes(Constants.UTF8ENCODING);
-        core = new CorePlan(plan, catalogVersion);
-        extractedParamValues = plan.extractedParamValues;
-        boundParamIndexes = plan.boundParamIndexes();
-        extractedParamStrings = extractedLiterals;
-        partitionParam = plan.getPartitioningKey();
-
-        validate();
-    }
 
     /***
      * Constructor
@@ -60,25 +48,25 @@ public class AdHocPlannedStatement {
      * @param extractedParamValues      params extracted from constant values
      * @param partitionParam            value used for partitioning
      */
-    public AdHocPlannedStatement(byte[] sql,
-                                 CorePlan core,
-                                 ParameterSet extractedParamValues,
-                                 String[] extractedParamStrings,
-                                 String[] constants,
-                                 Object partitionParam) {
-
+    AdHocPlannedStatement(byte[] sql,
+                          CorePlan core,
+                          ParameterSet extractedParamValues,
+                          int[] boundParamIndexes) {
         this.sql = sql;
         this.core = core;
         this.extractedParamValues = extractedParamValues;
-        this.boundParamIndexes = null;
-        this.extractedParamStrings = extractedParamStrings;
-        this.boundParamStrings = constants;
-        this.partitionParam = partitionParam;
-
-        // When this constructor is used for deserializaton on the proc-running side,
-        // the bound param and extracted param string constants and the partitioning param object are not required.
+        this.boundParamIndexes = boundParamIndexes;
 
         validate();
+    }
+
+    AdHocPlannedStatement(CompiledPlan plan, CorePlan coreIn) {
+        this(plan.sql.getBytes(Constants.UTF8ENCODING), coreIn,
+             plan.extractedParamValues, plan.boundParamIndexes());
+    }
+
+    AdHocPlannedStatement(AdHocPlannedStatement original, CorePlan coreIn) {
+        this(original.sql, coreIn, original.extractedParamValues, null);
     }
 
     private void validate() {
@@ -148,7 +136,7 @@ public class AdHocPlannedStatement {
         // params
         ParameterSet parameterSet = ParameterSet.fromByteBuffer(buf);
 
-        return new AdHocPlannedStatement(sql, core, parameterSet, null, null, null);
+        return new AdHocPlannedStatement(sql, core, parameterSet, null);
     }
 
     /* (non-Javadoc)
@@ -163,16 +151,6 @@ public class AdHocPlannedStatement {
         }
         AdHocPlannedStatement other = (AdHocPlannedStatement) obj;
 
-        if (partitionParam != null) {
-            if (!partitionParam.equals(other.partitionParam)) {
-                return false;
-            }
-        }
-        else {
-            if (other.partitionParam != null) {
-                return false;
-            }
-        }
         if (!Arrays.equals(sql, other.sql)) {
             return false;
         }
@@ -195,7 +173,7 @@ public class AdHocPlannedStatement {
         return 42; // any arbitrary constant will do
     }
 
-    public String[] parameterBindings() {
+    public String[] parameterBindings(String[] extractedParamStrings) {
         if (boundParamStrings != null) {
             return boundParamStrings;
         }
@@ -210,5 +188,32 @@ public class AdHocPlannedStatement {
             boundParamStrings[paramIndex] = extractedParamStrings[paramIndex];
         }
         return boundParamStrings;
+    }
+
+    void setBoundConstants(String[] boundConstants) {
+        boundParamStrings = boundConstants;
+    }
+
+    public Object[] extractedParamArray() {
+        return extractedParamValues.toArray();
+    }
+
+    public boolean hasExtractedParams() {
+        return extractedParamValues.size() > 0;
+    }
+
+    int getPartitioningParameterIndex() { return core.getPartitioningParamIndex(); }
+
+    Object getPartitioningParameterValue() {
+        int paramIndex = core.getPartitioningParamIndex();
+        if (paramIndex != -1 && extractedParamValues != null && extractedParamValues.size() > paramIndex ) {
+            return extractedParamValues.toArray()[paramIndex];
+        } else {
+            return core.getPartitioningParamValue();
+        }
+    }
+
+    public VoltType getPartitioningParameterType() {
+        return core.getPartitioningParamType();
     }
 }

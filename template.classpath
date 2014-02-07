@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
-    <classpathentry kind="lib" path="third_party/java/jars/hamcrest-all-1.3.jar"/>
     <classpathentry kind="src" path="src/frontend"/>
     <classpathentry kind="src" path="tests/frontend"/>
     <classpathentry kind="src" path="tests/hsqldb"/>
@@ -13,10 +12,11 @@
     <classpathentry kind="src" path="tests/test_apps/adhocbenchmark/src"/>
     <classpathentry kind="src" path="src/hsqldb19b3"/>
     <classpathentry kind="src" path="third_party/java/src"/>
+
     <classpathentry kind="lib" path="lib/commons-lang3-3.0.jar"/>
     <classpathentry kind="lib" path="lib/commons-cli-1.2.jar"/>
     <classpathentry kind="lib" path="lib/jline-2.10.jar"/>
-    <classpathentry kind="lib" path="third_party/java/jars/ant_doxygen.jar"/>
+    <classpathentry kind="lib" path="third_party/java/jars/hamcrest-all-1.3.jar"/>
     <classpathentry kind="lib" path="third_party/java/jars/ant-junit.jar"/>
     <classpathentry kind="lib" path="third_party/java/jars/ant-testability-explorer.jar"/>
     <classpathentry kind="lib" path="third_party/java/jars/ant.jar"/>
@@ -39,17 +39,21 @@
     <classpathentry kind="lib" path="lib/slf4j-nop-1.6.2.jar"/>
     <classpathentry kind="lib" path="lib/jna.jar"/>
     <classpathentry kind="lib" path="lib/protobuf-java-2.4.1.jar"/>
-    <classpathentry kind="lib" path="lib/snappy-java-1.0.5-M3.jar"/>
+    <classpathentry kind="lib" path="lib/snappy-java-1.1.0.1.jar"/>
     <classpathentry kind="lib" path="lib/zmq-2.1.11.jar"/>
     <classpathentry kind="lib" path="lib/jsch-0.1.50.jar"/>
     <classpathentry kind="lib" path="lib/super-csv-2.1.0.jar"/>
-    <classpathentry kind="lib" path="third_party/java/jars/mockito-all-1.9.0.jar"/>
+    <classpathentry kind="lib" path="third_party/java/jars/mockito-core-1.9.5.jar"/>
+    <classpathentry kind="lib" path="third_party/java/jars/objenesis-2.1.jar"/>
     <classpathentry kind="lib" path="third_party/java/jars/make-it-easy-3.1.0.jar"/>
-    <classpathentry kind="lib" path="third_party/java/jars/javaee-api-7.0.jar"/>
+    <classpathentry kind="lib" path="third_party/java/jars/javaee-api-6.0.jar"/>
+    <classpathentry kind="lib" path="lib/groovy-all-2.1.7-indy.jar"/>
+
     <classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER">
         <attributes>
             <attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY" value="voltdb/voltdb"/>
         </attributes>
     </classpathentry>
+
     <classpathentry kind="output" path="obj/eclipse"/>
 </classpath>

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -172,6 +172,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private volatile boolean m_localhostReady = false;
     // memoized InstanceId
     private InstanceId m_instanceId = null;
+    private boolean m_shuttingDown = false;
 
     /*
      * References to other hosts in the mesh.
@@ -226,11 +227,23 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 for (int hostId: failedHostIds) {
                     m_knownFailedHosts.add(hostId);
                     removeForeignHost(hostId);
-                    logger.warn(String.format("Host %d failed", hostId));
+                    if (!m_shuttingDown) {
+                        logger.warn(String.format("Host %d failed", hostId));
+                    }
                 }
             }
         }
     };
+
+    public synchronized void prepareForShutdown()
+    {
+        m_shuttingDown = true;
+    }
+
+    public synchronized boolean isShuttingDown()
+    {
+        return m_shuttingDown;
+    }
 
     /**
      * Synchronization protects m_knownFailedHosts and ensures that every failed host is only reported
@@ -240,13 +253,17 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public synchronized void reportForeignHostFailed(int hostId) {
         long initiatorSiteId = CoreUtils.getHSIdFromHostAndSite(hostId, AGREEMENT_SITE_ID);
         m_agreementSite.reportFault(initiatorSiteId);
-        logger.warn(String.format("Host %d failed", hostId));
+        if (!m_shuttingDown) {
+            logger.warn(String.format("Host %d failed", hostId));
+        }
     }
 
     @Override
     public synchronized void relayForeignHostFailed(FaultMessage fm) {
         m_agreementSite.reportFault(fm);
-        m_logger.warn("Someone else claims a host failed: " + fm);
+        if (!m_shuttingDown) {
+            m_logger.warn("Someone else claims a host failed: " + fm);
+        }
     }
 
     /**
@@ -756,13 +773,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         if (!fhost.isUp())
         {
-            //Throwable t = new Throwable();
-            //java.io.StringWriter sw = new java.io.StringWriter();
-            //java.io.PrintWriter pw = new java.io.PrintWriter(sw);
-            //t.printStackTrace(pw);
-            //pw.flush();
-            m_logger.warn("Attempted delivery of message to failed site: " + CoreUtils.hsIdToString(hsId));
-            //m_logger.warn(sw.toString());
+            if (!m_shuttingDown) {
+                m_logger.warn("Attempted delivery of message to failed site: " + CoreUtils.hsIdToString(hsId));
+            }
             return null;
         }
         return fhost;

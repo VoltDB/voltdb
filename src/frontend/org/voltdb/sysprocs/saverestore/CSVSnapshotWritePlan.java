@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.CSVSnapshotFilter;
 import org.voltdb.SimpleFileSnapshotDataTarget;
@@ -61,6 +62,9 @@ import com.google_voltpatches.common.primitives.Longs;
  * site on a node. */
 public class CSVSnapshotWritePlan extends SnapshotWritePlan
 {
+
+    static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
+
     @Override
     protected boolean createSetupInternal(
             String file_path, String file_nonce,
@@ -215,6 +219,11 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
                 sitesToInclude.add(localSite);
             }
         }
+
+        if (sitesToInclude.isEmpty()) {
+            SNAP_LOG.info("This host was not selected to write CSV data for any partition");
+        }
+
         return sitesToInclude;
     }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -426,21 +426,12 @@ public abstract class JoinNode implements Cloneable {
      * Returns a list of immediate sub-queries which are part of this query.
      * @return List<AbstractParsedStmt> - list of sub-queries from this query
      */
-    public List<JoinNode> extractSubQueries() {
-        List<JoinNode> subQueries = new ArrayList<JoinNode>();
-        extractSubQueries(this, subQueries);
-        return subQueries;
-    }
-
-    private void extractSubQueries(JoinNode joinTree, List<JoinNode> subQueries) {
-        if (joinTree.m_nodeType == NodeType.SUBQUERY) {
-            subQueries.add(joinTree);
+    public void extractSubQueries(List<StmtSubqueryScan> subQueries) {
+        if (m_leftNode != null) {
+            m_leftNode.extractSubQueries(subQueries);
         }
-        if (joinTree.m_leftNode != null) {
-            extractSubQueries(joinTree.m_leftNode, subQueries);
-        }
-        if (joinTree.m_rightNode != null) {
-            extractSubQueries(joinTree.m_rightNode, subQueries);
+        if (m_rightNode != null) {
+            m_rightNode.extractSubQueries(subQueries);
         }
     }
 
@@ -521,14 +512,7 @@ public abstract class JoinNode implements Cloneable {
     public static JoinNode reconstructJoinTreeFromTableNodes(List<JoinNode> tableNodes) {
         JoinNode root = null;
         for (JoinNode leafNode : tableNodes) {
-            JoinNode node = null;
-            if (leafNode.getNodeType() == JoinNode.NodeType.LEAF) {
-                node = new TableLeafNode(leafNode.m_id, leafNode.m_tableAliasIndex, null, null);
-            } else if (leafNode.getNodeType() == JoinNode.NodeType.SUBQUERY) {
-                node = new SubqueryLeafNode(leafNode.m_id, leafNode.m_tableAliasIndex, null, null);
-            } else {
-                assert(false);
-            }
+            JoinNode node = leafNode.cloneWithoutFilters();
             if (root == null) {
                 root = node;
             } else {
@@ -540,6 +524,9 @@ public abstract class JoinNode implements Cloneable {
         }
         return root;
     }
+
+    @SuppressWarnings("static-method")
+    protected JoinNode cloneWithoutFilters() { assert(false); return null; }
 
     /**
      * Reconstruct a join tree from the list of sub-trees connecting the sub-trees in the order

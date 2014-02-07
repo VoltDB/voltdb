@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -117,7 +117,12 @@ public class ConstraintFailureException extends SQLException {
             sb.append(", Table CatalogId ");
             sb.append(tableName);
             sb.append('\n');
-            sb.append(getTuples().toString());
+            sb.append("Relevant Tuples:\n");
+            sb.append(getTuples().toFormattedString());
+            // remove trailing whitespace
+            while (Character.isWhitespace(sb.charAt(sb.length() - 1))) {
+                sb.setLength(sb.length() - 1);
+            }
             return sb.toString();
         }
     }

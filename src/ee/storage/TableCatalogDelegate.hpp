@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,9 +19,9 @@
 #define TABLECATALOGDELEGATE_HPP
 
 #include "common/CatalogDelegate.hpp"
-//#include "indexes/tableindex.h"
 #include "catalog/table.h"
 #include "catalog/index.h"
+#include "storage/persistenttable.h"
 
 namespace catalog {
 class Database;
@@ -57,7 +57,6 @@ class TableCatalogDelegate : public CatalogDelegate {
     // Delegate interface
     virtual void deleteCommand();
 
-
     // table specific
     int init(catalog::Database const &catalogDatabase,
              catalog::Table const &catalogTable);
@@ -87,6 +86,14 @@ class TableCatalogDelegate : public CatalogDelegate {
     // ADXXX: should be const
     Table *getTable() {
         return m_table;
+    }
+
+    PersistentTable *getPersistentTable() {
+        return dynamic_cast<PersistentTable *> (m_table);
+    }
+
+    void setTable(Table * tb) {
+        m_table = tb;
     }
 
     bool exportEnabled() {

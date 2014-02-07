@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -90,7 +90,7 @@ public enum QueryType {
         else if (stmt.startsWith("update")) {
             return QueryType.UPDATE;
         }
-        else if (stmt.startsWith("delete")) {
+        else if (stmt.startsWith("delete") || stmt.startsWith("trunca")) {
             return QueryType.DELETE;
         }
         else if (stmt.startsWith("select")) {

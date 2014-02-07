@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -71,7 +71,6 @@ public abstract class JoinProducerBase extends SiteTasker {
 
         protected void register()
         {
-            new VoltLogger("SNAPSHOT").info("TEMP MESSAGE " + m_whoami + "registering snapshot completion action");
             JOINLOG.debug(m_whoami + "registering snapshot completion action");
             VoltDB.instance().getSnapshotCompletionMonitor().addInterest(this);
         }

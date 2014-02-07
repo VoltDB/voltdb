@@ -1,0 +1,27 @@
+== 0.5.3
+    * Column types are no longer forced uppercase
+        - Fixes ENUM, SET bug where data values were incorrectly uppercased
+
+== 0.5.2 / 2009-12-02
+    * Column DEFAULT fixes
+        - strings are now quoted (except CURRENT_TIMESTAMP),
+        - non-None values handled ('', 0)
+    * CHARACTER SET AND COLLATE omitted from column definition if same as parent Table.
+    * Fixed Column definition syntax (ordering of attributes)
+
+== 0.5.1 / 2009-11-10
+    * bug fixes
+    * updated test configuration, added more tests
+    * added ability to retrieve comments on columns
+    * updated collections.orderedDict
+        - added support for index(), insert() and __delitem__()
+    * changed output of database options
+        - CHARSET is now CHARACTER SET
+        - <key> <value> is now <key>=<value>
+    * newlines and multiple spaces removed from table.create() string
+    * Changed DatabaseConnection to explicitly require a call to connect()
+    * backported to work with python 2.4
+    * schema name dropped from table.alter() and table.drop() to be consistent with table.create()
+
+== 0.5.0 / 2009-09-17
+    * Initial public release

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -50,8 +50,8 @@ public class SQLStmt {
     }
 
     // Used for uncompiled SQL.
-    private byte[] sqlText;
-    private String sqlTextStr;
+    byte[] sqlText;
+    String sqlTextStr;
     String joinOrder;
     // hash of the sql string for determinism checks
     byte[] sqlCRC;
@@ -111,6 +111,18 @@ public class SQLStmt {
      */
     @Override
     protected void finalize() throws Throwable {
+        // I have some doubts as to whether site is ever null, whether it ever should be,
+        // and whether it should be the determining factor in this cleanup code.
+        // "site" is only used here and arguably abused as a null/non-null boolean.
+        // The interesting cases to consider are:
+        // - the standard SQLStmts that are defined in user VoltProcedure classes.
+        // Oddly, these can be static members or instance members based on the whim of the user
+        //  -- are SQLStmts in either of these cases "finalized" before site shutdown,
+        // at a time when refreshing them in the LRU isn't pointless?
+        // - the dynamic SQLStmts built for ad hoc queries.
+        // These include client-issued ad hocs and "experimental" stored-proc-issued ad hocs.
+        // I'm totally guessing that site==null was supposed to distinguish somehow among
+        // some of these cases but I don't really know, or know which or know why or know how. --paul
         if (site != null) {
             ActivePlanRepository.decrefPlanFragmentById(aggregator.id);
             if (collector != null) {
@@ -185,23 +197,6 @@ public class SQLStmt {
             sqlTextStr = new String(sqlText, Constants.UTF8ENCODING);
         }
         return sqlTextStr;
-    }
-
-    public byte[] getSQLBytes() {
-        if (sqlText == null) {
-            sqlText = sqlTextStr.getBytes(Constants.UTF8ENCODING);
-        }
-        return sqlText;
-    }
-
-    public void setSQLBytes(byte[] sql) {
-        sqlText = sql;
-        sqlTextStr = null;
-    }
-
-    public void setSQLStr(String sql) {
-        sqlText = null;
-        sqlTextStr = sql;
     }
 
     /**

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -106,6 +106,8 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
         m_targetIndexName = isp.m_targetIndexName;
 
+        m_tableScan = isp.getTableScan();
+
         m_predicate = null;
         m_bindings = isp.getBindings();
 
@@ -176,7 +178,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             }
         } else {
             try {
-                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson);
+                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, m_tableScan);
             } catch (JSONException e) {
                 e.printStackTrace();
                 assert(false);
@@ -245,7 +247,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             indexSize = indexedColRefs.size();
         } else {
             try {
-                indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring);
+                indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring, isp.getTableScan());
                 indexSize = indexedExprs.size();
             } catch (JSONException e) {
                 // TODO Auto-generated catch block
@@ -415,11 +417,11 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
         //load end_expression
         AbstractExpression.loadFromJSONArrayChild(m_endkeyExpressions, jobj,
-                Members.ENDKEY_EXPRESSIONS.name());
+                Members.ENDKEY_EXPRESSIONS.name(), m_tableScan);
         AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
-                Members.SEARCHKEY_EXPRESSIONS.name());
+                Members.SEARCHKEY_EXPRESSIONS.name(), m_tableScan);
 
-        m_skip_null_predicate = AbstractExpression.fromJSONChild(jobj, Members.SKIP_NULL_PREDICATE.name());
+        m_skip_null_predicate = AbstractExpression.fromJSONChild(jobj, Members.SKIP_NULL_PREDICATE.name(), m_tableScan);
     }
 
     @Override
@@ -458,7 +460,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         else {
             try {
                 List<AbstractExpression> indexExpressions =
-                    AbstractExpression.fromJSONArrayString(jsonExpr);
+                    AbstractExpression.fromJSONArrayString(jsonExpr, m_tableScan);
                 int ii = 0;
                 for (AbstractExpression ae : indexExpressions) {
                     asIndexed[ii++] = ae.explain(m_targetTableName);

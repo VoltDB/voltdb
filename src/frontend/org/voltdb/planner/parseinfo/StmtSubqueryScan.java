@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,12 +17,19 @@
 
 package org.voltdb.planner.parseinfo;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Index;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
+import org.voltdb.planner.CompiledPlan;
+import org.voltdb.planner.ParsedSelectStmt;
+import org.voltdb.planner.ParsedUnionStmt;
 import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 
@@ -31,10 +38,26 @@ import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
  */
 public class StmtSubqueryScan extends StmtTableScan {
 
-    public StmtSubqueryScan(TempTable tempTable, String tableAlias) {
+    // Sub-Query
+    private final AbstractParsedStmt m_subquery;
+    private final List<ParsedColInfo> m_origSchema;
+    private CompiledPlan m_bestCostPlan = null;
+    // The partitioning object for that sub-query
+    PartitioningForStatement m_partitioning = null;
+    // The mapping - the temp table column to the sub-query (column, table) pair
+    Map<String, ParsedColInfo> m_columnMap = new HashMap<String, ParsedColInfo>();
+
+    public StmtSubqueryScan(String tableAlias, AbstractParsedStmt subquery) {
         super(tableAlias);
-        assert (tempTable != null);
-        m_tempTable = tempTable;
+        m_subquery = subquery;
+        AbstractParsedStmt columnBase = subquery;
+        while (columnBase instanceof ParsedUnionStmt) {
+            assert( ! ((ParsedUnionStmt)columnBase).m_children.isEmpty());
+            columnBase = ((ParsedUnionStmt)columnBase).m_children.get(0);
+        }
+        assert (columnBase instanceof ParsedSelectStmt);
+        m_origSchema = ((ParsedSelectStmt)columnBase).displayColumns();
+        assert(m_origSchema != null);
     }
 
     @Override
@@ -44,18 +67,24 @@ public class StmtSubqueryScan extends StmtTableScan {
 
     @Override
     public String getTableName() {
-        return m_tempTable.getTableName();
+        return null;
     }
 
+    /**
+     * The subquery is replicated if all tables from the FROM clause defining this subquery
+     * are replicated
+     * @return True if the subquery is replicated
+     */
     @Override
-    public TempTable getTempTable() {
-        assert (m_tempTable != null);
-        return m_tempTable;
-    }
-
-    @Override
-    public boolean getIsreplicated() {
-        return m_tempTable.getIsreplicated();
+    public boolean getIsReplicated() {
+        boolean isReplicated = true;
+        for (StmtTableScan tableScan : m_subquery.stmtCache) {
+            isReplicated = isReplicated && tableScan.getIsReplicated();
+            if ( ! isReplicated) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override
@@ -64,37 +93,20 @@ public class StmtSubqueryScan extends StmtTableScan {
     }
 
     @Override
-    public boolean isPartitioningColumn(String columnName) {
-        assert (m_partitioning != null);
-        // get the original column
-        ParsedColInfo origCol = m_columnMap.get(columnName);
-        assert(origCol != null);
-        return m_partitioning.isPartitionColumn(origCol.columnName);
-    }
-
-    @Override
     public String getPartitionColumnName() {
-        if (getIsreplicated() == false) {
-            // Returns first not null partitioning column of the underline sub-query
-            for (String patitionCol : m_partitioning.getPartitionColumns()) {
-                if (patitionCol != null) {
-                    return patitionCol;
-                }
-            }
-        }
+        //TODO: implement identification of exported subquery partitioning column(s)
         return null;
     }
 
     @Override
     public TupleValueExpression resolveTVEForDB(Database db, TupleValueExpression tve) {
         String columnName = tve.getColumnName();
-        for (ParsedColInfo colInfo : m_tempTable.getOrigSchema()) {
+        for (ParsedColInfo colInfo : m_origSchema) {
             boolean match = columnName.equals(colInfo.alias) ||
                     (colInfo.alias == null && columnName.equals(colInfo.columnName));
             if (match) {
-                AbstractParsedStmt subQuery = m_tempTable.getSubQuery();
-                assert(subQuery.tableAliasIndexMap.containsKey(colInfo.tableAlias));
-                StmtTableScan origTable = subQuery.stmtCache.get(subQuery.tableAliasIndexMap.get(colInfo.tableAlias));
+                assert(m_subquery.tableAliasIndexMap.containsKey(colInfo.tableAlias));
+                StmtTableScan origTable = m_subquery.stmtCache.get(m_subquery.tableAliasIndexMap.get(colInfo.tableAlias));
                 assert(origTable != null);
                 // Prepare the tve to go the level down
                 tve.setTableName(colInfo.tableName);
@@ -112,11 +124,30 @@ public class StmtSubqueryScan extends StmtTableScan {
         return tve;
     }
 
-    // Sub-Query
-    private TempTable m_tempTable = null;
-    // The partitioning object for that sub-query
-    PartitioningForStatement m_partitioning = null;
-    // The mapping - the temp table column to the sub-query (column, table) pair
-    Map<String, ParsedColInfo> m_columnMap = new HashMap<String, ParsedColInfo>();
+    static final Collection<Index> noIndexesSupportedOnSubqueryScans = new ArrayList<Index>();
+    @Override
+    public Collection<Index> getIndexes() {
+        return noIndexesSupportedOnSubqueryScans;
+    }
 
+    public AbstractParsedStmt getSubquery() {
+        return m_subquery;
+    }
+
+    public List<ParsedColInfo> getOrigSchema() {
+        return m_origSchema;
+    }
+
+    public CompiledPlan getBestCostPlan() {
+        return m_bestCostPlan;
+    }
+
+    public void setBestCostPlan(CompiledPlan costPlan) {
+        m_bestCostPlan = costPlan;
+    }
+
+    @Override
+    public String getColumnName(int columnIndex) {
+        return m_origSchema.get(columnIndex).alias;
+    }
 }

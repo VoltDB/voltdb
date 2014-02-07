@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2013 VoltDB Inc.
+# Copyright (C) 2008-2014 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -322,10 +322,11 @@ class CLIParser(ExtendedHelpOptionParser):
     Command/sub-command (verb) argument and option parsing and validation.
     """
 
-    def __init__(self, verbs, base_options, usage, description, version):
+    def __init__(self, prog, verbs, base_options, usage, description, version):
         """
         Command line processor constructor.
         """
+        self.prog         = prog
         self.verb         = None
         self.verbs        = verbs
         self.verb_names   = verbs.keys()
@@ -333,6 +334,7 @@ class CLIParser(ExtendedHelpOptionParser):
         self.verb_names.sort()
         self.base_options.sort()
         optparse.OptionParser.__init__(self,
+            prog        = prog,
             description = description,
             usage       = usage,
             version     = version)
@@ -515,14 +517,19 @@ class CLIParser(ExtendedHelpOptionParser):
     def on_format_epilog(self):
         if not self.verb:
             return self._format_verb_list()
-        if self.verb.get_argument_count() == 0:
-            return ''
-        rows = [(get_argument_usage(a), a.help) for a in self.verb.iter_arguments()]
-        lines = ['Arguments:', utility.format_table(rows, indent = 2)]
+        blocks = []
+        if self.verb.get_argument_count() > 0:
+            rows = [(get_argument_usage(a), a.help) for a in self.verb.iter_arguments()]
+            blocks.append('\n'.join(['Arguments:', utility.format_table(rows, indent = 2)]))
+        # other_info is used for the multi-verb variation list.
+        other_info = self.verb.cli_spec.get_attr('other_info', None)
+        if other_info:
+            blocks.append(other_info.strip())
+        # Automatically wrap description2 as a paragraph.
         description2 = self.verb.cli_spec.get_attr('description2', None)
         if description2:
-            lines.extend(('', description2))
-        return '\n%s\n' % ('\n'.join(lines))
+            blocks.append(utility.paragraph(description2))
+        return '\n%s' % '\n\n'.join(blocks)
 
     def _abort(self, *msgs):
         utility.error(*msgs)

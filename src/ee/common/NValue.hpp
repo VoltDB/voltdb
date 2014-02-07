@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -247,8 +247,7 @@ class NValue {
        storage area provided. If this is an Object type then the third
        argument indicates whether the object is stored in the tuple
        inline */
-    static const NValue deserializeFromTupleStorage(
-        const void *storage, const ValueType type, const bool isInlined);
+    static NValue initFromTupleStorage(const void *storage, ValueType type, bool isInlined);
 
     /* Serialize the scalar this NValue represents to the provided
        storage area. If the scalar is an Object type that is not
@@ -646,6 +645,8 @@ class NValue {
         m_sourceInlined = sourceInlined;
     }
 
+    void tagAsNull() { m_data[13] = OBJECT_NULL_BIT; }
+
     /**
      * An Object is something like a String that has a variable length
      * (thus it is length preceded) and can potentially have indirect
@@ -676,55 +677,11 @@ class NValue {
         return *reinterpret_cast<const int32_t *>(&m_data[8]);
     }
 
-    void setObjectLength(int32_t length) {
+    int8_t setObjectLength(int32_t length) {
         *reinterpret_cast<int32_t *>(&m_data[8]) = length;
-    }
-
-    /**
-     * -1 is returned for the length of a NULL object. If a string
-     * is inlined in its storage location there will be no pointer to
-     * check for NULL. The length preceding value must be used instead.
-     *
-     * The format for a length preceding value is a 1-byte short representation
-     * with the the 7th bit used to indicate a null value and the 8th bit used
-     * to indicate that this is part of a long representation and that 3 bytes
-     * follow. 6 bits are available to represent length for a maximum length
-     * of 63 bytes representable with a single byte length. 30 bits are available
-     * when the continuation bit is set and 3 bytes follow.
-     *
-     * The value is converted to network byte order so that the code
-     * will always know which byte contains the most signficant digits.
-     */
-    static int32_t getObjectLengthFromLocation(const char *location) {
-        /*
-         * Location will be NULL if the NValue is operating on storage that is not
-         * inlined and thus can contain a NULL pointer
-         */
-        if (location == NULL) {
-            return -1;
-        }
-        char firstByte = location[0];
-        const char premask = static_cast<char>(OBJECT_NULL_BIT | OBJECT_CONTINUATION_BIT);
-
-        /*
-         * Generated mask that removes the null and continuation bits
-         * from a single byte length value
-         */
-        const char mask = ~premask;
-        int32_t decodedNumber = 0;
-        if ((firstByte & OBJECT_NULL_BIT) != 0) {
-            return -1;
-        } else if ((firstByte & OBJECT_CONTINUATION_BIT) != 0) {
-            char numberBytes[4];
-            numberBytes[0] = static_cast<char>(location[0] & mask);
-            numberBytes[1] = location[1];
-            numberBytes[2] = location[2];
-            numberBytes[3] = location[3];
-            decodedNumber = ntohl(*reinterpret_cast<int32_t*>(numberBytes));
-        } else {
-            decodedNumber = location[0] & mask;
-        }
-        return decodedNumber;
+        int8_t lengthLength = getAppropriateObjectLengthLength(length);
+        setObjectLengthLength(lengthLength);
+        return lengthLength;
     }
 
     /*
@@ -790,23 +747,18 @@ class NValue {
      * Get a pointer to the value of an Object that lies beyond the storage of the length information
      */
     void* getObjectValue() const {
-        if (*reinterpret_cast<void* const*>(m_data) == NULL) {
+        if (isNull()) {
             return NULL;
-        } else if(*reinterpret_cast<const int32_t*>(&m_data[8]) == OBJECTLENGTH_NULL) {
-            return NULL;
-        } else {
-            void* value;
-            if (m_sourceInlined)
-            {
-                value = *reinterpret_cast<char* const*>(m_data) + getObjectLengthLength();
-            }
-            else
-            {
-                StringRef* sref = *reinterpret_cast<StringRef* const*>(m_data);
-                value = sref->get() + getObjectLengthLength();
-            }
-            return value;
         }
+        void* value;
+        if (m_sourceInlined) {
+            value = *reinterpret_cast<char* const*>(m_data) + getObjectLengthLength();
+        }
+        else {
+            StringRef* sref = *reinterpret_cast<StringRef* const*>(m_data);
+            value = sref->get() + getObjectLengthLength();
+        }
+        return value;
     }
 
     // getters
@@ -1957,36 +1909,54 @@ class NValue {
     static NValue getTinyIntValue(int8_t value) {
         NValue retval(VALUE_TYPE_TINYINT);
         retval.getTinyInt() = value;
+        if (value == INT8_NULL) {
+            retval.tagAsNull();
+        }
         return retval;
     }
 
     static NValue getSmallIntValue(int16_t value) {
         NValue retval(VALUE_TYPE_SMALLINT);
         retval.getSmallInt() = value;
+        if (value == INT16_NULL) {
+            retval.tagAsNull();
+        }
         return retval;
     }
 
     static NValue getIntegerValue(int32_t value) {
         NValue retval(VALUE_TYPE_INTEGER);
         retval.getInteger() = value;
+        if (value == INT32_NULL) {
+            retval.tagAsNull();
+        }
         return retval;
     }
 
     static NValue getBigIntValue(int64_t value) {
         NValue retval(VALUE_TYPE_BIGINT);
         retval.getBigInt() = value;
+        if (value == INT64_NULL) {
+            retval.tagAsNull();
+        }
         return retval;
     }
 
     static NValue getTimestampValue(int64_t value) {
         NValue retval(VALUE_TYPE_TIMESTAMP);
         retval.getTimestamp() = value;
+        if (value == INT64_NULL) {
+            retval.tagAsNull();
+        }
         return retval;
     }
 
     static NValue getDoubleValue(double value) {
         NValue retval(VALUE_TYPE_DOUBLE);
         retval.getDouble() = value;
+        if (value <= DOUBLE_NULL) {
+            retval.tagAsNull();
+        }
         return retval;
     }
 
@@ -2030,32 +2000,34 @@ class NValue {
 
     char* allocateValueStorage(int32_t length, Pool* stringPool)
     {
-        const int8_t lengthLength = getAppropriateObjectLengthLength(length);
+        // This unsets the NValue's null tag and returns the length of the length.
+        const int8_t lengthLength = setObjectLength(length);
         const int32_t minLength = length + lengthLength;
         StringRef* sref = StringRef::create(minLength, stringPool);
         char* storage = sref->get();
         setObjectLengthToLocation(length, storage);
         storage += lengthLength;
         setObjectValue(sref);
-        setObjectLength(length);
-        setObjectLengthLength(lengthLength);
         return storage;
     }
 
     static NValue getNullStringValue() {
         NValue retval(VALUE_TYPE_VARCHAR);
+        retval.tagAsNull();
         *reinterpret_cast<char**>(retval.m_data) = NULL;
         return retval;
     }
 
     static NValue getNullBinaryValue() {
         NValue retval(VALUE_TYPE_VARBINARY);
+        retval.tagAsNull();
         *reinterpret_cast<char**>(retval.m_data) = NULL;
         return retval;
     }
 
     static NValue getNullValue() {
         NValue retval(VALUE_TYPE_NULL);
+        retval.tagAsNull();
         return retval;
     }
 
@@ -2238,6 +2210,7 @@ inline int NValue::compare(const NValue rhs) const {
  * Set this NValue to null.
  */
 inline void NValue::setNull() {
+    tagAsNull(); // This gets overwritten for DECIMAL -- but that's OK.
     switch (getValueType())
     {
     case VALUE_TYPE_BOOLEAN:
@@ -2279,75 +2252,130 @@ inline void NValue::setNull() {
 }
 
 /**
- * Deserialize a scalar of the specified type from the tuple
+ * Initialize an NValue of the specified type from the tuple
  * storage area provided. If this is an Object type then the third
- * argument indicates whether the object is stored in the tuple
- * inline TODO: Could the isInlined argument be removed by have
- * the caller dereference the pointer?
+ * argument indicates whether the object is stored in the tuple inline.
  */
-inline const NValue NValue::deserializeFromTupleStorage(const void *storage,
-                                                 const ValueType type,
-                                                 const bool isInlined)
+inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, bool isInlined)
 {
     NValue retval(type);
     switch (type)
     {
     case VALUE_TYPE_TIMESTAMP:
         retval.getTimestamp() = *reinterpret_cast<const int64_t*>(storage);
+        if (retval.getTimestamp() == INT64_NULL) {
+            retval.tagAsNull();
+        }
         break;
     case VALUE_TYPE_TINYINT:
         retval.getTinyInt() = *reinterpret_cast<const int8_t*>(storage);
+        if (retval.getTinyInt() == INT8_NULL) {
+            retval.tagAsNull();
+        }
         break;
     case VALUE_TYPE_SMALLINT:
         retval.getSmallInt() = *reinterpret_cast<const int16_t*>(storage);
+        if (retval.getSmallInt() == INT16_NULL) {
+            retval.tagAsNull();
+        }
         break;
     case VALUE_TYPE_INTEGER:
         retval.getInteger() = *reinterpret_cast<const int32_t*>(storage);
+        if (retval.getInteger() == INT32_NULL) {
+            retval.tagAsNull();
+        }
         break;
     case VALUE_TYPE_BIGINT:
         retval.getBigInt() = *reinterpret_cast<const int64_t*>(storage);
+        if (retval.getBigInt() == INT64_NULL) {
+            retval.tagAsNull();
+        }
         break;
     case VALUE_TYPE_DOUBLE:
         retval.getDouble() = *reinterpret_cast<const double*>(storage);
+        if (retval.getDouble() <= DOUBLE_NULL) {
+            retval.tagAsNull();
+        }
         break;
     case VALUE_TYPE_DECIMAL:
-        ::memcpy( retval.m_data, storage, NValue::getTupleStorageSize(type));
+    {
+        ::memcpy(retval.m_data, storage, sizeof(TTInt));
         break;
+    }
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
     {
         //Potentially non-inlined type requires special handling
-        char* data = NULL;
         if (isInlined) {
             //If it is inlined the storage area contains the actual data so copy a reference
             //to the storage area
-            *reinterpret_cast<void**>(retval.m_data) = const_cast<void*>(storage);
-            data = *reinterpret_cast<char**>(retval.m_data);
+            char* inline_data = reinterpret_cast<char*>(const_cast<void*>(storage));
+            *reinterpret_cast<char**>(retval.m_data) = inline_data;
             retval.setSourceInlined(true);
-        } else {
-            //If it isn't inlined the storage area contains a pointer to the
-            // StringRef object containing the string's memory
-            memcpy( retval.m_data, storage, sizeof(void*));
-            StringRef* sref = *reinterpret_cast<StringRef**>(retval.m_data);
-            // If the StringRef pointer is null, that's because this
-            // was a null value; leave the data pointer as NULL so
-            // that getObjectLengthFromLocation will figure this out
-            // correctly, otherwise get the right char* from the StringRef
-            if (sref != NULL)
-            {
-                data = sref->get();
+            /**
+             * If a string is inlined in its storage location there will be no pointer to
+             * check for NULL. The length preceding value must be used instead.
+             */
+            if ((inline_data[0] & OBJECT_NULL_BIT) != 0) {
+                retval.tagAsNull();
+                break;
             }
+            int length = inline_data[0];
+            //std::cout << "NValue::initFromTupleStorage: length: " << length << std::endl;
+            retval.setObjectLength(length); // this unsets the null tag.
+            break;
         }
-        const int32_t length = getObjectLengthFromLocation(data);
-        //std::cout << "NValue::deserializeFromTupleStorage: length: " << length << std::endl;
-        retval.setObjectLength(length);
-        retval.setObjectLengthLength(getAppropriateObjectLengthLength(length));
+
+        // If it isn't inlined the storage area contains a pointer to the
+        // StringRef object containing the string's memory
+        StringRef* sref = *reinterpret_cast<StringRef**>(const_cast<void*>(storage));
+        *reinterpret_cast<StringRef**>(retval.m_data) = sref;
+        // If the StringRef pointer is null, that's because this
+        // was a null value; otherwise get the right char* from the StringRef
+        if (sref == NULL) {
+            retval.tagAsNull();
+            break;
+        }
+
+        // Cache the object length in the NValue.
+
+        /* The format for a length preceding value is a 1-byte short representation
+         * with the the 7th bit used to indicate a null value and the 8th bit used
+         * to indicate that this is part of a long representation and that 3 bytes
+         * follow. 6 bits are available to represent length for a maximum length
+         * of 63 bytes representable with a single byte length. 30 bits are available
+         * when the continuation bit is set and 3 bytes follow.
+         *
+         * The value is converted to network byte order so that the code
+         * will always know which byte contains the most signficant digits.
+         */
+
+        /*
+         * Generated mask that removes the null and continuation bits
+         * from a single byte length value
+         */
+        const char mask = ~static_cast<char>(OBJECT_NULL_BIT | OBJECT_CONTINUATION_BIT);
+
+        char* data = sref->get();
+        int32_t length = 0;
+        if ((data[0] & OBJECT_CONTINUATION_BIT) != 0) {
+            char numberBytes[4];
+            numberBytes[0] = static_cast<char>(data[0] & mask);
+            numberBytes[1] = data[1];
+            numberBytes[2] = data[2];
+            numberBytes[3] = data[3];
+            length = ntohl(*reinterpret_cast<int32_t*>(numberBytes));
+        } else {
+            length = data[0] & mask;
+        }
+
+        //std::cout << "NValue::initFromTupleStorage: length: " << length << std::endl;
+        retval.setObjectLength(length); // this unsets the null tag.
         break;
     }
     default:
-        throwDynamicSQLException(
-                "NValue::deserializeFromTupleStorage() unrecognized type '%s'",
-                getTypeName(type).c_str());
+        throwDynamicSQLException("NValue::initFromTupleStorage() invalid column type '%s'",
+                                 getTypeName(type).c_str());
     }
     return retval;
 }
@@ -2384,7 +2412,7 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
         *reinterpret_cast<double*>(storage) = getDouble();
         break;
       case VALUE_TYPE_DECIMAL:
-        ::memcpy( storage, m_data, NValue::getTupleStorageSize(type));
+        ::memcpy(storage, m_data, sizeof(TTInt));
         break;
       case VALUE_TYPE_VARCHAR:
       case VALUE_TYPE_VARBINARY:
@@ -2455,7 +2483,7 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
         *reinterpret_cast<double*>(storage) = getDouble();
         break;
       case VALUE_TYPE_DECIMAL:
-        ::memcpy( storage, m_data, NValue::getTupleStorageSize(type));
+        ::memcpy( storage, m_data, sizeof(TTInt));
         break;
       case VALUE_TYPE_VARCHAR:
       case VALUE_TYPE_VARBINARY:
@@ -2583,57 +2611,76 @@ inline void NValue::deserializeFromAllocateForStorage(SerializeInput &input, Poo
 inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeInput &input, Pool *dataPool)
 {
     setValueType(type);
+    // Parameter array NValue elements are reused from one executor call to the next,
+    // so these NValues need to forget they were ever null.
+    m_data[13] = 0; // effectively, this is tagAsNonNull()
     switch (type) {
-      case VALUE_TYPE_BIGINT:
+    case VALUE_TYPE_BIGINT:
         getBigInt() = input.readLong();
+        if (getBigInt() == INT64_NULL) {
+            tagAsNull();
+        }
         break;
-      case VALUE_TYPE_TIMESTAMP:
+    case VALUE_TYPE_TIMESTAMP:
         getTimestamp() = input.readLong();
+        if (getTimestamp() == INT64_NULL) {
+            tagAsNull();
+        }
         break;
-      case VALUE_TYPE_TINYINT:
+    case VALUE_TYPE_TINYINT:
         getTinyInt() = input.readByte();
+        if (getTinyInt() == INT8_NULL) {
+            tagAsNull();
+        }
         break;
-      case VALUE_TYPE_SMALLINT:
+    case VALUE_TYPE_SMALLINT:
         getSmallInt() = input.readShort();
+        if (getSmallInt() == INT16_NULL) {
+            tagAsNull();
+        }
         break;
-      case VALUE_TYPE_INTEGER:
+    case VALUE_TYPE_INTEGER:
         getInteger() = input.readInt();
+        if (getInteger() == INT32_NULL) {
+            tagAsNull();
+        }
         break;
-      case VALUE_TYPE_DOUBLE:
+    case VALUE_TYPE_DOUBLE:
         getDouble() = input.readDouble();
+        if (getDouble() <= DOUBLE_NULL) {
+            tagAsNull();
+        }
         break;
-      case VALUE_TYPE_VARCHAR:
-      case VALUE_TYPE_VARBINARY:
-      {
-          const int32_t length = input.readInt();
-          // the NULL SQL string is a NULL C pointer
-          if (length == OBJECTLENGTH_NULL) {
-              setNull();
-              break;
-          }
-          char* storage = allocateValueStorage(length, dataPool);
-          const char *str = (const char*) input.getRawPointer(length);
-          ::memcpy(storage, str, length);
-          break;
-      }
-      case VALUE_TYPE_DECIMAL: {
-          getDecimal().table[1] = input.readLong();
-          getDecimal().table[0] = input.readLong();
-          break;
-
-      }
-      case VALUE_TYPE_NULL: {
-          setNull();
-          break;
-      }
-      case VALUE_TYPE_ARRAY: {
-          deserializeIntoANewNValueList(input, dataPool);
-          break;
-      }
-      default:
-          throwDynamicSQLException(
-                  "NValue::deserializeFromAllocateForStorage() unrecognized type '%s'",
-                  getTypeName(type).c_str());
+    case VALUE_TYPE_VARCHAR:
+    case VALUE_TYPE_VARBINARY:
+    {
+        const int32_t length = input.readInt();
+        // the NULL SQL string is a NULL C pointer
+        if (length == OBJECTLENGTH_NULL) {
+            setNull();
+            break;
+        }
+        char* storage = allocateValueStorage(length, dataPool);
+        const char *str = (const char*) input.getRawPointer(length);
+        ::memcpy(storage, str, length);
+        break;
+    }
+    case VALUE_TYPE_DECIMAL: {
+        getDecimal().table[1] = input.readLong();
+        getDecimal().table[0] = input.readLong();
+        break;
+    }
+    case VALUE_TYPE_NULL: {
+        setNull();
+        break;
+    }
+    case VALUE_TYPE_ARRAY: {
+        deserializeIntoANewNValueList(input, dataPool);
+        break;
+    }
+    default:
+        throwDynamicSQLException("NValue::deserializeFromAllocateForStorage() unrecognized type '%s'",
+                                 getTypeName(type).c_str());
     }
 }
 
@@ -2759,14 +2806,7 @@ inline void NValue::allocateObjectFromInlinedValue(Pool* stringPool)
     assert(m_valueType == VALUE_TYPE_VARCHAR || m_valueType == VALUE_TYPE_VARBINARY);
     assert(m_sourceInlined);
 
-    // Not sure why there need to be two ways to signify NULL,
-    // maybe it simplifies value transfer from inline tuple storage
-    // to be able to use the second object-length-based form,
-    // but since this is how isNull works, do likewise.
-    if (*reinterpret_cast<void* const*>(m_data) == NULL ||
-        *reinterpret_cast<const int32_t*>(&m_data[8]) == OBJECTLENGTH_NULL) {
-        // Standardize on the more direct NULL representation.
-        // The object-length-based form of NULL appears to only be expected for inlined values.
+    if (isNull()) {
         *reinterpret_cast<void**>(m_data) = NULL;
         // serializeToTupleStorage fusses about this inline flag being set, even for NULLs
         setSourceInlined(false);
@@ -2790,41 +2830,12 @@ inline void NValue::allocateObjectFromInlinedValue(Pool* stringPool)
 }
 
 inline bool NValue::isNull() const {
-    switch (getValueType()) {
-        case VALUE_TYPE_NULL:
-        case VALUE_TYPE_INVALID:
-            return true;
-        case VALUE_TYPE_BOOLEAN:
-            return *reinterpret_cast<const int8_t*>(m_data) == INT8_NULL;
-        case VALUE_TYPE_TINYINT:
-            return getTinyInt() == INT8_NULL;
-        case VALUE_TYPE_SMALLINT:
-            return getSmallInt() == INT16_NULL;
-        case VALUE_TYPE_INTEGER:
-            return getInteger() == INT32_NULL;
-        case VALUE_TYPE_TIMESTAMP:
-        case VALUE_TYPE_BIGINT:
-            return getBigInt() == INT64_NULL;
-        case VALUE_TYPE_ADDRESS:
-            return *reinterpret_cast<void* const*>(m_data) == NULL;
-        case VALUE_TYPE_DOUBLE:
-            return getDouble() <= DOUBLE_NULL;
-        case VALUE_TYPE_VARCHAR:
-        case VALUE_TYPE_VARBINARY:
-            return *reinterpret_cast<void* const*>(m_data) == NULL ||
-            *reinterpret_cast<const int32_t*>(&m_data[8]) == OBJECTLENGTH_NULL;
-        case VALUE_TYPE_DECIMAL: {
-            TTInt min;
-            min.SetMin();
-            return getDecimal() == min;
-        }
-        case VALUE_TYPE_ARRAY:
-            return false;
-        default:
-            throwDynamicSQLException("NValue::isNull() called with unknown ValueType '%s'",
-                                     getValueTypeString().c_str());
+    if (getValueType() == VALUE_TYPE_DECIMAL) {
+        TTInt min;
+        min.SetMin();
+        return getDecimal() == min;
     }
-    return false;
+    return m_data[13] == OBJECT_NULL_BIT;
 }
 
 inline bool NValue::isNaN() const {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,11 +20,11 @@ package org.voltdb.planner.microoptimizations;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
-import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DeterminismMode;
+import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
+import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
@@ -51,7 +51,8 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
     }
 
     @Override
-    public List<CompiledPlan> apply(CompiledPlan plan, Database db) {
+    public List<CompiledPlan> apply(CompiledPlan plan, AbstractParsedStmt parsedStmt) {
+        this.m_parsedStmt = parsedStmt;
         ArrayList<CompiledPlan> retval = new ArrayList<CompiledPlan>();
 
         //TODO: This should not further penalize seqscan plans that have
@@ -60,7 +61,7 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
         AbstractPlanNode planGraph = plan.rootPlanGraph;
 
         if (!plan.isOrderDeterministic()) {
-            planGraph = recursivelyApply(planGraph, db);
+            planGraph = recursivelyApply(planGraph);
             plan.rootPlanGraph = planGraph;
         }
 
@@ -68,7 +69,7 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
         return retval;
     }
 
-    AbstractPlanNode recursivelyApply(AbstractPlanNode plan, Database db)
+    AbstractPlanNode recursivelyApply(AbstractPlanNode plan)
     {
         assert(plan != null);
 
@@ -84,7 +85,7 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
 
         for (AbstractPlanNode child : children) {
             // TODO this will break when children feed multiple parents
-            AbstractPlanNode newChild = recursivelyApply(child, db);
+            AbstractPlanNode newChild = recursivelyApply(child);
             // Do a graft into the (parent) plan only if a replacement for a child was found.
             if (newChild == child) {
                 continue;
@@ -99,15 +100,15 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
         }
         SeqScanPlanNode scanNode = (SeqScanPlanNode) plan;
 
-        if (scanNode.isSubQuery() == true) {
+        if (scanNode.isSubQuery()) {
             // This is a sub-query and can't have indexes
             return plan;
         }
 
         // got here? we're got ourselves a sequential scan over a real table
         assert (scanNode.getChildCount() == 0);
-        String tableName = scanNode.getTargetTableName();
-        Table table = db.getTables().get(tableName);
+        StmtTableScan tableScan = scanNode.getTableScan();
+        assert(tableScan != null);
 
         Index indexToScan = null;
 
@@ -115,7 +116,7 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
         // note: This is not the same as picking the narrowest key in c++,
         // which is probably what you want if it turns out this optimization
         // does anything for performance at all.
-        for (Index index : table.getIndexes()) {
+        for (Index index : tableScan.getIndexes()) {
             // skip non-unique indexes
             if (index.getUnique() == false) {
                 continue;

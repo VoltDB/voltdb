@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,6 +23,9 @@ import java.util.Date;
 import org.json_voltpatches.JSONString;
 import org.voltdb.common.Constants;
 
+/**
+ * Represent a microsecond-accurate VoltDB timestamp type.
+ */
 public class TimestampType implements JSONString, Comparable<TimestampType> {
     /**
      * Create a TimestampType from microseconds from epoch.
@@ -37,7 +40,7 @@ public class TimestampType implements JSONString, Comparable<TimestampType> {
     /**
      * Create a TimestampType from a Java Date class.
      * Microseconds will be rounded to zero.
-     * @param Java Date instance.
+     * @param date Java Date instance.
      */
     public TimestampType(Date date) {
         m_usecs = 0;
@@ -57,6 +60,14 @@ public class TimestampType implements JSONString, Comparable<TimestampType> {
         return (timeInMillis * 1000) + ((fractionalSecondsInNanos % 1000000)/1000);
     }
 
+    /**
+     * Given a string parseable by the JDBC Timestamp parser, return the fractional component
+     * in milliseconds.
+     *
+     * @param param A timstamp in string format that is parseable by JDBC.
+     * @return The fraction of a second portion of this timestamp expressed in milliseconds.
+     * @throws IllegalArgumentException if the timestamp uses higher than millisecond precision.
+     */
     public static long millisFromJDBCformat(String param) {
         java.sql.Timestamp sqlTS = java.sql.Timestamp.valueOf(param);
         final long fractionalSecondsInNanos = sqlTS.getNanos();

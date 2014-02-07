@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -538,12 +538,12 @@ public class TestJSONInterface extends TestCase {
         // Call @AdHoc with zero parameters
         pset = ParameterSet.emptyParameterSet();
         responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
-        assertTrue(responseJSON.contains("Adhoc system procedure requires exactly one or two parameters"));
+        assertTrue(responseJSON.contains("Adhoc system procedure requires at least the query parameter."));
 
         // Call @AdHoc with many parameters (more than 2)
         pset = ParameterSet.fromArrayNoCopy("select * from blah", "foo", "bar");
         responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
-        assertTrue(responseJSON.contains("Adhoc system procedure requires exactly one or two parameters"));
+        assertTrue(responseJSON.contains("Unable to execute adhoc sql statement(s): Too many actual arguments were passed for the parameters in the sql statement(s): (2 vs. 0)"));
 
     } finally {
         if (server != null) {

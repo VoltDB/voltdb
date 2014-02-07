@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,11 +22,14 @@ import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.SelectionKey;
 import java.util.ArrayDeque;
+import java.util.concurrent.TimeUnit;
 
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
+import org.voltcore.utils.RateLimitedLogger;
 
 /**
 *
@@ -219,7 +222,8 @@ public class NIOWriteStream implements WriteStream {
             ByteBuffer buffer = null;
             if (m_currentWriteBuffer == null) {
                 m_currentWriteBuffer = m_queuedBuffers.poll();
-                buffer = (ByteBuffer) m_currentWriteBuffer.b.flip();
+                buffer = m_currentWriteBuffer.b;
+                buffer.flip();
             } else {
                 buffer = m_currentWriteBuffer.b;
             }
@@ -355,8 +359,21 @@ public class NIOWriteStream implements WriteStream {
         while ((ds = oldlist.poll()) != null) {
             ByteBuffer data[] = ds.serialize();
             for (ByteBuffer buf : data) {
-                assert(buf.limit() == buf.capacity());//No sloppy serialization, we can allow it later if necessary
-                buf.clear();
+                if (buf.limit() != buf.capacity()) {
+                    boolean assertOn = false;
+                    assert (assertOn = true);
+                    if (assertOn) {
+                        networkLog.fatal("Sloppy serialization size for message class " + ds);
+                        System.exit(-1);
+                    }
+                    RateLimitedLogger.tryLogForMessage(
+                            "Sloppy serialization size for message class " + ds,
+                            System.currentTimeMillis(),
+                            1, TimeUnit.HOURS,
+                            networkLog,
+                            Level.WARN);
+                }
+                buf.position(0);
                 bytesQueued += buf.remaining();
                 while (buf.hasRemaining()) {
                     BBContainer outCont = m_queuedBuffers.peekLast();
@@ -387,7 +404,13 @@ public class NIOWriteStream implements WriteStream {
         int bytesReleased = 0;
         m_isShutdown = true;
         BBContainer c = null;
+        if (m_currentWriteBuffer != null) {
+            bytesReleased += m_currentWriteBuffer.b.remaining();
+            m_currentWriteBuffer.discard();
+        }
         while ((c = m_queuedBuffers.poll()) != null) {
+            //Buffer is not flipped after being written to in swap and serialize, need to do it here
+            c.b.flip();
             bytesReleased += c.b.remaining();
             c.discard();
         }

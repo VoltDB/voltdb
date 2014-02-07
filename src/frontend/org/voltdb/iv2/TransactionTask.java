@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,8 +17,11 @@
 
 package org.voltdb.iv2;
 
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.VoltDB;
 import org.voltdb.dtxn.TransactionState;
 
 public abstract class TransactionTask extends SiteTasker
@@ -28,11 +31,32 @@ public abstract class TransactionTask extends SiteTasker
 
     final protected TransactionState m_txnState;
     final protected TransactionTaskQueue m_queue;
+    protected ListenableFuture<Object> m_durabilityBackpressureFuture = CoreUtils.COMPLETED_FUTURE;
 
     public TransactionTask(TransactionState txnState, TransactionTaskQueue queue)
     {
         m_txnState = txnState;
         m_queue = queue;
+    }
+
+    public TransactionTask setDurabilityBackpressureFuture(ListenableFuture<Object> fut) {
+        m_durabilityBackpressureFuture = fut;
+        return this;
+    }
+
+    /*
+     * If async command logging is in use and the command log isn't keeping up
+     * an incomplete future will be populated here and can be waited on.
+     *
+     * Otherwise it will be null or will be populated with a completed future that
+     * returns immediately.
+     */
+    protected void waitOnDurabilityBackpressureFuture() {
+        try {
+            m_durabilityBackpressureFuture.get();
+        } catch (Throwable t) {
+            VoltDB.crashLocalVoltDB("Unexpected exception waiting for durability future", true, t);
+        }
     }
 
     @Override

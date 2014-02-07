@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -74,9 +74,6 @@ public class CompiledPlan {
     /** Parameter values, if the planner pulled constants out of the plan */
     public ParameterSet extractedParamValues = ParameterSet.emptyParameterSet();
 
-    /** A list of output column ids, indexes and types */
-    public NodeSchema columns = new NodeSchema();
-
     public ParsedSelectStmt  selectStmt = null;
 
     /**
@@ -102,7 +99,7 @@ public class CompiledPlan {
     /** Which extracted param is the partitioning object (assuming parameterized plans) */
     public int partitioningKeyIndex = -1;
 
-    private Object m_partitioningKey;
+    private Object m_partitioningValue;
 
     void resetPlanNodeIds() {
         int nextId = resetPlanNodeIds(rootPlanGraph, 1);
@@ -194,12 +191,12 @@ public class CompiledPlan {
         return total;
     }
 
-    public void setPartitioningKey(Object object) {
-        m_partitioningKey = object;
+    public void setPartitioningValue(Object object) {
+        m_partitioningValue = object;
     }
 
-    public Object getPartitioningKey() {
-        return m_partitioningKey;
+    public Object getPartitioningValue() {
+        return m_partitioningValue;
     }
 
     public static byte[] bytesForPlan(AbstractPlanNode planGraph) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -1143,7 +1143,7 @@ TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
     TBMap blocks(getTableData());
     getBlocksPendingSnapshot().swap(getBlocksNotPendingSnapshot());
     getBlocksPendingSnapshotLoad().swap(getBlocksNotPendingSnapshotLoad());
-    voltdb::CopyOnWriteIterator COWIterator(m_table, &getSurgeon(), blocks.begin(), blocks.end());
+    voltdb::CopyOnWriteIterator COWIterator(m_table, &getSurgeon(), blocks);
     TableTuple tuple(m_table->schema());
     TableTuple COWTuple(m_table->schema());
 

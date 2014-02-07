@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -38,6 +38,7 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
@@ -103,11 +104,11 @@ public class MaterializedViewFixInfo {
             List<ParsedColInfo> displayColumns, List<ParsedColInfo> groupByColumns) {
 
         // Check valid cases first
-//@TODO
-if (mvTableScan.getScanType() != StmtTableScan.TABLE_SCAN_TYPE.TARGET_TABLE_SCAN) {
-    return false;
-}
-        Table table = mvTableScan.getTargetTable();
+        //@TODO
+        if  ( ! (mvTableScan instanceof StmtTargetTableScan)) {
+            return false;
+        }
+        Table table = ((StmtTargetTableScan)mvTableScan).getTargetTable();
         assert (table != null);
         String mvTableName = table.getTypeName();
         Table srcTable = table.getMaterializer();
@@ -119,7 +120,7 @@ if (mvTableScan.getScanType() != StmtTableScan.TABLE_SCAN_TYPE.TARGET_TABLE_SCAN
             return false;
         }
 
-        String partitionColName = partitionCol.getName();
+        int partitionColIndex = partitionCol.getIndex();
         MaterializedViewInfo mvInfo = srcTable.getViews().get(mvTableName);
 
         int numOfGroupByColumns;
@@ -128,7 +129,7 @@ if (mvTableScan.getScanType() != StmtTableScan.TABLE_SCAN_TYPE.TARGET_TABLE_SCAN
         if (complexGroupbyJson.length() > 0) {
             List<AbstractExpression> mvComplexGroupbyCols = null;
             try {
-                mvComplexGroupbyCols = AbstractExpression.fromJSONArrayString(complexGroupbyJson);
+                mvComplexGroupbyCols = AbstractExpression.fromJSONArrayString(complexGroupbyJson, null);
             } catch (JSONException e) {
                 e.printStackTrace();
             }
@@ -137,7 +138,7 @@ if (mvTableScan.getScanType() != StmtTableScan.TABLE_SCAN_TYPE.TARGET_TABLE_SCAN
             for (AbstractExpression expr: mvComplexGroupbyCols) {
                 if (expr instanceof TupleValueExpression) {
                     TupleValueExpression tve = (TupleValueExpression) expr;
-                    if (tve.getColumnName().equals(partitionColName)) {
+                    if (tve.getColumnIndex() == partitionColIndex) {
                         // If group by columns contain partition column from source table.
                         // Then, query on MV table will have duplicates from each partition.
                         // There is no need to fix this case, so just return.
@@ -150,7 +151,7 @@ if (mvTableScan.getScanType() != StmtTableScan.TABLE_SCAN_TYPE.TARGET_TABLE_SCAN
             numOfGroupByColumns = mvSimpleGroupbyCols.size();
 
             for (ColumnRef colRef: mvSimpleGroupbyCols) {
-                if (colRef.getColumn().getName().equals(partitionColName)) {
+                if (colRef.getColumn().getIndex() == partitionColIndex) {
                     // If group by columns contain partition column from source table.
                     // Then, query on MV table will have duplicates from each partition.
                     // There is no need to fix this case, so just return.

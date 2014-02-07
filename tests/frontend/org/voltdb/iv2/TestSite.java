@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -41,15 +41,22 @@ public class TestSite {
     public void testReplayFilter()
     {
         // Replay normal SPs
-        assertFalse(Site.filter(makeInit(false)));
+        assertFalse(Site.filter(makeInit("Blah")));
 
-        // Replay SP Adhoc
-        assertFalse(Site.filter(makeInit(true)));
+        // @LoadSinglePartitionTable a durable sysproc
+        assertFalse(Site.filter(makeInit("@LoadSinglePartitionTable")));
+
+        // Replay a sysproc thats not durable
+        assertTrue(Site.filter(makeInit("@Quiesce")));
 
         // Replay @BalancePartitions fragments
         assertFalse(Site.filter(makeFrag(true, SysProcFragmentId.PF_prepBalancePartitions)));
         assertFalse(Site.filter(makeFrag(true, SysProcFragmentId.PF_balancePartitions)));
         assertFalse(Site.filter(makeFrag(true, SysProcFragmentId.PF_balancePartitionsData)));
+        // Replay @LoadMultipartitionTable fragments
+        assertFalse(Site.filter(makeFrag(true, SysProcFragmentId.PF_distribute)));
+        // Replay filter rejects @SnapshotRestore fragments
+        assertTrue(Site.filter(makeFrag(true, SysProcFragmentId.PF_restoreAsyncRunLoop)));
 
         // Replay complete msgs
         assertFalse(Site.filter(makeComplete()));
@@ -67,14 +74,9 @@ public class TestSite {
         return msg;
     }
 
-    private static Iv2InitiateTaskMessage makeInit(boolean adhoc)
-    {
+    private static Iv2InitiateTaskMessage makeInit(String procName)    {
         Iv2InitiateTaskMessage msg = mock(Iv2InitiateTaskMessage.class);
-        if (adhoc) {
-            doReturn("@AdHoc").when(msg).getStoredProcedureName();
-        } else {
-            doReturn("Blah").when(msg).getStoredProcedureName();
-        }
+        doReturn(procName).when(msg).getStoredProcedureName();
         return msg;
     }
 

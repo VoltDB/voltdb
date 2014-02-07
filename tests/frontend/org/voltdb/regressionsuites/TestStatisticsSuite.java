@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import junit.framework.Test;
 
@@ -42,6 +43,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.join.BalancePartitionsStatistics;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.SaveRestoreBase;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
@@ -49,7 +51,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
 
     private static int SITES = 2;
     private static int HOSTS = 3;
-    private static int KFACTOR = 1;
+    private static int KFACTOR = MiscUtils.isPro() ? 1 : 0;
     private static int PARTITIONS = (SITES * HOSTS) / (KFACTOR + 1);
     private static boolean hasLocalServer = false;
 
@@ -102,7 +104,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
     // the column designated by 'columnName' has the value 'rowId'.  For example, for
     // Table stats, if columnName is 'TABLE_NAME' and rowId is 'foo', this
     // will verify that each site has returned results for table 'foo'
-    public void validateRowSeenAtAllSites(VoltTable result, String columnName, String rowId,
+    public boolean validateRowSeenAtAllSites(VoltTable result, String columnName, String rowId,
             boolean enforceUnique)
     {
         result.resetRowPosition();
@@ -120,7 +122,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
                 sitesSeen.add(thisSiteId);
             }
         }
-        assertEquals(HOSTS * SITES, sitesSeen.size());
+        return (HOSTS * SITES) == sitesSeen.size();
     }
 
     // For the provided table, verify that there is a row for each partition in the cluster where
@@ -316,19 +318,34 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
         VoltTable[] results = null;
-        // table
-        //
-        results = client.callProcedure("@Statistics", "table", 0).getResults();
-        System.out.println("Test statistics table: " + results[0].toString());
-        // one aggregate table returned
-        assertEquals(1, results.length);
-        validateSchema(results[0], expectedTable);
-        // with 10 rows per site. Can be two values depending on the test scenario of cluster vs. local.
-        assertEquals(HOSTS * SITES * 3, results[0].getRowCount());
-        // Validate that each site returns a result for each table
-        validateRowSeenAtAllSites(results[0], "TABLE_NAME", "WAREHOUSE", true);
-        validateRowSeenAtAllSites(results[0], "TABLE_NAME", "NEW_ORDER", true);
-        validateRowSeenAtAllSites(results[0], "TABLE_NAME", "ITEM", true);
+        boolean success = false;
+        long start = System.currentTimeMillis();
+        while (!success) {
+            if (System.currentTimeMillis() - start > 60000) fail("Took too long");
+            success = true;
+            // table
+            //
+            results = client.callProcedure("@Statistics", "table", 0).getResults();
+            System.out.println("Test statistics table: " + results[0].toString());
+            // one aggregate table returned
+            assertEquals(1, results.length);
+            validateSchema(results[0], expectedTable);
+            // with 10 rows per site. Can be two values depending on the test scenario of cluster vs. local.
+            if (HOSTS * SITES * 3 != results[0].getRowCount()) {
+                success = false;
+            }
+            // Validate that each site returns a result for each table
+            if (success) {
+                success = validateRowSeenAtAllSites(results[0], "TABLE_NAME", "WAREHOUSE", true);
+            }
+            if (success) {
+                success = validateRowSeenAtAllSites(results[0], "TABLE_NAME", "NEW_ORDER", true);
+            }
+            if (success) {
+                validateRowSeenAtAllSites(results[0], "TABLE_NAME", "ITEM", true);
+            }
+            if (success) break;
+        }
     }
 
     public void testIndexStatistics() throws Exception {
@@ -352,12 +369,23 @@ public class TestStatisticsSuite extends SaveRestoreBase {
 
         VoltTable[] results = null;
 
-        results = client.callProcedure("@Statistics", "index", 0).getResults();
-        System.out.println("Index results: " + results[0].toString());
-        assertEquals(1, results.length);
-        validateSchema(results[0], expectedTable);
-        validateRowSeenAtAllSites(results[0], "INDEX_NAME", "SYS_IDX_W_PK_TREE_10018", true);
-        validateRowSeenAtAllSites(results[0], "INDEX_NAME", "SYS_IDX_I_PK_TREE_10020", true);
+        boolean success = false;
+        long start = System.currentTimeMillis();
+        while (!success) {
+            if (System.currentTimeMillis() - start > 60000) fail("Took too long");
+            success = true;
+            results = client.callProcedure("@Statistics", "index", 0).getResults();
+            System.out.println("Index results: " + results[0].toString());
+            assertEquals(1, results.length);
+            validateSchema(results[0], expectedTable);
+            if (success) {
+                success = validateRowSeenAtAllSites(results[0], "INDEX_NAME", "SYS_IDX_W_PK_TREE_10018", true);
+            }
+            if (success) {
+                success = validateRowSeenAtAllSites(results[0], "INDEX_NAME", "SYS_IDX_I_PK_TREE_10020", true);
+            }
+            if (success) break;
+        }
     }
 
     public void testMemoryStatistics() throws Exception {
@@ -431,6 +459,14 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         // Induce procedure invocations on all partitions.  May fail in non-legacy hashing case
         // this plus R/W replication should ensure that every site on every node runs this transaction
         // at least once
+
+        results = client.callProcedure("@GetPartitionKeys", "INTEGER").getResults();
+        VoltTable keys = results[0];
+        for (int k = 0;k < keys.getRowCount(); k++) {
+            long key = keys.fetchRow(k).getLong(1);
+            client.callProcedure("NEW_ORDER.insert", key);
+        }
+
         for (int i = 0; i < HOSTS * SITES; i++) {
             client.callProcedure("NEW_ORDER.insert", i);
         }
@@ -895,6 +931,11 @@ public class TestStatisticsSuite extends SaveRestoreBase {
 
     public void testSnapshotStatus() throws Exception {
         System.out.println("\n\nTESTING SNAPSHOTSTATUS\n\n\n");
+        if (KFACTOR == 0) {
+            // SnapshotSave is a PRO feature starting from 4.0
+            return;
+        }
+
         Client client  = getFullyConnectedClient();
 
         ColumnInfo[] expectedSchema = new ColumnInfo[14];
@@ -1004,6 +1045,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
     }
 
     public void testRebalanceStats() throws Exception {
+        System.out.println("testRebalanceStats");
         // Test constants
         final int DURATION_SECONDS = 10;
         final int INVOCATION_SLEEP_MILLIS = 500;
@@ -1027,7 +1069,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
             int ranges = r.nextInt(RANGES_TO_MOVE / loopCount);
             int bytes = r.nextInt(BYTES_TO_MOVE / loopCount);
             int rows = r.nextInt(ROWS_TO_MOVE / loopCount);
-            bps.logBalanceEnds(ranges, bytes, invocationTimeMS, rows);
+            bps.logBalanceEnds(ranges, bytes, TimeUnit.MILLISECONDS.toNanos(invocationTimeMS), TimeUnit.MILLISECONDS.toNanos(invocationTimeMS), rows);
             checker.update(ranges, bytes, rows);
             checker.check(bps.getLastStatsPoint());
             int idleTimeMS = r.nextInt(IDLE_SLEEP_MILLIS);

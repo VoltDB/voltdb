@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -45,11 +45,13 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
+import org.voltdb.compiler.Language;
 import org.voltdb.compiler.ProcedureCompiler;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
+import org.voltdb.groovy.GroovyScriptProcedureDelegate;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.planner.ActivePlanRepository;
@@ -107,6 +109,7 @@ public class ProcedureRunner {
     protected ProcedureStatsCollector m_statsCollector;
     protected final Procedure m_catProc;
     protected final boolean m_isSysProc;
+    protected final Language m_language;
 
     // dependency ids for ad hoc
     protected final static int AGG_DEPID = 1;
@@ -124,6 +127,17 @@ public class ProcedureRunner {
         public final SQLStmt sql = new SQLStmt("TBD");
     }
 
+    private final static Language.Visitor<String, VoltProcedure> procedureNameRetriever =
+            new Language.Visitor<String, VoltProcedure>() {
+                @Override
+                public String visitJava(VoltProcedure p) {
+                    return p.getClass().getSimpleName();
+                }
+                @Override
+                public String visitGroovy(VoltProcedure p) {
+                    return ((GroovyScriptProcedureDelegate)p).getProcedureName();
+                }
+            };
 
     ProcedureRunner(VoltProcedure procedure,
                     SiteProcedureConnection site,
@@ -132,11 +146,21 @@ public class ProcedureRunner {
                     CatalogSpecificPlanner csp) {
         assert(m_inputCRC.getValue() == 0L);
 
+        String language = catProc.getLanguage();
+
+        if (language != null && !language.trim().isEmpty()) {
+            m_language = Language.valueOf(language.trim().toUpperCase());
+        } else if (procedure instanceof StmtProcedure){
+            m_language = null;
+        } else {
+            m_language = Language.JAVA;
+        }
+
         if (procedure instanceof StmtProcedure) {
             m_procedureName = catProc.getTypeName().intern();
         }
         else {
-            m_procedureName = procedure.getClass().getSimpleName();
+            m_procedureName = m_language.accept(procedureNameRetriever, procedure);
         }
         m_procedure = procedure;
         m_isSysProc = procedure instanceof VoltSystemProcedure;
@@ -256,15 +280,25 @@ public class ProcedureRunner {
             // run a regular java class
             if (m_catProc.getHasjava()) {
                 try {
-                    if (log.isTraceEnabled()) {
-                        log.trace("invoking... procMethod=" + m_procMethod.getName() + ", class=" + getClass().getName());
+                    if (m_language == Language.JAVA) {
+                        if (log.isTraceEnabled()) {
+                            log.trace("invoking... procMethod=" + m_procMethod.getName() + ", class=" + getClass().getName());
+                        }
+                        try {
+                            Object rawResult = m_procMethod.invoke(m_procedure, paramList);
+                            results = getResultsFromRawResults(rawResult);
+                        } catch (IllegalAccessException e) {
+                            // If reflection fails, invoke the same error handling that other exceptions do
+                            throw new InvocationTargetException(e);
+                        }
                     }
-                    try {
-                        Object rawResult = m_procMethod.invoke(m_procedure, paramList);
+                    else if (m_language == Language.GROOVY) {
+                        if (log.isTraceEnabled()) {
+                            log.trace("invoking... groovy closure on class=" + getClass().getName());
+                        }
+                        GroovyScriptProcedureDelegate proc = (GroovyScriptProcedureDelegate)m_procedure;
+                        Object rawResult = proc.invoke(paramList);
                         results = getResultsFromRawResults(rawResult);
-                    } catch (IllegalAccessException e) {
-                        // If reflection fails, invoke the same error handling that other exceptions do
-                        throw new InvocationTargetException(e);
                     }
                     log.trace("invoked");
                 }
@@ -290,8 +324,7 @@ public class ProcedureRunner {
             else {
                 assert(m_catProc.getStatements().size() == 1);
                 try {
-                    m_cachedSingleStmt.params = getCleanParams(
-                            m_cachedSingleStmt.stmt, paramList);
+                    m_cachedSingleStmt.params = getCleanParams(m_cachedSingleStmt.stmt, paramList);
                     if (getHsqlBackendIfExists() != null) {
                         // HSQL handling
                         VoltTable table =
@@ -367,25 +400,29 @@ public class ProcedureRunner {
      * @param txnState
      * @return true if the txn hashes to the current partition, false otherwise
      */
-    public boolean checkPartition(TransactionState txnState) {
-        TheHashinator.HashinatorType hashinatorType = TheHashinator.getConfiguredHashinatorType();
-        if (hashinatorType == TheHashinator.HashinatorType.LEGACY) {
-            // Legacy hashinator is not used for elastic, no need to check partitioning. In fact,
-            // since SP sysprocs all pass partitioning parameters as bytes,
-            // they will hash to different partitions using the legacy hashinator. So don't do it.
-            return true;
-        }
-
+    public boolean checkPartition(TransactionState txnState, TheHashinator hashinator) {
         if (m_catProc.getSinglepartition()) {
+            TheHashinator.HashinatorType hashinatorType = hashinator.getConfigurationType();
+            if (hashinatorType == TheHashinator.HashinatorType.LEGACY) {
+                // Legacy hashinator is not used for elastic, no need to check partitioning. In fact,
+                // since SP sysprocs all pass partitioning parameters as bytes,
+                // they will hash to different partitions using the legacy hashinator. So don't do it.
+                return true;
+            }
+
             StoredProcedureInvocation invocation = txnState.getInvocation();
-            int parameterType = m_catProc.getPartitioncolumn().getType();
-            int partitionparameter = m_catProc.getPartitionparameter();
-            Object parameterAtIndex = invocation.getParameterAtIndex(partitionparameter);
+            int parameterType;
+            Object parameterAtIndex;
 
             // check if AdHoc_RO_SP or AdHoc_RW_SP
             if (m_procedure instanceof AdHocBase) {
                 // ClientInterface should pre-validate this param is valid
-                parameterType = (Byte) invocation.getParameterAtIndex(partitionparameter + 1);
+                parameterAtIndex = invocation.getParameterAtIndex(0);
+                parameterType = (Byte) invocation.getParameterAtIndex(1);
+            } else {
+                parameterType = m_catProc.getPartitioncolumn().getType();
+                int partitionparameter = m_catProc.getPartitionparameter();
+                parameterAtIndex = invocation.getParameterAtIndex(partitionparameter);
             }
 
             // Note that @LoadSinglepartitionTable has problems if the parititoning param
@@ -395,7 +432,7 @@ public class ProcedureRunner {
             // before we initiate the proc (like adhocs).
 
             try {
-                int partition = TheHashinator.getPartitionForParameter(parameterType, parameterAtIndex);
+                int partition = hashinator.getHashedPartitionForParameter(parameterType, parameterAtIndex);
                 if (partition == m_site.getCorrespondingPartitionId()) {
                     return true;
                 } else {
@@ -509,20 +546,19 @@ public class ProcedureRunner {
         }
 
         try {
-            AdHocPlannedStmtBatch paw = m_csp.plan( sql, !m_catProc.getSinglepartition(),
-                    ProcedureInvocationType.ORIGINAL, 0, 0).get();
-            if (paw.errorMsg != null) {
-                throw new VoltAbortException("Failed to plan sql '" + sql + "' error: " + paw.errorMsg);
+            AdHocPlannedStmtBatch batch = m_csp.plan(sql, args, m_catProc.getSinglepartition()).get();
+            if (batch.errorMsg != null) {
+                throw new VoltAbortException("Failed to plan sql '" + sql + "' error: " + batch.errorMsg);
             }
 
-            if (m_catProc.getReadonly() && !paw.isReadOnly()) {
+            if (m_catProc.getReadonly() && !batch.isReadOnly()) {
                 throw new VoltAbortException("Attempted to queue DML adhoc sql '" + sql + "' from read only procedure");
             }
 
-            assert(1 == paw.plannedStatements.size());
+            assert(1 == batch.plannedStatements.size());
 
             QueuedSQL queuedSQL = new QueuedSQL();
-            AdHocPlannedStatement plannedStatement = paw.plannedStatements.get(0);
+            AdHocPlannedStatement plannedStatement = batch.plannedStatements.get(0);
 
             long aggFragId = ActivePlanRepository.loadOrAddRefPlanFragment(
                     plannedStatement.core.aggregatorHash, plannedStatement.core.aggregatorFragment);
@@ -544,24 +580,33 @@ public class ProcedureRunner {
                     plannedStatement.core.readOnly,
                     plannedStatement.core.parameterTypes,
                     m_site);
-            if (plannedStatement.extractedParamValues.size() == 0) {
-                // case handles if there were parameters OR
-                // if there were no constants to pull out
-                queuedSQL.params = getCleanParams(queuedSQL.stmt, args);
-            }
-            else {
+            Object[] argumentParams = args;
+            // case handles if there were parameters OR
+            // if there were no constants to pull out
+            // In the current scheme, which does not support combining user-provided parameters
+            // with planner-extracted parameters in the same statement, an original sql statement
+            // containing parameters to match its provided arguments should bypass the parameterizer,
+            // so there should be no extracted params.
+            // The presence of extracted paremeters AND user-provided arguments can only arise when
+            // the arguments have no user-specified parameters in the sql statement
+            // to put these arguments to use -- these are invalid, so flag an error.
+            // Even the special "partitioning argument" provided to @AdHocSpForTest with no
+            // corresponding parameter in the sql should have been noted and discarded by the
+            // dispatcher before reaching this ProcedureRunner. This opens the possibility of
+            // supporting @AdHocSpForTest with queries that contain '?' parameters.
+            if (plannedStatement.hasExtractedParams()) {
                 if (args.length > 0) {
                     throw new ExpectedProcedureException(
                             "Number of arguments provided was " + args.length  +
-                            " where 0 were expected for statement " + sql);
+                            " where 0 were expected for statement: " + sql);
                 }
-                Object[] extractedParams = plannedStatement.extractedParamValues.toArray();
-                if (extractedParams.length != queuedSQL.stmt.statementParamJavaTypes.length) {
-                    String msg = String.format("Wrong number of extracted param for parameterized statement: %s", sql);
+                argumentParams = plannedStatement.extractedParamArray();
+                if (argumentParams.length != queuedSQL.stmt.statementParamJavaTypes.length) {
+                    String msg = String.format("Wrong number of params for parameterized statement: %s", sql);
                     throw new VoltAbortException(msg);
                 }
-                queuedSQL.params = getCleanParams(queuedSQL.stmt, extractedParams);
             }
+            queuedSQL.params = getCleanParams(queuedSQL.stmt, argumentParams);
 
             updateCRC(queuedSQL);
             m_batch.add(queuedSQL);
@@ -699,7 +744,7 @@ public class ProcedureRunner {
         return sysproc.executePlanFragment(dependencies, fragmentId, params, m_systemProcedureContext);
     }
 
-    protected ParameterSet getCleanParams(SQLStmt stmt, Object... inArgs) {
+    private final ParameterSet getCleanParams(SQLStmt stmt, Object... inArgs) {
         final int numParamTypes = stmt.statementParamJavaTypes.length;
         final byte stmtParamTypes[] = stmt.statementParamJavaTypes;
         final Object[] args = new Object[numParamTypes];
@@ -771,8 +816,12 @@ public class ProcedureRunner {
         stmt.statementParamJavaTypes = new byte[numStatementParamJavaTypes];
         for (StmtParameter param : catStmt.getParameters()) {
             stmt.statementParamJavaTypes[param.getIndex()] = (byte)param.getJavatype();
+            // ??? How does the SQLStmt successfully handle IN LIST queries without
+            // caching the value of param.getIsarray() here?
+            // Is the array-ness also reflected in the javatype? --paul
         }
     }
+
 
     protected void reflect() {
         // fill in the sql for single statement procs
@@ -783,7 +832,7 @@ public class ProcedureRunner {
                 assert(stmt != null);
                 Statement statement = m_catProc.getStatements().get(VoltDB.ANON_STMT_NAME);
                 String s = statement.getSqltext();
-                stmt.setSQLStr(s);
+                SQLStmtAdHocHelper.setSQLStr(stmt, s);
                 m_cachedSingleStmt.stmt = stmt;
 
                 int numParams = m_catProc.getParameters().size();
@@ -817,32 +866,27 @@ public class ProcedureRunner {
             }
         }
         else {
-            // parse the java run method
-            Method[] methods = m_procedure.getClass().getDeclaredMethods();
+            // this is where, in the case of java procedures, m_method is set
+            m_paramTypes = m_language.accept(parametersTypeRetriever, this);
 
-            for (final Method m : methods) {
-                String name = m.getName();
-                if (name.equals("run")) {
-                    if (Modifier.isPublic(m.getModifiers()) == false)
-                        continue;
-                    m_procMethod = m;
-                    m_paramTypes = m.getParameterTypes();
-                }
-            }
-
-            if (m_procMethod == null) {
+            if (m_procMethod == null && m_language == Language.JAVA) {
                 throw new RuntimeException("No \"run\" method found in: " + m_procedure.getClass().getName());
             }
         }
 
         // iterate through the fields and deal with sql statements
         Map<String, SQLStmt> stmtMap = null;
-        try {
-            stmtMap = ProcedureCompiler.getValidSQLStmts(null, m_procedureName, m_procedure.getClass(), m_procedure, true);
-        } catch (Exception e1) {
-            // shouldn't throw anything outside of the compiler
-            e1.printStackTrace();
-            return;
+        if (m_catProc.getHasjava() == false) {
+            try {
+                stmtMap = ProcedureCompiler.getValidSQLStmts(null, m_procedureName, m_procedure.getClass(), m_procedure, true);
+            } catch (Exception e1) {
+                // shouldn't throw anything outside of the compiler
+                e1.printStackTrace();
+                return;
+            }
+        }
+        else {
+            stmtMap = m_language.accept(sqlStatementsRetriever, this);
         }
 
         for (final Entry<String, SQLStmt> entry : stmtMap.entrySet()) {
@@ -863,7 +907,70 @@ public class ProcedureRunner {
         }
     }
 
-    /**
+    private final static Language.Visitor<Class<?>[], ProcedureRunner> parametersTypeRetriever =
+            new Language.Visitor<Class<?>[], ProcedureRunner>() {
+                @Override
+                public Class<?>[] visitJava(ProcedureRunner p) {
+                    Method[] methods = p.m_procedure.getClass().getDeclaredMethods();
+
+                    for (final Method m : methods) {
+                        String name = m.getName();
+                        if (name.equals("run")) {
+                            if (Modifier.isPublic(m.getModifiers()) == false)
+                                continue;
+                            p.m_procMethod = m;
+                            return m.getParameterTypes();
+                        }
+                    }
+                    return null;
+                }
+                @Override
+                public Class<?>[] visitGroovy(ProcedureRunner p) {
+                    return ((GroovyScriptProcedureDelegate)p.m_procedure).getParameterTypes();
+                }
+            };
+
+   private final static Language.Visitor<Map<String,SQLStmt>, ProcedureRunner> sqlStatementsRetriever =
+           new Language.Visitor<Map<String,SQLStmt>, ProcedureRunner>() {
+            @Override
+            public Map<String, SQLStmt> visitJava(ProcedureRunner p) {
+                Map<String, SQLStmt> stmtMap = null;
+                try {
+                    stmtMap = ProcedureCompiler.getValidSQLStmts(null, p.m_procedureName, p.m_procedure.getClass(), p.m_procedure, true);
+                } catch (Exception e1) {
+                    // shouldn't throw anything outside of the compiler
+                    e1.printStackTrace();
+                }
+                return stmtMap;
+            }
+            @Override
+            public Map<String, SQLStmt> visitGroovy(ProcedureRunner p) {
+                return ((GroovyScriptProcedureDelegate)p.m_procedure).getStatementMap();
+            }
+        };
+
+   /**
+    * Test whether or not the given stack frame is within a procedure invocation
+    * @param stel a stack trace element
+    * @return true if it is, false it is not
+    */
+   protected boolean isProcedureStackTraceElement(StackTraceElement stel) {
+       int lastPeriodPos = stel.getClassName().lastIndexOf('.');
+
+       if (lastPeriodPos == -1) {
+           lastPeriodPos = 0;
+       } else {
+           ++lastPeriodPos;
+       }
+
+       // Account for inner classes too. Inner classes names comprise of the parent
+       // class path followed by a dollar sign
+       String simpleName = stel.getClassName().substring(lastPeriodPos);
+       return simpleName.equals(m_procedureName)
+           || (simpleName.startsWith(m_procedureName) && simpleName.charAt(m_procedureName.length()) == '$');
+   }
+
+   /**
     *
     * @param e
     * @return A ClientResponse containing error information
@@ -875,7 +982,7 @@ public class ProcedureRunner {
        StackTraceElement[] stack = e.getStackTrace();
        ArrayList<StackTraceElement> matches = new ArrayList<StackTraceElement>();
        for (StackTraceElement ste : stack) {
-           if (ste.getClassName().equals(m_procedure.getClass().getName()))
+           if (isProcedureStackTraceElement(ste))
                matches.add(ste);
        }
 
@@ -941,19 +1048,12 @@ public class ProcedureRunner {
    }
 
    protected ClientResponseImpl getErrorResponse(byte status, String msg, SerializableException e) {
-
-       StringBuilder msgOut = new StringBuilder();
-       msgOut.append("VOLTDB ERROR: ");
-       msgOut.append(msg);
-
-       log.trace(msgOut);
-
        return new ClientResponseImpl(
                status,
                m_appStatusCode,
                m_appStatusString,
                new VoltTable[0],
-               msgOut.toString(), e);
+               "VOLTDB ERROR: " + msg);
    }
 
    /**

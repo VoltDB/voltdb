@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -68,7 +68,8 @@ public class CorePlan {
      * to determine the correct partition to route the transaction?
      * (Note, not serialized because it's not needed at the ExecutionSite.)
      */
-    public final int partitioningParamIndex;
+    private int partitioningParamIndex = -1;
+    private Object partitioningParamValue = null;
 
     /**
      * Constructor from QueryPlanner output.
@@ -104,7 +105,6 @@ public class CorePlan {
         this.catalogVersion = catalogVersion;
         parameterTypes = plan.parameterTypes();
         readOnly = plan.readOnly;
-        partitioningParamIndex = plan.partitioningKeyIndex;
     }
 
     /***
@@ -136,7 +136,6 @@ public class CorePlan {
         this.readOnly = isReadOnly;
         this.parameterTypes = paramTypes;
         this.catalogVersion = catalogVersion;
-        partitioningParamIndex = -1; // invalid after de-serialization
     }
 
     @Override
@@ -290,4 +289,26 @@ public class CorePlan {
         assert false : "hashCode not designed";
         return 42; // any arbitrary constant will do
     }
+
+    public void setPartitioningParamIndex(int partitioningParamIndex) {
+        this.partitioningParamIndex = partitioningParamIndex;
+    }
+    public int getPartitioningParamIndex() {
+        return partitioningParamIndex;
+    }
+    public void setPartitioningParamValue(Object partitioningParamValue) {
+        this.partitioningParamValue = partitioningParamValue;
+    }
+    public Object getPartitioningParamValue() {
+        return partitioningParamValue;
+    }
+
+    public VoltType getPartitioningParamType() {
+        // TODO Auto-generated method stub
+        if (partitioningParamIndex < 0 || partitioningParamIndex >= parameterTypes.length) {
+            return VoltType.NULL;
+        }
+        return parameterTypes[partitioningParamIndex];
+    }
+
 }

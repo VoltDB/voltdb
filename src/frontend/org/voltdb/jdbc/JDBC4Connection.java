@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -150,14 +150,59 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
         }
     }
 
+    /**
+     * Check if the createStatement() options are supported
+     *
+     * See http://docs.oracle.com/javase/7/docs/api/index.html?java/sql/DatabaseMetaData.html
+     *
+     * The following flags are supported:
+     *  - The type must either be TYPE_SCROLL_INSENSITIVE or TYPE_FORWARD_ONLY.
+     *  - The concurrency must be CONCUR_READ_ONLY.
+     *  - The holdability must be CLOSE_CURSORS_AT_COMMIT.
+     *
+     * @param resultSetType  JDBC result set type option
+     * @param resultSetConcurrency  JDBC result set concurrency option
+     * @param resultSetHoldability  JDBC result set holdability option
+     * @throws SQLException  if not supported
+     */
+    private static void checkCreateStatementSupported(
+            int resultSetType, int resultSetConcurrency, int resultSetHoldability)
+                    throws SQLException
+    {
+        if (   (   (resultSetType != ResultSet.TYPE_SCROLL_INSENSITIVE
+                &&  resultSetType != ResultSet.TYPE_FORWARD_ONLY))
+            || resultSetConcurrency != ResultSet.CONCUR_READ_ONLY
+            || resultSetHoldability != ResultSet.CLOSE_CURSORS_AT_COMMIT) {
+            throw SQLError.noSupport();
+        }
+    }
+
+    /**
+     * Check if the createStatement() options are supported
+     *
+     * The following flags are supported:
+     *  - The type must either be TYPE_SCROLL_INSENSITIVE or TYPE_FORWARD_ONLY.
+     *  - The concurrency must be CONCUR_READ_ONLY.
+     *
+     * @param resultSetType  JDBC result set type option
+     * @param resultSetConcurrency  JDBC result set concurrency option
+     * @throws SQLException  if not supported
+     */
+    private static void checkCreateStatementSupported(
+            int resultSetType, int resultSetConcurrency)
+                    throws SQLException
+    {
+        checkCreateStatementSupported(resultSetType, resultSetConcurrency, ResultSet.CLOSE_CURSORS_AT_COMMIT);
+    }
+
     // Creates a Statement object that will generate ResultSet objects with the given type and concurrency.
     @Override
     public Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException
     {
-        if (resultSetType == ResultSet.TYPE_SCROLL_INSENSITIVE && resultSetConcurrency == ResultSet.CONCUR_READ_ONLY)
-            return createStatement();
         checkClosed();
-        throw SQLError.noSupport();
+        // Reject options that don't coincide with normal VoltDB behavior.
+        checkCreateStatementSupported(resultSetType, resultSetConcurrency);
+        return createStatement();
     }
 
     // Creates a Statement object that will generate ResultSet objects with the given type, concurrency, and holdability.
@@ -165,7 +210,9 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();
+        // Reject options that don't coincide with normal VoltDB behavior.
+        checkCreateStatementSupported(resultSetType, resultSetConcurrency, resultSetHoldability);
+        return createStatement();
     }
 
     // Factory method for creating Struct objects.

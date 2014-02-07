@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,10 +17,12 @@
 
 package org.voltdb.planner.parseinfo;
 
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.PartitioningForStatement;
@@ -47,9 +49,7 @@ public abstract class StmtTableScan {
 
     abstract public String getTableName();
 
-    abstract public boolean getIsreplicated();
-
-    abstract public boolean isPartitioningColumn(String columnName);
+    abstract public boolean getIsReplicated();
 
     abstract public String getPartitionColumnName();
 
@@ -63,19 +63,19 @@ public abstract class StmtTableScan {
         return m_scanColumns;
     }
 
-    public Table getTargetTable() {
-        return null;
-    }
+    abstract public Collection<Index> getIndexes();
 
-    public TempTable getTempTable() {
-        return null;
-    }
-
-    public void setPartitioning(PartitioningForStatement partitioning) {
-    }
+    public void setPartitioning(PartitioningForStatement partitioning) {}
 
     // table alias
     protected String m_tableAlias = null;
     // Store a unique list of the columns actually used by this table instance.
-    protected Set<SchemaColumn> m_scanColumns = new  HashSet<SchemaColumn>();
+    protected Set<SchemaColumn> m_scanColumns = new HashSet<SchemaColumn>();
+
+    abstract public String getColumnName(int m_columnIndex);
+
+    public Table getTable() {
+        // TODO abstract this out after merge with self-join fix
+        return null;
+    }
 }

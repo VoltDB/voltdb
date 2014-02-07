@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -34,6 +34,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
@@ -94,26 +95,24 @@ public class PlannerTestAideDeCamp {
      */
     CompiledPlan compileAdHocPlan(String sql, DeterminismMode detMode)
     {
-        compile(sql, 0, null, null, detMode);
+        compile(sql, 0, null, true, false, detMode);
         return m_currentPlan;
     }
 
-    List<AbstractPlanNode> compile(String sql, int paramCount, boolean singlePartition, String joinOrder) {
-        Object partitionParameter = null;
-        if (singlePartition) {
-            partitionParameter = "Forced single partitioning";
-        }
-        return compile(sql, paramCount, joinOrder, partitionParameter, DeterminismMode.SAFER);
+    List<AbstractPlanNode> compile(String sql, int paramCount, boolean inferPartitioning, boolean singlePartition, String joinOrder) {
+        return compile(sql, paramCount, joinOrder, inferPartitioning, singlePartition, DeterminismMode.SAFER);
     }
 
     /**
      * Compile and cache the statement and plan and return the final plan graph.
      */
-    private List<AbstractPlanNode> compile(String sql, int paramCount, String joinOrder, Object partitionParameter, DeterminismMode detMode)
+    private List<AbstractPlanNode> compile(String sql, int paramCount, String joinOrder, boolean inferPartitioning, boolean forceSingle, DeterminismMode detMode)
     {
-        Statement catalogStmt = proc.getStatements().add("stmt-" + String.valueOf(compileCounter++));
+        String stmtLabel = "stmt-" + String.valueOf(compileCounter++);
+
+        Statement catalogStmt = proc.getStatements().add(stmtLabel);
         catalogStmt.setSqltext(sql);
-        catalogStmt.setSinglepartition(partitionParameter != null);
+        catalogStmt.setSinglepartition(forceSingle);
         catalogStmt.setBatched(false);
         catalogStmt.setParamnum(paramCount);
 
@@ -138,40 +137,38 @@ public class PlannerTestAideDeCamp {
 
         DatabaseEstimates estimates = new DatabaseEstimates();
         TrivialCostModel costModel = new TrivialCostModel();
-        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, true, true);
-        QueryPlanner planner =
-            new QueryPlanner(catalogStmt.getSqltext(), catalogStmt.getTypeName(),
-                    catalogStmt.getParent().getTypeName(), catalog.getClusters().get("cluster"),
-                    db, partitioning, hsql, estimates, false, StatementCompiler.DEFAULT_MAX_JOIN_TABLES,
-                    costModel, null, joinOrder, detMode);
+        PartitioningForStatement partitioning;
+        if (inferPartitioning) {
+            partitioning = PartitioningForStatement.inferPartitioning();
+        } else if (forceSingle) {
+            partitioning = PartitioningForStatement.forceSP();
+        } else {
+            partitioning = PartitioningForStatement.forceMP();
+        }
+        String procName = catalogStmt.getParent().getTypeName();
+        Cluster catalogCluster = catalog.getClusters().get("cluster");
+        QueryPlanner planner = new QueryPlanner(sql, stmtLabel, procName, catalogCluster, db,
+                partitioning, hsql, estimates, false, StatementCompiler.DEFAULT_MAX_JOIN_TABLES,
+                costModel, null, joinOrder, detMode);
 
         CompiledPlan plan = null;
         planner.parse();
         plan = planner.plan();
         assert(plan != null);
 
+        // Partitioning optionally inferred from the planning process.
+        if (partitioning.isInferred()) {
+            catalogStmt.setSinglepartition(partitioning.isInferredSingle());
+        }
+
         // Input Parameters
         // We will need to update the system catalogs with this new information
-        // If this is an adhoc query then there won't be any parameters
         for (int i = 0; i < plan.parameters.length; ++i) {
             StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(i));
             ParameterValueExpression pve = plan.parameters[i];
             catalogParam.setJavatype(pve.getValueType().getValue());
             catalogParam.setIsarray(pve.getParamIsVector());
             catalogParam.setIndex(i);
-        }
-
-        // Output Columns
-        int index = 0;
-        for (SchemaColumn col : plan.columns.getColumns())
-        {
-            Column catColumn = catalogStmt.getOutput_columns().add(String.valueOf(index));
-            catColumn.setNullable(false);
-            catColumn.setIndex(index);
-            catColumn.setName(col.getColumnName());
-            catColumn.setType(col.getType().getValue());
-            catColumn.setSize(col.getSize());
-            index++;
         }
 
         List<PlanNodeList> nodeLists = new ArrayList<PlanNodeList>();

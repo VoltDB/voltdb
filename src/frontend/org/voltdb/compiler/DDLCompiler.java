@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,6 +26,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -50,15 +51,19 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
+import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.groovy.GroovyCodeBlockCompiler;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
+import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
@@ -218,11 +223,43 @@ public class DDLCompiler {
             "AS" +                                  // AS token
             "\\s+" +                                // one or more spaces
             "(" +                                   // (3) begin SELECT or DML statement
-            "(?:SELECT|INSERT|UPDATE|DELETE)" +     //   valid DML start tokens (not captured)
+            "(?:SELECT|INSERT|UPDATE|DELETE|TRUNCATE)" +     //   valid DML start tokens (not captured)
             "\\s+" +                                //   one or more spaces
             ".+)" +                                 //   end SELECT or DML statement
             ";" +                                   // semi-colon terminator
             "\\z"                                   // end of DDL statement
+            );
+
+    static final char   BLOCK_DELIMITER_CHAR = '#';
+    static final String BLOCK_DELIMITER = "###";
+
+    static final Pattern procedureWithScriptPattern = Pattern.compile(
+            "\\A" +                                 // beginning of DDL statement
+            "CREATE" +                              // CREATE token
+            "\\s+" +                                // one or more spaces
+            "PROCEDURE" +                           // PROCEDURE token
+            "\\s+" +                                // one or more spaces
+            "([\\w.$]+)" +                          // (1) procedure name
+            "(?:" +                                 // begin optional ALLOW clause
+            "\\s+" +                                //   one or more spaces
+            "ALLOW" +                               //   ALLOW token
+            "\\s+" +                                //   one or more spaces
+            "([\\w.$]+(?:\\s*,\\s*[\\w.$]+)*)" +    //   (2) comma-separated role list
+            ")?" +                                  // end optional ALLOW clause
+            "\\s+" +                                // one or more spaces
+            "AS" +                                  // AS token
+            "\\s+" +                                // one or more spaces
+            BLOCK_DELIMITER +                       // block delimiter ###
+            "(.+)" +                                // (3) code block content
+            BLOCK_DELIMITER +                       // block delimiter ###
+            "\\s+" +                                // one or more spaces
+            "LANGUAGE" +                            // LANGUAGE token
+            "\\s+" +                                // one or more spaces
+            "(GROOVY)" +                            // (4) language name
+            "\\s*" +                                // zero or more spaces
+            ";" +                                   // semi-colon terminator
+            "\\z",                                  // end of DDL statement
+            Pattern.CASE_INSENSITIVE|Pattern.MULTILINE|Pattern.DOTALL
             );
 
     /**
@@ -395,7 +432,7 @@ public class DDLCompiler {
         int lineNo;
     }
 
-    public DDLCompiler(VoltCompiler compiler, HSQLInterface hsql, VoltDDLElementTracker tracker) {
+    public DDLCompiler(VoltCompiler compiler, HSQLInterface hsql, VoltDDLElementTracker tracker)  {
         assert(compiler != null);
         assert(hsql != null);
         assert(tracker != null);
@@ -410,7 +447,7 @@ public class DDLCompiler {
      * @param db
      * @throws VoltCompiler.VoltCompilerException
      */
-    public void loadSchema(String path, Database db)
+    public void loadSchema(String path, Database db, DdlProceduresToLoad whichProcs)
             throws VoltCompiler.VoltCompilerException {
         File inputFile = new File(path);
         FileReader reader = null;
@@ -421,7 +458,7 @@ public class DDLCompiler {
         }
 
         m_currLineNo = 1;
-        loadSchema(path, db, reader);
+        loadSchema(path, db, reader, whichProcs);
     }
 
     /**
@@ -431,7 +468,7 @@ public class DDLCompiler {
      * @param reader
      * @throws VoltCompiler.VoltCompilerException
      */
-    private void loadSchema(String path, Database db, FileReader reader)
+    private void loadSchema(String path, Database db, FileReader reader, DdlProceduresToLoad whichProcs)
             throws VoltCompiler.VoltCompilerException {
 
         DDLStatement stmt = getNextStatement(reader, m_compiler);
@@ -439,7 +476,7 @@ public class DDLCompiler {
             // Some statements are processed by VoltDB and the rest are handled by HSQL.
             boolean processed = false;
             try {
-                processed = processVoltDBStatement(stmt.statement, db);
+                processed = processVoltDBStatement(stmt.statement, db, whichProcs);
             } catch (VoltCompilerException e) {
                 // Reformat the message thrown by VoltDB DDL processing to have a line number.
                 String msg = "VoltDB DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
@@ -499,7 +536,7 @@ public class DDLCompiler {
 
         int loc = 0;
         do {
-            if( ! Character.isJavaIdentifierStart(identifier.charAt(loc))) {
+            if ( ! Character.isJavaIdentifierStart(identifier.charAt(loc))) {
                 String msg = "Unknown indentifier in DDL: \"" +
                         statement.substring(0,statement.length()-1) +
                         "\" contains invalid identifier \"" + identifier + "\"";
@@ -517,10 +554,14 @@ public class DDLCompiler {
      * CREATE PROCEDURE, and CREATE ROLE.
      * @param statement  DDL statement string
      * @param db
+     * @param whichProcs
      * @return true if statement was handled, otherwise it should be passed to HSQL
      * @throws VoltCompilerException
      */
-    private boolean processVoltDBStatement(String statement, Database db) throws VoltCompilerException {
+    private boolean processVoltDBStatement(String statement, Database db,
+                                           DdlProceduresToLoad whichProcs)
+            throws VoltCompilerException
+    {
         if (statement == null || statement.trim().isEmpty()) {
             return false;
         }
@@ -529,7 +570,7 @@ public class DDLCompiler {
 
         // matches if it is the beginning of a voltDB statement
         Matcher statementMatcher = voltdbStatementPrefixPattern.matcher(statement);
-        if( ! statementMatcher.find()) {
+        if ( ! statementMatcher.find()) {
             return false;
         }
 
@@ -538,11 +579,22 @@ public class DDLCompiler {
 
         // matches if it is CREATE PROCEDURE [ALLOW <role> ...] FROM CLASS <class-name>;
         statementMatcher = procedureClassPattern.matcher(statement);
-        if( statementMatcher.matches()) {
-            String clazz = checkIdentifierStart(statementMatcher.group(2), statement);
+        if (statementMatcher.matches()) {
+            if (whichProcs != DdlProceduresToLoad.ALL_DDL_PROCEDURES) {
+                return true;
+            }
+            String className = checkIdentifierStart(statementMatcher.group(2), statement);
+            Class<?> clazz;
+            try {
+                clazz = Class.forName(className);
+            } catch (ClassNotFoundException e) {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "Cannot load class for procedure: %s",
+                        className));
+            }
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
-                    new ArrayList<String>(), clazz);
+                    new ArrayList<String>(), Language.JAVA, clazz);
 
             // Add roles if specified.
             if (statementMatcher.group(1) != null) {
@@ -563,12 +615,12 @@ public class DDLCompiler {
 
         // matches if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] AS <select-or-dml-statement>
         statementMatcher = procedureSingleStatementPattern.matcher(statement);
-        if( statementMatcher.matches()) {
+        if (statementMatcher.matches()) {
             String clazz = checkIdentifierStart(statementMatcher.group(1), statement);
             String sqlStatement = statementMatcher.group(3);
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
-                    new ArrayList<String>(), clazz, sqlStatement, null, null, false);
+                    new ArrayList<String>(), clazz, sqlStatement, null, null, false, null, null);
 
             // Add roles if specified.
             if (statementMatcher.group(2) != null) {
@@ -582,18 +634,60 @@ public class DDLCompiler {
             return true;
         }
 
+        // matches  if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] AS
+        // ### <code-block> ### LANGUAGE <language-name>
+        statementMatcher = procedureWithScriptPattern.matcher(statement);
+        if (statementMatcher.matches()) {
+
+            String className = checkIdentifierStart(statementMatcher.group(1), statement);
+            String codeBlock = statementMatcher.group(3);
+            Language language = Language.valueOf(statementMatcher.group(4).toUpperCase());
+
+
+            Class<?> scriptClass = null;
+
+            if (language == Language.GROOVY) {
+                try {
+                    scriptClass = GroovyCodeBlockCompiler.instance().parseCodeBlock(codeBlock, className);
+                } catch (CodeBlockCompilerException ex) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "Procedure \"%s\" code block has syntax errors:\n%s",
+                            className, ex.getMessage()));
+                } catch (Exception ex) {
+                    throw m_compiler.new VoltCompilerException(ex);
+                }
+            } else {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "Language \"%s\" is not a supported", language.name()));
+            }
+
+            ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
+                    new ArrayList<String>(), language, scriptClass);
+
+            // Add roles if specified.
+            if (statementMatcher.group(2) != null) {
+                for (String roleName : StringUtils.split(statementMatcher.group(2), ',')) {
+                    descriptor.m_authGroups.add(roleName.trim().toLowerCase());
+                }
+            }
+            // track the defined procedure
+            m_tracker.add(descriptor);
+
+            return true;
+        }
+
         // matches if it is the beginning of a partition statement
         statementMatcher = prePartitionPattern.matcher(statement);
-        if( statementMatcher.matches()) {
+        if (statementMatcher.matches()) {
 
             // either TABLE or PROCEDURE
             String partitionee = statementMatcher.group(1).toUpperCase();
-            if( TABLE.equals(partitionee)) {
+            if (TABLE.equals(partitionee)) {
 
                 // matches if it is PARTITION TABLE <table> ON COLUMN <column>
                 statementMatcher = partitionTablePattern.matcher(statement);
 
-                if( ! statementMatcher.matches()) {
+                if ( ! statementMatcher.matches()) {
                     throw m_compiler.new VoltCompilerException(String.format(
                             "Invalid PARTITION statement: \"%s\", " +
                             "expected syntax: PARTITION TABLE <table> ON COLUMN <column>",
@@ -606,14 +700,16 @@ public class DDLCompiler {
                         );
                 return true;
             }
-            else if( PROCEDURE.equals(partitionee)) {
-
+            else if (PROCEDURE.equals(partitionee)) {
+                if (whichProcs != DdlProceduresToLoad.ALL_DDL_PROCEDURES) {
+                    return true;
+                }
                 // matches if it is
                 //   PARTITION PROCEDURE <procedure>
                 //      ON  TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]
                 statementMatcher = partitionProcedurePattern.matcher(statement);
 
-                if( ! statementMatcher.matches()) {
+                if ( ! statementMatcher.matches()) {
                     throw m_compiler.new VoltCompilerException(String.format(
                             "Invalid PARTITION statement: \"%s\", " +
                             "expected syntax: PARTITION PROCEDURE <procedure> ON "+
@@ -629,7 +725,7 @@ public class DDLCompiler {
 
                 // if not specified default parameter index to 0
                 String parameterNo = statementMatcher.group(4);
-                if( parameterNo == null) {
+                if (parameterNo == null) {
                     parameterNo = "0";
                 }
 
@@ -648,7 +744,7 @@ public class DDLCompiler {
 
         // matches if it is REPLICATE TABLE <table-name>
         statementMatcher = replicatePattern.matcher(statement);
-        if( statementMatcher.matches()) {
+        if (statementMatcher.matches()) {
             // group(1) -> table
             m_tracker.put(
                     checkIdentifierStart(statementMatcher.group(1), statement),
@@ -678,7 +774,7 @@ public class DDLCompiler {
         // group 1 is role name
         // group 2 is comma-separated permission list or null if there is no WITH clause
         statementMatcher = createRolePattern.matcher(statement);
-        if( statementMatcher.matches()) {
+        if (statementMatcher.matches()) {
             String roleName = statementMatcher.group(1);
             CatalogMap<Group> groupMap = db.getGroups();
             if (groupMap.get(roleName) != null) {
@@ -718,7 +814,7 @@ public class DDLCompiler {
         }
 
         statementMatcher = exportPattern.matcher(statement);
-        if( statementMatcher.matches()) {
+        if (statementMatcher.matches()) {
 
             // check the table portion
             String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
@@ -732,7 +828,7 @@ public class DDLCompiler {
          * the statement is syntax incorrect
          */
 
-        if( PARTITION.equals(commandPrefix)) {
+        if (PARTITION.equals(commandPrefix)) {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Invalid PARTITION statement: \"%s\", " +
                     "expected syntax: \"PARTITION TABLE <table> ON COLUMN <column>\" or " +
@@ -741,29 +837,30 @@ public class DDLCompiler {
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
 
-        if( REPLICATE.equals(commandPrefix)) {
+        if (REPLICATE.equals(commandPrefix)) {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Invalid REPLICATE statement: \"%s\", " +
                     "expected syntax: REPLICATE TABLE <table>",
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
 
-        if( PROCEDURE.equals(commandPrefix)) {
+        if (PROCEDURE.equals(commandPrefix)) {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Invalid CREATE PROCEDURE statement: \"%s\", " +
                     "expected syntax: \"CREATE PROCEDURE [ALLOW <role> [, <role> ...] FROM CLASS <class-name>\" " +
-                    "or: \"CREATE PROCEDURE <name> [ALLOW <role> [, <role> ...] AS <single-select-or-dml-statement>\"",
+                    "or: \"CREATE PROCEDURE <name> [ALLOW <role> [, <role> ...] AS <single-select-or-dml-statement>\" " +
+                    "or: \"CREATE PROCEDURE <proc-name> [ALLOW <role> ...] AS ### <code-block> ### LANGUAGE GROOVY\"",
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
 
-        if( ROLE.equals(commandPrefix)) {
+        if (ROLE.equals(commandPrefix)) {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Invalid CREATE ROLE statement: \"%s\", " +
                     "expected syntax: CREATE ROLE <role>",
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
 
-        if( EXPORT.equals(commandPrefix)) {
+        if (EXPORT.equals(commandPrefix)) {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Invalid EXPORT TABLE statement: \"%s\", " +
                     "expected syntax: EXPORT TABLE <table>",
@@ -818,6 +915,12 @@ public class DDLCompiler {
     private static int kStateReadingStringLiteralSpecialChar = 4; // dealing with one or more single quotes
     private static int kStateReadingStringLiteral = 5;            // in the middle of a string literal
     private static int kStateCompleteStatement = 6;               // found end of statement
+    private static int kStateReadingCodeBlockDelim = 7 ;          // dealing with code block delimiter ###
+    private static int kStateReadingCodeBlockNextDelim = 8;       // dealing with code block delimiter ###
+    private static int kStateReadingCodeBlock = 9;                // reading code block
+    private static int kStateReadingEndCodeBlockDelim = 10 ;      // dealing with ending code block delimiter ###
+    private static int kStateReadingEndCodeBlockNextDelim = 11;   // dealing with ending code block delimiter ###
+
 
     private int readingState(char[] nchar, DDLStatement retval) {
         if (nchar[0] == '-') {
@@ -841,12 +944,65 @@ public class DDLCompiler {
             retval.statement += nchar[0];
             return kStateReadingStringLiteral;
         }
+        else if (nchar[0] == BLOCK_DELIMITER_CHAR) {
+            // we may be examining ### code block delimiters
+            retval.statement += nchar[0];
+            return kStateReadingCodeBlockDelim;
+        }
         else {
             // accumulate and continue
             retval.statement += nchar[0];
         }
 
         return kStateReading;
+    }
+
+    private int readingCodeBlockStateDelim(char [] nchar, DDLStatement retval) {
+        retval.statement += nchar[0];
+        if (nchar[0] == BLOCK_DELIMITER_CHAR) {
+            return kStateReadingCodeBlockNextDelim;
+        } else {
+            return readingState(nchar, retval);
+        }
+    }
+
+    private int readingEndCodeBlockStateDelim(char [] nchar, DDLStatement retval) {
+        retval.statement += nchar[0];
+        if (nchar[0] == BLOCK_DELIMITER_CHAR) {
+            return kStateReadingEndCodeBlockNextDelim;
+        } else {
+            return kStateReadingCodeBlock;
+        }
+    }
+
+    private int readingCodeBlockStateNextDelim(char [] nchar, DDLStatement retval) {
+        if (nchar[0] == BLOCK_DELIMITER_CHAR) {
+            retval.statement += nchar[0];
+            return kStateReadingCodeBlock;
+        }
+        return readingState(nchar, retval);
+    }
+
+    private int readingEndCodeBlockStateNextDelim(char [] nchar, DDLStatement retval) {
+        retval.statement += nchar[0];
+        if (nchar[0] == BLOCK_DELIMITER_CHAR) {
+            return kStateReading;
+        }
+        return kStateReadingCodeBlock;
+    }
+
+    private int readingCodeBlock(char [] nchar, DDLStatement retval) {
+        // all characters in the literal are accumulated. keep track of
+        // newlines for error messages.
+        retval.statement += nchar[0];
+        if (nchar[0] == BLOCK_DELIMITER_CHAR) {
+            return kStateReadingEndCodeBlockDelim;
+        }
+
+        if (nchar[0] == '\n') {
+            m_currLineNo += 1;
+        }
+        return kStateReadingCodeBlock;
     }
 
     private int readingStringLiteralState(char[] nchar, DDLStatement retval) {
@@ -986,6 +1142,21 @@ public class DDLCompiler {
                 }
                 else if (state == kStateReadingStringLiteralSpecialChar) {
                     state = readingStringLiteralSpecialChar(nchar, retval);
+                }
+                else if (state == kStateReadingCodeBlockDelim) {
+                    state = readingCodeBlockStateDelim(nchar, retval);
+                }
+                else if (state == kStateReadingCodeBlockNextDelim) {
+                    state = readingCodeBlockStateNextDelim(nchar, retval);
+                }
+                else if (state == kStateReadingCodeBlock) {
+                    state = readingCodeBlock(nchar, retval);
+                }
+                else if (state == kStateReadingEndCodeBlockDelim) {
+                    state = readingEndCodeBlockStateDelim(nchar, retval);
+                }
+                else if (state == kStateReadingEndCodeBlockNextDelim) {
+                    state = readingEndCodeBlockStateNextDelim(nchar, retval);
                 }
                 else {
                     throw compiler.new VoltCompilerException("Unrecoverable error parsing DDL.");
@@ -1564,6 +1735,12 @@ public class DDLCompiler {
      * materialized views.
      */
     void processMaterializedViews(Database db) throws VoltCompiler.VoltCompilerException {
+        HashSet <String> viewTableNames = new HashSet<>();
+        for (Entry<Table, String> entry : matViewMap.entrySet()) {
+            viewTableNames.add(entry.getKey().getTypeName());
+        }
+
+
         for (Entry<Table, String> entry : matViewMap.entrySet()) {
             Table destTable = entry.getKey();
             String query = entry.getValue();
@@ -1605,6 +1782,12 @@ public class DDLCompiler {
 
             // create the materializedviewinfo catalog node for the source table
             Table srcTable = stmt.tableList.get(0);
+            if (viewTableNames.contains(srcTable.getTypeName())) {
+                String msg = String.format("A materialized view (%s) can not be defined on another view (%s).",
+                        viewName, srcTable.getTypeName());
+                throw m_compiler.new VoltCompilerException(msg);
+            }
+
             MaterializedViewInfo matviewinfo = srcTable.getViews().add(viewName);
             matviewinfo.setDest(destTable);
             AbstractExpression where = stmt.getSingleTableFilterExpression();
@@ -1750,92 +1933,79 @@ public class DDLCompiler {
     }
 
     // if the materialized view has MIN / MAX, try to find an index defined on the source table
-    // covering all group by cols / exprs to avoid expensive tablescan, must be full key coverage
-    private static Index findBestMatchIndexForMatviewMinOrMax(MaterializedViewInfo matviewinfo, Table srcTable, List<AbstractExpression> groupbyExprs) {
+    // covering all group by cols / exprs to avoid expensive tablescan.
+    // For now, the only acceptable index is defined exactly on the group by columns IN ORDER.
+    // This allows the same key to be used to do lookups on the grouped table index and the
+    // base table index.
+    // TODO: More flexible (but usually less optimal*) indexes may be allowed here and supported
+    // in the EE in the future including:
+    //   -- *indexes on the group keys listed out of order
+    //   -- *indexes on the group keys as a prefix before other indexed values.
+    //   -- indexes on the group keys PLUS the MIN/MAX argument value (to eliminate post-filtering)
+    private static Index findBestMatchIndexForMatviewMinOrMax(MaterializedViewInfo matviewinfo,
+            Table srcTable, List<AbstractExpression> groupbyExprs)
+    {
         CatalogMap<Index> allIndexes = srcTable.getIndexes();
+        // Match based on one of two algorithms depending on whether expressions are all simple columns.
+        if (groupbyExprs == null) {
+            for (Index index : allIndexes) {
+                String expressionjson = index.getExpressionsjson();
+                if ( ! expressionjson.isEmpty()) {
+                    continue;
+                }
+                List<ColumnRef> indexedColRefs =
+                        CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
+                List<ColumnRef> groupbyColRefs =
+                        CatalogUtil.getSortedCatalogItems(matviewinfo.getGroupbycols(), "index");
+                if (indexedColRefs.size() != groupbyColRefs.size()) {
+                    continue;
+                }
 
-        ArrayList<Index> candidates = new ArrayList<Index>();
-
-        for (Index index : allIndexes) {
-            String expressionjson = index.getExpressionsjson();
-            if (groupbyExprs == null && !expressionjson.isEmpty() ||
-                    groupbyExprs != null && expressionjson.isEmpty()) {
-                continue;
+                boolean matchedAll = true;
+                for (int i = 0; i < indexedColRefs.size(); ++i) {
+                    int groupbyColIndex = groupbyColRefs.get(i).getColumn().getIndex();
+                    int indexedColIndex = indexedColRefs.get(i).getColumn().getIndex();
+                    if (groupbyColIndex != indexedColIndex) {
+                        matchedAll = false;
+                        break;
+                    }
+                }
+                if (matchedAll) {
+                    return index;
+                }
             }
-            List<AbstractExpression> indexedExprs = null;
-            List<ColumnRef> indexedColRefs = null;
-
-            // complex group by exprs
-            if (groupbyExprs != null) {
+        } else {
+            for (Index index : allIndexes) {
+                String expressionjson = index.getExpressionsjson();
+                if (expressionjson.isEmpty()) {
+                    continue;
+                }
+                List<AbstractExpression> indexedExprs = null;
+                StmtTableScan tableScan = new StmtTargetTableScan(srcTable, srcTable.getTypeName());
                 try {
-                    indexedExprs = AbstractExpression.fromJSONArrayString(expressionjson);
+                    indexedExprs = AbstractExpression.fromJSONArrayString(expressionjson, tableScan);
                 } catch (JSONException e) {
                     e.printStackTrace();
                     assert(false);
                     return null;
                 }
-
-                if (!prefixCompatibleExprs(indexedExprs, groupbyExprs)) {
-                    continue;
-                } else {
-                    candidates.add(index);
-                }
-            }
-            // simple group by cols
-            else {
-                indexedColRefs = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
-                List<ColumnRef> groupbyColRefs = CatalogUtil.getSortedCatalogItems(matviewinfo.getGroupbycols(), "index");
-
-                if (indexedColRefs.size() > groupbyColRefs.size()) {
+                if (indexedExprs.size() != groupbyExprs.size()) {
                     continue;
                 }
 
-                List<Integer> indexedColIds = new ArrayList<Integer>();
-                List<Integer> groupbyColIds = new ArrayList<Integer>();
-
-                for (ColumnRef cr : indexedColRefs) {
-                    indexedColIds.add(cr.getColumn().getIndex());
-                }
-                for (ColumnRef cr : groupbyColRefs) {
-                    groupbyColIds.add(cr.getColumn().getIndex());
-                }
-
-                boolean found = true;
-                for (int i = 0; i < indexedColIds.size(); i++) {
-                    if (!indexedColIds.contains(groupbyColIds.get(i))) {
-                        found = false;
+                boolean matchedAll = true;
+                for (int i = 0; i < indexedExprs.size(); ++i) {
+                    if ( ! indexedExprs.get(i).equals(groupbyExprs.get(i))) {
+                        matchedAll = false;
                         break;
                     }
                 }
-                if (found) {
-                    candidates.add(index);
+                if (matchedAll) {
+                    return index;
                 }
             }
         }
-
-        // return the widest index (match best)
-        Index ret = null;
-        for (Index index : candidates) {
-            if (ret == null) {
-                ret = index;
-            } else if (CatalogUtil.getCatalogIndexSize(index) > CatalogUtil.getCatalogIndexSize(ret)) {
-                ret = index;
-            }
-        }
-        return ret;
-    }
-
-    // srcExprs is the prefix of destExprs
-    private static boolean prefixCompatibleExprs(List<AbstractExpression> srcExprs, List<AbstractExpression> destExprs) {
-        if (srcExprs.size() > destExprs.size()) {
-            return false;
-        }
-        for (int i = 0; i < srcExprs.size(); i ++) {
-            if (!srcExprs.contains(destExprs.get(i))) {
-                return false;
-            }
-        }
-        return true;
+        return null;
     }
 
     /**

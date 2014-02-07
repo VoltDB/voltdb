@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,7 +28,6 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.common.Constants;
-import org.voltdb.messaging.FastSerializer;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.SerializationHelper;
@@ -462,7 +461,13 @@ public class ParameterSet implements JSONString {
 
         byte nextTypeByte = in.get();
         if (nextTypeByte == ARRAY) {
-            VoltType nextType = VoltType.get(in.get());
+            VoltType nextType = null;
+            byte etype = in.get();
+            try {
+                nextType = VoltType.get(etype);
+            } catch (AssertionError ae) {
+                throw new RuntimeException("ParameterSet doesn't support type " + etype);
+            }
             if (nextType == null) {
                 value = null;
             }
@@ -484,7 +489,12 @@ public class ParameterSet implements JSONString {
             }
         }
         else {
-            VoltType nextType = VoltType.get(nextTypeByte);
+            VoltType nextType;
+            try {
+                nextType = VoltType.get(nextTypeByte);
+            } catch (AssertionError ae) {
+                throw new RuntimeException("ParameterSet doesn't support type " + nextTypeByte);
+            }
             switch (nextType) {
                 case NULL:
                     value = null;
@@ -603,16 +613,16 @@ public class ParameterSet implements JSONString {
                 buf.put(type.getValue());
                 switch (type) {
                     case SMALLINT:
-                        FastSerializer.writeArray((short[]) obj, buf);
+                        SerializationHelper.writeArray((short[]) obj, buf);
                         break;
                     case INTEGER:
-                        FastSerializer.writeArray((int[]) obj, buf);
+                        SerializationHelper.writeArray((int[]) obj, buf);
                         break;
                     case BIGINT:
-                        FastSerializer.writeArray((long[]) obj, buf);
+                        SerializationHelper.writeArray((long[]) obj, buf);
                         break;
                     case FLOAT:
-                        FastSerializer.writeArray((double[]) obj, buf);
+                        SerializationHelper.writeArray((double[]) obj, buf);
                         break;
                     case STRING:
                         if (m_encodedStringArrays[i] == null) {
@@ -626,21 +636,21 @@ public class ParameterSet implements JSONString {
                         }
                         buf.putShort((short)m_encodedStringArrays[i].length);
                         for (int zz = 0; zz < m_encodedStringArrays[i].length; zz++) {
-                            FastSerializer.writeString(m_encodedStringArrays[i][zz], buf);
+                            SerializationHelper.writeVarbinary(m_encodedStringArrays[i][zz], buf);
                         }
                         break;
                     case TIMESTAMP:
-                        FastSerializer.writeArray((TimestampType[]) obj, buf);
+                        SerializationHelper.writeArray((TimestampType[]) obj, buf);
                         break;
                     case DECIMAL:
                         // converted long128 in serializer api
-                        FastSerializer.writeArray((BigDecimal[]) obj, buf);
+                        SerializationHelper.writeArray((BigDecimal[]) obj, buf);
                         break;
                     case VOLTTABLE:
-                        FastSerializer.writeArray((VoltTable[]) obj, buf);
+                        SerializationHelper.writeArray((VoltTable[]) obj, buf);
                         break;
                     case VARBINARY:
-                        FastSerializer.writeArray((byte[][]) obj, buf);
+                        SerializationHelper.writeArray((byte[][]) obj, buf);
                         break;
                     default:
                         throw new RuntimeException("FIXME: Unsupported type " + type);
@@ -693,7 +703,7 @@ public class ParameterSet implements JSONString {
                         // should not happen
                         throw new IOException("String not encoded: " + (String) obj);
                     }
-                    FastSerializer.writeString(m_encodedStrings[i], buf);
+                    SerializationHelper.writeVarbinary(m_encodedStrings[i], buf);
                     break;
                 case TIMESTAMP:
                     long micros = timestampToMicroseconds(obj);

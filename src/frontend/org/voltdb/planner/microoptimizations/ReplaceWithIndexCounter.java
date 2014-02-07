@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,10 +20,10 @@ package org.voltdb.planner.microoptimizations;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
+import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -37,7 +37,9 @@ import org.voltdb.types.ExpressionType;
 public class ReplaceWithIndexCounter extends MicroOptimization {
 
     @Override
-    public List<CompiledPlan> apply(CompiledPlan plan, Database db) {
+    public List<CompiledPlan> apply(CompiledPlan plan, AbstractParsedStmt parsedStmt) {
+        this.m_parsedStmt = parsedStmt;
+
         ArrayList<CompiledPlan> retval = new ArrayList<CompiledPlan>();
 
         AbstractPlanNode planGraph = plan.rootPlanGraph;

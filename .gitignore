@@ -11,6 +11,7 @@ voltdb_crash*
 buildstring.txt
 /plannerlog.txt
 obj/
+groovyout/
 /src/catgen/out
 /src/ee/catalog/*
 /src/ee/tags
@@ -40,3 +41,8 @@ doc/tutorials/auction/csvloader_*.csv
 /README.voltadmin
 /.idea
 *.iml
+/tools/voltify.venv
+/*.sublime-project
+/*.sublime-workspace
+/testobjects/
+/.tags

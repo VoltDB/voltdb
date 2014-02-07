@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2013 VoltDB Inc.
+# Copyright (C) 2008-2014 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -26,29 +26,14 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# This script assumes a relative location in a root subdirectory of a voltdb
-# distribution. The logic is intentionally minimal since almost all of the
-# heavy lifting happens in runner.main(). The script name determines the verbs
-# that are loaded from <name>.d subdirectories. It loads the version number
-# from version.txt in the script's parent directory. It can be copied to other
-# names, and also to other locations if the path-building is adjusted. The
-# description should also be changed if re-used for another base command.
 import sys
 import os
-try:
-    cmd_dir, cmd_name = os.path.split(os.path.realpath(sys.argv[0]))
-    # Adjust these variables as needed for other base commands, locations, etc..
-    base_dir    = os.path.dirname(cmd_dir)
-    lib_dir     = os.path.join(base_dir, 'lib', 'python')
-    version     = open(os.path.join(base_dir, 'version.txt')).read().strip()
-    description = 'Preview release command line interface to the Voter example in examples/voter.'
-    standalone  = False
-    # Tweak the Python library path to call voltcli.runner.main().
-    sys.path.insert(0, lib_dir)
-    from voltcli import runner
-    os.chdir(os.path.join(base_dir, 'examples', 'voter'))
-# Be selective about exceptions to avoid masking load-time library exceptions.
-except (IOError, OSError, ImportError), e:
-    sys.stderr.write('Exception (%s): %s\n' % (e.__class__.__name__, str(e)))
-    sys.exit(1)
-runner.main(cmd_name, cmd_dir, version, description, standalone = standalone, *sys.argv[1:])
+import toolrunner
+
+description = 'Preview release command line interface to the Voter example in examples/voter.'
+standalone = False
+directory = os.path.join('examples', 'voter')
+verbose = (sys.argv[1:]==['-v'])
+
+toolrunner.main(description=description, standalone=standalone,
+                directory=directory, verbose=verbose)

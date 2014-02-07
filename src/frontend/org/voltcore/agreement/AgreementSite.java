@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -274,8 +274,34 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                         //Owner is what associates the session with a specific initiator
                         //only used for createSession
                         txnState.m_request.setOwner(txnState.initiatorHSId);
-                        m_lastUsedTxnId = txnState.txnId;
-                        m_server.prepRequest(txnState.m_request, txnState.txnId);
+
+                        /*
+                         * We may pull reads out of the priority queue outside the global
+                         * order. This means the txnid might be wrong so just sub
+                         * the last used txnid from a write that is guaranteed to have been globally
+                         * ordered properly
+                         *
+                         * It doesn't matter for the most part, but the ZK code we give the ID to expects to
+                         * it to always increase and if we pull reads in early that will not always be true.
+                         */
+                        long txnIdToUse = txnState.txnId;
+                        switch (txnState.m_request.type) {
+                            case OpCode.exists:
+                            case OpCode.getChildren:
+                            case OpCode.getChildren2:
+                            case OpCode.getData:
+                                //Don't use the txnid generated for the read since
+                                //it may not be globally ordered with writes
+                                txnIdToUse = m_lastUsedTxnId;
+                                break;
+                            default:
+                                //This is a write, stash away the txnid for use
+                                //for future reads
+                                m_lastUsedTxnId = txnState.txnId;
+                                break;
+                        }
+
+                        m_server.prepRequest(txnState.m_request, txnIdToUse);
                     }
                 }
                 else if (m_recoverBeforeTxn != null) {
@@ -324,6 +350,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         }
     }
 
+    private long m_lastHeartbeatTime = System.nanoTime();
     private void processMessage(VoltMessage message) throws Exception {
         if (!m_hsIds.contains(message.m_sourceHSId)) {
             m_recoveryLog.info("Dropping message " + message + " because it is not from a known up site");
@@ -361,6 +388,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             } else if (lom.payload instanceof Request) {
                 Request r = (Request)lom.payload;
                 long txnId = 0;
+                boolean isRead = false;
                 switch(r.type) {
                     case OpCode.createSession:
                         txnId = r.sessionId;
@@ -377,6 +405,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                             m_server.prepRequest(r, m_lastUsedTxnId);
                             return;
                         }
+                        isRead = true;
                         //Fall through is intentional, going with the default of putting
                         //it in the global order
                     default:
@@ -384,16 +413,24 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                         break;
                 }
 
-                for (long initiatorHSId : m_hsIds) {
-                    if (initiatorHSId == m_hsId) continue;
-                    AgreementTaskMessage atm =
-                        new AgreementTaskMessage(
-                                r,
-                                txnId,
-                                m_hsId,
-                                m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(initiatorHSId));
-                    m_mailbox.send( initiatorHSId, atm);
+                /*
+                 * Don't send the whole request if this is a read blocked on a write
+                 * We may send a heartbeat instead of propagating a useless read transaction
+                 * at the end of this block
+                 */
+                if (!isRead) {
+                    for (long initiatorHSId : m_hsIds) {
+                        if (initiatorHSId == m_hsId) continue;
+                        AgreementTaskMessage atm =
+                            new AgreementTaskMessage(
+                                    r,
+                                    txnId,
+                                    m_hsId,
+                                    m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(initiatorHSId));
+                        m_mailbox.send( initiatorHSId, atm);
+                    }
                 }
+
                 //Process the ATM eagerly locally to aid
                 //in having a complete set of stuff to ship
                 //to a recovering agreement site
@@ -405,6 +442,21 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                             m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(m_hsId));
                 atm.m_sourceHSId = m_hsId;
                 processMessage(atm);
+
+                /*
+                 * Don't send a heartbeat out for ever single blocked read that occurs
+                 * Try and limit to 2000 a second which is a lot and should be pretty
+                 * close to the previous behavior of propagating all reads. My measurements
+                 * don't show the old behavior is better than none at all, but I fear
+                 * change.
+                 */
+                if (isRead) {
+                    final long now = System.nanoTime();
+                    if (TimeUnit.NANOSECONDS.toMicros(now - m_lastHeartbeatTime) > 500) {
+                        m_lastHeartbeatTime = now;
+                        sendHeartbeats();
+                    }
+                }
             }
         } else if (message instanceof AgreementTaskMessage) {
             AgreementTaskMessage atm = (AgreementTaskMessage)message;
@@ -413,6 +465,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                         atm.m_txnId,
                         false,
                         atm.m_lastSafeTxnId);
+
                 AgreementTransactionState transactionState =
                     new AgreementTransactionState(atm.m_txnId, atm.m_initiatorHSId, atm.m_request);
                 if (m_txnQueue.add(transactionState)) {
@@ -620,8 +673,8 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         m_mailbox.deliver(lom);
     }
 
-    private static class AgreementTransactionState extends OrderableTransaction {
-        private final Request m_request;
+    static class AgreementTransactionState extends OrderableTransaction {
+        public final Request m_request;
         public AgreementTransactionState(long txnId, long initiatorHSId, Request r) {
             super(txnId, initiatorHSId);
             m_request = r;

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -48,6 +48,7 @@
 
 #include "abstractplannode.h"
 #include "expressions/abstractexpression.h"
+#include "storage/TableCatalogDelegate.hpp"
 
 namespace voltdb
 {
@@ -58,7 +59,7 @@ public:
     virtual ~AbstractScanPlanNode();
 
     Table* getTargetTable() const;
-    void setTargetTable(Table* val);
+    void setTargetTableDelegate(TableCatalogDelegate* tcd);
 
     std::string getTargetTableName() const;
     void setTargetTableName(std::string name);
@@ -84,7 +85,7 @@ protected:
     // The results of the operations will be written to the the output table
     //
     std::string m_targetTableName;
-    Table* m_targetTable; // volatile
+    TableCatalogDelegate* m_tcd;
     //
     // This is the predicate used to filter out tuples during the scan
     //

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -37,7 +37,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.exceptions.SQLException;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
@@ -590,7 +589,6 @@ public class TestSQLTypesSuite extends RegressionSuite {
                 client.callProcedure("Insert", params);
             }
             catch (final ProcCallException e) {
-                assertTrue(e.getCause() instanceof SQLException);
                 assertTrue(e.toString().contains("exceeds specified size"));
                 caught = true;
             }

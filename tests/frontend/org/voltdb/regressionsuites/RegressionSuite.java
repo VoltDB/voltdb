@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -41,6 +41,9 @@ import org.voltdb.client.ClientConfigForTest;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.common.Constants;
+
+import com.google_voltpatches.common.net.HostAndPort;
 
 /**
  * Base class for a set of JUnit tests that perform regression tests
@@ -213,10 +216,14 @@ public class RegressionSuite extends TestCase {
         final Random r = new Random();
         final String listener = listeners.get(r.nextInt(listeners.size()));
         byte[] hashedPassword = ConnectionUtil.getHashedPassword(m_password);
+        HostAndPort hNp = HostAndPort.fromString(listener);
+        int port = Constants.DEFAULT_PORT;
+        if (hNp.hasPort()) {
+            port = hNp.getPort();
+        }
         final SocketChannel channel = (SocketChannel)
             ConnectionUtil.getAuthenticatedConnection(
-                    listener,
-                    m_username, hashedPassword, port(0))[0];
+                    hNp.getHostText(), m_username, hashedPassword, port)[0];
         channel.configureBlocking(true);
         if (!noTearDown) {
             synchronized (m_clientChannels) {

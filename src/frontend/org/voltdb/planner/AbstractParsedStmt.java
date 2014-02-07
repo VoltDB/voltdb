@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -44,7 +44,6 @@ import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.SubqueryLeafNode;
 import org.voltdb.planner.parseinfo.TableLeafNode;
-import org.voltdb.planner.parseinfo.TempTable;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
@@ -83,7 +82,7 @@ public abstract class AbstractParsedStmt {
     public HashMap<String, Integer> tableAliasIndexMap = new HashMap<String, Integer>();
 
     protected final String[] m_paramValues;
-    protected final Database m_db;
+    public final Database m_db;
 
     static final String INSERT_NODE_NAME = "insert";
     static final String UPDATE_NODE_NAME = "update";
@@ -410,20 +409,20 @@ public abstract class AbstractParsedStmt {
      * @param subQuery
      * @return index into the cache array
      */
-    private int addTableToStmtCache(String tableName, String tableAlias, AbstractParsedStmt subQuery) {
+    private int addTableToStmtCache(String tableName, String tableAlias, AbstractParsedStmt subquery) {
         // Create an index into the query Catalog cache
         if (!tableAliasIndexMap.containsKey(tableAlias)) {
             int nextIndex = stmtCache.size();
             tableAliasIndexMap.put(tableAlias, nextIndex);
-            StmtTableScan tableCache = null;
-            if (subQuery == null) {
-                tableCache = new StmtTargetTableScan(getTableFromDB(tableName), tableAlias);
+            StmtTableScan tableScan = null;
+            if (subquery == null) {
+                tableScan = new StmtTargetTableScan(getTableFromDB(tableName), tableAlias);
             } else {
                 // Temp table always have name SYSTEM_SUBQUERY.
                 // Need to use its alias to uniquely identify the sub-query
-                tableCache = new StmtSubqueryScan(new TempTable(tableAlias, tableAlias, subQuery), tableAlias);
+                tableScan = new StmtSubqueryScan(tableAlias, subquery);
             }
-            stmtCache.add(tableCache);
+            stmtCache.add(tableScan);
             tableAliasIndexMap.put(tableAlias, nextIndex);
         }
         return tableAliasIndexMap.get(tableAlias);
@@ -603,9 +602,8 @@ public abstract class AbstractParsedStmt {
             assert(parameter_idx >= 0); // better be valid by now.
             assert(parameter_idx < args.size()); // must refer to a provided argument
             expr.setParameterArg(parameter_idx);
+            expr.negotiateInitialValueTypes();
         }
-
-        expr.resolveForStmt(m_db, this);
         return expr;
     }
 
@@ -633,28 +631,29 @@ public abstract class AbstractParsedStmt {
             tableAlias = tableName;
         }
         // Possible sub-query
-        AbstractParsedStmt subQuery = parseSubQuery(tableNode);
+        AbstractParsedStmt subquery = parseSubQuery(tableNode);
 
         // add table to the query cache before processing the JOIN/WHERE expressions
         // The order is important because processing sub-query expressions assumes that
         // the sub-query is already registered
-        int aliasIdx = addTableToStmtCache(tableName, tableAlias, subQuery);
+        int aliasIdx = addTableToStmtCache(tableName, tableAlias, subquery);
 
         AbstractExpression joinExpr = parseJoinCondition(tableNode);
         AbstractExpression whereExpr = parseWhereCondition(tableNode);
 
-        StmtTableScan tableCache = stmtCache.get(aliasIdx);
-        if (tableCache.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TARGET_TABLE_SCAN) {
-            Table table = tableCache.getTargetTable();
+        StmtTableScan tableScan = stmtCache.get(aliasIdx);
+        if (tableScan instanceof StmtTargetTableScan) {
+            Table table = ((StmtTargetTableScan)tableScan).getTargetTable();
             tableList.add(table);
         }
 
         // The join type of the leaf node is always INNER
         // For a new tree its node's ids start with 0 and keep incrementing by 1
         int nodeId = (joinTree == null) ? 0 : joinTree.getId() + 1;
-        JoinNode leafNode = (subQuery == null) ?
+        JoinNode leafNode = (subquery == null) ?
                 new TableLeafNode(nodeId, aliasIdx, joinExpr, whereExpr) :
-                new SubqueryLeafNode(nodeId, aliasIdx, joinExpr, whereExpr);
+                new SubqueryLeafNode(nodeId, aliasIdx, joinExpr, whereExpr,
+                        new StmtSubqueryScan(tableAlias, subquery));
 
         if (joinTree == null) {
             // this is the first table

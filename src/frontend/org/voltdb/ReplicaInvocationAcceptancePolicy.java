@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -42,9 +42,13 @@ public class ReplicaInvocationAcceptancePolicy extends InvocationAcceptancePolic
             }
 
             // hackish way to check if an adhoc query is read-only
-            if (invocation.procName.equals("@AdHoc")) {
+            //??? What keeps @AdHoc from invoking a read/write mixed batch that starts with a 'select'?
+            //??? Or what would prevent these writes from getting missed here?
+            if (invocation.procName.equals("@AdHoc") || invocation.procName.equals("@AdHocSpForTest")) {
                 String sql = (String) invocation.getParams().toArray()[0];
-                isReadOnly = sql.trim().toLowerCase().startsWith("select");
+                String initial = sql.trim().substring(0, 1);
+                // Match "SELECT ... , "select ..." and the likes of "(select ... ) union ... "
+                isReadOnly = "sS(".contains(initial);
             }
 
             if (isReadOnly) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -31,8 +31,10 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.JoinNode;
+import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.JoinNode.NodeType;
+import org.voltdb.planner.parseinfo.SubqueryLeafNode;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
@@ -69,28 +71,41 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     SelectSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, PartitioningForStatement partitioning)
     {
         super(db, parsedStmt, partitioning);
+        //TODO: refactor all of this join order calculation into an AbstractParsedStmt method that
+        // returns a collection of JoinNode trees, as in:
+        // m_joinOrders.addAll(parsedStmt.generateJoinOrders())
         //If a join order was provided
         if (parsedStmt.joinOrder != null) {
             //Extract the table names/aliases from the , separated list
             ArrayList<String> tableAliases = new ArrayList<String>();
             //Don't allow dups for now since self joins aren't supported
             HashSet<String> dupCheck = new HashSet<String>();
-            for (String table : parsedStmt.joinOrder.split(",")) {
-                tableAliases.add(table.trim());
-                if (!dupCheck.add(table.trim())) {
+            // Calling trim() up front is important only in the case of a trailing comma.
+            // It allows a trailing comma followed by whitespace as in "A,B, " to be ignored
+            // like a normal trailing comma as in "A,B,". The alternatives would be to treat
+            // these as different cases (strange) or to complain about both -- which could be
+            // accomplished by appending an additional space to the join order here
+            // instead of calling trim.
+            for (String element : parsedStmt.joinOrder.trim().split(",")) {
+                String alias = element.trim().toUpperCase();
+                tableAliases.add(alias);
+                if (!dupCheck.add(alias)) {
                     StringBuilder sb = new StringBuilder();
-                    sb.append("The specified join order \"");
-                    sb.append(parsedStmt.joinOrder).append("\" contains duplicate tables. ");
+                    sb.append("The specified join order \"").append(parsedStmt.joinOrder);
+                    sb.append("\" contains a duplicate element \"").append(alias).append("\".");
                     throw new RuntimeException(sb.toString());
                 }
             }
 
+            //TODO: now that the table aliases list is built, the remaining validations
+            // here and in isValidJoinOrder should be combined in one AbstractParsedStmt function
+            // that generates a JoinNode tree or throws an exception.
             if (parsedStmt.tableAliasIndexMap.size() != tableAliases.size()) {
                 StringBuilder sb = new StringBuilder();
                 sb.append("The specified join order \"");
-                sb.append(parsedStmt.joinOrder).append("\" does not contain the correct number of tables\n");
+                sb.append(parsedStmt.joinOrder).append("\" does not contain the correct number of elements\n");
                 sb.append("Expected ").append(parsedStmt.tableList.size());
-                sb.append(" but found ").append(tableAliases.size()).append(" tables");
+                sb.append(" but found ").append(tableAliases.size()).append(" elements.");
                 throw new RuntimeException(sb.toString());
             }
 
@@ -622,7 +637,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         boolean mayNeedInnerSendReceive = ( ! m_partitioning.wasSpecifiedAsSingle()) &&
                 (m_partitioning.getCountOfPartitionedTables() > 0) &&
                 (parentNode.getJoinType() != JoinType.INNER) &&
-                ! innerTable.getIsreplicated();
+                ! innerTable.getIsReplicated();
 // too expensive/complicated to test here? (parentNode.m_leftNode has a replicated result?) &&
 
 
@@ -709,10 +724,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         // End of recursion
         AbstractPlanNode scanNode = getAccessPlanForTable(joinNode.getTableAliasIndex(), joinNode.m_currentAccessPath);
         // Connect the sub-query tree if any
-        if (joinNode.getNodeType() == NodeType.SUBQUERY) {
-            StmtTableScan tableCache = m_parsedStmt.stmtCache.get(joinNode.getTableAliasIndex());
-            assert(tableCache.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TEMP_TABLE_SCAN);
-            CompiledPlan subQueryPlan = tableCache.getTempTable().getBetsCostPlan();
+        if (joinNode instanceof SubqueryLeafNode) {
+            StmtSubqueryScan tableScan = ((SubqueryLeafNode)joinNode).getSubqueryScan();
+            CompiledPlan subQueryPlan = tableScan.getBestCostPlan();
             assert(subQueryPlan != null);
             assert(subQueryPlan.rootPlanGraph != null);
             // The sub-query best cost plan needs to be un-linked from the previous parent plan

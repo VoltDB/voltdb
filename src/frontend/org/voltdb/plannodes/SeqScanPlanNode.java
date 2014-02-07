@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,6 +22,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
+import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.types.PlanNodeType;
 
@@ -31,7 +32,11 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
         super();
     }
 
-public SeqScanPlanNode(String tableName, String tableAlias) {
+    public SeqScanPlanNode(StmtTableScan tableScan) {
+        setTableScan(tableScan);
+    }
+
+    public SeqScanPlanNode(String tableName, String tableAlias) {
         super(tableName, tableAlias);
         assert(tableName != null && tableAlias != null);
     }
@@ -123,5 +128,4 @@ public SeqScanPlanNode(String tableName, String tableAlias) {
             }
         }
     }
-
 }

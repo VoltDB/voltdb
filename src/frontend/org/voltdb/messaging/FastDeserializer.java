@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -186,10 +186,12 @@ public class FastDeserializer implements DataInput {
         if (len == VoltType.NULL_STRING_LENGTH) {
             return null;
         }
-        assert len >= 0;
 
         if (len < VoltType.NULL_STRING_LENGTH) {
             throw new IOException("String length is negative " + len);
+        }
+        if (len > buffer.remaining()) {
+            throw new IOException("String length is bigger than total buffer " + len);
         }
 
         // now assume not null
@@ -217,6 +219,9 @@ public class FastDeserializer implements DataInput {
         if (len < VoltType.NULL_STRING_LENGTH) {
             throw new IOException("Varbinary length is negative " + len);
         }
+        if (len > buffer.remaining()) {
+            throw new IOException("Varbinary length is bigger than total buffer " + len);
+        }
 
         // now assume not null
         final byte[] retval = new byte[len];
@@ -230,7 +235,7 @@ public class FastDeserializer implements DataInput {
      * @throws IOException
      */
     public BigDecimal readBigDecimal() throws IOException {
-        return VoltDecimalHelper.deserializeBigDecimal(this);
+        return VoltDecimalHelper.deserializeBigDecimal(buffer);
     }
 
     /**

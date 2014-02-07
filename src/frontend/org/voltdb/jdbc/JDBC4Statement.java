@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,14 +18,12 @@
 package org.voltdb.jdbc;
 
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.sql.BatchUpdateException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -55,21 +53,28 @@ public class JDBC4Statement implements java.sql.Statement
         private final String[] sql;
         private final int parameterCount;
         private final byte type;
+        private final byte queryType;   // Type of query EXEC'd by @AdHoc
         private final Object[] parameters;
 
         private VoltSQL(String[] sql, int parameterCount, byte type)
         {
             this.sql = sql;
             this.parameterCount = parameterCount;
-            this.type = type;
+            this.type = this.queryType = type;
             this.parameters = null;
         }
 
         private VoltSQL(String[] sql, int parameterCount, byte type, Object[] parameters)
         {
+            this(sql, parameterCount, type, type, parameters);
+        }
+
+        private VoltSQL(String[] sql, int parameterCount, byte type, byte queryType, Object[] parameters)
+        {
             this.sql = sql;
             this.parameterCount = parameterCount;
             this.type = type;
+            this.queryType = queryType;
             this.parameters = parameters;
         }
 
@@ -92,6 +97,14 @@ public class JDBC4Statement implements java.sql.Statement
         {
             for(int i=0;i<types.length;i++)
                 if (this.type == types[i])
+                    return true;
+            return false;
+        }
+
+        public boolean isQueryOfType(int... types)
+        {
+            for(int i=0;i<types.length;i++)
+                if (this.queryType == types[i])
                     return true;
             return false;
         }
@@ -153,53 +166,14 @@ public class JDBC4Statement implements java.sql.Statement
 
             if (this.type == TYPE_EXEC)
                 return new VoltSQL(this.sql, this.parameterCount, this.type, params);
-            else if (this.parameterCount == 0)
-                return new VoltSQL(this.sql, 0, this.type);
             else
             {
-                StringBuilder query = new StringBuilder();
-                for(int i=0;i<params.length;i++)
-                {
-                    query.append(this.sql[i]);
-                    if (params[i] == null)
-                        query.append("null");
-                    else if (params[i].getClass().equals(Byte.class))
-                        query.append(((Byte)params[i]).byteValue());
-                    else if (params[i].getClass().equals(Short.class))
-                        query.append(((Short)params[i]).shortValue());
-                    else if (params[i].getClass().equals(Integer.class))
-                        query.append(((Integer)params[i]).intValue());
-                    else if (params[i].getClass().equals(Long.class))
-                        query.append(((Long)params[i]).longValue());
-                    else if (params[i].getClass().equals(Double.class))
-                        query.append(((Double)params[i]).doubleValue());
-                    else if (params[i] == VoltType.NULL_TIMESTAMP)
-                        query.append("null");
-                    else if (params[i].getClass().equals(Timestamp.class))
-                    {
-                        Timestamp timestamp = (Timestamp)params[i];
-                        if (timestamp.toString().length() < 26)
-                            timestamp.setNanos(timestamp.getNanos()+1);
-                        query.append("'" + timestamp.toString().substring(0,26) + "'");
-                    }
-                    else if (params[i] == VoltType.NULL_DECIMAL)
-                        query.append("null");
-                    else if (params[i].getClass().equals(BigDecimal.class))
-                        query.append("'" + ((BigDecimal)params[i]).toPlainString() + "'");
-                    else if (params[i] == VoltType.NULL_STRING_OR_VARBINARY)
-                        query.append("null");
-                    else if (params[i].getClass().equals(String.class))
-                    {
-                        if (((String)params[i]).indexOf("\r") > -1 || ((String)params[i]).indexOf("\n") > -1)
-                            throw SQLError.get(SQLError.QUERY_PARSING_ERROR); // Sorry pal: no line feeds for ad-hoc queries
-                        query.append("'" + SingleQuote.matcher((String)params[i]).replaceAll("''") + "'");
-                    }
-                    else
-                        throw SQLError.get(SQLError.ILLEGAL_ARGUMENT); // Unknown parameter type
+                Object[] paramsOut = new Object[params.length+1];
+                paramsOut[0] = this.sql[0];
+                for (int i = 0; i < params.length; ++i) {
+                    paramsOut[i+1] = params[i];
                 }
-                if (this.sql.length > this.parameterCount)
-                    query.append(this.sql[this.sql.length-1]);
-                return new VoltSQL(new String[]{query.toString()}, 0, this.type);
+                return new VoltSQL(new String[] {"@AdHoc"}, this.parameterCount, TYPE_EXEC, this.type, paramsOut);
             }
         }
 
@@ -221,7 +195,6 @@ public class JDBC4Statement implements java.sql.Statement
             throw SQLError.get(SQLError.ILLEGAL_STATEMENT);
         }
 
-        private static final Pattern SingleQuote = Pattern.compile("'", Pattern.MULTILINE);
         private static final Pattern EscapedSingleQuote = Pattern.compile("''", Pattern.MULTILINE);
         private static final Pattern SingleLineComments = Pattern.compile("^\\s*(\\/\\/|--).*$", Pattern.MULTILINE);
         private static final Pattern Extract = Pattern.compile("'[^']*'", Pattern.MULTILINE);
@@ -273,36 +246,35 @@ public class JDBC4Statement implements java.sql.Statement
             if (query.indexOf("'") > -1)
                 throw SQLError.get(SQLError.UNTERMINATED_STRING);
 
-            String[] queryParts = null;
+            // Make sure there's a ';' terminator;
+            if (!query.endsWith(";")) {
+                query += ";";
+            }
+            // Count substitution parameters.
             int parameterCount = 0;
             if(query.indexOf("?") > -1)
             {
-                queryParts = (query + ";").split("\\?");
+                String[] queryParts = (query + ";").split("\\?");
                 parameterCount = queryParts.length-1;
             }
-            else
-                queryParts = new String[] { query };
 
             if(stringFragments.size() > 0)
             {
-                for(int k = 0;k<stringFragments.size();k++)
-                    for(int l = 0;l<queryParts.length;l++)
-                        queryParts[l] = queryParts[l].replace("#(SQL_PARSER_STRING_FRAGMENT#" + k + ")", stringFragments.get(k));
+                for(int k = 0;k<stringFragments.size();k++) {
+                    query = query.replace("#(SQL_PARSER_STRING_FRAGMENT#" + k + ")", stringFragments.get(k));
+                }
             }
-            for(int l = 0;l<queryParts.length;l++)
-                queryParts[l] = queryParts[l].replace("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)", "''");
+            query = query.replace("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)", "''");
 
             // Welcome to volt... cannot accept \r or \n in inline SQL...
-            for(int l = 0;l<queryParts.length;l++)
-                if (queryParts[l].indexOf("\r") > -1 || queryParts[l].indexOf("\n") > -1)
-                    throw SQLError.get(SQLError.QUERY_PARSING_ERROR);
+            if (query.indexOf("\r") > -1 || query.indexOf("\n") > -1)
+                throw SQLError.get(SQLError.QUERY_PARSING_ERROR);
 
-            return new VoltSQL(queryParts, parameterCount, type);
+            return new VoltSQL(new String[] {query}, parameterCount, type);
         }
     }
 
     private ArrayList<VoltSQL> batch = null;
-    private ArrayList<String> warnings = null;
     protected boolean isClosed = false;
     private int fetchDirection = ResultSet.FETCH_FORWARD;
     private int fetchSize = 0;
@@ -370,7 +342,7 @@ public class JDBC4Statement implements java.sql.Statement
         {
             for (Iterator<JDBC4ResultSet> iter = this.openResults.iterator(); iter.hasNext();)
             {
-                JDBC4ResultSet element = (JDBC4ResultSet)iter.next();
+                JDBC4ResultSet element = iter.next();
 
                 try
                 {
@@ -395,7 +367,7 @@ public class JDBC4Statement implements java.sql.Statement
     {
         checkClosed();
         VoltSQL query = VoltSQL.parseSQL(sql);
-        if (query.hasParameters() || !query.isOfType(VoltSQL.TYPE_INSERT,VoltSQL.TYPE_UPDATE,VoltSQL.TYPE_DELETE))
+        if (!query.isOfType(VoltSQL.TYPE_INSERT,VoltSQL.TYPE_UPDATE,VoltSQL.TYPE_DELETE))
             throw SQLError.get(SQLError.ILLEGAL_STATEMENT, sql);
         this.addBatch(query);
     }
@@ -421,7 +393,6 @@ public class JDBC4Statement implements java.sql.Statement
     public void clearWarnings() throws SQLException
     {
         checkClosed();
-        warnings = null;
     }
 
     // Releases this Statement object's database and JDBC resources immediately instead of waiting for this to happen when it is automatically closed.
@@ -435,7 +406,7 @@ public class JDBC4Statement implements java.sql.Statement
     protected boolean execute(VoltSQL query) throws SQLException
     {
         checkClosed();
-        if (query.isOfType(VoltSQL.TYPE_SELECT,VoltSQL.TYPE_EXEC))
+        if (query.isQueryOfType(VoltSQL.TYPE_SELECT,VoltSQL.TYPE_EXEC))
         {
             setCurrentResult(query.execute(this.sourceConnection.NativeConnection, this.m_timeout), -1);
             return true;
@@ -453,7 +424,7 @@ public class JDBC4Statement implements java.sql.Statement
     {
         checkClosed();
         VoltSQL query = VoltSQL.parseSQL(sql);
-        if (query.hasParameters() || !query.isOfType(VoltSQL.TYPE_SELECT,VoltSQL.TYPE_INSERT,VoltSQL.TYPE_UPDATE,VoltSQL.TYPE_DELETE))
+        if (!query.isOfType(VoltSQL.TYPE_SELECT,VoltSQL.TYPE_INSERT,VoltSQL.TYPE_UPDATE,VoltSQL.TYPE_DELETE))
             throw SQLError.get(SQLError.ILLEGAL_STATEMENT, sql);
 
         return this.execute(query);
@@ -521,7 +492,7 @@ public class JDBC4Statement implements java.sql.Statement
     {
         checkClosed();
         VoltSQL query = VoltSQL.parseSQL(sql);
-        if (query.hasParameters() || !query.isOfType(VoltSQL.TYPE_SELECT))
+        if (!query.isOfType(VoltSQL.TYPE_SELECT))
             throw SQLError.get(SQLError.ILLEGAL_STATEMENT, sql);
         return this.executeQuery(query);
     }
@@ -538,7 +509,7 @@ public class JDBC4Statement implements java.sql.Statement
     {
         checkClosed();
         VoltSQL query = VoltSQL.parseSQL(sql);
-        if (query.hasParameters() || !query.isOfType(VoltSQL.TYPE_INSERT,VoltSQL.TYPE_UPDATE,VoltSQL.TYPE_DELETE))
+        if (!query.isOfType(VoltSQL.TYPE_INSERT,VoltSQL.TYPE_UPDATE,VoltSQL.TYPE_DELETE))
             throw SQLError.get(SQLError.ILLEGAL_STATEMENT, sql);
         return this.executeUpdate(query);
     }

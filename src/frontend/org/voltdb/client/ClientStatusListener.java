@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,6 +21,7 @@ package org.voltdb.client;
  * Listener that a client application can provide to a {@link Client} in order to receive notifications
  * when a connection is lost or backpressure occurs
  *
+ * @deprecated Use {@link ClientStatusListenerExt} instead.
  */
 @Deprecated
 public interface ClientStatusListener {
@@ -39,5 +40,12 @@ public interface ClientStatusListener {
      */
     void backpressure(boolean status);
 
+    /**
+     * Called when a {@link ProcedureCallback#clientCallback(ClientResponse)} invocation throws
+     * an exception.
+     * @param callback The callback that threw an exception.
+     * @param r The response object passed to the callback.
+     * @param e The exception thrown by the callback.
+     */
     void uncaughtException(ProcedureCallback callback, ClientResponse r, Throwable e);
 }
