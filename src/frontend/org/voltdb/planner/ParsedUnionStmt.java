@@ -112,7 +112,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     * @param inListExpr TVE for the columns from the IN list
     * @return modified subquery
     */
-    protected static ParsedUnionStmt rewriteInSubqueryAsExists(ParsedUnionStmt unionStmt, AbstractExpression inListExpr) {
+    protected static void rewriteInSubqueryAsExists(ParsedUnionStmt unionStmt, AbstractExpression inListExpr) {
         if (unionStmt.m_unionType == UnionType.UNION || unionStmt.m_unionType == UnionType.UNION_ALL) {
             // rewrite for all children
             for (AbstractParsedStmt childStmt : unionStmt.m_children) {
@@ -134,6 +134,5 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
                 ParsedUnionStmt.rewriteInSubqueryAsExists((ParsedUnionStmt) childStmt, inListExpr);
             }
         }
-        return unionStmt;
     }
 }

@@ -32,6 +32,7 @@ import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.MaterializePlanNode;
 import org.voltdb.plannodes.MaterializedScanPlanNode;
+import org.voltdb.plannodes.NestLoopInPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
@@ -63,6 +64,7 @@ public enum PlanNodeType {
     //
     NESTLOOP        (20, NestLoopPlanNode.class),
     NESTLOOPINDEX   (21, NestLoopIndexPlanNode.class),
+    NESTLOOPIN      (22, NestLoopInPlanNode.class),
 
     //
     // Operator Nodes

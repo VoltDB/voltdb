@@ -17,6 +17,7 @@
 
 package org.voltdb.plannodes;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeMap;
 
@@ -251,6 +252,18 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         stringer.key(Members.PRE_JOIN_PREDICATE.name()).value(m_preJoinPredicate);
         stringer.key(Members.JOIN_PREDICATE.name()).value(m_joinPredicate);
         stringer.key(Members.WHERE_PREDICATE.name()).value(m_wherePredicate);
+
+        List<AbstractExpression> predicates = new ArrayList<AbstractExpression>();
+        if (m_preJoinPredicate != null) {
+            predicates.add(m_preJoinPredicate);
+        }
+        if (m_joinPredicate != null) {
+            predicates.add(m_joinPredicate);
+        }
+        if (m_wherePredicate != null) {
+            predicates.add(m_wherePredicate);
+        }
+        subqueryParamsToJSONString(ExpressionUtil.combine(predicates), stringer);
     }
 
     @Override
@@ -261,6 +274,15 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         m_preJoinPredicate = AbstractExpression.fromJSONChild(jobj, Members.PRE_JOIN_PREDICATE.name());
         m_joinPredicate = AbstractExpression.fromJSONChild(jobj, Members.JOIN_PREDICATE.name());
         m_wherePredicate = AbstractExpression.fromJSONChild(jobj, Members.WHERE_PREDICATE.name());
+        if (m_preJoinPredicate != null) {
+            m_preJoinPredicate = subqueriesParamsFromJSONString(m_preJoinPredicate, jobj);
+        }
+        if (m_joinPredicate != null) {
+            m_joinPredicate = subqueriesParamsFromJSONString(m_joinPredicate, jobj);
+        }
+        if (m_wherePredicate != null) {
+            m_wherePredicate = subqueriesParamsFromJSONString(m_wherePredicate, jobj);
+        }
     }
 
     /**

@@ -383,9 +383,8 @@ public class plannerTester {
         JSONObject jobj;
         try {
             jobj = new JSONObject( prettyJson );
-            JSONArray jarray =  jobj.getJSONArray("PLAN_NODES");
             Database db = s_singleton.getDatabase();
-            pnt.loadFromJSONArray(jarray, db);
+            pnt.loadFromJSONPlan(jobj, db);
         } catch (JSONException e) {
             e.printStackTrace();
         }

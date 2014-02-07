@@ -46,6 +46,10 @@ public class testLoadPlanNodeFromJSON extends PlannerTestCase {
         testLoadQueryPlanTree("select * from l,t where lname=? and l.a=t.a order by l.b limit ?;");
         testLoadQueryPlanTree("select l.id, count(*) as tag from l group by l.id order by tag, l.id limit ?;");
         testLoadQueryPlanTree("select count(*) from l where lname=? and id < ?;");
+        testLoadQueryPlanTree("select l.id from l where l.id = ? and exists (select a from t where l.a = t.a)");
+        testLoadQueryPlanTree("select l.id from l where l.id = ? and exists (select a from t where exists(select 1 from t where t.a = l.id))");
+        testLoadQueryPlanTree("select l.id from l where l.id = ? or exists (select a from t where l.a = t.a)");
+        testLoadQueryPlanTree("select l.id from l join t on l.id=t.a and exists (select a from t where l.a = t.a)");
     }
 
     public void testLoadQueryPlanTree(String sql) throws JSONException {
@@ -53,11 +57,12 @@ public class testLoadPlanNodeFromJSON extends PlannerTestCase {
         PlanNodeTree pnt = new PlanNodeTree(pn);
         String str = pnt.toJSONString();
         System.out.println(str);
-        JSONArray jarray = new JSONObject(str)
-                .getJSONArray(PlanNodeTree.Members.PLAN_NODES.name());
+        JSONObject jsonPlan = new JSONObject(str);
         PlanNodeTree pnt1 = new PlanNodeTree();
-        pnt1.loadFromJSONArray(jarray, getDatabase());
+        pnt1.loadFromJSONPlan(jsonPlan, getDatabase());
         String str1 = pnt1.toJSONString();
+        System.out.println("Str  :" + str);
+        System.out.println("Str1 :" + str1);
         assertTrue(str.equals(str1));
     }
 }

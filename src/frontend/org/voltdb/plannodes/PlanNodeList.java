@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 
 /**
@@ -32,10 +33,13 @@ import org.json_voltpatches.JSONStringer;
 public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeList> {
 
     public enum Members {
-        EXECUTE_LIST;
+        EXECUTE_LIST,
+        SUBQUERY_EXECUTE_LISTS,
+        SUBQUERY_ID;
     }
 
-    protected List<AbstractPlanNode> m_list = new ArrayList<AbstractPlanNode>();
+    protected List<AbstractPlanNode> m_list;
+    protected Map<Integer, List<AbstractPlanNode>> m_subqueryLists = new HashMap<Integer, List<AbstractPlanNode>>();
 
     public PlanNodeList() {
         super();
@@ -44,7 +48,13 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
     public PlanNodeList(AbstractPlanNode root_node) {
         super(root_node);
         try {
-            constructList();
+            // Construct parent list
+            m_list = constructList(m_planNodes);
+            // Construct subqueries
+            for(Map.Entry<Integer, List<AbstractPlanNode>> entry : m_subqueryPlanList.entrySet()) {
+                List<AbstractPlanNode> list = constructList(entry.getValue());
+                m_subqueryLists.put(entry.getKey(), list);
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -52,6 +62,10 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
 
     public List<AbstractPlanNode> getExecutionList() {
         return m_list;
+    }
+
+    public Map<Integer, List<AbstractPlanNode>> getSubqueryExecutionLists() {
+        return m_subqueryLists;
     }
 
     @Override
@@ -64,14 +78,14 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
         return ret;
     }
 
-    public void constructList() throws Exception {
+    public List<AbstractPlanNode> constructList(List<AbstractPlanNode> planNodes) throws Exception {
         //
         // Create a counter for each node based on the # of children that it has
         // If any node has no children, put it in the execute list
         //
         List<AbstractPlanNode> execute_list = Collections.synchronizedList(new ArrayList<AbstractPlanNode>());
         Map<AbstractPlanNode, Integer> child_cnts = new HashMap<AbstractPlanNode, Integer>();
-        for (AbstractPlanNode node : m_planNodes) {
+        for (AbstractPlanNode node : planNodes) {
             int num_of_children = node.getChildCount();
             if (num_of_children == 0) {
                 execute_list.add(node);
@@ -83,13 +97,13 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
         // Now run through a simulation
         // Doing it this way maintains the nuances of the parent-child relationships
         //
-        m_list.clear();
+        List<AbstractPlanNode> list = new ArrayList<AbstractPlanNode>();
         while (!execute_list.isEmpty()) {
             AbstractPlanNode node = execute_list.remove(0);
             //
             // Add the node to our execution list
             //
-            m_list.add(node);
+            list.add(node);
             //
             // Then update all of this node's parents and reduce their wait counter by 1
             // If the counter is at zero, then we'll add it to end of our list
@@ -107,10 +121,10 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
         //
         // Important! Make sure that our list has the same number of entries in our tree
         //
-        if (m_list.size() != m_planNodes.size()) {
-            throw new Exception("ERROR: The execution list has '" + m_list.size() + "' PlanNodes but our original tree has '" + m_planNodes.size() + "' PlanNode entries");
+        if (list.size() != planNodes.size()) {
+            throw new Exception("ERROR: The execution list has '" + m_list.size() + "' PlanNodes but our original tree has '" + planNodes.size() + "' PlanNode entries");
         }
-        return;
+        return list;
     }
 
     @Override
@@ -125,6 +139,17 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
             if (diff != 0) return diff;
         }
 
+        // compare subqueries
+        for (Map.Entry<Integer, List<AbstractPlanNode>> nodeListEntry : m_subqueryLists.entrySet()) {
+            List<AbstractPlanNode> nodeList = nodeListEntry.getValue();
+            int thisId = nodeListEntry.getKey();
+            List<AbstractPlanNode> onodeList = o.m_subqueryLists.get(thisId);
+            if (onodeList == null || nodeList.size() != onodeList.size()) return -1;
+            for (int i = 0; i < nodeList.size(); i++) {
+                diff = nodeList.get(i).m_id - onodeList.get(i).m_id;
+                if (diff != 0) return diff;
+            }
+        }
         return 0;
     }
 
@@ -140,6 +165,19 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
                 stringer.value(node.getPlanNodeId().intValue());
             }
             stringer.endArray(); //end execution list
+
+            stringer.key(Members.SUBQUERY_EXECUTE_LISTS.name()).array();
+            for (Map.Entry<Integer, List<AbstractPlanNode>> nodeListEntry : m_subqueryLists.entrySet()) {
+                stringer.object().key(Members.SUBQUERY_ID.name());
+                stringer.value(nodeListEntry.getKey());
+                stringer.key(Members.EXECUTE_LIST.name()).array();
+                for (AbstractPlanNode node : nodeListEntry.getValue()) {
+                    assert (node instanceof JSONString);
+                    stringer.value(node.getPlanNodeId().intValue());
+                }
+                stringer.endArray().endObject(); //end list and entry
+            }
+            stringer.endArray(); // end map
 
             stringer.endObject(); //end PlanNodeList
         } catch (JSONException e) {
@@ -161,7 +199,7 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
         for (AbstractPlanNode node : m_list) {
                 sb.append(node.toDOTString());
         }
-
+        //TODO ENG-451-exists add subqueries
         sb.append("\n}\n");
         return sb.toString();
     }

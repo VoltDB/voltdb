@@ -995,7 +995,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     * @param inListExpr TVE for the columns from the IN list
     * @return modified subquery
     */
-    protected static ParsedSelectStmt rewriteInSubqueryAsExists(ParsedSelectStmt selectStmt, AbstractExpression inListExpr) {
+    protected static void rewriteInSubqueryAsExists(ParsedSelectStmt selectStmt, AbstractExpression inListExpr) {
         List<AbstractExpression> whereList = new ArrayList<AbstractExpression>();
         List<AbstractExpression> havingList = new ArrayList<AbstractExpression>();
         Collection<AbstractExpression> inExprList = ExpressionUtil.uncombineAny(inListExpr.getLeft());
@@ -1098,8 +1098,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             selectStmt.aggregationList.clear();
             selectStmt.parseHavingExpression(true);
         }
-
-        return selectStmt;
     }
 
     public boolean hasAggregateExpression () {

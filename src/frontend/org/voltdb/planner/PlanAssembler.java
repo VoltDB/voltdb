@@ -18,8 +18,10 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -38,8 +40,10 @@ import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
+import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.OperatorExpression;
+import org.voltdb.expressions.SubqueryExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
@@ -57,6 +61,7 @@ import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.MaterializePlanNode;
+import org.voltdb.plannodes.NestLoopInPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
@@ -87,6 +92,8 @@ public class PlanAssembler {
     private class ParsedResultAccumulator {
         public boolean m_contentIsDeterministic = true;
         public boolean m_orderIsDeterministic = true;
+        public boolean m_hasExistsSubquery = false;
+        public boolean m_hasFromSubquery = false;
         public CompiledPlan m_compiledPlan;
         public int m_planId = 0;
         public PartitioningForStatement m_commonPartitioning = null;
@@ -350,10 +357,19 @@ public class PlanAssembler {
                     subQueryResult.m_orderIsDeterministic && retval.isOrderDeterministic();
             retval.statementGuaranteesDeterminism(contentIsDeterministic, orderIsDeterministic);
 
-            // Need to re-attach the sub-queries plans to the best parent plan. The same best plan for each
-            // sub-query is reused with all parent candidate plans and needs to be reconnected with
-            // the final best parent plan
-            retval.rootPlanGraph = connectChildrenBestPlans(retval.rootPlanGraph);
+            if (subQueryResult.m_hasFromSubquery == true) {
+                // Need to re-attach the FROM sub-queries plans to the best parent plan.
+                // The same best plan for each sub-query is reused with all parent candidate plans
+                // and needs to be reconnected with the final best parent plan
+                retval.rootPlanGraph = finalizeFromSubqueryBestPlans(retval.rootPlanGraph);
+            }
+            if (subQueryResult.m_hasExistsSubquery == true) {
+                // If possible, replace the scan or join nodes containing the EXISTS/IN sub-queries plans
+                // with an NLIJ-like node with the original scan/join as its outer child,
+                // the same "ouputschema" as the original, and a new "subquery" plan as
+                // its inner inline child.
+                retval.rootPlanGraph = finalizeExistsSubqueryBestPlans(retval.rootPlanGraph);
+            }
         }
         return retval;
     }
@@ -373,38 +389,78 @@ public class PlanAssembler {
      * @return ChildPlanResult
      */
     private ParsedResultAccumulator getBestCostPlanForSubQueries(AbstractParsedStmt parsedStmt) {
-        List<JoinNode> subQueryNodes = null;
         if (parsedStmt.joinTree == null) {
             return null;
         }
-        subQueryNodes = parsedStmt.joinTree.extractSubQueries();
-        if (subQueryNodes.isEmpty()) {
-            return null;
-        }
+        // Process FROM subqueries (FROM (SELECT ...))
+        List<JoinNode> subQueryNodes = parsedStmt.joinTree.extractSubQueries();
+        ParsedResultAccumulator parsedResult = null;
+        if (subQueryNodes.isEmpty() == false) {
+            parsedResult = new ParsedResultAccumulator();
+            parsedResult.m_hasFromSubquery = true;
+            for (JoinNode subQueryNode : subQueryNodes) {
+                assert(subQueryNode.getTableAliasIndex() != StmtTableScan.NULL_ALIAS_INDEX);
+                StmtTableScan tableCache = parsedStmt.stmtCache.get(subQueryNode.getTableAliasIndex());
+                assert(tableCache.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TEMP_TABLE_SCAN);
+                AbstractParsedStmt subquery = tableCache.getTempTable().getSubQuery();
+                assert(subquery != null);
 
-        ParsedResultAccumulator parsedResult = new ParsedResultAccumulator();
-        for (JoinNode subQueryNode : subQueryNodes) {
-            assert(subQueryNode.getTableAliasIndex() != StmtTableScan.NULL_ALIAS_INDEX);
-            StmtTableScan tableCache = parsedStmt.stmtCache.get(subQueryNode.getTableAliasIndex());
-            assert(tableCache.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TEMP_TABLE_SCAN);
-            AbstractParsedStmt subQuery = tableCache.getTempTable().getSubQuery();
-            assert(subQuery != null);
+                parsedResult = planForParsedStmt(subquery, parsedResult);
+                // Remove the coordinator send/receive pair. It will be added later
+                // for the whole plan
+                parsedResult.m_compiledPlan.rootPlanGraph =
+                        removeCoordinatorSendReceivePair(parsedResult.m_compiledPlan.rootPlanGraph);
 
-            parsedResult = planForParsedStmt(subQuery, parsedResult);
-            // Remove the coordinator send/receive pair. It will be added later
-            // for the whole plan
-            parsedResult.m_compiledPlan.rootPlanGraph =
-                    removeCoordinatorSendReceivePair(parsedResult.m_compiledPlan.rootPlanGraph);
-
-            tableCache.setPartitioning(parsedResult.m_currentPartitioning);
-            if (parsedResult.m_compiledPlan == null) {
-                return parsedResult;
+                tableCache.setPartitioning(parsedResult.m_currentPartitioning);
+                if (parsedResult.m_compiledPlan == null) {
+                    return parsedResult;
+                }
+                tableCache.getTempTable().setBetsCostPlan(parsedResult.m_compiledPlan);
             }
-            tableCache.getTempTable().setBetsCostPlan(parsedResult.m_compiledPlan);
         }
 
+        // Process expression subqueries ( EXISTS/IN (SELECT...) )
+        AbstractExpression treeExpr = parsedStmt.joinTree.getAllFilters();
+        List<AbstractExpression> subqueryExprs = (treeExpr != null) ?
+                treeExpr.findAllSubexpressionsOfType(ExpressionType.SUBQUERY) : null;
+        if (subqueryExprs != null && subqueryExprs.isEmpty() == false) {
+            if (parsedResult == null) {
+                parsedResult = new ParsedResultAccumulator();
+            }
+            parsedResult.m_hasExistsSubquery = true;
+            for (AbstractExpression expr : subqueryExprs) {
+                assert(expr instanceof SubqueryExpression);
+                SubqueryExpression subqueryExpr = (SubqueryExpression) expr;
+                TempTable subqueryTable = subqueryExpr.getTable();
+                Integer idx = parsedStmt.tableAliasIndexMap.get(subqueryTable.getTableAlias());
+                assert (idx != null);
+                StmtTableScan tableCache = parsedStmt.stmtCache.get(idx);
+                AbstractParsedStmt subquery = subqueryExpr.getSubquery();
+                assert(subquery != null);
+
+                parsedResult = planForParsedStmt(subquery, parsedResult);
+                // Remove the coordinator send/receive pair. It will be added later
+                // for the whole plan
+                parsedResult.m_compiledPlan.rootPlanGraph =
+                        removeCoordinatorSendReceivePair(parsedResult.m_compiledPlan.rootPlanGraph);
+                // The suqery plan must not contain Receive/Send nodes because it will be executed
+                // multiple times during the parent statement execution.
+                if (parsedResult.m_compiledPlan.rootPlanGraph.hasAnyNodeOfType(PlanNodeType.SEND)) {
+                    // fail the whole plan
+                    parsedResult.m_compiledPlan = null;
+                }
+
+                tableCache.setPartitioning(parsedResult.m_currentPartitioning);
+                if (parsedResult.m_compiledPlan == null) {
+                    return parsedResult;
+                }
+                subqueryTable.setBetsCostPlan(parsedResult.m_compiledPlan);
+            }
+        }
         // need to reset plan id for the entire SQL
-        m_planSelector.m_planId = parsedResult.m_planId;
+        if (parsedResult != null) {
+            m_planSelector.m_planId = parsedResult.m_planId;
+        }
 
         return parsedResult;
     }
@@ -622,7 +678,7 @@ public class PlanAssembler {
      * @param initial plan
      * @return A complete plan tree for the entire SQl.
      */
-    private AbstractPlanNode connectChildrenBestPlans(AbstractPlanNode parentPlan) {
+    private AbstractPlanNode finalizeFromSubqueryBestPlans(AbstractPlanNode parentPlan) {
         if (parentPlan instanceof AbstractScanPlanNode) {
             AbstractScanPlanNode scanNode = (AbstractScanPlanNode) parentPlan;
             if (scanNode.isSubQuery()) {
@@ -639,10 +695,85 @@ public class PlanAssembler {
             }
         } else {
             for (int i = 0; i < parentPlan.getChildCount(); ++i) {
-                connectChildrenBestPlans(parentPlan.getChild(i));
+                finalizeFromSubqueryBestPlans(parentPlan.getChild(i));
             }
         }
         return parentPlan;
+    }
+
+    /**
+     * If possible, replace the scan or join nodes containing the EXISTS/IN sub-queries plans
+     * with an NLIJ-like node with the original scan/join as its outer child,
+     * the same "ouputschema" as the original, and a new "subquery" plan as
+     * its inner inline child.
+     * The subquery expression can be replaced with the IN NLIJ node if it constitutes
+     * the whole expression or it is part of the conjunction AND expression.
+     * @param planNode
+     * @return modified plan tree
+     */
+    private AbstractPlanNode finalizeExistsSubqueryBestPlans(AbstractPlanNode planNode) {
+        // Recurse to children first
+         int count = planNode.getChildCount();
+        if (count > 0) {
+            List<AbstractPlanNode> nodeList = new ArrayList<AbstractPlanNode>();
+            for (int idx = 0; idx < count; ++idx) {
+                AbstractPlanNode child = planNode.getChild(idx);
+                nodeList.add(finalizeExistsSubqueryBestPlans(child));
+            }
+            planNode.disconnectChildren();
+            for (AbstractPlanNode child : nodeList) {
+                planNode.addAndLinkChild(child);
+            }
+        }
+        // Handle the parent node itself. Disconnect it from the original parent,
+        // it will be reconnected back as a child
+        planNode.disconnectParents();
+        AbstractPlanNode retval = planNode;
+        if (planNode instanceof AbstractScanPlanNode) {
+            AbstractScanPlanNode scanNode = (AbstractScanPlanNode) planNode;
+            Collection<AbstractExpression> exprs = ExpressionUtil.uncombineAny(scanNode.getPredicate());
+            retval = replaceSubqueyExprInPredicate(scanNode, exprs);
+            // Reassemble the predicate
+            scanNode.setPredicate(ExpressionUtil.combine(exprs));
+        } else if (planNode instanceof AbstractJoinPlanNode) {
+            AbstractJoinPlanNode joinNode = (AbstractJoinPlanNode) planNode;
+            // Join Predicate
+            Collection<AbstractExpression> joinExprs = ExpressionUtil.uncombineAny(joinNode.getJoinPredicate());
+            retval = replaceSubqueyExprInPredicate(joinNode, joinExprs);
+            // Reassemble the join predicate
+            joinNode.setJoinPredicate(ExpressionUtil.combine(joinExprs));
+            // Prejoin Predicate
+            Collection<AbstractExpression> preJoinExprs = ExpressionUtil.uncombineAny(joinNode.getPreJoinPredicate());
+            retval = replaceSubqueyExprInPredicate(retval, preJoinExprs);
+            // Reassemble the join predicate
+            joinNode.setPreJoinPredicate(ExpressionUtil.combine(preJoinExprs));
+            // Where Predicate
+            Collection<AbstractExpression> whereExprs = ExpressionUtil.uncombineAny(joinNode.getWherePredicate());
+            retval = replaceSubqueyExprInPredicate(retval, whereExprs);
+            // Reassemble the join predicate
+            joinNode.setWherePredicate(ExpressionUtil.combine(whereExprs));
+        }
+        return retval;
+    }
+
+    private AbstractPlanNode replaceSubqueyExprInPredicate(AbstractPlanNode planNode, Collection<AbstractExpression> exprs) {
+        AbstractPlanNode retval = planNode;
+        Iterator<AbstractExpression> it = exprs.iterator();
+        while (it.hasNext()) {
+            AbstractExpression nextExpr = it.next();
+            if (ExpressionType.OPERATOR_EXISTS.equals(nextExpr.getExpressionType())) {
+                AbstractExpression subqueryExpr = nextExpr.getLeft();
+                assert(subqueryExpr != null && subqueryExpr instanceof SubqueryExpression);
+                AbstractPlanNode subqueryPlan = ((SubqueryExpression)subqueryExpr).getSubqueryNode();
+                NestLoopInPlanNode join = new NestLoopInPlanNode(
+                        ((SubqueryExpression)subqueryExpr).getSubqueryId(), retval, subqueryPlan,
+                        ((SubqueryExpression)subqueryExpr).getParameterParentTveMap());
+                retval = join;
+                // Remove the EXISTS expressions from the original predicate
+                it.remove();
+            }
+        }
+        return retval;
     }
 
     private AbstractPlanNode getNextSelectPlan() {

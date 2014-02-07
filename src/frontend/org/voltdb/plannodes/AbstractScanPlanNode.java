@@ -32,7 +32,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.CatalogUtil;
 
@@ -367,6 +366,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         if (m_isSubQuery) {
             stringer.key(Members.SUBQUERY_INDICATOR.name()).value("TRUE");
         }
+
+        subqueryParamsToJSONString(m_predicate, stringer);
     }
 
     @Override
@@ -377,6 +378,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         m_targetTableAlias = jobj.getString( Members.TARGET_TABLE_ALIAS.name() );
         if (jobj.has("SUBQUERY_INDICATOR")) {
             m_isSubQuery = "TRUE".equalsIgnoreCase(jobj.getString( Members.SUBQUERY_INDICATOR.name() ));
+        }
+        if (m_predicate != null) {
+            m_predicate = subqueriesParamsFromJSONString(m_predicate, jobj);
         }
     }
 

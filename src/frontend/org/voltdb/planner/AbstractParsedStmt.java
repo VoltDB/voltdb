@@ -53,6 +53,14 @@ import org.voltdb.types.JoinType;
 
 public abstract class AbstractParsedStmt {
 
+     // Internal statement counter
+    public static int NEXT_STMT_ID = 1;
+    // Internal parameter counter
+    public static int NEXT_PARAMETER_ID = 1;
+
+    // The unique id to identify the statement
+    public int stmtId;
+
     public String sql;
 
     // The initial value is a safety net for the case of parameter-less statements.
@@ -141,6 +149,8 @@ public abstract class AbstractParsedStmt {
        else {
            throw new RuntimeException("Unexpected Element: " + stmtTypeElement.name);
        }
+       // Set the unique id
+       retval.stmtId = NEXT_STMT_ID++;
        return retval;
    }
 
@@ -176,6 +186,9 @@ public abstract class AbstractParsedStmt {
     public static AbstractParsedStmt parse(String sql, VoltXMLElement stmtTypeElement, String[] paramValues,
             Database db, String joinOrder) {
 
+        // reset the statemet counteres
+        NEXT_STMT_ID = 1;
+        NEXT_PARAMETER_ID = 1;
         AbstractParsedStmt retval = getParsedStmt(stmtTypeElement, paramValues, db);
         return parse(retval, sql, stmtTypeElement, db, joinOrder);
     }
@@ -387,8 +400,11 @@ public abstract class AbstractParsedStmt {
         assert(exprNode.children.size() == 1);
         VoltXMLElement subqueryElmt = exprNode.children.get(0);
         AbstractParsedStmt subqueryStmt = parseSubquery(subqueryElmt);
-        assert(subqueryStmt != null);
-        return new SubqueryExpression(subqueryStmt);
+        String tableName = "VOLT_TEMP_TABLE_" + subqueryStmt.stmtId;
+        // add table to the query cache
+        int idx = addTableToStmtCache(tableName, tableName, subqueryStmt);
+        StmtTableScan tableCache = stmtCache.get(idx);
+        return new SubqueryExpression(tableCache.getTempTable());
     }
 
     /**
@@ -584,17 +600,21 @@ public abstract class AbstractParsedStmt {
             return inExpr;
         }
         AbstractParsedStmt subquery = ((SubqueryExpression)subqueryExpr).getSubquery();
-        AbstractParsedStmt existsStmt = null;
         if (subquery instanceof ParsedSelectStmt) {
             ParsedSelectStmt selectStmt = (ParsedSelectStmt) subquery;
-            existsStmt = ParsedSelectStmt.rewriteInSubqueryAsExists(selectStmt, inExpr);
+            ParsedSelectStmt.rewriteInSubqueryAsExists(selectStmt, inExpr);
         } else if (subquery instanceof ParsedUnionStmt) {
             ParsedUnionStmt unionStmt = (ParsedUnionStmt) subquery;
-            existsStmt = ParsedUnionStmt.rewriteInSubqueryAsExists(unionStmt, inExpr);
+            ParsedUnionStmt.rewriteInSubqueryAsExists(unionStmt, inExpr);
         } else {
             throw new PlanningErrorException("Only select or set operations statements are allowed in a subquery.");
         }
-        subqueryExpr = new SubqueryExpression(existsStmt);
+
+        String tableName = "VOLT_TEMP_TABLE_" + subquery.stmtId;
+        // add table to the query cache
+        int idx = addTableToStmtCache(tableName, tableName, subquery);
+        StmtTableScan tableCache = stmtCache.get(idx);
+        subqueryExpr = new SubqueryExpression(tableCache.getTempTable());
         return new OperatorExpression(ExpressionType.OPERATOR_EXISTS, subqueryExpr, null);
     }
 
@@ -797,9 +817,13 @@ public abstract class AbstractParsedStmt {
     private void parseParameters(VoltXMLElement paramsNode) {
         m_paramList = new ParameterValueExpression[paramsNode.children.size()];
 
+        long max_parameter_id = 0;
         for (VoltXMLElement node : paramsNode.children) {
             if (node.name.equalsIgnoreCase("parameter")) {
                 long id = Long.parseLong(node.attributes.get("id"));
+                if (id > max_parameter_id) {
+                    max_parameter_id = id;
+                }
                 int index = Integer.parseInt(node.attributes.get("index"));
                 String typeName = node.attributes.get("valuetype");
                 String isVectorParam = node.attributes.get("isvector");
@@ -813,6 +837,9 @@ public abstract class AbstractParsedStmt {
                 m_paramsById.put(id, pve);
                 m_paramList[index] = pve;
             }
+        }
+        if (max_parameter_id > NEXT_PARAMETER_ID) {
+            NEXT_PARAMETER_ID = (int)max_parameter_id;
         }
     }
 
@@ -1181,7 +1208,13 @@ public abstract class AbstractParsedStmt {
     }
 
     public ParameterValueExpression[] getParameters() {
-        return m_paramList;
+        // Is a statement contains subqueries the parameters will be associated with
+        // the parent statement
+        if (m_parentStmt != null) {
+            return m_parentStmt.getParameters();
+        } else {
+            return m_paramList;
+        }
     }
 
     public boolean hasSubqueries() {

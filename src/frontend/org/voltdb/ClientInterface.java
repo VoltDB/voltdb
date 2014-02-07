@@ -1323,8 +1323,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     PlanNodeTree pnt = new PlanNodeTree();
                     try {
                         JSONObject jobj = new JSONObject( plan );
-                        JSONArray jarray =  jobj.getJSONArray(PlanNodeTree.Members.PLAN_NODES.name());
-                        pnt.loadFromJSONArray(jarray, db);
+                        pnt.loadFromJSONPlan(jobj, db);
                         String str = pnt.getRootPlanNode().toExplainPlanString();
                         vt[i] = new VoltTable(new VoltTable.ColumnInfo( "EXECUTION_PLAN", VoltType.STRING));
                         vt[i].addRow(str);
@@ -1340,12 +1339,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     PlanNodeTree collpnt = new PlanNodeTree();
                     try {
                         JSONObject jobj = new JSONObject( aggplan );
-                        JSONArray jarray =  jobj.getJSONArray(PlanNodeTree.Members.PLAN_NODES.name());
-                        pnt.loadFromJSONArray(jarray, db);
+                        pnt.loadFromJSONPlan(jobj, db);
                         //reattach plan fragments
                         jobj = new JSONObject( collplan );
-                        jarray =  jobj.getJSONArray(PlanNodeTree.Members.PLAN_NODES.name());
-                        collpnt.loadFromJSONArray(jarray, db);
+                        collpnt.loadFromJSONPlan(jobj, db);
                         assert( collpnt.getRootPlanNode() instanceof SendPlanNode);
                         pnt.getRootPlanNode().reattachFragment( (SendPlanNode) collpnt.getRootPlanNode() );
 

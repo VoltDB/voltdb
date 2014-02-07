@@ -37,6 +37,9 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.SubqueryExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.PlanStatistics;
 import org.voltdb.planner.StatsField;
 import org.voltdb.types.PlanNodeType;
@@ -63,7 +66,12 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         INLINE_NODES,
         CHILDREN_IDS,
         PARENT_IDS,
-        OUTPUT_SCHEMA;
+        OUTPUT_SCHEMA,
+        SUBQUERIES,
+        SUBQUERY_ID,
+        SUBQUERY_PARAMS,
+        PARAM_IDX,
+        PARAM_TVE;
     }
 
     protected int m_id = -1;
@@ -900,6 +908,72 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             for( int i = 0; i < size; i++ ) {
                 m_outputSchema.addColumn( SchemaColumn.fromJSONObject(jarray.getJSONObject(i)) );
             }
+        }
+    }
+    protected AbstractExpression subqueriesParamsFromJSONString(AbstractExpression predicate, JSONObject obj) throws JSONException {
+        if (predicate == null) {
+            return predicate;
+        }
+        List<AbstractExpression> subqueryExprs = predicate.findAllSubexpressionsOfClass(SubqueryExpression.class);
+        if (subqueryExprs.isEmpty()) {
+            return predicate;
+        }
+        JSONArray jarr = obj.getJSONArray(Members.SUBQUERIES.name());
+        assert(subqueryExprs.size() == jarr.length());
+        Map<Integer, JSONObject> jmap = new HashMap<Integer, JSONObject>();
+        int size = jarr.length();
+        for (int idx = 0; idx < size; ++idx) {
+            JSONObject jobj = jarr.getJSONObject(idx);
+            int subqueryId = jobj.getInt(Members.SUBQUERY_ID.name());
+            jmap.put(subqueryId, jobj);
+        }
+        for (AbstractExpression expr : subqueryExprs) {
+            assert(expr instanceof SubqueryExpression);
+            SubqueryExpression subqueryExpr = (SubqueryExpression) expr;
+            int subqueryId = subqueryExpr.getSubqueryId();
+            JSONObject jobj = jmap.get(subqueryId);
+            Map<Integer, TupleValueExpression> paramMap = subqueryParamsFromJSONString(jobj);
+            subqueryExpr.setParameterParentTveMap(paramMap);
+        }
+        return predicate;
+    }
+
+    protected Map<Integer, TupleValueExpression> subqueryParamsFromJSONString(JSONObject obj) throws JSONException {
+        Map<Integer, TupleValueExpression> params = new HashMap<Integer, TupleValueExpression>();
+        if (obj.has(Members.SUBQUERY_PARAMS.name())) {
+            JSONArray jtves = obj.getJSONArray(Members.SUBQUERY_PARAMS.name());
+            int size = jtves.length();
+            for( int i = 0; i < size; i++ ) {
+                JSONObject jobj = jtves.getJSONObject(i);
+                int paramId = jobj.getInt(Members.PARAM_IDX.name());
+                AbstractExpression tve = AbstractExpression.fromJSONChild(jobj, Members.PARAM_TVE.name());
+                assert(tve instanceof TupleValueExpression);
+                params.put(paramId, (TupleValueExpression)tve);
+            }
+        }
+        return params;
+    }
+
+    protected void subqueryParamsToJSONString(AbstractExpression predicate, JSONStringer stringer) throws JSONException {
+        if (predicate == null) {
+            return;
+        }
+        List<AbstractExpression> subqueryExprs = predicate.findAllSubexpressionsOfClass(SubqueryExpression.class);
+        if (!subqueryExprs.isEmpty()) {
+            stringer.key(Members.SUBQUERIES.name()).array();
+            for(AbstractExpression expr : subqueryExprs) {
+                assert(expr instanceof SubqueryExpression);
+                SubqueryExpression subqueryExpr = (SubqueryExpression) expr;
+                stringer.object().key(Members.SUBQUERY_ID.name()).value(subqueryExpr.getSubqueryId());
+                stringer.key(Members.SUBQUERY_PARAMS.name()).array();
+                Map<Integer, TupleValueExpression> paramMap = subqueryExpr.getParameterParentTveMap();
+                for (Map.Entry<Integer, TupleValueExpression> paramEntry : paramMap.entrySet()) {
+                    stringer.object().key(Members.PARAM_IDX.name()).value(paramEntry.getKey());
+                    stringer.key(Members.PARAM_TVE.name()).value(paramEntry.getValue()).endObject();
+                }
+                stringer.endArray().endObject();
+            }
+            stringer.endArray();
         }
     }
 
