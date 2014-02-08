@@ -63,6 +63,7 @@ import org.voltdb.common.Constants;
 class Distributer {
 
     static final long PING_HANDLE = Long.MAX_VALUE;
+    public static final Long ASYNC_TOPO_HANDLE = PING_HANDLE - 1;
     static final long USE_DEFAULT_TIMEOUT = 0;
 
     // handles used internally are negative and decrement for each call
@@ -377,6 +378,19 @@ class Distributer {
                 if (response.getClientHandle() == PING_HANDLE) {
                     m_outstandingPing = false;
                     return;
+                } else if (response.getClientHandle() == ASYNC_TOPO_HANDLE) {
+                    System.out.println("Received async topology update");
+                    /*
+                     * Really didn't want to add this block because it is not DRY
+                     * for the exception handling, but trying to set + reset the async topo callback
+                     * turned out to be pretty challenging
+                     */
+                    cb = new TopoUpdateCallback();
+                    try {
+                        cb.clientCallback(response);
+                    } catch (Exception e) {
+                        uncaughtException(cb, response, e);
+                    }
                 }
 
                 CallbackBookeeping stuff = m_callbacks.remove(response.getClientHandle());
@@ -664,6 +678,19 @@ class Distributer {
             spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@SystemCatalog", "PROCEDURES");
             //The handle is specific to procedure updates and has special cased handling
             queue(spi, new ProcUpdateCallback(), true, USE_DEFAULT_TIMEOUT);
+
+            //Subscribe to topology updates
+            spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Subscribe", "TOPOLOGY");
+            queue(spi, new ProcedureCallback() {
+                @Override
+                public void clientCallback(ClientResponse response) {
+                    if (response.getStatus() != ClientResponse.SUCCESS) {
+                        System.err.println("Error response received subscribing to topology updates.\n " +
+                                           "Performance may be reduced on topology updates. Error was \"" +
+                                            response.getStatusString() + "\"");
+                    }
+                }
+            }, true, USE_DEFAULT_TIMEOUT);
         }
     }
 

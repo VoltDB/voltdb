@@ -19,10 +19,18 @@ package org.voltdb;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.TimeUnit;
+
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.base.Predicate;
+import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.cache.Cache;
+import com.google_voltpatches.common.cache.CacheBuilder;
 
 import org.voltcore.network.Connection;
 import org.voltcore.network.VoltPort;
@@ -41,10 +49,6 @@ import com.google_voltpatches.common.util.concurrent.RateLimiter;
  * will be used to identify when the same event is signaled multiple times. Internally the supplier
  * is free to return the most recent value for that type of event (such as cluster topology)
  *
- * If event sets are generally going to be small and homogenous it would be nice to have an identity
- * mechanism to store the same object as the event set value which would reduce allocation and promotion,
- * but I stopped short of that complexity for now
- *
  * With a few adapters this could be a generic event coalescing and rate limiting mechanism, but I
  * don't see a reason to over engineer it until we actually have a second use case
  *
@@ -57,19 +61,58 @@ public class RateLimitedClientNotifier {
                                 = new ConcurrentHashMap<Connection, Object>(2048, .75f, 128);
     private final LinkedTransferQueue<Runnable> m_submissionQueue = new LinkedTransferQueue<Runnable>();
 
-    private final RateLimiter m_limiter =
-            RateLimiter.create(Long.getLong("CLIENT_NOTIFICATION_RATE", 1000).doubleValue());
+    private static final double NOTIFICATION_RATE = Long.getLong("CLIENT_NOTIFICATION_RATE", 1000).doubleValue();
+    private RateLimiter m_limiter;
+
+    //Cache nodes use to build linked lists of notifications
+    //This avoids having to create and promote large numbers of objects and then GC them later
+    private static final Cache<Node, Node> m_cachedNodes =
+                                            CacheBuilder.newBuilder()
+                                                    .maximumSize(10000).concurrencyLevel(1).build();
 
     /*
-     * Linked list node saves allocating a dedicated list object
+     * Linked list node saves allocating a dedicated list object and allows for object pooling
      */
-    private static class Node {
+    private static class Node implements Callable<Node> {
         private final Supplier<DeferredSerialization> notification;
         private final Node next;
 
         private Node(Supplier<DeferredSerialization> notification, Node next) {
+            Preconditions.checkNotNull(notification);
             this.notification = notification;
             this.next = next;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o == this) return true;
+            if (o == null) return false;
+            if (!(o instanceof Node)) return false;
+            Node other = (Node)o;
+            if (other.notification == notification) {
+                if (other.next == next) return true;
+                if (other.next != null && next != null) {
+                    return next.equals(other.next);
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public int hashCode() {
+            if (next == null) return notification.hashCode();
+            final int prime = 31;
+            int result = 1;
+            Node head = this;
+            do {
+                result = result * prime + head.notification.hashCode();
+            } while ((head = next) != null);
+            return result;
+        }
+
+        @Override
+        public Node call() {
+            return this;
         }
     }
 
@@ -92,6 +135,8 @@ public class RateLimitedClientNotifier {
             if (m_clientsPendingNotification.isEmpty()) {
                 //Block until submissions create further work
                 runSubmissions(true);
+                //Create a fresh limiter each time so there isn't a burst of permits
+                m_limiter = RateLimiter.create(NOTIFICATION_RATE, 5, TimeUnit.SECONDS);
             } else {
                 //Non-blocking poll for changes
                 runSubmissions(false);
@@ -153,11 +198,15 @@ public class RateLimitedClientNotifier {
     //Queue a notification to a collection of connections
     //The collection will be filtered to exclude non VoltPort connections
     public void queueNotification(
-            final Collection<Connection> connections, final Supplier<DeferredSerialization> notification) {
+            final Collection<ClientInterfaceHandleManager> connections,
+            final Supplier<DeferredSerialization> notification,
+            final Predicate<ClientInterfaceHandleManager> wantsNotificationPredicate) {
         m_submissionQueue.offer(new Runnable() {
             @Override
             public void run() {
-                for (Connection c : connections) {
+                for (ClientInterfaceHandleManager cihm : connections) {
+                    if (!wantsNotificationPredicate.apply(cihm)) continue;
+                    final Connection c = cihm.connection;
                     if (VoltPort.class != c.getClass()) continue;
 
                     /*
@@ -166,32 +215,42 @@ public class RateLimitedClientNotifier {
                      * and walk the list to dedupe events by identity
                      */
                     Object pendingNotifications = m_clientsPendingNotification.get(c);
-                    if (pendingNotifications == null) {
-                        m_clientsPendingNotification.put(c, notification);
-                    } else if (pendingNotifications instanceof Supplier) {
-                        //Identity duplicate check
-                        if (pendingNotifications == notification) return;
-                        //Convert to a two node linked list
-                        @SuppressWarnings("unchecked")
-                        Node n1 = new Node((Supplier<DeferredSerialization>)pendingNotifications, null);
-                        Node n2 = new Node(notification, n1);
-                        m_clientsPendingNotification.put(c,  n2);
-                    } else {
-                        //Walk the list and check if the notification is a duplicate
-                        Node head = (Node)pendingNotifications;
-                        boolean dup = false;
-                        while (head != null) {
-                            if (head.notification == notification) {
-                                dup = true;
-                                break;
+                    try {
+                        if (pendingNotifications == null) {
+                            m_clientsPendingNotification.put(c, notification);
+                        } else if (pendingNotifications instanceof Supplier) {
+                            //Identity duplicate check
+                            if (pendingNotifications == notification) return;
+                            //Convert to a two node linked list
+                            @SuppressWarnings("unchecked")
+                            Node n1 = new Node((Supplier<DeferredSerialization>)pendingNotifications, null);
+                            n1 = m_cachedNodes.get(n1, n1);
+                            Node n2 = new Node(notification, n1);
+                            n2 = m_cachedNodes.get(n2, n2);
+                            m_clientsPendingNotification.put(c,  n2);
+                        } else {
+                            //Walk the list and check if the notification is a duplicate
+                            Node head = (Node)pendingNotifications;
+                            boolean dup = false;
+                            while (head != null) {
+                                if (head.notification == notification) {
+                                    dup = true;
+                                    break;
+                                }
+                                head = head.next;
                             }
-                            head = head.next;
+                            //If it's a dupe, no new work
+                            if (dup) continue;
+                            //Otherwise replace the head of the list which is the value in the map
+                            Node replacement = new Node(notification, (Node)pendingNotifications);
+                            replacement = m_cachedNodes.get(replacement, replacement);
+                            m_clientsPendingNotification.put(c, replacement);
                         }
-                        //If it's a dupe, no new work
-                        if (dup) continue;
-                        //Otherwise replace the head of the list which is the value in the map
-                        Node replacement = new Node(notification, (Node)pendingNotifications);
-                        m_clientsPendingNotification.put(c, replacement);
+                    } catch (ExecutionException e) {
+                        VoltDB.crashLocalVoltDB(
+                                "Unexpected exception pushing client notifications",
+                                true,
+                                Throwables.getRootCause(e));
                     }
                 }
             }
