@@ -391,6 +391,7 @@ class Distributer {
                     } catch (Exception e) {
                         uncaughtException(cb, response, e);
                     }
+                    return;
                 }
 
                 CallbackBookeeping stuff = m_callbacks.remove(response.getClientHandle());

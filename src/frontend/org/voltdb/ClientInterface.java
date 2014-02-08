@@ -2255,7 +2255,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         return;
                     }
 
-                    final ByteBuffer buf = ByteBuffer.allocate(r.getSerializedSize());
+                    final int size = r.getSerializedSize();
+                    final ByteBuffer buf = ByteBuffer.allocate(size + 4);
+                    buf.putInt(size);
                     r.flattenToBuffer(buf);
                     buf.flip();
 
