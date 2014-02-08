@@ -2205,7 +2205,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             public void run() {
                 checkForTopologyChanges();
             }
-        }, 5, 5, TimeUnit.SECONDS);
+        }, 5, 0, TimeUnit.SECONDS);
     }
 
     /*
@@ -2275,10 +2275,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         @Override
                         public void cancel() {}
                     });
-                    m_notifier.queueNotification(
-                            m_cihm.values(),
-                            m_currentTopologySupplier,
-                            m_wantsTopologyUpdatesPredicate);
+                    if (oldValue != null) {
+                        m_notifier.queueNotification(
+                                m_cihm.values(),
+                                m_currentTopologySupplier,
+                                m_wantsTopologyUpdatesPredicate);
+                    }
 
                 } catch (Throwable t) {
                     hostLog.error("Error checking for topology updates", Throwables.getRootCause(t));
