@@ -193,7 +193,7 @@ public class TestDDLCompiler extends TestCase {
                 foundFKWarnings++;
             }
         }
-        assertEquals(1, foundCheckWarnings);
+        assertEquals(0, foundCheckWarnings);
         assertEquals(1, foundFKWarnings);
 
         // cleanup after the test

@@ -435,8 +435,11 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
             client.callProcedure("TABLECHECK.insert", 101, 1, 3, "bedford", tm);
         } catch (ProcCallException e) {
             ex = e;
-            assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint "));
-            assertTrue(e.getMessage().contains("SYS_CT"));
+            if (isHSQL()) { assertTrue(e.getMessage().contains("check constraint;"));
+            } else {
+                assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint "));
+                assertTrue(e.getMessage().contains("SYS_CT"));
+            }
         } finally {
             assertNotNull(ex);
         }
@@ -447,7 +450,9 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
             client.callProcedure("TABLECHECK.insert", -1, 1, 3, "bedford", tm);
         } catch (ProcCallException e) {
             ex = e;
-            assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK1"));
+            if (isHSQL())  assertTrue(e.getMessage().contains("check constraint;"));
+            else assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK1"));
+
         } finally {
             assertNotNull(ex);
         }
@@ -458,7 +463,8 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
             client.callProcedure("TABLECHECK.insert", 2, 1, 3, "bedford", Timestamp.valueOf("2013-02-05 13:56:40.123456"));
         } catch (ProcCallException e) {
             ex = e;
-            assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK2"));
+            if (isHSQL())  assertTrue(e.getMessage().contains("check constraint;"));
+            else assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK2"));
         } finally {
             assertNotNull(ex);
         }
@@ -469,7 +475,8 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
             client.callProcedure("TABLECHECK.insert", 2, 51, 300, "bedford", tm);
         } catch (ProcCallException e) {
             ex = e;
-            assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK3"));
+            if (isHSQL())  assertTrue(e.getMessage().contains("check constraint;"));
+            else assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK3"));
         } finally {
             assertNotNull(ex);
         }
@@ -479,20 +486,24 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
             client.callProcedure("TABLECHECK.insert", 2, 1, 1, "bedford", tm);
         } catch (ProcCallException e) {
             ex = e;
-            assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK3"));
+            if (isHSQL())  assertTrue(e.getMessage().contains("check constraint;"));
+            else assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK3"));
         } finally {
             assertNotNull(ex);
         }
 
         // test check3 with null
-        ex = null;
-        try {
-            client.callProcedure("TABLECHECK.insert", 2, 1, null, "bedford", tm);
-        } catch (ProcCallException e) {
-            ex = e;
-            assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK3"));
-        } finally {
-            assertNotNull(ex);
+        if (!isHSQL()) {
+            // Hsql has a bug with NULL check.
+            ex = null;
+            try {
+                client.callProcedure("TABLECHECK.insert", 2, null, 5, "bedford", tm);
+            } catch (ProcCallException e) {
+                ex = e;
+                assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK3"));
+            } finally {
+                assertNotNull(ex);
+            }
         }
 
         vt = client.callProcedure("@AdHoc", "select count(*) from TABLECHECK where id = 1").getResults()[0];
@@ -506,8 +517,11 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
             client.callProcedure("@AdHoc", "update TABLECHECK set id = 101 where id = 1");
         } catch (ProcCallException e) {
             ex = e;
-            assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint "));
-            assertTrue(e.getMessage().contains("SYS_CT"));
+            if (isHSQL())  assertTrue(e.getMessage().contains("check constraint;"));
+            else {
+                assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint "));
+                assertTrue(e.getMessage().contains("SYS_CT"));
+            }
         } finally {
             assertNotNull(ex);
         }
@@ -518,7 +532,8 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
             client.callProcedure("@AdHoc", "update TABLECHECK set id = -1 where id = 1");
         } catch (ProcCallException e) {
             ex = e;
-            assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK1"));
+            if (isHSQL())  assertTrue(e.getMessage().contains("check constraint;"));
+            else assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK1"));
         } finally {
             assertNotNull(ex);
         }
@@ -529,7 +544,8 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
             client.callProcedure("@AdHoc", "update TABLECHECK set tm = '2013-02-05 13:56:40.123456' where id = 1");
         } catch (ProcCallException e) {
             ex = e;
-            assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK2"));
+            if (isHSQL())  assertTrue(e.getMessage().contains("check constraint;"));
+            else assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK2"));
         } finally {
             assertNotNull(ex);
         }
@@ -540,7 +556,8 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
             client.callProcedure("@AdHoc", "update TABLECHECK set id = 2, age = 51, wage = 300 where id = 1");
         } catch (ProcCallException e) {
             ex = e;
-            assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK3"));
+            if (isHSQL())  assertTrue(e.getMessage().contains("check constraint;"));
+            else assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK3"));
         } finally {
             assertNotNull(ex);
         }
@@ -550,20 +567,25 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
             client.callProcedure("@AdHoc", "update TABLECHECK set id = 2, age = 1, wage = 1 where id = 1");
         } catch (ProcCallException e) {
             ex = e;
-            assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK3"));
+            if (isHSQL())  assertTrue(e.getMessage().contains("check constraint;"));
+            else assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK3"));
         } finally {
             assertNotNull(ex);
         }
 
         // test check3 with null
-        ex = null;
-        try {
-            client.callProcedure("@AdHoc", "update TABLECHECK set id = 2, age = 1, wage = NULL where id = 1");
-        } catch (ProcCallException e) {
-            ex = e;
-            assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK3"));
-        } finally {
-            assertNotNull(ex);
+        if (!isHSQL()) {
+            // Hsql has a bug with NULL check.
+            ex = null;
+            try {
+                client.callProcedure("@AdHoc", "update TABLECHECK set id = 2, age = NULL, wage = 5 where id = 1");
+            } catch (ProcCallException e) {
+                ex = e;
+                if (isHSQL())  assertTrue(e.getMessage().contains("check constraint;"));
+                else assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK3"));
+            } finally {
+                assertNotNull(ex);
+            }
         }
 
         vt = client.callProcedure("@AdHoc", "select count(*) from TABLECHECK where id = 1").getResults()[0];
