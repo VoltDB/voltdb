@@ -29,6 +29,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Random;
 import java.util.TreeMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
@@ -53,6 +54,8 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.common.Constants;
+
+import com.google_voltpatches.common.base.Throwables;
 
 /**
  *   De/multiplexes transactions across a cluster
@@ -129,6 +132,14 @@ class Distributer {
 
     private String m_buildString;
 
+    /*
+     * The connection we have issued our subscriptions to. If the connection is lost
+     * we will need to request subscription from a different node
+     */
+    private NodeConnection m_subscribedConnection = null;
+    //Track if a request is pending so we don't accidentally handle a failed node twice
+    private boolean m_subscriptionRequestPending = false;
+
     /**
      * Handles topology updates for client affinity
      */
@@ -146,6 +157,47 @@ class Distributer {
             }
             catch (Exception e) {
                 e.printStackTrace();
+            }
+        }
+    }
+
+    /**
+     * Handles @Subscribe response
+     */
+    class SubscribeCallback implements ProcedureCallback {
+
+        @Override
+        public void clientCallback(ClientResponse response) throws Exception {
+            //Fast path subscribing retry if the connection was lost before getting a response
+            if (response.getStatus() == ClientResponse.CONNECTION_LOST && !m_connections.isEmpty()) {
+                subscribeToNewNode();
+                return;
+            }
+
+            //Slow path, god knows why it didn't succeed, could be a bug. Don't firehose attempts.
+            if (response.getStatus() != ClientResponse.SUCCESS) {
+                System.err.println("Error response received subscribing to topology updates.\n " +
+                                   "Performance may be reduced on topology updates. Error was \"" +
+                                    response.getStatusString() + "\"");
+                //Retry on the off chance that it will work the Nth time, or work at a different node
+                m_ex.schedule(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            subscribeToNewNode();
+                        } catch (Throwable t) {
+                            t.printStackTrace();
+                            Throwables.propagate(t);
+                        }
+                    }
+                }, 2, TimeUnit.MINUTES);
+                return;
+            }
+            //If success, the code in NodeConnection.stopping needs to know it has to handle selecting
+            //a new node to for subscriptions, so set the pending request to false to let that code
+            //know that the failure won't be handled in the callback
+            synchronized (Distributer.this) {
+                m_subscriptionRequestPending = false;
             }
         }
     }
@@ -510,6 +562,17 @@ class Distributer {
                                 m_connections.size(),
                                 m_closeCause);
                     }
+
+                    /*
+                     * Deal with the fact that this may have been the connection that subscriptions were issued
+                     * to. If a subscription request was pending, don't handle selecting a new node here
+                     * let the callback see the failure and retry
+                     */
+                    if (m_useClientAffinity &&
+                        m_subscribedConnection == this &&
+                        m_subscriptionRequestPending == false) {
+                        subscribeToNewNode();
+                    }
                 }
                 m_isConnected = false;
 
@@ -680,18 +743,40 @@ class Distributer {
             //The handle is specific to procedure updates and has special cased handling
             queue(spi, new ProcUpdateCallback(), true, USE_DEFAULT_TIMEOUT);
 
+            if (m_subscribedConnection == null) {
+                subscribeToNewNode();
+            }
+        }
+    }
+
+    private void subscribeToNewNode() {
+        //Technically necessary to synchronize for safe publication of this store
+        synchronized (Distributer.this) {
+            m_subscribedConnection = null;
+        }
+        if (!m_connections.isEmpty()) {
+            NodeConnection replacement = m_connections.get(new Random().nextInt(m_connections.size()));
+            subscribeWithNode(replacement);
+        }
+    }
+
+    /**
+     * Subscribe to receive async updates on the specified node connection. This will set m_subscribed
+     * connection to the provided connection
+     */
+    private void subscribeWithNode(NodeConnection cxn) {
+        try {
+            //Technically necessary to synchronize for safe publication of this store
+            synchronized (Distributer.this) {
+                m_subscriptionRequestPending = true;
+                m_subscribedConnection = cxn;
+            }
             //Subscribe to topology updates
-            spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Subscribe", "TOPOLOGY");
-            queue(spi, new ProcedureCallback() {
-                @Override
-                public void clientCallback(ClientResponse response) {
-                    if (response.getStatus() != ClientResponse.SUCCESS) {
-                        System.err.println("Error response received subscribing to topology updates.\n " +
-                                           "Performance may be reduced on topology updates. Error was \"" +
-                                            response.getStatusString() + "\"");
-                    }
-                }
-            }, true, USE_DEFAULT_TIMEOUT);
+            ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Subscribe", "TOPOLOGY");
+            final ByteBuffer buf = serializeSPI(spi);
+            cxn.createWork(spi.getHandle(), spi.getProcName(), buf, new SubscribeCallback(), true, USE_DEFAULT_TIMEOUT);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
@@ -829,13 +914,11 @@ class Distributer {
          * createWork synchronizes on an individual connection which allows for more concurrency
          */
         if (cxn != null) {
-            ByteBuffer buf = ByteBuffer.allocate(4 + invocation.getSerializedSize());
-            buf.putInt(buf.capacity() - 4);
+            ByteBuffer buf = null;
             try {
-                invocation.flattenToBuffer(buf);
-                buf.flip();
+                buf = serializeSPI(invocation);
             } catch (Exception e) {
-                throw new RuntimeException(e);
+                Throwables.propagate(e);
             }
             cxn.createWork(invocation.getHandle(), invocation.getProcName(), buf, cb, ignoreBackpressure, timeout);
         }
@@ -1076,5 +1159,14 @@ class Distributer {
             return HashinatorLiteType.LEGACY;
         }
         return m_hashinator.getConfigurationType();
+    }
+
+    private ByteBuffer serializeSPI(ProcedureInvocation pi) throws IOException {
+        ByteBuffer buf = ByteBuffer.allocate(pi.getSerializedSize() + 4);
+        buf.putInt(buf.capacity() - 4);
+        pi.flattenToBuffer(buf);
+        buf.flip();
+        return buf;
+
     }
 }
