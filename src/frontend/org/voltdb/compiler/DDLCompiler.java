@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.io.LineNumberReader;
 import java.io.Reader;
 import java.math.BigDecimal;
-import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -425,7 +424,7 @@ public class DDLCompiler {
     Map<String, String> m_tableNameToDDL = new TreeMap<String, String>();
 
     // Resolve classes using a custom loader. Needed for catalog version upgrade.
-    final URLClassLoader m_classLoader;
+    final ClassLoader m_classLoader;
 
     private class DDLStatement {
         public DDLStatement() {
@@ -437,7 +436,7 @@ public class DDLCompiler {
     public DDLCompiler(VoltCompiler compiler,
                        HSQLInterface hsql,
                        VoltDDLElementTracker tracker,
-                       URLClassLoader classLoader)  {
+                       ClassLoader classLoader)  {
         assert(compiler != null);
         assert(hsql != null);
         assert(tracker != null);

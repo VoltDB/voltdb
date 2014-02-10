@@ -173,7 +173,7 @@ public abstract class CatalogUtil {
         // Let VoltCompiler do a version check and upgrade the catalog on the fly.
         // I.e. jarfile may be modified.
         VoltCompiler compiler = new VoltCompiler();
-        compiler.postProcessLoadedCatalog(jarfile);
+        compiler.upgradeCatalogAsNeeded(jarfile);
 
         return jarfile;
     }
