@@ -18,12 +18,7 @@
 package org.voltdb.planner.parseinfo;
 
 import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
-
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
-import org.voltdb.catalog.Table;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.plannodes.SchemaColumn;
@@ -41,9 +36,10 @@ public abstract class StmtTableScan {
         TEMP_TABLE_SCAN
     }
 
-    protected StmtTableScan(String tableAlias) {
-        m_tableAlias = tableAlias;
-    }
+    // table alias
+    protected String m_tableAlias = null;
+
+    protected StmtTableScan(String tableAlias) { m_tableAlias = tableAlias; }
 
     abstract public TABLE_SCAN_TYPE getScanType();
 
@@ -53,29 +49,15 @@ public abstract class StmtTableScan {
 
     abstract public String getPartitionColumnName();
 
-    abstract public TupleValueExpression resolveTVEForDB(Database db, TupleValueExpression tve);
+    public String getTableAlias() { return m_tableAlias; }
 
-    public String getTableAlias() {
-        return m_tableAlias;
-    }
-
-    public Set<SchemaColumn> getScanColumns() {
-        return m_scanColumns;
-    }
+    abstract public Collection<SchemaColumn> getScanColumns();
 
     abstract public Collection<Index> getIndexes();
 
     public void setPartitioning(PartitioningForStatement partitioning) {}
 
-    // table alias
-    protected String m_tableAlias = null;
-    // Store a unique list of the columns actually used by this table instance.
-    protected Set<SchemaColumn> m_scanColumns = new HashSet<SchemaColumn>();
-
     abstract public String getColumnName(int m_columnIndex);
 
-    public Table getTable() {
-        // TODO abstract this out after merge with self-join fix
-        return null;
-    }
+    abstract public void resolveTVE(TupleValueExpression expr, String columnName);
 }

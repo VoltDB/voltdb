@@ -22,7 +22,6 @@ import java.util.ArrayDeque;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.planner.parseinfo.JoinNode;
-import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 
 /**
@@ -67,7 +66,7 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
     AbstractPlanNode nextPlan() {
         if (!m_generatedPlans) {
             // Analyze join conditions
-            m_parsedStmt.analyzeJoinExpressions(m_parsedStmt.joinTree);
+            m_parsedStmt.joinTree.analyzeJoinExpressions(m_parsedStmt.noTableSelectionList);
             // these just shouldn't happen right?
             assert(m_parsedStmt.noTableSelectionList.size() == 0);
 
@@ -78,8 +77,7 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
             // into the WHERE list.
             tableNode.m_whereInnerList.addAll(tableNode.m_joinInnerList);
             tableNode.m_joinInnerList.clear();
-            assert (tableNode.getTableAliasIndex() != StmtTableScan.NULL_ALIAS_INDEX);
-            tableNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(tableNode.getTableAliasIndex(),
+            tableNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(tableNode.getTableScan(),
                     null,
                     tableNode.m_whereInnerList,
                     null));
@@ -87,7 +85,7 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
             for (AccessPath path : tableNode.m_accessPaths) {
                 tableNode.m_currentAccessPath = path;
 
-                AbstractPlanNode plan = getAccessPlanForTable(tableNode.getTableAliasIndex(), tableNode.m_currentAccessPath);
+                AbstractPlanNode plan = getAccessPlanForTable(tableNode);
                 m_plans.add(plan);
             }
 

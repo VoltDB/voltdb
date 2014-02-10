@@ -35,6 +35,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -1524,38 +1525,51 @@ public abstract class CatalogUtil {
                                               AbstractPlanNode topPlan,
                                               AbstractPlanNode bottomPlan)
     {
-        Collection<String> tablesRead = new TreeSet<String>();
-        Collection<String> tablesUpdated = new TreeSet<String>();
+        Map<String, StmtTargetTableScan> tablesRead = new TreeMap<String, StmtTargetTableScan>();
         Collection<String> indexes = new TreeSet<String>();
         if (topPlan != null) {
-            topPlan.getTablesAndIndexes(tablesRead, tablesUpdated, indexes);
+            topPlan.getTablesAndIndexes(tablesRead, indexes);
         }
         if (bottomPlan != null) {
-            bottomPlan.getTablesAndIndexes(tablesRead, tablesUpdated, indexes);
+            bottomPlan.getTablesAndIndexes(tablesRead, indexes);
         }
 
-        // make useage only in either read or updated, not both
-        tablesRead.removeAll(tablesUpdated);
+        String updated = null;
+        if ( ! stmt.getReadonly()) {
+            updated = topPlan.getUpdatedTable();
+            if (updated == null) {
+                updated = bottomPlan.getUpdatedTable();
+            }
+            assert(updated != null);
+        }
+
+        Set<String> readTableNames = tablesRead.keySet();
 
         for (Table table : db.getTables()) {
-            for (String indexName : indexes) {
-                Index index = table.getIndexes().get(indexName);
-                if (index != null) {
-                    updateIndexUsageAnnotation(index, stmt);
+            if (readTableNames.contains(table.getTypeName())) {
+                readTableNames.remove(table.getTypeName());
+                for (String indexName : indexes) {
+                    Index index = table.getIndexes().get(indexName);
+                    if (index != null) {
+                        updateIndexUsageAnnotation(index, stmt);
+                    }
                 }
-            }
-            if (tablesRead.contains(table.getTypeName())) {
-                updateTableUsageAnnotation(table, stmt, true);
-                tablesRead.remove(table.getTypeName());
-            }
-            if (tablesUpdated.contains(table.getTypeName())) {
+                if (updated != null && updated.equals(table.getTypeName())) {
+                    // make useage only in either read or updated, not both
+                    updateTableUsageAnnotation(table, stmt, true);
+                    updated = null;
+                    continue;
+                }
                 updateTableUsageAnnotation(table, stmt, false);
-                tablesUpdated.remove(table.getTypeName());
+            }
+            else if (updated != null && updated.equals(table.getTypeName())) {
+                updateTableUsageAnnotation(table, stmt, true);
+                updated = null;
             }
         }
 
         assert(tablesRead.size() == 0);
-        assert(tablesUpdated.size() == 0);
+        assert(updated == null);
     }
 
     private static void updateIndexUsageAnnotation(Index index, Statement stmt) {

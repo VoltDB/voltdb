@@ -26,6 +26,7 @@ import org.voltdb.planner.CompiledPlan;
 public abstract class MicroOptimization {
     protected AbstractParsedStmt m_parsedStmt;
 
+    @SuppressWarnings("static-method")
     boolean shouldRun(DeterminismMode detMode) {
         return true;
     }

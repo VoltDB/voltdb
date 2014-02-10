@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
@@ -32,6 +31,7 @@ import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.planner.ParsedUnionStmt;
 import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
+import org.voltdb.plannodes.SchemaColumn;
 
 /**
  * StmtTableScan caches data related to a given instance of a sub-query within the statement scope
@@ -46,6 +46,8 @@ public class StmtSubqueryScan extends StmtTableScan {
     PartitioningForStatement m_partitioning = null;
     // The mapping - the temp table column to the sub-query (column, table) pair
     Map<String, ParsedColInfo> m_columnMap = new HashMap<String, ParsedColInfo>();
+    // Store a unique list of the subquery result columns actually used by the parent query.
+    protected Map<String, SchemaColumn> m_scanColumns = new HashMap<String, SchemaColumn>();
 
     public StmtSubqueryScan(String tableAlias, AbstractParsedStmt subquery) {
         super(tableAlias);
@@ -78,7 +80,7 @@ public class StmtSubqueryScan extends StmtTableScan {
     @Override
     public boolean getIsReplicated() {
         boolean isReplicated = true;
-        for (StmtTableScan tableScan : m_subquery.stmtCache) {
+        for (StmtTableScan tableScan : m_subquery.tableAliasMap.values()) {
             isReplicated = isReplicated && tableScan.getIsReplicated();
             if ( ! isReplicated) {
                 return false;
@@ -96,32 +98,6 @@ public class StmtSubqueryScan extends StmtTableScan {
     public String getPartitionColumnName() {
         //TODO: implement identification of exported subquery partitioning column(s)
         return null;
-    }
-
-    @Override
-    public TupleValueExpression resolveTVEForDB(Database db, TupleValueExpression tve) {
-        String columnName = tve.getColumnName();
-        for (ParsedColInfo colInfo : m_origSchema) {
-            boolean match = columnName.equals(colInfo.alias) ||
-                    (colInfo.alias == null && columnName.equals(colInfo.columnName));
-            if (match) {
-                assert(m_subquery.tableAliasIndexMap.containsKey(colInfo.tableAlias));
-                StmtTableScan origTable = m_subquery.stmtCache.get(m_subquery.tableAliasIndexMap.get(colInfo.tableAlias));
-                assert(origTable != null);
-                // Prepare the tve to go the level down
-                tve.setTableName(colInfo.tableName);
-                tve.setColumnName(colInfo.columnName);
-                tve = origTable.resolveTVEForDB(db, tve);
-                // restore the table and column names and the index from the current level
-                tve.setTableName(getTableName());
-                tve.setColumnName(columnName);
-                tve.setColumnIndex(colInfo.index);
-
-                m_columnMap.put(columnName, colInfo);
-            }
-        }
-        assert (tve.getColumnIndex() != -1);
-        return tve;
     }
 
     static final Collection<Index> noIndexesSupportedOnSubqueryScans = new ArrayList<Index>();
@@ -149,5 +125,21 @@ public class StmtSubqueryScan extends StmtTableScan {
     @Override
     public String getColumnName(int columnIndex) {
         return m_origSchema.get(columnIndex).alias;
+    }
+
+    @Override
+    public void resolveTVE(TupleValueExpression expr, String columnName) {
+        // TODO resolve index by matching columnName to subquery output column aliases
+        // expr.resolveForTable(m_table);
+        if (m_scanColumns.get(columnName) == null) {
+            SchemaColumn scol = new SchemaColumn("", m_tableAlias,
+                    columnName, columnName, (TupleValueExpression) expr.clone());
+            m_scanColumns.put(columnName, scol);
+        }
+    }
+
+    @Override
+    public Collection<SchemaColumn> getScanColumns() {
+        return m_scanColumns.values();
     }
 }

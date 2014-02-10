@@ -21,9 +21,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
-import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.types.ExpressionType;
 
 public class FunctionExpression extends AbstractExpression {

@@ -143,7 +143,6 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
 
         // make an index node from the scan node
         IndexScanPlanNode indexScanNode = new IndexScanPlanNode(scanNode, null, indexToScan, SortDirectionType.ASC);
-        indexScanNode.setKeyIterate(true);
         indexScanNode.setForDeterminismOnly();
 
         return indexScanNode;

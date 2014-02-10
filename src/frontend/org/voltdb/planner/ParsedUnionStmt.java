@@ -95,6 +95,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
      * @param sql
      * @param joinOrder
      */
+    @Override
     void postParse(String sql, String joinOrder) {
         for (AbstractParsedStmt selectStmt : m_children) {
             selectStmt.postParse(sql, joinOrder);

@@ -278,10 +278,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // Handle joined query case case.
         // MV partitioned table without partition column can only join with replicated tables.
         // For all tables in this query, the # of tables that need to be fixed should not exceed one.
-        for (StmtTableScan mvTableScan: stmtCache) {
+        for (StmtTableScan mvTableScan: tableAliasMap.values()) {
             Set<SchemaColumn> mvNewScanColumns = new HashSet<SchemaColumn>();
 
-            Set<SchemaColumn> columns = mvTableScan.getScanColumns();
+            Collection<SchemaColumn> columns = mvTableScan.getScanColumns();
             // For a COUNT(*)-only scan, a table may have no scan columns.
             // For a joined query without processed columns from table TB, TB has no scan columns
             if (columns != null) {
@@ -488,7 +488,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     // Concat elements to the XXXColumns list
-    private void insertToColumnList (List<ParsedColInfo>columnList,
+    private static void insertToColumnList (List<ParsedColInfo>columnList,
             List<ParsedColInfo> newCols) {
         for (ParsedColInfo col: newCols) {
             if (!columnList.contains(col)) {
@@ -497,7 +497,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
-    private boolean isNewtoColumnList(List<ParsedColInfo>columnList, AbstractExpression expr) {
+    private static boolean isNewtoColumnList(List<ParsedColInfo>columnList, AbstractExpression expr) {
         boolean isNew = true;
         for (ParsedColInfo ic: columnList) {
             if (ic.expression.equals(expr)) {
