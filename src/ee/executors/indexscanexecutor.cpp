@@ -305,7 +305,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         VOLT_DEBUG("COUNT NULL Expression:\n%s", skipNullExpr->debug(true).c_str());
     }
 
-    ProgressMonitorProxy pmp(m_engine, targetTable);
+    ProgressMonitorProxy pmp(m_engine, this, targetTable);
     //
     // An index scan has three parts:
     //  (1) Lookup tuples using the search key

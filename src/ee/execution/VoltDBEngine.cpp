@@ -1713,6 +1713,8 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
     }
 }
 
+static std::string dummy_last_accessed_plan_node_name("no plan node in progress");
+
 void VoltDBEngine::reportProgessToTopend() {
     std::string tableName;
     int64_t tableSize;
@@ -1727,7 +1729,9 @@ void VoltDBEngine::reportProgessToTopend() {
     //Update stats in java and let java determine if we should cancel this query.
     m_tuplesProcessedInFragment += m_tuplesProcessedSinceReport;
     m_tupleReportThreshold = m_topend->fragmentProgressUpdate(m_currentIndexInBatch,
-                                        *m_lastAccessedPlanNodeName,
+                                        (m_lastAccessedExec == NULL) ?
+                                        dummy_last_accessed_plan_node_name :
+                                        planNodeToString(m_lastAccessedExec->getPlanNode()->getPlanNodeType()),
                                         tableName,
                                         tableSize,
                                         m_tuplesProcessedInBatch + m_tuplesProcessedInFragment);
