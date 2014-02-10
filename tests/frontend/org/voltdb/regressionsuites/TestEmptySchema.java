@@ -25,13 +25,12 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
-
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.compiler.VoltProjectBuilder;
 
@@ -45,15 +44,6 @@ public class TestEmptySchema extends RegressionSuite
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("");
         return builder;
-    }
-
-    void validateSchema(VoltTable result, VoltTable expected)
-    {
-        assertEquals(expected.getColumnCount(), result.getColumnCount());
-        for (int i = 0; i < result.getColumnCount(); i++) {
-            assertEquals("Failed name column: " + i, expected.getColumnName(i), result.getColumnName(i));
-            assertEquals("Failed type column: " + i, expected.getColumnType(i), result.getColumnType(i));
-        }
     }
 
     public void testEmptySchema() throws Exception {

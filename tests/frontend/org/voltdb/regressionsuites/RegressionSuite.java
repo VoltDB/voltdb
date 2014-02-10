@@ -337,4 +337,17 @@ public class RegressionSuite extends TestCase {
             }
         }
     }
+
+    // ALL OF THE VALIDATION SCHEMAS IN THIS TEST ARE BASED OFF OF
+    // THE VOLTDB DOCS, RATHER THAN REUSING THE CODE THAT GENERATES THEM.
+    // IN SOME MAGICAL FUTURE MAYBE THEY ALL CAN BE GENERATED FROM THE
+    // SAME METADATA.
+    static public void validateSchema(VoltTable result, VoltTable expected)
+    {
+        assertEquals(expected.getColumnCount(), result.getColumnCount());
+        for (int i = 0; i < result.getColumnCount(); i++) {
+            assertEquals("Failed name column: " + i, expected.getColumnName(i), result.getColumnName(i));
+            assertEquals("Failed type column: " + i, expected.getColumnType(i), result.getColumnType(i));
+        }
+    }
 }
