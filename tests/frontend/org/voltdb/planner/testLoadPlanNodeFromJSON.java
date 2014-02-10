@@ -23,7 +23,6 @@
 
 package org.voltdb.planner;
 
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.plannodes.AbstractPlanNode;

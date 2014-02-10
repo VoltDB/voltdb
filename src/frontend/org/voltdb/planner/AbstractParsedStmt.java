@@ -54,9 +54,9 @@ import org.voltdb.types.JoinType;
 public abstract class AbstractParsedStmt {
 
      // Internal statement counter
-    public static int NEXT_STMT_ID = 1;
+    public static int NEXT_STMT_ID = 0;
     // Internal parameter counter
-    public static int NEXT_PARAMETER_ID = 1;
+    public static int NEXT_PARAMETER_ID = 0;
 
     // The unique id to identify the statement
     public int stmtId;
@@ -187,8 +187,8 @@ public abstract class AbstractParsedStmt {
             Database db, String joinOrder) {
 
         // reset the statemet counteres
-        NEXT_STMT_ID = 1;
-        NEXT_PARAMETER_ID = 1;
+        NEXT_STMT_ID = 0;
+        NEXT_PARAMETER_ID = 0;
         AbstractParsedStmt retval = getParsedStmt(stmtTypeElement, paramValues, db);
         return parse(retval, sql, stmtTypeElement, db, joinOrder);
     }
@@ -594,12 +594,13 @@ public abstract class AbstractParsedStmt {
     private AbstractExpression rewriteInExpressionAsExists(AbstractExpression inExpr) {
         assert(ExpressionType.COMPARE_IN == inExpr.getExpressionType());
         assert(inExpr.getLeft() != null);
-        AbstractExpression subqueryExpr = inExpr.getRight();
-        assert(subqueryExpr != null);
-        if (ExpressionType.SUBQUERY != subqueryExpr.getExpressionType()) {
+        AbstractExpression expr = inExpr.getRight();
+        assert(expr != null);
+        if (ExpressionType.SUBQUERY != expr.getExpressionType()) {
             return inExpr;
         }
-        AbstractParsedStmt subquery = ((SubqueryExpression)subqueryExpr).getSubquery();
+        SubqueryExpression subqueryExpr = (SubqueryExpression) expr;
+        AbstractParsedStmt subquery = subqueryExpr.getSubquery();
         if (subquery instanceof ParsedSelectStmt) {
             ParsedSelectStmt selectStmt = (ParsedSelectStmt) subquery;
             ParsedSelectStmt.rewriteInSubqueryAsExists(selectStmt, inExpr);
@@ -614,8 +615,11 @@ public abstract class AbstractParsedStmt {
         // add table to the query cache
         int idx = addTableToStmtCache(tableName, tableName, subquery);
         StmtTableScan tableCache = stmtCache.get(idx);
-        subqueryExpr = new SubqueryExpression(tableCache.getTempTable());
-        return new OperatorExpression(ExpressionType.OPERATOR_EXISTS, subqueryExpr, null);
+        SubqueryExpression newSubqueryExpr = new SubqueryExpression(tableCache.getTempTable());
+        // Combine the parameters from the original IN expression with the parameters
+        // from the rewritten expression
+        newSubqueryExpr.getParameterParentTveMap().putAll(subqueryExpr.getParameterParentTveMap());
+        return new OperatorExpression(ExpressionType.OPERATOR_EXISTS, newSubqueryExpr, null);
     }
 
     /**
@@ -817,14 +821,14 @@ public abstract class AbstractParsedStmt {
     private void parseParameters(VoltXMLElement paramsNode) {
         m_paramList = new ParameterValueExpression[paramsNode.children.size()];
 
-        long max_parameter_id = 0;
+        long max_parameter_id = -1;
         for (VoltXMLElement node : paramsNode.children) {
             if (node.name.equalsIgnoreCase("parameter")) {
                 long id = Long.parseLong(node.attributes.get("id"));
-                if (id > max_parameter_id) {
-                    max_parameter_id = id;
-                }
                 int index = Integer.parseInt(node.attributes.get("index"));
+                if (index > max_parameter_id) {
+                    max_parameter_id = index;
+                }
                 String typeName = node.attributes.get("valuetype");
                 String isVectorParam = node.attributes.get("isvector");
                 VoltType type = VoltType.typeFromString(typeName);
@@ -838,8 +842,8 @@ public abstract class AbstractParsedStmt {
                 m_paramList[index] = pve;
             }
         }
-        if (max_parameter_id > NEXT_PARAMETER_ID) {
-            NEXT_PARAMETER_ID = (int)max_parameter_id;
+        if (max_parameter_id >= NEXT_PARAMETER_ID) {
+            NEXT_PARAMETER_ID = (int)max_parameter_id + 1;
         }
     }
 

@@ -1070,6 +1070,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // add a single dummy output column
         ParsedColInfo col = new ParsedColInfo();
         ConstantValueExpression colExpr = new ConstantValueExpression();
+        colExpr.setValueType(VoltType.NUMERIC);
         colExpr.setValue("1");
         col.expression = colExpr;
         ExpressionUtil.finalizeValueTypes(col.expression);
@@ -1079,6 +1080,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         col.columnName = "";
         col.alias = "C1";
         col.index = 0;
+        selectStmt.displayColumns.add(col);
 
         // reprocess HAVING expressions
         if (selectStmt.having != null) {
