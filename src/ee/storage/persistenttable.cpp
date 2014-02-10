@@ -334,11 +334,11 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
         }
 
         std::string constraintName;
-        FAIL_IF(!checkConstraint(target, constraintName)) {
+        FAIL_IF(!checkConstraint(source, constraintName)) {
             char buffer [256];
             snprintf (buffer, 256, "[INSERT]: Table %s failed on check constraint %s",
                     m_name.c_str(), constraintName.c_str());
-            throw ConstraintFailureException(this, target, buffer);
+            throw ConstraintFailureException(this, source, buffer);
         }
     }
 
