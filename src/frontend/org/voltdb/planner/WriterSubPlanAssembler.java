@@ -68,6 +68,8 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
     AbstractPlanNode nextPlan() {
         if (!m_generatedPlans) {
             assert (m_parsedStmt.joinTree != null);
+            // Clone the node to make make sure that analyze expression is called
+            // only once on the node.
             JoinNode tableNode = (JoinNode) m_parsedStmt.joinTree.clone();
             // Analyze join conditions
             m_parsedStmt.analyzeJoinExpressions(tableNode);
