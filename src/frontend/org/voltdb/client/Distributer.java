@@ -571,7 +571,14 @@ class Distributer {
                     if (m_useClientAffinity &&
                         m_subscribedConnection == this &&
                         m_subscriptionRequestPending == false) {
-                        subscribeToNewNode();
+                        //Don't subscribe to a new node immediately
+                        //to somewhat prevent a thundering herd
+                        m_ex.schedule(new Runnable() {
+                            @Override
+                            public void run() {
+                                subscribeToNewNode();
+                            }
+                        }, new Random().nextInt(10000), TimeUnit.MILLISECONDS);
                     }
                 }
                 m_isConnected = false;
@@ -735,46 +742,70 @@ class Distributer {
                 m_hostIdToConnection.put(hostId, cxn);
             }
 
-            ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
-            //The handle is specific to topology updates and has special cased handling
-            queue(spi, new TopoUpdateCallback(), true, USE_DEFAULT_TIMEOUT);
-
-            spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@SystemCatalog", "PROCEDURES");
-            //The handle is specific to procedure updates and has special cased handling
-            queue(spi, new ProcUpdateCallback(), true, USE_DEFAULT_TIMEOUT);
-
             if (m_subscribedConnection == null) {
                 subscribeToNewNode();
             }
         }
     }
 
+    /*
+     * Subscribe to receive async updates on a new node connection. This will set m_subscribed
+     * connection to the provided connection.
+     *
+     * If we are subscribing to a new connection on node failure this will also fetch the topology post node
+     * failure. If the cluster hasn't finished resolving the failure it is fine, we will get the new topo through\
+     */
     private void subscribeToNewNode() {
         //Technically necessary to synchronize for safe publication of this store
+        NodeConnection cxn = null;
+        boolean firstTime = false;
         synchronized (Distributer.this) {
+            if (m_subscribedConnection != null) {
+                firstTime = true;
+            }
             m_subscribedConnection = null;
-        }
-        if (!m_connections.isEmpty()) {
-            NodeConnection replacement = m_connections.get(new Random().nextInt(m_connections.size()));
-            subscribeWithNode(replacement);
-        }
-    }
-
-    /**
-     * Subscribe to receive async updates on the specified node connection. This will set m_subscribed
-     * connection to the provided connection
-     */
-    private void subscribeWithNode(NodeConnection cxn) {
-        try {
-            //Technically necessary to synchronize for safe publication of this store
-            synchronized (Distributer.this) {
+            if (!m_connections.isEmpty()) {
+                cxn = m_connections.get(new Random().nextInt(m_connections.size()));
                 m_subscriptionRequestPending = true;
                 m_subscribedConnection = cxn;
+            } else {
+                return;
             }
-            //Subscribe to topology updates
+        }
+        try {
+
+            //Subscribe to topology updates before retrieving the current topo
+            //so there isn't potential for lost updates
             ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Subscribe", "TOPOLOGY");
             final ByteBuffer buf = serializeSPI(spi);
-            cxn.createWork(spi.getHandle(), spi.getProcName(), buf, new SubscribeCallback(), true, USE_DEFAULT_TIMEOUT);
+            cxn.createWork(spi.getHandle(),
+                    spi.getProcName(),
+                    serializeSPI(spi),
+                    new SubscribeCallback(),
+                    true,
+                    USE_DEFAULT_TIMEOUT);
+
+            spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
+            //The handle is specific to topology updates and has special cased handling
+            cxn.createWork(spi.getHandle(),
+                    spi.getProcName(),
+                    serializeSPI(spi),
+                    new TopoUpdateCallback(),
+                    true,
+                    USE_DEFAULT_TIMEOUT);
+
+            //Don't need to retrieve procedure updates every time we do a new subscription
+            //since catalog changes aren't correlated with node failure the same way topo is
+            if (firstTime) {
+                spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@SystemCatalog", "PROCEDURES");
+                //The handle is specific to procedure updates and has special cased handling
+                cxn.createWork(spi.getHandle(),
+                        spi.getProcName(),
+                        serializeSPI(spi),
+                        new ProcUpdateCallback(),
+                        true,
+                        USE_DEFAULT_TIMEOUT);
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
