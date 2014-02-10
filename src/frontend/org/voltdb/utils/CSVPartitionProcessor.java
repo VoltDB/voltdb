@@ -25,6 +25,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ParameterConverter;
 import org.voltdb.TheHashinator;
@@ -34,6 +35,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
+
 import static org.voltdb.utils.CSVFileReader.synchronizeErrorInfo;
 
 /**
@@ -51,7 +53,7 @@ class CSVPartitionProcessor implements Runnable {
     final long m_partitionId;
     //This is just so we can identity thread name and log information.
     final String m_processorName;
-    //Processed count indicates how many inser sent to server.
+    //Processed count indicates how many insert sent to server.
     final AtomicLong m_partitionProcessedCount = new AtomicLong(0);
     //Incremented after insert is acknowledged by server.
     static AtomicLong m_partitionAcknowledgedCount = new AtomicLong(0);
@@ -97,7 +99,7 @@ class CSVPartitionProcessor implements Runnable {
         m_processorName = "PartitionProcessor-" + partitionId;
     }
 
-    //Check if the procedure you are using with -p option is multipart.
+    //Check if the procedure you are using with -p option is multi-part.
     private static boolean isProcedureMp(Client csvClient)
             throws IOException, org.voltdb.client.ProcCallException {
         boolean procedure_is_mp = false;
@@ -383,7 +385,7 @@ class CSVPartitionProcessor implements Runnable {
     }
 
     // while there are rows and m_endOfData not seen batch and call procedure for insert.
-    private void processLoadTable(VoltTable table, String procName) {
+    private void processLoadTable(VoltTable table, String procName) throws InterruptedException {
         List<CSVLineWithMetaData> batchList = new ArrayList<CSVLineWithMetaData>();
         while (true) {
             if (m_errored) {
@@ -392,10 +394,11 @@ class CSVPartitionProcessor implements Runnable {
                 return;
             }
             List<CSVLineWithMetaData> mlineList = new ArrayList<CSVLineWithMetaData>();
-            m_partitionQueue.drainTo(mlineList, m_config.batch);
+            mlineList.add(m_partitionQueue.take());
+            m_partitionQueue.drainTo(mlineList, m_config.batch-1);
             for (CSVLineWithMetaData lineList : mlineList) {
                 if (lineList == m_endOfData) {
-                    //Process anything that we didnt process yet.
+                    //Process anything that we didn't process yet.
                     if (table.getRowCount() > 0) {
                         PartitionProcedureCallback cbmt = new PartitionProcedureCallback(batchList, this);
                         try {
@@ -445,7 +448,7 @@ class CSVPartitionProcessor implements Runnable {
 
     // while there are rows and m_endOfData not seen batch and call procedure supplied by user.
     // When -p option is used only 1 processor is created.
-    private void processUserSuppliedProcedure(String procName) {
+    private void processUserSuppliedProcedure(String procName) throws InterruptedException {
         while (true) {
             if (m_errored) {
                 //Let file reader know not to read any more. All Partition Processors will quit processing.
@@ -453,6 +456,7 @@ class CSVPartitionProcessor implements Runnable {
                 return;
             }
             List<CSVLineWithMetaData> mlineList = new ArrayList<CSVLineWithMetaData>();
+            mlineList.add(m_partitionQueue.take());
             m_partitionQueue.drainTo(mlineList, m_config.batch);
             //Go over lines we collected and submit one insert at a time as this is with -p option.
             for (CSVLineWithMetaData lineList : mlineList) {
