@@ -378,10 +378,22 @@ public class AsyncBenchmark {
      *
      */
     class doTxnCallback implements ProcedureCallback {
+
+        final Map<Integer, Long> m_rids;
+        final int m_cid;
+        final long m_nextrid;
+
+        public doTxnCallback(Map<Integer, Long> rids, int cid, long nextrid) {
+            m_rids = rids;
+            m_cid = cid;
+            m_nextrid = nextrid;
+        }
+
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
             if (response.getStatus() == ClientResponse.SUCCESS) {
                 txnCount.incrementAndGet();
+                m_rids.put(m_cid, m_nextrid);
                 return; // pass
             }
 
@@ -509,14 +521,11 @@ public class AsyncBenchmark {
                         continue;
                     }
 
-                    // asynchronously call the "doTxn" procedure
+                    // asynchronously call the "doTxn" procedure update rids in callback.
                     try {
-                        client.callProcedure(new doTxnCallback(),
-                                             "doTxn",
-                                             cid,
-                                             rid,
-                                             rid > windowPerCid ? rid - windowPerCid : 0,
-                                             processor.generateForStore().getStoreValue());
+                        client.callProcedure(new doTxnCallback(rids, cid, rid + 1), "doTxn",
+                                cid, rid, rid > windowPerCid ? rid - windowPerCid : 0,
+                                processor.generateForStore().getStoreValue());
                     }
                     catch (NoConnectionsException e) {
                         log.error("ClientThread got NoConnectionsException on doTxn proc call.");
@@ -527,8 +536,6 @@ public class AsyncBenchmark {
                 log.error("Benchark had a unexpected exception", e);
                 System.exit(-1);
             }
-
-            rids.put(cid, rid + 1);
         }
 
         // cancel periodic stats printing
