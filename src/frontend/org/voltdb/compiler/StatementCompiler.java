@@ -119,7 +119,7 @@ public abstract class StatementCompiler {
         // Check order determinism before accessing the detail which it caches.
         boolean orderDeterministic = plan.isOrderDeterministic();
         catalogStmt.setIsorderdeterministic(orderDeterministic);
-        boolean contentDeterministic = plan.isContentDeterministic();
+        boolean contentDeterministic = orderDeterministic || ! plan.hasLimitOrOffset();
         catalogStmt.setIscontentdeterministic(contentDeterministic);
         String nondeterminismDetail = plan.nondeterminismDetail();
         catalogStmt.setNondeterminismdetail(nondeterminismDetail);
