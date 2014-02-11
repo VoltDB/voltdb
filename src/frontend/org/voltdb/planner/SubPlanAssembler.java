@@ -19,7 +19,6 @@ package org.voltdb.planner;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 
 import org.json_voltpatches.JSONException;
@@ -1173,7 +1172,6 @@ public abstract class SubPlanAssembler {
      * @return return the newly created receive node (which is linked to the new sends)
      */
     protected static AbstractPlanNode addSendReceivePair(AbstractPlanNode scanNode) {
-
         SendPlanNode sendNode = new SendPlanNode();
         sendNode.addAndLinkChild(scanNode);
 

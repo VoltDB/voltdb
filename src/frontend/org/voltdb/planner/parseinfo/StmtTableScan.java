@@ -18,6 +18,7 @@
 package org.voltdb.planner.parseinfo;
 
 import java.util.Collection;
+
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.PartitioningForStatement;
@@ -60,4 +61,5 @@ public abstract class StmtTableScan {
     abstract public String getColumnName(int m_columnIndex);
 
     abstract public void resolveTVE(TupleValueExpression expr, String columnName);
+
 }

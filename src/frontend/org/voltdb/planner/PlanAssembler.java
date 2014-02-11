@@ -89,7 +89,6 @@ public class PlanAssembler {
 
     // The convinience struct to accumulate results after pasring multiple statements
     private class ParsedResultAccumulator {
-        public boolean m_contentIsDeterministic = true;
         public boolean m_orderIsDeterministic = true;
         public CompiledPlan m_compiledPlan;
         public int m_planId = 0;
@@ -331,13 +330,12 @@ public class PlanAssembler {
         }
 
         CompiledPlan retval = m_planSelector.m_bestPlan;
-
         if (subQueryResult != null && retval != null) {
-            boolean contentIsDeterministic =
-                    subQueryResult.m_contentIsDeterministic && retval.isContentDeterministic();
             boolean orderIsDeterministic =
                     subQueryResult.m_orderIsDeterministic && retval.isOrderDeterministic();
-            retval.statementGuaranteesDeterminism(contentIsDeterministic, orderIsDeterministic);
+
+            // TODO(xin): Conficts
+            retval.statementGuaranteesDeterminism(orderIsDeterministic, false);
 
             // Need to re-attach the sub-queries plans to the best parent plan. The same best plan for each
             // sub-query is reused with all parent candidate plans and needs to be reconnected with
@@ -404,27 +402,16 @@ public class PlanAssembler {
      *         computable plans.
      */
     private CompiledPlan getNextPlan() {
-        CompiledPlan retval = new CompiledPlan();
+        CompiledPlan retval;
         AbstractParsedStmt nextStmt = null;
         if (m_parsedUnion != null) {
             nextStmt = m_parsedUnion;
             retval = getNextUnionPlan();
-            if (retval != null) {
-                retval.readOnly = true;
-            }
         } else if (m_parsedSelect != null) {
             nextStmt = m_parsedSelect;
-            retval.rootPlanGraph = getNextSelectPlan();
-            retval.readOnly = true;
-            if (retval.rootPlanGraph != null)
-            {
-                // Check PlanColumn resource leakage later by recording the select stmt.
-                retval.selectStmt = m_parsedSelect;
-                boolean orderIsDeterministic = m_parsedSelect.isOrderDeterministic();
-                boolean contentIsDeterministic = (m_parsedSelect.hasLimitOrOffset() == false) || orderIsDeterministic;
-                retval.statementGuaranteesDeterminism(contentIsDeterministic, orderIsDeterministic);
-            }
+            retval = getNextSelectPlan();
         } else {
+            retval = new CompiledPlan();
             retval.readOnly = false;
             if (m_parsedInsert != null) {
                 nextStmt = m_parsedInsert;
@@ -444,9 +431,10 @@ public class PlanAssembler {
                         "setupForNewPlans not called or not successfull.");
             }
             assert (nextStmt.tableList.size() == 1);
-            if (nextStmt.tableList.get(0).getIsreplicated())
+            if (nextStmt.tableList.get(0).getIsreplicated()) {
                 retval.replicatedTableDML = true;
-            retval.statementGuaranteesDeterminism(true, true); // Until we support DML w/ subqueries/limits
+            }
+            retval.statementGuaranteesDeterminism(false, true); // Until we support DML w/ subqueries/limits
         }
 
         if (retval == null || retval.rootPlanGraph == null) {
@@ -477,8 +465,6 @@ public class PlanAssembler {
         m_recentErrorMsg = null;
 
         ArrayList<CompiledPlan> childrenPlans = new ArrayList<CompiledPlan>();
-        boolean orderIsDeterministic = true;
-        boolean contentIsDeterministic = true;
 
         // Build best plans for the children first
         ParsedResultAccumulator parsedResult = new ParsedResultAccumulator();
@@ -507,7 +493,9 @@ public class PlanAssembler {
         retval.rootPlanGraph = subUnionRoot;
         retval.readOnly = true;
         retval.sql = m_planSelector.m_sql;
-        retval.statementGuaranteesDeterminism(contentIsDeterministic, orderIsDeterministic);
+        boolean orderIsDeterministic = m_parsedUnion.isOrderDeterministic();
+        boolean hasLimitOrOffset = m_parsedUnion.hasLimitOrOffset();
+        retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
 
         // compute the cost - total of all children
         retval.cost = 0.0;
@@ -532,16 +520,12 @@ public class PlanAssembler {
             }
             return parsedResult;
         }
-
         parsedResult.m_orderIsDeterministic = parsedResult.m_orderIsDeterministic &&
                 parsedResult.m_compiledPlan.isOrderDeterministic();
-        parsedResult.m_contentIsDeterministic = parsedResult.m_contentIsDeterministic &&
-                parsedResult.m_compiledPlan.isContentDeterministic();
 
         // Make sure that next child's plans won't override current ones.
         parsedResult.m_planId = selector.m_planId;
 
-//        parsedResult = setCommonPartitioning(partitioning, parsedResult);
         return parsedResult;
     }
 
@@ -627,7 +611,8 @@ public class PlanAssembler {
         return parentPlan;
     }
 
-    private AbstractPlanNode getNextSelectPlan() {
+    private CompiledPlan getNextSelectPlan() {
+
         assert (subAssembler != null);
 
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
@@ -742,7 +727,13 @@ public class PlanAssembler {
             root = handleLimitOperator(root);
         }
 
-        return root;
+        CompiledPlan retval = new CompiledPlan();
+        retval.rootPlanGraph = root;
+        retval.readOnly = true;
+        boolean orderIsDeterministic = m_parsedSelect.isOrderDeterministic();
+        boolean hasLimitOrOffset = m_parsedSelect.hasLimitOrOffset();
+        retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
+        return retval;
     }
 
     private boolean needProjectionNode (AbstractPlanNode root) {
@@ -1056,11 +1047,10 @@ public class PlanAssembler {
      * @param isReplicated Whether or not the target table is a replicated table.
      * @return
      */
+
     private static AbstractPlanNode addSumOrLimitAndSendToDMLNode(AbstractPlanNode dmlRoot, boolean isReplicated)
     {
         AbstractPlanNode sumOrLimitNode;
-        SendPlanNode sendNode = new SendPlanNode();
-
         if (isReplicated) {
             // Replicated table DML result doesn't need to be summed. All partitions should
             // modify the same number of tuples in replicated table, so just pick the result from
@@ -1104,6 +1094,7 @@ public class PlanAssembler {
 
         // connect the nodes to build the graph
         sumOrLimitNode.addAndLinkChild(dmlRoot);
+        SendPlanNode sendNode = new SendPlanNode();
         sendNode.addAndLinkChild(sumOrLimitNode);
 
         return sendNode;
@@ -1153,11 +1144,6 @@ public class PlanAssembler {
             return root;
         }
 
-        // Ignore ORDER BY in cases where there can be at most one row.
-        if (m_parsedSelect.guaranteesUniqueRow()) {
-            return root;
-        }
-
         SortDirectionType sortDirection = SortDirectionType.INVALID;
 
         // Skip the explicit ORDER BY plan step if an IndexScan is already providing the equivalent ordering.
@@ -1186,85 +1172,6 @@ public class PlanAssembler {
                                               : SortDirectionType.DESC);
         }
         orderByNode.addAndLinkChild(root);
-
-        // get all of the columns in the sort
-        List<AbstractExpression> orderExpressions = orderByNode.getSortExpressions();
-        String fromTableAlias = orderExpressions.get(0).baseTableAlias();
-
-        // In theory, for every table in the query, there needs to exist a uniqueness constraint
-        // (primary key or other unique index) on some of the ORDER BY values regardless of whether
-        // the associated index is used in the selected plan.
-        // If the index scan was used at the top of the plan, and its sort order was valid
-        // -- meaning covering the entire ORDER BY clause --
-        // this function would have already returned without adding an orderByNode.
-        // The interesting cases, including issue ENG-3335, are
-        // -- when the index scan is in the distributed part of the plan
-        // Then, the orderByNode is required to re-order the results at the coordinator.
-        // -- when the index was not the one selected for the plan.
-        // -- when the index is defined on a left-most child of a join the distributed part of the plan
-        // Then, the orderByNode is required to re-order the results at the coordinator.
-
-        // Start by eliminating joins since, in general, a join (one-to-many) may produce multiple joined rows for each unique input row.
-        // TODO: In theory, it is possible to analyze the join criteria and/or projected columns
-        // to determine whether the particular join preserves the uniqueness of its index-scanned input.
-        boolean allScansAreDeterministic = true;
-        for (Table table : m_parsedSelect.tableList) {
-
-            allScansAreDeterministic = false;
-            // search indexes for one that makes the order by deterministic
-            for (Index index : table.getIndexes()) {
-                // skip non-unique indexes
-                if (!index.getUnique()) {
-                    continue;
-                }
-
-                // get the list of expressions for the index
-                List<AbstractExpression> indexExpressions = new ArrayList<AbstractExpression>();
-
-                String jsonExpr = index.getExpressionsjson();
-                // if this is a pure-column index...
-                if (jsonExpr.isEmpty()) {
-                    for (ColumnRef cref : index.getColumns()) {
-                        Column col = cref.getColumn();
-                        // Can not set table Alias here, only table name
-                        TupleValueExpression tve = new TupleValueExpression(table.getTypeName(),
-                                                                            col.getName(),
-                                                                            col.getIndex());
-                        tve.setValueSize(col.getSize());
-                        tve.setValueType(VoltType.get((byte) col.getType()));
-                        indexExpressions.add(tve);
-                    }
-                }
-                // if this is a fancy expression-based index...
-                else {
-                    StmtTableScan tableScan = m_parsedSelect.tableAliasMap.get(fromTableAlias);
-                    try {
-                        indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, tableScan);
-                    } catch (JSONException e) {
-                        e.printStackTrace(); // danger will robinson
-                        assert(false);
-                        return null;
-                    }
-                }
-
-                // If the sort covers the index, then it's a unique sort.
-                //TODO: The statement's equivalence sets would be handy here to recognize cases like
-                //    WHERE A.unique_id = 1 AND A.b_id = 2 and B.unique_id = A.b_id ORDER BY B.unique_id
-                if (orderExpressions.containsAll(indexExpressions)) {
-                    allScansAreDeterministic = true;
-                    break;
-                }
-            }
-
-            if ( ! allScansAreDeterministic) {
-                break;
-            }
-        }
-
-        if (allScansAreDeterministic) {
-            orderByNode.setOrderingByUniqueColumns();
-        }
-
         return orderByNode;
     }
 

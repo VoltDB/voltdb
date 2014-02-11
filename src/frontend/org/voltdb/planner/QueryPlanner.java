@@ -17,6 +17,8 @@
 
 package org.voltdb.planner;
 
+import java.util.List;
+
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -30,8 +32,10 @@ import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.NodeSchema;
+import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
+import org.voltdb.types.PlanNodeType;
 
 /**
  * The query planner accepts catalog data, SQL statements from the catalog, then
@@ -269,6 +273,10 @@ public class QueryPlanner {
         // find the plan with minimal cost
         CompiledPlan bestPlan = assembler.getBestCostPlan(parsedStmt);
 
+        // This processing of bestPlan outside/after getBestCostPlan
+        // allows getBestCostPlan to be called both here and
+        // in PlanAssembler.getNextUnion on each branch of a union.
+
         // make sure we got a winner
         if (bestPlan == null) {
             if (debuggingSoRetryOnError) {
@@ -281,7 +289,7 @@ public class QueryPlanner {
             return null;
         }
 
-        if (bestPlan.readOnly == true) {
+        if (bestPlan.readOnly) {
             SendPlanNode sendNode = new SendPlanNode();
             // connect the nodes to build the graph
             sendNode.addAndLinkChild(bestPlan.rootPlanGraph);
@@ -292,8 +300,9 @@ public class QueryPlanner {
         // Execute the generateOutputSchema and resolveColumnIndexes Once from the top plan node for only best plan
         bestPlan.rootPlanGraph.generateOutputSchema(m_db);
         bestPlan.rootPlanGraph.resolveColumnIndexes();
-        if (bestPlan.selectStmt != null) {
-            checkPlanColumnLeakage(bestPlan, bestPlan.selectStmt);
+        if (parsedStmt instanceof ParsedSelectStmt) {
+            List<SchemaColumn> columns = bestPlan.rootPlanGraph.getOutputSchema().getColumns();
+            ((ParsedSelectStmt)parsedStmt).checkPlanColumnMatch(columns);
         }
 
         // Output the best plan debug info
@@ -304,30 +313,48 @@ public class QueryPlanner {
         bestPlan.resetPlanNodeIds();
 
         // split up the plan everywhere we see send/recieve into multiple plan fragments
-        Fragmentizer.fragmentize(bestPlan, m_db);
+        fragmentize(bestPlan);
         return bestPlan;
     }
 
     private static void checkPlanColumnLeakage(CompiledPlan plan, ParsedSelectStmt stmt) {
         NodeSchema output_schema = plan.rootPlanGraph.getOutputSchema();
         // Sanity-check the output NodeSchema columns against the display columns
-        if (stmt.displayColumns.size() != output_schema.size())
-        {
+        if (stmt.displayColumns.size() != output_schema.size()) {
             throw new PlanningErrorException("Mismatched plan output cols " +
             "to parsed display columns");
         }
-        for (ParsedColInfo display_col : stmt.displayColumns)
-        {
+        for (ParsedColInfo display_col : stmt.displayColumns) {
             SchemaColumn col = output_schema.find(display_col.tableName,
                                                   display_col.tableAlias,
                                                   display_col.columnName,
                                                   display_col.alias);
-            if (col == null)
-            {
+            if (col == null) {
                 throw new PlanningErrorException("Mismatched plan output cols " +
                                                  "to parsed display columns");
             }
         }
     }
 
+    private static void fragmentize(CompiledPlan plan) {
+        List<AbstractPlanNode> receives = plan.rootPlanGraph.findAllNodesOfType(PlanNodeType.RECEIVE);
+
+        if (receives.isEmpty()) return;
+
+        assert (receives.size() == 1);
+
+        ReceivePlanNode recvNode = (ReceivePlanNode) receives.get(0);
+        assert(recvNode.getChildCount() == 1);
+        AbstractPlanNode childNode = recvNode.getChild(0);
+        assert(childNode instanceof SendPlanNode);
+        SendPlanNode sendNode = (SendPlanNode) childNode;
+
+        // disconnect the send and receive nodes
+        sendNode.clearParents();
+        recvNode.clearChildren();
+
+        plan.subPlanGraph = sendNode;
+
+        return;
+    }
 }

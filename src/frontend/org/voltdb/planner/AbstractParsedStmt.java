@@ -792,4 +792,20 @@ public abstract class AbstractParsedStmt {
         return m_paramList;
     }
 
+    public boolean hasLimitOrOffset()
+    {
+        // This dummy implementation for DML statements should never be called.
+        // The interface is established on AbstractParsedStmt for support
+        // in ParsedSelectStmt and ParsedUnionStmt.
+        return false;
+    }
+
+    public boolean isOrderDeterministic()
+    {
+        // This dummy implementation for DML statements should never be called.
+        // The interface is established on AbstractParsedStmt for support
+        // in ParsedSelectStmt and ParsedUnionStmt.
+        throw new RuntimeException("isOrderDeterministic not supported by DML statements");
+    }
+
 }
