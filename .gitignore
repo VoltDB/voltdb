@@ -7,6 +7,7 @@
 *.pyc
 *.swp
 *~
+.DS_Store
 voltdb_crash*
 buildstring.txt
 /plannerlog.txt
