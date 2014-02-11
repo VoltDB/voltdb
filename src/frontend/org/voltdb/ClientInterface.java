@@ -1045,8 +1045,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             ReplicationRole replicationRole,
             Cartographer cartographer,
             int partitionCount,
-            InetAddress intf,
-            int port,
+            InetAddress clientIntf,
+            int clientPort,
+            InetAddress adminIntf,
             int adminPort,
             long timestampTestingSalt) throws Exception {
 
@@ -1063,23 +1064,22 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * Construct the runnables so they have access to the list of connections
          */
         final ClientInterface ci = new ClientInterface(
-           intf, port, adminPort, context, messenger, replicationRole, cartographer, allPartitions);
+                clientIntf, clientPort, adminIntf, adminPort, context, messenger, replicationRole, cartographer, allPartitions);
 
         return ci;
     }
 
-    ClientInterface(InetAddress intf, int port, int adminPort, CatalogContext context, HostMessenger messenger,
-                    ReplicationRole replicationRole,
-                    Cartographer cartographer, int[] allPartitions) throws Exception
-    {
+    ClientInterface(InetAddress clientIntf, int clientPort, InetAddress adminIntf, int adminPort,
+            CatalogContext context, HostMessenger messenger, ReplicationRole replicationRole,
+            Cartographer cartographer, int[] allPartitions) throws Exception {
         m_catalogContext.set(context);
         m_cartographer = cartographer;
 
         // pre-allocate single partition array
         m_allPartitions = allPartitions;
-        m_acceptor = new ClientAcceptor(intf, port, messenger.getNetwork(), false);
+        m_acceptor = new ClientAcceptor(clientIntf, clientPort, messenger.getNetwork(), false);
         m_adminAcceptor = null;
-        m_adminAcceptor = new ClientAcceptor(intf, adminPort, messenger.getNetwork(), true);
+        m_adminAcceptor = new ClientAcceptor(adminIntf, adminPort, messenger.getNetwork(), true);
         registerPolicies(replicationRole);
 
         m_mailbox = new LocalMailbox(messenger,  messenger.getHSIdForLocalSite(HostMessenger.CLIENT_INTERFACE_SITE_ID)) {
@@ -2049,7 +2049,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             task.procName = "@UpdateApplicationCatalog";
                             task.setParams(changeResult.encodedDiffCommands, changeResult.catalogHash, changeResult.catalogBytes,
                                            changeResult.expectedCatalogVersion, changeResult.deploymentString,
-                                           changeResult.deploymentCRC, changeResult.requiresSnapshotIsolation ? 1 : 0);
+                                           changeResult.deploymentCRC, changeResult.requiresSnapshotIsolation ? 1 : 0,
+                                           changeResult.worksWithElastic ? 1 : 0);
                             task.clientHandle = changeResult.clientHandle;
                             // DR stuff
                             task.type = changeResult.invocationType;

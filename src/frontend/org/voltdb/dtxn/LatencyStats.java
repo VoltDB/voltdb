@@ -138,7 +138,8 @@ public class LatencyStats extends SiteStatsSource {
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval)
     {
         m_totals = new LatencyInfo();
-        for (ClientInterface ci : VoltDB.instance().getClientInterfaces()) {
+        ClientInterface ci = VoltDB.instance().getClientInterface();
+        if (ci != null) {
             List<LatencyInfo> thisci = ci.getLatencyStats();
             for (LatencyInfo info : thisci) {
                 m_totals.mergeLatencyInfo(info);

@@ -156,6 +156,10 @@ public class TestSelfJoins  extends PlannerTestCase {
         //* for debug */ System.out.println(apn.toExplainPlanString());
         // Some day, the wasteful projection node will not be here to skip.
         pn = apn.getChild(0).getChild(0);
+
+        /* for debug */ System.out.println(apn.toExplainPlanString());
+        // Some day, the wasteful projection node will not be here to skip.
+        pn = apn.getChild(0).getChild(0);
         assertTrue(pn instanceof NestLoopIndexPlanNode);
         nlij = (NestLoopIndexPlanNode) pn;
         assertNull(nlij.getPreJoinPredicate());
@@ -349,12 +353,10 @@ public class TestSelfJoins  extends PlannerTestCase {
         searchKeys = c.getSearchKeyExpressions();
         assertEquals(1, searchKeys.size());
         assertTrue(searchKeys.get(0) instanceof TupleValueExpression);
-
    }
 
     @Override
     protected void setUp() throws Exception {
         setupSchema(TestJoinOrder.class.getResource("testself-joins-ddl.sql"), "testselfjoins", false);
     }
-
 }

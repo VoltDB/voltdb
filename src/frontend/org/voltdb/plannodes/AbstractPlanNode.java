@@ -283,22 +283,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     /**
-     * Does the (sub)plan guarantee an identical result/effect (except possibly for ordering)
-     * when "replayed" against the same database state, such as during replication or CL recovery.
-     * @return
-     */
-    public boolean isContentDeterministic() {
-        // Leaf nodes need to re-implement this test.
-        assert(m_children != null);
-        for (AbstractPlanNode child : m_children) {
-            if (! child.isContentDeterministic()) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
      * Accessor for description of plan non-determinism.
      * @return the field
      */

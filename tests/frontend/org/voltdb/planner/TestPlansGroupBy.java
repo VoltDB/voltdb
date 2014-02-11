@@ -171,12 +171,20 @@ public class TestPlansGroupBy extends PlannerTestCase {
         pns = compileToFragments("SELECT F_D2 - F_D3, ABS(F_D1), COUNT(*) FROM F GROUP BY F_D2 - F_D3, ABS(F_D1)");
         checkGroupByOnlyPlan(pns, true, true, true);
 
-        // unoptimized case (only use second col of the index), but will be replaced in
-        // SeqScanToIndexScan optimization for deterministic reason
+        // unoptimized case (only uses second col of the index), will not be replaced in
+        // SeqScanToIndexScan for determinism because of non-deterministic receive.
         // use EXPR_F_TREE1 not EXPR_F_TREE2
         pns = compileToFragments("SELECT F_D2 - F_D3, COUNT(*) FROM F GROUP BY F_D2 - F_D3");
-        //* debug */ System.out.println(pns.get(0).toExplainPlanString());
-        checkGroupByOnlyPlan(pns, true, true, true);
+        //* debug */ System.out.println("DEBUG 0: " + pns.get(0).getChild(0).toExplainPlanString());
+        //* debug */ System.out.println("DEBUG 1: " + pns.get(1).getChild(0).toExplainPlanString());
+        checkGroupByOnlyPlan(pns, true, true, false);
+
+        // unoptimized case (only uses second col of the index), will be replaced in
+        // SeqScanToIndexScan for determinism.
+        // use EXPR_F_TREE1 not EXPR_F_TREE2
+        pns = compileToFragments("SELECT F_D2 - F_D3, COUNT(*) FROM RF GROUP BY F_D2 - F_D3");
+        System.out.println("DEBUG 2: " + pns.get(0).getChild(0).toExplainPlanString());
+        checkGroupByOnlyPlan(pns, false, true, true);
 
         pns = compileToFragments("SELECT F_VAL1, F_VAL2, COUNT(*) FROM RF GROUP BY F_VAL2, F_VAL1");
         //*/ debug */ System.out.println("DEBUG: " + pns.get(0).toExplainPlanString());
