@@ -328,6 +328,11 @@ public class TestAdminMode extends RegressionSuite
                 int siteCount, BackendTarget target) {
             super(jarFileName, siteCount, target);
         }
+
+        @Override
+        public void setMaxHeap(int max) {
+            //Nothing
+        }
     }
 
     @SuppressWarnings("deprecation")

@@ -28,6 +28,7 @@ public class CatalogChangeResult extends AsyncCompilerResult {
     public String encodedDiffCommands;
     public long deploymentCRC;
     public boolean requiresSnapshotIsolation;
+    public boolean worksWithElastic;
     public ProcedureInvocationType invocationType;
     public long originalTxnId;
     public long originalUniqueId;

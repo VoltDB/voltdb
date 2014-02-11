@@ -62,6 +62,9 @@ public class DeletePlanNode extends AbstractOperationPlanNode {
 
     @Override
     protected String explainPlanForNode(String indent) {
-        return "DELETE";
+        if (m_truncate) {
+            return "TRUNCATE TABLE " + m_targetTableName;
+        }
+        return "DELETE" + m_targetTableName;
     }
 }

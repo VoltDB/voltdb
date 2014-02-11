@@ -253,7 +253,7 @@ public class StreamBlockQueue {
             if (b.isPersisted()) {
                 break;
             }
-            memoryBlockUsage += b.totalUso();
+            memoryBlockUsage += b.unreleasedSize(); //Use only unreleased size.
         }
         return memoryBlockUsage + m_persistentDeque.sizeInBytes();
     }

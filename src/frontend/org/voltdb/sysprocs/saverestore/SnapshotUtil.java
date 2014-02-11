@@ -1343,7 +1343,7 @@ public class SnapshotUtil {
             }
         });
 
-        final SnapshotDaemon sd = VoltDB.instance().getClientInterfaces().get(0).getSnapshotDaemon();
+        final SnapshotDaemon sd = VoltDB.instance().getClientInterface().getSnapshotDaemon();
         Runnable work = new Runnable() {
             @Override
             public void run() {
