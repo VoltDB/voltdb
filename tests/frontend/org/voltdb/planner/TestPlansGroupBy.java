@@ -104,6 +104,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testGroupByOnly() {
+        System.out.println("Starting testGroupByOnly");
         // Replicated Table
 
         // only GROUP BY cols in SELECT clause
@@ -154,9 +155,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkGroupByOnlyPlan(pns, true, true, true);
 
         pns = compileToFragments("SELECT F_D1, COUNT(*) FROM F GROUP BY F_D1");
-        for (AbstractPlanNode apn: pns) {
-            System.out.println(apn.toExplainPlanString());
-        }
+        //*/ debug */ System.out.println("DEBUG: " + pns.get(0).toExplainPlanString());
+        //*/ debug */ System.out.println("DEBUG: " + pns.get(1).toExplainPlanString());
         checkGroupByOnlyPlan(pns, true, true, true);
 
         pns = compileToFragments("SELECT F_VAL1, SUM(F_VAL2) FROM F GROUP BY F_VAL1");
@@ -175,8 +175,13 @@ public class TestPlansGroupBy extends PlannerTestCase {
         // SeqScanToIndexScan optimization for deterministic reason
         // use EXPR_F_TREE1 not EXPR_F_TREE2
         pns = compileToFragments("SELECT F_D2 - F_D3, COUNT(*) FROM F GROUP BY F_D2 - F_D3");
-        // debug */ System.out.println(pns.get(0).toExplainPlanString());
+        //* debug */ System.out.println(pns.get(0).toExplainPlanString());
         checkGroupByOnlyPlan(pns, true, true, true);
+
+        pns = compileToFragments("SELECT F_VAL1, F_VAL2, COUNT(*) FROM RF GROUP BY F_VAL2, F_VAL1");
+        //*/ debug */ System.out.println("DEBUG: " + pns.get(0).toExplainPlanString());
+        checkGroupByOnlyPlan(pns, false, false, true);
+        System.out.println("Finishing testGroupByOnly");
     }
 
     public void testEdgeComplexRelatedCases() {
