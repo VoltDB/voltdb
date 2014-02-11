@@ -1014,19 +1014,22 @@ public class PlanAssembler {
         // Note that even tree index scans that produce values in their own "key order" only report
         // their sort direction != SortDirectionType.INVALID
         // when they enforce an ordering equivalent to the one requested in the ORDER BY clause.
-        if (root.getPlanNodeType() == PlanNodeType.INDEXSCAN) {
-            sortDirection = ((IndexScanPlanNode) root).getSortDirection();
-            if (sortDirection != SortDirectionType.INVALID) {
-                return root;
-            }
+        // Even an intervening non-hash aggregate will not interfere in this optimization.
+        AbstractPlanNode nonAggPlan = root;
+        if (root.getPlanNodeType() == PlanNodeType.AGGREGATE) {
+            nonAggPlan = root.getChild(0);
         }
-        // Optimization for NestLoopIndex on IN list
-        // skip the explicit ORDER BY plan step if NestLoopIndex is providing the equivalent ordering
-        if (root instanceof AbstractJoinPlanNode) {
-            sortDirection = ((AbstractJoinPlanNode)root).getSortDirection();
-            if (sortDirection != SortDirectionType.INVALID) {
-                return root;
-            }
+        if (nonAggPlan instanceof IndexScanPlanNode) {
+            sortDirection = ((IndexScanPlanNode)nonAggPlan).getSortDirection();
+        }
+        // Optimization for NestLoopIndex on IN list, possibly other cases of ordered join results.
+        // Skip the explicit ORDER BY plan step if NestLoopIndex is providing the equivalent ordering
+        else if (nonAggPlan instanceof AbstractJoinPlanNode) {
+            sortDirection = ((AbstractJoinPlanNode)nonAggPlan).getSortDirection();
+        }
+
+        if (sortDirection != SortDirectionType.INVALID) {
+            return root;
         }
 
         OrderByPlanNode orderByNode = new OrderByPlanNode();
@@ -1232,8 +1235,11 @@ public class PlanAssembler {
             AggregatePlanNode topAggNode = null;
             if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
                 AbstractPlanNode candidate = root.getChild(0).getChild(0);
-                // do the type check here, no need to find substitute if it is already an IndexScan node
-                if (candidate.getPlanNodeType() == PlanNodeType.SEQSCAN) {
+                // For a seqscan feeding a GROUP BY, consider substituting an IndexScan that pre-sorts
+                // by the GROUP BY keys. This is a much bigger win if the aggregation can get pushed
+                // down so that the ordering is not lost by the lack of a mergesort in the RECEIVE node,
+                // but it shouldn't hurt (much?) anyway.
+                if (candidate.getPlanNodeType() == PlanNodeType.SEQSCAN && m_parsedSelect.isGrouped()) {
                     candidate = indexAccessForGroupByExprs(candidate);
                     if (candidate.getPlanNodeType() == PlanNodeType.INDEXSCAN) {
                         candidate.clearParents();
@@ -1241,7 +1247,10 @@ public class PlanAssembler {
                         root.getChild(0).addAndLinkChild(candidate);
                     }
                 }
-            } else {
+            }
+            else if (root.getPlanNodeType() == PlanNodeType.SEQSCAN && m_parsedSelect.isGrouped()) {
+                // For a seqscan feeding a GROUP BY, consider substituting an IndexScan that pre-sorts
+                // by the GROUP BY keys.
                 root = indexAccessForGroupByExprs(root);
             }
             // A hash is required to build up per-group aggregates in parallel vs.
@@ -1264,17 +1273,44 @@ public class PlanAssembler {
             // This is the less ambitious aspect of issue ENG-4096. The more ambitious aspect
             // is that the ability to by-pass use of the hash could actually motivate selection of
             // a compatible index scan, even when one would not be motivated by a WHERE or ORDER BY clause.
-
-            if (m_parsedSelect.isGrouped() &&
-                (root.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
-                 ((IndexScanPlanNode) root).getSortDirection() == SortDirectionType.INVALID)) {
+            boolean needHashAgg = m_parsedSelect.isGrouped();
+            if (needHashAgg) {
+                boolean predeterminedOrdering = false;
+                if (root instanceof IndexScanPlanNode) {
+                    if (((IndexScanPlanNode)root).getSortDirection() == SortDirectionType.INVALID) {
+                        if (((IndexScanPlanNode)root).isForGroupingOnly()) {
+                            needHashAgg = false;
+                        }
+                    } else {
+                        predeterminedOrdering = true;
+                    }
+                }
+                else if (root instanceof AbstractJoinPlanNode) {
+                    if (((AbstractJoinPlanNode)root).getSortDirection() != SortDirectionType.INVALID) {
+                        predeterminedOrdering = true;
+                    }
+                }
+                if (predeterminedOrdering) {
+                    // The ordering predetermined by indexed access is known to cover (at least) the
+                    // ORDER BY columns.
+                    // Yet, any additional non-ORDER-BY columns in the GROUP BY clause will still
+                    // require hashing to keep them grouped.
+                    // Aggregate hashing is currently an all or nothing operation,
+                    // so ALL of the GROUP BY columns (in any order) need to make up a prefix
+                    // of the ORDER BY columns to allow the plan to skip the hashing.
+                    if (m_parsedSelect.groupByIsAnOrderByPermutation()) {
+                        needHashAgg = false;
+                    }
+                }
+            }
+            if (needHashAgg) {
                 aggNode = new HashAggregatePlanNode();
-                if (!m_parsedSelect.mvFixInfo.needed()) {
+                if ( ! m_parsedSelect.mvFixInfo.needed()) {
                     topAggNode = new HashAggregatePlanNode();
                 }
             } else {
                 aggNode = new AggregatePlanNode();
-                if (!m_parsedSelect.mvFixInfo.needed()) {
+                if ( ! m_parsedSelect.mvFixInfo.needed()) {
                     topAggNode = new AggregatePlanNode();
                 }
             }
@@ -1435,21 +1471,38 @@ public class PlanAssembler {
         return handleDistinct(root);
     }
 
-    AbstractPlanNode indexAccessForGroupByExprs(AbstractPlanNode root) {
-        if (root.getPlanNodeType() == PlanNodeType.SEQSCAN && m_parsedSelect.isGrouped()) {
-            Table targetTable = m_catalogDb.getTables().get(((SeqScanPlanNode)root).getTargetTableName());
-            CatalogMap<Index> allIndexes = targetTable.getIndexes();
-            ArrayList<ParsedColInfo> groupBys = m_parsedSelect.groupByColumns;
+    private AbstractPlanNode indexAccessForGroupByExprs(AbstractPlanNode root) {
+        ArrayList<ParsedColInfo> groupBys = m_parsedSelect.groupByColumns;
 
-            String fromTableAlias = groupBys.get(0).expression.baseTableAlias();
-            assert(fromTableAlias != null);
-            int idx = m_parsedSelect.tableAliasIndexMap.get(fromTableAlias);
+        // Can't use index access to optimize a multi-table-based GROUP BY
+        String fromTableAlias = null;
+        for (ParsedColInfo col : groupBys) {
+            List<AbstractExpression> baseTVEs = col.expression.findBaseTVEs();
+            for (AbstractExpression baseTVE : baseTVEs) {
+                String nextTableAlias = ((TupleValueExpression)baseTVE).getTableAlias();
+                assert(nextTableAlias != null);
+                if (fromTableAlias == null) {
+                    fromTableAlias = nextTableAlias;
+                } else if ( ! fromTableAlias.equals(nextTableAlias)) {
+                    return root;
+                }
+            }
+        }
+        assert(fromTableAlias != null);
+        // This method of accessing the underlying table will probably not survive the up-coming
+        // changes to support subquery scans.
+        // Even when this method is replaced, a null target table will be a possibility.
+        // That case should by-pass this GROUP BY optimization.
+        Table targetTable = m_catalogDb.getTables().get(((SeqScanPlanNode)root).getTargetTableName());
+        if (targetTable != null) {
+            CatalogMap<Index> allIndexes = targetTable.getIndexes();
 
             for (Index index : allIndexes) {
-                if (!IndexType.isScannable(index.getType())) {
+                if ( ! IndexType.isScannable(index.getType())) {
                     continue;
                 }
 
+                ArrayList<AbstractExpression> allBindings = new ArrayList<AbstractExpression>();
                 boolean replacable = true;
                 String exprsjson = index.getExpressionsjson();
                 if (exprsjson.isEmpty()) {
@@ -1458,38 +1511,36 @@ public class PlanAssembler {
                         continue;
                     }
 
-                    for (int i = 0; i < groupBys.size(); i++) {
-                        // don't compare column idx here, because resolveColumnIndex is not yet called
-                        AbstractExpression expr = groupBys.get(i).expression;
-                        if (expr.getExpressionType() != ExpressionType.VALUE_TUPLE) {
+                    for (ParsedColInfo gbCol : groupBys) {
+                        AbstractExpression expr = gbCol.expression;
+                        if ( ! (expr instanceof TupleValueExpression)) {
                             replacable = false;
                             break;
                         }
-                        if (!fromTableAlias.equals(((TupleValueExpression)expr).getTableAlias())) {
+                        TupleValueExpression grouptve = (TupleValueExpression)expr;
+                        if ( ! fromTableAlias.equals(grouptve.getTableAlias())) {
                             replacable = false;
                             break;
                         }
-
+                        String gbColName = grouptve.getColumnName();
                         // ignore order of keys in GROUP BY expr
                         boolean foundMatch = false;
                         for (int j = 0; j < groupBys.size(); j++) {
-                            if (indexedColRefs.get(j).getColumn().getName().equals(groupBys.get(i).columnName)) {
+                            // don't compare column index here, because resolveColumnIndex is not yet called
+                            if (indexedColRefs.get(j).getColumn().getName().equals(gbColName)) {
                                 foundMatch = true;
                                 break;
                             }
                         }
-                        if (!foundMatch) {
+                        if ( ! foundMatch) {
                             replacable = false;
                             break;
                         }
                     }
-                    if (replacable) {
-                        IndexScanPlanNode indexScanNode = new IndexScanPlanNode((SeqScanPlanNode)root, null, index, SortDirectionType.ASC);
-                        return indexScanNode;
-                    }
                 } else {
                     // either pure expression index or mix of expressions and simple columns
                     List<AbstractExpression> indexedExprs = null;
+                    int idx = m_parsedSelect.tableAliasIndexMap.get(fromTableAlias);
                     StmtTableScan fromTableScan = m_parsedSelect.stmtCache.get(idx);
 
                     try {
@@ -1502,30 +1553,32 @@ public class PlanAssembler {
                     if (groupBys.size() > indexedExprs.size()) {
                         continue;
                     }
-                    ArrayList<AbstractExpression> allBindings = new ArrayList<AbstractExpression>();
-                    for (int i = 0; i < groupBys.size(); i++) {
+                    for (ParsedColInfo gbCol : groupBys) {
+                        AbstractExpression expr = gbCol.expression;
                         // ignore order of keys in GROUP BY expr
                         boolean foundMatch = false;
                         for (int j = 0; j < groupBys.size(); j++) {
                             AbstractExpression indexExpr = indexedExprs.get(j);
-                            List<AbstractExpression> binding = groupBys.get(i).expression.bindingToIndexedExpression(indexExpr);
-                            if (binding != null ) {
+                            List<AbstractExpression> binding = expr.bindingToIndexedExpression(indexExpr);
+                            if (binding != null) {
                                 allBindings.addAll(binding);
                                 foundMatch = true;
                                 break;
                             }
                         }
-                        if (!foundMatch) {
+                        if ( ! foundMatch) {
                             replacable = false;
                             break;
                         }
                     }
-                    if (replacable) {
-                        IndexScanPlanNode indexScanNode = new IndexScanPlanNode((SeqScanPlanNode)root, null, index, SortDirectionType.ASC);
-                        indexScanNode.setBindings(allBindings);
-                        return indexScanNode;
-                    }
                 }
+                if ( ! replacable) {
+                    continue;
+                }
+                IndexScanPlanNode indexScanNode = new IndexScanPlanNode((SeqScanPlanNode)root, null, index, SortDirectionType.INVALID);
+                indexScanNode.setForGroupingOnly();
+                indexScanNode.setBindings(allBindings);
+                return indexScanNode;
             }
         }
         return root;
