@@ -378,10 +378,6 @@ public class AsyncBenchmark {
      *
      */
     class doTxnCallback implements ProcedureCallback {
-
-        public doTxnCallback() {
-        }
-
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
             if (response.getStatus() == ClientResponse.SUCCESS) {
@@ -513,11 +509,14 @@ public class AsyncBenchmark {
                         continue;
                     }
 
-                    // asynchronously call the "doTxn" procedure update rids in callback.
+                    // asynchronously call the "doTxn" procedure
                     try {
-                        client.callProcedure(new doTxnCallback(), "doTxn",
-                                cid, rid, rid > windowPerCid ? rid - windowPerCid : 0,
-                                processor.generateForStore().getStoreValue());
+                        client.callProcedure(new doTxnCallback(),
+                                             "doTxn",
+                                             cid,
+                                             rid,
+                                             rid > windowPerCid ? rid - windowPerCid : 0,
+                                             processor.generateForStore().getStoreValue());
                     }
                     catch (NoConnectionsException e) {
                         log.error("ClientThread got NoConnectionsException on doTxn proc call.");
@@ -528,6 +527,7 @@ public class AsyncBenchmark {
                 log.error("Benchark had a unexpected exception", e);
                 System.exit(-1);
             }
+
             rids.put(cid, rid + 1);
         }
 
