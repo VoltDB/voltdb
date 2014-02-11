@@ -23,11 +23,10 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
-import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.compiler.DatabaseEstimates.TableEstimates;
+import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
-import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.types.PlanNodeType;
 
 public class SeqScanPlanNode extends AbstractScanPlanNode {
@@ -118,29 +117,5 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
             return;
         }
         super.generateTableSchema(db);
-/*
-            assert(m_children.size() == 1);
-            // Generate the sub-query table schema
-            m_children.get(0).generateOutputSchema(db);
-
-            m_tableSchema = new NodeSchema();
-            NodeSchema subQuerySchema = m_children.get(0).getOutputSchema();
-            for (SchemaColumn col : subQuerySchema.getColumns()) {
-                // get the column from the sub-query schema and replace the table name and alias
-                // with the derived table name and alias.
-                String columnAlias = col.getColumnAlias();
-                String columnName = col.getColumnName();
-                if (columnAlias != null) {
-                    columnName = columnAlias;
-                }
-                SchemaColumn newCol = new SchemaColumn(m_targetTableName,
-                        m_targetTableAlias,
-                        columnName,
-                        columnAlias,
-                        (AbstractExpression) col.getExpression().clone());
-                m_tableSchema.addColumn(newCol);
-            }
-        }
- */
     }
 }

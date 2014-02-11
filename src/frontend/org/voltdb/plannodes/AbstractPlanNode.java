@@ -270,7 +270,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * Recursively find the target table name for a DML statement.
      * The name will be attached to the AbstractOperationNode child
      * of a Send Node, in all cases, so the "recursion" can be very limited.
-     * Most plan nodes can quick;y stub out this recursion and return null.
+     * Most plan nodes can quickly stub out this recursion and return null.
      * @return
      */
     @SuppressWarnings("static-method")

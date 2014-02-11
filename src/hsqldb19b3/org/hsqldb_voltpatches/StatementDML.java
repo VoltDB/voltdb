@@ -1342,7 +1342,6 @@ public class StatementDML extends StatementDMQL {
         }
 
         voltAppendParameters(session, xml, parameters);
-//        voltAppendParameters(session, xml);
         xml.attributes.put("table", targetTable.getName().name);
         return xml;
     }

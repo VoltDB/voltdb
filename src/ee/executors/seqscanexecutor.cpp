@@ -92,9 +92,9 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     else
     {
         // Create output table based on output schema from the plan
-        const std::string& temp_name = (!node->isSubQuery()) ?
-            node->getTargetTable()->name() :
-            node->getChildren()[0]->getOutputTable()->name();
+        const std::string& temp_name = (node->isSubQuery()) ?
+                node->getChildren()[0]->getOutputTable()->name():
+                node->getTargetTable()->name();
         setTempOutputTable(limits, temp_name);
     }
     return true;
@@ -115,9 +115,9 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     Table* output_table = node->getOutputTable();
     assert(output_table);
 
-    Table* input_table = (!node->isSubQuery()) ?
-        node->getTargetTable() :
-        node->getChildren()[0]->getOutputTable();
+    Table* input_table = (node->isSubQuery()) ?
+            node->getChildren()[0]->getOutputTable():
+            node->getTargetTable();
 
     assert(input_table);
     Table* target_table = node->getTargetTable();

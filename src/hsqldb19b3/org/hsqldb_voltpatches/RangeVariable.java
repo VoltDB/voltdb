@@ -1166,9 +1166,6 @@ final class RangeVariable {
         primaryIndex = rangeTable.getPrimaryIndex();
         primaryKey   = rangeTable.getPrimaryKey();
 
-//        if (rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
-//            throw new HSQLParseException("VoltDB does not support subqueries, consider using views instead");
-//        }
 
         // get the index for this scan (/filter)
         // note: ignored if scan if full table scan
