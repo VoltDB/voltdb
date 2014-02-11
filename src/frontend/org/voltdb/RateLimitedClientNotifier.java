@@ -61,23 +61,24 @@ public class RateLimitedClientNotifier {
                                 = new ConcurrentHashMap<Connection, Object>(2048, .75f, 128);
     private final LinkedTransferQueue<Runnable> m_submissionQueue = new LinkedTransferQueue<Runnable>();
 
-    private static final double NOTIFICATION_RATE = Long.getLong("CLIENT_NOTIFICATION_RATE", 1000).doubleValue();
+    static double NOTIFICATION_RATE = Long.getLong("CLIENT_NOTIFICATION_RATE", 1000).doubleValue();
+    static long WARMUP_MS = Long.getLong("CLIENT_NOTIFICATION_WARMUP_MS", 5000);
     private RateLimiter m_limiter;
 
     //Cache nodes use to build linked lists of notifications
     //This avoids having to create and promote large numbers of objects and then GC them later
-    private static final Cache<Node, Node> m_cachedNodes =
+    static final Cache<Node, Node> m_cachedNodes =
                                             CacheBuilder.newBuilder()
                                                     .maximumSize(10000).concurrencyLevel(1).build();
 
     /*
      * Linked list node saves allocating a dedicated list object and allows for object pooling
      */
-    private static class Node implements Callable<Node> {
+    public static class Node implements Callable<Node> {
         private final Supplier<DeferredSerialization> notification;
         private final Node next;
 
-        private Node(Supplier<DeferredSerialization> notification, Node next) {
+        public Node(Supplier<DeferredSerialization> notification, Node next) {
             Preconditions.checkNotNull(notification);
             this.notification = notification;
             this.next = next;
@@ -106,7 +107,7 @@ public class RateLimitedClientNotifier {
             Node head = this;
             do {
                 result = result * prime + head.notification.hashCode();
-            } while ((head = next) != null);
+            } while ((head = head.next) != null);
             return result;
         }
 
@@ -136,7 +137,7 @@ public class RateLimitedClientNotifier {
                 //Block until submissions create further work
                 runSubmissions(true);
                 //Create a fresh limiter each time so there isn't a burst of permits
-                m_limiter = RateLimiter.create(NOTIFICATION_RATE, 5, TimeUnit.SECONDS);
+                m_limiter = RateLimiter.create(NOTIFICATION_RATE, WARMUP_MS, TimeUnit.MILLISECONDS);
             } else {
                 //Non-blocking poll for changes
                 runSubmissions(false);
@@ -167,9 +168,9 @@ public class RateLimitedClientNotifier {
         } else {
             //Notification is a linked list containing multiple events
             Node head = (Node)value;
-            while (head != null) {
+            do {
                 key.writeStream().enqueue(head.notification.get());
-            }
+            } while ((head = head.next) != null);
         }
 
     }
@@ -207,7 +208,6 @@ public class RateLimitedClientNotifier {
                 for (ClientInterfaceHandleManager cihm : connections) {
                     if (!wantsNotificationPredicate.apply(cihm)) continue;
                     final Connection c = cihm.connection;
-                    if (VoltPort.class != c.getClass()) continue;
 
                     /*
                      * To avoid extra allocations and promotion we initially store a single event

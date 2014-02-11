@@ -172,10 +172,12 @@ class Distributer {
             if (response.getStatus() == ClientResponse.CONNECTION_LOST && !m_connections.isEmpty()) {
                 subscribeToNewNode();
                 return;
+            } else if (response.getStatus() == ClientResponse.CONNECTION_LOST) {
+                return;
             }
 
             //Slow path, god knows why it didn't succeed, could be a bug. Don't firehose attempts.
-            if (response.getStatus() != ClientResponse.SUCCESS) {
+            if (response.getStatus() != ClientResponse.SUCCESS && !m_ex.isShutdown()) {
                 System.err.println("Error response received subscribing to topology updates.\n " +
                                    "Performance may be reduced on topology updates. Error was \"" +
                                     response.getStatusString() + "\"");
@@ -570,7 +572,8 @@ class Distributer {
                      */
                     if (m_useClientAffinity &&
                         m_subscribedConnection == this &&
-                        m_subscriptionRequestPending == false) {
+                        m_subscriptionRequestPending == false &&
+                        !m_ex.isShutdown()) {
                         //Don't subscribe to a new node immediately
                         //to somewhat prevent a thundering herd
                         m_ex.schedule(new Runnable() {
@@ -760,7 +763,7 @@ class Distributer {
         NodeConnection cxn = null;
         boolean firstTime = false;
         synchronized (Distributer.this) {
-            if (m_subscribedConnection != null) {
+            if (m_subscribedConnection == null) {
                 firstTime = true;
             }
             m_subscribedConnection = null;

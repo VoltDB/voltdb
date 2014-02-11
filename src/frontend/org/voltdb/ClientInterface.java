@@ -2231,7 +2231,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             new Predicate<ClientInterfaceHandleManager>() {
                 @Override
                 public boolean apply(ClientInterfaceHandleManager input) {
-                    return input.wantsTopologyUpdates();
+                    return input.wantsTopologyUpdates() && input.connection.getClass() == VoltPort.class;
                 }};
 
     /*

@@ -26,10 +26,11 @@ import java.net.InetSocketAddress;
 import java.util.concurrent.Future;
 
 public class MockConnection implements Connection {
+    public final MockWriteStream m_writeStream = new MockWriteStream();
 
     @Override
     public WriteStream writeStream() {
-        throw new UnsupportedOperationException();
+        return m_writeStream;
     }
 
     @Override

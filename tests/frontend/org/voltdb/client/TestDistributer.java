@@ -592,10 +592,6 @@ public class TestDistributer extends TestCase {
             volt0.start();
 
             ClientConfig config = new ClientConfig();
-            /*
-             * The library will immediately generate two transactions
-             * to init client affinity
-             */
             config.setMaxOutstandingTxns(8);
             config.setConnectionResponseTimeout(2000);
 
