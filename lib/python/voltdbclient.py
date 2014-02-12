@@ -22,6 +22,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+import sys
+if sys.hexversion < 0x02050000:
+    raise Exception("Python version 2.5 or greater is required.")
 import array
 import socket
 import struct
