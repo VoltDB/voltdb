@@ -65,6 +65,7 @@ import com.google_voltpatches.common.base.Throwables;
  */
 class Distributer {
 
+    static int RESUBSCRIPTION_DELAY_MS = Integer.getInteger("RESUBSCRIPTION_DELAY_MS", 10000);
     static final long PING_HANDLE = Long.MAX_VALUE;
     public static final Long ASYNC_TOPO_HANDLE = PING_HANDLE - 1;
     static final long USE_DEFAULT_TIMEOUT = 0;
@@ -140,6 +141,9 @@ class Distributer {
     //Track if a request is pending so we don't accidentally handle a failed node twice
     private boolean m_subscriptionRequestPending = false;
 
+    //Until catalog subscription is implemented, only fetch it once
+    private boolean m_fetchedCatalog = false;
+
     /**
      * Handles topology updates for client affinity
      */
@@ -147,6 +151,7 @@ class Distributer {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
+            if (clientResponse.getStatus() != ClientResponse.SUCCESS) return;
             try {
                 synchronized (Distributer.this) {
                     VoltTable results[] = clientResponse.getResults();
@@ -211,6 +216,7 @@ class Distributer {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
+            if (clientResponse.getStatus() != ClientResponse.SUCCESS) return;
             try {
                 synchronized (Distributer.this) {
                     VoltTable results[] = clientResponse.getResults();
@@ -218,7 +224,9 @@ class Distributer {
                         VoltTable vt = results[0];
                         updateProcedurePartitioning(vt);
                     }
+                    m_fetchedCatalog = true;
                 }
+
             }
             catch (Exception e) {
                 e.printStackTrace();
@@ -581,7 +589,7 @@ class Distributer {
                             public void run() {
                                 subscribeToNewNode();
                             }
-                        }, new Random().nextInt(10000), TimeUnit.MILLISECONDS);
+                        }, new Random().nextInt(RESUBSCRIPTION_DELAY_MS), TimeUnit.MILLISECONDS);
                     }
                 }
                 m_isConnected = false;
@@ -761,11 +769,7 @@ class Distributer {
     private void subscribeToNewNode() {
         //Technically necessary to synchronize for safe publication of this store
         NodeConnection cxn = null;
-        boolean firstTime = false;
         synchronized (Distributer.this) {
-            if (m_subscribedConnection == null) {
-                firstTime = true;
-            }
             m_subscribedConnection = null;
             if (!m_connections.isEmpty()) {
                 cxn = m_connections.get(new Random().nextInt(m_connections.size()));
@@ -799,7 +803,7 @@ class Distributer {
 
             //Don't need to retrieve procedure updates every time we do a new subscription
             //since catalog changes aren't correlated with node failure the same way topo is
-            if (firstTime) {
+            if (!m_fetchedCatalog) {
                 spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@SystemCatalog", "PROCEDURES");
                 //The handle is specific to procedure updates and has special cased handling
                 cxn.createWork(spi.getHandle(),
