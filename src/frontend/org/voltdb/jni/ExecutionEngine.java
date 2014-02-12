@@ -318,7 +318,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
     }
 
-    static final long LONG_OP_THRESHOLD = 100;
+    static final long LONG_OP_THRESHOLD = 10000;
     public long fragmentProgressUpdate(int batchIndex,
                                           String planNodeName,
                                           String lastAccessedTable,
