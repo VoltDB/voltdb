@@ -328,7 +328,7 @@ public class TarFileOutputStream {
      * @see #close
      */
     public void finish() throws IOException {
-        // A VoltDB extension to make tar output more flexible
+        // A VoltDB extension to enable archiving to a stream
         finishStream();
         writeFile.renameTo(targetFile);
     }
@@ -367,7 +367,7 @@ public class TarFileOutputStream {
         }
 
         writeStream.close();
-        // A VoltDB extension to make tar output more flexible
+        // A VoltDB extension to enable archiving to a stream
         /* disable 1 line ...
         writeFile.renameTo(targetFile);
         ... disabled 1 line */

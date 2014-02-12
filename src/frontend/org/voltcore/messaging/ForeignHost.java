@@ -36,6 +36,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
+import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
 
 public class ForeignHost {
@@ -300,6 +301,9 @@ public class ForeignHost {
         final long sourceHSId = in.getLong();
         final int destCount = in.getInt();
         if (destCount == -1) {//This is a poison pill
+            //Ignore poison pill during shutdown, in tests we receive crash messages from
+            //leader appointer during shutdown
+            if (VoltDB.instance().getMode() == OperationMode.SHUTTINGDOWN) return;
             byte messageBytes[] = new byte[in.getInt()];
             in.get(messageBytes);
             String message = new String(messageBytes, "UTF-8");

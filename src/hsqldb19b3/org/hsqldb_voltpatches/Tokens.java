@@ -776,14 +776,16 @@ public class Tokens {
     static final String        T_BITAND           = "BITAND";
     static final String        T_BITOR            = "BITOR";
     static final String        T_BITXOR           = "BITXOR";
+    // CHERRY PICK -- mysterious
+    static final String        T_CONCAT_WORD      = "CONCAT";
+    // End of CHERRY PICK
     static final String        T_ROUNDMAGIC       = "ROUNDMAGIC";
     static final String        T_ASCII            = "ASCII";
-    // A VoltDB extension -- mysterious
-    static final String        T_CONCAT_WORD      = "CONCAT";
+    // CHERRY PICK -- mysterious
     /* disable 1 line ...
     static final String        T_CONCAT_WORD      = "CONCAT_WORD";
     ... disabled 1 line */
-    // End of VoltDB extension
+    // End of CHERRY PICK
     static final String        T_DIFFERENCE       = "DIFFERENCE";
     static final String        T_HEXTORAW         = "HEXTORAW";
     static final String        T_LCASE            = "LCASE";

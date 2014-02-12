@@ -40,7 +40,7 @@ import org.hsqldb_voltpatches.lib.HsqlTimer;
 import org.hsqldb_voltpatches.lib.IntKeyHashMap;
 import org.hsqldb_voltpatches.lib.Iterator;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
-// A VoltDB extension to disable a subpackage dependency
+// A VoltDB extension to disable a package dependency
 /* disable 2 lines ...
 import org.hsqldb_voltpatches.server.Server;
 import org.hsqldb_voltpatches.server.ServerConstants;
@@ -167,13 +167,13 @@ public class DatabaseManager {
                           : db.sessionManager.getSession(sessionId);
     }
 
-    // A VoltDB extension to disable a subpackage dependency
-    /* disable 14 lines ...
     /**
      * Used by server to open or create a database
      */
 
 // loosecannon1@users 1.7.2 patch properties on the JDBC URL
+    // A VoltDB extension to disable a package dependency
+    /* disable 9 lines ...
     public static int getDatabase(String type, String path, Server server,
                                   HsqlProperties props) {
 
@@ -183,9 +183,8 @@ public class DatabaseManager {
 
         return db.databaseID;
     }
-    ... disabled 14 lines */
+    ... disabled 9 lines */
     // End of VoltDB extension
-
     /**
      * This has to be improved once a threading model is in place.
      * Current behaviour:
@@ -349,11 +348,7 @@ public class DatabaseManager {
         Object  key  = path;
         HashMap databaseMap;
 
-// A VoltDB extension to disable a subpackage dependency
-/* disable 1 line ...
         notifyServers(database);
-... disabled 1 line */
-// End of VoltDB extension
 
         if (type == DatabaseURL.S_FILE) {
             databaseMap = fileDatabaseMap;
@@ -374,8 +369,7 @@ public class DatabaseManager {
             ValuePool.resetPool();
         }
     }
-// A VoltDB extension to disable a subpackage dependency
-/* disable 93 lines ...
+
     /**
      * Maintains a map of servers to sets of databases.
      * Servers register each of their databases.
@@ -437,8 +431,12 @@ public class DatabaseManager {
             HashSet databases = (HashSet) serverMap.get(server);
 
             if (databases.contains(db)) {
+// A VoltDB extension to disable a package dependency
+/* disable 2 lines ...
                 server.notify(ServerConstants.SC_DATABASE_SHUTDOWN,
                               db.databaseID);
+... disabled 2 lines */
+// End of VoltDB extension
             }
         }
     }
@@ -459,9 +457,6 @@ public class DatabaseManager {
         return false;
     }
 
-... disabled 93 lines */
-// End of VoltDB extension
-
     // Timer
     private static final HsqlTimer timer = new HsqlTimer();
 
@@ -479,4 +474,9 @@ public class DatabaseManager {
             return path;
         }
     }
+    /************************* Volt DB Extensions *************************/
+    /** Minimal stub to locally resolve Server class references. */
+    private static class Server {
+    }
+    /**********************************************************************/
 }

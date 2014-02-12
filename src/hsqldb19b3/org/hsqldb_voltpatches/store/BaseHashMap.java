@@ -143,22 +143,18 @@ public class BaseHashMap {
             throw new IllegalArgumentException();
         }
 
-        // A VoltDB extension to prevent a flaky crash?
+        // CHERRY PICK to prevent a flaky crash?
         if (initialCapacity < 3) {
             initialCapacity = 3;
         }
-        // End of VoltDB extension
+        // End of CHERRY PICK to prevent a flaky crash?
         this.loadFactor      = 1;    // can use any value if necessary
         this.initialCapacity = initialCapacity;
         threshold            = initialCapacity;
 
-        // A VoltDB extension to prevent a flaky crash?
-        /* disable 3 lines ...
         if (threshold < 3) {
             threshold = 3;
         }
-        ... disabled 3 lines */
-        // End of VoltDB extension
 
         int hashtablesize = (int) (initialCapacity * loadFactor);
 
@@ -1170,11 +1166,13 @@ public class BaseHashMap {
         if (key == null) {
             return false;
         }
-        // A VoltDB extension to prevent a flaky crash?
+
+        // CHERRY PICK to prevent a flaky crash?
         if (hashIndex.elementCount == 0) {
             return false;
         }
-        // End of VoltDB extension
+
+        // End of CHERRY PICK
 
         int lookup = getLookup(key, key.hashCode());
 
@@ -1183,11 +1181,12 @@ public class BaseHashMap {
     }
 
     protected boolean containsKey(int key) {
-        // A VoltDB extension to prevent a flaky crash?
+        // CHERRY PICK to prevent a flaky crash?
         if (hashIndex.elementCount == 0) {
             return false;
         }
-        // End of VoltDB extension
+
+        // End of CHERRY PICK
 
         int lookup = getLookup(key);
 
@@ -1196,12 +1195,13 @@ public class BaseHashMap {
     }
 
     protected boolean containsKey(long key) {
-        // A VoltDB extension to prevent a flaky crash?
+
+        // CHERRY PICK to prevent a flaky crash?
         if (hashIndex.elementCount == 0) {
             return false;
         }
-        // End of VoltDB extension
 
+        // End of CHERRY PICK
         int lookup = getLookup(key);
 
         return lookup == -1 ? false
@@ -1209,14 +1209,15 @@ public class BaseHashMap {
     }
 
     protected boolean containsValue(Object value) {
-        // A VoltDB extension to prevent a flaky crash?
-        if (hashIndex.elementCount == 0) {
-            return false;
-        }
-        // End of VoltDB extension
 
         int lookup = 0;
 
+        // CHERRY PICK to prevent a flaky crash?
+        if (hashIndex.elementCount == 0) {
+            return false;
+        }
+
+        // End of CHERRY PICK
         if (value == null) {
             for (; lookup < hashIndex.newNodePointer; lookup++) {
                 if (objectValueTable[lookup] == null) {
@@ -1480,9 +1481,10 @@ public class BaseHashMap {
             }
 
             if (isList) {
-                // A VoltDB extension to prevent a flaky crash?
+                // CHERRY PICK to prevent a flaky crash?
                 removeRow(lookup);
-                // End of VoltDB extension
+
+                // End of CHERRY PICK
                 lookup--;
             }
         }

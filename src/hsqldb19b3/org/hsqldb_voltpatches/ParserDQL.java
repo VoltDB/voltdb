@@ -4279,11 +4279,11 @@ public class ParserDQL extends ParserBase {
                 case Tokens.COMMA :
                 default :
                     if (token.tokenType != exprType) {
-        // A VoltDB extension to avoid using exceptions for flow control.
+                        // A VoltDB extension to avoid using exceptions for flow control.
                         if ( ! preferToThrow) {
                             return unexpectedToken();
                         }
-        // End of VoltDB extension
+                        // End of VoltDB extension
                         throw unexpectedToken();
                     }
 

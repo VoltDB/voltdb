@@ -189,7 +189,7 @@ public class TarReader {
     }
 
     public void read() throws IOException, TarMalformatException {
-        // A VoltDB extension to make extraction more verbose
+        // A VoltDB extension to make extraction less verbose
         read(true);
     }
 
@@ -280,11 +280,10 @@ public class TarReader {
                          * extracted.
                          */
                         // A VoltDB extension to make extraction less verbose
-                        if (verbose) {
-                        // End of VoltDB extension
+                        if (verbose) System.out.println(header.toString());
+                        /* disable 1 line ...
                         System.out.println(header.toString());
-                        // A VoltDB extension to make extraction less verbose
-                        }
+                        ... disabled 1 line */
                         // End of VoltDB extension
 
                         // Instance variable mode will be used to differentiate
