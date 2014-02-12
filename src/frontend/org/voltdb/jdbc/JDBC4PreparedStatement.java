@@ -312,7 +312,7 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
     public void setFloat(int parameterIndex, float x) throws SQLException
     {
         checkParameterBounds(parameterIndex);
-        throw SQLError.noSupport();
+        this.parameters[parameterIndex - 1] = x;
     }
 
     // Sets the designated parameter to the given Java int value.
