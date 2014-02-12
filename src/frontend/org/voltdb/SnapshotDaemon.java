@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -922,11 +922,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                     //Turtles all the way down
                                     scheduleSnapshotForLater(
                                             requestObj,
-                                            null,//null because it shouldn't be used, request already responded to
+                                            requestId,
                                             false);
                                 } else if (haveFailure) {
                                     SNAP_LOG.info("Queued user snapshot was attempted, but there was a failure.");
-                                    if (requestId != null) {
+                                    try {
                                         ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
                                         ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
                                         m_zk.create(
@@ -935,13 +935,18 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                                 Ids.OPEN_ACL_UNSAFE,
                                                 CreateMode.PERSISTENT);
                                     }
+                                    catch (NodeExistsException e) {
+                                        // used to pass null as request ID to avoid this check if the request ID
+                                        // already existed, this gives us the same behavior with a pre-existing
+                                        // request ID
+                                    }
                                     //Reset the watch, in case this is recoverable
                                     userSnapshotRequestExistenceCheck(true);
                                     //Log the details of the failure, after resetting the watch in case of some odd NPE
                                     result.resetRowPosition();
                                     SNAP_LOG.info(result);
                                 } else {
-                                    if (requestId != null) {
+                                    try {
                                         SNAP_LOG.debug("Queued user snapshot was successfully requested, saving to path " +
                                                 VoltZK.user_snapshot_response + requestId);
                                         /*
@@ -954,6 +959,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                                 rimpl.flattenToBuffer(buf).array(),
                                                 Ids.OPEN_ACL_UNSAFE,
                                                 CreateMode.PERSISTENT);
+                                    }
+                                    catch (NodeExistsException e) {
+                                        // used to pass null as request ID to avoid this check if the request ID
+                                        // already existed, this gives us the same behavior with a pre-existing
+                                        // request ID
                                     }
                                     userSnapshotRequestExistenceCheck(true);
                                     return;

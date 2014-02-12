@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -110,5 +110,21 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         this.joinOrder = joinOrder;
     }
 
+    public boolean isOrderDeterministic() {
+        for (AbstractParsedStmt childStmt : m_children) {
+            if ( ! childStmt.isOrderDeterministic()) {
+                return false;
+            }
+        }
+        return true;
+    }
 
+    public boolean hasLimitOrOffset() {
+        for (AbstractParsedStmt childStmt : m_children) {
+            if ( childStmt.hasLimitOrOffset()) {
+                return true;
+            }
+        }
+        return false;
+    }
 }

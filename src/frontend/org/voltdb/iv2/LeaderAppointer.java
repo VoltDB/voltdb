@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,6 +17,8 @@
 
 package org.voltdb.iv2;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -321,6 +323,13 @@ public class LeaderAppointer implements Promotable
         m_partSnapshotSchedule = partitionSnapshotSchedule;
         m_usingCommandLog = usingCommandLog;
         m_stats = stats;
+        if (m_partitionDetectionEnabled) {
+            if (!testPartitionDetectionDirectory(m_partSnapshotSchedule))
+            {
+                VoltDB.crashLocalVoltDB("Unable to create partition detection snapshot directory at " +
+                        m_partSnapshotSchedule.getPath(), false, null);
+            }
+        }
     }
 
     @Override
@@ -589,6 +598,39 @@ public class LeaderAppointer implements Promotable
                     VoltZK.lastKnownLiveNodes, true, e);
         }
         return nodes;
+    }
+
+    /*
+     * Check if the directory specified for the snapshot on partition detection
+     * exists, and has permissions set correctly.
+     */
+    private boolean testPartitionDetectionDirectory(SnapshotSchedule schedule) {
+        if (m_partitionDetectionEnabled) {
+            File partitionPath = new File(schedule.getPath());
+            if (!partitionPath.exists()) {
+                tmLog.error("Directory " + partitionPath + " for partition detection snapshots does not exist");
+                return false;
+            }
+            if (!partitionPath.isDirectory()) {
+                tmLog.error("Directory " + partitionPath + " for partition detection snapshots is not a directory");
+                return false;
+            }
+            File partitionPathFile = new File(partitionPath, Long.toString(System.currentTimeMillis()));
+            try {
+                partitionPathFile.createNewFile();
+                partitionPathFile.delete();
+            } catch (IOException e) {
+                tmLog.error(
+                        "Could not create a test file in " +
+                        partitionPath +
+                        " for partition detection snapshots");
+                e.printStackTrace();
+                return false;
+            }
+            return true;
+        } else {
+            return true;
+        }
     }
 
     /**

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -33,8 +33,6 @@ public interface SystemProcedureExecutionContext {
 
     public long getSpHandleForSnapshotDigest();
 
-    public long getCurrentTxnId();
-
     public long getSiteId();
 
     // does this site have "lowest site id" responsibilities.
@@ -66,10 +64,12 @@ public interface SystemProcedureExecutionContext {
     public boolean updateCatalog(String catalogDiffCommands, CatalogContext context,
             CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation);
 
+    public TheHashinator getCurrentHashinator();
+
     /**
      * Update the EE hashinator with the given configuration.
      */
-    public void updateHashinator(HashinatorConfig config);
+    public void updateHashinator(TheHashinator hashinator);
 
     boolean activateTableStream(int tableId, TableStreamType type, boolean undo, byte[] predicates);
 

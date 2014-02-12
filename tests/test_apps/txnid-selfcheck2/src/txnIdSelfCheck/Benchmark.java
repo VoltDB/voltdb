@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,6 +23,7 @@
 
 package txnIdSelfCheck;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -404,7 +405,8 @@ public class Benchmark {
         long diffInSeconds = (now - lastProgressTimestamp) / 1000;
 
         log.info(String.format("Executed %d%s", txnCount.get(),
-                madeProgress ? "" : " (no progress made in " + diffInSeconds + " seconds)"));
+                madeProgress ? "" : " (no progress made in " + diffInSeconds + " seconds, last at " +
+                        (new SimpleDateFormat("yyyy-MM-DD HH:mm:ss.S")).format(new Date(lastProgressTimestamp)) + ")"));
 
         if (diffInSeconds > config.progresstimeout) {
             log.error("No progress was made in over " + diffInSeconds + " seconds while connected to a cluster. Exiting.");
@@ -477,6 +479,10 @@ public class Benchmark {
         // Run the benchmark loop for the requested duration
         // The throughput may be throttled depending on client configuration
         log.info("Running benchmark...");
+        while (((ClientImpl) client).isHashinatorInitialized() == false) {
+            Thread.sleep(1000);
+            System.out.println("Wait for hashinator..");
+        }
 
         BigTableLoader partitionedLoader = new BigTableLoader(client, "bigp",
                          (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits);
@@ -484,6 +490,13 @@ public class Benchmark {
         BigTableLoader replicatedLoader = new BigTableLoader(client, "bigr",
                          (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits);
         replicatedLoader.start();
+
+        LoadTableLoader plt = new LoadTableLoader(client, "loadp",
+                (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits, false, 0);
+        plt.start();
+        LoadTableLoader rlt = new LoadTableLoader(client, "loadmp",
+                (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, 3, permits, true, -1);
+        rlt.start();
 
         ReadThread readThread = new ReadThread(client, config.threads, config.threadoffset,
                 config.allowinprocadhoc, config.mpratio, permits);
@@ -507,8 +520,14 @@ public class Benchmark {
         log.info("All threads started...");
 
         // subtract time spent initializing threads and starting them
-        Thread.sleep((1000l * config.duration) - (System.currentTimeMillis() - benchmarkStartTS));
+        long rt = (1000l * config.duration) - (System.currentTimeMillis() - benchmarkStartTS);
+        if (rt > 0) {
+            Thread.sleep(rt);
+        }
 
+        log.info("Duration completed shutting down...");
+
+        /* XXX/PSR
         replicatedLoader.shutdown();
         partitionedLoader.shutdown();
         readThread.shutdown();
@@ -522,14 +541,21 @@ public class Benchmark {
         readThread.join();
         adHocMayhemThread.join();
         idpt.join();
+
+        //Shutdown LoadTableLoader
+        rlt.shutdown();
+        plt.shutdown();
+        rlt.join();
+        plt.join();
+
         for (ClientThread clientThread : clientThreads) {
             clientThread.join();
         }
-
+        */
         // cancel periodic stats printing
         timer.cancel();
         checkpointTimer.cancel();
-
+        /*
         shutdown.set(true);
         es.shutdownNow();
 
@@ -537,9 +563,11 @@ public class Benchmark {
         client.drain();
         client.close();
         permitsTimer.cancel();
+        */
 
         log.info(HORIZONTAL_RULE);
         log.info("Benchmark Complete");
+        System.exit(0);
     }
 
     /**

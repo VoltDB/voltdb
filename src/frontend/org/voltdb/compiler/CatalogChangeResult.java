@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,6 +28,7 @@ public class CatalogChangeResult extends AsyncCompilerResult {
     public String encodedDiffCommands;
     public long deploymentCRC;
     public boolean requiresSnapshotIsolation;
+    public boolean worksWithElastic;
     public ProcedureInvocationType invocationType;
     public long originalTxnId;
     public long originalUniqueId;

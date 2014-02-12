@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -43,6 +43,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.join.BalancePartitionsStatistics;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.SaveRestoreBase;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
@@ -50,7 +51,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
 
     private static int SITES = 2;
     private static int HOSTS = 3;
-    private static int KFACTOR = 1;
+    private static int KFACTOR = MiscUtils.isPro() ? 1 : 0;
     private static int PARTITIONS = (SITES * HOSTS) / (KFACTOR + 1);
     private static boolean hasLocalServer = false;
 
@@ -458,6 +459,14 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         // Induce procedure invocations on all partitions.  May fail in non-legacy hashing case
         // this plus R/W replication should ensure that every site on every node runs this transaction
         // at least once
+
+        results = client.callProcedure("@GetPartitionKeys", "INTEGER").getResults();
+        VoltTable keys = results[0];
+        for (int k = 0;k < keys.getRowCount(); k++) {
+            long key = keys.fetchRow(k).getLong(1);
+            client.callProcedure("NEW_ORDER.insert", key);
+        }
+
         for (int i = 0; i < HOSTS * SITES; i++) {
             client.callProcedure("NEW_ORDER.insert", i);
         }
@@ -922,6 +931,11 @@ public class TestStatisticsSuite extends SaveRestoreBase {
 
     public void testSnapshotStatus() throws Exception {
         System.out.println("\n\nTESTING SNAPSHOTSTATUS\n\n\n");
+        if (KFACTOR == 0) {
+            // SnapshotSave is a PRO feature starting from 4.0
+            return;
+        }
+
         Client client  = getFullyConnectedClient();
 
         ColumnInfo[] expectedSchema = new ColumnInfo[14];

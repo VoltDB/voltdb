@@ -7,19 +7,21 @@ import hudson.slaves.*
 def jenkins = jenkins.model.Jenkins.instance;
 
 
-def stack1 = ["volt12a-controller-of-volt12a-b-c-d-e-f", "volt12a","volt12b-RH6","volt12c","volt12d","volt12e-U10.04","volt12f-U10.04"];
-String controller1 = "volt12a-controller-of-volt12a-b-c-d-e-f"
+def stack1 = ["volt12a-controller-of-volt12a-b-c-d-e-f", "volt12a-U12.04","volt12b-RH6","volt12c-RH5","volt12d-U12.04","volt12e-U10.04","volt12f-U10.04"];
+//String controller1 = [ stack1[0] ]
 
-def stack2 = ["volt12i-controller-of-volt12i-j-k-l-m-n", "volt12i","volt12j-RH6","volt12k","volt12l","volt12m-U10.04","volt12n-U10.04"];
-String controller2 = "volt12i-controller-of-volt12i-j-k-l-m-n"
+def stack2 = ["volt12i-controller-of-volt12i-j-k-l-m-n", "volt12i-U12.04","volt12j-RH6","volt12k-U12.04","volt12l-U12.04","volt12m-U10.04","volt12n-U10.04"];
+//String controller2 = [ stack2[0] ]
 
 //def stack3 = [ "volt3j-controller-of-volt3a-b-c-d-e-f-g-h-i", "volt3a","volt3b","volt3c","volt3d","volt3e","volt3f", "volt3g", "volt3h", "volt3i"];
 def stack3 = ["volt3j-controller-of-volt3a-b-c-d-e-f-g-h-i"]
 
-def stack4 = [ "volt12q-controller-of-votl12q-r-s-t-u-v","volt12q-C6","volt12r-C6","volt12s-C6","volt12t-C6","volt12u-C6","volt12v-U10.04"];
-def controller4 = ["volt12q-controller-of-votl12q-r-s-t-u-v"]
+def stack4 = [ "volt12q-controller-of-votl12q-r-s-t-u-v","volt12q-C6","volt12r-C6","volt12s-C6","volt12t-C6","volt12u-C6","volt12v-C6"];
+def controller4 = [ stack4[0] ]
 
+def controller5 = [ "volt13a-controller-of-votl13a-b-c-d-e-f" ]
 
+def controller6 = [ "volt5a-controller-of-volt5b-c-d-volt7b-c-d-frankencluster" ]
 
 void varyHost(host, OfflineIsTrue) {
        slave = Jenkins.instance.getComputer(host)
@@ -64,6 +66,7 @@ void setRotation(hour, stacks) {
          s = it.next()
 
          if (hour.equals("day")) {
+
                // daytime: wait for controller idle, vary slaves online
                if (isIdle(s[0])) {
                   for (h in s.subList(1, s.size())) { varyHost(h, false) }
@@ -98,6 +101,7 @@ void setRotation(hour, stacks) {
 h = new Date().getHours()
 println ("hour: " + h)
 if (h < 17)
-   setRotation("day", [ stack1, stack2, controller4, stack3 ])
+   //setRotation("night", [  stack4 ])
+   setRotation("day", [ stack1, stack2 ])
 else
-   setRotation("night", [ stack1, stack2, stack4, stack3 ])
+   setRotation("night", [ stack1, stack2, stack3, controller6 ]) 

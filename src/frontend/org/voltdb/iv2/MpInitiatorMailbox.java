@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,9 +19,9 @@ package org.voltdb.iv2;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.LinkedTransferQueue;
+import java.util.concurrent.*;
 
+import com.google_voltpatches.common.base.Supplier;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
@@ -81,24 +81,28 @@ public class MpInitiatorMailbox extends InitiatorMailbox
                     "MpInitiator send", 1024 * 128);
 
     @Override
-    public void setRepairAlgo(final RepairAlgo algo)
-    {
-        final CountDownLatch cdl = new CountDownLatch(1);
-        m_taskQueue.offer(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    setRepairAlgoInternal(algo);
-                } finally {
-                    cdl.countDown();
+    public RepairAlgo constructRepairAlgo(final Supplier<List<Long>> survivors, final String whoami) {
+        RepairAlgo ra = null;
+        if (Thread.currentThread().getId() != m_taskThreadId) {
+            FutureTask<RepairAlgo> ft = new FutureTask(new Callable<RepairAlgo>() {
+                @Override
+                public RepairAlgo call() throws Exception {
+                    RepairAlgo ra = new MpPromoteAlgo( survivors.get(), MpInitiatorMailbox.this, whoami);
+                    setRepairAlgoInternal(ra);
+                    return ra;
                 }
+            });
+            m_taskQueue.offer(ft);
+            try {
+                ra = ft.get();
+            } catch (Exception e) {
+                Throwables.propagate(e);
             }
-        });
-        try {
-            cdl.await();
-        } catch (InterruptedException e) {
-            Throwables.propagate(e);
+        } else {
+            ra = new MpPromoteAlgo( survivors.get(), this, whoami);
+            setRepairAlgoInternal(ra);
         }
+        return ra;
     }
 
     @Override

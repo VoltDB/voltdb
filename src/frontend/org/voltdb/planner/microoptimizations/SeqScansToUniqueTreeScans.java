@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,6 +27,7 @@ import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.SortDirectionType;
@@ -46,8 +47,9 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
      * Only applies when stronger determinism is needed.
      */
     @Override
-    boolean shouldRun(DeterminismMode detMode) {
-        return detMode != DeterminismMode.FASTER;
+    boolean shouldRun(DeterminismMode detMode, boolean hasDeterministicStatement)
+    {
+        return ( ! hasDeterministicStatement) && detMode != DeterminismMode.FASTER;
     }
 
     @Override
@@ -55,14 +57,13 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
         this.m_parsedStmt = parsedStmt;
         ArrayList<CompiledPlan> retval = new ArrayList<CompiledPlan>();
 
-        //TODO: This should not further penalize seqscan plans that have
-        // already been post-sorted into strict order determinism,
-        // so, check first for plan.isOrderDeterministic()?
+        // The statement is already known NOT to be inherently order deterministic.
+        // Some PLANs for a non-ordered query may turn out to be deterministic anyway.
+        // So, check first.
         AbstractPlanNode planGraph = plan.rootPlanGraph;
 
-        if (!plan.isOrderDeterministic()) {
-            planGraph = recursivelyApply(planGraph);
-            plan.rootPlanGraph = planGraph;
+        if ( ! planGraph.isOrderDeterministic()) {
+            plan.rootPlanGraph = recursivelyApply(planGraph);
         }
 
         retval.add(plan);
@@ -75,7 +76,13 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
 
         // depth first:
         //     Find Sequential Scan node.
-        //     Replace any unique tree index scan if possible.
+        //     Replace with any unique tree index scan if possible.
+
+        // Skip the collector fragment because its result will get aggregated
+        // in a non-deterministic order regardless of the original scan ordering.
+        if (plan instanceof ReceivePlanNode) {
+            return plan;
+        }
 
         ArrayList<AbstractPlanNode> children = new ArrayList<AbstractPlanNode>();
 
@@ -91,11 +98,11 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
                 continue;
             }
             boolean replaced = plan.replaceChild(child, newChild);
-            assert(true == replaced);
+            assert(replaced);
         }
 
         // skip the meat if this isn't a scan node
-        if ((plan instanceof SeqScanPlanNode) == false) {
+        if ( ! (plan instanceof SeqScanPlanNode)) {
             return plan;
         }
         assert(plan.getChildCount() == 0);
@@ -140,7 +147,6 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
 
         // make an index node from the scan node
         IndexScanPlanNode indexScanNode = new IndexScanPlanNode(scanNode, null, indexToScan, SortDirectionType.ASC);
-        indexScanNode.setKeyIterate(true);
         indexScanNode.setForDeterminismOnly();
 
         return indexScanNode;

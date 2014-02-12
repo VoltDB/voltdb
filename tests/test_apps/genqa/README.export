@@ -50,3 +50,4 @@ TO RUN onserver Export Client to connect to JDBC (postgresql):
     -- Run the export client:
     ./run.sh async-export
     -- Verify in postgresql a schema with name vexport has tables. and table has data. (TODO)
+    -- Verify update catalog keeps export going. (TODO)

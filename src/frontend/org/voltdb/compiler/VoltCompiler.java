@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -777,7 +777,7 @@ public class VoltCompiler {
             // add the file object's path to the list of files for the jar
             m_ddlFilePaths.put(schemaFile.getName(), schemaFile.getPath());
 
-            ddlcompiler.loadSchema(schemaFile.getAbsolutePath(), db);
+            ddlcompiler.loadSchema(schemaFile.getAbsolutePath(), db, whichProcs);
         }
 
         ddlcompiler.compileToCatalog(db);

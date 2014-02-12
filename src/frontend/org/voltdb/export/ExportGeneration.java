@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -159,12 +159,20 @@ public class ExportGeneration {
      * @param exportOverflowDirectory
      * @throws IOException
      */
-    public ExportGeneration(long txnId, Runnable onAllSourcesDrained, File exportOverflowDirectory) throws IOException {
+    public ExportGeneration(long txnId, Runnable onAllSourcesDrained, File exportOverflowDirectory, boolean isRejoin) throws IOException {
         m_onAllSourcesDrained = onAllSourcesDrained;
         m_timestamp = txnId;
-        m_directory = new File(exportOverflowDirectory, Long.toString(txnId) );
-        if (!m_directory.mkdirs()) {
-            throw new IOException("Could not create " + m_directory);
+        m_directory = new File(exportOverflowDirectory, Long.toString(txnId));
+        if (!isRejoin) {
+            if (!m_directory.mkdirs()) {
+                throw new IOException("Could not create " + m_directory);
+            }
+        } else {
+            if (!m_directory.canWrite()) {
+                if (!m_directory.mkdirs()) {
+                    throw new IOException("Could not create " + m_directory);
+                }
+            }
         }
         exportLog.info("Creating new export generation " + m_timestamp);
     }

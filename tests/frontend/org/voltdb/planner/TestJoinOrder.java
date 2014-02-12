@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -63,11 +63,81 @@ public class TestJoinOrder extends PlannerTestCase {
                 n = node.getChild(0);
             }
         }
+
+        pn = compileSPWithJoinOrder("select * from T1, T2 where A=B", "  T1  ,  T2  ");
+        /* DEBUG */ System.out.println(pn.toExplainPlanString());
+        n = pn.getChild(0).getChild(0);
+        assertEquals("T1", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
+        assertEquals("T2", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
+
+        pn = compileSPWithJoinOrder("select * from T1, T2 where A=B", "  T2,T1  ");
+        n = pn.getChild(0).getChild(0);
+        assertEquals("T2", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
+        assertEquals("T1", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
+
+        // Don't mind a trailing comma -- even when followed by space.
+        pn = compileSPWithJoinOrder("select * from T1, T2 where A=B", "T2,T1,  ");
+        n = pn.getChild(0).getChild(0);
+        assertEquals("T2", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
+        assertEquals("T1", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
+
+        pn = compileSPWithJoinOrder("select * from T1, T2 where A=B", "T1,T2,");
+        n = pn.getChild(0).getChild(0);
+        assertEquals("T1", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
+        assertEquals("T2", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
+
+        try {
+            // Wants alias "T2", not bogus "Z"
+            compileWithInvalidJoinOrder("select * from T1, T2 where A=B", "T1,Z");
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().indexOf(" doesn't exist ") != -1);
+        }
+
+        try {
+            // Wants comma, not semicolon -- does not parse the correct number of symbols.
+            // The parser may give a smarter message in the future.
+            compileWithInvalidJoinOrder("select * from T1, T2 where A=B", "T1;T2");
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().indexOf(" does not contain the correct number of elements") != -1);
+        }
+
+        try {
+            // Wants comma, not double comma -- does not parse the correct number of symbols.
+            // The parser may give a smarter message in the future.
+            compileWithInvalidJoinOrder("select * from T1, T2 where A=B", "T1,,T2");
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().indexOf(" does not contain the correct number of elements") != -1);
+        }
+
+        try {
+            // Does not want leading comma -- does not parse the correct number of symbols.
+            // The parser may give a smarter message in the future.
+            compileWithInvalidJoinOrder("select * from T1, T2 where A=B", ",T1,T2");
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().indexOf(" does not contain the correct number of elements") != -1);
+        }
+
+        try {
+            // Does not want leading comma after whitespace
+            // -- does not parse the correct number of symbols.
+            // The parser may give a smarter message in the future.
+            compileWithInvalidJoinOrder("select * from T1, T2 where A=B", " ,T1,T2");
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().indexOf(" does not contain the correct number of elements") != -1);
+        }
     }
 
     public void testAliasJoinOrder() {
-        List<AbstractPlanNode> pns = compileWithJoinOrderToFragments("select * from P1 X, P2 Y where A=B", "X,Y");
-        AbstractPlanNode n = pns.get(1).getChild(0);
+        List<AbstractPlanNode> pns;
+        AbstractPlanNode n;
+
+        pns = compileWithJoinOrderToFragments("select * from P1 X, P2 Y where A=B", "X,Y");
+        n = pns.get(1).getChild(0);
         assertEquals("P1", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
         assertEquals("P2", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
 
@@ -80,6 +150,64 @@ public class TestJoinOrder extends PlannerTestCase {
         n = pns.get(1).getChild(0);
         assertEquals("P1", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
         assertEquals("P1", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
+
+        // Test case insensitivity in table and alias names
+
+        pns = compileWithJoinOrderToFragments("select * from P1 x, P2 Y where A=B", "X,y");
+        n = pns.get(1).getChild(0);
+        assertEquals("P1", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
+        assertEquals("P2", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
+
+        pns = compileWithJoinOrderToFragments("select * from P1 x, P2 Y where A=B", "y,X");
+        n = pns.get(1).getChild(0);
+        assertEquals("P2", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
+        assertEquals("P1", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
+
+        pns = compileWithJoinOrderToFragments("select * from P1 , P1 YY where P1.A=YY.A", "P1,yY");
+        n = pns.get(1).getChild(0);
+        assertEquals("P1", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
+        assertEquals("P1", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
+
+        pns = compileWithJoinOrderToFragments("select * from P1 , P1 Yy where P1.A=Yy.A", "p1,YY");
+        n = pns.get(1).getChild(0);
+        assertEquals("P1", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
+        assertEquals("P1", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
+
+        try {
+            // Wants alias "Y", not bogus "Z"
+            compileWithInvalidJoinOrder("select * from P1 x, P2 Y where A=B", "x,Z");
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().indexOf(" doesn't exist ") != -1);
+        }
+
+        try {
+            // Wants alias "Y", not raw table name
+            // -- in the future, this may get a specialized message -- or may just be allowed
+            compileWithInvalidJoinOrder("select * from P1 x, P2 Y where A=B", "x,P2");
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().indexOf(" doesn't exist ") != -1);
+        }
+
+        try {
+            // Wants alias "Y", not raw table name (which is arguably ambiguous in this case).
+            // -- in the future, this may get a specialized message -- or may just be allowed
+            compileWithInvalidJoinOrder("select * from P1 x, P1 Y where x.A=Y.A", "x,P1");
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().indexOf(" doesn't exist ") != -1);
+        }
+
+        try {
+            // Wants aliases "x,Y", not raw table names (which are definitely ambiguous in this case).
+            // -- in the future, this may get a specialized message -- or may just be allowed
+            compileWithInvalidJoinOrder("select * from P1 x, P1 Y where x.A=Y.A", "P1,P1");
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().indexOf(" contains a duplicate element ") != -1);
+        }
+
     }
 
     public void testOuterJoinOrder() {
@@ -97,10 +225,22 @@ public class TestJoinOrder extends PlannerTestCase {
     }
 
     public void testMicroOptimizationJoinOrder() {
-        List<AbstractPlanNode> pns = compileWithJoinOrderToFragments("select * from J1, P2 where A=B", "J1, P2");
-        AbstractPlanNode n = pns.get(1).getChild(0);
+        // Microoptimization can be used for determinism only when working with replicated tables or
+        // single-partition queries.
+        List<AbstractPlanNode> pns;
+        AbstractPlanNode n;
+
+        pns = compileWithJoinOrderToFragments("select * from J1, P2 where A=B and A=1", "J1, P2");
+        n = pns.get(0).getChild(0).getChild(0);
         assertTrue(((IndexScanPlanNode)n.getChild(0)).getTargetTableName().equals("J1"));
         assertTrue(((SeqScanPlanNode)n.getChild(1)).getTargetTableName().equals("P2"));
+
+        pns = compileWithJoinOrderToFragments("select * from I1, T2 where A=B", "I1, T2");
+        /*/ to debug */ System.out.println(pns.get(0).toExplainPlanString());
+        n = pns.get(0).getChild(0).getChild(0);
+        assertTrue(((IndexScanPlanNode)n.getChild(0)).getTargetTableName().equals("I1"));
+        assertTrue(((SeqScanPlanNode)n.getChild(1)).getTargetTableName().equals("T2"));
+
     }
 
     public void testInnerOuterJoinOrder() {
@@ -144,7 +284,7 @@ public class TestJoinOrder extends PlannerTestCase {
                     "T1, T2, T3, T4, T5, T7");
             fail();
         } catch (Exception ex) {
-            assertTrue(ex.getMessage().indexOf("does not contain the correct number of tables") != -1);
+            assertTrue(ex.getMessage().indexOf(" does not contain the correct number of elements") != -1);
         }
 
         try {
@@ -152,7 +292,7 @@ public class TestJoinOrder extends PlannerTestCase {
                     "T1, T2, T3, T4, T5, T7, T6, T8");
             fail();
         } catch (Exception ex) {
-            assertTrue(ex.getMessage().indexOf("does not contain the correct number of tables") != -1);
+            assertTrue(ex.getMessage().indexOf(" does not contain the correct number of elements") != -1);
         }
     }
 

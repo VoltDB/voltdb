@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,6 +26,9 @@ package org.voltdb.client;
  */
 public class ClientStatusListenerExt {
 
+    /**
+     * Cause of the disconnection event.
+     */
     public static enum DisconnectCause {
         /** Connection timed out */
         TIMEOUT,
@@ -35,7 +38,8 @@ public class ClientStatusListenerExt {
 
     /**
      * Notify listeners that a connection to a host was lost.
-     * @param hostname Name of the host the connect was lost to
+     * @param hostname Name of the host the connection was lost from.
+     * @param port Port number of the connection to the lost host.
      * @param connectionsLeft Number of remaining connections this client has to the DB
      * @param cause The reason why this callback is being called
      */

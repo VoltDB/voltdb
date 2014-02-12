@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -38,6 +38,7 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.TimestampType;
 
@@ -495,13 +496,13 @@ public class TestCSVLoader extends TestCase {
         };
         //Both \N and \\N as csv input are treated as NULL
         String []myData = {
-                "1,\\" + VoltTable.CSV_NULL        + ",1,11111111,\"\"NULL\"\",1.10,1.11",
-                "2," + VoltTable.QUOTED_CSV_NULL + ",1,11111111,\"NULL\",1.10,1.11",
-                "3," + VoltTable.CSV_NULL        + ",1,11111111,  \\" + VoltTable.CSV_NULL        + "  ,1.10,1.11",
-                "4," + VoltTable.CSV_NULL        + ",1,11111111,  " + VoltTable.QUOTED_CSV_NULL + "  ,1.10,1.11",
-                "5,\\" + VoltTable.CSV_NULL        + ",1,11111111, \"  \\" + VoltTable.CSV_NULL   + "  \",1.10,1.11",
-                "6,\\" + VoltTable.CSV_NULL        + ",1,11111111, \"  \\" + VoltTable.CSV_NULL  + " L \",1.10,1.11",
-                "7,\\" + VoltTable.CSV_NULL        + ",1,11111111,  \"abc\\" + VoltTable.CSV_NULL + "\"  ,1.10,1.11"
+                "1,\\" + Constants.CSV_NULL        + ",1,11111111,\"\"NULL\"\",1.10,1.11",
+                "2," + Constants.QUOTED_CSV_NULL + ",1,11111111,\"NULL\",1.10,1.11",
+                "3," + Constants.CSV_NULL        + ",1,11111111,  \\" + Constants.CSV_NULL        + "  ,1.10,1.11",
+                "4," + Constants.CSV_NULL        + ",1,11111111,  " + Constants.QUOTED_CSV_NULL + "  ,1.10,1.11",
+                "5,\\" + Constants.CSV_NULL        + ",1,11111111, \"  \\" + Constants.CSV_NULL   + "  \",1.10,1.11",
+                "6,\\" + Constants.CSV_NULL        + ",1,11111111, \"  \\" + Constants.CSV_NULL  + " L \",1.10,1.11",
+                "7,\\" + Constants.CSV_NULL        + ",1,11111111,  \"abc\\" + Constants.CSV_NULL + "\"  ,1.10,1.11"
         };
         int invalidLineCnt = 0;
         int validLineCnt = myData.length - invalidLineCnt;

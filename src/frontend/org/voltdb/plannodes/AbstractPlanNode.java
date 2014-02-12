@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -48,6 +48,18 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * all PlanNodes will have a unique id
      */
     private static int NEXT_PLAN_NODE_ID = 1;
+
+    // Keep this flag turned off in production or when testing user-accessible EXPLAIN output or when
+    // using EXPLAIN output to validate plans.
+    protected static boolean m_verboseExplainForDebugging = false; // CODE REVIEWER! this SHOULD be false!
+    public static void enableVerboseExplainForDebugging() { m_verboseExplainForDebugging = true; }
+    public static boolean disableVerboseExplainForDebugging()
+    {
+        boolean was = m_verboseExplainForDebugging;
+        m_verboseExplainForDebugging = false;
+        return was;
+    }
+    public static void restoreVerboseExplainForDebugging(boolean was) { m_verboseExplainForDebugging = was; }
 
     /*
      * IDs only need to be unique for a single plan.
@@ -264,22 +276,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         for (AbstractPlanNode child : m_children) {
             if (! child.isOrderDeterministic()) {
                 m_nondeterminismDetail = child.m_nondeterminismDetail;
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * Does the (sub)plan guarantee an identical result/effect (except possibly for ordering)
-     * when "replayed" against the same database state, such as during replication or CL recovery.
-     * @return
-     */
-    public boolean isContentDeterministic() {
-        // Leaf nodes need to re-implement this test.
-        assert(m_children != null);
-        for (AbstractPlanNode child : m_children) {
-            if (! child.isContentDeterministic()) {
                 return false;
             }
         }
@@ -768,11 +764,14 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
         stringer.endArray(); //end inlineNodes
 
+        outputSchemaToJSON(stringer);
+    }
+
+    private void outputSchemaToJSON(JSONStringer stringer) throws JSONException {
         if (m_hasSignificantOutputSchema) {
             stringer.key(Members.OUTPUT_SCHEMA.name());
             stringer.array();
-            for (int col = 0; col < m_outputSchema.getColumns().size(); col++) {
-                SchemaColumn column = m_outputSchema.getColumns().get(col);
+            for (SchemaColumn column : m_outputSchema.getColumns()) {
                 column.toJSONString(stringer);
             }
             stringer.endArray();
@@ -786,9 +785,30 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     public void explainPlan_recurse(StringBuilder sb, String indent) {
-        // skip projection nodes basically (they're boring as all get out)
+        if (m_verboseExplainForDebugging && m_hasSignificantOutputSchema) {
+            sb.append(indent + "Detailed Output Schema: ");
+            JSONStringer stringer = new JSONStringer();
+            try
+            {
+                stringer.object();
+                outputSchemaToJSON(stringer);
+                stringer.endObject();
+                sb.append(stringer.toString());
+            }
+            catch (Exception e)
+            {
+                sb.append(indent + "CORRUPTED beyond the ability to format? " + e);
+                e.printStackTrace();
+            }
+            sb.append(indent + "from\n");
+        }
         String extraIndent = " ";
+        // Except when verbosely debugging,
+        // skip projection nodes basically (they're boring as all get out)
         if (getPlanNodeType() == PlanNodeType.PROJECTION) {
+            if (m_verboseExplainForDebugging) {
+                sb.append(indent + "PROJECTION\n");
+            }
             extraIndent = "";
         }
         else {

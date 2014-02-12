@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -113,6 +113,7 @@ import org.voltdb.types.IndexType;
 import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
+import org.voltdb.SystemProcedureCatalog;
 
 /**
  *
@@ -983,6 +984,8 @@ public abstract class CatalogUtil {
             catDeployment.getSystemsettings().add("systemsettings");
         int maxtemptablesize = 100;
         int snapshotpriority = 6;
+        int elasticPauseTime = 50;
+        int elasticThroughput = 2;
         if (deployment.getSystemsettings() != null)
         {
             Temptables temptables = deployment.getSystemsettings().getTemptables();
@@ -994,9 +997,16 @@ public abstract class CatalogUtil {
             if (snapshot != null) {
                 snapshotpriority = snapshot.getPriority();
             }
+            SystemSettingsType.Elastic elastic = deployment.getSystemsettings().getElastic();
+            if (elastic != null) {
+                elasticPauseTime = deployment.getSystemsettings().getElastic().getDuration();
+                elasticThroughput = deployment.getSystemsettings().getElastic().getThroughput();
+            }
         }
         syssettings.setMaxtemptablesize(maxtemptablesize);
         syssettings.setSnapshotpriority(snapshotpriority);
+        syssettings.setElasticpausetime(elasticPauseTime);
+        syssettings.setElasticthroughput(elasticThroughput);
     }
 
     private static void validateDirectory(String type, File path, boolean crashOnFailedValidation) {
@@ -1680,4 +1690,23 @@ public abstract class CatalogUtil {
 
         return indexSize;
     }
+
+    /**
+     * Return if given proc is durable if its a sysproc SystemProcedureCatalog is consulted. All non sys procs are all
+     * durable.
+     *
+     * @param procName
+     * @return true if proc is durable for non sys procs return true (durable)
+     */
+    public static boolean isDurableProc(String procName) {
+        //For sysprocs look at sysproc catalog.
+        if (procName.charAt(0) == '@') {
+            SystemProcedureCatalog.Config sysProc = SystemProcedureCatalog.listing.get(procName);
+            if (sysProc != null) {
+                return sysProc.isDurable();
+            }
+        }
+        return true;
+    }
+
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -51,6 +51,7 @@
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "execution/VoltDBEngine.h"
+#include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/tuplevalueexpression.h"
 #include "plannodes/nestloopindexnode.h"
@@ -122,13 +123,12 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     output_table = dynamic_cast<TempTable*>(node->getOutputTable());
     assert(output_table);
 
-    inner_table = dynamic_cast<PersistentTable*>(inline_node->getTargetTable());
-    assert(inner_table);
-
     assert(node->getInputTables().size() == 1);
     outer_table = node->getInputTables()[0];
     assert(outer_table);
 
+    inner_table = dynamic_cast<PersistentTable*>(inline_node->getTargetTable());
+    assert(inner_table);
     //
     // Grab the Index from our inner table
     // We'll throw an error if the index is missing
@@ -157,12 +157,31 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     return true;
 }
 
+void NestLoopIndexExecutor::updateTargetTableAndIndex() {
+    inner_table = dynamic_cast<PersistentTable*>(inline_node->getTargetTable());
+    assert(inner_table);
+
+    index = inner_table->index(inline_node->getTargetIndexName());
+    assert(index);
+
+    // NULL tuple for outer join
+    if (node->getJoinType() == JOIN_TYPE_LEFT) {
+        Table* inner_out_table = inline_node->getOutputTable();
+        assert(inner_out_table);
+        m_null_tuple.init(inner_out_table->schema());
+    }
+
+    index_values = TableTuple(index->getKeySchema());
+    index_values.move( index_values_backing_store - TUPLE_HEADER_SIZE);
+    index_values.setAllNulls();
+}
+
 bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
 {
     assert (node == dynamic_cast<NestLoopIndexPlanNode*>(m_abstractNode));
     assert(node);
-    assert (inline_node == dynamic_cast<IndexScanPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_INDEXSCAN)));
-    assert(inline_node);
+
+    updateTargetTableAndIndex();
 
     assert (output_table == dynamic_cast<TempTable*>(node->getOutputTable()));
     assert(output_table);
@@ -259,12 +278,12 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     TableTuple null_tuple = m_null_tuple;
     int num_of_inner_cols = (join_type == JOIN_TYPE_LEFT)? null_tuple.sizeInValues() : 0;
 
-    m_engine->setLastAccessedTable(inner_table);
+    ProgressMonitorProxy pmp(m_engine, inner_table);
     VOLT_TRACE("<num_of_outer_cols>: %d\n", num_of_outer_cols);
     while ((limit == -1 || tuple_ctr < limit) && outer_iterator.next(outer_tuple)) {
         VOLT_TRACE("outer_tuple:%s",
                    outer_tuple.debug(outer_table->name()).c_str());
-        m_engine->noteTuplesProcessedForProgressMonitoring(1);
+        pmp.countdownProgress();
         // Set the outer tuple columns. Must be outside the inner loop
         // in case of the empty inner table
         join_tuple.setNValues(0, outer_tuple, 0, num_of_outer_cols);
@@ -404,7 +423,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                             index->moveToEnd(false);
                         } else {
                             while (!(inner_tuple = index->nextValue()).isNullTuple()) {
-                                m_engine->noteTuplesProcessedForProgressMonitoring(1);
+                                pmp.countdownProgress();
                                 if (initial_expression != NULL && !initial_expression->eval(&outer_tuple, &inner_tuple).isTrue()) {
                                     // just passed the first failed entry, so move 2 backward
                                     index->moveToBeforePriorEntry();
@@ -434,7 +453,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                 {
                     VOLT_TRACE("inner_tuple:%s",
                                inner_tuple.debug(inner_table->name()).c_str());
-                    m_engine->noteTuplesProcessedForProgressMonitoring(1);
+                    pmp.countdownProgress();
 
                     //
                     // First check to eliminate the null index rows for UNDERFLOW case only
@@ -492,6 +511,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                             VOLT_TRACE("MATCH: %s",
                                    join_tuple.debug(output_table->name()).c_str());
                             output_table->insertTupleNonVirtual(join_tuple);
+                            pmp.countdownProgress();
                         }
                     }
                 }
@@ -510,6 +530,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                 ++tuple_ctr;
                 join_tuple.setNValues(num_of_outer_cols, m_null_tuple, 0, num_of_inner_cols);
                 output_table->insertTupleNonVirtual(join_tuple);
+                pmp.countdownProgress();
             }
         }
     }

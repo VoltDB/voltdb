@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -97,22 +97,6 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                                     " in table: " + m_targetTableName + " refers to " +
                                     " table: " + col.getTableName());
             }
-        }
-    }
-
-    /**
-     * Does the plan guarantee an identical result/effect
-     * when "replayed" against the same database state, such as during replication or CL recovery.
-     * @return true unless the scan has an inline limit and no particular order.
-     */
-    @Override
-    public boolean isContentDeterministic() {
-        AbstractPlanNode limit = this.getInlinePlanNode(PlanNodeType.LIMIT);
-        if ((limit == null) || isOrderDeterministic()) {
-            return true;
-        } else {
-            m_nondeterminismDetail = "a limit on an unordered scan may return different rows";
-            return false;
         }
     }
 

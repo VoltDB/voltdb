@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -410,8 +410,14 @@ public class MiscUtils {
         return "";
     }
 
+    // cache whether we're running pro code
+    private static Boolean m_isPro = null;
+    // check if we're running pro code
     public static boolean isPro() {
-        return null != MiscUtils.loadProClass("org.voltdb.CommandLogImpl", "Command logging", true);
+        if (m_isPro == null) {
+            m_isPro = null != MiscUtils.loadProClass("org.voltdb.CommandLogImpl", "Command logging", true);
+        }
+        return m_isPro.booleanValue();
     }
 
     /**
@@ -430,6 +436,15 @@ public class MiscUtils {
      */
     public static int getPortFromHostnameColonPort(String server, int defaultPort) {
         return HostAndPort.fromString(server).getPortOrDefault(defaultPort);
+    }
+
+    /**
+     * @param server String containing a hostname/ip, or a hostname/ip:port.
+     * @param defaultPort If a port isn't specified, use this one.
+     * @return HostAndPort number.
+     */
+    public static HostAndPort getHostAndPortFromHostnameColonPort(String server, int defaultPort) {
+        return HostAndPort.fromString(server).withDefaultPort(defaultPort);
     }
 
     /**

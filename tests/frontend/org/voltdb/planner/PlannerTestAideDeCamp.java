@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -169,19 +169,6 @@ public class PlannerTestAideDeCamp {
             catalogParam.setJavatype(pve.getValueType().getValue());
             catalogParam.setIsarray(pve.getParamIsVector());
             catalogParam.setIndex(i);
-        }
-
-        // Output Columns
-        int index = 0;
-        for (SchemaColumn col : plan.columns.getColumns())
-        {
-            Column catColumn = catalogStmt.getOutput_columns().add(String.valueOf(index));
-            catColumn.setNullable(false);
-            catColumn.setIndex(index);
-            catColumn.setName(col.getColumnName());
-            catColumn.setType(col.getType().getValue());
-            catColumn.setSize(col.getSize());
-            index++;
         }
 
         List<PlanNodeList> nodeLists = new ArrayList<PlanNodeList>();

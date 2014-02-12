@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -206,7 +206,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         container.b.putInt(container.b.remaining() - 4);
         container.b.position(0);
 
-        final byte schemaBytes[] = schemaTable.getSchemaBytes();
+        final byte schemaBytes[] = PrivateVoltTableFactory.getSchemaBytes(schemaTable);
 
         final PureJavaCrc32 crc = new PureJavaCrc32();
         ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b.remaining() + schemaBytes.length);
@@ -258,7 +258,11 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     try {
                         m_channel.force(false);
                     } catch (IOException e) {
-                        SNAP_LOG.error("Error syncing snapshot", e);
+                        if (!(e instanceof java.nio.channels.AsynchronousCloseException )) {
+                            SNAP_LOG.error("Error syncing snapshot", e);
+                        } else {
+                            SNAP_LOG.debug("Asynchronous close syncing snasphot data, presumably graceful", e);
+                        }
                     }
                     m_bytesAllowedBeforeSync.release(bytesSinceLastSync);
                 }

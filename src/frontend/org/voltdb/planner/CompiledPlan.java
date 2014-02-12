@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -74,9 +74,6 @@ public class CompiledPlan {
     /** Parameter values, if the planner pulled constants out of the plan */
     public ParameterSet extractedParamValues = ParameterSet.emptyParameterSet();
 
-    /** A list of output column ids, indexes and types */
-    public NodeSchema columns = new NodeSchema();
-
     public ParsedSelectStmt  selectStmt = null;
 
     /**
@@ -90,9 +87,9 @@ public class CompiledPlan {
     public boolean readOnly = false;
 
     /**
-     * Whether the plan's statement mandates a result with deterministic content;
+     * Whether the plan's statement mandates a result with nondeterministic content;
      */
-    private boolean m_statementIsContentDeterministic = false;
+    private boolean m_statementHasLimitOrOffset = false;
 
     /**
      * Whether the plan's statement mandates a result with deterministic content and order;
@@ -130,18 +127,9 @@ public class CompiledPlan {
      * Mark the level of result determinism imposed by the statement,
      * which can save us from a difficult determination based on the plan graph.
      */
-    public void statementGuaranteesDeterminism(boolean content, boolean order) {
-        if (order) {
-            // Can't be order-deterministic without also being content-deterministic.
-            assert (content);
-            m_statementIsContentDeterministic = true;
-            m_statementIsOrderDeterministic = true;
-        } else {
-            assert (m_statementIsOrderDeterministic == false);
-            if (content) {
-                m_statementIsContentDeterministic = true;
-            }
-        }
+    public void statementGuaranteesDeterminism(boolean hasLimitOrOffset, boolean order) {
+        m_statementHasLimitOrOffset = hasLimitOrOffset;
+        m_statementIsOrderDeterministic = order;
     }
 
     /**
@@ -157,15 +145,21 @@ public class CompiledPlan {
     }
 
     /**
+     * Accessor for flag marking the original statement as guaranteeing an identical result/effect
+     * when "replayed" against the same database state, such as during replication or CL recovery.
+     */
+    public boolean hasDeterministicStatement()
+    {
+        return m_statementIsOrderDeterministic;
+    }
+
+    /**
      * Accessor for flag marking the plan as guaranteeing an identical result/effect
      * when "replayed" against the same database state, such as during replication or CL recovery.
      * @return the corresponding value from the first fragment
      */
-    public boolean isContentDeterministic() {
-        if (m_statementIsContentDeterministic) {
-            return true;
-        }
-        return rootPlanGraph.isContentDeterministic();
+    public boolean hasLimitOrOffset() {
+        return m_statementHasLimitOrOffset;
     }
 
     /**

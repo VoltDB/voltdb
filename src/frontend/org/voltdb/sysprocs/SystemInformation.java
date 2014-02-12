@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -399,9 +399,8 @@ public class SystemInformation extends VoltSystemProcedure
         results.addRow("sitesperhost", Integer.toString(deploy.getSitesperhost()));
 
         String http_enabled = "false";
-        int http_port = cluster.getHttpdportno();
-        if (http_port != -1)
-        {
+        int http_port = VoltDB.instance().getConfig().m_httpPort;
+        if (http_port != -1 && http_port != Integer.MAX_VALUE) {
             http_enabled = "true";
             results.addRow("httpport", Integer.toString(http_port));
         }
@@ -453,7 +452,7 @@ public class SystemInformation extends VoltSystemProcedure
 
         results.addRow("heartbeattimeout", Integer.toString(cluster.getHeartbeattimeout()));
 
-        results.addRow("adminport", Integer.toString(cluster.getAdminport()));
+        results.addRow("adminport", Integer.toString(VoltDB.instance().getConfig().m_adminPort));
         String adminstartup = "false";
         if (cluster.getAdminstartup())
         {

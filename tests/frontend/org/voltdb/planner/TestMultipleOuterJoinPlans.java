@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -269,9 +269,11 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
       c = n.getChild(0);
       assertTrue(c instanceof NestLoopIndexPlanNode);
 
-      // R3.A and P2.A have an index. P2,R1 is NLJ/IndexScan because it's an outer join and P2 is distributed
+      // R3.A has an index. R3,P2 is NLJ because it's an outer join and P2 is distributed
       lpn = compileToFragments("select *  FROM R3,R1 LEFT JOIN P2 ON R3.A = P2.A WHERE R3.A=R1.A ");
       assertTrue(lpn.size() == 2);
+      // to debug */ System.out.println("DEBUG 0.0: " + lpn.get(0).toExplainPlanString());
+      // to debug */ System.out.println("DEBUG 0.1: " + lpn.get(1).toExplainPlanString());
       n = lpn.get(0).getChild(0).getChild(0);
       assertTrue(n instanceof NestLoopPlanNode);
       assertTrue(JoinType.LEFT == ((NestLoopPlanNode) n).getJoinType());
@@ -281,11 +283,13 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
       c = n.getChild(1);
       assertTrue(c instanceof ReceivePlanNode);
       n = lpn.get(1).getChild(0);
-      assertTrue(n instanceof IndexScanPlanNode);
+      assertTrue(n instanceof SeqScanPlanNode);
 
-      // R3.A and P2.A have an index. P2,R1 is NLJ/IndexScan because P2 is distributed and it's an outer join
+      // R3.A has an index. P2,R1 is NLJ because P2 is distributed and it's an outer join
       lpn = compileToFragments("select *  FROM R1 LEFT JOIN P2 ON R1.A = P2.A, R3 WHERE R1.A=R3.A ");
       assertTrue(lpn.size() == 2);
+      // to debug */ System.out.println("DEBUG 1.0: " + lpn.get(0).toExplainPlanString());
+      // to debug */ System.out.println("DEBUG 1.1: " + lpn.get(1).toExplainPlanString());
       n = lpn.get(0).getChild(0).getChild(0);
       assertTrue(n instanceof NestLoopIndexPlanNode);
       assertTrue(JoinType.INNER == ((NestLoopIndexPlanNode) n).getJoinType());
@@ -296,7 +300,7 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
       c = n.getChild(1);
       assertTrue(c instanceof ReceivePlanNode);
       n = lpn.get(1).getChild(0);
-      assertTrue(n instanceof IndexScanPlanNode);
+      assertTrue(n instanceof SeqScanPlanNode);
 
       // Two distributed table
       lpn = compileToFragments("select *  FROM R3,P1 LEFT JOIN P2 ON R3.A = P2.A WHERE R3.A=P1.A ");

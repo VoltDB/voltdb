@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -55,13 +55,13 @@ using namespace voltdb;
 AbstractScanPlanNode::AbstractScanPlanNode(int32_t id)
     : AbstractPlanNode(id), m_predicate(NULL)
 {
-    m_targetTable = NULL;
+    m_tcd = NULL;
 }
 
 AbstractScanPlanNode::AbstractScanPlanNode()
     : AbstractPlanNode(), m_predicate(NULL)
 {
-    m_targetTable = NULL;
+    m_tcd = NULL;
 }
 
 AbstractScanPlanNode::~AbstractScanPlanNode()
@@ -89,13 +89,16 @@ AbstractScanPlanNode::getPredicate() const
 Table*
 AbstractScanPlanNode::getTargetTable() const
 {
-    return m_targetTable;
+    if (m_tcd == NULL) {
+        return NULL;
+    }
+    return m_tcd->getTable();
 }
 
 void
-AbstractScanPlanNode::setTargetTable(Table* table)
+AbstractScanPlanNode::setTargetTableDelegate(TableCatalogDelegate* tcd)
 {
-    m_targetTable = table;
+    m_tcd = tcd;
 }
 
 string

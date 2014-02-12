@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -77,9 +77,9 @@ class MockTopend : public Topend {
         return 0;
     }
 
-    virtual bool fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
+    virtual int64_t fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
             std::string targetTableName, int64_t targetTableSize, int64_t tuplesFound) {
-        return false;
+        return 1000000000; // larger means less likely/frequent callbacks to ignore
     }
 
     virtual std::string planForFragmentId(int64_t fragmentId) {

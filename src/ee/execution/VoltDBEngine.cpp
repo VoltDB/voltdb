@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -92,7 +92,6 @@
 #include "storage/TableCatalogDelegate.hpp"
 #include "org_voltdb_jni_ExecutionEngine.h" // to use static values
 #include "stats/StatsAgent.h"
-#include "voltdbipc.h"
 #include "common/FailureInjection.h"
 
 #include <iostream>
@@ -112,7 +111,15 @@ namespace voltdb {
 const int64_t AD_HOC_FRAG_ID = -1;
 
 VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
-    : m_currentUndoQuantum(NULL),
+    : m_currentIndexInBatch(0),
+      m_allTuplesScanned(0),
+      m_tuplesProcessedInBatch(0),
+      m_tuplesProcessedInFragment(0),
+      m_tuplesProcessedSinceReport(0),
+      m_tupleReportThreshold(LONG_OP_THRESHOLD),
+      m_lastAccessedTable(NULL),
+      m_lastAccessedPlanNodeName(NULL),
+      m_currentUndoQuantum(NULL),
       m_hashinator(NULL),
       m_staticParams(MAX_PARAM_COUNT),
       m_currentInputDepId(-1),
@@ -247,7 +254,6 @@ VoltDBEngine::~VoltDBEngine() {
         tidPair.second->decrementRefcount();
     }
 
-    delete m_topend;
     delete m_executorContext;
 }
 
@@ -268,6 +274,29 @@ Table* VoltDBEngine::getTable(string name) const
 {
     // Caller responsible for checking null return value.
     return findInMapOrNull(name, m_tablesByName);
+}
+
+TableCatalogDelegate* VoltDBEngine::getTableDelegate(string name) const
+{
+    // Caller responsible for checking null return value.
+    CatalogDelegate * delegate = findInMapOrNull(name, m_delegatesByName);
+    return dynamic_cast<TableCatalogDelegate*>(delegate);
+}
+
+catalog::Table* VoltDBEngine::getCatalogTable(std::string name) const {
+    // iterate over all of the tables in the new catalog
+    std::map<string, catalog::Table*>::const_iterator catTableIter;
+    for (catTableIter = m_database->tables().begin();
+            catTableIter != m_database->tables().end();
+            catTableIter++)
+    {
+        catalog::Table *catalogTable = catTableIter->second;
+
+        if (catalogTable->name() == name) {
+            return catalogTable;
+        }
+    }
+    return NULL;
 }
 
 bool VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput* out) const {
@@ -522,7 +551,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
     assert(m_catalog != NULL);
     VOLT_DEBUG("Loading catalog...");
 
-    VOLT_TRACE("Catalog string contents:\n%s\n",catalogPayload.c_str());
+
     m_catalog->execute(catalogPayload);
 
 
@@ -1694,11 +1723,14 @@ void VoltDBEngine::reportProgessToTopend() {
         tableSize = m_lastAccessedTable->activeTupleCount();
     }
     //Update stats in java and let java determine if we should cancel this query.
-    if(m_topend->fragmentProgressUpdate(m_currentIndexInBatch,
+    m_tuplesProcessedInFragment += m_tuplesProcessedSinceReport;
+    m_tupleReportThreshold = m_topend->fragmentProgressUpdate(m_currentIndexInBatch,
                                         *m_lastAccessedPlanNodeName,
                                         tableName,
                                         tableSize,
-                                        m_tuplesProcessedInBatch + m_tuplesProcessedInFragment)){
+                                        m_tuplesProcessedInBatch + m_tuplesProcessedInFragment);
+    m_tuplesProcessedSinceReport = 0;
+    if (m_tupleReportThreshold == 0) {
         VOLT_DEBUG("Interrupt query.");
         throw InterruptException("Query interrupted.");
     }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -103,6 +103,188 @@ public class TestIndexSelection extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof IndexScanPlanNode);
         assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"DELETED_SINCE_IDX\""));
+    }
+
+    public void testFixedPlanWithExpressionIndexAndAlias()
+    {
+        AbstractPlanNode pn;
+        IndexScanPlanNode ispn;
+        String json;
+        pn = compile(
+                "select * from l aliased where  b = ? and DECODE(a, null, 0, a) = 0 and id = ?;");
+        // System.out.println("DEBUG: " + pn.toExplainPlanString());
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof IndexScanPlanNode);
+        json = pn.toJSONString();
+        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"DECODE_IDX3\""));
+        ispn = (IndexScanPlanNode)pn;
+        assertEquals(3, ispn.getSearchKeyExpressions().size());
+
+        pn = compile(
+                "select * from l aliased, l where l.b = ? and DECODE(l.a, null, 0, l.a) = 0 and l.id = ? and l.lname = aliased.lname;");
+        //* to debug */ System.out.println("DEBUG: " + pn.toExplainPlanString());
+        // Skip the Send, Projection, and NestLoop plan nodes.
+        pn = pn.getChild(0).getChild(0);
+        assertTrue(pn instanceof NestLoopIndexPlanNode);
+        ispn = (IndexScanPlanNode)pn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        json = ispn.toJSONString();
+        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"IDX_A\""));
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof IndexScanPlanNode);
+        json = pn.toJSONString();
+        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"DECODE_IDX3\""));
+        ispn = (IndexScanPlanNode)pn;
+        assertEquals(3, ispn.getSearchKeyExpressions().size());
+
+        pn = compile(
+                "select * from l x, l where x.b = ? and DECODE(x.a, null, 0, x.a) = 0 and x.id = ? and l.lname = x.lname;");
+        //* to debug */ System.out.println("DEBUG: " + pn.toExplainPlanString());
+        // Skip the Send, Projection, and NestLoop plan nodes.
+        pn = pn.getChild(0).getChild(0).getChild(0);
+        assertTrue(pn instanceof IndexScanPlanNode);
+        json = pn.toJSONString();
+        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"DECODE_IDX3\""));
+        ispn = (IndexScanPlanNode)pn;
+        assertEquals(3, ispn.getSearchKeyExpressions().size());
+
+        pn = compile(
+                "select * from l x, l where x.b = ? and DECODE(x.a, null, 0, x.a) = 0 and x.id = ? and l.lname = x.lname;");
+        //* to debug */ System.out.println("DEBUG: " + pn.toExplainPlanString());
+        // Skip the Send, Projection, and NestLoop plan nodes.
+        pn = pn.getChild(0).getChild(0).getChild(0);
+        assertTrue(pn instanceof IndexScanPlanNode);
+        json = pn.toJSONString();
+        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"DECODE_IDX3\""));
+        ispn = (IndexScanPlanNode)pn;
+        assertEquals(3, ispn.getSearchKeyExpressions().size());
+
+        pn = compile(
+                "select * from l x, l where l.b = ? and DECODE(x.a, null, 0, x.a) = 0 and x.id = ? and l.lname = x.lname;");
+        //*/ to debug */ System.out.println("DEBUG: " + pn.toExplainPlanString());
+        // Skip the Send, Projection, and NestLoop plan nodes.
+        pn = pn.getChild(0).getChild(0);
+        assertTrue(pn instanceof NestLoopIndexPlanNode);
+        ispn = (IndexScanPlanNode)pn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        json = ispn.toJSONString();
+        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"SYS_IDX_PK_"));
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof IndexScanPlanNode);
+        json = pn.toJSONString();
+        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"DECODE_IDX3\""));
+        ispn = (IndexScanPlanNode)pn;
+        assertEquals(1, ispn.getSearchKeyExpressions().size());
+
+        pn = compile(
+                "select * from l x, l where l.b = ? and DECODE(x.a, null, 0, x.a) = 0 and l.id = ? and l.lname = x.lname;");
+        //*/ to debug */ System.out.println("DEBUG: " + pn.toExplainPlanString());
+        // Skip the Send, and Projection plan nodes.
+        pn = pn.getChild(0).getChild(0);
+        assertTrue(pn instanceof NestLoopIndexPlanNode);
+        ispn = (IndexScanPlanNode)pn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        json = ispn.toJSONString();
+        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"IDX_A\""));
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof IndexScanPlanNode);
+        json = pn.toJSONString();
+        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"DECODE_IDX3\""));
+        ispn = (IndexScanPlanNode)pn;
+        assertEquals(1, ispn.getSearchKeyExpressions().size());
+
+        pn = compile(
+                "select * from l x, l where x.b = ? and DECODE(l.a, null, 0, l.a) = 0 and x.id = ? and l.lname = x.lname;");
+        //*/ to debug */ System.out.println("DEBUG: " + pn.toExplainPlanString());
+        // Skip the Send and Projection plan nodes.
+        pn = pn.getChild(0).getChild(0);
+        assertTrue(pn instanceof NestLoopIndexPlanNode);
+        ispn = (IndexScanPlanNode)pn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        json = ispn.toJSONString();
+        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"IDX_A\""));
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof IndexScanPlanNode);
+        json = pn.toJSONString();
+        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"DECODE_IDX3\""));
+        ispn = (IndexScanPlanNode)pn;
+        assertEquals(1, ispn.getSearchKeyExpressions().size());
+
+        pn = compile(
+                "select * from l x, l where l.b = ? and DECODE(x.a, null, 0, x.a) = 0 and l.id = ? and l.lname = x.lname;");
+        System.out.println("DEBUG: " + pn.toExplainPlanString());
+        // Skip the Send and Projection plan nodes.
+        pn = pn.getChild(0).getChild(0);
+        assertTrue(pn instanceof NestLoopIndexPlanNode);
+        ispn = (IndexScanPlanNode)pn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        json = ispn.toJSONString();
+        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"IDX_A\""));
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof IndexScanPlanNode);
+        json = pn.toJSONString();
+        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"DECODE_IDX3\""));
+        ispn = (IndexScanPlanNode)pn;
+        assertEquals(1, ispn.getSearchKeyExpressions().size());
+
+        pn = compile(
+                "select * from l x, l where x.b = ? and DECODE(l.a, null, 0, x.a) = 0 and x.id = ? and l.lname = x.lname;");
+        //*/ to debug */ System.out.println("DEBUG: " + pn.toExplainPlanString());
+        // Skip the Send and Projection plan nodes.
+        pn = pn.getChild(0).getChild(0);
+        assertTrue(pn instanceof NestLoopIndexPlanNode);
+        ispn = (IndexScanPlanNode)pn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        json = ispn.toJSONString();
+        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"IDX_A\""));
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof IndexScanPlanNode);
+        json = pn.toJSONString();
+        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"DECODE_IDX3\""));
+        ispn = (IndexScanPlanNode)pn;
+        assertEquals(1, ispn.getSearchKeyExpressions().size());
+
+        pn = compile(
+                "select * from l x, l where l.b = ? and DECODE(x.a, null, 0, l.a) = 0 and l.id = ? and l.lname = x.lname;");
+        System.out.println("DEBUG: " + pn.toExplainPlanString());
+        // Skip the Send and Projection plan nodes.
+        pn = pn.getChild(0).getChild(0);
+        assertTrue(pn instanceof NestLoopIndexPlanNode);
+        ispn = (IndexScanPlanNode)pn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        json = ispn.toJSONString();
+        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"IDX_A\""));
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof IndexScanPlanNode);
+        json = pn.toJSONString();
+        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"DECODE_IDX3\""));
+        ispn = (IndexScanPlanNode)pn;
+        assertEquals(1, ispn.getSearchKeyExpressions().size());
+
+        pn = compile(
+                "select * from l x, l where x.b = ? and DECODE(l.a, null, 0, x.a) = 0 and x.id = ? and l.lname = x.lname;");
+        //*/ to debug */ System.out.println("DEBUG: " + pn.toExplainPlanString());
+        // Skip the Send and Projection plan nodes.
+        pn = pn.getChild(0).getChild(0);
+        assertTrue(pn instanceof NestLoopIndexPlanNode);
+        ispn = (IndexScanPlanNode)pn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        json = ispn.toJSONString();
+        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"IDX_A\""));
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof IndexScanPlanNode);
+        json = pn.toJSONString();
+        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"DECODE_IDX3\""));
+        ispn = (IndexScanPlanNode)pn;
+        assertEquals(1, ispn.getSearchKeyExpressions().size());
+
+        pn = compile(
+                "select * from l x, l where l.b = ? and DECODE(x.a, null, 0, l.a) = 0 and x.id = ? and l.lname = x.lname;");
+        System.out.println("DEBUG: " + pn.toExplainPlanString());
+        // Skip the Send and Projection plan nodes.
+        pn = pn.getChild(0).getChild(0);
+        assertTrue(pn instanceof NestLoopIndexPlanNode);
+        ispn = (IndexScanPlanNode)pn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        json = ispn.toJSONString();
+        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"SYS_IDX_PK"));
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof IndexScanPlanNode);
+        json = pn.toJSONString();
+        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"DECODE_IDX3\""));
+        ispn = (IndexScanPlanNode)pn;
+        assertEquals(1, ispn.getSearchKeyExpressions().size());
     }
 
     public void testCaseWhenIndex()

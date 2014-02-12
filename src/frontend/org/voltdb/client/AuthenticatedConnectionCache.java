@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -41,6 +41,7 @@ import org.voltdb.common.Constants;
 public class AuthenticatedConnectionCache {
 
     final String m_hostname;
+    final String m_adminHostName;
     final int m_port;
     final int m_adminPort;
     final int m_targetSize; // goal size of the client cache
@@ -90,18 +91,19 @@ public class AuthenticatedConnectionCache {
     }
 
     public AuthenticatedConnectionCache(int targetSize) {
-        this(targetSize, "localhost");
+        this(targetSize, "localhost", "localhost");
     }
 
-    public AuthenticatedConnectionCache(int targetSize, String serverHostname) {
-        this(targetSize, serverHostname, Constants.DEFAULT_PORT, 0);
+    public AuthenticatedConnectionCache(int targetSize, String serverHostname, String adminHostName) {
+        this(targetSize, serverHostname, Constants.DEFAULT_PORT, adminHostName, 0);
     }
 
-    public AuthenticatedConnectionCache(int targetSize, String serverHostname, int serverPort, int adminPort) {
+    public AuthenticatedConnectionCache(int targetSize, String serverHostname, int serverPort, String adminHostName, int adminPort) {
         assert(serverHostname != null);
         assert(serverPort > 0);
 
         m_hostname = serverHostname;
+        m_adminHostName = adminHostName;
         m_port = serverPort;
         m_adminPort = adminPort;
         m_targetSize = targetSize;
@@ -123,10 +125,10 @@ public class AuthenticatedConnectionCache {
                     if ((hashedPassword != null) && (hashedPassword.length > 0)) {
                         throw new IOException("Username was null but password was not.");
                     }
-                    adminClient.createConnection(m_hostname, m_adminPort);
+                    adminClient.createConnection(m_adminHostName, m_adminPort);
                 }
                 else {
-                    adminClient.createConnectionWithHashedCredentials(m_hostname, m_adminPort, userName, hashedPassword);
+                    adminClient.createConnectionWithHashedCredentials(m_adminHostName, m_adminPort, userName, hashedPassword);
                 }
             }
             catch (IOException ioe)

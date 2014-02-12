@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,18 +23,16 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google_voltpatches.common.base.*;
+import com.google_voltpatches.common.collect.MapMaker;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
-
-import com.google_voltpatches.common.base.Charsets;
-import com.google_voltpatches.common.base.Supplier;
-import com.google_voltpatches.common.base.Suppliers;
-import com.google_voltpatches.common.base.Throwables;
 
 /**
  * Class that maps object values to partitions. It's rather simple
@@ -77,6 +75,16 @@ public abstract class TheHashinator {
     public abstract byte[] getConfigBytes();
 
     /**
+     * A map to store hashinators, including older versions of hashinators.
+     * During live rejoin sites will replay balance fragments in an order that results
+     * in some sites skipping ahead to newer hashinators.
+     *
+     * References are weak so this has no impact on memory utilization
+     */
+    private static final ConcurrentMap<Long, TheHashinator> m_cachedHashinators =
+            new MapMaker().weakValues().concurrencyLevel(1).initialCapacity(16).makeMap();
+
+    /**
      * Return compressed (cooked) bytes for serialization.
      * Defaults to providing raw bytes, e.g. for legacy.
      * @return cooked config bytes
@@ -99,7 +107,9 @@ public abstract class TheHashinator {
      * The starting version number will be 0.
      */
     public static void initialize(Class<? extends TheHashinator> hashinatorImplementation, byte config[]) {
-        instance.set(Pair.of(0L, constructHashinator( hashinatorImplementation, config, false)));
+        TheHashinator hashinator = constructHashinator( hashinatorImplementation, config, false);
+        m_cachedHashinators.put(0L, hashinator);
+        instance.set(Pair.of(0L, hashinator));
     }
 
     /**
@@ -148,7 +158,7 @@ public abstract class TheHashinator {
     abstract public int pHashinateLong(long value);
     abstract public int pHashinateBytes(byte[] bytes);
     abstract public long pGetConfigurationSignature();
-    abstract protected HashinatorConfig pGetCurrentConfig();
+    abstract public HashinatorConfig pGetCurrentConfig();
     abstract public Map<Integer, Integer> pPredecessors(int partition);
     abstract public Pair<Integer, Integer> pPredecessor(int partition, int token);
     abstract public Map<Integer, Integer> pGetRanges(int partition);
@@ -173,19 +183,6 @@ public abstract class TheHashinator {
         PureJavaCrc32C crc = new PureJavaCrc32C();
         crc.update(config);
         return crc.getValue();
-    }
-
-    /**
-     * Given a long value, pick a partition to store the data. It's only called for legacy
-     * hashinator, elastic hashinator hashes all types the same way through hashinateBytes().
-     *
-     * @param value The value to hash.
-     * @param partitionCount The number of partitions to choose from.
-     * @return A value between 0 and partitionCount-1, hopefully pretty evenly
-     * distributed.
-     */
-    static int hashinateLong(long value) {
-        return instance.get().getSecond().pHashinateLong(value);
     }
 
     /**
@@ -349,18 +346,27 @@ public abstract class TheHashinator {
      * @param configBytes  config data (format determined by cooked flag)
      * @param cooked  compressible wire serialization format if true
      */
-    public static UndoAction updateHashinator(
+    public static Pair<? extends UndoAction, TheHashinator> updateHashinator(
             Class<? extends TheHashinator> hashinatorImplementation,
             long version,
             byte configBytes[],
             boolean cooked) {
+        //Use a cached/canonical hashinator if possible
+        TheHashinator existingHashinator = m_cachedHashinators.get(version);
+        if (existingHashinator == null) {
+            existingHashinator = constructHashinator(hashinatorImplementation, configBytes, cooked);
+            TheHashinator tempVal = m_cachedHashinators.putIfAbsent( version, existingHashinator);
+            if (tempVal != null) existingHashinator = tempVal;
+        }
+
+        //Do a CAS loop to maintain a global instance
         while (true) {
             final Pair<Long, ? extends TheHashinator> snapshot = instance.get();
             if (version > snapshot.getFirst()) {
                 final Pair<Long, ? extends TheHashinator> update =
-                        Pair.of(version, constructHashinator(hashinatorImplementation, configBytes, cooked));
+                        Pair.of(version, existingHashinator);
                 if (instance.compareAndSet(snapshot, update)) {
-                    return new UndoAction() {
+                    return Pair.of(new UndoAction() {
                         @Override
                         public void release() {}
 
@@ -372,17 +378,17 @@ public abstract class TheHashinator {
                                         "Didn't roll back hashinator because it wasn't set to expected hashinator");
                             }
                         }
-                    };
+                    }, existingHashinator);
                 }
             } else {
-                return new UndoAction() {
+                return Pair.of(new UndoAction() {
 
                     @Override
                     public void release() {}
 
                     @Override
                     public void undo() {}
-                };
+                }, existingHashinator);
             }
         }
     }
@@ -456,6 +462,10 @@ public abstract class TheHashinator {
         return instance.get().getSecond().pGetCurrentConfig();
     }
 
+    public static TheHashinator getCurrentHashinator() {
+        return instance.get().getSecond();
+    }
+
     public static Map<Integer, Integer> predecessors(int partition) {
         return instance.get().getSecond().pPredecessors(partition);
     }
@@ -501,9 +511,10 @@ public abstract class TheHashinator {
      * Update the current configured hashinator class. Used by snapshot restore.
      * @param version
      * @param config
-     * @return UndoAction Undo action to revert hashinator update
+     * @return Pair<UndoAction, TheHashinator> Undo action to revert hashinator update and the hashinator that was
+     *         requested which may actually be an older one (although the one requested) during live rejoin
      */
-    public static UndoAction updateConfiguredHashinator(long version, byte config[]) {
+    public static Pair< ? extends UndoAction, TheHashinator> updateConfiguredHashinator(long version, byte config[]) {
         return updateHashinator(getConfiguredHashinatorClass(), version, config, true);
     }
 
