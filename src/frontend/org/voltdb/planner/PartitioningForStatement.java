@@ -21,7 +21,6 @@ package org.voltdb.planner;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 import org.voltdb.VoltType;
@@ -165,7 +164,7 @@ public class PartitioningForStatement implements Cloneable{
     }
 
     /**
-     * @return deep copy of self
+     * @return A new PartitioningForStatement
      */
     @Override
     public Object clone() {

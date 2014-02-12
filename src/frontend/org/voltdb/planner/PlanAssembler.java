@@ -92,7 +92,6 @@ public class PlanAssembler {
         public boolean m_orderIsDeterministic = true;
         public CompiledPlan m_compiledPlan;
         public int m_planId = 0;
-        public PartitioningForStatement m_commonPartitioning = null;
         public PartitioningForStatement m_currentPartitioning = null;
     }
 
@@ -117,6 +116,10 @@ public class PlanAssembler {
 
     /** Describes the specified and inferred partition context. */
     private PartitioningForStatement m_partitioning;
+
+    public PartitioningForStatement getPartition() {
+        return m_partitioning;
+    }
 
     /** Error message */
     String m_recentErrorMsg;
@@ -240,8 +243,8 @@ public class PlanAssembler {
             return;
         }
 
-// @TODO
-// Need to use StmtTableScan instead
+        // @TODO
+        // Need to use StmtTableScan instead
         // check that no modification happens to views
         if (tableListIncludesView(parsedStmt.tableList)) {
             throw new RuntimeException("Illegal to modify a materialized view.");
@@ -465,24 +468,82 @@ public class PlanAssembler {
         m_recentErrorMsg = null;
 
         ArrayList<CompiledPlan> childrenPlans = new ArrayList<CompiledPlan>();
+        PartitioningForStatement commonPartitioning = null;
 
         // Build best plans for the children first
-        ParsedResultAccumulator parsedResult = new ParsedResultAccumulator();
+        int planId = 0;
         for (AbstractParsedStmt parsedChildStmt : m_parsedUnion.m_children) {
-            parsedResult = planForParsedStmt(parsedChildStmt, parsedResult);
-            parsedResult = setCommonPartitioning(parsedResult);
-            if (parsedResult.m_compiledPlan == null) {
+            PartitioningForStatement partitioning = (PartitioningForStatement)m_partitioning.clone();
+            PlanSelector processor = (PlanSelector) m_planSelector.clone();
+            processor.m_planId = planId;
+            PlanAssembler assembler = new PlanAssembler(
+                    m_catalogCluster, m_catalogDb, partitioning, processor);
+            CompiledPlan bestChildPlan = assembler.getBestCostPlan(parsedChildStmt);
+            partitioning = assembler.getPartition();
+
+            // make sure we got a winner
+            if (bestChildPlan == null) {
+                if (m_recentErrorMsg == null) {
+                    m_recentErrorMsg = "Unable to plan for statement. Error unknown.";
+                }
                 return null;
             }
-            childrenPlans.add(parsedResult.m_compiledPlan);
+            childrenPlans.add(bestChildPlan);
+
+            // Make sure that next child's plans won't override current ones.
+            planId = processor.m_planId;
+
+            // Decide whether child statements' partitioning is compatible.
+            if (commonPartitioning == null) {
+                commonPartitioning = partitioning;
+                continue;
+            }
+
+            AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpression();
+            if (commonPartitioning.requiresTwoFragments()) {
+                if (partitioning.requiresTwoFragments() || statementPartitionExpression != null) {
+                    // If two child statements need to use a second fragment,
+                    // it can't currently be a two-fragment plan.
+                    // The coordinator expects a single-table result from each partition.
+                    // Also, currently the coordinator of a two-fragment plan is not allowed to
+                    // target a particular partition, so neither can the union of the coordinator
+                    // and a statement that wants to run single-partition.
+                    throw new PlanningErrorException(
+                            "Statements are too complex in set operation using multiple partitioned tables.");
+                }
+                // the new statement is apparently a replicated read and has no effect on partitioning
+                continue;
+            }
+            AbstractExpression commonPartitionExpression = commonPartitioning.singlePartitioningExpression();
+            if (commonPartitionExpression == null) {
+                // the prior statement(s) were apparently replicated reads
+                // and have no effect on partitioning
+                commonPartitioning = partitioning;
+                continue;
+            }
+            if (partitioning.requiresTwoFragments()) {
+                // Again, currently the coordinator of a two-fragment plan is not allowed to
+                // target a particular partition, so neither can the union of the coordinator
+                // and a statement that wants to run single-partition.
+                throw new PlanningErrorException(
+                        "Statements are too complex in set operation using multiple partitioned tables.");
+            }
+            if (statementPartitionExpression == null) {
+                // the new statement is apparently a replicated read and has no effect on partitioning
+                continue;
+            }
+            if ( ! commonPartitionExpression.equals(statementPartitionExpression)) {
+                throw new PlanningErrorException(
+                        "Statements use conflicting partitioned table filters in set operation or sub-query.");
+            }
         }
 
-        if (parsedResult.m_commonPartitioning != null) {
-            m_partitioning = (PartitioningForStatement)parsedResult.m_commonPartitioning.clone();
+        if (commonPartitioning != null) {
+            m_partitioning = commonPartitioning;
         }
 
         // need to reset plan id for the entire UNION
-        m_planSelector.m_planId = parsedResult.m_planId;
+        m_planSelector.m_planId = planId;
 
         // Add and link children plans
         for (CompiledPlan selectPlan : childrenPlans) {
@@ -506,7 +567,6 @@ public class PlanAssembler {
     }
 
     private ParsedResultAccumulator planForParsedStmt(AbstractParsedStmt parsedStmt, ParsedResultAccumulator parsedResult) {
-
         parsedResult.m_currentPartitioning = (PartitioningForStatement)m_partitioning.clone();
         PlanSelector selector = (PlanSelector) m_planSelector.clone();
         selector.m_planId = parsedResult.m_planId;
@@ -518,7 +578,7 @@ public class PlanAssembler {
             if (m_recentErrorMsg == null) {
                 m_recentErrorMsg = "Unable to plan for statement. Error unknown.";
             }
-            return parsedResult;
+            return null;
         }
         parsedResult.m_orderIsDeterministic = parsedResult.m_orderIsDeterministic &&
                 parsedResult.m_compiledPlan.isOrderDeterministic();
@@ -526,64 +586,6 @@ public class PlanAssembler {
         // Make sure that next child's plans won't override current ones.
         parsedResult.m_planId = selector.m_planId;
 
-        return parsedResult;
-    }
-
-    /**
-     * Pick a new common partitioning given the existing common partitioning and the new one.
-     * An exception is thrown if they are not compatible
-     *
-     * @param parsedResult with the current partitioning
-     * @return updated parsedResult
-     */
-    private static ParsedResultAccumulator setCommonPartitioning(ParsedResultAccumulator parsedResult) {
-        assert (parsedResult!= null);
-        assert (parsedResult.m_currentPartitioning != null);
-
-         // Decide whether child statements' partitioning is compatible.
-        if (parsedResult.m_commonPartitioning == null) {
-            parsedResult.m_commonPartitioning = parsedResult.m_currentPartitioning;
-            return parsedResult;
-        }
-
-        AbstractExpression statementPartitionExpression = parsedResult.m_currentPartitioning.singlePartitioningExpression();
-        if (parsedResult.m_commonPartitioning.requiresTwoFragments()) {
-            if (parsedResult.m_currentPartitioning.requiresTwoFragments() || statementPartitionExpression != null) {
-                // If two child statements need to use a second fragment,
-                // it can't currently be a two-fragment plan.
-                // The coordinator expects a single-table result from each partition.
-                // Also, currently the coordinator of a two-fragment plan is not allowed to
-                // target a particular partition, so neither can the union of the coordinator
-                // and a statement that wants to run single-partition.
-                throw new PlanningErrorException(
-                        "Statements are too complex in set operation using multiple partitioned tables.");
-            }
-            // the new statement is apparently a replicated read and has no effect on partitioning
-            return parsedResult;
-        }
-        AbstractExpression
-        commonPartitionExpression = parsedResult.m_commonPartitioning.singlePartitioningExpression();
-        if (commonPartitionExpression == null) {
-            // the prior statement(s) were apparently replicated reads
-            // and have no effect on partitioning
-            parsedResult.m_commonPartitioning = parsedResult.m_currentPartitioning;
-            return parsedResult;
-        }
-        if (parsedResult.m_currentPartitioning.requiresTwoFragments()) {
-            // Again, currently the coordinator of a two-fragment plan is not allowed to
-            // target a particular partition, so neither can the union of the coordinator
-            // and a statement that wants to run single-partition.
-            throw new PlanningErrorException(
-                    "Statements are too complex in set operation using multiple partitioned tables.");
-        }
-        if (statementPartitionExpression == null) {
-            // the new statement is apparently a replicated read and has no effect on partitioning
-            return parsedResult;
-        }
-        if ( ! commonPartitionExpression.equals(statementPartitionExpression)) {
-            throw new PlanningErrorException(
-                    "Statements use conflicting partitioned table filters in set operation or sub-query.");
-        }
         return parsedResult;
     }
 
@@ -1915,6 +1917,8 @@ public class PlanAssembler {
     public String getErrorMessage() {
         return m_recentErrorMsg;
     }
+
+
 
     /**
      * Remove the coordinator send/receive pair if any from the graph.
