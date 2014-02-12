@@ -120,6 +120,11 @@ import com.google_voltpatches.common.util.concurrent.MoreExecutors;
  */
 public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
+    static long TOPOLOGY_CHANGE_CHECK_MS = Long.getLong("TOPOLOGY_CHANGE_CHECK_MS", 5000);
+
+    //Same as in Distributer.java
+    public static final long ASYNC_TOPO_HANDLE = Long.MAX_VALUE - 1;
+
     // reasons a connection can fail
     public static final byte AUTHENTICATION_FAILURE = -1;
     public static final byte MAX_CONNECTIONS_LIMIT_ERROR = 1;
@@ -307,11 +312,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         public void shutdown() throws InterruptedException {
             //sync prevents interruption while shuttown down executor
-            synchronized (this) {
-                m_running = false;
-                m_thread.interrupt();
+            if (m_thread != null) {
+                synchronized (this) {
+                    m_running = false;
+                    m_thread.interrupt();
+                }
+                m_thread.join();
             }
-            m_thread.join();
         }
 
         //Thread for Running authentication of client.
@@ -2182,8 +2189,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return ft;
     }
 
+    private ScheduledFuture<?> m_deadConnectionFuture;
+    private ScheduledFuture<?> m_topologyCheckFuture;
     public void schedulePeriodicWorks() {
-        VoltDB.instance().scheduleWork(new Runnable() {
+        m_deadConnectionFuture = VoltDB.instance().scheduleWork(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -2200,12 +2209,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * that operates on cached data and it ensures that clients eventually converge on the current
          * topology
          */
-        VoltDB.instance().scheduleWork(new Runnable() {
+        m_topologyCheckFuture = VoltDB.instance().scheduleWork(new Runnable() {
             @Override
             public void run() {
                 checkForTopologyChanges();
             }
-        }, 5, 0, TimeUnit.SECONDS);
+        }, 0, TOPOLOGY_CHANGE_CHECK_MS, TimeUnit.MILLISECONDS);
     }
 
     /*
@@ -2231,7 +2240,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             new Predicate<ClientInterfaceHandleManager>() {
                 @Override
                 public boolean apply(ClientInterfaceHandleManager input) {
-                    return input.wantsTopologyUpdates() && input.connection.getClass() == VoltPort.class;
+                    return input.wantsTopologyUpdates();
                 }};
 
     /*
@@ -2290,7 +2299,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         final StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setProcName("@Statistics");
         spi.setParams("TOPO", 0);
-        spi.setClientHandle(Long.MAX_VALUE - 1);
+        spi.setClientHandle(ASYNC_TOPO_HANDLE);
         dispatchStatistics(OpsSelector.STATISTICS, spi, p.getFirst());
     }
 
@@ -2327,6 +2336,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     // to the dispatcher..  Or write a "stop reading and flush
     // all your read buffers" events .. or something ..
     protected void shutdown() throws InterruptedException {
+        if (m_deadConnectionFuture != null) m_deadConnectionFuture.cancel(false);
+        if (m_topologyCheckFuture != null) m_topologyCheckFuture.cancel(false);
         if (m_maxConnectionUpdater != null) {
             m_maxConnectionUpdater.cancel(false);
         }
@@ -2687,4 +2698,5 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 new VoltTable[0], errorMessage, task.clientHandle);
         return clientResponse;
     }
+
 }
