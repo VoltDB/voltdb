@@ -441,7 +441,6 @@ class Distributer {
                     m_outstandingPing = false;
                     return;
                 } else if (response.getClientHandle() == ASYNC_TOPO_HANDLE) {
-                    System.out.println("Received async topology update");
                     /*
                      * Really didn't want to add this block because it is not DRY
                      * for the exception handling, but trying to set + reset the async topo callback
