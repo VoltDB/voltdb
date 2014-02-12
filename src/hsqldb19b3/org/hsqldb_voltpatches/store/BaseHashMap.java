@@ -277,7 +277,12 @@ public class BaseHashMap {
                 lastLookup = lookup,
                 lookup = hashIndex.getNextLookup(lookup)) {
             if (isObjectKey) {
+                // A VoltDB extension to prevent an intermittent NPE on catalogUpdate?
+                if (objectKey.equals(objectKeyTable[lookup])) {
+                /* disabled 1 line ...
                 if (objectKeyTable[lookup].equals(objectKey)) {
+                ... disabled 1 line */
+                // End of VoltDB extension
                     break;
                 }
             } else if (isIntKey) {
