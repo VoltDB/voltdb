@@ -44,6 +44,7 @@ public class DummyCommandLog implements CommandLog {
     public boolean log(
             Iv2InitiateTaskMessage message,
             long spHandle,
+            Set<Integer> involvedPartitions,
             DurabilityListener l,
             Object handle) {
         return false;

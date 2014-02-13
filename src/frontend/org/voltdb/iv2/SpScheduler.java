@@ -538,7 +538,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         final SpProcedureTask task =
             new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg, m_drGateway);
         if (!msg.isReadOnly()) {
-            if (!m_cl.log(msg, msg.getSpHandle(), m_durabilityListener, task)) {
+            if (!m_cl.log(msg, msg.getSpHandle(), new HashSet<Integer>(), m_durabilityListener, task)) {
                 m_pendingTasks.offer(task);
             }
         } else {
@@ -824,7 +824,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                                  m_pendingTasks, msg, null);
         }
         if (logThis) {
-            if (!m_cl.log(msg.getInitiateTask(), msg.getSpHandle(), m_durabilityListener, task)) {
+            assert !msg.getInvolvedPartitions().isEmpty();
+            if (!m_cl.log(msg.getInitiateTask(), msg.getSpHandle(), msg.getInvolvedPartitions(),
+                    m_durabilityListener, task)) {
                 m_pendingTasks.offer(task);
             } else {
                 /* Getting here means that the task is the first fragment of an MP txn and

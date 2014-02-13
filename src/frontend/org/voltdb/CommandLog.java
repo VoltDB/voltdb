@@ -59,6 +59,7 @@ public interface CommandLog {
     public abstract boolean log(
             Iv2InitiateTaskMessage message,
             long spHandle,
+            Set<Integer> involvedPartitions,
             DurabilityListener listener,
             Object durabilityHandle);
 
