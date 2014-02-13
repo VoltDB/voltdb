@@ -493,7 +493,7 @@ public class MpScheduler extends Scheduler
      */
     public void handleEOLMessage()
     {
-        Iv2EndOfLogMessage msg = new Iv2EndOfLogMessage(true);
+        Iv2EndOfLogMessage msg = new Iv2EndOfLogMessage(m_partitionId);
         MPIEndOfLogTransactionState txnState = new MPIEndOfLogTransactionState(msg);
         MPIEndOfLogTask task = new MPIEndOfLogTask(m_mailbox, m_pendingTasks,
                                                    txnState, m_iv2Masters);
