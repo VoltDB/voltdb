@@ -113,6 +113,7 @@ public class VoltLogger {
                 } catch (Exception e) {
                     Throwables.propagate(e);
                 }
+                break;
             default:
                 throw new AssertionError("Unrecognized level " + level);
         }
