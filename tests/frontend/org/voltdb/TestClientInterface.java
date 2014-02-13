@@ -46,10 +46,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
@@ -182,8 +180,7 @@ public class TestClientInterface {
             public Object answer(InvocationOnMock invocation)
             {
                 Object args[] = invocation.getArguments();
-                ses.scheduleAtFixedRate((Runnable) args[0], (long) args[1], (long) args[2], (TimeUnit) args[3]);
-                return null;
+                return ses.scheduleAtFixedRate((Runnable) args[0], (long) args[1], (long) args[2], (TimeUnit) args[3]);
             }
         }).when(m_volt).scheduleWork(any(Runnable.class), anyLong(), anyLong(), (TimeUnit)anyObject());
 

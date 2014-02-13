@@ -2336,8 +2336,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     // to the dispatcher..  Or write a "stop reading and flush
     // all your read buffers" events .. or something ..
     protected void shutdown() throws InterruptedException {
-        if (m_deadConnectionFuture != null) m_deadConnectionFuture.cancel(false);
-        if (m_topologyCheckFuture != null) m_topologyCheckFuture.cancel(false);
+        if (m_deadConnectionFuture != null) {
+            m_deadConnectionFuture.cancel(false);
+            try {m_deadConnectionFuture.get();} catch (Throwable t) {}
+        }
+        if (m_topologyCheckFuture != null) {
+            m_topologyCheckFuture.cancel(false);
+            try {m_topologyCheckFuture.get();} catch (Throwable t) {}
+        }
         if (m_maxConnectionUpdater != null) {
             m_maxConnectionUpdater.cancel(false);
         }
