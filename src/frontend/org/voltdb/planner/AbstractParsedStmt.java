@@ -37,9 +37,9 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
+import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
-import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.SubqueryLeafNode;
 import org.voltdb.planner.parseinfo.TableLeafNode;
 import org.voltdb.plannodes.SchemaColumn;
@@ -104,7 +104,6 @@ public abstract class AbstractParsedStmt {
     */
    private static AbstractParsedStmt getParsedStmt(VoltXMLElement stmtTypeElement, String[] paramValues,
            Database db) {
-
        AbstractParsedStmt retval = null;
 
        if (stmtTypeElement == null) {
@@ -744,20 +743,20 @@ public abstract class AbstractParsedStmt {
     }
 
     private AbstractParsedStmt parseSubQuery(VoltXMLElement tableScan) {
-        AbstractParsedStmt subQuery = null;
         for (VoltXMLElement childNode : tableScan.children) {
             if (childNode.name.equals("tablesubquery")) {
                 if (!childNode.children.isEmpty()) {
-                    subQuery = AbstractParsedStmt.getParsedStmt(childNode.children.get(0), m_paramValues, m_db);
+                    AbstractParsedStmt subQuery = AbstractParsedStmt.getParsedStmt(childNode.children.get(0), m_paramValues, m_db);
                     // Propagate parameters from the parent to the child
                     subQuery.m_paramsById.putAll(m_paramsById);
                     subQuery.m_paramList = m_paramList;
                     subQuery = AbstractParsedStmt.parse(subQuery, sql, childNode.children.get(0), m_paramValues, m_db, joinOrder);
-                    break;
+
+                    return subQuery;
                 }
             }
         }
-        return subQuery;
+        return null;
     }
 
     /** Parse a where or join clause. This behavior is common to all kinds of statements.

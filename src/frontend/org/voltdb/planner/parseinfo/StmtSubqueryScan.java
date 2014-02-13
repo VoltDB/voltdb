@@ -20,7 +20,6 @@ package org.voltdb.planner.parseinfo;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.voltdb.catalog.Index;
@@ -28,9 +27,10 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.ParsedSelectStmt;
+import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.planner.ParsedUnionStmt;
 import org.voltdb.planner.PartitioningForStatement;
-import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.plannodes.SchemaColumn;
 
 /**
@@ -40,12 +40,14 @@ public class StmtSubqueryScan extends StmtTableScan {
 
     // Sub-Query
     private final AbstractParsedStmt m_subquery;
-    private final List<ParsedColInfo> m_origSchema;
+    private ArrayList<SchemaColumn> m_schemaList = new ArrayList<>();
+    private Map<String, Integer> m_columnIndexMap = new HashMap<String, Integer>();
+
     private CompiledPlan m_bestCostPlan = null;
     // The partitioning object for that sub-query
     PartitioningForStatement m_partitioning = null;
-    // The mapping - the temp table column to the sub-query (column, table) pair
-    Map<String, ParsedColInfo> m_columnMap = new HashMap<String, ParsedColInfo>();
+
+
     // Store a unique list of the subquery result columns actually used by the parent query.
     protected Map<String, SchemaColumn> m_scanColumns = new HashMap<String, SchemaColumn>();
 
@@ -58,8 +60,16 @@ public class StmtSubqueryScan extends StmtTableScan {
             columnBase = ((ParsedUnionStmt)columnBase).m_children.get(0);
         }
         assert (columnBase instanceof ParsedSelectStmt);
-        m_origSchema = ((ParsedSelectStmt)columnBase).displayColumns();
-        assert(m_origSchema != null);
+
+        int i = 0;
+        for (ParsedColInfo col: ((ParsedSelectStmt)columnBase).displayColumns()) {
+            String colAlias = col.alias == null? col.columnName : col.alias;
+            SchemaColumn scol = new SchemaColumn(col.tableName, col.tableAlias, col.columnName, col.alias, col.expression);
+            m_schemaList.add(scol);
+            m_columnIndexMap.put(colAlias, i);
+            i++;
+        }
+
     }
 
     @Override
@@ -110,10 +120,6 @@ public class StmtSubqueryScan extends StmtTableScan {
         return m_subquery;
     }
 
-    public List<ParsedColInfo> getOrigSchema() {
-        return m_origSchema;
-    }
-
     public CompiledPlan getBestCostPlan() {
         return m_bestCostPlan;
     }
@@ -123,14 +129,28 @@ public class StmtSubqueryScan extends StmtTableScan {
     }
 
     @Override
-    public String getColumnName(int columnIndex) {
-        return m_origSchema.get(columnIndex).alias;
+    public Collection<SchemaColumn> getScanColumns() {
+        return m_scanColumns.values();
+    }
+
+    @Override
+    public String getColumnName(int m_columnIndex) {
+        return m_schemaList.get(m_columnIndex).getColumnName();
     }
 
     @Override
     public void resolveTVE(TupleValueExpression expr, String columnName) {
-        // TODO resolve index by matching columnName to subquery output column aliases
-        // expr.resolveForTable(m_table);
+        Integer idx = m_columnIndexMap.get(columnName);
+        if (idx == null) {
+            throw new PlanningErrorException("Mismatched columns " + columnName + " in subquery");
+        }
+        SchemaColumn schemaCol = m_schemaList.get(idx.intValue());
+
+        expr.setColumnIndex(idx.intValue());
+        expr.setValueType(schemaCol.getType());
+        expr.setValueSize(schemaCol.getSize());
+
+
         if (m_scanColumns.get(columnName) == null) {
             SchemaColumn scol = new SchemaColumn("", m_tableAlias,
                     columnName, columnName, (TupleValueExpression) expr.clone());
@@ -138,8 +158,4 @@ public class StmtSubqueryScan extends StmtTableScan {
         }
     }
 
-    @Override
-    public Collection<SchemaColumn> getScanColumns() {
-        return m_scanColumns.values();
-    }
 }

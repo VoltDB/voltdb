@@ -102,20 +102,15 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
         if (m_isSubQuery) {
             assert(m_children.size() == 1);
             m_children.get(0).resolveColumnIndexes();
+            return;
         }
         super.resolveColumnIndexes();
     }
 
     @Override
     protected String explainPlanForNode(String indent) {
-        return "SEQUENTIAL SCAN of \"" + m_targetTableName + "\"" + explainPredicate("\n" + indent + " filter by ");
+        String tableName = m_targetTableName == null? m_targetTableAlias: m_targetTableName;
+        return "SEQUENTIAL SCAN of \"" + tableName + "\"" + explainPredicate("\n" + indent + " filter by ");
     }
 
-    @Override
-    protected void generateTableSchema(Database db) {
-        if (m_isSubQuery) {
-            return;
-        }
-        super.generateTableSchema(db);
-    }
 }

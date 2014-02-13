@@ -22,7 +22,6 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -222,9 +221,29 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     public void generateOutputSchema(Database db)
     {
         // fill in the table schema if we haven't already
-        if (m_tableSchema == null)
-        {
-            generateTableSchema(db);
+        if (m_tableSchema == null) {
+            if (isSubQuery()) {
+                assert(m_children.size() == 1);
+                m_children.get(0).generateOutputSchema(db);
+                m_tableSchema = m_children.get(0).getOutputSchema();
+            } else {
+                m_tableSchema = new NodeSchema();
+                CatalogMap<Column> cols = db.getTables().getIgnoreCase(m_targetTableName).getColumns();
+                // you don't strictly need to sort this, but it makes diff-ing easier
+                for (Column col : CatalogUtil.getSortedCatalogItems(cols, "index"))
+                {
+                    // must produce a tuple value expression for this column.
+                    TupleValueExpression tve = new TupleValueExpression(
+                            m_targetTableName, m_targetTableAlias, col.getTypeName(), col.getTypeName(), col.getIndex());
+                    tve.setValueType(VoltType.get((byte)col.getType()));
+                    tve.setValueSize(col.getSize());
+                    m_tableSchema.addColumn(new SchemaColumn(m_targetTableName,
+                                                             m_targetTableAlias,
+                                                             col.getTypeName(),
+                                                             col.getTypeName(),
+                                                             tve));
+                }
+            }
         }
 
         // Until the scan has an implicit projection rather than an explicitly
@@ -255,6 +274,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
         else
         {
+
             if (m_tableScanSchema.size() != 0)
             {
                 // Order the scan columns according to the table schema
@@ -274,11 +294,11 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 }
                 m_tableScanSchema.sortByTveIndex();
                 // Create inline projection to map table outputs to scan outputs
-                ProjectionPlanNode map = new ProjectionPlanNode();
-                map.setOutputSchema(m_tableScanSchema);
-                addInlinePlanNode(map);
+                ProjectionPlanNode projectionNode = new ProjectionPlanNode();
+                projectionNode.setOutputSchema(m_tableScanSchema);
+                addInlinePlanNode(projectionNode);
                 // a bit redundant but logically consistent
-                m_outputSchema = map.getOutputSchema().copyAndReplaceWithTVE();
+                m_outputSchema = projectionNode.getOutputSchema().copyAndReplaceWithTVE();
                 m_hasSignificantOutputSchema = false; // It's just a cheap knock-off of the projection's
             }
             else
@@ -390,25 +410,5 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             return prefix + m_predicate.explain(m_targetTableName);
         }
         return "";
-    }
-
-    protected void generateTableSchema(Database db) {
-        m_tableSchema = new NodeSchema();
-        CatalogMap<Column> cols =
-            db.getTables().getIgnoreCase(m_targetTableName).getColumns();
-        // you don't strictly need to sort this, but it makes diff-ing easier
-        for (Column col : CatalogUtil.getSortedCatalogItems(cols, "index"))
-        {
-            // must produce a tuple value expression for this column.
-            TupleValueExpression tve = new TupleValueExpression(
-                    m_targetTableName, m_targetTableAlias, col.getTypeName(), col.getTypeName(), col.getIndex());
-            tve.setValueType(VoltType.get((byte)col.getType()));
-            tve.setValueSize(col.getSize());
-            m_tableSchema.addColumn(new SchemaColumn(m_targetTableName,
-                                                     m_targetTableAlias,
-                                                     col.getTypeName(),
-                                                     col.getTypeName(),
-                                                     tve));
-        }
     }
 }

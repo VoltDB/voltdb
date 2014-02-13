@@ -29,9 +29,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.ScalarValueHints;
-import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
@@ -315,25 +313,6 @@ public class QueryPlanner {
         // split up the plan everywhere we see send/recieve into multiple plan fragments
         fragmentize(bestPlan);
         return bestPlan;
-    }
-
-    private static void checkPlanColumnLeakage(CompiledPlan plan, ParsedSelectStmt stmt) {
-        NodeSchema output_schema = plan.rootPlanGraph.getOutputSchema();
-        // Sanity-check the output NodeSchema columns against the display columns
-        if (stmt.displayColumns.size() != output_schema.size()) {
-            throw new PlanningErrorException("Mismatched plan output cols " +
-            "to parsed display columns");
-        }
-        for (ParsedColInfo display_col : stmt.displayColumns) {
-            SchemaColumn col = output_schema.find(display_col.tableName,
-                                                  display_col.tableAlias,
-                                                  display_col.columnName,
-                                                  display_col.alias);
-            if (col == null) {
-                throw new PlanningErrorException("Mismatched plan output cols " +
-                                                 "to parsed display columns");
-            }
-        }
     }
 
     private static void fragmentize(CompiledPlan plan) {
