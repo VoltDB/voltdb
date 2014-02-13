@@ -455,12 +455,8 @@ public class ParameterConverter {
             return param;
         } else if (expectedClz == String.class) {
             //For VARCHAR columns if not null or not an array send toString value.
-            if (param == null) {
-                return nullValueForType(expectedClz);
-            } else {
-                if (!param.getClass().isArray()) {
-                    return String.valueOf(param);
-                }
+            if (!param.getClass().isArray()) {
+                return String.valueOf(param);
             }
         }
 
