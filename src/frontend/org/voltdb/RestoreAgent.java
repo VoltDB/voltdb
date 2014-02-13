@@ -656,7 +656,7 @@ SnapshotCompletionInterest, Promotable
          * snapshot restore finishes.
          */
         if (m_action.doesRecover()) {
-            m_replayAgent.generateReplayPlan(expectedPartitionCount);
+            m_replayAgent.generateReplayPlan(expectedPartitionCount, m_isLeader);
         }
 
         m_planned = true;
