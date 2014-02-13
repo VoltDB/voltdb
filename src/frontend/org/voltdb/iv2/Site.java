@@ -28,6 +28,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google_voltpatches.common.base.Preconditions;
+
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -1181,5 +1182,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void setProcedureName(String procedureName) {
         m_ee.setProcedureName(procedureName);
+    }
+
+    @Override
+    public void notifyOfSnapshotNonce(String nonce) {
+        m_initiatorMailbox.notifyOfSnapshotNonce(nonce);
     }
 }
