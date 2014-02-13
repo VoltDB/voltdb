@@ -44,6 +44,15 @@ public class TableCountPlanNode extends AbstractScanPlanNode {
         return PlanNodeType.TABLECOUNT;
     }
 
+    /**
+     * Should just return true -- there's only one order for a single row
+     * @return true
+     */
+    @Override
+    public boolean isOrderDeterministic() {
+        return true;
+    }
+
     @Override
     public void generateOutputSchema(Database db){}
 
