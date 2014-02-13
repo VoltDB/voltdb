@@ -132,18 +132,25 @@ public abstract class CatalogUtil {
      * @param catalogBytes
      * @param log
      * @return The serialized string of the catalog content.
-     * @throws Exception
+     * @throws IOException
      *             If the catalog cannot be loaded because it's incompatible, or
      *             if there is no version information in the catalog.
      */
-    public static String loadCatalogFromJar(byte[] catalogBytes, VoltLogger log) throws IOException
+    public static String loadCatalogFromJar(byte[] catalogBytes, VoltLogger log)
+            throws IOException
     {
         InMemoryJarfile jarfile = loadCatalogJar(catalogBytes, log);
         byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
         if (null == serializedCatalogBytes) {
             throw new IOException("Database catalog not found in loaded in-memory jar.");
         }
-        return new String(serializedCatalogBytes, "UTF-8");
+        try {
+            return new String(serializedCatalogBytes, "UTF-8");
+        }
+        catch (UnsupportedEncodingException e) {
+            // This should not happen.
+            throw new IOException("Unexpected encoding exception reading catalog bytes.");
+        }
     }
 
     /**
@@ -154,12 +161,12 @@ public abstract class CatalogUtil {
      * @param catalogBytes
      * @param log
      * @return The in-memory jar containing the loaded catalog.
-     * @throws VoltCompilerException
      * @throws IOException
      *             If the catalog cannot be loaded because it's incompatible, or
      *             if there is no version information in the catalog.
      */
-    public static InMemoryJarfile loadCatalogJar(byte[] catalogBytes, VoltLogger log) throws IOException
+    public static InMemoryJarfile loadCatalogJar(byte[] catalogBytes, VoltLogger log)
+            throws IOException
     {
         assert(catalogBytes != null);
 

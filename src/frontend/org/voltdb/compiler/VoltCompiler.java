@@ -20,7 +20,6 @@ package org.voltdb.compiler;
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -494,8 +493,14 @@ public class VoltCompiler {
             if (projectReader != null) {
                 projectReader.putInJar(jarOutput, "project.xml");
             }
-            for (final Entry<String, String> e : m_ddlFilePaths.entrySet())
-                jarOutput.put(e.getKey(), new File(e.getValue()));
+            // Only add ddl file contents if not already in the in-memory catalog jar.
+            // This will happen during version upgrade.
+            for (final Entry<String, String> e : m_ddlFilePaths.entrySet()) {
+                String key = e.getKey();
+                if (!jarOutput.containsKey(key)) {
+                    jarOutput.put(e.getKey(), new File(e.getValue()));
+                }
+            }
             // put the compiler report into the jarfile
             jarOutput.put("catalog-report.html", m_report.getBytes(Constants.UTF8ENCODING));
             jarOutput.writeToFile(new File(jarOutputPath)).run();
@@ -800,7 +805,16 @@ public class VoltCompiler {
             for (SchemasType.Schema schema : database.getSchemas().getSchema()) {
                 compilerLog.l7dlog( Level.INFO, LogKeys.compiler_VoltCompiler_CatalogPath.name(),
                                     new Object[] {schema.getPath()}, null);
-                ddlReaderList.add(createDDLFileReader(schema.getPath()));
+                // Prefer to use the in-memory copy.
+                // All ddl.sql is placed in the jar root folder.
+                File schemaFile = new File(schema.getPath());
+                String schemaName = schemaFile.getName();
+                if (jarOutput != null && jarOutput.containsKey(schemaName)) {
+                    ddlReaderList.add(new VoltCompilerJarFileReader(jarOutput, schemaName));
+                }
+                else {
+                    ddlReaderList.add(createDDLFileReader(schema.getPath()));
+                }
             }
         }
 
@@ -2228,16 +2242,23 @@ public class VoltCompiler {
      * an upgraded jar file.
      *
      * @param outputJar  in-memory jar file (updated in place here)
-     * @throws FileNotFoundException, IOException
+     * @throws IOException
      */
     public void upgradeCatalogAsNeeded(InMemoryJarfile outputJar)
-                    throws FileNotFoundException, IOException
+                    throws IOException
     {
         byte[] buildInfoBytes = outputJar.get(CatalogUtil.CATALOG_BUILDINFO_FILENAME);
         if (buildInfoBytes == null) {
             throw new IOException("Catalog build information not found - please build your application using the current version of VoltDB.");
         }
-        String buildInfo = new String(buildInfoBytes, "UTF-8");
+        String buildInfo;
+        try {
+            buildInfo = new String(buildInfoBytes, "UTF-8");
+        }
+        catch (UnsupportedEncodingException e) {
+            // This should not happen.
+            throw new IOException("Unexpected encoding exception reading build info.");
+        }
         String[] buildInfoLines = buildInfo.split("\n");
         if (buildInfoLines.length != 5) {
             throw new IOException("Catalog built with an old version of VoltDB - please build your application using the current version of VoltDB.");
@@ -2314,6 +2335,7 @@ public class VoltCompiler {
                             voltVersionString, version, outputJarPath));
                 }
                 else {
+                    compilerLog.error("Catalog upgrade failed.");
                     throw new IOException(String.format(
                             "Failed to generate upgraded catalog file \"%s\".",
                             outputJarPath));
