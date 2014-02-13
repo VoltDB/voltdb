@@ -418,6 +418,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // Create the GlobalServiceElector.  Do this here so we can register the MPI with it
             // when we construct it below
             m_globalServiceElector = new GlobalServiceElector(m_messenger.getZK(), m_messenger.getHostId());
+            // Start the GlobalServiceElector.  Not sure where this will actually belong.
+            try {
+                m_globalServiceElector.start();
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unable to start GlobalServiceElector", true, e);
+            }
 
             // Always create a mailbox for elastic join data transfer
             if (m_config.m_isEnterprise) {
@@ -622,15 +628,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             try {
                 usingCommandLog = m_config.m_isEnterprise &&
                     m_catalogContext.cluster.getLogconfig().get("log").getEnabled();
-                m_leaderAppointer = new LeaderAppointer(
-                        m_messenger,
-                        m_configuredNumberOfPartitions,
-                        m_deployment.getCluster().getKfactor(),
-                        m_catalogContext.cluster.getNetworkpartition(),
-                        m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"),
-                        usingCommandLog,
-                        topo, m_MPI, kSafetyStats);
-                m_globalServiceElector.registerService(m_leaderAppointer);
 
                 for (Initiator iv2init : m_iv2Initiators) {
                     iv2init.configure(
@@ -647,19 +644,24 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                             m_nodeDRGateway,
                             m_config.m_executionCoreBindings.poll());
                 }
+
+                // LeaderAppointer startup blocks if the initiators are not initialized.
+                // So create the LeaderAppointer after the initiators.
+                m_leaderAppointer = new LeaderAppointer(
+                        m_messenger,
+                        m_configuredNumberOfPartitions,
+                        m_deployment.getCluster().getKfactor(),
+                        m_catalogContext.cluster.getNetworkpartition(),
+                        m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"),
+                        usingCommandLog,
+                        topo, m_MPI, kSafetyStats);
+                m_globalServiceElector.registerService(m_leaderAppointer);
             } catch (Exception e) {
                 Throwable toLog = e;
                 if (e instanceof ExecutionException) {
                     toLog = ((ExecutionException)e).getCause();
                 }
                 VoltDB.crashLocalVoltDB("Error configuring IV2 initiator.", true, toLog);
-            }
-
-            // Start the GlobalServiceElector.  Not sure where this will actually belong.
-            try {
-                m_globalServiceElector.start();
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Unable to start GlobalServiceElector", true, e);
             }
 
             // Need to register the OpsAgents right before we turn on the client interface

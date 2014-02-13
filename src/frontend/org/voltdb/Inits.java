@@ -681,6 +681,7 @@ public class Inits {
                     VoltDB.crashLocalVoltDB("Unable to construct the RestoreAgent", true, e);
                 }
 
+                m_rvdb.m_globalServiceElector.registerService(m_rvdb.m_restoreAgent);
                 m_rvdb.m_restoreAgent.setCatalogContext(m_rvdb.m_catalogContext);
                 // Generate plans and get (hostID, catalogPath) pair
                 Pair<Integer,String> catalog = m_rvdb.m_restoreAgent.findRestoreCatalog();

@@ -35,6 +35,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -50,7 +51,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
-import org.voltcore.zk.LeaderElector;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
@@ -72,9 +72,12 @@ import org.voltdb.utils.MiscUtils;
  *
  * Once all of these tasks have finished successfully, it will call RealVoltDB
  * to resume normal operation.
+ *
+ * Making it a Promotable and elected by the GlobalServiceElector so that it's
+ * colocated with the MPI.
  */
 public class RestoreAgent implements CommandLogReinitiator.Callback,
-SnapshotCompletionInterest
+SnapshotCompletionInterest, Promotable
 {
     // Implement this callback to get notified when restore finishes.
     public interface Callback {
@@ -127,12 +130,6 @@ SnapshotCompletionInterest
 
     private boolean m_planned = false;
 
-    /*
-     * Don't ask the leader elector if you are the leader
-     * it can give the wrong answer after the first election...
-     * Use the memoized field m_isLeader.
-     */
-    private LeaderElector m_leaderElector = null;
     private boolean m_isLeader = false;
 
     private TransactionCreator m_initiator;
@@ -514,16 +511,6 @@ SnapshotCompletionInterest
      */
     void enterRestore() {
         try {
-            m_leaderElector = new LeaderElector(m_zk, VoltZK.restore_barrier,
-                                                "restore",
-                                                new byte[0], null);
-            m_leaderElector.start(true);
-            m_isLeader = m_leaderElector.isLeader();
-        } catch (Exception e) {
-            VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
-                                     false, e);
-        }
-        try {
             m_generatedRestoreBarrier2 = m_zk.create(VoltZK.restore_barrier2 + "/counter", null,
                         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
         } catch (Exception e) {
@@ -562,10 +549,6 @@ SnapshotCompletionInterest
                 break;
             }
         }
-
-        try {
-            m_leaderElector.shutdown();
-        } catch (Exception ignore) {}
 
         // Clean up the ZK snapshot ID node so that we're good for next time.
         try
@@ -1307,5 +1290,11 @@ SnapshotCompletionInterest
             changeState();
         }
         return new CountDownLatch(0);
+    }
+
+    @Override
+    public void acceptPromotion() throws InterruptedException, ExecutionException, KeeperException
+    {
+        m_isLeader = true;
     }
 }
