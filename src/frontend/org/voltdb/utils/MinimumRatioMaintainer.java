@@ -22,8 +22,12 @@ import com.google_voltpatches.common.base.Preconditions;
 
 /*
  *
- * Maintain a minimum ratio between two counts. A is always and counted.
- * B is counted, but may not be allowed if doing a B would break the ratio restriction.
+ * Maintain a minimum ratio between two counts. unrestricted is always counted.
+ * restricted is counted, but may not be allowed if doing a restricted increment would break the ratio restriction.
+ *
+ * This is useful for maintaining a best possible latency for tasks of the unrestricted type by allow them to burst,
+ * but still ensuring that the restricted tasks are done at a rate that maintains the ratio.
+ *
  */
 public class MinimumRatioMaintainer {
     private final double ratio;

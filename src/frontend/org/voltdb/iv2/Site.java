@@ -526,10 +526,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         //If the mrm says we can do a restricted task, go do it
                         //Otherwise spin doing unrestricted tasks until we can bail out
                         //and do the restricted task that was polled
-                        if (!m_rejoinTaskLog.isEmpty() && !mrm.canDoRestricted()) {
-                            while (!mrm.canDoRestricted()) {
-                                replayFromTaskLog(mrm);
-                            }
+                        while (!m_rejoinTaskLog.isEmpty() && !mrm.canDoRestricted()) {
+                            replayFromTaskLog(mrm);
                         }
                         mrm.didRestricted();
                         task.runForRejoin(getSiteProcedureConnection(), m_rejoinTaskLog);
