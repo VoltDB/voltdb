@@ -28,6 +28,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google_voltpatches.common.base.Preconditions;
+
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -81,13 +82,18 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.sysprocs.SysProcFragmentId;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.LogKeys;
 
+import org.voltdb.utils.MinimumRatioMaintainer;
 import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+
+    private static final double m_taskLogReplayRatio =
+            Double.valueOf(System.getProperty("TASKLOG_REPLAY_RATIO", "0.6"));
 
     // Set to false trigger shutdown.
     volatile boolean m_shouldContinue = true;
@@ -497,7 +503,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
         initialize(m_startupConfig.m_serializedCatalog, m_startupConfig.m_timestamp);
         m_startupConfig = null; // release the serializedCatalog bytes.
-
+        //Maintain a minimum ratio of task log (unrestricted) to live (restricted) transactions
+        final MinimumRatioMaintainer mrm = new MinimumRatioMaintainer(m_taskLogReplayRatio);
         try {
             while (m_shouldContinue) {
                 if (m_rejoinState == kStateRunning) {
@@ -512,11 +519,23 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 else {
                     // Rejoin operation poll and try to do some catchup work. Tasks
                     // are responsible for logging any rejoin work they might have.
-                    SiteTasker task = m_scheduler.poll();
-                    if (task != null) {
+                    SiteTasker task = null;
+                    boolean didWork = false;
+                    while ((task = m_scheduler.poll()) != null) {
+                        didWork = true;
+                        //If the task log is empty, free to execute the task
+                        //If the mrm says we can do a restricted task, go do it
+                        //Otherwise spin doing unrestricted tasks until we can bail out
+                        //and do the restricted task that was polled
+                        while (!m_rejoinTaskLog.isEmpty() && !mrm.canDoRestricted()) {
+                            replayFromTaskLog(mrm);
+                        }
+                        mrm.didRestricted();
                         task.runForRejoin(getSiteProcedureConnection(), m_rejoinTaskLog);
                     }
-                    replayFromTaskLog();
+                    //If there are no tasks, do task log work
+                    didWork |= replayFromTaskLog(mrm);
+                    if (!didWork) Thread.yield();
                 }
             }
         }
@@ -539,24 +558,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     ParticipantTransactionState global_replay_mpTxn = null;
-    void replayFromTaskLog() throws IOException
+    boolean replayFromTaskLog(MinimumRatioMaintainer mrm) throws IOException
     {
         // not yet time to catch-up.
         if (m_rejoinState != kStateReplayingRejoin) {
-            return;
+            return false;
         }
 
-        // replay 10:1 in favor of replay
-        for (int i=0; i < 10; ++i) {
-            if (m_rejoinTaskLog.isEmpty()) {
-                break;
-            }
-
-            TransactionInfoBaseMessage tibm = m_rejoinTaskLog.getNextMessage();
-            if (tibm == null) {
-                break;
-            }
-
+        TransactionInfoBaseMessage tibm = m_rejoinTaskLog.getNextMessage();
+        if (tibm != null) {
+            mrm.didUnrestricted();
             if (tibm instanceof Iv2InitiateTaskMessage) {
                 Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)tibm;
                 SpProcedureTask t = new SpProcedureTask(
@@ -620,6 +631,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         if (m_rejoinTaskLog.isEmpty() && global_replay_mpTxn == null) {
             setReplayRejoinComplete();
         }
+        return tibm != null;
     }
 
     static boolean filter(TransactionInfoBaseMessage tibm)
@@ -629,20 +641,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         // if it wants to be filtered for rejoin and eliminate this
         // horrible introspection. This implementation mimics the
         // original live rejoin code for ExecutionSite...
+        // Multi part AdHoc Does not need to be chacked because its an alias and runs procedure as planned.
         if (tibm instanceof FragmentTaskMessage && ((FragmentTaskMessage)tibm).isSysProcTask()) {
-            if (!SysProcFragmentId.isBalancePartitionsFragment(((FragmentTaskMessage) tibm).getPlanHash(0))) {
+            if (!SysProcFragmentId.isDurableFragment(((FragmentTaskMessage) tibm).getPlanHash(0))) {
                 return true;
             }
         }
         else if (tibm instanceof Iv2InitiateTaskMessage) {
-            Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage)tibm;
-            if ((itm.getStoredProcedureName().startsWith("@") == false) ||
-                (itm.getStoredProcedureName().startsWith("@AdHoc") == true)) {
-                return false;
-            }
-            else {
-                return true;
-            }
+            Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage) tibm;
+            //All durable sysprocs and non-sysprocs should not get filtered.
+            return !CatalogUtil.isDurableProc(itm.getStoredProcedureName());
         }
         return false;
     }
@@ -1174,5 +1182,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void setProcedureName(String procedureName) {
         m_ee.setProcedureName(procedureName);
+    }
+
+    @Override
+    public void notifyOfSnapshotNonce(String nonce) {
+        m_initiatorMailbox.notifyOfSnapshotNonce(nonce);
     }
 }

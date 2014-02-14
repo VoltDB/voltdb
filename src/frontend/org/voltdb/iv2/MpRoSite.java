@@ -500,4 +500,10 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public void setProcedureName(String procedureName) {
         // don't need to do anything here I think?
     }
+
+    @Override
+    public void notifyOfSnapshotNonce(String nonce) {
+        // TODO Auto-generated method stub
+
+    }
 }

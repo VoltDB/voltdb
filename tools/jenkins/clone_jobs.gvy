@@ -13,9 +13,11 @@ def str_oldbranch = "master"
 def str_viewname="system tests-elastic"
 //def str_viewname="system tests-noelastic"
 
-def str_branch = "ENG-5154"
-boolean enable_performance = true
-boolean enable_systemtest = false
+def str_branch = "ENG-5664"
+boolean enable_performance = false
+def trigger_performance = "kit" // trigger or kit
+boolean enable_systemtest = true
+boolean enable_endurance = false
 boolean enable_cl_truncation = false
 boolean enable_supers = false
 boolean makenew = false // true=delete existing jobs, false=keep existing jobs but change job enable/disable settings
@@ -38,8 +40,6 @@ for (item in Hudson.instance.items) {
                            item.getName().contains(str_search_3))) {
 */
 for(item in view.getItems()) {
-    //if (item.disabled)
-    //     continue
     if (item.getName().startsWith("kit-"))
       alljobs.add(0, item)
     else
@@ -70,7 +70,9 @@ for(item in alljobs)
 
       AbstractProject project = job
 
-      if (project.getName().startsWith("performance-"))
+      if (item.disabled)
+         project.disabled = true
+      else if (project.getName().startsWith("performance-"))
           project.disabled = !enable_performance
       else if (project.getName().endsWith("-cl-truncation"))
           project.disabled = !enable_cl_truncation
@@ -78,6 +80,8 @@ for(item in alljobs)
           project.disabled = !enable_systemtest
       else if (project.getName().startsWith("test-"))
           project.disabled = !enable_supers
+      else if (project.getName().startsWith("endurance-"))
+          project.disabled = !enable_endurance
      else
           project.disabled = false
 
@@ -116,9 +120,13 @@ for(item in alljobs)
             if (t != null)
                 job.removeTrigger(t.getDescriptor())
         } catch(e) { println "no timer trigger found" }
+
         if (project != kit) {
-            // make a list of all jobs for a BuildTrigger for the kit build job
-            downstream = downstream + "," + project.getName() // make a list of downstream projects
+            if (project.getName().startsWith("performance-") && trigger_performance != "kit")
+                project.addTrigger(new triggers.TimerTrigger(trigger_performance))
+            else
+                // make a list of all jobs for a BuildTrigger for the kit build job
+                downstream = downstream + "," + project.getName() // make a list of downstream projects
         }
     }
 
@@ -153,5 +161,5 @@ if (downstream.length() > 0) {
   } catch(e) {
      kit.getPublishersList().add(bt)
   }
-  kit.save()
 }
+kit.save()

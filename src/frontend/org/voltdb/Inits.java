@@ -431,6 +431,37 @@ public class Inits {
         StartHTTPServer() {
         }
 
+        //Setup http server with given port and interface
+        private void setupHttpServer(String httpInterface, int httpPort, boolean findAny, boolean mustListen) {
+
+            boolean success = false;
+            for (; true; httpPort++) {
+                try {
+                    m_rvdb.m_adminListener = new HTTPAdminListener(m_rvdb.m_jsonEnabled, httpInterface, httpPort);
+                    success = true;
+                    break;
+                } catch (Exception e1) {
+                    if (mustListen) {
+                        hostLog.fatal("HTTP service unable to bind to port " + httpPort + ". Exiting.", e1);
+                        System.exit(-1);
+                    }
+                }
+                if (!findAny) {
+                    break;
+                }
+            }
+            if (!success) {
+                m_rvdb.m_httpPortExtraLogMessage = "HTTP service unable to bind to ports 8080 through "
+                        + String.valueOf(httpPort - 1);
+                if (mustListen) {
+                    System.exit(-1);
+                }
+                m_config.m_httpPort = -1;
+                return;
+            }
+            m_config.m_httpPort = httpPort;
+        }
+
         @Override
         public void run() {
             // start the httpd dashboard/jsonapi. A port value of -1 means disabled
@@ -443,33 +474,20 @@ public class Inits {
                     m_rvdb.m_jsonEnabled = m_deployment.getHttpd().getJsonapi().isEnabled();
                 }
             }
-
-            // if not set by the user, just find a free port
-            if (httpPort == 0) {
+            // if set by cli use that.
+            if (m_config.m_httpPort != Integer.MAX_VALUE) {
+                setupHttpServer(m_config.m_httpPortInterface, m_config.m_httpPort, false, true);
+                // if not set by the user, just find a free port
+            } else if (httpPort == 0) {
                 // if not set by the user, start at 8080
                 httpPort = 8080;
-
-                for (; true; httpPort++) {
-                    try {
-                        m_rvdb.m_adminListener = new HTTPAdminListener(m_rvdb.m_jsonEnabled, httpPort);
-                        break;
-                    } catch (Exception e1) {}
+                setupHttpServer("", httpPort, true, false);
+            } else if (httpPort != -1) {
+                if (!m_deployment.getHttpd().isEnabled()) {
+                    return;
                 }
-                if (httpPort == 8081)
-                    m_rvdb.m_httpPortExtraLogMessage = "HTTP service unable to bind to port 8080";
-                else if (httpPort > 8081)
-                    m_rvdb.m_httpPortExtraLogMessage = "HTTP service unable to bind to ports 8080 through "
-                            + String.valueOf(httpPort - 1);
+                setupHttpServer("", httpPort, false, true);
             }
-            else if (httpPort != -1) {
-                try {
-                    m_rvdb.m_adminListener = new HTTPAdminListener(m_rvdb.m_jsonEnabled, httpPort);
-                } catch (Exception e1) {
-                    hostLog.fatal("HTTP service unable to bind to port " + httpPort + ". Exiting.");
-                    System.exit(-1);
-                }
-            }
-            m_config.m_httpPort = httpPort;
         }
     }
 

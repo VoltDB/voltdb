@@ -30,6 +30,7 @@ import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -538,8 +539,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         final SpProcedureTask task =
             new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg, m_drGateway);
         if (!msg.isReadOnly()) {
-            if (!m_cl.log(msg, msg.getSpHandle(), new HashSet<Integer>(), m_durabilityListener, task)) {
-                m_pendingTasks.offer(task);
+            ListenableFuture<Object> durabilityBackpressureFuture =
+                    m_cl.log(msg, msg.getSpHandle(), new HashSet<Integer>(), m_durabilityListener, task);
+            if (durabilityBackpressureFuture != null) {
+                m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
             }
         } else {
             m_pendingTasks.offer(task);
@@ -824,10 +827,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                                  m_pendingTasks, msg, null);
         }
         if (logThis) {
-            assert !msg.getInvolvedPartitions().isEmpty();
-            if (!m_cl.log(msg.getInitiateTask(), msg.getSpHandle(), msg.getInvolvedPartitions(),
-                    m_durabilityListener, task)) {
-                m_pendingTasks.offer(task);
+            ListenableFuture<Object> durabilityBackpressureFuture =
+                    m_cl.log(msg.getInitiateTask(), msg.getSpHandle(), msg.getInvolvedPartitions(),
+                             m_durabilityListener, task);
+            if (durabilityBackpressureFuture != null) {
+                m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
             } else {
                 /* Getting here means that the task is the first fragment of an MP txn and
                  * synchronous command logging is on, so create a backlog for future tasks of

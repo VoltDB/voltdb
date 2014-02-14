@@ -636,10 +636,11 @@ public abstract class VoltTableRow {
         return getTimestampAsSqlTimestamp(colIndex);
     }
 
-    /*
-     * Retrieve the BigDecimal value stored in the column
+    /**
+     * <p>Retrieve the {@link BigDecimal} value stored in the column
      * specified by the index. All DECIMAL types have a fixed
-     * scale when represented as BigDecimals.
+     * scale when represented as BigDecimals.</p>
+     *
      * @param columnIndex Index of the column
      * @return BigDecimal representation.
      * @see #wasNull()
@@ -655,7 +656,7 @@ public abstract class VoltTableRow {
     }
 
     /**
-     * Retrieve the BigDecimal value stored in the column
+     * Retrieve the {@link BigDecimal} value stored in the column
      * specified by columnName. All DECIMAL types have a
      * fixed scale when represented as BigDecimals.
      * @param columnName Name of the column

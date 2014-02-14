@@ -21,33 +21,32 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb_testprocs.regressionsuites.executionsitekillers;
+package org.voltdb_testprocs.regressionsuites.sqlfeatureprocs;
 
-import org.voltdb.*;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
 @ProcInfo (
-    partitionInfo = "NEW_ORDER.NO_W_ID: 0",
-    singlePartition = true
+    singlePartition = false
 )
-public class SinglePartitionKiller extends VoltProcedure {
+public class TruncateTable extends VoltProcedure {
 
-    public final SQLStmt insert = new SQLStmt("INSERT INTO NEW_ORDER VALUES (?, ?, ?);");
+    public final SQLStmt truncateRTable = new SQLStmt("DELETE from RTABLE;");
+    public final SQLStmt truncatePTable = new SQLStmt("DELETE from PTABLE;");
 
-    public VoltTable[] run(byte w_id) throws VoltAbortException {
-        voltQueueSQL(insert, w_id, w_id, w_id);
-        VoltTable[] results = voltExecuteSQL();
+    public final SQLStmt insertRTable = new SQLStmt("INSERT INTO RTABLE VALUES(6,  30,  1.1, 'Jedi',  'Winchester');");
 
-        // SCARY!  DON'T TRY THIS AT HOME!  Need a way to kill only one
-        // replica and had to resort to this.  ABSOLUTELY POSITIVELY NOT
-        // ADVISED AND DEFINITELY FROWNED UPON FOR A REAL APPLICATION.
-        int host_id = VoltDB.instance().getHostMessenger().getHostId();
-        if ((host_id % 2) == 0)
-        {
-            throw new AssertionError("Site-co killer, q'est que c'est");
-        }
-        else
-        {
-            return results;
-        }
+    public VoltTable[] run() {
+
+        voltQueueSQL(truncateRTable);
+        voltQueueSQL(truncatePTable);
+
+        voltQueueSQL(insertRTable);
+        voltQueueSQL(insertRTable);
+
+        return voltExecuteSQL();
     }
+
 }

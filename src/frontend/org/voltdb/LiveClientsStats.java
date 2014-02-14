@@ -104,8 +104,8 @@ public class LiveClientsStats extends StatsSource
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval)
     {
         m_clientStats = new HashMap<Long, Pair<String,long[]>>();
-        for (ClientInterface ci : VoltDB.instance().getClientInterfaces())
-        {
+        ClientInterface ci = VoltDB.instance().getClientInterface();
+        if (ci != null) {
             m_clientStats.putAll(ci.getLiveClientStats());
         }
         return new DummyIterator(m_clientStats.keySet().iterator());

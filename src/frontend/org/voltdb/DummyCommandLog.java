@@ -20,6 +20,8 @@ package org.voltdb;
 import java.util.Map;
 import java.util.Set;
 
+import com.google_voltpatches.common.util.concurrent.Futures;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class DummyCommandLog implements CommandLog {
@@ -41,13 +43,13 @@ public class DummyCommandLog implements CommandLog {
                               Map<Integer, Long> perPartitionTxnId) {}
 
     @Override
-    public boolean log(
+    public ListenableFuture<Object> log(
             Iv2InitiateTaskMessage message,
             long spHandle,
             Set<Integer> involvedPartitions,
             DurabilityListener l,
             Object handle) {
-        return false;
+        return Futures.immediateFuture(null);
     }
 
     @Override

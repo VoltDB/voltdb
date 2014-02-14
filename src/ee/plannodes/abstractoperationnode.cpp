@@ -64,10 +64,13 @@ string AbstractOperationPlanNode::getTargetTableName() const {
     return target_table_name;
 }
 Table* AbstractOperationPlanNode::getTargetTable() const {
-    return (this->target_table);
+    if (m_tcd == NULL) {
+        return NULL;
+    }
+    return (m_tcd->getTable());
 }
-void AbstractOperationPlanNode::setTargetTable(Table* table) {
-    this->target_table = table;
+void AbstractOperationPlanNode::setTargetTableDelegate(TableCatalogDelegate * table) {
+    m_tcd = table;
 }
 void AbstractOperationPlanNode::setTargetTableName(string name) {
     this->target_table_name = name;

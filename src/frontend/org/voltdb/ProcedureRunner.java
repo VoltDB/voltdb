@@ -838,7 +838,7 @@ public class ProcedureRunner {
                 assert(stmt != null);
                 Statement statement = m_catProc.getStatements().get(VoltDB.ANON_STMT_NAME);
                 String s = statement.getSqltext();
-                stmt.setSQLStr(s);
+                SQLStmtAdHocHelper.setSQLStr(stmt, s);
                 m_cachedSingleStmt.stmt = stmt;
 
                 int numParams = m_catProc.getParameters().size();

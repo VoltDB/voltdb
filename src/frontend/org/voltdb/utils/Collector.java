@@ -241,6 +241,9 @@ public class Collector {
                 if (file.getName().startsWith("voltdb_crash") && file.getName().endsWith(".txt")) {
                     collectionFilesList.add(file.getCanonicalPath());
                 }
+                if (file.getName().startsWith("hs_err_pid") && file.getName().endsWith(".log")) {
+                    collectionFilesList.add(file.getCanonicalPath());
+                }
             }
 
             for (File file: new File(m_workingDir).listFiles()) {
@@ -290,10 +293,10 @@ public class Collector {
             }
             else {
                 TimestampType ts = new TimestampType(new java.util.Date());
-                timestamp = ts.toString().replace(' ', '-');
+                timestamp = ts.toString().replace(' ', '-').replace(':', '-');
 
                 // get rid of microsecond part
-                timestamp = timestamp.substring(0, "YYYY-mm-DD-HH:MM:ss".length());
+                timestamp = timestamp.substring(0, "YYYY-mm-DD-HH-MM-ss".length());
 
                 rootpath = System.getProperty("user.dir");
             }

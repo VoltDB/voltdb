@@ -72,16 +72,6 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
     }
 
     /**
-     * Accessor for flag marking the plan as guaranteeing an identical result/effect
-     * when "replayed" against the same database state, such as during replication or CL recovery.
-     * @return true, since statement does not produce a query result
-     */
-    @Override
-    public boolean isContentDeterministic() {
-        return true;
-    }
-
-    /**
      * @return the target_table_name
      */
     public final String getTargetTableName() {
@@ -113,11 +103,10 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
         if (m_outputSchema == null)
         {
             m_outputSchema = new NodeSchema();
-            // The EE knows to assume the correct output schema for these "DML" nodes.
-            // TODO: It'd probably be ok just to leave m_outputSchema null, here, but
-            // maybe the "completed plan" processing for DML statements would need to be a
-            // made aware of this.
-            m_hasSignificantOutputSchema = false;
+            // If there is a child node, its output schema will depend on that.
+            // If not, mark this flag true to get initialized in EE.
+            m_hasSignificantOutputSchema = m_children.size() == 0 ? true : false;
+
             // This TVE is magic and repeats unfortunately like this
             // throughout the planner.  Consolidate at some point --izzy
             TupleValueExpression tve = new TupleValueExpression(

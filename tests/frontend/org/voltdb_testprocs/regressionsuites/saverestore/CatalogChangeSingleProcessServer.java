@@ -101,4 +101,9 @@ public class CatalogChangeSingleProcessServer extends LocalSingleProcessServer
             retval += "-JNI";
         return retval;
     }
+
+    @Override
+    public void setMaxHeap(int max) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
 }

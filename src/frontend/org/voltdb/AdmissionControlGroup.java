@@ -181,7 +181,7 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
                             "the next time the condition occurs to avoid log spam");
                 }
                 if (badPendingBytes) {
-                    networkLog.warn(
+                    networkLog.error(
                             "Backpressure reports a negative outstanding transaction byte count (" +
                             m_pendingTxnBytes +
                             "). No action required.");
