@@ -83,13 +83,20 @@ class Row {
 
 def cli = new CliBuilder(usage: 'chartbuilder.groovy [options] [log-files]')
 
-cli.c(longOpt: 'csv-file', required: true, argName:'file', args: 1, 'periodic measurements csv file' )
-cli.h(longOpt: 'help', required: false, 'usage information')
+cli.c(longOpt: 'csv-file', required:true, argName:'file', args:1, 'periodic measurements csv file' )
+cli.h(longOpt: 'help', required:false, 'usage information')
+cli.o(longOpt: 'output', required:false, argName:'file', args:1, 'chart output file')
 
 def opts = cli.parse(args)
-if (!opts || opts.h) {
+if (!opts) return
+else if (opts.h) {
 	cli.usage()
 	return
+}
+
+def pw = System.out
+if (opts.o) {
+	pw = new PrintWriter(new FileWriter(opts.o),true)
 }
 
 def periodicFH = new File(opts.c)
@@ -142,7 +149,7 @@ triggers << new Trigger(re: nodefailRE, onMatch: { lines, mtc, tm ->
 })
 
 def feeder = new LogFeeder()
-def voltRE = ~/(?i)volt/
+def voltRE = ~/(?i)(?:volt|-log)/
 
 opts.arguments().each { logFN ->
 	def logFH = new File(logFN)
@@ -201,4 +208,4 @@ def txt = """<html>
 </html>
 """
 
-println txt
+pw.println txt
