@@ -34,7 +34,8 @@ import java.util.concurrent.ExecutorService;
 public class VoltLogger {
     final CoreVoltLogger m_logger;
 
-    private static final ExecutorService m_es = CoreUtils.getSingleThreadExecutor("Async Logger");
+    private static final String m_threadName = "Async Logger";
+    private static final ExecutorService m_es = CoreUtils.getSingleThreadExecutor(m_threadName);
 
     private static final boolean m_disableAsync = Boolean.getBoolean("DISABLE_ASYNC_LOGGING");
 
@@ -74,10 +75,16 @@ public class VoltLogger {
      */
     private void submit(final Level l, final Object message, final Throwable t, boolean wait) {
         if (m_disableAsync) m_logger.log(l, message, t);
+        final Thread currentThread = Thread.currentThread();
         final Runnable r = new Runnable() {
             @Override
             public void run() {
-                m_logger.log(l, message, t);
+                Thread.currentThread().setName(currentThread.getName());
+                try {
+                    m_logger.log(l, message, t);
+                } finally {
+                    Thread.currentThread().setName(m_threadName);
+                }
             }
         };
         if (wait) {
@@ -93,10 +100,16 @@ public class VoltLogger {
 
     private void submitl7d(final Level level, final String key, final Object[] params, final Throwable t) {
         if (m_disableAsync) m_logger.l7dlog(level, key, params, t);
+        final Thread currentThread = Thread.currentThread();
         final Runnable r = new Runnable() {
             @Override
             public void run() {
-                m_logger.l7dlog(level, key, params, t);
+                Thread.currentThread().setName(currentThread.getName());
+                try {
+                    m_logger.l7dlog(level, key, params, t);
+                } finally {
+                    Thread.currentThread().setName(m_threadName);
+                }
             }
         };
         switch (level) {
