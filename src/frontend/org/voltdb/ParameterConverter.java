@@ -453,6 +453,11 @@ public class ParameterConverter {
             }
         } else if (expectedClz == VoltTable.class && inputClz == VoltTable.class) {
             return param;
+        } else if (expectedClz == String.class) {
+            //For VARCHAR columns if not null or not an array send toString value.
+            if (!param.getClass().isArray()) {
+                return String.valueOf(param);
+            }
         }
 
         // handle SystemProcedureExecutionContext without linking to it
