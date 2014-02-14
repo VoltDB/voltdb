@@ -515,13 +515,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_lastTxnTime = EstTime.currentTimeMillis();
                     }
                     task.run(getSiteProcedureConnection());
-                }
-                else {
+                } else if (m_rejoinState == kStateReplayingRejoin) {
                     // Rejoin operation poll and try to do some catchup work. Tasks
                     // are responsible for logging any rejoin work they might have.
-                    SiteTasker task = null;
+                    SiteTasker task = m_scheduler.poll();
                     boolean didWork = false;
-                    while ((task = m_scheduler.poll()) != null) {
+                    if (task != null) {
                         didWork = true;
                         //If the task log is empty, free to execute the task
                         //If the mrm says we can do a restricted task, go do it
@@ -531,11 +530,19 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             replayFromTaskLog(mrm);
                         }
                         mrm.didRestricted();
-                        task.runForRejoin(getSiteProcedureConnection(), m_rejoinTaskLog);
+                        if (m_rejoinState == kStateRunning) {
+                            task.run(getSiteProcedureConnection());
+                        } else {
+                            task.runForRejoin(getSiteProcedureConnection(), m_rejoinTaskLog);
+                        }
+                    } else {
+                        //If there are no tasks, do task log work
+                        didWork |= replayFromTaskLog(mrm);
                     }
-                    //If there are no tasks, do task log work
-                    didWork |= replayFromTaskLog(mrm);
                     if (!didWork) Thread.yield();
+                } else {
+                    SiteTasker task = m_scheduler.take();
+                    task.runForRejoin(getSiteProcedureConnection(), m_rejoinTaskLog);
                 }
             }
         }
