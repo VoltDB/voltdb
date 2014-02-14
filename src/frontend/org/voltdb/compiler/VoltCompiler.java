@@ -2083,7 +2083,12 @@ public class VoltCompiler {
         }
 
         String stem = c.getName().replace('.', '/');
-        URL curl = cl.getResource(stem+".class");
+        String cpath = stem + ".class";
+        URL curl = cl.getResource(cpath);
+        if (curl == null) {
+            throw new VoltCompilerException(String.format(
+                    "Failed to find class file %s in jar.", cpath));
+        }
 
         if ("jar".equals(curl.getProtocol())) {
             Pattern nameRE = Pattern.compile("\\A(" + stem + "\\$[^/]+).class\\z");
@@ -2316,9 +2321,15 @@ public class VoltCompiler {
 
             // Use the in-memory jarfile-provided class loader so that procedure
             // classes can be found and copied to the new file that gets written.
+            // The temp file usage is a work-around to make the more complex
+            // inner class scan logic work without extending InMemoryJarFile.
+            File tempfile = File.createTempFile("catalog", ".jar");
             ClassLoader originalClassLoader = m_classLoader;
             try {
-                m_classLoader = outputJar.getLoader();
+                // Create a temporary custom class loader so that catalog classes can be found.
+                // Caller handles IOException.
+                outputJar.writeToFile(tempfile);
+                m_classLoader = new VoltCompilerClassLoader(tempfile.toURI().toURL());
 
                 // Compile and save the file to voltdbroot. Assume it's a test environment if there
                 // is no catalog context available.
@@ -2342,8 +2353,9 @@ public class VoltCompiler {
                 }
             }
             finally {
-                // Restore the original class loader.
+                // Restore the original class loader and delete the temporary jar file.
                 m_classLoader = originalClassLoader;
+                tempfile.delete();
             }
         }
     }
