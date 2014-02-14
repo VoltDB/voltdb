@@ -118,7 +118,6 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_tuplesProcessedSinceReport(0),
       m_tupleReportThreshold(LONG_OP_THRESHOLD),
       m_lastAccessedTable(NULL),
-      m_lastAccessedPlanNodeName(NULL),
       m_currentUndoQuantum(NULL),
       m_hashinator(NULL),
       m_staticParams(MAX_PARAM_COUNT),

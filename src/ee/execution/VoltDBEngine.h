@@ -521,7 +521,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int64_t m_tupleReportThreshold;
         Table *m_lastAccessedTable;
         AbstractExecutor* m_lastAccessedExec;
-        std::string *m_lastAccessedPlanNodeName;
 
         PlanSet m_plans;
         voltdb::UndoLog m_undoLog;
