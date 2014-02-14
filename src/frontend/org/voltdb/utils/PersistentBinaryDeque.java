@@ -262,7 +262,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             }
             resultBuffer.flip();
 
-            return new BBContainer( resultBuffer, 0L) {
+            return new BBContainer( resultBuffer ) {
                 private boolean discarded = false;
 
                 private final Throwable t = new Throwable();

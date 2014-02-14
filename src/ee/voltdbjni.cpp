@@ -631,29 +631,6 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSeria
 
 /*
  * Class:     org_voltcore_utils_DBBPool
- * Method:    getBufferAddress
- * Signature: (Ljava/nio/ByteBuffer;)J
- *
- * Returns the native address of the provided DirectByteBuffer as a long
- * @param env Pointer to the JNIEnv for this thread
- * @param obj Pointer to the object on which this method was called
- * @param buffer DirectByteBuffer
- * @return Native address of the DirectByteBuffer as a long
- */
-SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltcore_utils_DBBPool_getBufferAddress
-  (JNIEnv *env, jclass clazz, jobject buffer)
-{
-    void *address = env->GetDirectBufferAddress(buffer);
-    if (env->ExceptionCheck()) {
-        env->ExceptionDescribe();
-        return (jlong)address;
-    }
-    assert(address);
-    return reinterpret_cast<jlong>(address);
-}
-
-/*
- * Class:     org_voltcore_utils_DBBPool
  * Method:    getBufferCRC32
  * Signature: (Ljava/nio/ByteBuffer;II)I
  */

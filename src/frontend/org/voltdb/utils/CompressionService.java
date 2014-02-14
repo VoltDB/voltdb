@@ -120,7 +120,7 @@ public final class CompressionService {
                 final int crcCalcStart = outBuffer.b.position();
                 compressBuffer(inBuffer, outBuffer.b);
                 final int crc32c =
-                        DBBPool.getCRC32C( outBuffer.address, crcCalcStart, outBuffer.b.limit() - crcCalcStart);
+                        DBBPool.getCRC32C( outBuffer.address(), crcCalcStart, outBuffer.b.limit() - crcCalcStart);
                 outBuffer.b.putInt(crcPosition, crc32c);
                 return outBuffer;
             }

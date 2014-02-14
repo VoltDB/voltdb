@@ -1419,7 +1419,7 @@ public class SnapshotUtil {
 
         buf.putInt(outputContainers.size());
         for (DBBPool.BBContainer container : outputContainers) {
-            buf.putLong(container.address);
+            buf.putLong(container.address());
             buf.putInt(container.b.position());
             buf.putInt(container.b.remaining());
         }

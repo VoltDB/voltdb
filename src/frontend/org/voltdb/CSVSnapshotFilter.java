@@ -73,7 +73,7 @@ public class CSVSnapshotFilter implements SnapshotDataFilter {
                     m_lastNumCharacters = p.getFirst();
                     final BBContainer origin = cont;
                     cont = null;
-                    return new BBContainer( ByteBuffer.wrap(p.getSecond()), 0L) {
+                    return new BBContainer( ByteBuffer.wrap(p.getSecond())) {
                         @Override
                         public void discard() {
                             origin.discard();

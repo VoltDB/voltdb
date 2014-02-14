@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop_voltpatches.hbase.utils.DirectMemoryUtils;
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
+import sun.nio.ch.DirectBuffer;
 
 /**
  * A pool of {@link java.nio.ByteBuffer ByteBuffers} that are
@@ -46,20 +47,18 @@ public final class DBBPool {
      *
      */
     public static abstract class BBContainer {
-        /**
-         * Pointer to the location in memory where this buffer is located. Useful if you
-         * want to pass it to the native side so it doesn't have to call GetDirectBufferAddress.
-         */
-        final public long address;
 
         /**
          * The buffer
          */
         final public ByteBuffer b;
 
-        public BBContainer(ByteBuffer b, long address) {
+        public BBContainer(ByteBuffer b) {
             this.b = b;
-            this.address = address;
+        }
+
+        public long address() {
+            return ((DirectBuffer)b).address();
         }
 
         abstract public void discard();
@@ -72,7 +71,7 @@ public final class DBBPool {
      */
     private static final class BBWrapperContainer extends BBContainer {
         protected BBWrapperContainer(ByteBuffer b) {
-            super( b, 0);
+            super( b );
         }
 
         @Override
@@ -92,13 +91,6 @@ public final class DBBPool {
     }
 
     private static final VoltLogger m_logger = new VoltLogger(DBBPool.class.getName());
-
-    /**
-     * Retrieve the native address of a DirectByteBuffer as a long
-     * @param b Buffer you want to retrieve the address of
-     * @return Native address of the buffer as a long.
-     */
-    public static native long getBufferAddress( ByteBuffer b );
 
     /**
      * Retrieve the CRC32C value of a DirectByteBuffer as a long
@@ -189,10 +181,10 @@ public final class DBBPool {
 
         BBContainer cont = pooledBuffers.poll();
         if (cont == null) {
-            cont = allocateDirectWithAddress(capacity);
+            cont = allocateDirect(capacity);
         }
         final BBContainer origin = cont;
-        cont = new BBContainer(origin.b, origin.address) {
+        cont = new BBContainer(origin.b) {
             @Override
             public void discard() {
                 m_pooledBuffers.get(b.capacity()).offer(origin);
@@ -256,31 +248,12 @@ public final class DBBPool {
         bytesAllocatedGlobally.getAndAdd(capacity);
         logAllocation(capacity);
 
-        return new DeallocatingContainer(retval, 0);
-    }
-
-    public static BBContainer allocateDirectWithAddress(final int capacity) {
-        ByteBuffer retval = null;
-        try {
-            retval = ByteBuffer.allocateDirect(capacity);
-        } catch (OutOfMemoryError e) {
-            if (e.getMessage().contains("Direct buffer memory")) {
-                clear();
-                retval = ByteBuffer.allocateDirect(capacity);
-            } else {
-                throw new Error(e);
-            }
-
-        }
-        bytesAllocatedGlobally.getAndAdd(capacity);
-        logAllocation(capacity);
-
-        return new DeallocatingContainer(retval, DBBPool.getBufferAddress(retval));
+        return new DeallocatingContainer(retval);
     }
 
     private static class DeallocatingContainer extends BBContainer {
-        private DeallocatingContainer(ByteBuffer buf, long pointer) {
-            super(buf, pointer);
+        private DeallocatingContainer(ByteBuffer buf) {
+            super(buf);
         }
 
         @Override
@@ -288,7 +261,7 @@ public final class DBBPool {
             try {
                 bytesAllocatedGlobally.getAndAdd(-b.capacity());
                 logDeallocation(b.capacity());
-                DirectMemoryUtils.destroyDirectByteBuffer(b);
+                ((DirectBuffer)b).cleaner().clean();
             } catch (Throwable e) {
                 // The client code doesn't want to link to the VoltDB class, so this hack was born.
                 // It should be temporary as the goal is to remove client code dependency on

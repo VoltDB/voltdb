@@ -59,8 +59,8 @@ public class TableSaveFile
     public class Container extends BBContainer {
         public final int partitionId;
         private final BBContainer m_origin;
-        Container(ByteBuffer b, long pointer, BBContainer origin, int partitionId) {
-            super(b, pointer);
+        Container(ByteBuffer b, BBContainer origin, int partitionId) {
+            super(b);
             m_origin = origin;
             this.partitionId = partitionId;
         }
@@ -880,8 +880,8 @@ public class TableSaveFile
                      */
                     final int calculatedCRC =
                             m_checksumType == ChecksumType.CRC32C  ?
-                                    DBBPool.getCRC32C(c.address, c.b.position(), c.b.remaining()) :
-                                        DBBPool.getCRC32(c.address, c.b.position(), c.b.remaining());
+                                    DBBPool.getCRC32C(c.address(), c.b.position(), c.b.remaining()) :
+                                        DBBPool.getCRC32(c.address(), c.b.position(), c.b.remaining());
                     if (calculatedCRC != nextChunkCRC) {
                         m_corruptedPartitions.add(nextChunkPartitionId);
                         if (m_continueOnCorruptedChunk) {
@@ -973,15 +973,14 @@ public class TableSaveFile
             if (c == null) {
                 final BBContainer originContainer = DBBPool.allocateDirect(DEFAULT_CHUNKSIZE);
                 final ByteBuffer b = originContainer.b;
-                final long pointer = org.voltcore.utils.DBBPool.getBufferAddress(b);
-                c = new Container(b, pointer, originContainer, nextChunkPartitionId);
+                c = new Container(b, originContainer, nextChunkPartitionId);
             }
             /*
              * Need to reconstruct the container with the partition id of the next
              * chunk so it can be a final public field. The buffer, address, and origin
              * container remain the same.
              */
-            c = new Container(c.b, c.address, c.m_origin, nextChunkPartitionId);
+            c = new Container(c.b, c.m_origin, nextChunkPartitionId);
             return c;
         }
 

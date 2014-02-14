@@ -67,7 +67,7 @@ public class TestMurmur3 extends TestCase {
         Random r = new Random(seed);
         System.out.println("Seed is " + seed);
         EELibraryLoader.loadExecutionEngineLibrary(true);
-        BBContainer c = DBBPool.allocateDirectWithAddress(4096);
+        BBContainer c = DBBPool.allocateDirect(4096);
         c.b.order(ByteOrder.LITTLE_ENDIAN);
 
         for (int ii = 0; ii < iterations; ii++) {
@@ -78,7 +78,7 @@ public class TestMurmur3 extends TestCase {
             c.b.put(bytes);
             c.b.flip();
 
-            long nativeHash = DBBPool.getMurmur3128(c.address, 0, bytesToFill);
+            long nativeHash = DBBPool.getMurmur3128(c.address(), 0, bytesToFill);
             long javaHash =  MurmurHash3.hash3_x64_128(c.b, 0, bytesToFill, 0);
             if (nativeHash != javaHash) {
                 fail("Failed in iteration " + ii + " native hash " + Long.toHexString(nativeHash) +

@@ -185,8 +185,7 @@ public class TestExecutionEngine extends TestCase {
         BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
         try {
             origin.b.clear();
-            long address = org.voltcore.utils.DBBPool.getBufferAddress(origin.b);
-            BBContainer container = new BBContainer(origin.b, address){
+            BBContainer container = new BBContainer(origin.b){
 
                 @Override
                 public void discard() {
@@ -199,7 +198,7 @@ public class TestExecutionEngine extends TestCase {
                                                                    output).getSecond()[0];
             assertTrue(serialized > 0);
             container.b.limit(serialized);
-            destinationEngine.get().processRecoveryMessage( container.b, container.address);
+            destinationEngine.get().processRecoveryMessage( container.b, container.address() );
 
 
             serialized = sourceEngine.tableStreamSerializeMore(WAREHOUSE_TABLEID,
@@ -216,7 +215,7 @@ public class TestExecutionEngine extends TestCase {
                                                                output).getSecond()[0];
             assertTrue(serialized > 0);
             container.b.limit(serialized);
-            destinationEngine.get().processRecoveryMessage( container.b, container.address);
+            destinationEngine.get().processRecoveryMessage( container.b, container.address());
 
 
             serialized = sourceEngine.tableStreamSerializeMore(STOCK_TABLEID,
@@ -300,8 +299,7 @@ public class TestExecutionEngine extends TestCase {
         BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
         try {
             origin.b.clear();
-            long address = org.voltcore.utils.DBBPool.getBufferAddress(origin.b);
-            BBContainer container = new BBContainer(origin.b, address){
+            BBContainer container = new BBContainer(origin.b){
                 @Override
                 public void discard() {}
             };

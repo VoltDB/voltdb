@@ -95,7 +95,7 @@ public class StreamBlockQueue {
             ByteBuffer buf = cont.b.slice();
             //Pass the stream block a subset of the bytes, provide
             //a container that discards the original returned by the persistent deque
-            StreamBlock block = new StreamBlock( new BBContainer(buf, 0L) {
+            StreamBlock block = new StreamBlock( new BBContainer(buf) {
                     @Override
                     public void discard() {
                         fcont.discard();

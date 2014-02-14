@@ -448,10 +448,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
                 try {
                     m_committedBuffers.offer(new StreamBlock(
-                            new BBContainer(buffer, bufferPtr) {
+                            new BBContainer(buffer) {
                                 @Override
                                 public void discard() {
-                                    DBBPool.deleteCharArrayMemory(address);
+                                    DBBPool.deleteCharArrayMemory(address());
                                     deleted.set(true);
                                 }
                             }, uso, false));
@@ -652,7 +652,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     class AckingContainer extends BBContainer {
         final long m_uso;
         public AckingContainer(ByteBuffer buf, long uso) {
-            super(buf, 0L);
+            super(buf);
             m_uso = uso;
         }
 
