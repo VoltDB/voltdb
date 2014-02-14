@@ -30,6 +30,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -37,7 +38,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.sql.Types;
+import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -52,9 +53,11 @@ import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.VoltType;
 import org.voltdb.client.ArbitraryDurationProc;
 import org.voltdb.client.TestClientFeatures;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.MiscUtils;
 
 public class TestJDBCDriver {
@@ -83,10 +86,13 @@ public class TestJDBCDriver {
                              "A20 INTEGER, A21 INTEGER, A22_ID INTEGER, A23 INTEGER, A24_ID INTEGER, " +
                              "A25 INTEGER, A26_MIDDLE INTEGER, " +
                              "PRIMARY KEY(A1));" +
-            "CREATE TABLE NUMBER_NINE(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1));" +
+            "CREATE TABLE NUMBER_NINE(A1 INTEGER NOT NULL, A2 INTEGER, A3_BIN VARBINARY, PRIMARY KEY(A1));" +
             "CREATE TABLE WAREHOUSE(A1 INTEGER NOT NULL, A2 INTEGER, A3 INTEGER, A4_ID INTEGER, " +
                              "A5 INTEGER, A6 INTEGER, A7 INTEGER, A8 INTEGER, W_ID INTEGER, " +
                              "PRIMARY KEY(A1));" +
+            "CREATE TABLE ALL_TYPES(A1 TINYINT NOT NULL, A2 SMALLINT, A3 INTEGER, A4 BIGINT, " +
+                             "A5 FLOAT, A6 VARCHAR(10), A7 VARBINARY(10), A8 TIMESTAMP, " +
+                             "A9 DECIMAL, PRIMARY KEY(A1));" +
             "CREATE UNIQUE INDEX UNIQUE_ORDERS_HASH ON ORDERS (A1, A2_ID); " +
             "CREATE INDEX IDX_ORDERS_HASH ON ORDERS (A2_ID);";
 
@@ -104,6 +110,7 @@ public class TestJDBCDriver {
         pb.addPartitionInfo("NUMBER_NINE", "A1");
         pb.addStmtProcedure("InsertA", "INSERT INTO TT VALUES(?,?);", "TT.A1: 0");
         pb.addStmtProcedure("SelectB", "SELECT * FROM TT;");
+        pb.addStmtProcedure("SelectC", "SELECT * FROM ALL_TYPES;");
         boolean success = pb.compile(Configuration.getPathToCatalogForTest("jdbcdrivertest.jar"), 3, 1, 0);
         assert(success);
         MiscUtils.copyFile(pb.getPathToDeployment(), Configuration.getPathToCatalogForTest("jdbcdrivertest.xml"));
@@ -205,7 +212,7 @@ public class TestJDBCDriver {
     @Test
     public void testAllTables() throws SQLException {
         // TPCC has 10 tables
-        tableTest(null, "%", 12);
+        tableTest(null, "%", 13);
     }
 
     @Test
@@ -214,7 +221,7 @@ public class TestJDBCDriver {
             int expected = 0;
             // TPCC has 10 tables and no views
             if (type.equals("TABLE")) {
-                expected = 12;
+                expected = 13;
             }
             tableTest(new String[] {type}, "%", expected);
         }
@@ -230,9 +237,9 @@ public class TestJDBCDriver {
         tableTest(null, "O%", 2);
          // schema has 5 tables with names containing "ST"
         tableTest(null, "%ST%", 5);
-        // schema has 10 tables
-        tableTest(null, "", 12);
-        // schema has 10 tables, but won't match the types array
+        // schema has 13 tables
+        tableTest(null, "", 13);
+        // schema has 13 tables, but won't match the types array
         tableTest(new String[] {""}, "", 0);
     }
 
@@ -284,7 +291,7 @@ public class TestJDBCDriver {
         tableColumnTest("CUSTOMER", "____", 1);
         tableColumnTest("%", "%ID", 13);
         tableColumnTest(null, "%ID", 13);
-        tableColumnTest(null, "", 63);
+        tableColumnTest(null, "", 73);
     }
 
     /**
@@ -342,7 +349,7 @@ public class TestJDBCDriver {
                 conn.getMetaData().getProcedures("blah", "blah", "%");
         int count = 0;
         List<String> names = Arrays.asList(new String[] {"InsertA",
-            "SelectB", "ArbitraryDurationProc"});
+            "SelectB", "SelectC", "ArbitraryDurationProc"});
         while (procedures.next()) {
             String procedure = procedures.getString("PROCEDURE_NAME");
             if (procedure.contains(".")) {
@@ -353,9 +360,9 @@ public class TestJDBCDriver {
             count++;
         }
         System.out.println("Procedure count is: " + count);
-        // 8 tables * 4 CRUD/table + 3 procedures +
+        // 9 tables * 4 CRUD/table + 3 procedures +
         // 4 tables * 3 for replicated crud
-        assertEquals(8 * 4 + 3 + 4 * 3, count);
+        assertEquals(9 * 4 + 3 + 4 * 3, count);
     }
 
     @Test
@@ -423,16 +430,83 @@ public class TestJDBCDriver {
 
     @Test
     public void testResultSetMetaData() throws SQLException {
-        ResultSetMetaData meta = conn.getMetaData().getTableTypes().getMetaData();
+        CallableStatement cs = conn.prepareCall("{call SelectC}");
+        ResultSet results = cs.executeQuery();
+        ResultSetMetaData meta = results.getMetaData();
+        assertEquals(9, meta.getColumnCount());
         // JDBC index starts at 1!!!!!!!!!!!!!!!!!!!!!!!
-        assertEquals(String.class.getName(), meta.getColumnClassName(1));
-        assertTrue(meta.getColumnDisplaySize(1) > 0);
-        assertEquals(Types.VARCHAR, meta.getColumnType(1));
-        assertEquals("VARCHAR", meta.getColumnTypeName(1));
-        assertTrue(meta.getPrecision(1) > 0);
+        assertEquals(Byte.class.getName(), meta.getColumnClassName(1));
+        assertEquals(java.sql.Types.TINYINT, meta.getColumnType(1));
+        assertEquals("TINYINT", meta.getColumnTypeName(1));
+        assertEquals(7, meta.getPrecision(1));
         assertEquals(0, meta.getScale(1));
-        assertTrue(meta.isCaseSensitive(1));
-        assertFalse(meta.isSigned(1));
+        assertFalse(meta.isCaseSensitive(1));
+        assertTrue(meta.isSigned(1));
+
+        assertEquals(Short.class.getName(), meta.getColumnClassName(2));
+        assertEquals(java.sql.Types.SMALLINT, meta.getColumnType(2));
+        assertEquals("SMALLINT", meta.getColumnTypeName(2));
+        assertEquals(15, meta.getPrecision(2));
+        assertEquals(0, meta.getScale(2));
+        assertFalse(meta.isCaseSensitive(2));
+        assertTrue(meta.isSigned(2));
+
+        assertEquals(Integer.class.getName(), meta.getColumnClassName(3));
+        assertEquals(java.sql.Types.INTEGER, meta.getColumnType(3));
+        assertEquals("INTEGER", meta.getColumnTypeName(3));
+        assertEquals(31, meta.getPrecision(3));
+        assertEquals(0, meta.getScale(3));
+        assertFalse(meta.isCaseSensitive(3));
+        assertTrue(meta.isSigned(3));
+
+        assertEquals(Long.class.getName(), meta.getColumnClassName(4));
+        assertEquals(java.sql.Types.BIGINT, meta.getColumnType(4));
+        assertEquals("BIGINT", meta.getColumnTypeName(4));
+        assertEquals(63, meta.getPrecision(4));
+        assertEquals(0, meta.getScale(4));
+        assertFalse(meta.isCaseSensitive(4));
+        assertTrue(meta.isSigned(4));
+
+        assertEquals(Double.class.getName(), meta.getColumnClassName(5));
+        assertEquals(java.sql.Types.FLOAT, meta.getColumnType(5));
+        assertEquals("FLOAT", meta.getColumnTypeName(5));
+        assertEquals(53, meta.getPrecision(5));
+        assertEquals(0, meta.getScale(5));
+        assertFalse(meta.isCaseSensitive(5));
+        assertTrue(meta.isSigned(5));
+
+        assertEquals(String.class.getName(), meta.getColumnClassName(6));
+        assertEquals(java.sql.Types.VARCHAR, meta.getColumnType(6));
+        assertEquals("VARCHAR", meta.getColumnTypeName(6));
+        assertEquals(VoltType.MAX_VALUE_LENGTH, meta.getPrecision(6));
+        assertEquals(0, meta.getScale(6));
+        assertTrue(meta.isCaseSensitive(6));
+        assertFalse(meta.isSigned(6));
+
+        assertEquals(Byte[].class.getCanonicalName(), meta.getColumnClassName(7));
+        assertEquals(java.sql.Types.VARBINARY, meta.getColumnType(7));
+        assertEquals(128, meta.getColumnDisplaySize(7));
+        assertEquals("VARBINARY", meta.getColumnTypeName(7));
+        assertEquals(VoltType.MAX_VALUE_LENGTH, meta.getPrecision(7));
+        assertEquals(0, meta.getScale(7));
+        assertFalse(meta.isCaseSensitive(7));
+        assertFalse(meta.isSigned(7));
+
+        assertEquals(Timestamp.class.getName(), meta.getColumnClassName(8));
+        assertEquals(java.sql.Types.TIMESTAMP, meta.getColumnType(8));
+        assertEquals("TIMESTAMP", meta.getColumnTypeName(8));
+        assertEquals(63, meta.getPrecision(8));
+        assertEquals(0, meta.getScale(8));
+        assertFalse(meta.isCaseSensitive(8));
+        assertFalse(meta.isSigned(8));
+
+        assertEquals(BigDecimal.class.getName(), meta.getColumnClassName(9));
+        assertEquals(java.sql.Types.DECIMAL, meta.getColumnType(9));
+        assertEquals("DECIMAL", meta.getColumnTypeName(9));
+        assertEquals(VoltDecimalHelper.kDefaultPrecision, meta.getPrecision(9));
+        assertEquals(12, meta.getScale(9));
+        assertFalse(meta.isCaseSensitive(9));
+        assertTrue(meta.isSigned(9));
     }
 
     @Test
