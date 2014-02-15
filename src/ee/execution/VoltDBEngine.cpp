@@ -118,7 +118,6 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_tuplesProcessedSinceReport(0),
       m_tupleReportThreshold(LONG_OP_THRESHOLD),
       m_lastAccessedTable(NULL),
-      m_lastAccessedPlanNodeName(NULL),
       m_currentUndoQuantum(NULL),
       m_hashinator(NULL),
       m_staticParams(MAX_PARAM_COUNT),
@@ -331,6 +330,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
     // reset these at the start of each batch
     m_tuplesProcessedInBatch = 0;
     m_tuplesProcessedInFragment = 0;
+    m_tuplesProcessedSinceReport = 0;
 
     for (m_currentIndexInBatch = 0; m_currentIndexInBatch < numFragments; ++m_currentIndexInBatch) {
 
@@ -360,6 +360,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         // at the end of each frag, rollup and reset counters
         m_tuplesProcessedInBatch += m_tuplesProcessedInFragment;
         m_tuplesProcessedInFragment = 0;
+        m_tuplesProcessedSinceReport = 0;
     }
 
     m_stringPool.purge();
@@ -1711,6 +1712,8 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
     }
 }
 
+static std::string dummy_last_accessed_plan_node_name("no plan node in progress");
+
 void VoltDBEngine::reportProgessToTopend() {
     std::string tableName;
     int64_t tableSize;
@@ -1725,7 +1728,9 @@ void VoltDBEngine::reportProgessToTopend() {
     //Update stats in java and let java determine if we should cancel this query.
     m_tuplesProcessedInFragment += m_tuplesProcessedSinceReport;
     m_tupleReportThreshold = m_topend->fragmentProgressUpdate(m_currentIndexInBatch,
-                                        *m_lastAccessedPlanNodeName,
+                                        (m_lastAccessedExec == NULL) ?
+                                        dummy_last_accessed_plan_node_name :
+                                        planNodeToString(m_lastAccessedExec->getPlanNode()->getPlanNodeType()),
                                         tableName,
                                         tableSize,
                                         m_tuplesProcessedInBatch + m_tuplesProcessedInFragment);
