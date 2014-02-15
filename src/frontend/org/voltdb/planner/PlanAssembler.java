@@ -715,19 +715,24 @@ public class PlanAssembler {
         // Recurse to children first
          int count = planNode.getChildCount();
         if (count > 0) {
+            // Disconnect all children just in case a NLInJ node needs to be inserted
+            // between the current parent and the child
             List<AbstractPlanNode> nodeList = new ArrayList<AbstractPlanNode>();
             for (int idx = 0; idx < count; ++idx) {
                 AbstractPlanNode child = planNode.getChild(idx);
-                nodeList.add(finalizeExistsSubqueryBestPlans(child));
+                nodeList.add(child);
             }
             planNode.disconnectChildren();
-            for (AbstractPlanNode child : nodeList) {
-                planNode.addAndLinkChild(child);
+            // process each node
+            for (int idx = 0; idx < count; ++idx) {
+                AbstractPlanNode child = nodeList.get(idx);
+                // disconnect from the current parent
+                child.disconnectParents();
+                // Reconnect the parent and the new child
+                planNode.addAndLinkChild(finalizeExistsSubqueryBestPlans(child));
             }
         }
-        // Handle the parent node itself. Disconnect it from the original parent,
-        // it will be reconnected back as a child
-        planNode.disconnectParents();
+        // Handle the parent node itself.
         AbstractPlanNode retval = planNode;
         if (planNode instanceof AbstractScanPlanNode) {
             AbstractScanPlanNode scanNode = (AbstractScanPlanNode) planNode;
@@ -767,7 +772,7 @@ public class PlanAssembler {
                 AbstractPlanNode subqueryPlan = ((SubqueryExpression)subqueryExpr).getSubqueryNode();
                 NestLoopInPlanNode join = new NestLoopInPlanNode(
                         ((SubqueryExpression)subqueryExpr).getSubqueryId(), retval, subqueryPlan,
-                        ((SubqueryExpression)subqueryExpr).getParameterParentTveMap());
+                        ((SubqueryExpression)subqueryExpr).getParameterTveMap());
                 retval = join;
                 // Remove the EXISTS expressions from the original predicate
                 it.remove();

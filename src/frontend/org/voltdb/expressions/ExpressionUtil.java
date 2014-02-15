@@ -251,7 +251,7 @@ public abstract class ExpressionUtil {
             // Since this method collects only TVEs related to the current (parent) query,
             // the subquery's TVE are ignored
             SubqueryExpression subqueryExpr = (SubqueryExpression) input;
-            tves.addAll(subqueryExpr.getParentTves());
+            tves.addAll(subqueryExpr.getParameterTves());
             return tves;
         }
 

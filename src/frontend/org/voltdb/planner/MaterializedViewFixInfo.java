@@ -182,6 +182,7 @@ public class MaterializedViewFixInfo {
             TupleValueExpression tve = new TupleValueExpression(mvTableName, mvTableAlias, colName, colName, i);
             tve.setValueType(VoltType.get((byte)mvCol.getType()));
             tve.setValueSize(mvCol.getSize());
+            tve.setOrigStmtId(mvTableScan.getStatementId());
 
             mvDDLGroupbyColumnNames.add(colName);
 
@@ -250,6 +251,7 @@ public class MaterializedViewFixInfo {
             TupleValueExpression tve = new TupleValueExpression(mvTableName, mvTableAlias, colName, colName);
             tve.setValueType(VoltType.get((byte)mvCol.getType()));
             tve.setValueSize(mvCol.getSize());
+            tve.setOrigStmtId(mvTableScan.getStatementId());
 
             needReAggTVEs.add(tve);
         }

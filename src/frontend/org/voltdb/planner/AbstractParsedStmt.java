@@ -459,10 +459,8 @@ public abstract class AbstractParsedStmt {
         String tableAlias = tveColumn.getTableAlias();
         StmtTableScan tableCache = getStmtTableScanByAlias(this, tableAlias);
         assert(tableCache != null);
-        // Set the indicator whether this TVE is from this statement or the parent one.
-        if (!tableAliasIndexMap.containsKey(tableAlias)) {
-            tveColumn.setParentTve(true);
-        }
+        // Set the statement ID this TVE refers to.
+        tveColumn.setOrigStmtId(tableCache.getStatementId());
         // For the subqueries replace table name with its alias.
         if (tableCache.getScanType() == StmtTableScan.TABLE_SCAN_TYPE.TEMP_TABLE_SCAN) {
             tveColumn.setTableName(tableAlias);
@@ -492,11 +490,11 @@ public abstract class AbstractParsedStmt {
             tableAliasIndexMap.put(tableAlias, nextIndex);
             StmtTableScan tableCache = null;
             if (subQuery == null) {
-                tableCache = new StmtTargetTableScan(getTableFromDB(tableName), tableAlias);
+                tableCache = new StmtTargetTableScan(getTableFromDB(tableName), tableAlias, stmtId);
             } else {
                 // Temp table always have name SYSTEM_SUBQUERY.
                 // Need to use its alias to uniquely identify the sub-query
-                tableCache = new StmtSubqueryScan(new TempTable(tableAlias, tableAlias, subQuery), tableAlias);
+                tableCache = new StmtSubqueryScan(new TempTable(tableAlias, tableAlias, subQuery), tableAlias, stmtId);
             }
             stmtCache.add(tableCache);
             tableAliasIndexMap.put(tableAlias, nextIndex);
@@ -618,7 +616,7 @@ public abstract class AbstractParsedStmt {
         SubqueryExpression newSubqueryExpr = new SubqueryExpression(tableCache.getTempTable());
         // Combine the parameters from the original IN expression with the parameters
         // from the rewritten expression
-        newSubqueryExpr.getParameterParentTveMap().putAll(subqueryExpr.getParameterParentTveMap());
+        newSubqueryExpr.getParameterTveMap().putAll(subqueryExpr.getParameterTveMap());
         return new OperatorExpression(ExpressionType.OPERATOR_EXISTS, newSubqueryExpr, null);
     }
 

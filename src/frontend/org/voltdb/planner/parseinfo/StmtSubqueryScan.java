@@ -31,8 +31,8 @@ import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
  */
 public class StmtSubqueryScan extends StmtTableScan {
 
-    public StmtSubqueryScan(TempTable tempTable, String tableAlias) {
-        super(tableAlias);
+    public StmtSubqueryScan(TempTable tempTable, String tableAlias, int stmtId) {
+        super(tableAlias, stmtId);
         assert (tempTable != null);
         m_tempTable = tempTable;
     }

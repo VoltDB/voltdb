@@ -47,7 +47,7 @@ public class NestLoopInPlanNode extends AbstractJoinPlanNode {
     // The subquery node id is required to load the node from the JSON
     private int m_subqueryNodeId = -1;
     // correlated parameters
-    Map<Integer, TupleValueExpression> m_params = null;
+    Map<Integer, TupleValueExpression> m_parameterTveMap = null;
 
     public NestLoopInPlanNode() {
         super();
@@ -61,7 +61,7 @@ public class NestLoopInPlanNode extends AbstractJoinPlanNode {
         addAndLinkChild(outerNode);
         m_subqueryNode = subqueryNode;
         m_subqueryNode.disconnectParents();
-        m_params = params;
+        m_parameterTveMap = params;
     }
 
     public int getSubqueryId() {
@@ -82,12 +82,12 @@ public class NestLoopInPlanNode extends AbstractJoinPlanNode {
         m_subqueryNodeId = m_subqueryNode.getPlanNodeId();
     }
 
-    public Map<Integer, TupleValueExpression> getParameterMap() {
-        return m_params;
+    public Map<Integer, TupleValueExpression> getParameterTveMap() {
+        return m_parameterTveMap;
     }
 
-    public void setParameterMap(Map<Integer, TupleValueExpression> params) {
-        m_params = params;
+    public void setParameterTveMap(Map<Integer, TupleValueExpression> parameterTveMap) {
+        m_parameterTveMap = parameterTveMap;
     }
 
     @Override
@@ -96,14 +96,6 @@ public class NestLoopInPlanNode extends AbstractJoinPlanNode {
         super.toJSONString(stringer);
         stringer.key(Members.SUBQUERY_ID.name()).value(m_subqueryId);
         stringer.key(Members.SUBQUERY_ROOT_NODE_ID.name()).value(m_subqueryNode.m_id);
-        if (m_params != null && !m_params.isEmpty()) {
-            stringer.key(Members.SUBQUERY_PARAMS.name()).array();
-            for (Map.Entry<Integer, TupleValueExpression> paramEntry : m_params.entrySet()) {
-                stringer.object().key(Members.PARAM_IDX.name()).value(paramEntry.getKey());
-                stringer.key(Members.PARAM_TVE.name()).value(paramEntry.getValue()).endObject();
-            }
-            stringer.endArray();
-        }
     }
 
     @Override
@@ -112,7 +104,6 @@ public class NestLoopInPlanNode extends AbstractJoinPlanNode {
 
         m_subqueryId = obj.getInt(Members.SUBQUERY_ID.name());
         m_subqueryNodeId = obj.getInt(Members.SUBQUERY_ROOT_NODE_ID.name());
-        m_params = subqueryParamsFromJSONString(obj);
     }
 
     @Override
@@ -157,9 +148,12 @@ public class NestLoopInPlanNode extends AbstractJoinPlanNode {
 
     @Override
     protected String explainPlanForNode(String indent) {
-        // TODO ENG-451-exists
+        // Explain the subquery
+        StringBuilder sb = new StringBuilder();
+        m_subqueryNode.explainPlan_recurse(sb, "");
+        // Explain itself
         return "NEST LOOP IN JOIN\n" +
-            indent + "subquery " + m_subqueryNode.explainPlanForNode(indent);
+            indent + "(Subquery: " + m_subqueryId + " " + sb.toString() + " Subquery_end)";
     }
 
 }

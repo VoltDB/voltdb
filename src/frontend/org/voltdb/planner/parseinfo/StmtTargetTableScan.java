@@ -27,8 +27,8 @@ import org.voltdb.expressions.TupleValueExpression;
  */
 public class StmtTargetTableScan extends StmtTableScan {
 
-    public StmtTargetTableScan(Table table, String tableAlias) {
-        super(tableAlias);
+    public StmtTargetTableScan(Table table, String tableAlias, int stmtId) {
+        super(tableAlias, stmtId);
         assert (table != null);
         m_table = table;
     }

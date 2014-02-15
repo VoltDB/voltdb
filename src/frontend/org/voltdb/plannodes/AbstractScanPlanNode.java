@@ -366,8 +366,6 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         if (m_isSubQuery) {
             stringer.key(Members.SUBQUERY_INDICATOR.name()).value("TRUE");
         }
-
-        subqueryParamsToJSONString(m_predicate, stringer);
     }
 
     @Override
@@ -378,9 +376,6 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         m_targetTableAlias = jobj.getString( Members.TARGET_TABLE_ALIAS.name() );
         if (jobj.has("SUBQUERY_INDICATOR")) {
             m_isSubQuery = "TRUE".equalsIgnoreCase(jobj.getString( Members.SUBQUERY_INDICATOR.name() ));
-        }
-        if (m_predicate != null) {
-            m_predicate = subqueriesParamsFromJSONString(m_predicate, jobj);
         }
     }
 

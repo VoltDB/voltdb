@@ -1010,12 +1010,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             ParsedSelectStmt.ParsedColInfo colInfo = selectStmt.displayColumns.get(idx);
             assert(colInfo.expression != null);
             AbstractExpression clonedExpr = (AbstractExpression)expr.clone();
-            // Get list of all TVEs from the IN list and mark them as parent TVE because
-            // they will be pushed down to the subquery
-            List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(clonedExpr);
-            for (TupleValueExpression tve : tves) {
-                tve.setParentTve(true);
-            }
             // Create new compare equal expression
             AbstractExpression equalityExpr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
                     clonedExpr, (AbstractExpression) colInfo.expression.clone());

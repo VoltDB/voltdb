@@ -263,7 +263,6 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         if (m_wherePredicate != null) {
             predicates.add(m_wherePredicate);
         }
-        subqueryParamsToJSONString(ExpressionUtil.combine(predicates), stringer);
     }
 
     @Override
@@ -274,15 +273,6 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         m_preJoinPredicate = AbstractExpression.fromJSONChild(jobj, Members.PRE_JOIN_PREDICATE.name());
         m_joinPredicate = AbstractExpression.fromJSONChild(jobj, Members.JOIN_PREDICATE.name());
         m_wherePredicate = AbstractExpression.fromJSONChild(jobj, Members.WHERE_PREDICATE.name());
-        if (m_preJoinPredicate != null) {
-            m_preJoinPredicate = subqueriesParamsFromJSONString(m_preJoinPredicate, jobj);
-        }
-        if (m_joinPredicate != null) {
-            m_joinPredicate = subqueriesParamsFromJSONString(m_joinPredicate, jobj);
-        }
-        if (m_wherePredicate != null) {
-            m_wherePredicate = subqueriesParamsFromJSONString(m_wherePredicate, jobj);
-        }
     }
 
     /**

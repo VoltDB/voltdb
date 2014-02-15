@@ -274,6 +274,20 @@ public class TestSubQueries   extends PlannerTestCase {
         assertEquals(new Integer(1), ((ParameterValueExpression)pve).getParameterIndex());
     }
 
+
+    public void testParamTveInOutputSchema() {
+        AbstractPlanNode pn = compile("select r2.a from r2, r1 where r2.a = r1.a or " +
+                "exists (select 1 from r2 where exists(select 1 from r2 where r2.a = r1.c))");
+        pn = pn.getChild(0);
+        verifyOutputSchema(pn, "A");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof NestLoopPlanNode);
+        NestLoopPlanNode nlp = (NestLoopPlanNode) pn;
+        // looking for the r1.c to be part of the pn output schema
+        // it is required by the second subquery
+        verifyOutputSchema(nlp, "A", "A", "C");
+    }
+
     public void testExistsStay() {
         AbstractPlanNode pn = compile("select r2.c from r2 where r2.c = ? or exists (select c from r1 where r1.c = r2.c)");
         pn = pn.getChild(0);
@@ -323,11 +337,6 @@ public class TestSubQueries   extends PlannerTestCase {
       assertEquals(new Integer(2), ((ParameterValueExpression)e2.getLeft()).getParameterIndex());
     }
 
-//  public void testNestedExists() {
-// params are not propagated properly all the way up
-//    compile("select l.id from l where l.id = ? and exists (select a from t where exists(select 1 from t where t.a = l.id))");
-// }
-
     public void testDeleteWhereIn() {
         List<AbstractPlanNode> lpn = compileToFragments("delete from r1 where a in (select a from r2 where r1.c = r2.c)");
         assertTrue(lpn.size() == 2);
@@ -359,8 +368,6 @@ public class TestSubQueries   extends PlannerTestCase {
               "This special case join between an outer replicated table and " +
               "an inner partitioned table is too complex and is not supported.");
     }
-
-    // output schema correlated params are prop
 
     private void verifyOutputSchema(AbstractPlanNode pn, String... columns) {
         NodeSchema ns = pn.getOutputSchema();

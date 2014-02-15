@@ -39,8 +39,9 @@ public abstract class StmtTableScan {
         TEMP_TABLE_SCAN
     }
 
-    protected StmtTableScan(String tableAlias) {
+    protected StmtTableScan(String tableAlias, int stmtId) {
         m_tableAlias = tableAlias;
+        m_stmtId = stmtId;
     }
 
     abstract public TABLE_SCAN_TYPE getScanType();
@@ -57,6 +58,10 @@ public abstract class StmtTableScan {
 
     public String getTableAlias() {
         return m_tableAlias;
+    }
+
+    public int getStatementId() {
+        return m_stmtId;
     }
 
     public Set<SchemaColumn> getScanColumns() {
@@ -78,6 +83,8 @@ public abstract class StmtTableScan {
     public void setPartitioning(PartitioningForStatement partitioning) {
     }
 
+    // The statement id this table belongs to
+    protected int m_stmtId;
     // table alias
     protected String m_tableAlias = null;
     // Store a unique list of the columns actually used by this table instance.

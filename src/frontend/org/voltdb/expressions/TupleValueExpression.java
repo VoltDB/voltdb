@@ -41,7 +41,6 @@ public class TupleValueExpression extends AbstractValueExpression {
         TABLE_ALIAS,
         COLUMN_NAME,
         TABLE_IDX,  // used for JOIN queries only, 0 for outer table, 1 for inner table
-        PARENT_IND,
     }
 
     protected int m_columnIndex = -1;
@@ -52,8 +51,8 @@ public class TupleValueExpression extends AbstractValueExpression {
     protected int m_tableIdx = 0;
 
     private boolean m_hasAggregate = false;
-    /** True if this TVE is referenced from a subquery */
-    private boolean m_tveFromParentStmt = false;
+    /** The statement id this TVE refers to */
+    private int m_origStmtId = -1;
 
     /**
      * Create a new TupleValueExpression
@@ -113,6 +112,7 @@ public class TupleValueExpression extends AbstractValueExpression {
         clone.m_tableAlias = m_tableAlias;
         clone.m_columnName = m_columnName;
         clone.m_columnAlias = m_columnAlias;
+        clone.m_origStmtId = m_origStmtId;
         return clone;
     }
 
@@ -204,15 +204,15 @@ public class TupleValueExpression extends AbstractValueExpression {
      *  Set the parent TVE indicator
      * @param parentTve
      */
-    public void setParentTve(boolean parentTve) {
-        m_tveFromParentStmt = parentTve;
+    public void setOrigStmtId(int origStmtId) {
+        m_origStmtId = origStmtId;
     }
 
     /**
      * @return parent TVE indicator
      */
-    public boolean getParentTve() {
-        return m_tveFromParentStmt;
+    public int getOrigStmtId() {
+        return m_origStmtId;
     }
 
     @Override
@@ -221,7 +221,14 @@ public class TupleValueExpression extends AbstractValueExpression {
             return false;
         }
         TupleValueExpression expr = (TupleValueExpression) obj;
-
+        if (m_origStmtId != -1 && expr.m_origStmtId != -1) {
+            // Implying both sides have statement id set
+            // If one of the ids is not set it is considered to be a wild card
+            // matching any other id.
+            if (m_origStmtId != expr.m_origStmtId) {
+                return false;
+            }
+        }
         if ((m_tableName == null) != (expr.m_tableName == null)) {
             return false;
         }
@@ -252,7 +259,7 @@ public class TupleValueExpression extends AbstractValueExpression {
     @Override
     public int hashCode() {
         // based on implementation of equals
-        int result = 0;
+        int result = (m_origStmtId == -1) ? 0 : m_origStmtId;
         if (m_tableName != null) {
             result += m_tableName.hashCode();
         }
@@ -277,9 +284,6 @@ public class TupleValueExpression extends AbstractValueExpression {
             stringer.key(Members.TABLE_IDX.name()).value(m_tableIdx);
             //System.out.println("TVE: toJSONString(), tableIdx = " + m_tableIdx);
         }
-        if (m_tveFromParentStmt == true) {
-            stringer.key(Members.PARENT_IND.name()).value(m_tveFromParentStmt);
-        }
     }
 
     @Override
@@ -292,9 +296,6 @@ public class TupleValueExpression extends AbstractValueExpression {
         if (obj.has(Members.TABLE_IDX.name())) {
             m_tableIdx = obj.getInt(Members.TABLE_IDX.name());
             //System.out.println("TVE: loadFromJSONObject(), tableIdx = " + m_tableIdx);
-        }
-        if (obj.has(Members.PARENT_IND.name())) {
-            m_tveFromParentStmt = obj.getBoolean(Members.PARENT_IND.name());
         }
     }
 
