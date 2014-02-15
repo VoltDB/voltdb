@@ -798,23 +798,31 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         StringBuilder sb = new StringBuilder();
         explainPlan_recurse(sb, "");
         String fullExpalinString = sb.toString();
-        // Extract subqueries
-        //(Subquery: " + m_subqueryId + " " + sb.toString() + " Subquery_end)
-//        Pattern subqueryPattern = Pattern.compile("(Subquery: [0-9]+)(\\u0020)(.*)(Subquery_end)");
-        Pattern subqueryPattern = Pattern.compile("(Subquery: [0-9]+)(.*)(Subquery_end)", Pattern.DOTALL);
-        Matcher subqueryMatcher = subqueryPattern.matcher(fullExpalinString);
+        // Extract subqueries into a map to explain them separately
+        Pattern subqueryPattern = Pattern.compile("Subquery_([0-9]+)(.*)(\\s*)Subquery_(\\1)", Pattern.DOTALL);
         Map<String, String> subqueries = new TreeMap<String, String>();
-        StringBuilder finalSb = new StringBuilder();
-        int pos = 0;
-        while(subqueryMatcher.find()) {
-            finalSb.append(fullExpalinString.substring(pos, subqueryMatcher.end(1)));
-            pos = subqueryMatcher.end();
-            subqueries.put(subqueryMatcher.group(1), subqueryMatcher.group(3));
-        }
+        String topStmt = extractExplainedSubquries(fullExpalinString, subqueryPattern, subqueries);
+        StringBuilder fullSb = new StringBuilder(topStmt);
         for (Map.Entry<String, String> subquery : subqueries.entrySet()) {
-            finalSb.append("\n\n").append(subquery.getKey()).append('\n').append(subquery.getValue());
+            fullSb.append("\n").append(subquery.getKey()).append('\n').append(subquery.getValue());
         }
-        return finalSb.toString();
+        return fullSb.toString();
+    }
+
+    private String extractExplainedSubquries(String explainedSubquery, Pattern pattern, Map<String, String> subqueries) {
+        Matcher matcher = pattern.matcher(explainedSubquery);
+        int pos = 0;
+        StringBuilder sb = new StringBuilder();
+        while(matcher.find()) {
+            sb.append(explainedSubquery.substring(pos, matcher.end(1)));
+            pos = matcher.end();
+            String nextExplainedStmt = extractExplainedSubquries(matcher.group(2), pattern, subqueries);
+            subqueries.put("Subquery_" + matcher.group(1), nextExplainedStmt);
+        }
+        if (pos < explainedSubquery.length()) {
+            sb.append(explainedSubquery.substring(pos));
+        }
+        return sb.toString();
     }
 
     public void explainPlan_recurse(StringBuilder sb, String indent) {

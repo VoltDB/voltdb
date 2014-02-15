@@ -55,13 +55,10 @@ public class testLoadPlanNodeFromJSON extends PlannerTestCase {
         AbstractPlanNode pn = compile(sql);
         PlanNodeTree pnt = new PlanNodeTree(pn);
         String str = pnt.toJSONString();
-        System.out.println(str);
         JSONObject jsonPlan = new JSONObject(str);
         PlanNodeTree pnt1 = new PlanNodeTree();
         pnt1.loadFromJSONPlan(jsonPlan, getDatabase());
         String str1 = pnt1.toJSONString();
-        System.out.println("Str  :" + str);
-        System.out.println("Str1 :" + str1);
         assertTrue(str.equals(str1));
     }
 }

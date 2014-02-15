@@ -148,12 +148,14 @@ public class NestLoopInPlanNode extends AbstractJoinPlanNode {
 
     @Override
     protected String explainPlanForNode(String indent) {
+        String extraindent = " ";
         // Explain the subquery
         StringBuilder sb = new StringBuilder();
         m_subqueryNode.explainPlan_recurse(sb, "");
         // Explain itself
         return "NEST LOOP IN JOIN\n" +
-            indent + "(Subquery: " + m_subqueryId + " " + sb.toString() + " Subquery_end)";
+            indent + extraindent + "(Subquery_" + m_subqueryId + " " + sb.toString() +
+            "Subquery_" + m_subqueryId + ")";
     }
 
 }

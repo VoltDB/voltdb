@@ -173,7 +173,8 @@ public class SubqueryExpression extends AbstractExpression {
             // Explain the subquery
             StringBuilder sb = new StringBuilder();
             m_subqueryNode.explainPlan_recurse(sb, "");
-            return "(Subquery: " + m_subqueryId + " " + sb.toString() + " Subquery_end)";
+            return "(Subquery_" + m_subqueryId + " " + sb.toString() + "Subquery_"+
+            m_subqueryId + ")";
         } else {
             return "(Subquery: null)";
         }
