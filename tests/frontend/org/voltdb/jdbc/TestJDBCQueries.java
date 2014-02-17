@@ -215,6 +215,86 @@ public class TestJDBCQueries {
     }
 
     @Test
+    public void testFloatDoubleVarcharColumn() throws Exception {
+        for (Data d : data) {
+            try {
+                String q = String.format("insert into %s values(?, ?)", d.tablename);
+                PreparedStatement ins = conn.prepareStatement(q);
+                ins.setString(1, d.good[0]);
+                ins.setFloat(2, (float) 1.0);
+                if (ins.executeUpdate() != 1) {
+                    fail();
+                }
+                q = String.format("select * from %s", d.tablename);
+                Statement sel = conn.createStatement();
+                sel.execute(q);
+                ResultSet rs = sel.getResultSet();
+                int rowCount = 0;
+                boolean found = false;
+                while (rs.next()) {
+                    if (rs.getString(2).equals("1.0")) {
+                        found = true;
+                    }
+                    rowCount++;
+                }
+                assertTrue(found);
+                assertEquals(4, rowCount);
+
+                //Do double
+                q = String.format("insert into %s values(?, ?)", d.tablename);
+                ins = conn.prepareStatement(q);
+                ins.setString(1, d.good[0]);
+                ins.setDouble(2, 9.999999);
+                if (ins.executeUpdate() != 1) {
+                    fail();
+                }
+                q = String.format("select * from %s", d.tablename);
+                sel = conn.createStatement();
+                sel.execute(q);
+                rs = sel.getResultSet();
+                rowCount = 0;
+                found = false;
+                while (rs.next()) {
+                    if (rs.getString(2).equals("9.999999")) {
+                        found = true;
+                    }
+                    rowCount++;
+                }
+                assertTrue(found);
+                assertEquals(5, rowCount);
+
+                //Do int
+                q = String.format("insert into %s values(?, ?)", d.tablename);
+                ins = conn.prepareStatement(q);
+                ins.setString(1, d.good[0]);
+                ins.setInt(2, 9);
+                if (ins.executeUpdate() != 1) {
+                    fail();
+                }
+                q = String.format("select * from %s", d.tablename);
+                sel = conn.createStatement();
+                sel.execute(q);
+                rs = sel.getResultSet();
+                rowCount = 0;
+                found = false;
+                while (rs.next()) {
+                    if (rs.getString(2).equals("9")) {
+                        found = true;
+                    }
+                    rowCount++;
+                }
+                assertTrue(found);
+                assertEquals(6, rowCount);
+
+            } catch (SQLException e) {
+                e.printStackTrace();
+                System.err.printf("ERROR(SELECT): %s: %s\n", d.typename, e.getMessage());
+                fail();
+            }
+        }
+    }
+
+    @Test
     public void testQueryBatch() throws Exception
     {
         Statement batch = conn.createStatement();
@@ -225,9 +305,13 @@ public class TestJDBCQueries {
         try {
             int[] resultCodes = batch.executeBatch();
             assertEquals(data.length, resultCodes.length);
+            int total_cnt = 0;
             for (int i = 0; i < data.length; ++i) {
-                assertEquals(data[i].good.length, resultCodes[i]);
+                assertEquals(data[i].good.length + 3, resultCodes[i]);
+                total_cnt += data[i].good.length + 3;
             }
+            //Test update count
+            assertEquals(total_cnt, batch.getUpdateCount());
         }
         catch(SQLException e) {
             System.err.printf("ERROR: %s\n", e.getMessage());

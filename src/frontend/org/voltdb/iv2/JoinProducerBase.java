@@ -172,4 +172,6 @@ public abstract class JoinProducerBase extends SiteTasker {
     public abstract void deliver(RejoinMessage message);
 
     public abstract TaskLog constructTaskLog(String voltroot);
+
+    public abstract void notifyOfSnapshotNonce(String nonce);
 }
