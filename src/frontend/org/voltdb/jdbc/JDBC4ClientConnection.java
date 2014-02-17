@@ -50,7 +50,8 @@ import org.voltdb.client.ProcedureCallback;
 public class JDBC4ClientConnection implements Closeable {
     private final JDBC4PerfCounterMap statistics;
     private final ArrayList<String> servers;
-    private final Client client;
+    private final ClientConfig config;
+    private Client client;
 
     /**
      * The base hash/key for this connection, that uniquely identifies its parameters, as defined by
@@ -76,6 +77,9 @@ public class JDBC4ClientConnection implements Closeable {
      * cluster, the call cannot be cancelled!).
      */
     protected long defaultAsyncTimeout = 60000;
+
+    // Retry attempts in seconds.
+    private static int[] RETRY_ATTEMPTS = new int[]{10, 10, 10, 30, 60, 60};
 
     /**
      * Creates a new native client wrapper from the given parameters (internal use only).
@@ -110,9 +114,12 @@ public class JDBC4ClientConnection implements Closeable {
      * @throws IOException
      * @throws UnknownHostException
      */
-    protected JDBC4ClientConnection(String clientConnectionKeyBase, String clientConnectionKey,
+    protected JDBC4ClientConnection(
+            String clientConnectionKeyBase, String clientConnectionKey,
             String[] servers, String user, String password, boolean isHeavyWeight,
-            int maxOutstandingTxns) throws UnknownHostException, IOException {
+            int maxOutstandingTxns)
+                    throws UnknownHostException, IOException
+    {
         // Save the list of trimmed non-empty server names.
         this.servers = new ArrayList<String>(servers.length);
         for (String server : servers) {
@@ -130,17 +137,83 @@ public class JDBC4ClientConnection implements Closeable {
         this.statistics = JDBC4ClientConnectionPool.getStatistics(clientConnectionKeyBase);
 
         // Create configuration
-        final ClientConfig config = new ClientConfig(user, password);
+        this.config = new ClientConfig(user, password);
         config.setHeavyweight(isHeavyWeight);
         if (maxOutstandingTxns > 0)
             config.setMaxOutstandingTxns(maxOutstandingTxns);
 
         // Create client and connect.
-        this.client = ClientFactory.createClient(config);
+        initializeClientConnection(false);
+    }
+
+    /**
+     * Private method to (re)initialize a client connection.
+     * @throws UnknownHostException
+     * @throws IOException
+     */
+    private void initializeClientConnection(boolean retry) throws UnknownHostException, IOException
+    {
+        // Make sure client is non-null only when fully connected.
+        Client clientTmp = this.client;
         this.users = 0;
-        for (String server : this.servers) {
-            this.client.createConnection(server);
+        this.client = null;
+        if (clientTmp != null) {
+            try {
+                clientTmp.close();
+            }
+            catch (InterruptedException e) {
+                // ignore
+            }
         }
+
+        // Make connections and retry as needed if allowed.
+        clientTmp = ClientFactory.createClient(this.config);
+        for (String server : this.servers) {
+            try {
+                int iretry;
+                for (iretry = 0; iretry < JDBC4ClientConnection.RETRY_ATTEMPTS.length; ++iretry) {
+                    try {
+                        clientTmp.createConnection(server);
+                        break;
+                    }
+                    catch (IOException e) {
+                        if (!retry) {
+                            throw e;
+                        }
+                        System.err.printf("Retrying connection to \"%s\" in %d seconds...\n",
+                                          server, JDBC4ClientConnection.RETRY_ATTEMPTS[iretry]);
+                        Thread.sleep(JDBC4ClientConnection.RETRY_ATTEMPTS[iretry] * 1000);
+                    }
+                }
+                if (iretry == JDBC4ClientConnection.RETRY_ATTEMPTS.length ) {
+                    throw new IOException(String.format(
+                            "Client connection failed after %d retries.", iretry));
+                }
+            }
+            catch (InterruptedException ie) {
+                this.client = null;
+                throw new IOException("Client connection retry sleep was interrupted " +
+                                      "before a connection could be made.");
+            }
+        }
+
+        // If no exception escaped this method it's a good client.
+        this.client = clientTmp;
+        this.users++;
+    }
+
+    /**
+     * Get current client or reconnect one as needed.
+     * @return  client
+     * @throws UnknownHostException
+     * @throws IOException
+     */
+    protected ClientImpl getClient() throws UnknownHostException, IOException
+    {
+        if (this.client == null) {
+            this.initializeClientConnection(true);
+        }
+        return (ClientImpl) this.client;
     }
 
     /**
@@ -162,11 +235,24 @@ public class JDBC4ClientConnection implements Closeable {
         this.users--;
         if (this.users == 0) {
             try {
-                this.client.close();
+                if (this.client != null) {
+                    this.client.close();
+                }
             } catch (Exception x) {
                 // ignore
             }
         }
+    }
+
+    /**
+     * Drop the client connection, e.g. when a NoConnectionsException is caught.
+     * It will try to reconnect as needed and appropriate.
+     */
+    protected void drop_client() {
+        // Force dispose() to get rid of the client.
+        this.users = 1;
+        this.dispose();
+        this.client = null;
     }
 
     /**
@@ -198,12 +284,18 @@ public class JDBC4ClientConnection implements Closeable {
         long start = System.currentTimeMillis();
         try {
             // If connections are lost try reconnecting.
-            ClientResponse response = ((ClientImpl) client).callProcedureWithTimeout(procedure, timeout, parameters);
+            ClientResponse response = this.getClient().callProcedureWithTimeout(procedure, timeout, parameters);
             this.statistics.update(procedure, response);
             return response;
-        } catch (ProcCallException pce) {
+        }
+        catch (ProcCallException pce) {
             this.statistics.update(procedure, System.currentTimeMillis() - start, false);
             throw pce;
+        }
+        catch (NoConnectionsException e) {
+            this.statistics.update(procedure, System.currentTimeMillis() - start, false);
+            this.drop_client();
+            throw e;
         }
     }
 
@@ -264,8 +356,14 @@ public class JDBC4ClientConnection implements Closeable {
      */
     public boolean executeAsync(ProcedureCallback callback, String procedure, Object... parameters)
             throws NoConnectionsException, IOException {
-        return this.client.callProcedure(new TrackingCallback(this, procedure, callback),
-                procedure, parameters);
+        try {
+            return this.getClient().callProcedure(new TrackingCallback(this, procedure, callback),
+                    procedure, parameters);
+        }
+        catch (NoConnectionsException e) {
+            this.drop_client();
+            throw e;
+        }
     }
 
     /**
@@ -281,18 +379,24 @@ public class JDBC4ClientConnection implements Closeable {
     public Future<ClientResponse> executeAsync(String procedure, Object... parameters)
             throws NoConnectionsException, IOException {
         final JDBC4ExecutionFuture future = new JDBC4ExecutionFuture(this.defaultAsyncTimeout);
-        this.client.callProcedure(new TrackingCallback(this, procedure, new ProcedureCallback() {
-            @SuppressWarnings("unused")
-            final JDBC4ExecutionFuture result;
-            {
-                this.result = future;
-            }
+        try {
+            this.getClient().callProcedure(new TrackingCallback(this, procedure, new ProcedureCallback() {
+                @SuppressWarnings("unused")
+                final JDBC4ExecutionFuture result;
+                {
+                    this.result = future;
+                }
 
-            @Override
-            public void clientCallback(ClientResponse response) throws Exception {
-                future.set(response);
-            }
-        }), procedure, parameters);
+                @Override
+                public void clientCallback(ClientResponse response) throws Exception {
+                    future.set(response);
+                }
+            }), procedure, parameters);
+        }
+        catch (NoConnectionsException e) {
+            this.drop_client();
+            throw e;
+        }
         return future;
     }
 
@@ -302,6 +406,9 @@ public class JDBC4ClientConnection implements Closeable {
      * @return A {@link ClientStatsContext} that correctly represents the client statistics.
      */
     public ClientStatsContext getClientStatsContext() {
+        if (this.client == null) {
+            return null;
+        }
         return this.client.createStatsContext();
     }
 
@@ -369,6 +476,9 @@ public class JDBC4ClientConnection implements Closeable {
     }
 
     void writeSummaryCSV(ClientStats stats, String path) throws IOException {
+        if (this.client == null) {
+            throw new IOException("Client is unavailable for writing summary CSV.");
+        }
         this.client.writeSummaryCSV(stats, path);
     }
 
@@ -376,12 +486,21 @@ public class JDBC4ClientConnection implements Closeable {
      * Block the current thread until all queued stored procedure invocations have received
      * responses or there are no more connections to the cluster
      *
-     * @throws NoConnectionsException
      * @throws InterruptedException
+     * @throws IOException
      * @see Client#drain()
      */
-    public void drain() throws NoConnectionsException, InterruptedException {
-        this.client.drain();
+    public void drain() throws InterruptedException, IOException {
+        if (this.client == null) {
+            throw new IOException("Client is unavailable for drain().");
+        }
+        try {
+            this.client.drain();
+        }
+        catch (NoConnectionsException e) {
+            this.drop_client();
+            throw e;
+        }
     }
 
     /**
@@ -389,8 +508,12 @@ public class JDBC4ClientConnection implements Closeable {
      * connections to the database
      *
      * @throws InterruptedException
+     * @throws IOException
      */
-    public void backpressureBarrier() throws InterruptedException {
+    public void backpressureBarrier() throws InterruptedException, IOException {
+        if (this.client == null) {
+            throw new IOException("Client is unavailable for backpressureBarrier().");
+        }
         this.client.backpressureBarrier();
     }
 
@@ -410,6 +533,12 @@ public class JDBC4ClientConnection implements Closeable {
      */
     public ClientResponse updateApplicationCatalog(File catalogPath, File deploymentPath)
             throws IOException, NoConnectionsException, ProcCallException {
-        return this.client.updateApplicationCatalog(catalogPath, deploymentPath);
+        try {
+            return this.getClient().updateApplicationCatalog(catalogPath, deploymentPath);
+        }
+        catch (NoConnectionsException e) {
+            this.drop_client();
+            throw e;
+        }
     }
 }
