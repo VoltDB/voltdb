@@ -448,7 +448,6 @@ class ServerBundle(JavaBundle):
                 '-server',
                 '-XX:+HeapDumpOnOutOfMemoryError',
                 '-XX:HeapDumpPath=/tmp',
-                '-XX:-ReduceInitialCardMarks',
                 '-XX:+UseParNewGC',
                 '-XX:+UseConcMarkSweepGC',
                 '-XX:+CMSParallelRemarkEnabled',

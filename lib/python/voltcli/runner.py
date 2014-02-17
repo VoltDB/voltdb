@@ -134,6 +134,7 @@ class JavaRunner(object):
         java_args = [environment.java]
         java_opts = utility.merge_java_options(environment.java_opts, java_opts_override)
         java_args.extend(java_opts)
+        java_args.append('-Djava.awt.headless=true -Dsun.net.inetaddr.ttl=300 -Dsun.net.inetaddr.negative.ttl=3600');
         java_args.append('-Dlog4j.configuration=file://%s' % os.environ['LOG4J_CONFIG_PATH'])
         java_args.append('-Djava.library.path="%s"' % os.environ['VOLTDB_VOLTDB'])
         java_args.extend(('-classpath', classpath))
