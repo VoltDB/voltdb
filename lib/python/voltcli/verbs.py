@@ -371,6 +371,7 @@ class JavaBundle(object):
            cli.StringOption(None, '--zookeeper', 'zkport', 'specify the zookeeper port number'),
            cli.StringOption(None, '--replication', 'replicationport', 'specify the replication port number (1st of 3 sequential ports)'),
            cli.StringOption(None, '--admin', 'adminport', 'specify the admin port number'),
+           cli.StringOption(None, '--http', 'httpport', 'specify the http port number'),
            cli.StringOption(None, '--internalinterface', 'internalinterface', 'specify the network interface to use for internal communication, such as the internal and zookeeper ports'),
            cli.StringOption(None, '--externalinterface', 'externalinterface', 'specify the network interface to use for external ports, such as the admin and client ports'))
 
@@ -480,6 +481,10 @@ class ServerBundle(JavaBundle):
             utility.abort('host is required.')
         if runner.opts.clientport:
             final_args.extend(['port', runner.opts.clientport])
+        if runner.opts.adminport:
+            final_args.extend(['adminport', runner.opts.adminport])
+        if runner.opts.httpport:
+            final_args.extend(['httpport', runner.opts.httpport])
         if runner.opts.license:
             final_args.extend(['license', runner.opts.license])
         if runner.opts.internalinterface:
