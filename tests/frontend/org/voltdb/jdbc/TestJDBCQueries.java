@@ -35,7 +35,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+import org.junit.After;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
@@ -137,26 +139,6 @@ public class TestJDBCQueries {
 
         // Set up ServerThread and Connection
         startServer();
-
-        // Populate tables.
-        for (Data d : data) {
-            String q = String.format("insert into %s values(?, ?)", d.tablename);
-            for (String id : d.good) {
-                try {
-                    PreparedStatement sel = conn.prepareStatement(q);
-                        sel.setString(1, id);
-                        sel.setString(2, String.format("VALUE:%s:%s", d.tablename, id));
-                        sel.execute();
-                        int count = sel.getUpdateCount();
-                        assertTrue(count==1);
-                }
-                catch(SQLException e) {
-                    System.err.printf("ERROR(INSERT): %s value='%s': %s\n",
-                                      d.typename, d.good[0], e.getMessage());
-                    fail();
-                }
-            }
-        }
     }
 
     @AfterClass
@@ -164,6 +146,45 @@ public class TestJDBCQueries {
         stopServer();
         File f = new File(testjar);
         f.delete();
+    }
+
+    @Before
+    public void populateTables()
+    {
+        // Populate tables.
+        for (Data d : data) {
+            String q = String.format("insert into %s values(?, ?)", d.tablename);
+            for (String id : d.good) {
+                try {
+                    PreparedStatement sel = conn.prepareStatement(q);
+                    sel.setString(1, id);
+                    sel.setString(2, String.format("VALUE:%s:%s", d.tablename, id));
+                    sel.execute();
+                    int count = sel.getUpdateCount();
+                    assertTrue(count==1);
+                }
+                catch(SQLException e) {
+                    System.err.printf("ERROR(INSERT): %s value='%s': %s\n",
+                            d.typename, d.good[0], e.getMessage());
+                    fail();
+                }
+            }
+        }
+    }
+
+    @After
+    public void clearTables()
+    {
+        for (Data d : data) {
+            try {
+                PreparedStatement sel =
+                        conn.prepareStatement(String.format("delete from %s", d.tablename));
+                sel.execute();
+            } catch (SQLException e) {
+                System.err.printf("ERROR(DELETE): %s: %s\n", d.tablename, e.getMessage());
+                fail();
+            }
+        }
     }
 
     private static void startServer() throws ClassNotFoundException, SQLException {
@@ -307,8 +328,8 @@ public class TestJDBCQueries {
             assertEquals(data.length, resultCodes.length);
             int total_cnt = 0;
             for (int i = 0; i < data.length; ++i) {
-                assertEquals(data[i].good.length + 3, resultCodes[i]);
-                total_cnt += data[i].good.length + 3;
+                assertEquals(data[i].good.length, resultCodes[i]);
+                total_cnt += data[i].good.length;
             }
             //Test update count
             assertEquals(total_cnt, batch.getUpdateCount());
