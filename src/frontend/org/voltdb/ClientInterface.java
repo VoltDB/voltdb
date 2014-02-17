@@ -1901,7 +1901,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return new ClientResponseImpl(
                        err == null ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE,
                        new VoltTable[] { },
-                       null,
+                       err,
                        task.clientHandle);
     }
 
