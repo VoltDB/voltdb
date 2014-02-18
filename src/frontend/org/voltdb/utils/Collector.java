@@ -340,13 +340,7 @@ public class Collector {
             String[] dmesgCmd = {"bash", "-c", "/bin/dmesg"};
             cmd(tarGenerator, dmesgCmd, "dmesgdata");
 
-            if (m_calledFromVEM) {
-                // if collector is called by VEM, do not output the list of files included in the compressed file to stdout
-                tarGenerator.write(false, false);
-            }
-            else {
-                tarGenerator.write(false, true);
-            }
+            tarGenerator.write(m_calledFromVEM ? null : System.out);
 
             long sizeInByte = collectionFile.length();
             String sizeStringInKB = String.format("%5.2f", (double)sizeInByte / 1000);

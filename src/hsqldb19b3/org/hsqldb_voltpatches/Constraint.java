@@ -133,10 +133,6 @@ public final class Constraint implements SchemaObject {
     // for temp constraints only
     OrderedHashSet mainColSet;
     OrderedHashSet refColSet;
-    // Is this for temp constraints only? What's a temp constraint?
-    Expression[] indexExprs; // A VoltDB extension to support indexed expressions
-    boolean assumeUnique = false; // For VoltDB
-    int rowsLimit = Integer.MAX_VALUE; // For VoltDB
 
     //
     final public static Constraint[] emptyArray = new Constraint[]{};
@@ -218,12 +214,6 @@ public final class Constraint implements SchemaObject {
         this.name  = name;
         constType  = type;
         mainColSet = mainCols;
-    }
-
-    // A VoltDB extension to support indexed expressions
-    public Constraint(HsqlName name, OrderedHashSet baseCols, Expression[] exprs) {
-        this(name, baseCols, Constraint.UNIQUE);
-        indexExprs = exprs;
     }
 
     void setColumnsIndexes(Table table) {
@@ -340,7 +330,7 @@ public final class Constraint implements SchemaObject {
                 if (indexExprs != null) {
                     return getExprList(sb);
                 }
-
+                // End of VoltDB extension
                 int[] col = getMainColumns();
 
                 getColumnList(getMain(), col, col.length, sb);
@@ -1035,7 +1025,17 @@ public final class Constraint implements SchemaObject {
         }
     }
 
-    /*************** VOLTDB *********************/
+    /************************* Volt DB Extensions *************************/
+
+    Expression[] indexExprs; // A VoltDB extension to support indexed expressions
+    boolean assumeUnique = false; // For VoltDB
+    int rowsLimit = Integer.MAX_VALUE; // For VoltDB
+
+    // A VoltDB extension to support indexed expressions
+    public Constraint withExpressions(Expression[] exprs) {
+        indexExprs = exprs;
+        return this;
+    }
 
     /**
      * @return The name of this constraint instance's type.
@@ -1084,7 +1084,7 @@ public final class Constraint implements SchemaObject {
 
     // A VoltDB extension to support indexed expressions
     public boolean isUniqueWithExprs(Expression[] indexExprs2) {
-        if (constType != UNIQUE || ! indexExprs.equals(indexExprs2)) {
+        if (constType != UNIQUE || (indexExprs == null) || ! indexExprs.equals(indexExprs2)) {
             return false;
         }
         return true;
@@ -1110,5 +1110,5 @@ public final class Constraint implements SchemaObject {
         this.assumeUnique = assumeUnique;
         return this;
     }
-
+    /**********************************************************************/
 }

@@ -33,7 +33,6 @@ package org.hsqldb_voltpatches.jdbc.pool;
 
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.concurrent.Executor;
 
 /**
  * Wraps a connection from the connection pool during a session. A session lasts from the
@@ -98,26 +97,5 @@ public class SessionConnectionWrapper extends BaseConnectionWrapper {
         this.connection = null;
 
         temp.close();
-    }
-
-    public void setSchema(String schema) throws SQLException {
-        throw new SQLException();
-    }
-
-    public String getSchema() throws SQLException {
-        throw new SQLException();
-    }
-
-    public void abort(Executor executor) throws SQLException {
-        throw new SQLException();
-    }
-
-    public void setNetworkTimeout(Executor executor, int milliseconds)
-            throws SQLException {
-        throw new SQLException();
-    }
-
-    public int getNetworkTimeout() throws SQLException {
-        throw new SQLException();
     }
 }
