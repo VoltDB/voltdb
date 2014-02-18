@@ -285,4 +285,12 @@ public final class DBBPool {
      */
     public static native void deleteCharArrayMemory(long pointer);
 
+    /*
+     * Allocate a direct byte buffer that bypasses all GC and Java limits
+     * and requires manual memory management. The memory will not be zeroed
+     * and will come from the new/delete in C++. The pointer can be freed
+     * using deleteCharArrayMemory.
+     */
+    public static native ByteBuffer allocateUnsafeByteBuffer(long size);
+
 }

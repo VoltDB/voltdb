@@ -46,6 +46,7 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.CompressionService;
+import org.voltdb.utils.PosixAdvise;
 
 import com.google_voltpatches.common.util.concurrent.Callables;
 import com.google_voltpatches.common.util.concurrent.Futures;
@@ -107,6 +108,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("Snapshot sync service")));
 
     public static final int SNAPSHOT_SYNC_FREQUENCY = Integer.getInteger("SNAPSHOT_SYNC_FREQUENCY", 500);
+    public static final int SNAPSHOT_FADVISE_BYTES = Integer.getInteger("SNAPSHOT_FADVISE_BYTES", 1024 * 1024 * 2);
 
     public DefaultSnapshotDataTarget(
             final File file,
@@ -249,13 +251,16 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
         ScheduledFuture<?> syncTask = null;
         syncTask = m_syncService.scheduleAtFixedRate(new Runnable() {
+            private long fadvisedBytes = 0;
             @Override
             public void run() {
                 //Only sync for at least 4 megabyte of data, enough to amortize the cost of seeking
                 //on ye olden platters. Since we are appending to a file it's actually 2 seeks.
                 while (m_bytesWrittenSinceLastSync.get() > (1024 * 1024 * 4)) {
                     final int bytesSinceLastSync = m_bytesWrittenSinceLastSync.getAndSet(0);
+                    long positionAtSync = 0;
                     try {
+                        positionAtSync = m_channel.position();
                         m_channel.force(false);
                     } catch (IOException e) {
                         if (!(e instanceof java.nio.channels.AsynchronousCloseException )) {
@@ -265,6 +270,33 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                         }
                     }
                     m_bytesAllowedBeforeSync.release(bytesSinceLastSync);
+
+                    /*
+                     * Don't pollute the page cache with snapshot data, use fadvise
+                     * to periodically request the kernel drop pages we have written
+                     */
+                    try {
+                        if (positionAtSync - fadvisedBytes > SNAPSHOT_FADVISE_BYTES) {
+                            //Get aligned start and end position
+                            final long fadviseStart = fadvisedBytes;
+                            //-1 because we don't want to drop the last page because
+                            //we might modify it while appending
+                            fadvisedBytes = ((positionAtSync / 4096) - 1) * 4096;
+                            final long retval = PosixAdvise.fadvise(
+                                    m_fos.getFD(),
+                                    fadviseStart,
+                                    fadvisedBytes - fadviseStart,
+                                    PosixAdvise.POSIX_FADV_DONTNEED );
+                            if (retval != 0) {
+                                SNAP_LOG.error("Error fadvising snapshot data: " + retval);
+                                SNAP_LOG.error(
+                                        "Params offset " + fadviseStart +
+                                        " length " + (fadvisedBytes - fadviseStart));
+                            }
+                        }
+                    } catch (Throwable t) {
+                        SNAP_LOG.error("Error fadvising snapshot data", t);
+                    }
                 }
             }
         }, SNAPSHOT_SYNC_FREQUENCY, SNAPSHOT_SYNC_FREQUENCY, TimeUnit.MILLISECONDS);
