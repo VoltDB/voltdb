@@ -321,6 +321,16 @@ public class DDLCompiler {
             );
 
     /**
+     * Regex to match ALTER or DROP TABLE statements. Capture group (1) is operator, (2) is TABLE, but (3) is used.
+     */
+    static final Pattern alterOrDropTablePattern = Pattern.compile(
+            "(?i)" + // (ignore case)
+            "\\A" + // (start statement)
+            "(ALTER|DROP)\\s+(TABLE)\\s+" + // (1) ALTER or DROP TABLE
+            "([\\w.$]+)" // (3) <table name>
+    );
+
+    /**
      * NB supports only unquoted table and column names
      *
      * Regex Description:
@@ -486,7 +496,7 @@ public class DDLCompiler {
             }
             if (!processed) {
                 try {
-                    // Check for CREATE TABLE or CREATE VIEW.
+                    // Check for CREATE TABLE, CREATE VIEW, ALTER or DROP TABLE.
                     // We sometimes choke at parsing statements with newlines, so
                     // check against a newline free version of the stmt.
                     String oneLinerStmt = stmt.statement.replace("\n", " ");
@@ -494,6 +504,22 @@ public class DDLCompiler {
                     if (tableMatcher.find()) {
                         String tableName = tableMatcher.group(2);
                         m_tableNameToDDL.put(tableName.toUpperCase(), stmt.statement);
+                    } else {
+                        Matcher atableMatcher = alterOrDropTablePattern.matcher(oneLinerStmt);
+                        if (atableMatcher.find()) {
+                            String op = atableMatcher.group(1);
+                            String tableName = atableMatcher.group(3);
+                            if (op.equalsIgnoreCase("DROP")) {
+                                m_tableNameToDDL.remove(tableName.toUpperCase());
+                            } else {
+                                //ALTER - Append the statement
+                                String prevStmt = m_tableNameToDDL.get(tableName.toUpperCase());
+                                if (prevStmt != null) {
+                                    //Append the SQL for report...else would blow up compilation.
+                                    m_tableNameToDDL.put(tableName.toUpperCase(), prevStmt + "\n" + stmt.statement);
+                                }
+                            }
+                        }
                     }
 
                     // kind of ugly.  We hex-encode each statement so we can

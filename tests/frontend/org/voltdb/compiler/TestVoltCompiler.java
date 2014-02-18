@@ -3116,4 +3116,88 @@ public class TestVoltCompiler extends TestCase {
         return count;
     }
 
+    public void testAlterTable() throws IOException {
+        final String simpleSchema1
+                = "create table mytable  (pkey integer, column2_integer integer);\n"
+                + "alter table mytable add column newcol varchar(50);\n";
+
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema1);
+        final String schemaPath = schemaFile.getPath();
+
+        final String simpleProject
+                = "<?xml version=\"1.0\"?>\n"
+                + "<project>"
+                + "<database name='database'>"
+                + "<schemas>"
+                + "<schema path='" + schemaPath + "' />"
+                + "</schemas>"
+                + "<procedures/>"
+                + "</database>"
+                + "</project>";
+
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+        final String projectPath = projectFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+
+        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertTrue(success);
+    }
+
+    public void testDropTable() throws IOException {
+        final String simpleSchema1
+                = "create table mytable  (pkey integer, column2_integer integer);\n"
+                + "drop table mytable;\n";
+
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema1);
+        final String schemaPath = schemaFile.getPath();
+
+        final String simpleProject
+                = "<?xml version=\"1.0\"?>\n"
+                + "<project>"
+                + "<database name='database'>"
+                + "<schemas>"
+                + "<schema path='" + schemaPath + "' />"
+                + "</schemas>"
+                + "<procedures/>"
+                + "</database>"
+                + "</project>";
+
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+        final String projectPath = projectFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+
+        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertTrue(success);
+    }
+
+    public void testDropTableIfExists() throws IOException {
+        final String simpleSchema1
+                = "create table mytable  (pkey integer, column2_integer integer);\n"
+                + "drop table mytablenonexistant if exists;\n";
+
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema1);
+        final String schemaPath = schemaFile.getPath();
+
+        final String simpleProject
+                = "<?xml version=\"1.0\"?>\n"
+                + "<project>"
+                + "<database name='database'>"
+                + "<schemas>"
+                + "<schema path='" + schemaPath + "' />"
+                + "</schemas>"
+                + "<procedures/>"
+                + "</database>"
+                + "</project>";
+
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+        final String projectPath = projectFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+
+        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertTrue(success);
+    }
+
 }
