@@ -305,12 +305,6 @@ bool PersistentTable::insertTuple(TableTuple &source)
 
 void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
 {
-    if (visibleTupleCount() >= m_tupleLimit) {
-        std::stringstream builder;
-        builder << "Table " << m_name << " exceeds table maximum row count " << m_tupleLimit;
-        throw ConstraintFailureException(this, source, builder.str());
-    }
-
     //
     // First get the next free tuple
     // This will either give us one from the free slot list, or
@@ -338,6 +332,13 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
         // not null checks at first
         FAIL_IF(!checkNulls(target)) {
             throw ConstraintFailureException(this, source, TableTuple(), CONSTRAINT_TYPE_NOT_NULL);
+        }
+
+        if (visibleTupleCount() >= m_tupleLimit) {
+            char buffer [256];
+            snprintf (buffer, 256, "Table %s exceeds table maximum row count %d",
+                    m_name.c_str(), m_tupleLimit);
+            throw ConstraintFailureException(this, source, buffer);
         }
     }
 

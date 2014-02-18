@@ -1682,7 +1682,7 @@ public class DDLCompiler {
                 throw m_compiler.new VoltCompilerException("Invalid constraint limit number '" + tupleLimit + "'");
             }
             if (tableLimitConstraintCounter.contains(table.getTypeName())) {
-                throw m_compiler.new VoltCompilerException("Too many table limit constraints");
+                throw m_compiler.new VoltCompilerException("Too many table limit constraints for table " + table.getTypeName());
             } else {
                 tableLimitConstraintCounter.add(table.getTypeName());
             }
