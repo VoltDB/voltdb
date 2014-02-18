@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Set;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
-import com.google_voltpatches.common.collect.Sets;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Subject;
@@ -131,7 +130,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     Iv2InitiateTaskMessage m_initiateTask;
     ByteBuffer m_initiateTaskBuffer;
     // Partitions involved in this multipart, set in the first fragment
-    Set<Integer> m_involvedPartitions = Sets.newHashSet();
+    Set<Integer> m_involvedPartitions = ImmutableSet.of();
 
     // context for long running fragment status log messages
     byte[] m_procedureName = null;
@@ -774,10 +773,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         // Involved partition
         short involvedPartitionCount = buf.getShort();
-        m_involvedPartitions = Sets.newHashSet();
+        ImmutableSet.Builder<Integer> involvedPartitionsBuilder = ImmutableSet.builder();
         for (int i = 0; i < involvedPartitionCount; i++) {
-            m_involvedPartitions.add(buf.getInt());
+            involvedPartitionsBuilder.add(buf.getInt());
         }
+        m_involvedPartitions = involvedPartitionsBuilder.build();
 
         int initiateTaskMessageLength = buf.getInt();
         if (initiateTaskMessageLength > 0) {
