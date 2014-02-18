@@ -125,6 +125,7 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
     tuple->setNValue( StatsSource::m_columnName2Index["TABLE_TYPE"], m_tableType);
     int64_t tupleCount = m_table->activeTupleCount();
     int tupleLimit = m_table->tupleLimit();
+
     // This overflow is unlikely (requires 2 terabytes of allocated string memory)
     int64_t allocated_tuple_mem_kb = m_table->allocatedTupleMemory() / 1024;
     int64_t occupied_tuple_mem_kb = 0;
@@ -164,16 +165,15 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
             StatsSource::m_columnName2Index["TUPLE_COUNT"],
             ValueFactory::getBigIntValue(tupleCount));
     tuple->setNValue(StatsSource::m_columnName2Index["TUPLE_ALLOCATED_MEMORY"],
-                     ValueFactory::
-                     getIntegerValue(static_cast<int32_t>(allocated_tuple_mem_kb)));
+            ValueFactory::getIntegerValue(static_cast<int32_t>(allocated_tuple_mem_kb)));
     tuple->setNValue(StatsSource::m_columnName2Index["TUPLE_DATA_MEMORY"],
-                     ValueFactory::
-                     getIntegerValue(static_cast<int32_t>(occupied_tuple_mem_kb)));
+            ValueFactory::getIntegerValue(static_cast<int32_t>(occupied_tuple_mem_kb)));
     tuple->setNValue(StatsSource::m_columnName2Index["STRING_DATA_MEMORY"],
-                     ValueFactory::
-                      getIntegerValue(static_cast<int32_t>(string_data_mem_kb)));
+            ValueFactory::getIntegerValue(static_cast<int32_t>(string_data_mem_kb)));
     tuple->setNValue(StatsSource::m_columnName2Index["TUPLE_LIMIT"],
-                     ValueFactory::getIntegerValue(tupleLimit));
+            tupleLimit == INT_MAX ?
+            ValueFactory::getNullValue() :
+            ValueFactory::getIntegerValue(tupleLimit));
 }
 
 /**

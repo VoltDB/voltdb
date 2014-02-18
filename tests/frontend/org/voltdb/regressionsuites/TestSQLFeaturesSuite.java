@@ -30,6 +30,7 @@ import junit.framework.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
@@ -556,48 +557,53 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         // When table limit feature is fully supported, there needs to be more test cases.
         // generalize this test within a loop, maybe.
         // Test max row 0
-        vt = client.callProcedure("@AdHoc", "select count(*) from TBNAME_TABLELIMIT_0").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select count(*) from CAPPED0").getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {0});
 
         e = null;
         try {
-            vt = client.callProcedure("TBNAME_TABLELIMIT_0.insert", 0, 0, 0).getResults()[0];
+            vt = client.callProcedure("CAPPED0.insert", 0, 0, 0).getResults()[0];
         } catch (ProcCallException ex) {
             System.out.println(ex.getMessage());
             e = ex;
             assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
-            assertTrue(ex.getMessage().contains("Table TBNAME_TABLELIMIT_0 exceeds table maximum row count 0"));
+            assertTrue(ex.getMessage().contains("Table CAPPED0 exceeds table maximum row count 0"));
         } finally {
             assertNotNull(e);
         }
-        vt = client.callProcedure("@AdHoc", "select count(*) from TBNAME_TABLELIMIT_0").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select count(*) from CAPPED0").getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {0});
 
         // Test @Statistics TABLE
-        checkStatisticsForTableLimit(client, "TBNAME_TABLELIMIT_0", 0);
+        checkStatisticsForTableLimit(client, "CAPPED0", 0);
 
         // Test max row 2
-        vt = client.callProcedure("TBNAME_TABLELIMIT_2.insert", 0, 0, 0).getResults()[0];
+        vt = client.callProcedure("CAPPED2.insert", 0, 0, 0).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
-        vt = client.callProcedure("TBNAME_TABLELIMIT_2.insert", 1, 1, 1).getResults()[0];
+        vt = client.callProcedure("CAPPED2.insert", 1, 1, 1).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
 
         e = null;
         try {
-            vt = client.callProcedure("TBNAME_TABLELIMIT_2.insert", 2, 2, 2).getResults()[0];
+            vt = client.callProcedure("CAPPED2.insert", 2, 2, 2).getResults()[0];
         } catch (ProcCallException ex) {
             System.out.println(ex.getMessage());
             e = ex;
             assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
-            assertTrue(ex.getMessage().contains("Table TBNAME_TABLELIMIT_2 exceeds table maximum row count 2"));
+            assertTrue(ex.getMessage().contains("Table CAPPED2 exceeds table maximum row count 2"));
         } finally {
             assertNotNull(e);
         }
-        vt = client.callProcedure("@AdHoc", "select count(*) from TBNAME_TABLELIMIT_2").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select count(*) from CAPPED2").getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {2});
 
         // Test @Statistics TABLE
-        checkStatisticsForTableLimit(client, "TBNAME_TABLELIMIT_2", 2);
+        checkStatisticsForTableLimit(client, "CAPPED2", 2);
+
+        // Test @Statistics TABLE for normal table
+        vt = client.callProcedure("NOCAPPED.insert", 0, 0, 0).getResults()[0];
+        // Test @Statistics TABLE
+        checkStatisticsForTableLimit(client, "NOCAPPED", VoltType.NULL_INTEGER);
     }
 
 

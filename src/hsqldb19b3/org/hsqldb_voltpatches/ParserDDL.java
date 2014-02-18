@@ -993,6 +993,7 @@ public class ParserDDL extends ParserRoutine {
                 case Tokens.ASSUMEUNIQUE : // For VoltDB.
                 case Tokens.UNIQUE :
                 case Tokens.CHECK :
+                case Tokens.LIMIT :
                     if (!startPart) {
                         throw unexpectedToken();
                     }
@@ -1330,6 +1331,12 @@ public class ParserDDL extends ParserRoutine {
                         table.setColumnTypeVars(c.notNullColumnIndex);
                     }
 
+                    session.database.schemaManager.addSchemaObject(c);
+
+                    break;
+                }
+                case Constraint.LIMIT : {
+                    table.addConstraint(c);
                     session.database.schemaManager.addSchemaObject(c);
 
                     break;
@@ -2761,6 +2768,21 @@ public class ParserDDL extends ParserRoutine {
                                               Constraint.CHECK);
 
                 readCheckConstraintCondition(c);
+                constraintList.add(c);
+
+                break;
+            }
+            case Tokens.LIMIT : {
+                read();
+
+                if (constName == null) {
+                    constName = database.nameManager.newAutoName("LIMIT",
+                            schemaObject.getSchemaName(),
+                            schemaObject.getName(), SchemaObject.CONSTRAINT);
+                }
+
+                Constraint c = new Constraint(constName, null, Constraint.LIMIT);
+                readLimitConstraintCondition(c);
                 constraintList.add(c);
 
                 break;
@@ -4931,5 +4953,22 @@ public class ParserDDL extends ParserRoutine {
     void checkDatabaseUpdateAuthorisation() {
         session.checkAdmin();
         session.checkDDLWrite();
+    }
+
+
+    /*************** VOLTDB *********************/
+
+    /**
+     * Responsible for handling Volt limit constraints section of CREATE TABLE ...
+     *
+     * @param c check constraint
+     */
+    void readLimitConstraintCondition(Constraint c) {
+        // PARTITION may be optimal
+        readThis(Tokens.PARTITION);
+        readThis(Tokens.ROWS);
+
+        int rowsLimit = readInteger();
+        c.rowsLimit = rowsLimit;
     }
 }

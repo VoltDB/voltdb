@@ -30,6 +30,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -423,6 +424,8 @@ public class DDLCompiler {
     // There's specifically no cleanup here because I don't think
     // any is needed.
     Map<String, String> m_tableNameToDDL = new TreeMap<String, String>();
+
+    private Set<String> tableLimitConstraintCounter = new HashSet<>();
 
     private class DDLStatement {
         public DDLStatement() {
@@ -1209,18 +1212,7 @@ public class DDLCompiler {
             matViewMap.put(table, query);
         }
 
-        // FIXME (xin): hack to get table limit info from DDL
-        Pattern r = Pattern.compile("(.+)(_tablelimit_)(\\d+)");
-        Matcher m = r.matcher(name.toLowerCase());
-        if (m.find( )) {
-            int tupleLimit = Integer.parseInt(m.group(3));
-            table.setTuplelimit(tupleLimit);
-            System.out.println("DEBUG EXPERIMENTAL FEATURE ENABLED: TABLE LIMIT ESTABLISHED ON TABLE " + name + " (" + tupleLimit + ")");
-        } else {
-            table.setTuplelimit(Integer.MAX_VALUE);
-        }
-
-        // all tables start replicated
+         // all tables start replicated
         // if a partition is found in the project file later,
         //  then this is reversed
         table.setIsreplicated(true);
@@ -1268,8 +1260,10 @@ public class DDLCompiler {
 
             if (subNode.name.equals("constraints")) {
                 for (VoltXMLElement constraintNode : subNode.children) {
-                    if (constraintNode.name.equals("constraint"))
+                    if (constraintNode.name.equals("constraint")) {
                         addConstraintToCatalog(table, constraintNode, indexReplacementMap);
+                    }
+
                 }
             }
         }
@@ -1680,6 +1674,22 @@ public class DDLCompiler {
         String name = node.attributes.get("name");
         String typeName = node.attributes.get("constrainttype");
         ConstraintType type = ConstraintType.valueOf(typeName);
+
+        table.setTuplelimit(Integer.MAX_VALUE);
+        if (type == ConstraintType.LIMIT) {
+            int tupleLimit = Integer.parseInt(node.attributes.get("rowslimit"));
+            if (tupleLimit < 0) {
+                throw m_compiler.new VoltCompilerException("Invalid constraint limit number '" + tupleLimit + "'");
+            }
+            if (tableLimitConstraintCounter.contains(table.getTypeName())) {
+                throw m_compiler.new VoltCompilerException("Too many table limit constraints");
+            } else {
+                tableLimitConstraintCounter.add(table.getTypeName());
+            }
+
+            table.setTuplelimit(tupleLimit);
+            return;
+        }
 
         if (type == ConstraintType.CHECK) {
             String msg = "VoltDB does not enforce check constraints. ";

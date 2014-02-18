@@ -115,7 +115,8 @@ public final class Constraint implements SchemaObject {
                             UNIQUE         = 2,
                             CHECK          = 3,
                             PRIMARY_KEY    = 4,
-                            TEMP           = 5;
+                            TEMP           = 5,
+                            LIMIT          = 6;
     ConstraintCore          core;
     private HsqlName        name;
     int                     constType;
@@ -135,6 +136,7 @@ public final class Constraint implements SchemaObject {
     // Is this for temp constraints only? What's a temp constraint?
     Expression[] indexExprs; // A VoltDB extension to support indexed expressions
     boolean assumeUnique = false; // For VoltDB
+    int rowsLimit = Integer.MAX_VALUE; // For VoltDB
 
     //
     final public static Constraint[] emptyArray = new Constraint[]{};
@@ -1045,6 +1047,7 @@ public final class Constraint implements SchemaObject {
             case UNIQUE: return "UNIQUE";
             case CHECK: return isNotNull ? "NOT_NULL" : "CHECK";
             case PRIMARY_KEY: return "PRIMARY_KEY";
+            case LIMIT: return "LIMIT";
         }
         return "UNKNOWN";
     }
@@ -1067,6 +1070,7 @@ public final class Constraint implements SchemaObject {
         constraint.attributes.put("name", getName().name);
         constraint.attributes.put("constrainttype", getTypeName());
         constraint.attributes.put("assumeunique", assumeUnique ? "true" : "false");
+        constraint.attributes.put("rowslimit", String.valueOf(rowsLimit));
 
         // VoltDB implements constraints by defining an index, by annotating metadata (such as for NOT NULL columns),
         // or by issuing a "not supported" warning (such as for foreign keys).
