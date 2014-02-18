@@ -36,7 +36,6 @@ import java.math.BigDecimal;
 
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
-import org.hsqldb_voltpatches.Row;
 import org.hsqldb_voltpatches.Types;
 import org.hsqldb_voltpatches.lib.StringConverter;
 import org.hsqldb_voltpatches.persist.TextCache;
@@ -49,6 +48,7 @@ import org.hsqldb_voltpatches.types.JavaObjectData;
 import org.hsqldb_voltpatches.types.TimeData;
 import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.Row;
 
 /**
  *  Class for writing the data for a database row in text table format.

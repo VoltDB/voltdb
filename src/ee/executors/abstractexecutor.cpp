@@ -61,9 +61,6 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
 {
     assert (m_abstractNode);
 
-    // cache the name of the abstractNode for debugging/logging/progress reporting
-    m_planNodeName = planNodeToString(m_abstractNode->getPlanNodeType());
-
     //
     // Grab the input tables directly from this node's children
     //

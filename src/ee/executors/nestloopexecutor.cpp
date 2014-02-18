@@ -162,7 +162,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     TableIterator iterator0 = outer_table->iterator();
     int tuple_ctr = 0;
     int tuple_skipped = 0;
-    ProgressMonitorProxy pmp(m_engine, inner_table);
+    ProgressMonitorProxy pmp(m_engine, this, inner_table);
 
     while ((limit == -1 || tuple_ctr < limit) && iterator0.next(outer_tuple)) {
         pmp.countdownProgress();
