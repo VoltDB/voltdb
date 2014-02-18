@@ -66,7 +66,6 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.index.Index;
 import org.hsqldb_voltpatches.index.IndexAVL;
@@ -84,8 +83,8 @@ import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.rights.Grantee;
 import org.hsqldb_voltpatches.store.ValuePool;
-import org.hsqldb_voltpatches.types.LobData;
 import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.types.LobData;
 
 // fredt@users 20020130 - patch 491987 by jimbag@users - made optional
 // fredt@users 20020405 - patch 1.7.0 by fredt - quoted identifiers
@@ -177,7 +176,7 @@ public class Table extends TableBase implements SchemaObject {
 
                 type = MEMORY_TABLE;
 
-            // fall through
+            // $FALL-THROUGH$
             case MEMORY_TABLE :
                 persistenceScope = SCOPE_FULL;
                 isSchemaBased    = true;
@@ -282,7 +281,6 @@ public class Table extends TableBase implements SchemaObject {
                                          this, true);
     }
 
-    @Override
     public int getType() {
         return SchemaObject.TABLE;
     }
@@ -290,7 +288,6 @@ public class Table extends TableBase implements SchemaObject {
     /**
      *  Returns the HsqlName object fo the table
      */
-    @Override
     public final HsqlName getName() {
         return tableName;
     }
@@ -298,7 +295,6 @@ public class Table extends TableBase implements SchemaObject {
     /**
      * Returns the catalog name or null, depending on a database property.
      */
-    @Override
     public HsqlName getCatalogName() {
         return database.getCatalogName();
     }
@@ -306,17 +302,14 @@ public class Table extends TableBase implements SchemaObject {
     /**
      * Returns the schema name.
      */
-    @Override
     public HsqlName getSchemaName() {
         return tableName.schema;
     }
 
-    @Override
     public Grantee getOwner() {
         return tableName.schema.owner;
     }
 
-    @Override
     public OrderedHashSet getReferences() {
 
         OrderedHashSet set = new OrderedHashSet();
@@ -332,7 +325,6 @@ public class Table extends TableBase implements SchemaObject {
         return set;
     }
 
-    @Override
     public OrderedHashSet getComponents() {
 
         OrderedHashSet set = new OrderedHashSet();
@@ -349,7 +341,6 @@ public class Table extends TableBase implements SchemaObject {
         return set;
     }
 
-    @Override
     public void compile(Session session) {}
 
     String[] getSQL(OrderedHashSet resolved, OrderedHashSet unresolved) {
@@ -425,7 +416,6 @@ public class Table extends TableBase implements SchemaObject {
         return array;
     }
 
-    @Override
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer();
@@ -536,7 +526,6 @@ public class Table extends TableBase implements SchemaObject {
     /**
      * Used to create row id's
      */
-    @Override
     public int getId() {
         return tableName.hashCode();
     }
@@ -751,6 +740,7 @@ public class Table extends TableBase implements SchemaObject {
             if (constraintList[i].hasExprs()) {
                 continue;
             }
+            // End of VoltDB extension
             if (constraintList[i].hasTriggeredAction()) {
                 int[] mainColumns = constraintList[i].getMainColumns();
 
@@ -795,20 +785,6 @@ public class Table extends TableBase implements SchemaObject {
     }
 
     /**
-     * Returns the UNIQUE constraint with the given expression signature -- a VoltDB extension.
-     */
-    Constraint getUniqueConstraintForExprs(Expression[] indexExprs) {
-        for (int i = 0, size = constraintList.length; i < size; i++) {
-            Constraint exprc = constraintList[i];
-
-            if (exprc.isUniqueWithExprs(indexExprs)) {
-                return exprc;
-            }
-        }
-        return null;
-    }
-
-    /**
      * Returns the UNIQUE or PK constraint with the given column signature.
      * Modifies the composition of refTableCols if necessary.
      */
@@ -817,12 +793,11 @@ public class Table extends TableBase implements SchemaObject {
 
         for (int i = 0, size = constraintList.length; i < size; i++) {
             Constraint c    = constraintList[i];
-
             // A VoltDB extension -- Don't consider non-column expression indexes for this purpose
             if (c.hasExprs()) {
                 continue;
             }
-
+            // End of VoltDB extension
             int        type = c.getConstraintType();
 
             if (type != Constraint.UNIQUE && type != Constraint.PRIMARY_KEY) {
@@ -1059,20 +1034,21 @@ public class Table extends TableBase implements SchemaObject {
             int[] colarr = ArrayUtil.toAdjustedColumnArray(idx.getColumns(),
                 colIndex, adjust);
 
-            // A VoltDB extension -- Don't consider non-column expression indexes for this purpose
+            // A VoltDB extension to support indexed expressions and assume unique attribute
             Expression[] exprArr = idx.getExpressions();
-            if (exprArr != null) {
-                idx = tn.createExprIndexStructure(idx.getName(), colarr, adjustExprs(exprArr, colIndex, adjust),
-                                                  idx.isUnique(), idx.isConstraint()).setAssumeUnique(idx.isAssumeUnique());
-                tn.addIndex(idx);
-                continue;
-            }
-
+            boolean assumeUnique = idx.isAssumeUnique();
+            // End of VoltDB extension
             idx = tn.createIndexStructure(idx.getName(), colarr,
                                           idx.getColumnDesc(), null,
                                           idx.isUnique(), idx.isConstraint(),
-                                          idx.isForward()).setAssumeUnique(idx.isAssumeUnique());
+                                          idx.isForward());
 
+            // A VoltDB extension to support indexed expressions and assume unique attribute
+            if (exprArr != null) {
+                idx = idx.withExpressions(adjustExprs(exprArr, colIndex, adjust));
+            }
+            idx = idx.setAssumeUnique(assumeUnique);
+            // End of VoltDB extension
             tn.addIndex(idx);
         }
 
@@ -1118,15 +1094,6 @@ public class Table extends TableBase implements SchemaObject {
         tn.triggerLists = triggerLists;
 
         return tn;
-    }
-
-    /// Index expressions as exported to VoltDB are "column name based" not "column index based",
-    /// so they are not thrown off by column re-numbering.
-    /// VoltDB is responsible for re-resolving the names to the moved columns (changed column index numbers).
-    /// This stubbed pass-through method is here in case that someday changes in a way that would require
-    /// processing of the expression trees.
-    private Expression[] adjustExprs(Expression[] exprArr, int colIndex, int adjust) {
-        return exprArr;
     }
 
     /**
@@ -1984,7 +1951,7 @@ public class Table extends TableBase implements SchemaObject {
 
                 for (int j = 0; j < constraints.length; j++) {
                     constraints[j].checkCheckConstraint(session, this,
-                                                        data[i]);
+                                                        (Object) data[i]);
                 }
             }
 
@@ -2277,7 +2244,7 @@ public class Table extends TableBase implements SchemaObject {
         RowSetNavigator nav   = result.initialiseNavigator();
 
         while (nav.hasNext()) {
-            Object[] data = nav.getNext();
+            Object[] data = (Object[]) nav.getNext();
             Object[] newData =
                 (Object[]) ArrayUtil.resizeArrayIfDifferent(data,
                     getColumnCount());
@@ -2326,7 +2293,7 @@ public class Table extends TableBase implements SchemaObject {
         int             count = 0;
 
         while (nav.hasNext()) {
-            insertSys(store, nav.getNext());
+            insertSys(store, (Object[]) nav.getNext());
 
             count++;
         }
@@ -2343,7 +2310,7 @@ public class Table extends TableBase implements SchemaObject {
         RowSetNavigator nav = ins.initialiseNavigator();
 
         while (nav.hasNext()) {
-            Object[] data = nav.getNext();
+            Object[] data = (Object[]) nav.getNext();
             Object[] newData =
                 (Object[]) ArrayUtil.resizeArrayIfDifferent(data,
                     getColumnCount());
@@ -2536,7 +2503,7 @@ public class Table extends TableBase implements SchemaObject {
     void updateRowSet(Session session, HashMappedList rowSet, int[] cols,
                       boolean isTriggeredSet) {
 
-        // Prevent warning for "unused": boolean         hasLob = false;
+        boolean         hasLob = false;
         PersistentStore store  = session.sessionData.getRowStore(this);
 
         for (int i = 0; i < rowSet.size(); i++) {
@@ -2630,7 +2597,6 @@ public class Table extends TableBase implements SchemaObject {
         }
     }
 
-    @Override
     public void clearAllData(Session session) {
 
         super.clearAllData(session);
@@ -2640,7 +2606,6 @@ public class Table extends TableBase implements SchemaObject {
         }
     }
 
-    @Override
     public void clearAllData(PersistentStore store) {
 
         super.clearAllData(store);
@@ -2650,8 +2615,31 @@ public class Table extends TableBase implements SchemaObject {
         }
     }
 
+    /************************* Volt DB Extensions *************************/
 
-    /*************** VOLTDB *********************/
+    /**
+     * Returns the UNIQUE constraint with the given expression signature -- a VoltDB extension.
+     */
+    Constraint getUniqueConstraintForExprs(Expression[] indexExprs) {
+        for (int i = 0, size = constraintList.length; i < size; i++) {
+            Constraint exprc = constraintList[i];
+
+            if (exprc.isUniqueWithExprs(indexExprs)) {
+                return exprc;
+            }
+        }
+        return null;
+    }
+
+    /** Index expressions as exported to VoltDB are "column name based" not "column index based",
+     *  so they are not thrown off by column re-numbering.
+     *  VoltDB is responsible for re-resolving the names to the moved columns (changed column index numbers).
+     *  This stubbed pass-through method is here in case that someday changes in a way that would require
+     *  processing of the expression trees.
+     */
+    private Expression[] adjustExprs(Expression[] exprArr, int colIndex, int adjust) {
+        return exprArr;
+    }
 
     /**
      * VoltDB added method to get a non-catalog-dependent
@@ -2661,7 +2649,8 @@ public class Table extends TableBase implements SchemaObject {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    VoltXMLElement voltGetTableXML(Session session) throws HSQLParseException
+    VoltXMLElement voltGetTableXML(Session session)
+            throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         VoltXMLElement table = new VoltXMLElement("table");
 
@@ -2682,7 +2671,7 @@ public class Table extends TableBase implements SchemaObject {
         // read all the indexes
         VoltXMLElement indexes = new VoltXMLElement("indexes");
         table.children.add(indexes);
-        for (Index index : getIndexes()) {
+        for (Index index : indexList) {
             VoltXMLElement indexChild = index.voltGetIndexXML(session);
             indexes.children.add(indexChild);
             assert(indexChild != null);
@@ -2701,6 +2690,15 @@ public class Table extends TableBase implements SchemaObject {
         return table;
     }
 
+    // A VoltDB extension to support indexed expressions
+    public final Index createAndAddExprIndexStructure(HsqlName name, int[] columns, Expression[] indexExprs, boolean unique, boolean constraint) {
+
+        Index newExprIndex = createIndexStructure(name, columns, null, null, unique, constraint, false);
+        newExprIndex = newExprIndex.withExpressions(indexExprs);
+        addIndex(newExprIndex);
+        return newExprIndex;
+    } /* createAndAddExprIndexStructure */
+
     /* (non-Javadoc)
      * @see java.lang.Object#toString()
      */
@@ -2708,4 +2706,5 @@ public class Table extends TableBase implements SchemaObject {
     public String toString() {
         return super.toString() + ":" + getName().name;
     }
+    /**********************************************************************/
 }
