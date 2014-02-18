@@ -48,7 +48,7 @@ public class EELibraryLoader {
 
                 try {
                     final VoltLogger hostLog = new VoltLogger("HOST");
-                    final String libname = "voltdb-" + VoltDB.instance().getVersionString();
+                    final String libname = "voltdb-" + VoltDB.instance().getEELibraryVersionString();
                     hostLog.info("Loading native VoltDB code ("+libname+"). A confirmation message will follow if the loading is successful.");
                     System.loadLibrary(libname);
                     voltSharedLibraryLoaded = true;

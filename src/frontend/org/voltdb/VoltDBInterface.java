@@ -16,6 +16,7 @@
  */
 package org.voltdb;
 
+import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -68,6 +69,8 @@ public interface VoltDBInterface
     public CatalogContext getCatalogContext();
     public String getBuildString();
     public String getVersionString();
+    public boolean isCompatibleVersionString(String versionString);
+    public String getEELibraryVersionString();
     public HostMessenger getHostMessenger();
     public ClientInterface getClientInterface();
     public OpsAgent getOpsAgent(OpsSelector selector);

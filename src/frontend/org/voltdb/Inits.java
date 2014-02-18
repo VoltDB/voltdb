@@ -304,7 +304,8 @@ public class Inits {
                             catalogBytes);
                 }
                 catch (IOException e) {
-                    VoltDB.crashGlobalVoltDB("Unable to distribute catalog.", false, e);
+                    e.printStackTrace();
+                    VoltDB.crashGlobalVoltDB("Unable to distribute catalog.", true, e);
                 }
                 catch (org.apache.zookeeper_voltpatches.KeeperException e) {
                     VoltDB.crashGlobalVoltDB("Unable to publish catalog.", false, e);

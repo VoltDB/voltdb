@@ -158,7 +158,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
     private static final String m_defaultVersionString = "4.1";
+    private static final String m_defaultHotfixableRegexPattern = "^4\\.1(\\.\\d+)*\\z";
     private String m_versionString = m_defaultVersionString;
+    private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
     HostMessenger m_messenger = null;
     private ClientInterface m_clientInterface = null;
     HTTPAdminListener m_adminListener;
@@ -175,7 +177,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // globally available
     @SuppressWarnings("unused")
     private InitiatorStats m_initiatorStats;
-    @SuppressWarnings("unused")
     private LiveClientsStats m_liveClientsStats = null;
     int m_myHostId;
     long m_depCRC = -1;
@@ -286,11 +287,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         return m_licenseApi;
     }
 
+    public static int sleeptime = 0;
+
     /**
      * Initialize all the global components, then initialize all the m_sites.
      */
     @Override
     public void initialize(VoltDB.Configuration config) {
+
+        try {
+            Thread.sleep(sleeptime);
+        } catch (InterruptedException e1) {
+            // TODO Auto-generated catch block
+            e1.printStackTrace();
+        }
+
         synchronized(m_startAndStopLock) {
             // check that this is a 64 bit VM
             if (System.getProperty("java.vm.name").contains("64") == false) {
@@ -336,6 +347,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_pathToStartupCatalog = m_config.m_pathToCatalog;
             m_replicationActive = false;
             m_configLogger = null;
+            if (m_config.m_versionStringOverrideForTest != null) {
+                m_versionString = m_config.m_versionStringOverrideForTest;
+            }
+            if (m_config.m_versionCompatibilityRegexOverrideForTest != null) {
+                m_hotfixableRegexPattern = m_config.m_versionCompatibilityRegexOverrideForTest;
+            }
             ActivePlanRepository.clear();
 
             // set up site structure
@@ -366,8 +383,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
 
             m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
-
-            readBuildInfo(config.m_isEnterprise ? "Enterprise Edition" : "Community Edition");
 
             buildClusterMesh(isRejoin || m_joining);
 
@@ -812,7 +827,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_configLogger.start();
 
             DailyRollingFileAppender dailyAppender = null;
-            Enumeration appenders = Logger.getRootLogger().getAllAppenders();
+            Enumeration<?> appenders = Logger.getRootLogger().getAllAppenders();
             while (appenders.hasMoreElements()) {
                 Appender appender = (Appender) appenders.nextElement();
                 if (appender instanceof DailyRollingFileAppender){
@@ -884,7 +899,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 stringer.key("pid").value(CLibrary.getpid());
 
                 stringer.key("log4jDst").array();
-                Enumeration appenders = Logger.getRootLogger().getAllAppenders();
+                Enumeration<?> appenders = Logger.getRootLogger().getAllAppenders();
                 while (appenders.hasMoreElements()) {
                     Appender appender = (Appender) appenders.nextElement();
                     if (appender instanceof FileAppender){
@@ -897,7 +912,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     }
                 }
 
-                Enumeration loggers = Logger.getRootLogger().getLoggerRepository().getCurrentLoggers();
+                Enumeration<?> loggers = Logger.getRootLogger().getLoggerRepository().getCurrentLoggers();
                 while (loggers.hasMoreElements()) {
                     Logger logger = (Logger) loggers.nextElement();
                     appenders = logger.getAllAppenders();
@@ -1940,12 +1955,22 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     @Override
     public String getBuildString() {
-        return m_buildString;
+        return m_buildString == null ? "VoltDB" : m_buildString;
     }
 
     @Override
     public String getVersionString() {
         return m_versionString;
+    }
+
+    @Override
+    public boolean isCompatibleVersionString(String versionString) {
+        return versionString.matches(m_hotfixableRegexPattern);
+    }
+
+    @Override
+    public String getEELibraryVersionString() {
+        return m_defaultVersionString;
     }
 
     @Override

@@ -112,6 +112,9 @@ public class LocalCluster implements VoltServerConfig {
     public final PortGeneratorForTest portGenerator = new PortGeneratorForTest();
     private String m_voltdbroot = "";
 
+    private String[] m_versionOverrides = null;
+    private String[] m_versionCheckRegexOverrides = null;
+
     // The base command line - each process copies and customizes this.
     // Each local cluster process has a CommandLine instance configured
     // with the port numbers and command line parameter value specific to that
@@ -348,6 +351,12 @@ public class LocalCluster implements VoltServerConfig {
         startUp(clearLocalDataDirectories, ReplicationRole.NONE);
     }
 
+    public void setDeploymentAndVoltDBRoot(String pathToDeployment, String pathToVoltDBRoot) {
+        templateCmdLine.pathToDeployment(pathToDeployment);
+        m_voltdbroot = pathToVoltDBRoot;
+        m_compiled = true;
+    }
+
     public void setHostCount(int hostCount)
     {
         m_hostCount = hostCount;
@@ -394,6 +403,12 @@ public class LocalCluster implements VoltServerConfig {
         }
         if (m_target == BackendTarget.NATIVE_EE_IPC) {
             cmdln.m_ipcPort = portGenerator.next();
+        }
+        if ((m_versionOverrides != null) && (m_versionOverrides.length > 0)) {
+            assert(m_versionOverrides[0] != null);
+            assert(m_versionCheckRegexOverrides[0] != null);
+            cmdln.m_versionStringOverrideForTest = m_versionOverrides[0];
+            cmdln.m_versionCompatibilityRegexOverrideForTest = m_versionCheckRegexOverrides[0];
         }
 
         // for debug, dump the command line to a unique file.
@@ -652,11 +667,21 @@ public class LocalCluster implements VoltServerConfig {
             cmdln.voltFilePrefix(subroot.getPath());
             cmdln.voltRoot(subroot.getPath() + "/" + m_voltdbroot);
 
+            if ((m_versionOverrides != null) && (m_versionOverrides.length > hostId)) {
+                assert(m_versionOverrides[hostId] != null);
+                assert(m_versionCheckRegexOverrides[hostId] != null);
+                cmdln.m_versionStringOverrideForTest = m_versionOverrides[hostId];
+                cmdln.m_versionCompatibilityRegexOverrideForTest = m_versionCheckRegexOverrides[hostId];
+            }
+
             m_cmdLines.add(cmdln);
             m_procBuilder.command().clear();
             List<String> cmdlnList = cmdln.createCommandLine();
             String cmdLineFull = "Start cmd host=" + String.valueOf(hostId) + " :";
             for (String element : cmdlnList) {
+                System.out.println(element);
+                System.out.flush();
+                assert(element != null);
                 cmdLineFull += " " + element;
             }
             log.info(cmdLineFull);
@@ -804,6 +829,13 @@ public class LocalCluster implements VoltServerConfig {
             rejoinCmdLn.m_zkInterface = "127.0.0.1:" + portGenerator.next();
             rejoinCmdLn.m_internalPort = portGenerator.nextInternalPort();
             setPortsFromConfig(hostId, rejoinCmdLn);
+
+            if ((m_versionOverrides != null) && (m_versionOverrides.length > hostId)) {
+                assert(m_versionOverrides[hostId] != null);
+                assert(m_versionCheckRegexOverrides[hostId] != null);
+                rejoinCmdLn.m_versionStringOverrideForTest = m_versionOverrides[hostId];
+                rejoinCmdLn.m_versionCompatibilityRegexOverrideForTest = m_versionCheckRegexOverrides[hostId];
+            }
 
             List<String> rejoinCmdLnStr = rejoinCmdLn.createCommandLine();
             String cmdLineFull = "Rejoin cmd line:";
@@ -1146,6 +1178,16 @@ public class LocalCluster implements VoltServerConfig {
         return templateCmdLine.target() == BackendTarget.HSQLDB_BACKEND;
     }
 
+    public void setOverridesForHotfix(String[] versions, String[] regexOverrides) {
+        assert(versions != null);
+        assert(regexOverrides != null);
+        assert(versions.length == regexOverrides.length);
+
+        m_versionOverrides = versions;
+        m_versionCheckRegexOverrides = regexOverrides;
+    }
+
+    @Override
     public void setMaxHeap(int heap) {
         templateCmdLine.setMaxHeap(heap);
     }
