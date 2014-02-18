@@ -156,10 +156,6 @@ public class TestSelfJoins  extends PlannerTestCase {
         //* for debug */ System.out.println(apn.toExplainPlanString());
         // Some day, the wasteful projection node will not be here to skip.
         pn = apn.getChild(0).getChild(0);
-
-        /* for debug */ System.out.println(apn.toExplainPlanString());
-        // Some day, the wasteful projection node will not be here to skip.
-        pn = apn.getChild(0).getChild(0);
         assertTrue(pn instanceof NestLoopIndexPlanNode);
         nlij = (NestLoopIndexPlanNode) pn;
         assertNull(nlij.getPreJoinPredicate());
