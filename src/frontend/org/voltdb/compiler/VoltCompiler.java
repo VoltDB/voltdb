@@ -465,14 +465,7 @@ public class VoltCompiler {
         // WRITE CATALOG TO JAR HERE
         final String catalogCommands = catalog.serialize();
 
-        byte[] catalogBytes = null;
-        try {
-            catalogBytes =  catalogCommands.getBytes("UTF-8");
-        }
-        catch (final UnsupportedEncodingException e1) {
-            addErr("Can't encode the compiled catalog file correctly");
-            return false;
-        }
+        byte[] catalogBytes = catalogCommands.getBytes(Constants.UTF8ENCODING);
 
         try {
             // Don't update buildinfo if it's already present, e.g. while upgrading.
@@ -486,7 +479,7 @@ public class VoltCompiler {
                 buildinfo.append(System.getProperty("user.dir")).append('\n');
                 buildinfo.append(Long.toString(System.currentTimeMillis())).append('\n');
 
-                byte buildinfoBytes[] = buildinfo.toString().getBytes("UTF-8");
+                byte buildinfoBytes[] = buildinfo.toString().getBytes(Constants.UTF8ENCODING);
                 jarOutput.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, buildinfoBytes);
             }
             jarOutput.put(CatalogUtil.CATALOG_FILENAME, catalogBytes);
@@ -533,12 +526,7 @@ public class VoltCompiler {
                 s += "COST: " + Integer.toString(stmt.getCost()) + "\n";
                 s += "PLAN:\n\n";
                 s += Encoder.hexDecodeToString(stmt.getExplainplan()) + "\n";
-                byte[] b = null;
-                try {
-                    b = s.getBytes("UTF-8");
-                } catch (UnsupportedEncodingException e) {
-                    assert(false);
-                }
+                byte[] b = s.getBytes(Constants.UTF8ENCODING);
                 retval.put(proc.getTypeName() + "_" + stmt.getTypeName() + ".txt", b);
             }
         }
@@ -2257,13 +2245,7 @@ public class VoltCompiler {
             throw new IOException("Catalog build information not found - please build your application using the current version of VoltDB.");
         }
         String buildInfo;
-        try {
-            buildInfo = new String(buildInfoBytes, "UTF-8");
-        }
-        catch (UnsupportedEncodingException e) {
-            // This should not happen.
-            throw new IOException("Unexpected encoding exception reading build info.");
-        }
+        buildInfo = new String(buildInfoBytes, Constants.UTF8ENCODING);
         String[] buildInfoLines = buildInfo.split("\n");
         if (buildInfoLines.length != 5) {
             throw new IOException("Catalog built with an old version of VoltDB - please build your application using the current version of VoltDB.");
