@@ -183,6 +183,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         // SeqScanToIndexScan for determinism.
         // use EXPR_F_TREE1 not EXPR_F_TREE2
         pns = compileToFragments("SELECT F_D2 - F_D3, COUNT(*) FROM RF GROUP BY F_D2 - F_D3");
+        //*/ debug */ System.out.println(pns.get(0).toExplainPlanString());
         System.out.println("DEBUG 2: " + pns.get(0).getChild(0).toExplainPlanString());
         checkGroupByOnlyPlan(pns, false, true, true);
 
@@ -193,7 +194,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testEdgeComplexRelatedCases() {
-        // Make sure that this query will compile correctly
         pns = compileToFragments("select PKEY+A1 from T1 Order by PKEY+A1");
         AbstractPlanNode p = pns.get(0).getChild(0);
         assertTrue(p instanceof ProjectionPlanNode);
@@ -231,7 +231,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
         p = pns.get(0).getChild(0);
         /*/ to debug */ System.out.println("DEBUG: " + p.toExplainPlanString());
         assertTrue(p instanceof ProjectionPlanNode);
-        //assertTrue(p.getChild(0) instanceof LimitPlanNode);
         assertTrue(p.getChild(0) instanceof OrderByPlanNode);
         assertTrue(p.getChild(0).getChild(0) instanceof AggregatePlanNode);
 
