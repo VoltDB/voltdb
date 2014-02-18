@@ -1199,6 +1199,8 @@ public class DDLCompiler {
 
         // create a table node in the catalog
         Table table = db.getTables().add(name);
+        // set max value before return for view table
+        table.setTuplelimit(Integer.MAX_VALUE);
 
         // add the original DDL to the table (or null if it's not there)
         TableAnnotation annotation = new TableAnnotation();
@@ -1675,7 +1677,6 @@ public class DDLCompiler {
         String typeName = node.attributes.get("constrainttype");
         ConstraintType type = ConstraintType.valueOf(typeName);
 
-        table.setTuplelimit(Integer.MAX_VALUE);
         if (type == ConstraintType.LIMIT) {
             int tupleLimit = Integer.parseInt(node.attributes.get("rowslimit"));
             if (tupleLimit < 0) {
