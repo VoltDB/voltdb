@@ -19,6 +19,7 @@ groovyout/
 /src/ee/tags
 /src/ee/org_voltdb_jni_ExecutionEngine.h
 /src/ee/org_voltcore_utils_DBBPool.h
+/src/ee/org_voltdb_utils_PosixAdvise.h
 /src/frontend/org/voltdb/catalog/*.java
 /voltdb/libvoltdb*.so
 /voltdb/voltdb*.jar
