@@ -46,7 +46,7 @@ public class DummyCommandLog implements CommandLog {
     public ListenableFuture<Object> log(
             Iv2InitiateTaskMessage message,
             long spHandle,
-            Set<Integer> involvedPartitions,
+            int[] involvedPartitions,
             DurabilityListener l,
             Object handle) {
         return Futures.immediateFuture(null);

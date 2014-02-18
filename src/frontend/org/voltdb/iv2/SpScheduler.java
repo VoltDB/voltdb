@@ -30,6 +30,7 @@ import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import com.google_voltpatches.common.primitives.Ints;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -540,7 +541,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg, m_drGateway);
         if (!msg.isReadOnly()) {
             ListenableFuture<Object> durabilityBackpressureFuture =
-                    m_cl.log(msg, msg.getSpHandle(), new HashSet<Integer>(), m_durabilityListener, task);
+                    m_cl.log(msg, msg.getSpHandle(), null, m_durabilityListener, task);
             if (durabilityBackpressureFuture != null) {
                 m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
             }
@@ -828,7 +829,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
         if (logThis) {
             ListenableFuture<Object> durabilityBackpressureFuture =
-                    m_cl.log(msg.getInitiateTask(), msg.getSpHandle(), msg.getInvolvedPartitions(),
+                    m_cl.log(msg.getInitiateTask(), msg.getSpHandle(), Ints.toArray(msg.getInvolvedPartitions()),
                              m_durabilityListener, task);
             if (durabilityBackpressureFuture != null) {
                 m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
