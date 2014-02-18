@@ -99,10 +99,6 @@ public class TestRateLimitedClientNotifier {
         Node n4_2 = new Node(sup3, n3_2);
         assertTrue(n4.equals(n4_2));
         assertTrue(n4.hashCode() == n4_2.hashCode());
-
-        Cache<Node, Node> m_cachedNodes =
-                CacheBuilder.newBuilder()
-                        .maximumSize(10000).concurrencyLevel(1).build();
     }
 
     Cache<Node, Node> cache =
