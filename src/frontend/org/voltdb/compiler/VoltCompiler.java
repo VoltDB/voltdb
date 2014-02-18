@@ -684,17 +684,13 @@ public class VoltCompiler {
             final String databaseName = database.getName();
             // schema does not verify that the database is named "database"
             if (databaseName.equals("database") == false) {
-                compilerLog.l7dlog(Level.ERROR,
-                                   LogKeys.compiler_VoltCompiler_FailedToCompileXML.name(),
-                                   null);
-                return null;
+                return null; // error messaging handled higher up
             }
             // shutdown and make a new hsqldb
             try {
                 compileDatabaseNode(database, ddlReaderList, jarOutput);
             } catch (final VoltCompilerException e) {
-                compilerLog.l7dlog( Level.ERROR, LogKeys.compiler_VoltCompiler_FailedToCompileXML.name(), null);
-                return null;
+                return null; // error messaging handled higher up
             }
         }
         assert(m_catalog != null);
@@ -2303,15 +2299,10 @@ public class VoltCompiler {
 
             // Use the in-memory jarfile-provided class loader so that procedure
             // classes can be found and copied to the new file that gets written.
-            // The temp file usage is a work-around to make the more complex
-            // inner class scan logic work without extending InMemoryJarFile.
             File tempfile = File.createTempFile("catalog", ".jar");
             ClassLoader originalClassLoader = m_classLoader;
             try {
-                // Create a temporary custom class loader so that catalog classes can be found.
-                // Caller handles IOException.
-                outputJar.writeToFile(tempfile);
-                m_classLoader = new VoltCompilerClassLoader(tempfile.toURI().toURL());
+                m_classLoader = outputJar.getLoader();
 
                 // Compile and save the file to voltdbroot. Assume it's a test environment if there
                 // is no catalog context available.
@@ -2335,9 +2326,8 @@ public class VoltCompiler {
                 }
             }
             finally {
-                // Restore the original class loader and delete the temporary jar file.
+                // Restore the original class loader
                 m_classLoader = originalClassLoader;
-                tempfile.delete();
             }
         }
     }
