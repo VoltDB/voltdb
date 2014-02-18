@@ -88,8 +88,12 @@ public class MpReplayMessage extends VoltMessage {
                 + 8 // m_uniqueId
                 + 4 // m_partitionId
                 + 4 // m_involvedPartitions.size()
-                + 4 * m_involvedPartitions.size()
-                + m_invocation.getSerializedSize();
+                + 4 * m_involvedPartitions.size();
+
+        if (m_invocation != null) {
+            size += m_invocation.getSerializedSize();
+        }
+
         return size;
     }
 
@@ -104,8 +108,13 @@ public class MpReplayMessage extends VoltMessage {
         for (int i = 0; i < partitionCount; i++) {
             m_involvedPartitions.add(buf.getInt());
         }
-        m_invocation = new StoredProcedureInvocation();
-        m_invocation.initFromBuffer(buf);
+
+        if (buf.remaining() > 0) {
+            m_invocation = new StoredProcedureInvocation();
+            m_invocation.initFromBuffer(buf);
+        } else {
+            m_invocation = null;
+        }
     }
 
     @Override
@@ -119,7 +128,10 @@ public class MpReplayMessage extends VoltMessage {
         for (int pid : m_involvedPartitions) {
             buf.putInt(pid);
         }
-        m_invocation.flattenToBuffer(buf);
+
+        if (m_invocation != null) {
+            m_invocation.flattenToBuffer(buf);
+        }
 
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
