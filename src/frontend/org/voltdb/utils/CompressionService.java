@@ -177,6 +177,7 @@ public final class CompressionService {
 
         final int uncompressedLength = Snappy.uncompressedLength(compressed);
         if (output.capacity() < uncompressedLength) {
+            DBBPool.cleanByteBuffer(output);
             output = ByteBuffer.allocateDirect(Math.max(output.capacity() * 2, uncompressedLength));
             buffers = new IOBuffers(compressed, output);
             m_buffers.set(buffers);
@@ -213,6 +214,7 @@ public final class CompressionService {
         ByteBuffer output = buffers.output;
 
         if (input.capacity() < bytes.length){
+            DBBPool.cleanByteBuffer(input);
             input = ByteBuffer.allocateDirect(Math.max(input.capacity() * 2, bytes.length));
             buffers = new IOBuffers(input, output);
             m_buffers.set(buffers);
@@ -224,6 +226,7 @@ public final class CompressionService {
 
         final int uncompressedLength = Snappy.uncompressedLength(input);
         if (output.capacity() < uncompressedLength) {
+            DBBPool.cleanByteBuffer(output);
             output = ByteBuffer.allocateDirect(Math.max(output.capacity() * 2, uncompressedLength));
             buffers = new IOBuffers(input, output);
             m_buffers.set(buffers);

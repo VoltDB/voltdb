@@ -261,7 +261,7 @@ public final class DBBPool {
             try {
                 bytesAllocatedGlobally.getAndAdd(-b.capacity());
                 logDeallocation(b.capacity());
-                ((DirectBuffer)b).cleaner().clean();
+                DBBPool.cleanByteBuffer(b);
             } catch (Throwable e) {
                 // The client code doesn't want to link to the VoltDB class, so this hack was born.
                 // It should be temporary as the goal is to remove client code dependency on
@@ -293,4 +293,7 @@ public final class DBBPool {
      */
     public static native ByteBuffer allocateUnsafeByteBuffer(long size);
 
+    public static void cleanByteBuffer(ByteBuffer buf) {
+        ((DirectBuffer)buf).cleaner().clean();
+    }
 }

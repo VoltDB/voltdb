@@ -16,6 +16,8 @@
  */
 package org.voltdb.utils;
 
+import org.voltcore.utils.DBBPool;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.*;
@@ -156,6 +158,7 @@ public class VoltFile extends File {
                     }
                     inputChannel.close();
                     outputChannel.close();
+                    DBBPool.cleanByteBuffer(buf);
                 } else {
                     throw new IOException(fInOtherSubroot + " already exists");
                 }

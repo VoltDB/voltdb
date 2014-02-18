@@ -706,6 +706,7 @@ public class TableSaveFile
                     }
                 }
             }
+            DBBPool.cleanByteBuffer(fileInputBuffer);
         }
 
         private void readChunks() {
@@ -967,6 +968,7 @@ public class TableSaveFile
                     }
                 }
             }
+            DBBPool.cleanByteBuffer(fileInputBuffer);
         }
         private Container getOutputBuffer(final int nextChunkPartitionId) {
             Container c = m_buffers.poll();

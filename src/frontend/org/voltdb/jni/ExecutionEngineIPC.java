@@ -341,7 +341,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     boolean sync = header.get() == 1 ? true : false;
                     boolean isEndOfGeneration = header.get() == 1 ? true : false;
                     int length = header.getInt();
-                    ByteBuffer exportBuffer = ByteBuffer.allocateDirect(length);
+                    ByteBuffer exportBuffer = ByteBuffer.allocate(length);
                     while (exportBuffer.hasRemaining()) {
                         final int read = m_socket.getChannel().read(exportBuffer);
                         if (read == -1) {

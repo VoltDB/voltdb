@@ -1318,6 +1318,17 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_fadvise
 #endif
 }
 
+/*
+ * Class:     org_voltdb_utils_PosixAdvise
+ * Method:    fallocate
+ * Signature: (JJJ)J
+ */
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_fallocate
+  (JNIEnv *, jclass, jlong fd, jlong offset, jlong length) {
+    return posix_fallocate(static_cast<int>(fd), static_cast<off_t>(offset), static_cast<off_t>(length));
+}
+
+
 JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecuteTask
   (JNIEnv *env, jobject obj, jlong engine_ptr) {
     VOLT_DEBUG("nativeHashinate in C++ called");

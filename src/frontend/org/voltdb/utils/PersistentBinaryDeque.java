@@ -34,6 +34,7 @@ import java.util.TreeMap;
 
 import com.google_voltpatches.common.base.Throwables;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 
 import com.google_voltpatches.common.base.Joiner;
@@ -740,6 +741,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 }
             } finally {
                 fc.close();
+                DBBPool.cleanByteBuffer(readBuffer);
             }
         }
 
