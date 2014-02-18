@@ -18,17 +18,20 @@ package org.voltdb;
 
 
 import java.io.IOException;
+import java.lang.Thread.State;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.SortedMapDifference;
 import org.apache.cassandra_voltpatches.MurmurHash3;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -37,12 +40,17 @@ import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.collect.ImmutableSortedMap;
 import com.google_voltpatches.common.collect.UnmodifiableIterator;
 import org.voltdb.utils.CompressionService;
+import sun.misc.Cleaner;
 
 /**
  * A hashinator that uses Murmur3_x64_128 to hash values and a consistent hash ring
  * to pick what partition to route a particular value.
  */
 public class ElasticHashinator extends TheHashinator {
+    private static final AtomicLong m_allocatedHashinatorBytes = new AtomicLong(0);
+    private static Thread m_emergencyGCThread;
+    public static long HASHINATOR_GC_THRESHHOLD = Long.getLong("HASHINATOR_GC_THRESHHOLD", 128 * 1024 * 1024);
+
     public static int DEFAULT_TOTAL_TOKENS =
         Integer.parseInt(System.getProperty("ELASTIC_TOTAL_TOKENS", "16384"));
 
@@ -91,6 +99,7 @@ public class ElasticHashinator extends TheHashinator {
      */
     private final long m_tokens;
     private final int m_tokenCount;
+    private final Cleaner m_cleaner;
 
     private final Supplier<byte[]> m_configBytes;
     private final Supplier<byte[]> m_configBytesSupplier = Suppliers.memoize(new Supplier<byte[]>() {
@@ -131,6 +140,7 @@ public class ElasticHashinator extends TheHashinator {
                 : updateRaw(configBytes));
         m_tokens = p.getFirst();
         m_tokenCount = p.getSecond();
+        m_cleaner = Cleaner.create(this, new Deallocator(m_tokens, m_tokenCount * 8));
         m_configBytes = !cooked ? Suppliers.ofInstance(configBytes) : m_configBytesSupplier;
         m_cookedBytes = cooked ? Suppliers.ofInstance(configBytes) : m_cookedBytesSupplier;
         m_tokensMap =  Suppliers.memoize(new Supplier<ImmutableSortedMap<Integer, Integer>>() {
@@ -157,7 +167,10 @@ public class ElasticHashinator extends TheHashinator {
     private ElasticHashinator(SortedMap<Integer, Integer> tokens) {
         m_tokensMap = Suppliers.ofInstance(ImmutableSortedMap.copyOf(tokens));
         Preconditions.checkArgument(m_tokensMap.get().firstEntry().getKey().equals(Integer.MIN_VALUE));
-        m_tokens = unsafe.allocateMemory(8 * tokens.size());
+        final int bytes = 8 * tokens.size();
+        m_tokens = unsafe.allocateMemory(bytes);
+        trackAllocatedHashinatorBytes(bytes);
+        m_cleaner = Cleaner.create(this, new Deallocator(m_tokens, bytes));
         int ii = 0;
         for (Map.Entry<Integer, Integer> e : tokens.entrySet()) {
             final long ptr = m_tokens + (ii * 8);
@@ -481,7 +494,10 @@ public class ElasticHashinator extends TheHashinator {
         if (numEntries < 0) {
             throw new RuntimeException("Bad elastic hashinator config");
         }
-        long tokens = unsafe.allocateMemory(8 * numEntries);
+        final int bytes = 8 * numEntries;
+        long tokens = unsafe.allocateMemory(bytes);
+        trackAllocatedHashinatorBytes(bytes);
+
         int lastToken = Integer.MIN_VALUE;
         for (int ii = 0; ii < numEntries; ii++) {
             long ptr = tokens + (ii * 8);
@@ -541,7 +557,9 @@ public class ElasticHashinator extends TheHashinator {
         if (numEntries <= 0 || cookedBytes.length != 4 + tokensSize + partitionsSize) {
             throw new RuntimeException("Bad elastic hashinator cooked config size.");
         }
-        long tokens = unsafe.allocateMemory(8 * numEntries);
+        final long bytes = 8 * numEntries;
+        long tokens = unsafe.allocateMemory(bytes);
+        trackAllocatedHashinatorBytes(bytes);
         ByteBuffer tokenBuf = ByteBuffer.wrap(cookedBytes, 4, tokensSize);
         ByteBuffer partitionBuf = ByteBuffer.wrap(cookedBytes, 4 + tokensSize, partitionsSize);
         int tokensArray[] = new int[numEntries];
@@ -566,6 +584,28 @@ public class ElasticHashinator extends TheHashinator {
         return Pair.of(tokens, numEntries);
     }
 
+    //Track allocated bytes and invoke System.gc to encourage reclamation if it is growing large
+    private static synchronized void trackAllocatedHashinatorBytes(long bytes) {
+        final long allocated = m_allocatedHashinatorBytes.addAndGet(bytes);
+        if (allocated > HASHINATOR_GC_THRESHHOLD) {
+            hostLogger.warn(allocated + " bytes of hashinator data has been allocated");
+            if (m_emergencyGCThread == null || m_emergencyGCThread.getState() == State.TERMINATED) {
+                m_emergencyGCThread = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        hostLogger.warn("Invoking System.gc() to recoup hashinator bytes");
+                        System.gc();
+                        try {
+                            Thread.sleep(2000);
+                        } catch (InterruptedException e) {}
+                        hostLogger.info(m_allocatedHashinatorBytes.get() + " bytes of hashinator allocated after GC");
+                    }
+                }, "Hashinator GC thread");
+                m_emergencyGCThread.start();
+            }
+        }
+    }
+
     /**
      * Return (cooked) bytes optimized for serialization.
      * @return optimized config bytes
@@ -579,11 +619,6 @@ public class ElasticHashinator extends TheHashinator {
     @Override
     public HashinatorType getConfigurationType() {
         return TheHashinator.HashinatorType.ELASTIC;
-    }
-
-    @Override
-    public void finalize() {
-        unsafe.freeMemory(m_tokens);
     }
 
     @Override
@@ -655,5 +690,23 @@ public class ElasticHashinator extends TheHashinator {
     @Override
     protected Set<Integer> pGetPartitions() {
         return new HashSet<Integer>(m_tokensMap.get().values());
+    }
+
+    private static class Deallocator implements Runnable {
+        private long address;
+        private int size;
+        public Deallocator(long address, int size) {
+            this.address = address;
+            this.size = size;
+        }
+
+        public void run() {
+            if (address == 0) {
+                return;
+            }
+            unsafe.freeMemory(address);
+            address = 0;
+            m_allocatedHashinatorBytes.addAndGet(-size);
+        }
     }
 }
