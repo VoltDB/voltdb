@@ -305,6 +305,14 @@ bool PersistentTable::insertTuple(TableTuple &source)
 
 void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
 {
+
+    if (fallible && visibleTupleCount() >= m_tupleLimit) {
+        char buffer [256];
+        snprintf (buffer, 256, "Table %s exceeds table maximum row count %d",
+                m_name.c_str(), m_tupleLimit);
+        throw ConstraintFailureException(this, source, buffer);
+    }
+
     //
     // First get the next free tuple
     // This will either give us one from the free slot list, or
@@ -334,12 +342,6 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
             throw ConstraintFailureException(this, source, TableTuple(), CONSTRAINT_TYPE_NOT_NULL);
         }
 
-        if (visibleTupleCount() > m_tupleLimit) {
-            char buffer [256];
-            snprintf (buffer, 256, "Table %s exceeds table maximum row count %d",
-                    m_name.c_str(), m_tupleLimit);
-            throw ConstraintFailureException(this, source, buffer);
-        }
     }
 
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
