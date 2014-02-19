@@ -274,8 +274,18 @@ def vmain(description='(no description)',
         build_venv = not os.path.isdir(venv_dir)
         if not build_venv:
             # If the virtual environment is present check that it's current.
+            # If version.txt is not present leave it alone so that we don't
+            # get in the situation where the virtual environment gets
+            # recreated every time.
             venv_version = get_version(venv_dir, error_abort=False)
-            build_venv = (not venv_version or venv_version != version)
+            if venv_version is None:
+                warning('Unable to read the version file:',
+                        [os.path.join(venv_dir, 'version.txt')],
+                        'Assuming that the virtual environment is current.',
+                        'To force a rebuild delete the virtual environment base directory:',
+                        [venv_base])
+            else:
+                build_venv = venv_version != version
         if build_venv:
             _build_virtual_environment(venv_dir, version, packages)
         venv_complete = True
