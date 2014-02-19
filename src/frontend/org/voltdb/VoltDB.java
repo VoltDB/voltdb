@@ -312,8 +312,7 @@ public class VoltDB {
                         m_httpPort = Integer.parseInt(portStr);
                     }
                 } else if (arg.startsWith("zkport")) {
-                    String portStr = args[++i].trim();
-                    m_zkInterface = "127.0.0.1:" + portStr;
+                    m_zkInterface = "127.0.0.1:" + args[++i].trim();
                 }  else if (arg.equals("externalinterface")) {
                     m_externalInterface = args[++i].trim();
                 }
