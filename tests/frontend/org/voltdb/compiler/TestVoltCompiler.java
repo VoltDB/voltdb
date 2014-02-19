@@ -3076,12 +3076,9 @@ public class TestVoltCompiler extends TestCase {
         return count;
     }
 
-    public void testAlterTable() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "alter table mytable add column newcol varchar(50);\n";
-
-        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema1);
+    //Utility to get projectPath for ddl
+    public String getSimpleProjectPathForDDL(String ddl) {
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
         final String schemaPath = schemaFile.getPath();
 
         final String simpleProject
@@ -3097,11 +3094,55 @@ public class TestVoltCompiler extends TestCase {
 
         final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
         final String projectPath = projectFile.getPath();
+        return projectPath;
+    }
 
+    public void testAlterTable() throws IOException {
+        final String simpleSchema1
+                = "create table mytable  (pkey integer, column2_integer integer);\n"
+                + "alter table mytable add column newcol varchar(50);\n";
+
+        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
         final VoltCompiler compiler = new VoltCompiler();
-
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
+    }
+
+    //We will be successful in compiling but a WARN should appear.
+    public void testAlterTableAddForeignKey() throws IOException {
+        final String simpleSchema1
+                = "create table mytable  (pkey integer, column2_integer integer);\n"
+                + "create table ftable  (pkey integer, column2_integer integer UNIQUE);\n"
+                + "ALTER TABLE mytable ADD FOREIGN KEY (column2_integer) REFERENCES ftable(column2_integer);\n";
+
+        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
+        final VoltCompiler compiler = new VoltCompiler();
+        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertTrue(compiler.hasErrorsOrWarnings());
+        assertTrue(success);
+    }
+
+    public void testAlterUnknownTable() throws IOException {
+        final String simpleSchema1
+                = "create table mytable  (pkey integer, column2_integer integer);\n"
+                + "alter table mytablefoo add column newcol varchar(50);\n";
+
+        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
+        final VoltCompiler compiler = new VoltCompiler();
+        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertFalse(success);
+    }
+
+    public void testAlterTableBadDowngradeOfPartitionColumn() throws IOException {
+        final String simpleSchema1
+                = "create table mytable  (pkey integer NOT NULL, column2_integer integer);\n"
+                + "PARTITION TABLE mytable ON COLUMN pkey;"
+                + "alter table mytable alter column pkey NULL;\n";
+
+        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
+        final VoltCompiler compiler = new VoltCompiler();
+        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertFalse(success);
     }
 
     public void testDropTable() throws IOException {
@@ -3109,27 +3150,21 @@ public class TestVoltCompiler extends TestCase {
                 = "create table mytable  (pkey integer, column2_integer integer);\n"
                 + "drop table mytable;\n";
 
-        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema1);
-        final String schemaPath = schemaFile.getPath();
-
-        final String simpleProject
-                = "<?xml version=\"1.0\"?>\n"
-                + "<project>"
-                + "<database name='database'>"
-                + "<schemas>"
-                + "<schema path='" + schemaPath + "' />"
-                + "</schemas>"
-                + "<procedures/>"
-                + "</database>"
-                + "</project>";
-
-        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        final String projectPath = projectFile.getPath();
-
+        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
         final VoltCompiler compiler = new VoltCompiler();
-
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
+    }
+
+    public void testDropTableThatDoesNotExists() throws IOException {
+        final String simpleSchema1
+                = "create table mytable  (pkey integer, column2_integer integer);\n"
+                + "drop table mytablefoo;\n";
+
+        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
+        final VoltCompiler compiler = new VoltCompiler();
+        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertFalse(success);
     }
 
     public void testDropTableIfExists() throws IOException {
@@ -3137,25 +3172,8 @@ public class TestVoltCompiler extends TestCase {
                 = "create table mytable  (pkey integer, column2_integer integer);\n"
                 + "drop table mytablenonexistant if exists;\n";
 
-        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema1);
-        final String schemaPath = schemaFile.getPath();
-
-        final String simpleProject
-                = "<?xml version=\"1.0\"?>\n"
-                + "<project>"
-                + "<database name='database'>"
-                + "<schemas>"
-                + "<schema path='" + schemaPath + "' />"
-                + "</schemas>"
-                + "<procedures/>"
-                + "</database>"
-                + "</project>";
-
-        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        final String projectPath = projectFile.getPath();
-
+        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
         final VoltCompiler compiler = new VoltCompiler();
-
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
     }
