@@ -220,10 +220,14 @@ public class TarFileInputStream {
                                 requiredBytes - bytesSoFar);
 
             if (i < 0) {
+                // A VoltDB extension to disable tagging eof as an error.
                 return;
-                /*throw new EOFException(
+                /* disable 3 lines ...
+                throw new EOFException(
                     RB.singleton.getString(
-                        RB.DECOMPRESS_RANOUT, bytesSoFar, requiredBytes));*/
+                        RB.DECOMPRESS_RANOUT, bytesSoFar, requiredBytes));
+                ... disabled 3 lines */
+                // End of VoltDB extension
             }
 
             bytesRead  += i;

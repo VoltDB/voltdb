@@ -66,14 +66,16 @@
 
 package org.hsqldb_voltpatches;
 
+// A VoltDB extension to transfer Expression structures to the VoltDB planner
 import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Vector;
-
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.types.BinaryData;
+import org.hsqldb_voltpatches.types.TimestampData;
+// End of VoltDB extension
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.lib.ArrayListIdentity;
@@ -83,10 +85,8 @@ import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.lib.OrderedIntHashSet;
 import org.hsqldb_voltpatches.lib.Set;
 import org.hsqldb_voltpatches.persist.PersistentStore;
-import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.CharacterType;
 import org.hsqldb_voltpatches.types.NullType;
-import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.types.Type;
 
 /**
@@ -447,7 +447,6 @@ public class Expression {
         }
     }
 
-    @Override
     public boolean equals(Object other) {
 
         if (other == this) {
@@ -461,7 +460,6 @@ public class Expression {
         return false;
     }
 
-    @Override
     public int hashCode() {
 
         int val = opType + exprSubType;
@@ -1134,6 +1132,8 @@ public class Expression {
     void insertValuesIntoSubqueryTable(Session session,
                                        PersistentStore store) {
 
+        TableDerived table = subQuery.getTable();
+
         for (int i = 0; i < nodes.length; i++) {
             Object[] data = nodes[i].getRowValue(session);
 
@@ -1355,14 +1355,6 @@ public class Expression {
                                          Expression.emptyExpressionSet);
     }
 
-    // A VoltDB extension to support indexed expressions
-    public void collectAllColumnExpressions(HsqlList set) {
-
-        Expression.collectAllExpressions(set, this,
-                                         Expression.columnExpressionSet,
-                                         Expression.emptyExpressionSet);
-    }
-
     /**
      * collect all extrassions of a set of expression types appearing anywhere
      * in a select statement and its subselects, etc.
@@ -1442,7 +1434,15 @@ public class Expression {
         return null;
     }
 
-    /*************** VOLTDB *********************/
+    /************************* Volt DB Extensions *************************/
+
+    // A VoltDB extension to support indexed expressions
+    public void collectAllColumnExpressions(HsqlList set) {
+
+        Expression.collectAllExpressions(set, this,
+                                         Expression.columnExpressionSet,
+                                         Expression.emptyExpressionSet);
+    }
 
     static Map<Integer, VoltXMLElement> prototypes = new HashMap<Integer, VoltXMLElement>();
 
@@ -1476,7 +1476,7 @@ public class Expression {
         prototypes.put(OpTypes.DIVIDE,        (new VoltXMLElement("operation")).withValue("optype", "divide"));
 
         prototypes.put(OpTypes.CONCAT,        (new VoltXMLElement("function")) // concatenation
-                                               .withValue("function_id", String.valueOf(FunctionCustom.FUNC_CONCAT))
+                                               .withValue("function_id", FunctionCustom.FUNC_CONCAT_ID_STRING)
                                                .withValue("name", Tokens.T_CONCAT_WORD)
                                                .withValue("valuetype", Type.SQL_VARCHAR.getNameString()));
 
@@ -1536,15 +1536,17 @@ public class Expression {
     /**
      * @param session
      * @return
-     * @throws HSQLParseException
+     * @throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
      */
-    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
+    VoltXMLElement voltGetXML(Session session)
+            throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         return voltGetXML(session, null, null, -1);
     }
 
     VoltXMLElement voltGetXML(Session session, List<Expression> displayCols,
-            java.util.Set<Integer> ignoredDisplayColIndexes, int startKey) throws HSQLParseException
+            java.util.Set<Integer> ignoredDisplayColIndexes, int startKey)
+            throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         return voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey, null);
     }
@@ -1555,10 +1557,11 @@ public class Expression {
      * @param session The current Session object may be needed to resolve
      * some names.
      * @return XML, correctly indented, representing this object.
-     * @throws HSQLParseException
+     * @throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
      */
     VoltXMLElement voltGetXML(Session session, List<Expression> displayCols,
-            java.util.Set<Integer> ignoredDisplayColIndexes, int startKey, String realAlias) throws HSQLParseException
+            java.util.Set<Integer> ignoredDisplayColIndexes, int startKey, String realAlias)
+        throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         // The voltXML representations of expressions tends to be driven much more by the expression's opType
         // than its Expression class.
@@ -1652,7 +1655,8 @@ public class Expression {
                 // -- so that code got dropped.
                 // Going forward, it seems to make more sense to leverage the surviving VoltDB code path by hard-wiring here:
                 // valueType="BIGINT", value="1"/"0".
-                throw new HSQLParseException("VoltDB does not support WHERE clauses containing only constants");
+                throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
+                        "VoltDB does not support WHERE clauses containing only constants");
             }
 
             exp.attributes.put("valuetype", Types.getTypeName(dataType.typeCode));
@@ -1707,7 +1711,8 @@ public class Expression {
 
         case OpTypes.CAST:
             if (dataType == null) {
-                throw new HSQLParseException("VoltDB could not determine the type in a CAST operation");
+                throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
+                        "VoltDB could not determine the type in a CAST operation");
             }
             exp.attributes.put("valuetype", dataType.getNameString());
             return exp;
@@ -1760,7 +1765,8 @@ public class Expression {
         return sb.toString();
     }
 
-    private static void throwForUnsupportedExpression(int exprOp) throws HSQLParseException
+    private static void throwForUnsupportedExpression(int exprOp)
+            throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         String opAsString;
         switch (exprOp) {
@@ -1780,7 +1786,8 @@ public class Expression {
         case OpTypes.TABLE_SUBQUERY:
         case OpTypes.ROW:
         case OpTypes.TABLE:
-            throw new HSQLParseException("VoltDB does not support subqueries, consider using views or multiple statements instead");
+            throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
+                    "VoltDB does not support subqueries, consider using views or multiple statements instead");
 
         case OpTypes.FUNCTION:             opAsString = "HSQL-style user-defined Java SQL functions"; break;
 
@@ -1816,7 +1823,8 @@ public class Expression {
         default:
             opAsString = " the unknown operator with numeric code (" + String.valueOf(exprOp) + ")";
         }
-        throw new HSQLParseException("VoltDB does not support " + opAsString);
+        throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
+                "VoltDB does not support " + opAsString);
     }
 
     /**
@@ -1827,7 +1835,6 @@ public class Expression {
      * @param session The current Session object may be needed to resolve
      * some names.
      * @return simplified expression.
-     * @throws HSQLParseException
      */
     public Expression eliminateDuplicates(final Session session) {
         // First build the map of child expressions joined by the logical AND
@@ -1846,7 +1853,8 @@ public class Expression {
         return this;
     }
 
-    protected void extractAndSubExpressions(final Session session, Expression expr, Map<String, Expression> subExprMap) {
+    protected void extractAndSubExpressions(final Session session, Expression expr,
+            Map<String, Expression> subExprMap) {
         // If it is a logical expression AND then traverse down the tree
         if (expr instanceof ExpressionLogical && ((ExpressionLogical) expr).opType == OpTypes.AND) {
             extractAndSubExpressions(session, expr.nodes[LEFT], subExprMap);
@@ -1915,7 +1923,8 @@ public class Expression {
     }
 
     // A VoltDB extension to support indexed expressions
-    public VoltXMLElement voltGetExpressionXML(Session session, Table table) throws HSQLParseException {
+    public VoltXMLElement voltGetExpressionXML(Session session, Table table)
+            throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException {
         resolveTableColumns(table);
         Expression parent = null; // As far as I can tell, this argument just gets passed around but never used !?
         resolveTypes(session, parent);
@@ -1969,4 +1978,5 @@ public class Expression {
         // return the original default impl + the type
         return super.toString() + ": " + type;
     }
+    /**********************************************************************/
 }
