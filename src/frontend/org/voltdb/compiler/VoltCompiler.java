@@ -20,7 +20,6 @@ package org.voltdb.compiler;
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -466,14 +465,7 @@ public class VoltCompiler {
         // WRITE CATALOG TO JAR HERE
         final String catalogCommands = catalog.serialize();
 
-        byte[] catalogBytes = null;
-        try {
-            catalogBytes =  catalogCommands.getBytes("UTF-8");
-        }
-        catch (final UnsupportedEncodingException e1) {
-            addErr("Can't encode the compiled catalog file correctly");
-            return false;
-        }
+        byte[] catalogBytes = catalogCommands.getBytes(Constants.UTF8ENCODING);
 
         try {
             // Don't update buildinfo if it's already present, e.g. while upgrading.
@@ -487,15 +479,21 @@ public class VoltCompiler {
                 buildinfo.append(System.getProperty("user.dir")).append('\n');
                 buildinfo.append(Long.toString(System.currentTimeMillis())).append('\n');
 
-                byte buildinfoBytes[] = buildinfo.toString().getBytes("UTF-8");
+                byte buildinfoBytes[] = buildinfo.toString().getBytes(Constants.UTF8ENCODING);
                 jarOutput.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, buildinfoBytes);
             }
             jarOutput.put(CatalogUtil.CATALOG_FILENAME, catalogBytes);
             if (projectReader != null) {
                 projectReader.putInJar(jarOutput, "project.xml");
             }
-            for (final Entry<String, String> e : m_ddlFilePaths.entrySet())
-                jarOutput.put(e.getKey(), new File(e.getValue()));
+            // Only add ddl file contents if not already in the in-memory catalog jar.
+            // This will happen during version upgrade.
+            for (final Entry<String, String> e : m_ddlFilePaths.entrySet()) {
+                String key = e.getKey();
+                if (!jarOutput.containsKey(key)) {
+                    jarOutput.put(e.getKey(), new File(e.getValue()));
+                }
+            }
             // put the compiler report into the jarfile
             jarOutput.put("catalog-report.html", m_report.getBytes(Constants.UTF8ENCODING));
             jarOutput.writeToFile(new File(jarOutputPath)).run();
@@ -528,12 +526,7 @@ public class VoltCompiler {
                 s += "COST: " + Integer.toString(stmt.getCost()) + "\n";
                 s += "PLAN:\n\n";
                 s += Encoder.hexDecodeToString(stmt.getExplainplan()) + "\n";
-                byte[] b = null;
-                try {
-                    b = s.getBytes("UTF-8");
-                } catch (UnsupportedEncodingException e) {
-                    assert(false);
-                }
+                byte[] b = s.getBytes(Constants.UTF8ENCODING);
                 retval.put(proc.getTypeName() + "_" + stmt.getTypeName() + ".txt", b);
             }
         }
@@ -544,7 +537,7 @@ public class VoltCompiler {
             throws VoltCompilerException
     {
         try {
-            return new VoltCompilerDDLFileReader(path, m_projectFileURL);
+            return new VoltCompilerFileReader(VoltCompilerFileReader.getSchemaPath(m_projectFileURL, path));
         }
         catch (IOException e) {
             String msg = String.format("Unable to open schema file \"%s\" for reading: %s", path, e.getMessage());
@@ -691,16 +684,12 @@ public class VoltCompiler {
             final String databaseName = database.getName();
             // schema does not verify that the database is named "database"
             if (databaseName.equals("database") == false) {
-                compilerLog.l7dlog(Level.ERROR,
-                                   LogKeys.compiler_VoltCompiler_FailedToCompileXML.name(),
-                                   null);
-                return null;
+                return null; // error messaging handled higher up
             }
             // shutdown and make a new hsqldb
             try {
                 compileDatabaseNode(database, ddlReaderList, jarOutput);
             } catch (final VoltCompilerException e) {
-                compilerLog.l7dlog( Level.ERROR, LogKeys.compiler_VoltCompiler_FailedToCompileXML.name(), null);
                 return null;
             }
         }
@@ -800,7 +789,16 @@ public class VoltCompiler {
             for (SchemasType.Schema schema : database.getSchemas().getSchema()) {
                 compilerLog.l7dlog( Level.INFO, LogKeys.compiler_VoltCompiler_CatalogPath.name(),
                                     new Object[] {schema.getPath()}, null);
-                ddlReaderList.add(createDDLFileReader(schema.getPath()));
+                // Prefer to use the in-memory copy.
+                // All ddl.sql is placed in the jar root folder.
+                File schemaFile = new File(schema.getPath());
+                String schemaName = schemaFile.getName();
+                if (jarOutput != null && jarOutput.containsKey(schemaName)) {
+                    ddlReaderList.add(new VoltCompilerJarFileReader(jarOutput, schemaName));
+                }
+                else {
+                    ddlReaderList.add(createDDLFileReader(schema.getPath()));
+                }
             }
         }
 
@@ -2069,7 +2067,12 @@ public class VoltCompiler {
         }
 
         String stem = c.getName().replace('.', '/');
-        URL curl = cl.getResource(stem+".class");
+        String cpath = stem + ".class";
+        URL curl = cl.getResource(cpath);
+        if (curl == null) {
+            throw new VoltCompilerException(String.format(
+                    "Failed to find class file %s in jar.", cpath));
+        }
 
         if ("jar".equals(curl.getProtocol())) {
             Pattern nameRE = Pattern.compile("\\A(" + stem + "\\$[^/]+).class\\z");
@@ -2228,31 +2231,32 @@ public class VoltCompiler {
      * an upgraded jar file.
      *
      * @param outputJar  in-memory jar file (updated in place here)
-     * @throws FileNotFoundException, IOException
+     * @throws IOException
      */
     public void upgradeCatalogAsNeeded(InMemoryJarfile outputJar)
-                    throws FileNotFoundException, IOException
+                    throws IOException
     {
         byte[] buildInfoBytes = outputJar.get(CatalogUtil.CATALOG_BUILDINFO_FILENAME);
         if (buildInfoBytes == null) {
             throw new IOException("Catalog build information not found - please build your application using the current version of VoltDB.");
         }
-        String buildInfo = new String(buildInfoBytes, "UTF-8");
+        String buildInfo;
+        buildInfo = new String(buildInfoBytes, Constants.UTF8ENCODING);
         String[] buildInfoLines = buildInfo.split("\n");
         if (buildInfoLines.length != 5) {
             throw new IOException("Catalog built with an old version of VoltDB - please build your application using the current version of VoltDB.");
         }
-        String voltVersionString = buildInfoLines[0].trim();
+        String versionFromCatalog = buildInfoLines[0].trim();
 
         // Check if it's compatible (or the upgrade is being forced).
         // getConfig() may return null if it's being mocked for a test.
         if (   VoltDB.Configuration.m_forceCatalogUpgrade
-            || !CatalogUtil.isCatalogCompatible(voltVersionString)) {
+            || !CatalogUtil.isCatalogCompatible(versionFromCatalog)) {
 
             // Patch the buildinfo.
-            String version = VoltDB.instance().getVersionString();
-            buildInfoLines[0] = version;
-            buildInfoLines[1] = String.format("voltdb-auto-upgrade-to-%s", version);
+            String versionFromVoltDB = VoltDB.instance().getVersionString();
+            buildInfoLines[0] = versionFromVoltDB;
+            buildInfoLines[1] = String.format("voltdb-auto-upgrade-to-%s", versionFromVoltDB);
             buildInfoBytes = StringUtils.join(buildInfoLines, "\n").getBytes();
             outputJar.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, buildInfoBytes);
 
@@ -2301,26 +2305,57 @@ public class VoltCompiler {
 
                 // Compile and save the file to voltdbroot. Assume it's a test environment if there
                 // is no catalog context available.
-                String jarName = String.format("catalog-%s.jar", version);
+                String jarName = String.format("catalog-%s.jar", versionFromVoltDB);
+                String textName = String.format("catalog-%s.out", versionFromVoltDB);
                 CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
                 final String outputJarPath = (catalogContext != null
                         ? new File(catalogContext.cluster.getVoltroot(), jarName).getPath()
                         : VoltDB.Configuration.getPathToCatalogForTest(jarName));
+                // Place the compiler output in a text file in the same folder.
+                final String outputTextPath = (catalogContext != null
+                        ? new File(catalogContext.cluster.getVoltroot(), textName).getPath()
+                        : VoltDB.Configuration.getPathToCatalogForTest(textName));
+
+                // Do the compilation work.
                 boolean success = compileInternal(projectReader, outputJarPath, ddlReaderList, outputJar);
-                if (success) {
-                    consoleLog.info(String.format(
-                            "The catalog was automatically upgraded from " +
-                            "version %s to %s and saved to \"%s\"",
-                            voltVersionString, version, outputJarPath));
+
+                // Summarize the results to a file.
+                // Briefly log success or failure and mention the output text file.
+                PrintStream outputStream = new PrintStream(outputTextPath);
+                try {
+                    if (success) {
+                        summarizeSuccess(outputStream, null, outputJarPath);
+                        consoleLog.info(String.format(
+                                "The catalog was automatically upgraded from " +
+                                "version %s to %s and saved to \"%s\". " +
+                                "Compiler output is available in \"%s\".",
+                                versionFromCatalog, versionFromVoltDB,
+                                outputJarPath, outputTextPath));
+                    }
+                    else {
+                        summarizeErrors(outputStream, null);
+                        outputStream.close();
+                        compilerLog.error("Catalog upgrade failed.");
+                        compilerLog.info(String.format(
+                                "Had attempted to perform an automatic version upgrade of a " +
+                                "catalog that was compiled by an older %s version of VoltDB, " +
+                                "but the automatic upgrade failed. The cluster  will not be " +
+                                "able to start until the incompatibility is fixed. " +
+                                "Try re-compiling the catalog with the newer %s version " +
+                                "of the VoltDB compiler. Compiler output from the failed " +
+                                "upgrade is available in \"%s\".",
+                                versionFromCatalog, versionFromVoltDB, outputTextPath));
+                        throw new IOException(String.format(
+                                "Failed to generate upgraded catalog file \"%s\".",
+                                outputJarPath));
+                    }
                 }
-                else {
-                    throw new IOException(String.format(
-                            "Failed to generate upgraded catalog file \"%s\".",
-                            outputJarPath));
+                finally {
+                    outputStream.close();
                 }
             }
             finally {
-                // Restore the original class loader.
+                // Restore the original class loader
                 m_classLoader = originalClassLoader;
             }
         }

@@ -38,10 +38,10 @@ import org.hsqldb_voltpatches.Database;
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.HsqlNameManager;
+import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.NumberSequence;
 import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.Table;
-import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.rowio.RowOutputTextLog;
 
 /**

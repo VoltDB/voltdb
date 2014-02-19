@@ -31,7 +31,6 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
@@ -41,7 +40,6 @@ import org.hsqldb_voltpatches.persist.HsqlDatabaseProperties;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultConstants;
 import org.hsqldb_voltpatches.result.ResultMetaData;
-import org.hsqldb_voltpatches.types.Type;
 
 /**
  * Statement implementation for DML and base DQL statements.
@@ -180,7 +178,6 @@ public abstract class StatementDMQL extends Statement {
         }
     }
 
-    @Override
     public Result execute(Session session) {
 
         Result result = getAccessRightsResult(session);
@@ -229,7 +226,6 @@ public abstract class StatementDMQL extends Statement {
     /**
      * For the creation of the statement
      */
-    @Override
     public void setGeneratedColumnInfo(int generate, ResultMetaData meta) {
 
         // can support INSERT_SELECT also
@@ -259,7 +255,7 @@ public abstract class StatementDMQL extends Statement {
                     return;
                 }
 
-            // fall through
+            // $FALL-THROUGH$
             case ResultConstants.RETURN_GENERATED_KEYS :
                 generatedIndexes = new int[]{ colIndex };
                 break;
@@ -306,7 +302,6 @@ public abstract class StatementDMQL extends Statement {
         return values;
     }
 
-    @Override
     public boolean hasGeneratedColumns() {
         return generatedIndexes != null;
     }
@@ -362,7 +357,6 @@ public abstract class StatementDMQL extends Statement {
         }
     }
 
-    @Override
     public void clearVariables() {
 
         isValid            = false;
@@ -512,7 +506,6 @@ public abstract class StatementDMQL extends Statement {
      * Returns the metadata, which is empty if the CompiledStatement does not
      * generate a Result.
      */
-    @Override
     public ResultMetaData getResultMetaData() {
 
         switch (type) {
@@ -534,7 +527,6 @@ public abstract class StatementDMQL extends Statement {
     /**
      * Returns the metadata for the placeholder parameters.
      */
-    @Override
     public ResultMetaData getParametersMetaData() {
         return parameterMetaData;
     }
@@ -603,7 +595,6 @@ public abstract class StatementDMQL extends Statement {
     /**
      * Retrieves a String representation of this object.
      */
-    @Override
     public String describe(Session session) {
 
         try {
@@ -812,16 +803,13 @@ public abstract class StatementDMQL extends Statement {
                                      "]\n");
     }
 
-    @Override
     public void resolve() {}
 
-    @Override
     public RangeVariable[] getRangeVariables() {
         return rangeVariables;
     }
 
-
-    /*************** VOLTDB *********************/
+    /************************* Volt DB Extensions *************************/
 
     /**
      * VoltDB added method to get a non-catalog-dependent
@@ -832,7 +820,8 @@ public abstract class StatementDMQL extends Statement {
      * @throws HSQLParseException
      */
     @Override
-    VoltXMLElement voltGetStatementXML(Session session) throws HSQLParseException
+    VoltXMLElement voltGetStatementXML(Session session)
+            throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         // XXX this seems, how you say, dumb.  leaving it though until I track
         // down that nobody cares
@@ -852,7 +841,7 @@ public abstract class StatementDMQL extends Statement {
             parameter.attributes.put("index", String.valueOf(i));
             Expression expr = parameters[i];
             parameter.attributes.put("id", expr.getUniqueId(session));
-            Type paramType = expr.getDataType();
+            org.hsqldb_voltpatches.types.Type paramType = expr.getDataType();
             if (paramType != null) {
                 parameter.attributes.put("valuetype", Types.getTypeName(paramType.typeCode));
             }
@@ -879,5 +868,5 @@ public abstract class StatementDMQL extends Statement {
         }
         return result;
     }
-
+    /**********************************************************************/
 }

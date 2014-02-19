@@ -580,7 +580,7 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
     TableTuple nxtTuple(input_table->schema());
     PoolBackedTupleStorage nextGroupByKeyStorage(m_groupByKeySchema, &m_memoryPool);
     TableTuple& nextGroupByKeyTuple = nextGroupByKeyStorage;
-    ProgressMonitorProxy pmp(m_engine);
+    ProgressMonitorProxy pmp(m_engine, this);
     while (it.next(nxtTuple)) {
         pmp.countdownProgress();
         initGroupByKeyTuple(nextGroupByKeyStorage, nxtTuple);
@@ -642,7 +642,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     TableTuple nxtTuple(input_table->schema());
     PoolBackedTupleStorage nextGroupByKeyStorage(m_groupByKeySchema, &m_memoryPool);
     TableTuple& nextGroupByKeyTuple = nextGroupByKeyStorage;
-    ProgressMonitorProxy pmp(m_engine, NULL);
+    ProgressMonitorProxy pmp(m_engine, this);
     VOLT_TRACE("looping..");
     // Use the first input tuple to "prime" the system.
     // ENG-1565: for this special case, can have only one input row, apply the predicate here

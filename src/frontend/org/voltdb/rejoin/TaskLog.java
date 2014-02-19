@@ -59,4 +59,9 @@ public interface TaskLog {
      * @throws IOException
      */
     public void close() throws IOException;
+
+    /**
+     * Default policy at startup is to drop invocations until recording is necessary
+     */
+    public void enableRecording();
 }

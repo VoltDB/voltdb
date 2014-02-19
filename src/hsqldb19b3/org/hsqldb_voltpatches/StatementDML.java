@@ -31,7 +31,6 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.RangeVariable.RangeIteratorBase;
@@ -63,9 +62,6 @@ import org.hsqldb_voltpatches.types.Type;
 // support for MERGE statement by Justin Spadea (jzs9783@users dot sourceforge.net)
 public class StatementDML extends StatementDMQL {
 
-    /**
-     * Instantiate this as an INSERT statement
-     */
     StatementDML(int type, int group, HsqlName schemaName) {
         super(type, group, schemaName);
     }
@@ -172,7 +168,6 @@ public class StatementDML extends StatementDMQL {
               null);
     }
 
-    @Override
     Result getResult(Session session) {
 
         Result result = null;
@@ -205,7 +200,6 @@ public class StatementDML extends StatementDMQL {
     }
 
     // this fk references -> other  :  other read lock
-    @Override
     void getTableNamesForRead(OrderedHashSet set) {
 
         if (!baseTable.isTemp()) {
@@ -239,7 +233,6 @@ public class StatementDML extends StatementDMQL {
     }
 
     // other fk references this :  if constraint trigger action  : other write lock
-    @Override
     void getTableNamesForWrite(OrderedHashSet set) {
 
         if (baseTable.isTemp()) {
@@ -544,7 +537,7 @@ public class StatementDML extends StatementDMQL {
         newData.beforeFirst();
 
         while (newData.hasNext()) {
-            Object[] data = newData.getNext();
+            Object[] data = (Object[]) newData.getNext();
 
             baseTable.insertRow(session, store, data);
 
@@ -1251,11 +1244,10 @@ public class StatementDML extends StatementDMQL {
         return true;
     }
 
-
-    /*************** VOLTDB *********************/
+    /************************* Volt DB Extensions *************************/
 
     private void voltAppendTargetColumns(Session session, int[] columnMap, Expression[] expressions, VoltXMLElement xml)
-    throws HSQLParseException
+    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         VoltXMLElement columns = new VoltXMLElement("columns");
         xml.children.add(columns);
@@ -1270,7 +1262,7 @@ public class StatementDML extends StatementDMQL {
     }
 
     private void voltAppendCondition(Session session, VoltXMLElement xml)
-    throws HSQLParseException
+    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         assert(targetRangeVariables.length > 0);
         RangeVariable rv = targetRangeVariables[0];
@@ -1290,7 +1282,7 @@ public class StatementDML extends StatementDMQL {
     }
 
     private void voltAppendChildScans(Session session, VoltXMLElement xml)
-    throws HSQLParseException
+    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         // Joins in DML statements are not yet supported, so, for now,
         // just represent the one (target) table scan.
@@ -1309,7 +1301,7 @@ public class StatementDML extends StatementDMQL {
      */
     @Override
     VoltXMLElement voltGetStatementXML(Session session)
-    throws HSQLParseException
+    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         VoltXMLElement xml;
         switch (type) {
@@ -1338,12 +1330,13 @@ public class StatementDML extends StatementDMQL {
             break;
 
         default:
-            throw new HSQLParseException("VoltDB does not support DML statements of type " + type);
+            throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
+                "VoltDB does not support DML statements of type " + type);
         }
 
         voltAppendParameters(session, xml);
         xml.attributes.put("table", targetTable.getName().name);
         return xml;
     }
-
+    /**********************************************************************/
 }
