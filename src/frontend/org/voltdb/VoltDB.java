@@ -313,13 +313,8 @@ public class VoltDB {
                     }
                 } else if (arg.startsWith("zkport")) {
                     String portStr = args[++i].trim();
-                    if (portStr.indexOf(':') != -1) {
-                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, VoltDB.DEFAULT_ZK_PORT);
-                        m_zkInterface = hap.getHostText() + ":" + hap.getPort();
-                    } else {
-                        m_zkInterface = "127.0.0.1:" + portStr;
-                    }
-                }                else if (arg.equals("externalinterface")) {
+                    m_zkInterface = "127.0.0.1:" + portStr;
+                }  else if (arg.equals("externalinterface")) {
                     m_externalInterface = args[++i].trim();
                 }
                 else if (arg.startsWith("externalinterface ")) {
