@@ -562,53 +562,6 @@ public class TestJDBCDriver {
         startServer();
     }
 
-    /*
-     * Make sure a connection can recover from a broken connection when there are
-     * multiple clients. The JDBC4Connection code used reference counting that
-     * made it work with just one client, but break with more.
-     */
-    @Test
-    public void testReconnect() throws Exception {
-        // Make a second client.
-        Connection conn2 = DriverManager.getConnection("jdbc:voltdb://localhost:21212");
-        try {
-            // Break the current connection and try to execute a procedure call.
-            CallableStatement cs1 = conn.prepareCall("{call InsertA(?, ?)}");
-            cs1.setInt(1, 55);
-            cs1.setInt(2, 66);
-
-            // Shut down unceremoneously
-            server.shutdown();
-
-            // Expect failure
-            try {
-                cs1.execute();
-            }
-            catch (SQLException e) {
-                assertEquals(e.getSQLState(), SQLError.CONNECTION_FAILURE);
-            }
-
-            // Crank the server up again with enough delay to allow retry logic to kick in.
-            server = new ServerThread(testjar, pb.getPathToDeployment(), BackendTarget.NATIVE_EE_JNI);
-            server.setStartupDelayMS(15000);
-            server.start();
-
-            // Re-execute a new prepared statement with the restarted connection.
-            CallableStatement cs2 = conn.prepareCall("{call InsertA(?, ?)}");
-            cs2.setInt(1, 55);
-            cs2.setInt(2, 66);
-            try {
-                cs2.execute();
-            }
-            catch (SQLException e) {
-                fail("Expect the connection to function after reconnect.");
-            }
-        }
-        finally {
-            conn2.close();
-        }
-    }
-
     @Test
     public void testSetMaxRows() throws SQLException    {
         // Add 10 rows
