@@ -1214,7 +1214,7 @@ public class DDLCompiler {
             matViewMap.put(table, query);
         }
 
-         // all tables start replicated
+        // all tables start replicated
         // if a partition is found in the project file later,
         //  then this is reversed
         table.setIsreplicated(true);
@@ -1265,7 +1265,6 @@ public class DDLCompiler {
                     if (constraintNode.name.equals("constraint")) {
                         addConstraintToCatalog(table, constraintNode, indexReplacementMap);
                     }
-
                 }
             }
         }

@@ -70,7 +70,6 @@ public class ParserDDL extends ParserRoutine {
         super(session, scanner);
     }
 
-    @Override
     void reset(String sql) {
         super.reset(sql);
     }
@@ -1312,7 +1311,7 @@ public class ParserDDL extends ParserRoutine {
                             throw Error.error(ErrorCode.X_42522);
                         }
                     }
-                    else
+                    else 
                     // End of VoltDB extension
                     if (table.getUniqueConstraintForColumns(c.core.mainCols)
                             != null) {
