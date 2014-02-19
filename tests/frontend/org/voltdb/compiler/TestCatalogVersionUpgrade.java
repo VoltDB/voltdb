@@ -39,9 +39,6 @@ import org.voltdb.utils.MiscUtils;
 
 public class TestCatalogVersionUpgrade extends TestCase {
 
-    // The create statement name used to force an upgrade error.
-    private static String BAD_CREATE_NAME = "SQUIZZLE";
-
     // The message substring we expect to find from an upgrade failure.
     private static String UPGRADE_ERROR_MESSAGE_SUBSTRING = "Failed to generate upgraded catalog file";
 
@@ -58,23 +55,18 @@ public class TestCatalogVersionUpgrade extends TestCase {
         return buildInfoLines;
     }
 
-    private void dorkCatalog(
-            InMemoryJarfile memCatalog,
-            boolean dorkVersion,
-            boolean dorkDDL)
-            throws IOException
+    private void dorkVersion(InMemoryJarfile memCatalog) throws IOException
     {
-        if (dorkVersion) {
-            String[] bi = getBuildInfoLines(memCatalog);
-            bi[0] = bi[0].substring(0, bi[0].lastIndexOf('.'));
-            memCatalog.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, StringUtils.join(bi, '\n').getBytes());
-        }
-        if (dorkDDL) {
-            // Squizzle creation is no longer supported.
-            String key = new File(TPCCProjectBuilder.ddlURL.getPath()).getName();
-            String ddl = String.format("CREATE %s;\n%s", BAD_CREATE_NAME, new String(memCatalog.get(key), "UTF-8"));
-            memCatalog.put(key, ddl.getBytes());
-        }
+        String[] bi = getBuildInfoLines(memCatalog);
+        bi[0] = bi[0].substring(0, bi[0].lastIndexOf('.'));
+        memCatalog.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, StringUtils.join(bi, '\n').getBytes());
+    }
+
+    private void dorkCatalogDDL(InMemoryJarfile memCatalog, String statement) throws UnsupportedEncodingException {
+        // Squizzle creation is no longer supported.
+        String key = new File(TPCCProjectBuilder.ddlURL.getPath()).getName();
+        String ddl = String.format("%s;\n%s", statement, new String(memCatalog.get(key), "UTF-8"));
+        memCatalog.put(key, ddl.getBytes());
     }
 
     public void testCatalogAutoUpgrade() throws Exception
@@ -92,7 +84,7 @@ public class TestCatalogVersionUpgrade extends TestCase {
         // Load the catalog to an in-memory jar and tweak the version.
         byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
         InMemoryJarfile memCatalog = CatalogUtil.loadCatalogJar(bytes, null);
-        dorkCatalog(memCatalog, true, false);
+        dorkVersion(memCatalog);
 
         // Load/upgrade and check against the server version.
         InMemoryJarfile memCatalog2 = CatalogUtil.loadCatalogJar(memCatalog.getFullJarBytes(), null);
@@ -122,7 +114,9 @@ public class TestCatalogVersionUpgrade extends TestCase {
         // Load the catalog to an in-memory jar and tweak the version to make it incompatible.
         byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
         InMemoryJarfile memCatalog = CatalogUtil.loadCatalogJar(bytes, null);
-        dorkCatalog(memCatalog, true, true);
+        dorkVersion(memCatalog);
+        // Squizzle creation is no longer supported.
+        dorkCatalogDDL(memCatalog, "CREATE SQUIZZLE");
 
         // Check the (hopefully) upgraded catalog version against the server version.
         try {
@@ -134,5 +128,43 @@ public class TestCatalogVersionUpgrade extends TestCase {
             String message = e.getMessage();
             assertTrue(message.contains(UPGRADE_ERROR_MESSAGE_SUBSTRING));
         }
+    }
+
+    public void testAutoUpgradeWithGroovyProc() throws Exception
+    {
+        TPCCProjectBuilder project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addDefaultProcedures();
+
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        String jarName = "compile-deployment.jar";
+        String catalogJar = testDir + File.separator + jarName;
+        assertTrue("Project failed to compile", project.compile(catalogJar));
+
+        // Load the catalog to an in-memory jar and tweak the version.
+        byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
+        InMemoryJarfile memCatalog = CatalogUtil.loadCatalogJar(bytes, null);
+        dorkVersion(memCatalog);
+        dorkCatalogDDL(memCatalog,
+            "CREATE PROCEDURE groovy.procedures.SelectItem AS ### \n" +
+            "  selectItem = new SQLStmt('SELECT I_ID, I_NAME FROM ITEM WHERE I_ID = ?') \n" +
+            "  transactOn = { id -> \n" +
+            "    voltQueueSQL(selectItem, EXPECT_ZERO_OR_ONE_ROW, id) \n" +
+            "    voltExecuteSQL(true) \n" +
+            "  } \n" +
+            "### LANGUAGE GROOVY");
+
+        // Load/upgrade and check against the server version.
+        InMemoryJarfile memCatalog2 = CatalogUtil.loadCatalogJar(memCatalog.getFullJarBytes(), null);
+        assertNotNull(memCatalog2);
+        String[] buildInfoLines2 = getBuildInfoLines(memCatalog2);
+        String serverVersion = VoltDB.instance().getVersionString();
+        assertTrue(serverVersion.equals(buildInfoLines2[0]));
+
+        // Make sure the jar file is present.
+        String jarName2 = String.format("catalog-%s.jar", serverVersion);
+        File jar2 = new File(VoltDB.Configuration.getPathToCatalogForTest(jarName2));
+        assertTrue(jar2.exists());
     }
 }

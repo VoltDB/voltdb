@@ -2246,17 +2246,17 @@ public class VoltCompiler {
         if (buildInfoLines.length != 5) {
             throw new IOException("Catalog built with an old version of VoltDB - please build your application using the current version of VoltDB.");
         }
-        String voltVersionString = buildInfoLines[0].trim();
+        String versionFromCatalog = buildInfoLines[0].trim();
 
         // Check if it's compatible (or the upgrade is being forced).
         // getConfig() may return null if it's being mocked for a test.
         if (   VoltDB.Configuration.m_forceCatalogUpgrade
-            || !CatalogUtil.isCatalogCompatible(voltVersionString)) {
+            || !CatalogUtil.isCatalogCompatible(versionFromCatalog)) {
 
             // Patch the buildinfo.
-            String version = VoltDB.instance().getVersionString();
-            buildInfoLines[0] = version;
-            buildInfoLines[1] = String.format("voltdb-auto-upgrade-to-%s", version);
+            String versionFromVoltDB = VoltDB.instance().getVersionString();
+            buildInfoLines[0] = versionFromVoltDB;
+            buildInfoLines[1] = String.format("voltdb-auto-upgrade-to-%s", versionFromVoltDB);
             buildInfoBytes = StringUtils.join(buildInfoLines, "\n").getBytes();
             outputJar.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, buildInfoBytes);
 
@@ -2299,30 +2299,59 @@ public class VoltCompiler {
 
             // Use the in-memory jarfile-provided class loader so that procedure
             // classes can be found and copied to the new file that gets written.
-            File tempfile = File.createTempFile("catalog", ".jar");
             ClassLoader originalClassLoader = m_classLoader;
             try {
                 m_classLoader = outputJar.getLoader();
 
                 // Compile and save the file to voltdbroot. Assume it's a test environment if there
                 // is no catalog context available.
-                String jarName = String.format("catalog-%s.jar", version);
+                String jarName = String.format("catalog-%s.jar", versionFromVoltDB);
+                String textName = String.format("catalog-%s.out", versionFromVoltDB);
                 CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
                 final String outputJarPath = (catalogContext != null
                         ? new File(catalogContext.cluster.getVoltroot(), jarName).getPath()
                         : VoltDB.Configuration.getPathToCatalogForTest(jarName));
+                // Place the compiler output in a text file in the same folder.
+                final String outputTextPath = (catalogContext != null
+                        ? new File(catalogContext.cluster.getVoltroot(), textName).getPath()
+                        : VoltDB.Configuration.getPathToCatalogForTest(textName));
+
+                // Do the compilation work.
                 boolean success = compileInternal(projectReader, outputJarPath, ddlReaderList, outputJar);
-                if (success) {
-                    consoleLog.info(String.format(
-                            "The catalog was automatically upgraded from " +
-                            "version %s to %s and saved to \"%s\"",
-                            voltVersionString, version, outputJarPath));
+
+                // Summarize the results to a file.
+                // Briefly log success or failure and mention the output text file.
+                PrintStream outputStream = new PrintStream(outputTextPath);
+                try {
+                    if (success) {
+                        summarizeSuccess(outputStream, null, outputJarPath);
+                        consoleLog.info(String.format(
+                                "The catalog was automatically upgraded from " +
+                                "version %s to %s and saved to \"%s\". " +
+                                "Compiler output is available in \"%s\".",
+                                versionFromCatalog, versionFromVoltDB,
+                                outputJarPath, outputTextPath));
+                    }
+                    else {
+                        summarizeErrors(outputStream, null);
+                        outputStream.close();
+                        compilerLog.error("Catalog upgrade failed.");
+                        compilerLog.info(String.format(
+                                "Had attempted to perform an automatic version upgrade of a " +
+                                "catalog that was compiled by an older %s version of VoltDB, " +
+                                "but the automatic upgrade failed. The cluster  will not be " +
+                                "able to start until the incompatibility is fixed. " +
+                                "Try re-compiling the catalog with the newer %s version " +
+                                "of the VoltDB compiler. Compiler output from the failed " +
+                                "upgrade is available in \"%s\".",
+                                versionFromCatalog, versionFromVoltDB, outputTextPath));
+                        throw new IOException(String.format(
+                                "Failed to generate upgraded catalog file \"%s\".",
+                                outputJarPath));
+                    }
                 }
-                else {
-                    compilerLog.error("Catalog upgrade failed.");
-                    throw new IOException(String.format(
-                            "Failed to generate upgraded catalog file \"%s\".",
-                            outputJarPath));
+                finally {
+                    outputStream.close();
                 }
             }
             finally {
