@@ -66,7 +66,7 @@ import java.io.UnsupportedEncodingException;
  * You use this class in the same way as you would traditionally use
  * ResourceBundle:
  * <PRE>
- *  import org.hsqldb.util..RefCapablePropertyResourceBundle;
+ *  import org.hsqldb_voltpatches.util..RefCapablePropertyResourceBundle;
  *  ...
  *      RefCapablePropertyResourceBundle bundle =
  *              RefCapablePropertyResourceBundle.getBundle("subdir.xyz");

@@ -683,22 +683,21 @@ public class Inits {
 
                 try {
                     m_rvdb.m_restoreAgent = new RestoreAgent(
-                                                      m_rvdb.m_messenger.getZK(),
+                                                      m_rvdb.m_messenger,
                                                       m_rvdb.getSnapshotCompletionMonitor(),
                                                       m_rvdb,
-                                                      m_rvdb.m_myHostId,
                                                       m_config.m_startAction,
                                                       cl.getEnabled(),
                                                       cl.getLogpath(),
                                                       cl.getInternalsnapshotpath(),
                                                       snapshotPath,
                                                       allPartitions,
-                                                      ImmutableSet.copyOf(m_rvdb.m_messenger.getLiveHostIds()),
                                                       CatalogUtil.getVoltDbRoot(m_deployment.getPaths()).getAbsolutePath());
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Unable to construct the RestoreAgent", true, e);
                 }
 
+                m_rvdb.m_globalServiceElector.registerService(m_rvdb.m_restoreAgent);
                 m_rvdb.m_restoreAgent.setCatalogContext(m_rvdb.m_catalogContext);
                 // Generate plans and get (hostID, catalogPath) pair
                 Pair<Integer,String> catalog = m_rvdb.m_restoreAgent.findRestoreCatalog();

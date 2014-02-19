@@ -34,8 +34,8 @@ package org.hsqldb_voltpatches.rights;
 import org.hsqldb_voltpatches.Database;
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
-import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
+import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 

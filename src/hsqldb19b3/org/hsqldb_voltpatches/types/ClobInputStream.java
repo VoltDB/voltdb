@@ -37,7 +37,7 @@ import java.io.Reader;
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.HsqlException;
-import org.hsqldb_voltpatches.SessionInterface;
+import org.hsqldb_voltpatches.*;
 
 /**
  * This class is used as an InputStream to retrieve data from a Blob.
@@ -72,7 +72,6 @@ public final class ClobInputStream extends Reader {
         this.session         = session;
     }
 
-    @Override
     public int read() throws IOException {
 
         if (currentPosition >= availableLength) {
@@ -96,7 +95,6 @@ public final class ClobInputStream extends Reader {
         return val;
     }
 
-    @Override
     public int read(char[] cbuf, int off, int len) throws IOException {
 
         checkClosed();
@@ -112,7 +110,6 @@ public final class ClobInputStream extends Reader {
         return len;
     }
 
-    @Override
     public long skip(long n) throws IOException {
 
         if (n <= 0) {
@@ -132,7 +129,6 @@ public final class ClobInputStream extends Reader {
         return (int) (bufferOffset + buffer.length - currentPosition);
     }
 
-    @Override
     public void close() throws IOException {
         isClosed = true;
     }

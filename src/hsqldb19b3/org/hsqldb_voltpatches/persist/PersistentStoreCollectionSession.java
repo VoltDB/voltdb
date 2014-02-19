@@ -33,11 +33,11 @@ package org.hsqldb_voltpatches.persist;
 
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
-import org.hsqldb_voltpatches.HsqlException;
 import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.TableBase;
 import org.hsqldb_voltpatches.lib.Iterator;
 import org.hsqldb_voltpatches.lib.LongKeyHashMap;
+import org.hsqldb_voltpatches.HsqlException;
 
 /**
  * Collection of PersistenceStore itmes currently used by a session.

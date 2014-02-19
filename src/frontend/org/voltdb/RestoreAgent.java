@@ -35,8 +35,10 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 
+import com.google_voltpatches.common.collect.ImmutableSet;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.Code;
@@ -47,10 +49,10 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
-import org.voltcore.zk.LeaderElector;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
@@ -72,9 +74,12 @@ import org.voltdb.utils.MiscUtils;
  *
  * Once all of these tasks have finished successfully, it will call RealVoltDB
  * to resume normal operation.
+ *
+ * Making it a Promotable and elected by the GlobalServiceElector so that it's
+ * colocated with the MPI.
  */
 public class RestoreAgent implements CommandLogReinitiator.Callback,
-SnapshotCompletionInterest
+SnapshotCompletionInterest, Promotable
 {
     // Implement this callback to get notified when restore finishes.
     public interface Callback {
@@ -127,12 +132,6 @@ SnapshotCompletionInterest
 
     private boolean m_planned = false;
 
-    /*
-     * Don't ask the leader elector if you are the leader
-     * it can give the wrong answer after the first election...
-     * Use the memoized field m_isLeader.
-     */
-    private LeaderElector m_leaderElector = null;
     private boolean m_isLeader = false;
 
     private TransactionCreator m_initiator;
@@ -415,31 +414,30 @@ SnapshotCompletionInterest
                 }
             };
 
-    public RestoreAgent(ZooKeeper zk, SnapshotCompletionMonitor snapshotMonitor,
-                        Callback callback, int hostId, StartAction action, boolean clEnabled,
+    public RestoreAgent(HostMessenger hostMessenger, SnapshotCompletionMonitor snapshotMonitor,
+                        Callback callback, StartAction action, boolean clEnabled,
                         String clPath, String clSnapshotPath,
                         String snapshotPath, int[] allPartitions,
-                        Set<Integer> liveHosts,
                         String voltdbrootPath)
     throws IOException {
-        m_hostId = hostId;
+        m_hostId = hostMessenger.getHostId();
         m_initiator = null;
         m_snapshotMonitor = snapshotMonitor;
         m_callback = callback;
         m_action = action;
-        m_zk = zk;
+        m_zk = hostMessenger.getZK();
         m_clEnabled = VoltDB.instance().getConfig().m_isEnterprise ? clEnabled : false;
         m_clPath = clPath;
         m_clSnapshotPath = clSnapshotPath;
         m_snapshotPath = snapshotPath;
         m_allPartitions = allPartitions;
-        m_liveHosts = liveHosts;
+        m_liveHosts = ImmutableSet.copyOf(hostMessenger.getLiveHostIds());
         m_voltdbrootPath = voltdbrootPath;
 
-        initialize();
+        initialize(hostMessenger);
     }
 
-    private void initialize() {
+    private void initialize(HostMessenger hostMessenger) {
         // Load command log reinitiator
         try {
             Class<?> replayClass = MiscUtils.loadProClass("org.voltdb.CommandLogReinitiatorImpl",
@@ -448,14 +446,14 @@ SnapshotCompletionInterest
                 Constructor<?> constructor =
                     replayClass.getConstructor(int.class,
                                                StartAction.class,
-                                               ZooKeeper.class,
+                                               HostMessenger.class,
                                                String.class,
                                                Set.class);
 
                 m_replayAgent =
                     (CommandLogReinitiator) constructor.newInstance(m_hostId,
                                                                     m_action,
-                                                                    m_zk,
+                                                                    hostMessenger,
                                                                     m_clPath,
                                                                     m_liveHosts);
             }
@@ -514,16 +512,6 @@ SnapshotCompletionInterest
      */
     void enterRestore() {
         try {
-            m_leaderElector = new LeaderElector(m_zk, VoltZK.restore_barrier,
-                                                "restore",
-                                                new byte[0], null);
-            m_leaderElector.start(true);
-            m_isLeader = m_leaderElector.isLeader();
-        } catch (Exception e) {
-            VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
-                                     false, e);
-        }
-        try {
             m_generatedRestoreBarrier2 = m_zk.create(VoltZK.restore_barrier2 + "/counter", null,
                         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
         } catch (Exception e) {
@@ -562,10 +550,6 @@ SnapshotCompletionInterest
                 break;
             }
         }
-
-        try {
-            m_leaderElector.shutdown();
-        } catch (Exception ignore) {}
 
         // Clean up the ZK snapshot ID node so that we're good for next time.
         try
@@ -673,7 +657,7 @@ SnapshotCompletionInterest
          * snapshot restore finishes.
          */
         if (m_action.doesRecover()) {
-            m_replayAgent.generateReplayPlan(expectedPartitionCount);
+            m_replayAgent.generateReplayPlan(expectedPartitionCount, m_isLeader);
         }
 
         m_planned = true;
@@ -1307,5 +1291,11 @@ SnapshotCompletionInterest
             changeState();
         }
         return new CountDownLatch(0);
+    }
+
+    @Override
+    public void acceptPromotion() throws InterruptedException, ExecutionException, KeeperException
+    {
+        m_isLeader = true;
     }
 }

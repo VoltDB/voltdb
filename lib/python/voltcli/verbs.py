@@ -366,11 +366,12 @@ class JavaBundle(object):
     def initialize(self, verb):
         verb.add_options(
            cli.StringOption('-l', '--license', 'license', 'specify the location of the license file'),
-           cli.StringOption(None, '--client', 'clientport', 'specify the client port number'),
-           cli.StringOption(None, '--internal', 'internalport', 'specify the internal port number used to communicate between cluster nodes'),
-           cli.StringOption(None, '--zookeeper', 'zkport', 'specify the zookeeper port number'),
-           cli.StringOption(None, '--replication', 'replicationport', 'specify the replication port number (1st of 3 sequential ports)'),
-           cli.StringOption(None, '--admin', 'adminport', 'specify the admin port number'),
+           cli.StringOption(None, '--client', 'clientport', 'specify the client port as [ipaddress:]port-number'),
+           cli.StringOption(None, '--internal', 'internalport', 'specify the internal port as [ipaddress:]port-number used to communicate between cluster nodes'),
+           cli.StringOption(None, '--zookeeper', 'zkport', 'specify the zookeeper port'),
+           cli.StringOption(None, '--replication', 'replicationport', 'specify the replication port as [ipaddress:]port-number (1st of 3 sequential ports)'),
+           cli.StringOption(None, '--admin', 'adminport', 'specify the admin port as [ipaddress:]port-number'),
+           cli.StringOption(None, '--http', 'httpport', 'specify the http port as [ipaddress:]port-number'),
            cli.StringOption(None, '--internalinterface', 'internalinterface', 'specify the network interface to use for internal communication, such as the internal and zookeeper ports'),
            cli.StringOption(None, '--externalinterface', 'externalinterface', 'specify the network interface to use for external ports, such as the admin and client ports'))
 
@@ -441,14 +442,6 @@ class ServerBundle(JavaBundle):
                 cli.BooleanOption('-B', '--background', 'daemon',
                                   'run the VoltDB server in the background (as a daemon process)'))
 
-    def start(self, verb, runner):
-        # Add appropriate server-ish Java options.
-        verb.merge_java_options('java_opts_override',
-                '-server',
-                '-XX:+HeapDumpOnOutOfMemoryError',
-                '-XX:HeapDumpPath=/tmp',
-                '-XX:-ReduceInitialCardMarks')
-
     def go(self, verb, runner):
         if self.needs_catalog:
             if runner.opts.replica:
@@ -480,6 +473,10 @@ class ServerBundle(JavaBundle):
             utility.abort('host is required.')
         if runner.opts.clientport:
             final_args.extend(['port', runner.opts.clientport])
+        if runner.opts.adminport:
+            final_args.extend(['adminport', runner.opts.adminport])
+        if runner.opts.httpport:
+            final_args.extend(['httpport', runner.opts.httpport])
         if runner.opts.license:
             final_args.extend(['license', runner.opts.license])
         if runner.opts.internalinterface:
