@@ -542,3 +542,4 @@ public class JDBC4ClientConnection implements Closeable {
         }
     }
 }
+
