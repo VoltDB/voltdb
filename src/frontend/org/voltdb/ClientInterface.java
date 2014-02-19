@@ -2502,7 +2502,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     public void sendEOLMessage(int partitionId) {
         final long initiatorHSId = m_cartographer.getHSIdForMaster(partitionId);
-        Iv2EndOfLogMessage message = new Iv2EndOfLogMessage(false);
+        Iv2EndOfLogMessage message = new Iv2EndOfLogMessage(partitionId);
         m_mailbox.send(initiatorHSId, message);
     }
 
