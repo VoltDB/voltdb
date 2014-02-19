@@ -442,20 +442,6 @@ class ServerBundle(JavaBundle):
                 cli.BooleanOption('-B', '--background', 'daemon',
                                   'run the VoltDB server in the background (as a daemon process)'))
 
-    def start(self, verb, runner):
-        # Add appropriate server-ish Java options.
-        verb.merge_java_options('java_opts_override',
-                '-server',
-                '-XX:+HeapDumpOnOutOfMemoryError',
-                '-XX:HeapDumpPath=/tmp',
-                '-XX:+UseParNewGC',
-                '-XX:+UseConcMarkSweepGC',
-                '-XX:+CMSParallelRemarkEnabled',
-                '-XX:+UseTLAB',
-                '-XX:CMSInitiatingOccupancyFraction=75',
-                '-XX:+UseCMSInitiatingOccupancyOnly',
-                '-XX:+UseCondCardMark')
-
     def go(self, verb, runner):
         if self.needs_catalog:
             if runner.opts.replica:
