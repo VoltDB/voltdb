@@ -81,6 +81,19 @@ if 'JAVA_OPTS' in os.environ:
 if not [opt for opt in java_opts if opt.startswith('-Xmx')]:
     java_opts.append('-Xmx2048m')
 
+# Set common options now.
+java_opts.append('-server');
+java_opts.append('-Djava.awt.headless=true -Dsun.net.inetaddr.ttl=300 -Dsun.net.inetaddr.negative.ttl=3600');
+java_opts.append('-XX:+HeapDumpOnOutOfMemoryError');
+java_opts.append('-XX:HeapDumpPath=/tmp');
+java_opts.append('-XX:+UseParNewGC');
+java_opts.append('-XX:+UseConcMarkSweepGC');
+java_opts.append('-XX:+CMSParallelRemarkEnabled');
+java_opts.append('-XX:+UseTLAB');
+java_opts.append('-XX:CMSInitiatingOccupancyFraction=75');
+java_opts.append('-XX:+UseCMSInitiatingOccupancyOnly');
+java_opts.append('-XX:+UseCondCardMark');
+
 def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
     """
     Set the VOLTDB_LIB and VOLTDB_VOLTDB environment variables based on the
