@@ -537,7 +537,7 @@ public class VoltCompiler {
             throws VoltCompilerException
     {
         try {
-            return new VoltCompilerDDLFileReader(path, m_projectFileURL);
+            return new VoltCompilerFileReader(VoltCompilerFileReader.getSchemaPath(m_projectFileURL, path));
         }
         catch (IOException e) {
             String msg = String.format("Unable to open schema file \"%s\" for reading: %s", path, e.getMessage());
@@ -690,7 +690,7 @@ public class VoltCompiler {
             try {
                 compileDatabaseNode(database, ddlReaderList, jarOutput);
             } catch (final VoltCompilerException e) {
-                return null; // error messaging handled higher up
+                return null;
             }
         }
         assert(m_catalog != null);

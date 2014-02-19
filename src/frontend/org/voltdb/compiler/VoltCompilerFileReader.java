@@ -84,4 +84,34 @@ public class VoltCompilerFileReader extends VoltCompilerReader
     {
         jarFile.put(name, m_file);
     }
+
+    /**
+     * Get the path of a schema file, optionally relative to a project.xml file's path.
+     */
+    static String getSchemaPath(String projectFilePath, String path) throws IOException
+    {
+        File file = null;
+
+        if (path.contains(".jar!")) {
+            String ddlText = null;
+            ddlText = VoltCompilerUtils.readFileFromJarfile(path);
+            file = VoltProjectBuilder.writeStringToTempFile(ddlText);
+        }
+        else {
+            file = new File(path);
+        }
+
+        if (!file.isAbsolute()) {
+            // Resolve schemaPath relative to either the database definition xml file
+            // or the working directory.
+            if (projectFilePath != null) {
+                file = new File(new File(projectFilePath).getParent(), path);
+            }
+            else {
+                file = new File(path);
+            }
+        }
+
+        return file.getPath();
+    }
 }
