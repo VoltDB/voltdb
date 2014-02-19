@@ -88,5 +88,9 @@ def compile(runner):
     args.append(runner.opts.catalog)
     if runner.opts.ddl:
         args.extend(runner.opts.ddl)
-    kwargs = dict(classpath = runner.opts.classpath)
+    # Add procedures to classpath
+    cpath = 'procedures'
+    if runner.opts.classpath:
+       cpath = 'procedures:' + runner.opts.classpath
+    kwargs = dict(classpath = cpath)
     runner.java_execute(VoltCompiler, None, *args, **kwargs)
