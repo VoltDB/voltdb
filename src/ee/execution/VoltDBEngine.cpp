@@ -783,6 +783,13 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                 continue;
             }
 
+            //
+            // Same schema, but TUPLE_LIMIT may change.
+            // Because there is no table rebuilt work next, no special need to take care of
+            // the new tuple limit.
+            //
+            persistenttable->setTupleLimit(catalogTable->tuplelimit());
+
             //////////////////////////////////////////
             // find all of the indexes to add
             //////////////////////////////////////////
