@@ -262,11 +262,12 @@ public class TestDistributer extends TestCase {
             }
         }
 
-        public void shutdown() {
+        public void shutdown() throws InterruptedException {
             shutdown.set(true);
+            join();
         }
 
-        AtomicBoolean shutdown = new AtomicBoolean(false);
+        private AtomicBoolean shutdown = new AtomicBoolean(false);
         volatile ServerSocketChannel socket = null;
         volatile MockInputHandler handler = null;
         volatile VoltNetworkPool network;
@@ -324,11 +325,9 @@ public class TestDistributer extends TestCase {
         finally {
             if (volt0 != null) {
                 volt0.shutdown();
-                volt0.join();
             }
             if (volt1 != null) {
                 volt1.shutdown();
-                volt1.join();
             }
         }
     }
@@ -391,15 +390,12 @@ public class TestDistributer extends TestCase {
         finally {
             if (volt0 != null) {
                 volt0.shutdown();
-                volt0.join();
             }
             if (volt1 != null) {
                 volt1.shutdown();
-                volt1.join();
             }
             if (volt2 != null) {
                 volt2.shutdown();
-                volt2.join();
             }
         }
     }
@@ -465,8 +461,7 @@ public class TestDistributer extends TestCase {
 
         // clean up
         dist.shutdown();
-        volt.shutdown.set(true);
-        volt.join();
+        volt.shutdown();
     }
 
     /**
@@ -518,8 +513,7 @@ public class TestDistributer extends TestCase {
 
         // clean up
         dist.shutdown();
-        volt.shutdown.set(true);
-        volt.join();
+        volt.shutdown();
     }
 
     /**
@@ -577,8 +571,7 @@ public class TestDistributer extends TestCase {
 
         // clean up
         dist.shutdown();
-        volt.shutdown.set(true);
-        volt.join();
+        volt.shutdown();
     }
 
     public void testClient() throws Exception {
@@ -604,7 +597,6 @@ public class TestDistributer extends TestCase {
        finally {
            if (volt != null) {
                volt.shutdown();
-               volt.join();
            }
        }
     }
