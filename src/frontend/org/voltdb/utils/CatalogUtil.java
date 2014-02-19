@@ -23,7 +23,6 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.ByteBuffer;
@@ -55,6 +54,7 @@ import org.json_voltpatches.JSONException;
 import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -79,7 +79,9 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClusterConfig;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
@@ -113,7 +115,6 @@ import org.voltdb.types.IndexType;
 import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
-import org.voltdb.SystemProcedureCatalog;
 
 /**
  *
@@ -131,15 +132,37 @@ public abstract class CatalogUtil {
      * @param catalogBytes
      * @param log
      * @return The serialized string of the catalog content.
-     * @throws Exception
+     * @throws IOException
      *             If the catalog cannot be loaded because it's incompatible, or
      *             if there is no version information in the catalog.
      */
-    public static String loadCatalogFromJar(byte[] catalogBytes, VoltLogger log) throws IOException {
+    public static String loadCatalogFromJar(byte[] catalogBytes, VoltLogger log)
+            throws IOException
+    {
+        InMemoryJarfile jarfile = loadCatalogJar(catalogBytes, log);
+        byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
+        // Expect non-null here because loadCatalogJar() should have thrown an exception.
+        assert(serializedCatalogBytes != null);
+        return new String(serializedCatalogBytes, Constants.UTF8ENCODING);
+    }
+
+    /**
+     * Load a catalog from the jar bytes and provide the loaded in-memory jar.
+     * Access at this level is mainly for testing. Most callers only need the
+     * final catalog bytes, and should call loadCatalogFromJar() instead.
+     *
+     * @param catalogBytes
+     * @param log
+     * @return The in-memory jar containing the loaded catalog.
+     * @throws IOException
+     *             If the catalog cannot be loaded because it's incompatible, or
+     *             if there is no version information in the catalog.
+     */
+    public static InMemoryJarfile loadCatalogJar(byte[] catalogBytes, VoltLogger log)
+            throws IOException
+    {
         assert(catalogBytes != null);
 
-        String serializedCatalog = null;
-        String voltVersionString = null;
         InMemoryJarfile jarfile = new InMemoryJarfile(catalogBytes);
         byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
 
@@ -147,27 +170,12 @@ public abstract class CatalogUtil {
             throw new IOException("Database catalog not found - please build your application using the current version of VoltDB.");
         }
 
-        serializedCatalog = new String(serializedCatalogBytes, "UTF-8");
+        // Let VoltCompiler do a version check and upgrade the catalog on the fly.
+        // I.e. jarfile may be modified.
+        VoltCompiler compiler = new VoltCompiler();
+        compiler.upgradeCatalogAsNeeded(jarfile);
 
-        // Get Volt version string
-        byte[] buildInfoBytes = jarfile.get(CATALOG_BUILDINFO_FILENAME);
-        if (buildInfoBytes == null) {
-            throw new IOException("Catalog build information not found - please build your application using the current version of VoltDB.");
-        }
-        String buildInfo = new String(buildInfoBytes, "UTF-8");
-        String[] buildInfoLines = buildInfo.split("\n");
-        if (buildInfoLines.length != 5) {
-            throw new IOException("Catalog built with an old version of VoltDB - please build your application using the current version of VoltDB.");
-        }
-        voltVersionString = buildInfoLines[0].trim();
-
-        // Check if it's compatible
-        if (!isCatalogCompatible(voltVersionString)) {
-            throw new IOException("Catalog compiled with '" + voltVersionString + "' is not compatible with the current version of VoltDB (" +
-                    VoltDB.instance().getVersionString() + ") - " + " please build your application using the current version of VoltDB.");
-        }
-
-        return serializedCatalog;
+        return jarfile;
     }
 
     /**
@@ -764,14 +772,7 @@ public abstract class CatalogUtil {
         }
 
         byte[] data = null;
-        try {
-            data = sb.toString().getBytes("UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            hostLog.error("CRCing deployment file to determine" +
-                    " compatibility and determined deployment file is"+
-                    " not valid UTF-8. File must be UTF-8 encoded.");
-            data = new byte[]{0x0}; // should generate a CRC mismatch.
-        }
+        data = sb.toString().getBytes(Constants.UTF8ENCODING);
 
         PureJavaCrc32 crc = new PureJavaCrc32();
         crc.update(data);
@@ -820,12 +821,7 @@ public abstract class CatalogUtil {
      */
     public static DeploymentType parseDeploymentFromString(String deploymentString) {
         ByteArrayInputStream byteIS;
-        try {
-            byteIS = new ByteArrayInputStream(deploymentString.getBytes("UTF-8"));
-        } catch (UnsupportedEncodingException e) {
-            hostLog.warn("Unable to read deployment string: " + e.getMessage());
-            return null;
-        }
+        byteIS = new ByteArrayInputStream(deploymentString.getBytes(Constants.UTF8ENCODING));
         // get deployment info from xml file
         return getDeployment(byteIS);
     }
