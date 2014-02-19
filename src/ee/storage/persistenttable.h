@@ -372,6 +372,10 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // This is a testability feature not intended for use in product logic.
     int visibleTupleCount() const { return m_tupleCount - m_invisibleTuplesPendingDeleteCount; }
 
+    int tupleLimit() const {
+        return m_tupleLimit;
+    }
+
     void setTupleLimit(int32_t newLimit) {
         m_tupleLimit = newLimit;
     }

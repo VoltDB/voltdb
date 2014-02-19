@@ -365,7 +365,7 @@ public class RegressionSuite extends TestCase {
                 while(vt.advanceRow()) {
                     String name = vt.getString("TABLE_NAME");
                     if (tableName.equals(name)) {
-                        assertEquals(vt.getLong("TUPLE_LIMIT"), limit);
+                        assertEquals(limit, vt.getLong("TUPLE_LIMIT"));
                         return;
                     }
                 }
