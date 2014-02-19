@@ -92,6 +92,7 @@ import org.voltdb.types.ConstraintType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
+import org.voltdb.utils.InMemoryJarfile.JarLoader;
 import org.voltdb.utils.LogKeys;
 import org.xml.sax.ErrorHandler;
 import org.xml.sax.SAXException;
@@ -2033,28 +2034,34 @@ public class VoltCompiler {
         if (cl == null) {
             cl = Thread.currentThread().getContextClassLoader();
         }
+
         String classAsPath = c.getName().replace('.', '/') + ".class";
 
-        BufferedInputStream   cis = null;
-        ByteArrayOutputStream baos = null;
-        try {
-            cis  = new BufferedInputStream(cl.getResourceAsStream(classAsPath));
-            baos =  new ByteArrayOutputStream();
+        if (cl instanceof JarLoader) {
+            InMemoryJarfile memJar = ((JarLoader) cl).getInMemoryJarfile();
+            return memJar.get(classAsPath);
+        }
+        else {
+            BufferedInputStream   cis = null;
+            ByteArrayOutputStream baos = null;
+            try {
+                cis  = new BufferedInputStream(cl.getResourceAsStream(classAsPath));
+                baos =  new ByteArrayOutputStream();
 
-            byte [] buf = new byte[1024];
+                byte [] buf = new byte[1024];
 
-            int rsize = 0;
-            while ((rsize=cis.read(buf)) != -1) {
-                baos.write(buf, 0, rsize);
+                int rsize = 0;
+                while ((rsize=cis.read(buf)) != -1) {
+                    baos.write(buf, 0, rsize);
+                }
+
+            } finally {
+                try { if (cis != null)  cis.close();}   catch (Exception ignoreIt) {}
+                try { if (baos != null) baos.close();}  catch (Exception ignoreIt) {}
             }
 
-        } finally {
-            try { if (cis != null)  cis.close();}   catch (Exception ignoreIt) {}
-            try { if (baos != null) baos.close();}  catch (Exception ignoreIt) {}
+            return baos.toByteArray();
         }
-
-        return baos.toByteArray();
-
     }
 
 
@@ -2066,31 +2073,80 @@ public class VoltCompiler {
             cl = Thread.currentThread().getContextClassLoader();
         }
 
-        String stem = c.getName().replace('.', '/');
-        String cpath = stem + ".class";
-        URL curl = cl.getResource(cpath);
-        if (curl == null) {
-            throw new VoltCompilerException(String.format(
-                    "Failed to find class file %s in jar.", cpath));
-        }
+        Log.info(cl.getClass().getCanonicalName());
 
-        if ("jar".equals(curl.getProtocol())) {
-            Pattern nameRE = Pattern.compile("\\A(" + stem + "\\$[^/]+).class\\z");
-            String jarFN;
-            try {
-                jarFN = URLDecoder.decode(curl.getFile(), "UTF-8");
-            } catch (UnsupportedEncodingException e) {
-                String msg = "Unable to UTF-8 decode " + curl.getFile() + " for class " + c;
-                throw new VoltCompilerException(msg);
+        // if loading from an InMemoryJarFile, the process is a bit different...
+        if (cl instanceof JarLoader) {
+            String[] classes = ((JarLoader) cl).getInnerClassesForClass(c.getName());
+            for (String innerName : classes) {
+                Class<?> clz = null;
+                try {
+                    clz = cl.loadClass(innerName);
+                }
+                catch (ClassNotFoundException e) {
+                    String msg = "Unable to load " + c + " inner class " + innerName +
+                            " from in-memory jar representation.";
+                    throw new VoltCompilerException(msg);
+                }
+                assert(clz != null);
+                builder.add(clz);
             }
-            jarFN = jarFN.substring(5, jarFN.indexOf('!'));
-            JarFile jar = null;
-            try {
-                jar = new JarFile(jarFN);
-                Enumeration<JarEntry> entries = jar.entries();
-                while (entries.hasMoreElements()) {
-                    String name = entries.nextElement().getName();
-                    Matcher mtc = nameRE.matcher(name);
+        }
+        else {
+            String stem = c.getName().replace('.', '/');
+            String cpath = stem + ".class";
+            URL curl = cl.getResource(cpath);
+            if (curl == null) {
+                throw new VoltCompilerException(String.format(
+                        "Failed to find class file %s in jar.", cpath));
+            }
+
+            Pattern nameRE = Pattern.compile("\\A(" + stem + "\\$[^/]+).class\\z");
+
+            // load from an on-disk jar
+            if ("jar".equals(curl.getProtocol())) {
+                String jarFN;
+                try {
+                    jarFN = URLDecoder.decode(curl.getFile(), "UTF-8");
+                }
+                catch (UnsupportedEncodingException e) {
+                    String msg = "Unable to UTF-8 decode " + curl.getFile() + " for class " + c;
+                    throw new VoltCompilerException(msg);
+                }
+                jarFN = jarFN.substring(5, jarFN.indexOf('!'));
+                JarFile jar = null;
+                try {
+                    jar = new JarFile(jarFN);
+                    Enumeration<JarEntry> entries = jar.entries();
+                    while (entries.hasMoreElements()) {
+                        String name = entries.nextElement().getName();
+                        Matcher mtc = nameRE.matcher(name);
+                        if (mtc.find()) {
+                            String innerName = mtc.group(1).replace('/', '.');
+                            Class<?> inner;
+                            try {
+                                inner = cl.loadClass(innerName);
+                            } catch (ClassNotFoundException e) {
+                                String msg = "Unable to load " + c + " inner class " + innerName;
+                                throw new VoltCompilerException(msg);
+                            }
+                            builder.add(inner);
+                        }
+                    }
+                }
+                catch (IOException e) {
+                    String msg = "Cannot access class " + c + " source code location of " + jarFN;
+                    throw new VoltCompilerException(msg);
+                }
+                finally {
+                    if ( jar != null) try {jar.close();} catch (Exception ignoreIt) {};
+                }
+            }
+            // load directly from a classfile
+            else if ("file".equals(curl.getProtocol())) {
+                File sourceDH = new File(curl.getFile()).getParentFile();
+                for (File f: sourceDH.listFiles()) {
+                    Matcher mtc = nameRE.matcher(f.getAbsolutePath());
                     if (mtc.find()) {
                         String innerName = mtc.group(1).replace('/', '.');
                         Class<?> inner;
@@ -2103,30 +2159,8 @@ public class VoltCompiler {
                         builder.add(inner);
                     }
                 }
-            } catch (IOException e) {
-                String msg = "Cannot access class " + c + " source code location of " + jarFN;
-                throw new VoltCompilerException(msg);
-            } finally {
-                if ( jar != null) try {jar.close();} catch (Exception ignoreIt) {};
-            }
-        } else if ("file".equals(curl.getProtocol())) {
-            Pattern nameRE = Pattern.compile("/(" + stem + "\\$[^/]+).class\\z");
-            File sourceDH = new File(curl.getFile()).getParentFile();
-            for (File f: sourceDH.listFiles()) {
-                Matcher mtc = nameRE.matcher(f.getAbsolutePath());
-                if (mtc.find()) {
-                    String innerName = mtc.group(1).replace('/', '.');
-                    Class<?> inner;
-                    try {
-                        inner = cl.loadClass(innerName);
-                    } catch (ClassNotFoundException e) {
-                        String msg = "Unable to load " + c + " inner class " + innerName;
-                        throw new VoltCompilerException(msg);
-                    }
-                    builder.add(inner);
-                }
-            }
 
+            }
         }
         return builder.build();
     }
