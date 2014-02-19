@@ -334,7 +334,7 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
             throw ConstraintFailureException(this, source, TableTuple(), CONSTRAINT_TYPE_NOT_NULL);
         }
 
-        if (visibleTupleCount() >= m_tupleLimit) {
+        if (visibleTupleCount() > m_tupleLimit) {
             char buffer [256];
             snprintf (buffer, 256, "Table %s exceeds table maximum row count %d",
                     m_name.c_str(), m_tupleLimit);
