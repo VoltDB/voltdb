@@ -453,7 +453,6 @@ public class VoltCompiler {
         // do all the work to get the catalog
         DatabaseType database = getProjectDatabase(projectReader);
         if (database == null) {
-            compilerLog.error("Failed to create catalog database object.");
             return false;
         }
         final Catalog catalog = compileCatalogInternal(database, ddlReaderList, jarOutput);
