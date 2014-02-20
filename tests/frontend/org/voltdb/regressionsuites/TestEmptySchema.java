@@ -72,7 +72,7 @@ public class TestEmptySchema extends RegressionSuite
         VoltTable[] results = client.callProcedure("@Statistics", "TABLE", 0).getResults();
         System.out.println("TABLE RESULTS: " + results[0]);
         assertEquals(0, results[0].getRowCount());
-        assertEquals(12, results[0].getColumnCount());
+        assertEquals(expectedSchema.length, results[0].getColumnCount());
         validateSchema(results[0], expectedTable);
 
         expectedSchema = new ColumnInfo[12];
@@ -93,7 +93,7 @@ public class TestEmptySchema extends RegressionSuite
         results = client.callProcedure("@Statistics", "INDEX", 0).getResults();
         System.out.println("INDEX RESULTS: " + results[0]);
         assertEquals(0, results[0].getRowCount());
-        assertEquals(12, results[0].getColumnCount());
+        assertEquals(expectedSchema.length, results[0].getColumnCount());
         validateSchema(results[0], expectedTable);
     }
 

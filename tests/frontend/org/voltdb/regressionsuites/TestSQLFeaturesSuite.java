@@ -542,7 +542,6 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         try {
             vt = client.callProcedure("CAPPED0.insert", 0, 0, 0).getResults()[0];
         } catch (ProcCallException ex) {
-            System.out.println(ex.getMessage());
             e = ex;
             assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
             assertTrue(ex.getMessage().contains("Table CAPPED0 exceeds table maximum row count 0"));
@@ -565,7 +564,6 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         try {
             vt = client.callProcedure("CAPPED2.insert", 2, 2, 2).getResults()[0];
         } catch (ProcCallException ex) {
-            System.out.println(ex.getMessage());
             e = ex;
             assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
             assertTrue(ex.getMessage().contains("Table CAPPED2 exceeds table maximum row count 2"));
