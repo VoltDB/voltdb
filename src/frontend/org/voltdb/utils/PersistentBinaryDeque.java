@@ -549,7 +549,8 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
     private void assertions() {
         /*
-         * None of these assertions were ass
+         * None of these assertions were useful anymore, if we think of new ones put
+         * them here
          */
     }
 }

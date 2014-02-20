@@ -158,7 +158,7 @@ class PBDSegment {
 
     boolean offer(BBContainer cont, boolean compress) throws IOException {
         final ByteBuffer buf = cont.b;
-        if (cont.b.remaining() < 32) compress = false;
+        if (cont.b.remaining() < 32 || !buf.isDirect()) compress = false;
         final int maxCompressedSize = compress ? Snappy.maxCompressedLength(buf.remaining()) : buf.remaining();
         if (m_buf.remaining() < maxCompressedSize + 8) return false;
 
