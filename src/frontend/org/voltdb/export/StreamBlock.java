@@ -28,6 +28,7 @@ public class StreamBlock {
     StreamBlock(BBContainer cont, long uso, boolean isPersisted) {
         m_buffer = cont;
         m_uso = uso;
+        //The first 8 bytes are space for us to store the USO if we end up persisting
         m_buffer.b.position(8);
         m_totalUso = m_buffer.b.remaining();
         m_isPersisted = isPersisted;
