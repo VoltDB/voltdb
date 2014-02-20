@@ -31,7 +31,7 @@ namespace voltdb
     class StreamBlock {
     public:
         StreamBlock(char* data, size_t capacity, size_t uso)
-            : m_data(data), m_capacity(capacity), m_offset(0),
+            : m_data(data + 8), m_capacity(capacity), m_offset(0),
               m_uso(uso)
         {
         }
@@ -50,11 +50,11 @@ namespace voltdb
          * Returns a pointer to the underlying raw memory allocation
          */
         char* rawPtr() {
-            return m_data;
+            return m_data - 8;
         }
 
         int32_t rawLength() const {
-            return  static_cast<int32_t>(m_offset);
+            return  static_cast<int32_t>(m_offset) + 8;
         }
 
         /**

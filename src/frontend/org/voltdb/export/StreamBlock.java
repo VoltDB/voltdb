@@ -28,7 +28,8 @@ public class StreamBlock {
     StreamBlock(BBContainer cont, long uso, boolean isPersisted) {
         m_buffer = cont;
         m_uso = uso;
-        m_totalUso = m_buffer.b.capacity();
+        m_buffer.b.position(8);
+        m_totalUso = m_buffer.b.remaining();
         m_isPersisted = isPersisted;
     }
 
@@ -104,10 +105,8 @@ public class StreamBlock {
         return m_buffer.b.asReadOnlyBuffer();
     }
 
-    BBContainer[] asBufferChain() {
-        ByteBuffer usoBuffer = ByteBuffer.allocate(8);
-        usoBuffer.putLong(uso()).flip();
-        BBContainer cont = DBBPool.wrapBB(usoBuffer);
-        return new BBContainer[] { cont, m_buffer };
+    BBContainer asBBContainer() {
+        m_buffer.b.putLong(0, uso());
+        return m_buffer;
     }
 }

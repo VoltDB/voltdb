@@ -81,7 +81,7 @@ public class StreamBlockQueue {
     private StreamBlock pollPersistentDeque(boolean actuallyPoll) {
         BBContainer cont = null;
         try {
-            cont = m_persistentDeque.poll();
+            cont = m_persistentDeque.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
         } catch (IOException e) {
             exportLog.error(e);
         }
@@ -91,11 +91,10 @@ public class StreamBlockQueue {
         } else {
             //If the container is not null, unpack it.
             final BBContainer fcont = cont;
-            long uso = cont.b.getLong();
-            ByteBuffer buf = cont.b.slice();
+            long uso = cont.b.getLong(0);
             //Pass the stream block a subset of the bytes, provide
             //a container that discards the original returned by the persistent deque
-            StreamBlock block = new StreamBlock( new BBContainer(buf) {
+            StreamBlock block = new StreamBlock( new BBContainer(fcont.b) {
                     @Override
                     public void discard() {
                         fcont.discard();
@@ -199,12 +198,12 @@ public class StreamBlockQueue {
     public void offer(StreamBlock streamBlock) throws IOException {
         //Already have two blocks, put it in the deque
         if (m_memoryDeque.size() > 1) {
-            m_persistentDeque.offer(streamBlock.asBufferChain());
+            m_persistentDeque.offer(streamBlock.asBBContainer());
         } else {
             //Don't offer into the memory deque if there is anything waiting to be
             //polled out of the persistent deque. Check the persistent deque
             if (pollPersistentDeque(false) != null) {
-               m_persistentDeque.offer( streamBlock.asBufferChain());
+               m_persistentDeque.offer( streamBlock.asBBContainer());
             } else {
             //Persistent deque is empty put this in memory
                m_memoryDeque.offer(streamBlock);
@@ -220,18 +219,18 @@ public class StreamBlockQueue {
      */
     public void sync(boolean nofsync) throws IOException {
         if (m_memoryDeque.peek() != null && !m_memoryDeque.peek().isPersisted()) {
-            ArrayDeque<BBContainer[]> buffersToPush = new ArrayDeque<BBContainer[]>();
+            ArrayDeque<BBContainer> buffersToPush = new ArrayDeque<BBContainer>();
             while (m_memoryDeque.peek() != null) {
                 StreamBlock sb = m_memoryDeque.peek();
                 if (sb.isPersisted()) {
                     break;
                 }
                 m_memoryDeque.poll();
-                buffersToPush.offer(sb.asBufferChain());
+                buffersToPush.offer(sb.asBBContainer());
             }
 
             if (!buffersToPush.isEmpty()) {
-                m_persistentDeque.push(buffersToPush.toArray(new BBContainer[0][0]));
+                m_persistentDeque.push(buffersToPush.toArray(new BBContainer[0]));
             }
             ArrayList<StreamBlock> blocks = new ArrayList<StreamBlock>();
             for (int ii = 0; ii < buffersToPush.size(); ii++) {

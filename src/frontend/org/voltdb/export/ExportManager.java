@@ -556,20 +556,6 @@ public class ExportManager
                 return;
             }
 
-            /*
-             * Due to issues double freeing and using after free,
-             * copy the buffer onto the heap and rely on GC.
-             *
-             * This should buy enough time to diagnose the root cause.
-             */
-            if (buffer != null) {
-                ByteBuffer buf = ByteBuffer.allocate(buffer.remaining());
-                buf.put(buffer);
-                buf.flip();
-                DBBPool.deleteCharArrayMemory(bufferPtr);
-                buffer = buf;
-                bufferPtr = 0;
-            }
             generation.pushExportBuffer(partitionId, signature, uso, bufferPtr, buffer, sync, endOfStream);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread

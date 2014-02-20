@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop_voltpatches.hbase.utils.DirectMemoryUtils;
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
+import sun.misc.Cleaner;
 import sun.nio.ch.DirectBuffer;
 
 /**
@@ -294,6 +295,9 @@ public final class DBBPool {
     public static native ByteBuffer allocateUnsafeByteBuffer(long size);
 
     public static void cleanByteBuffer(ByteBuffer buf) {
-        ((DirectBuffer)buf).cleaner().clean();
+        if (buf == null) return;
+        if (!buf.isDirect()) return;
+        final Cleaner cleaner = ((DirectBuffer)buf).cleaner();
+        if (cleaner != null) cleaner.clean();
     }
 }

@@ -32,7 +32,7 @@ namespace voltdb {
 class Topend;
 //If you change this constant here change it in Java in the StreamBlockQueue where
 //it is used to calculate the number of bytes queued
-const int EL_BUFFER_SIZE = /* 1024; */ 2 * 1024 * 1024;
+const int EL_BUFFER_SIZE = /* 1024; */ (2 * 1024 * 1024) + 8;
 
 class TupleStreamWrapper {
 public:
