@@ -222,11 +222,20 @@ public class ReportMaker {
         }
         sb.append("</td>");
 
+        // column 6: has tuple limit
+        sb.append("<td>");
+        if (table.getTuplelimit() != Integer.MAX_VALUE) {
+            tag(sb, "info", String.valueOf(table.getTuplelimit()));
+        } else {
+            tag(sb, null, "No-limit");
+        }
+        sb.append("</td>");
+
         sb.append("</tr>\n");
 
         // BUILD THE DROPDOWN FOR THE DDL / INDEXES DETAIL
 
-        sb.append("<tr class='tablesorter-childRow'><td class='invert' colspan='6' id='s-"+ table.getTypeName().toLowerCase() + "--dropdown'>\n");
+        sb.append("<tr class='tablesorter-childRow'><td class='invert' colspan='7' id='s-"+ table.getTypeName().toLowerCase() + "--dropdown'>\n");
 
         TableAnnotation annotation = (TableAnnotation) table.getAnnotation();
         if (annotation != null) {
