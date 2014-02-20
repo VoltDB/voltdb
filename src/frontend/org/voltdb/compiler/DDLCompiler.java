@@ -456,18 +456,6 @@ public class DDLCompiler {
     public void loadSchema(Reader reader, Database db, DdlProceduresToLoad whichProcs)
             throws VoltCompiler.VoltCompilerException {
         m_currLineNo = 1;
-        loadSchemaInternal(db, reader, whichProcs);
-    }
-
-    /**
-     * Compile a file from an open input stream
-     * @param db  database
-     * @param reader  ddl input stream
-     * @param whichProcs  which type(s) of procedures to load
-     * @throws VoltCompiler.VoltCompilerException
-     */
-    private void loadSchemaInternal(Database db, Reader reader, DdlProceduresToLoad whichProcs)
-            throws VoltCompiler.VoltCompilerException {
 
         DDLStatement stmt = getNextStatement(reader, m_compiler);
         while (stmt != null) {
