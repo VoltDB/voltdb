@@ -60,6 +60,7 @@ public class ClientInterfaceHandleManager
     private final long m_expectedThreadId = Thread.currentThread().getId();
     final AdmissionControlGroup m_acg;
 
+    private volatile boolean m_wantsTopologyUpdates = false;
 
     private HandleGenerator m_shortCircuitHG = new HandleGenerator(SHORT_CIRCUIT_PART_ID);
 
@@ -481,5 +482,13 @@ public class ClientInterfaceHandleManager
     // not bomb when using the thread-safe version.
     boolean shouldCheckThreadIdAssertion() {
         return true;
+    }
+
+    public void setWantsTopologyUpdates(boolean wantsTopologyUpdates) {
+        m_wantsTopologyUpdates = wantsTopologyUpdates;
+    }
+
+    public boolean wantsTopologyUpdates() {
+        return m_wantsTopologyUpdates;
     }
 }

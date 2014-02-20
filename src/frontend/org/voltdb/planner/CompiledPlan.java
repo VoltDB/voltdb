@@ -73,8 +73,6 @@ public class CompiledPlan {
     /** Parameter values, if the planner pulled constants out of the plan */
     public ParameterSet extractedParamValues = ParameterSet.emptyParameterSet();
 
-    public ParsedSelectStmt  selectStmt = null;
-
     /**
      * If true, divide the number of tuples changed
      * by the number of partitions, as the number will

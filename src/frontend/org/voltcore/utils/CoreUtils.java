@@ -345,7 +345,7 @@ public class CoreUtils {
                         }
                     }
                 }
-            }, 3600, TimeUnit.SECONDS);
+            }, 1, TimeUnit.DAYS);
 
     /**
      * Return the local IP address, if it's resolvable.  If not,

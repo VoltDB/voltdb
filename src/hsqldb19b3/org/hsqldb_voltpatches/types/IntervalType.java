@@ -36,11 +36,11 @@ import java.math.BigDecimal;
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.OpTypes;
-import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.SessionInterface;
 import org.hsqldb_voltpatches.Tokens;
 import org.hsqldb_voltpatches.Types;
 import org.hsqldb_voltpatches.lib.StringConverter;
+import org.hsqldb_voltpatches.Session;
 
 /**
  * Type subclass for various typs of INTERVAL.<p>
@@ -473,7 +473,7 @@ public final class IntervalType extends DTIType {
             case Types.SQL_CLOB :
                 a = a.toString();
 
-            // fall through
+            // $FALL-THROUGH$
             case Types.SQL_CHAR :
             case Types.SQL_VARCHAR :
             case Types.VARCHAR_IGNORECASE : {
@@ -805,7 +805,7 @@ public final class IntervalType extends DTIType {
                     return new IntervalSecondData(seconds, nanos, this, true);
                 }
 
-            // fall through
+            // $FALL-THROUGH$
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "IntervalType");
         }

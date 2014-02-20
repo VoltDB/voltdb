@@ -120,8 +120,9 @@ public class HSQLInterface {
      */
     public void runDDLCommand(String ddl) throws HSQLParseException {
         Result result = sessionProxy.executeDirectStatement(ddl);
-        if (result.mode == ResultConstants.ERROR)
+        if (result.hasError()) {
             throw new HSQLParseException(result.getMainString());
+        }
     }
 
     /**
@@ -177,8 +178,9 @@ public class HSQLInterface {
 
         //Result result = Result.newPrepareResponse(cs.id, cs.type, rmd, pmd);
         Result result = Result.newPrepareResponse(cs);
-        if (result.mode == ResultConstants.ERROR)
+        if (result.hasError()) {
             throw new HSQLParseException(result.getMainString());
+        }
 
         VoltXMLElement xml = null;
         xml = cs.voltGetStatementXML(sessionProxy);

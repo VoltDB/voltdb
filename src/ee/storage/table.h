@@ -190,6 +190,10 @@ class Table {
         return m_nonInlinedMemorySize;
     }
 
+    virtual int tupleLimit() const {
+        return INT_MIN;
+    }
+
     // ------------------------------------------------------------------
     // COLUMNS
     // ------------------------------------------------------------------

@@ -1080,8 +1080,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                                                                             col.getName(),
                                                                             col.getName(),
                                                                             col.getIndex());
-                        tve.setValueSize(col.getSize());
-                        tve.setValueType(VoltType.get((byte) col.getType()));
                         indexExpressions.add(tve);
                     }
                 }

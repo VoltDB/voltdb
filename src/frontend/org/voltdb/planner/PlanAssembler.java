@@ -1634,7 +1634,6 @@ public class PlanAssembler {
         if (targetTable != null) {
             CatalogMap<Index> allIndexes = targetTable.getIndexes();
 
-            fromTableAlias = groupBys.get(0).expression.baseTableAlias();
             assert(fromTableAlias != null);
             StmtTableScan fromTableScan = m_parsedSelect.tableAliasMap.get(fromTableAlias);
             for (Index index : allIndexes) {

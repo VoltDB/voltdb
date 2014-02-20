@@ -1144,8 +1144,7 @@ final class RangeVariable {
         public void reset() {}
     }
 
-
-    /*************** VOLTDB *********************/
+    /************************* Volt DB Extensions *************************/
 
     /**
      * VoltDB added method to get a non-catalog-dependent
@@ -1156,7 +1155,7 @@ final class RangeVariable {
      * @throws HSQLParseException
      */
     VoltXMLElement voltGetRangeVariableXML(Session session)
-    throws HSQLParseException
+    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         Index        index;
         Index        primaryIndex;
@@ -1165,7 +1164,6 @@ final class RangeVariable {
         index        = rangeIndex;
         primaryIndex = rangeTable.getPrimaryIndex();
         primaryKey   = rangeTable.getPrimaryKey();
-
 
         // get the index for this scan (/filter)
         // note: ignored if scan if full table scan
@@ -1224,7 +1222,7 @@ final class RangeVariable {
             whereCond = nonIndexWhereCondition;
         } else {
             joinCond = nonIndexJoinCondition;
-            
+
             whereCond = indexCondition;
             if (indexEndCondition != null) {
                 if (whereCond != null) {
@@ -1241,7 +1239,7 @@ final class RangeVariable {
                     whereCond = nonIndexWhereCondition;
                 }
             }
-            
+
         }
         if (joinCond != null) {
             joinCond = joinCond.eliminateDuplicates(session);
@@ -1271,4 +1269,5 @@ final class RangeVariable {
         }
         return super.toString() + name;
     }
+    /**********************************************************************/
 }

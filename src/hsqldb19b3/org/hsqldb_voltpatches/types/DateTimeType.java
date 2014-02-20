@@ -36,7 +36,6 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 
-import org.apache.commons.lang3.time.DateFormatUtils;
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.HsqlDateTime;
@@ -61,13 +60,17 @@ public final class DateTimeType extends DTIType {
 
     public DateTimeType(int typeGroup, int type, int scale) {
 
+        // A VoltDB extension -- mysterious (BACKOUT?)
         super(typeGroup, type, 8, scale);
+        /* disable 1 line ...
+        super(typeGroup, type, 0, scale);
+        ... disabled 1 line */
+        // End of VoltDB extension
 
         withTimeZone = type == Types.SQL_TIME_WITH_TIME_ZONE
                        || type == Types.SQL_TIMESTAMP_WITH_TIME_ZONE;
     }
 
-    @Override
     public int displaySize() {
 
         switch (typeCode) {
@@ -96,14 +99,12 @@ public final class DateTimeType extends DTIType {
         }
     }
 
-    @Override
     public int getJDBCTypeCode() {
 
         // JDBC numbers happen to be the same as SQL
         return typeCode;
     }
 
-    @Override
     public String getJDBCClassName() {
 
         switch (typeCode) {
@@ -124,17 +125,14 @@ public final class DateTimeType extends DTIType {
         }
     }
 
-    @Override
     public Integer getJDBCPrecision() {
         return this.displaySize();
     }
 
-    @Override
     public int getSQLGenericTypeCode() {
         return Types.SQL_DATETIME;
     }
 
-    @Override
     public String getNameString() {
 
         switch (typeCode) {
@@ -161,7 +159,6 @@ public final class DateTimeType extends DTIType {
         }
     }
 
-    @Override
     public String getDefinition() {
 
         if (scale == DTIType.defaultTimeFractionPrecision) {
@@ -212,22 +209,18 @@ public final class DateTimeType extends DTIType {
         return sb.toString();
     }
 
-    @Override
     public boolean isDateTimeType() {
         return true;
     }
 
-    @Override
     public boolean isDateTimeTypeWithZone() {
         return withTimeZone;
     }
 
-    @Override
     public boolean acceptsFractionalPrecision() {
         return typeCode != Types.SQL_DATE;
     }
 
-    @Override
     public Type getAggregateType(Type other) {
 
         // DATE with DATE returned here
@@ -275,7 +268,6 @@ public final class DateTimeType extends DTIType {
         return getDateTimeType(newType, scale);
     }
 
-    @Override
     public Type getCombinedType(Type other, int operation) {
 
         switch (operation) {
@@ -343,7 +335,6 @@ public final class DateTimeType extends DTIType {
         throw Error.error(ErrorCode.X_42562);
     }
 
-    @Override
     public int compare(Object a, Object b) {
 
         long diff;
@@ -396,7 +387,6 @@ public final class DateTimeType extends DTIType {
         }
     }
 
-    @Override
     public Object convertToTypeLimits(SessionInterface session, Object a) {
 
         if (a == null) {
@@ -449,7 +439,6 @@ public final class DateTimeType extends DTIType {
         return (nanos / divisor) * divisor;
     }
 
-    @Override
     public Object convertToType(SessionInterface session, Object a,
                                 Type otherType) {
 
@@ -459,7 +448,7 @@ public final class DateTimeType extends DTIType {
 
         switch (otherType.typeCode) {
 
-            // BEGIN VOLTDB ADDED CODE
+            // A VoltDB extension to enable integer-to-timestamp conversion
             case Types.SQL_INTEGER :
             case Types.SQL_BIGINT :
                 // Assuming time provided is UTC. Can't use Timestamp.toString() since
@@ -469,16 +458,14 @@ public final class DateTimeType extends DTIType {
                 // Work around the bug by splicing in correctly-formatted milliseconds.
                 long ts = Long.parseLong(a.toString());
                 Date d = new Date(ts);
-                String utc = DateFormatUtils.formatUTC(d, "yyyy-MM-dd HH:mm:ss");
+                String utc = org.apache.commons.lang3.time.DateFormatUtils.formatUTC(d, "yyyy-MM-dd HH:mm:ss");
                 a = String.format("%s.%03d", utc, ts % 1000);
-                //otherType = Type.SQL_TIMESTAMP;
-            // END VOLTDB ADDED CODE
-
-            //$FALL-THROUGH$
+                // $FALL-THROUGH$
+            // End of VoltDB extension
             case Types.SQL_CLOB :
                 a = a.toString();
 
-            //$FALL-THROUGH$
+            //fall through
             case Types.SQL_CHAR :
             case Types.SQL_VARCHAR :
             case Types.VARCHAR_IGNORECASE :
@@ -503,7 +490,6 @@ public final class DateTimeType extends DTIType {
             case Types.SQL_TIMESTAMP :
             case Types.SQL_TIMESTAMP_WITH_TIME_ZONE :
                 break;
-
 
             default :
                 throw Error.error(ErrorCode.X_42561);
@@ -694,13 +680,11 @@ public final class DateTimeType extends DTIType {
         }
     }
 
-    @Override
     public Object convertToDefaultType(SessionInterface session, Object a) {
         throw Error.error(ErrorCode.X_42561);
     }
 
     /** @todo - do the time zone */
-    @Override
     public Object convertJavaToSQL(SessionInterface session, Object a) {
 
         switch (typeCode) {
@@ -714,7 +698,7 @@ public final class DateTimeType extends DTIType {
                 if (a instanceof java.util.Date) {
                     long seconds =
                         HsqlDateTime.getNormalisedTime(
-                            ((java.util.Date) a).getTime()) / 1000;
+                            ((java.util.Date) a).getTime()) / 1000;;
                     int zoneSeconds;
                     int nanos = 0;
 
@@ -727,7 +711,7 @@ public final class DateTimeType extends DTIType {
 
                     if (a instanceof java.sql.Timestamp) {
                         nanos = ((java.sql.Timestamp) a).getNanos();
-                        nanos = normaliseFraction(nanos, scale);
+                        nanos = this.normaliseFraction(nanos, (int) scale);
                     }
 
                     return new TimeData((int) seconds, nanos, zoneSeconds);
@@ -769,7 +753,7 @@ public final class DateTimeType extends DTIType {
 
                     if (a instanceof java.sql.Timestamp) {
                         nanos = ((java.sql.Timestamp) a).getNanos();
-                        nanos = normaliseFraction(nanos, scale);
+                        nanos = this.normaliseFraction(nanos, (int) scale);
                     }
 
                     return new TimestampData(seconds, nanos, zoneSeconds);
@@ -820,7 +804,6 @@ public final class DateTimeType extends DTIType {
         }
     }
 
-    @Override
     public Object convertSQLToJava(SessionInterface session, Object a) {
 
         switch (typeCode) {
@@ -881,7 +864,6 @@ public final class DateTimeType extends DTIType {
         return seconds;
     }
 
-    @Override
     public String convertToString(Object a) {
 
         boolean      zone = false;
@@ -950,7 +932,6 @@ public final class DateTimeType extends DTIType {
         }
     }
 
-    @Override
     public String convertToSQLString(Object a) {
 
         if (a == null) {
@@ -982,7 +963,6 @@ public final class DateTimeType extends DTIType {
         return sb.toString();
     }
 
-    @Override
     public boolean canConvertFrom(Type otherType) {
 
         if (otherType.typeCode == Types.SQL_ALL_TYPES) {
@@ -1006,7 +986,6 @@ public final class DateTimeType extends DTIType {
         return true;
     }
 
-    @Override
     public Object add(Object a, Object b, Type otherType) {
 
         if (a == null || b == null) {
@@ -1047,7 +1026,6 @@ public final class DateTimeType extends DTIType {
         throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeType");
     }
 
-    @Override
     public Object subtract(Object a, Object b, Type otherType) {
 
         if (a == null || b == null) {
@@ -1087,7 +1065,6 @@ public final class DateTimeType extends DTIType {
         throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeType");
     }
 
-    @Override
     public boolean equals(Object other) {
 
         if (other instanceof Type) {
@@ -1098,7 +1075,6 @@ public final class DateTimeType extends DTIType {
         return false;
     }
 
-    @Override
     public int getPart(Session session, Object dateTime, int part) {
 
         int calendarPart;
@@ -1200,7 +1176,6 @@ public final class DateTimeType extends DTIType {
                + increment;
     }
 
-    @Override
     public BigDecimal getSecondPart(Object dateTime) {
 
         long seconds = getPart(null, dateTime, Types.SQL_INTERVAL_SECOND);

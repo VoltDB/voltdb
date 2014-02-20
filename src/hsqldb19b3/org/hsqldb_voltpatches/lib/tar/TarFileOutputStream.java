@@ -189,14 +189,6 @@ public class TarFileOutputStream {
         // file.
     }
 
-    public TarFileOutputStream(GZIPOutputStream outputStream) throws IOException {
-        blocksPerRecord = TarFileOutputStream.Compression.DEFAULT_BLOCKS_PER_RECORD;
-
-        writeBuffer = new byte[blocksPerRecord * 512];
-
-        writeStream = outputStream;
-    }
-
     /**
      * This class and subclasses should write to the underlying writeStream
      * <b>ONLY WITH THIS METHOD</b>.
@@ -336,42 +328,13 @@ public class TarFileOutputStream {
      * @see #close
      */
     public void finish() throws IOException {
-
-        try {
-            long finalBlock = bytesWritten / 512 + 2;
-
-            if (finalBlock % blocksPerRecord != 0) {
-
-                // Round up total archive size to a blocksPerRecord multiple
-                finalBlock = (finalBlock / blocksPerRecord + 1)
-                             * blocksPerRecord;
-            }
-
-            int finalPadBlocks = (int) (finalBlock - bytesWritten / 512L);
-
-            if (TarFileOutputStream.debug) {
-                System.out.println(RB.singleton.getString(RB.PAD_BLOCK_WRITE,
-                        finalPadBlocks));
-            }
-
-            writePadBlocks(finalPadBlocks);
-        } catch (IOException ioe) {
-            try {
-                close();
-            } catch (IOException ne) {
-
-                // Too difficult to report every single error.
-                // More important that the user know about the original Exc.
-            }
-
-            throw ioe;
-        }
-
-        writeStream.close();
+        // A VoltDB extension to enable archiving to a stream
+        finishStream();
         writeFile.renameTo(targetFile);
     }
 
-    public void finish(boolean outputToStream) throws IOException {
+    public void finishStream() throws IOException {
+        // End of VoltDB extension
 
         try {
             long finalBlock = bytesWritten / 512 + 2;
@@ -404,9 +367,21 @@ public class TarFileOutputStream {
         }
 
         writeStream.close();
-
-        if (!outputToStream) {
-            writeFile.renameTo(targetFile);
-        }
+        // A VoltDB extension to enable archiving to a stream
+        /* disable 1 line ...
+        writeFile.renameTo(targetFile);
+        ... disabled 1 line */
+        // End of VoltDB extension
     }
+
+    /************************* Volt DB Extensions *************************/
+
+    public TarFileOutputStream(GZIPOutputStream outputStream) throws IOException {
+        blocksPerRecord = TarFileOutputStream.Compression.DEFAULT_BLOCKS_PER_RECORD;
+
+        writeBuffer = new byte[blocksPerRecord * 512];
+
+        writeStream = outputStream;
+    }
+    /**********************************************************************/
 }

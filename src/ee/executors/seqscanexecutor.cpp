@@ -192,8 +192,10 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         int tuple_ctr = 0;
         int tuple_skipped = 0;
         TempTable* output_temp_table = dynamic_cast<TempTable*>(output_table);
-        ProgressMonitorProxy pmp(m_engine, node->isSubQuery() ? target_table : (Table*)NULL);
-        while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple)) {
+
+        ProgressMonitorProxy pmp(m_engine, this, node->isSubQuery() ? target_table : (Table*)NULL);
+        while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
+        {
             VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
                        tuple.debug(input_table->name()).c_str(), tuple_ctr,
                        (int)input_table->activeTupleCount());

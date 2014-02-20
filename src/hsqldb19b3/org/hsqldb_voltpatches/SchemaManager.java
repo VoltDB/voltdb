@@ -286,31 +286,6 @@ public class SchemaManager {
     }
 
     /**
-     * If schemaName is null, return the default schema name, else return
-     * the HsqlName object for the schema. If schemaName does not exist,
-     * return the defaultName provided.
-     * Not throwing the usual exception saves some throw-then-catch nonsense
-     * in the usual session setup.
-     */
-    public HsqlName getSchemaHsqlNameNoThrow(String name, HsqlName defaultName) {
-
-        if (name == null) {
-            return defaultSchemaHsqlName;
-        }
-
-        if (SqlInvariants.INFORMATION_SCHEMA.equals(name)) {
-            return SqlInvariants.INFORMATION_SCHEMA_HSQLNAME;
-        }
-
-        Schema schema = ((Schema) schemaMap.get(name));
-
-        if (schema == null) {
-            return defaultName;
-        }
-        return schema.name;
-    }
-
-    /**
      * Same as above, but return string
      */
     public String getSchemaName(String name) {
@@ -1643,4 +1618,33 @@ public class SchemaManager {
     int getDefaultTableType() {
         return defaultTableType;
     }
+
+    /************************* Volt DB Extensions *************************/
+
+    /**
+     * If schemaName is null, return the default schema name, else return
+     * the HsqlName object for the schema. If schemaName does not exist,
+     * return the defaultName provided.
+     * Not throwing the usual exception saves some throw-then-catch nonsense
+     * in the usual session setup.
+     */
+    public HsqlName getSchemaHsqlNameNoThrow(String name, HsqlName defaultName) {
+
+        if (name == null) {
+            return defaultSchemaHsqlName;
+        }
+
+        if (SqlInvariants.INFORMATION_SCHEMA.equals(name)) {
+            return SqlInvariants.INFORMATION_SCHEMA_HSQLNAME;
+        }
+
+        Schema schema = ((Schema) schemaMap.get(name));
+
+        if (schema == null) {
+            return defaultName;
+        }
+        return schema.name;
+    }
+
+    /**********************************************************************/
 }
