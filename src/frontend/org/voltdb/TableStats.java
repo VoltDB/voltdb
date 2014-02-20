@@ -46,5 +46,6 @@ public class TableStats extends SiteStatsSource {
         columns.add(new ColumnInfo("TUPLE_ALLOCATED_MEMORY", VoltType.INTEGER));
         columns.add(new ColumnInfo("TUPLE_DATA_MEMORY", VoltType.INTEGER));
         columns.add(new ColumnInfo("STRING_DATA_MEMORY", VoltType.INTEGER));
+        columns.add(new ColumnInfo("TUPLE_LIMIT", VoltType.INTEGER));
     }
 }

@@ -2027,6 +2027,46 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(ddl, "A materialized view (MY_VIEW2) can not be defined on another view (MY_VIEW1)");
     }
 
+    public void testDDLCompilerTableLimit()
+    {
+        String ddl;
+
+        // test failed cases
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6xx);";
+        checkDDLErrorMessage(ddl, "unexpected token: XX");
+
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 66666666666666666666666666666666);";
+        checkDDLErrorMessage(ddl, "incompatible data type in operation");
+
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS -10);";
+        checkDDLErrorMessage(ddl, "Invalid constraint limit number '-10'");
+
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 5, CONSTRAINT tblimit2 LIMIT PARTITION ROWS 7);";
+        checkDDLErrorMessage(ddl, "Too many table limit constraints for table T");
+
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION Row 6);";
+        checkDDLErrorMessage(ddl, "unexpected token: ROW required: ROWS");
+
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT Rows 6);";
+        checkDDLErrorMessage(ddl, "unexpected token: ROWS required: PARTITION");
+
+
+        // Test success cases
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6);";
+        checkDDLErrorMessage(ddl, null);
+
+        ddl = "create table t(id integer not null, num integer," +
+                "LIMIT PARTITION ROWS 6);";
+        checkDDLErrorMessage(ddl, null);
+    }
+
     public void testPartitionOnBadType() {
         final String simpleSchema =
             "create table books (cash float default 0.0 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));";

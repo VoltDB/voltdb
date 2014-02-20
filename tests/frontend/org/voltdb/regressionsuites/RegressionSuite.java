@@ -337,4 +337,39 @@ public class RegressionSuite extends TestCase {
             }
         }
     }
+
+    // ALL OF THE VALIDATION SCHEMAS IN THIS TEST ARE BASED OFF OF
+    // THE VOLTDB DOCS, RATHER THAN REUSING THE CODE THAT GENERATES THEM.
+    // IN SOME MAGICAL FUTURE MAYBE THEY ALL CAN BE GENERATED FROM THE
+    // SAME METADATA.
+    static public void validateSchema(VoltTable result, VoltTable expected)
+    {
+        assertEquals(expected.getColumnCount(), result.getColumnCount());
+        for (int i = 0; i < result.getColumnCount(); i++) {
+            assertEquals("Failed name column: " + i, expected.getColumnName(i), result.getColumnName(i));
+            assertEquals("Failed type column: " + i, expected.getColumnType(i), result.getColumnType(i));
+        }
+    }
+
+    static public void validStatisticsForTableLimit(Client client, String tableName, long limit) throws Exception {
+        long start = System.currentTimeMillis();
+        while (true) {
+            Thread.sleep(1000);
+            if (System.currentTimeMillis() - start > 10000) fail("Took too long");
+
+            VoltTable[] results = client.callProcedure("@Statistics", "TABLE", 0).getResults();
+            for (VoltTable t: results) { System.out.println(t.toString()); }
+            if (results[0].getRowCount() == 0) continue;
+
+            for (VoltTable vt: results) {
+                while(vt.advanceRow()) {
+                    String name = vt.getString("TABLE_NAME");
+                    if (tableName.equals(name)) {
+                        assertEquals(limit, vt.getLong("TUPLE_LIMIT"));
+                        return;
+                    }
+                }
+            }
+        }
+    }
 }

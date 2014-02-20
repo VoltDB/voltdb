@@ -83,7 +83,8 @@ public:
         int partitionColumn = -1, // defaults provided for ease of testing.
         bool exportEnabled = false,
         bool exportOnly = false,
-        int tableAllocationTargetSize = 0);
+        int tableAllocationTargetSize = 0,
+        int tuplelimit = INT_MAX);
 
     /**
     * Creates an empty temp table with given name and columns.
