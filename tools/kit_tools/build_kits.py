@@ -40,6 +40,15 @@ def makeReleaseDir(releaseDir):
     os.makedirs(releaseDir)
     print "Created dir: " + releaseDir
 
+
+################################################
+# SEE IF HAS ZIP TARGET
+###############################################
+def versionHasZipTarget():
+    with settings(warn_only=True):
+        with cd(os.path.join(builddir,'pro')):
+                return run("ant -p -f mmt.xml | grep dist.pro.zip")
+
 ################################################
 # BUILD THE COMMUNITY VERSION
 ################################################
@@ -72,6 +81,15 @@ def makeTrialLicense(days=30):
         run("./make_trial_licenses.pl -t %d -W" % (days))
 
 ################################################
+# MAKE AN ENTERPRISE ZIP FILE FOR SOME PARTNER UPLOAD SITES
+################################################
+
+def makeEnterpriseZip():
+    with cd(builddir + "/pro"):
+        run("VOLTCORE=../voltdb ant -f mmt.xml dist.pro.zip")
+
+
+################################################
 # COPY FILES
 ################################################
 
@@ -99,6 +117,9 @@ def copyTrialLicenseToReleaseDir(releaseDir):
     get("%s/pro/trial_*.xml" % (builddir),
         "%s/license.xml" % (releaseDir))
 
+def copyEnterpriseZipToReleaseDir(releaseDir, version, operatingsys):
+    get("%s/pro/obj/pro/voltdb-ent-%s.zip" % (builddir, version),
+        "%s/%s-voltdb-ent-%s.zip" % (releaseDir, operatingsys, version))
 
 ################################################
 # COMPUTE CHECKSUMS
@@ -202,6 +223,9 @@ with settings(user=username,host_string=CentosSSHInfo[1],disable_known_hosts=Tru
     copyEnterpriseFilesToReleaseDir(releaseDir, versionCentos, "LINUX")
     makeTrialLicense()
     copyTrialLicenseToReleaseDir(releaseDir)
+    if versionHasZipTarget():
+        makeEnterpriseZip()
+        copyEnterpriseZipToReleaseDir(releaseDir, versionCentos, "LINUX")
 
 # build kits on the mini
 with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
