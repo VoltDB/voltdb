@@ -266,7 +266,6 @@ TEST_F(TupleStreamWrapperTest, BasicOps)
     }
     m_wrapper->periodicFlush(-1, 19, 19);
 
-    std::cout << "allocated byte caount " << m_wrapper->allocatedByteCount() << std::endl;
     EXPECT_EQ( 1802, m_wrapper->allocatedByteCount());
 
     // get the first buffer flushed
