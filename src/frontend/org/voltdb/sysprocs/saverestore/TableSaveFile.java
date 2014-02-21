@@ -18,6 +18,8 @@
 package org.voltdb.sysprocs.saverestore;
 
 import java.io.EOFException;
+import java.io.FileDescriptor;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.BufferOverflowException;
 import java.nio.BufferUnderflowException;
@@ -36,11 +38,13 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.TransactionIdManager;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.EELibraryLoader;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.utils.CompressionService;
+import org.voltdb.utils.PosixAdvise;
 
 /**
  * An abstraction around a table's save file for restore.  Deserializes the
@@ -83,19 +87,21 @@ public class TableSaveFile
             org.voltdb.SnapshotSiteProcessor.m_snapshotBufferLength + (1024 * 256);
 
     public TableSaveFile(
-            FileChannel dataIn,
+            FileInputStream fis,
             int readAheadChunks,
             Integer[] relevantPartitionIds) throws IOException {
-        this(dataIn, readAheadChunks, relevantPartitionIds, false);
+        this(fis, readAheadChunks, relevantPartitionIds, false);
     }
 
     // XXX maybe consider an IOException subclass at some point
     public TableSaveFile(
-            FileChannel dataIn,
+            FileInputStream fis,
             int readAheadChunks,
             Integer[] relevantPartitionIds,
             boolean continueOnCorruptedChunk) throws IOException
             {
+                m_fd = fis.getFD();
+                FileChannel dataIn = fis.getChannel();
         try {
             EELibraryLoader.loadExecutionEngineLibrary(true);
             if (relevantPartitionIds == null) {
@@ -452,6 +458,7 @@ public class TableSaveFile
     }
 
     private final FileChannel m_saveFile;
+    private final FileDescriptor m_fd;
     private final ByteBuffer m_tableHeader;
     private final boolean m_completed;
     private final int m_versionNum[] = new int[4];
@@ -512,8 +519,38 @@ public class TableSaveFile
             //For reading the compressed input.
             ByteBuffer fileInputBuffer =
                     ByteBuffer.allocateDirect(CompressionService.maxCompressedLength(DEFAULT_CHUNKSIZE));
-
+            long sinceLastFAdvise = Long.MAX_VALUE;
+            long positionAtLastFAdvise = 0;
             while (m_hasMoreChunks) {
+                if (sinceLastFAdvise > 1024 * 1024 * 48) {
+                    sinceLastFAdvise = 0;
+                    VoltLogger log = new VoltLogger("SNAPSHOT");
+                    try {
+                        final long position = m_saveFile.position();
+                        long retval = PosixAdvise.fadvise(
+                                m_fd,
+                                position,
+                                position + 1024 * 1024 * 64,
+                                PosixAdvise.POSIX_FADV_WILLNEED);
+                        if (retval != 0) {
+                            log.info("Failed to fadvise in TableSaveFile, this is harmless: " + retval);
+                        }
+                        long length = position - 4096 - positionAtLastFAdvise;
+                        if (length > 0) {
+                            retval = PosixAdvise.fadvise(
+                                    m_fd,
+                                    positionAtLastFAdvise,
+                                    position - 4096 - positionAtLastFAdvise,
+                                    PosixAdvise.POSIX_FADV_DONTNEED);
+                        }
+                        if (retval != 0) {
+                            log.info("Failed to fadvise in TableSaveFile, this is harmless: " + retval);
+                        }
+                        positionAtLastFAdvise = position;
+                    } catch (Throwable t) {
+                        log.info("Exception attempting fadvise", t);
+                    }
+                }
 
                 /*
                  * Limit the number of chunk materialized into memory at one time
@@ -536,6 +573,7 @@ public class TableSaveFile
                         if (read == -1) {
                             throw new EOFException();
                         }
+                        sinceLastFAdvise += read;
                     }
                     int nextChunkLength = chunkLengthB.getInt(0);
                     expectedAnotherChunk = true;
@@ -593,6 +631,7 @@ public class TableSaveFile
                         if (read == -1) {
                             throw new EOFException();
                         }
+                        sinceLastFAdvise += read;
                     }
                     fileInputBuffer.flip();
                     nextChunkLength = CompressionService.uncompressedLength(fileInputBuffer);
@@ -715,7 +754,6 @@ public class TableSaveFile
                     ByteBuffer.allocateDirect(CompressionService.maxCompressedLength(DEFAULT_CHUNKSIZE));
 
             while (m_hasMoreChunks) {
-
                 /*
                  * Limit the number of chunk materialized into memory at one time
                  */

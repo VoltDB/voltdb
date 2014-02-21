@@ -49,7 +49,7 @@ public class CSVTableSaveFile {
             throws IOException {
         m_delimiter = delimiter;
         final FileInputStream fis = new FileInputStream(saveFile);
-        m_saveFile = new TableSaveFile(fis.getChannel(), 10, partitions);
+        m_saveFile = new TableSaveFile(fis, 10, partitions);
         for (int ii = 0; ii < m_converterThreads.length; ii++) {
             m_converterThreads[ii] = new Thread(new ConverterThread());
             m_converterThreads[ii].start();
