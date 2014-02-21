@@ -434,9 +434,15 @@ public class ExportManager
                 m_generations.put( generation.m_timestamp, generation);
             } else {
                 String list[] = generationDirectory.list();
-                VoltFile.recursivelyDelete(generationDirectory);
-                exportLog.warn("Invalid export generation in overflow directory " + generationDirectory
-                        + " this will be cleaned up. Number of files deleted: " + (list != null ? list.length : 0));
+                if (list != null && list.length == 0) {
+                    try {
+                        VoltFile.recursivelyDelete(generationDirectory);
+                    } catch (IOException ioe) {
+                    }
+                } else {
+                    exportLog.error("Invalid export generation in overflow directory " + generationDirectory
+                            + " this will need to be manually cleaned up. files left: " + list);
+                }
             }
         }
     }
