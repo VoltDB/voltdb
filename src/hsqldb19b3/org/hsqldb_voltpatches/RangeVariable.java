@@ -1159,11 +1159,9 @@ final class RangeVariable {
     {
         Index        index;
         Index        primaryIndex;
-        int[]        primaryKey;
 
         index        = rangeIndex;
         primaryIndex = rangeTable.getPrimaryIndex();
-        primaryKey   = rangeTable.getPrimaryKey();
 
         // get the index for this scan (/filter)
         // note: ignored if scan if full table scan
@@ -1173,7 +1171,11 @@ final class RangeVariable {
         // output open tag
         VoltXMLElement scan = new VoltXMLElement("tablescan");
 
-        scan.attributes.put("table", rangeTable.getName().name);
+        if (rangeTable.tableType == TableBase.SYSTEM_SUBQUERY && tableAlias == null) {
+            scan.attributes.put("table", rangeTable.getName().name + rangeTable.getName().hashCode());
+        } else {
+            scan.attributes.put("table", rangeTable.getName().name);
+        }
 
         if (tableAlias != null && !rangeTable.getName().name.equals(tableAlias)) {
             scan.attributes.put("tablealias", tableAlias.name);

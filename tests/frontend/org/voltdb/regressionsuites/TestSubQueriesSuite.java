@@ -136,11 +136,11 @@ public class TestSubQueriesSuite extends RegressionSuite {
         project.addStmtProcedure("InsertP1", "INSERT INTO P1 VALUES(?, ?);");
         project.addStmtProcedure("InsertP2", "INSERT INTO P2 VALUES(?, ?);");
         project.addStmtProcedure("InsertP3", "INSERT INTO P3 VALUES(?, ?);");
-        /*
+
         config = new LocalCluster("testunion-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         if (!config.compile(project)) fail();
         builder.addServerConfig(config);
-        */
+
         // Cluster
         config = new LocalCluster("testunion-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         if (!config.compile(project)) fail();

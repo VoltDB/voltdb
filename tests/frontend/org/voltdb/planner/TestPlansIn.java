@@ -59,9 +59,9 @@ public class TestPlansIn extends PlannerTestCase {
         failToCompile("select * from new_order where no_w_id in (select w_id from warehouse);",
                 "Unsupported subquery");
         failToCompile("select * from new_order where exists (select w_id from warehouse);",
-                "Unsupported subquery");
+                "VoltDB does not support subqueries");
         failToCompile("select * from new_order where not exists (select w_id from warehouse);",
-                "Unsupported subquery");
+                "VoltDB does not support subqueries");
     }
 
     @Override

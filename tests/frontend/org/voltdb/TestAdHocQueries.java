@@ -634,7 +634,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("did not fail on exists clause");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("Unsupported subquery") > 0);
+                assertTrue(pcex.getMessage().indexOf("VoltDB does not support subqueries") > 0);
             }
             adHocQuery = "   SELECT STAFF.EMPNAME \n" +
                     "          FROM STAFF \n" +
