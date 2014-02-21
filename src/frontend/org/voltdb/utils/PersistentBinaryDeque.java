@@ -308,6 +308,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         decrementNumObjects();
         assertions();
+        assert(retcont.b != null);
         return wrapRetCont(segment, retcont);
     }
 
