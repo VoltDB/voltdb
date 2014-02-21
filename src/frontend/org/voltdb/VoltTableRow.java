@@ -93,6 +93,13 @@ public abstract class VoltTableRow {
     VoltTableRow() {}
 
     /**
+     * Return the name of the column with the specified index.
+     * @param columnIndex Index of the column
+     * @return Name of the column
+     */
+    abstract String getColumnName(int columnIndex);
+
+    /**
      * Return the {@link VoltType type} of the column with the specified index.
      * @param columnIndex Index of the column
      * @return {@link VoltType VoltType} of the column
@@ -100,7 +107,7 @@ public abstract class VoltTableRow {
     abstract VoltType getColumnType(int columnIndex);
 
     /**
-     * Return the index of the column with the specified index.
+     * Return the index of the column with the specified name.
      * @param columnName Name of the column
      * @return Index of the column
      */
@@ -679,62 +686,63 @@ public abstract class VoltTableRow {
         long value; double dvalue;
 
         VoltType columnType = getColumnType(columnIndex);
+        String columnName = getColumnName(columnIndex);
         switch (columnType) {
         case TINYINT:
             value = getLong(columnIndex);
             if (value == VoltType.NULL_TINYINT)
-                js.value(null);
+                js.key(columnName).value(null);
             else
-                js.value(value);
+                js.key(columnName).value(value);
             break;
         case SMALLINT:
             value = getLong(columnIndex);
             if (value == VoltType.NULL_SMALLINT)
-                js.value(null);
+                js.key(columnName).value(null);
             else
-                js.value(value);
+                js.key(columnName).value(value);
             break;
         case INTEGER:
             value = getLong(columnIndex);
             if (value == VoltType.NULL_INTEGER)
-                js.value(null);
+                js.key(columnName).value(null);
             else
-                js.value(value);
+                js.key(columnName).value(value);
             break;
         case BIGINT:
             value = getLong(columnIndex);
             if (value == VoltType.NULL_BIGINT)
-                js.value(null);
+                js.key(columnName).value(null);
             else
-                js.value(value);
+                js.key(columnName).value(value);
             break;
         case TIMESTAMP:
             value = getTimestampAsLong(columnIndex);
             if (value == VoltType.NULL_BIGINT)
-                js.value(null);
+                js.key(columnName).value(null);
             else
-                js.value(value);
+                js.key(columnName).value(value);
             break;
         case FLOAT:
             dvalue = getDouble(columnIndex);
             if (dvalue == VoltType.NULL_FLOAT)
-                js.value(null);
+                js.key(columnName).value(null);
             else
-                js.value(dvalue);
+                js.key(columnName).value(dvalue);
             break;
         case STRING:
-            js.value(getString(columnIndex));
+            js.key(columnName).value(getString(columnIndex));
             break;
         case VARBINARY:
             byte[] bin = getVarbinary(columnIndex);
-            js.value(Encoder.hexEncode(bin));
+            js.key(columnName).value(Encoder.hexEncode(bin));
             break;
         case DECIMAL:
             Object dec = getDecimalAsBigDecimal(columnIndex);
             if (dec == null)
-                js.value(null);
+                js.key(columnName).value(null);
             else
-                js.value(dec.toString());
+                js.key(columnName).value(dec.toString());
             break;
         case INVALID:
             break;

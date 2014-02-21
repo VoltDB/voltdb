@@ -411,6 +411,11 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         }
 
         @Override
+        protected String getColumnName(int columnIndex) {
+            return VoltTable.this.getColumnName(columnIndex);
+        }
+
+        @Override
         protected VoltType getColumnType(int columnIndex) {
             return VoltTable.this.getColumnType(columnIndex);
         }
@@ -442,6 +447,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      * @param index Index of the column
      * @return Name of the column with the specified index.
      */
+    @Override
     public final String getColumnName(int index) {
         assert(verifyTableInvariants());
         if ((index < 0) || (index >= m_colCount))
@@ -1168,11 +1174,11 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             VoltTableRow row = cloneRow();
             row.resetRowPosition();
             while (row.advanceRow()) {
-                js.array();
+                js.object();
                 for (int i = 0; i < getColumnCount(); i++) {
                     row.putJSONRep(i, js);
                 }
-                js.endArray();
+                js.endObject();
             }
             js.endArray();
 
