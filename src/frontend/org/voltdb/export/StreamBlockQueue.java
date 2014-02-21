@@ -249,9 +249,6 @@ public class StreamBlockQueue {
     public long sizeInBytes() {
         long memoryBlockUsage = 0;
         for (StreamBlock b : m_memoryDeque) {
-            if (b.isPersisted()) {
-                break;
-            }
             memoryBlockUsage += b.unreleasedSize(); //Use only unreleased size.
         }
         return memoryBlockUsage + m_persistentDeque.sizeInBytes();

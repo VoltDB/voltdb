@@ -25,11 +25,13 @@ import org.voltcore.utils.DBBPool.BBContainer;
 
 public class StreamBlock {
 
+    public static final int HEADER_SIZE = 8;
+
     StreamBlock(BBContainer cont, long uso, boolean isPersisted) {
         m_buffer = cont;
         m_uso = uso;
         //The first 8 bytes are space for us to store the USO if we end up persisting
-        m_buffer.b.position(8);
+        m_buffer.b.position(HEADER_SIZE);
         m_totalUso = m_buffer.b.remaining();
         m_isPersisted = isPersisted;
     }
@@ -103,11 +105,12 @@ public class StreamBlock {
     }
 
     ByteBuffer unreleasedBufferV2() {
-        return m_buffer.b.asReadOnlyBuffer();
+        return m_buffer.b.slice().asReadOnlyBuffer();
     }
 
     BBContainer asBBContainer() {
         m_buffer.b.putLong(0, uso());
+        m_buffer.b.position(0);
         return m_buffer;
     }
 }

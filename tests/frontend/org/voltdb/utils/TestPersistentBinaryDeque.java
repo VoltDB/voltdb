@@ -306,7 +306,7 @@ public class TestPersistentBinaryDeque {
             assertFalse(m_pbd.isEmpty());
         }
         //Compression results in a weird magic number
-        assertEquals( 134393970, m_pbd.sizeInBytes());
+        assertEquals( 1024 * 1024 * 2 * 96, m_pbd.sizeInBytes());
         File files[] = TEST_DIR.listFiles();
         assertEquals( 3, files.length);
 
@@ -318,7 +318,7 @@ public class TestPersistentBinaryDeque {
         pushContainers[1] = DBBPool.wrapBB(buffer2);
 
         m_pbd.push(pushContainers);
-        assertEquals( 138588290, m_pbd.sizeInBytes());
+        assertEquals( 1024 * 1024 * 2 * 98, m_pbd.sizeInBytes());
 
         //Expect this to create a single new file
         TreeSet<String> names = getSortedDirectoryListing();
@@ -332,12 +332,12 @@ public class TestPersistentBinaryDeque {
         BBContainer retval1 = m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
         buffer1.clear();
         assert(retval1.b.equals(buffer1));
-        assertEquals(136491130, m_pbd.sizeInBytes());
+        assertEquals(1024 * 1024 * 2 * 97, m_pbd.sizeInBytes());
 
         BBContainer retval2 = m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
         buffer2.clear();
         assertTrue(retval2.b.equals(buffer2));
-        assertEquals(134393970, m_pbd.sizeInBytes());
+        assertEquals(1024 * 1024 * 2 * 96, m_pbd.sizeInBytes());
 
 
         //Expect the file for the two polled objects to still be there
@@ -347,7 +347,7 @@ public class TestPersistentBinaryDeque {
         retval1.discard();
         retval2.discard();
 
-        assertEquals(134393970, m_pbd.sizeInBytes());
+        assertEquals(1024 * 1024 * 2 * 96, m_pbd.sizeInBytes());
 
         names = getSortedDirectoryListing();
         assertEquals( 3, names.size());

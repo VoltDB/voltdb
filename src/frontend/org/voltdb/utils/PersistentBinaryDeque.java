@@ -375,6 +375,11 @@ public class PersistentBinaryDeque implements BinaryDeque {
         return true;
     }
 
+    /*
+     * Don't use size in bytes to determine empty, could potentially
+     * diverge from object count on crash or power failure
+     * although incredibly unlikely
+     */
     @Override
     public long sizeInBytes() {
         assertions();
@@ -417,6 +422,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             try {
                 //Get the number of objects and then iterator over them
                 int numObjects = readBuffer.getInt();
+                int size = readBuffer.getInt();
                 exportLog.debug("PBD " + m_nonce + " has " + numObjects + " objects to parse and truncate");
                 for (int ii = 0; ii < numObjects; ii++) {
                     final int nextObjectLength = readBuffer.getInt();
