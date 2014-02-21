@@ -298,8 +298,6 @@ public class SocketJoiner {
      * Pull all ready to accept sockets
      */
     private void processSSC(ServerSocketChannel ssc) throws Exception {
-        LOG.info("CALLING processSSC");
-
         SocketChannel sc = null;
         while ((sc = ssc.accept()) != null) {
             sc.socket().setTcpNoDelay(true);
@@ -309,7 +307,6 @@ public class SocketJoiner {
             /*
              * Send the current time over the new connection for a clock skew check
              */
-            LOG.info("Primary sending clock skew to connector.");
             ByteBuffer currentTimeBuf = ByteBuffer.allocate(8);
             currentTimeBuf.putLong(System.currentTimeMillis());
             currentTimeBuf.flip();
@@ -320,7 +317,6 @@ public class SocketJoiner {
             /*
              * Read a length prefixed JSON message
              */
-            LOG.info("Primary reading address info from connector.");
             JSONObject jsObj = readJSONObjFromWire(sc, remoteAddress);
 
             LOG.info(jsObj.toString(2));
@@ -338,7 +334,6 @@ public class SocketJoiner {
             ByteBuffer returnJsBuffer = ByteBuffer.allocate(4 + jsBytes.length);
             returnJsBuffer.putInt(jsBytes.length);
             returnJsBuffer.put(jsBytes).flip();
-            LOG.info("Primary sending version info to connector.");
             while (returnJsBuffer.hasRemaining()) {
                 sc.write(returnJsBuffer);
             }
@@ -424,6 +419,9 @@ public class SocketJoiner {
         }
     }
 
+    /**
+     * Read version info from a socket and check compatibility.
+     */
     private void processVersionJSONResponse(SocketChannel sc,
                                             String remoteAddress,
                                             String localVersionString,
@@ -433,10 +431,6 @@ public class SocketJoiner {
         // read the json response from socketjoiner with version info
         JSONObject jsonVersionInfo = readJSONObjFromWire(sc, remoteAddress);
 
-        LOG.info("Version string JSON:");
-        LOG.info(jsonVersionInfo.toString(2));
-
-        // TODO
         String remoteVersionString = jsonVersionInfo.getString("versionString");
         String remoteBuildString = jsonVersionInfo.getString("buildString");
         boolean remoteAcceptsLocalVersion = jsonVersionInfo.getBoolean("versionCompatible");
@@ -464,20 +458,16 @@ public class SocketJoiner {
      * advertise the rest of the cluster so that connectToPrimary can connect to it
      */
     private void connectToPrimary() {
-        LOG.info("CALLING connectToPrimary");
-
         // collect clock skews from all nodes
         List<Long> skews = new ArrayList<Long>();
 
-        // TODO
+        // collect the set of active voltdb version strings in the cluster
+        // this is used to limit simulatanious versions to two
         Set<String> activeVersions = new TreeSet<String>();
-
-        List<String> adminModeErrors = new ArrayList<String>();
 
         SocketChannel socket = null;
         try {
-            LOG.debug("Non-Primary Starting");
-            LOG.debug("Non-Primary Connecting to Primary");
+            LOG.debug("Non-Primary Starting & Connecting to Primary");
 
             while (socket == null) {
                 try {
@@ -499,7 +489,6 @@ public class SocketJoiner {
             final String remoteAddress = socket.socket().getRemoteSocketAddress().toString();
 
             // Read the timestamp off the wire and calculate skew for this connection
-            LOG.info("reading timeskew int from primary 1.");
             ByteBuffer currentTimeBuf = ByteBuffer.allocate(8);
             while (currentTimeBuf.hasRemaining()) {
                 socket.read(currentTimeBuf);
@@ -532,7 +521,6 @@ public class SocketJoiner {
                 jsObj.put("address", m_internalInterface);
             }
 
-            LOG.info("Sending address info to primary 1");
             byte jsBytes[] = jsObj.toString(4).getBytes(Constants.UTF8ENCODING);
             ByteBuffer requestHostIdBuffer = ByteBuffer.allocate(4 + jsBytes.length);
             requestHostIdBuffer.putInt(jsBytes.length);
@@ -542,11 +530,9 @@ public class SocketJoiner {
             }
 
             // read the json response from socketjoiner with version info and validate it
-            LOG.info("Reading version info json from primary 1.");
             processVersionJSONResponse(socket, remoteAddress, localVersionString, localBuildString, activeVersions);
 
             // read the json response sent by HostMessenger with HostID
-            LOG.info("Reading host id info json from primary 1.");
             JSONObject jsonObj = readJSONObjFromWire(socket, remoteAddress);
 
             /*
@@ -571,7 +557,7 @@ public class SocketJoiner {
                 int port = host.getInt("port");
                 final int hostId = host.getInt("hostId");
 
-                LOG.info("Leader provided address " + address);
+                LOG.info("Leader provided address " + address + ":" + port);
                 InetSocketAddress hostAddr = new InetSocketAddress(address, port);
                 if (ii == 0) {
                     //Leader already has a socket
@@ -580,8 +566,6 @@ public class SocketJoiner {
                     hostSockets[ii] = socket;
                     continue;
                 }
-
-                LOG.info("PROCESSING VALID OTHER SOCKET IN connectToPrimary");
 
                 SocketChannel hostSocket = null;
                 while (hostSocket == null) {
@@ -602,13 +586,13 @@ public class SocketJoiner {
                 /*
                  * Get the clock skew value
                  */
-                LOG.info("Reading clock skew info json from primary N.");
                 currentTimeBuf.clear();
                 while (currentTimeBuf.hasRemaining()) {
                     hostSocket.read(currentTimeBuf);
                 }
                 currentTimeBuf.flip();
                 skew = System.currentTimeMillis() - currentTimeBuf.getLong();
+                assert(currentTimeBuf.remaining() == 0);
                 skews.add(skew);
 
                 jsObj = new JSONObject();
@@ -632,8 +616,7 @@ public class SocketJoiner {
                 listeningAddresses[ii] = hostAddr;
 
                 // read the json response from socketjoiner with version info and validate it
-                LOG.info("Read version json from primary N.");
-                processVersionJSONResponse(socket, remoteAddress, localVersionString, localBuildString, activeVersions);
+                processVersionJSONResponse(hostSocket, remoteAddress, localVersionString, localBuildString, activeVersions);
             }
 
             long maxSkew = Collections.max(skews);
@@ -665,13 +648,12 @@ public class SocketJoiner {
                     }
                 }
                 // trim the trailing comma + space
-                versions = versions.substring(0, versions.length() - 2 - 1);
+                versions = versions.substring(0, versions.length() - 2);
 
                 VoltDB.crashLocalVoltDB("Cluster aldready is running mixed voltdb versions (" + versions +").\n" +
-                                        "Adding version " + localVersionString + "would add a third version.\n" +
+                                        "Adding version " + localVersionString + " would add a third version.\n" +
                                         "VoltDB hotfix support supports only two unique versions simulaniously.", false, null);
             }
-            LOG.info("Version stuff seems cool.");
 
             /*
              * Notify the leader that we connected to the entire cluster, it will then go
@@ -681,7 +663,6 @@ public class SocketJoiner {
             while (joinCompleteBuffer.hasRemaining()) {
                 hostSockets[0].write(joinCompleteBuffer);
             }
-            LOG.info("Wrote Join Completion.");
 
             /*
              * Let host messenger know about the connections.

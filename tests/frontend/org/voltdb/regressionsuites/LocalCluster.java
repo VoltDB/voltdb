@@ -439,25 +439,28 @@ public class LocalCluster implements VoltServerConfig {
                     continue;
                 }
                 synchronized(pipeToFile) {
-                    // if eof, then no point in waiting around
-                    if (pipeToFile.m_eof.get())
-                        continue;
-
                     // if process is dead, no point in waiting around
-                    if (isProcessDead(pipeToFile.getProcess()))
+                    if (isProcessDead(pipeToFile.getProcess())) {
+                        // dead process means the other pipes won't start,
+                        // so bail here
+                        return false;
+                    }
+
+                    // if eof, then no point in waiting around
+                    if (pipeToFile.m_eof.get()) {
                         continue;
+                    }
 
                     // if not eof, then wait for statement of readiness
                     if (pipeToFile.m_witnessedReady.get() != true) {
                         try {
                             // use a timeout to prevent a forever hang
-                            pipeToFile.wait(1000);
+                            pipeToFile.wait(250);
                         }
                         catch (InterruptedException ex) {
                             log.error(ex.toString(), ex);
                         }
                         allReady = false;
-                        break;
                     }
                 }
             }
@@ -679,8 +682,6 @@ public class LocalCluster implements VoltServerConfig {
             List<String> cmdlnList = cmdln.createCommandLine();
             String cmdLineFull = "Start cmd host=" + String.valueOf(hostId) + " :";
             for (String element : cmdlnList) {
-                System.out.println(element);
-                System.out.flush();
                 assert(element != null);
                 cmdLineFull += " " + element;
             }

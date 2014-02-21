@@ -23,6 +23,7 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -52,11 +53,12 @@ public class TestMixedVersionClusters {
 
             m_cluster = new LocalCluster(
                     JAR_NAME,
-                    1,
+                    2,
                     versions.length,
                     K,
                     BackendTarget.NATIVE_EE_JNI);
             m_cluster.setOverridesForHotfix(versions, regexOverrides);
+            m_cluster.setHasLocalServer(false);
             m_cluster.setDeploymentAndVoltDBRoot(
                     m_builder.getPathToDeployment(),
                     m_builder.getPathToVoltRoot().getAbsolutePath());
@@ -69,7 +71,17 @@ public class TestMixedVersionClusters {
         }
 
         boolean killAndRejoin(String version, String regexMatcher) {
-            return false;
+            try {
+                m_cluster.shutDownSingleHost(2);
+                // just set the override for the last host
+                m_cluster.setOverridesForHotfix(new String[] {"", "", version},
+                                                new String[] {"", "", regexMatcher});
+                return m_cluster.recoverOne(2, 0, "");
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+                return false;
+            }
         }
 
         void shutdown() throws InterruptedException {
@@ -82,25 +94,31 @@ public class TestMixedVersionClusters {
     @BeforeClass
     public static void compileCatalog() throws IOException {
         m_builder.addLiteralSchema("CREATE TABLE V0 (id BIGINT);");
-        assertTrue(m_builder.compile(Configuration.getPathToCatalogForTest(JAR_NAME), 1, 3, K));
+        m_builder.configureLogging(null, null, false, false, 200, Integer.MAX_VALUE, null);
+        assertTrue(m_builder.compile(Configuration.getPathToCatalogForTest(JAR_NAME), 2, 3, K));
+    }
+
+    //
+    // This test will bomb out if a version isn't compatible with itself. We shouldn't ship that.
+    //
+    @Test
+    public void testCurrentVersionIsSelfCompatible() {
+        assertTrue(RealVoltDB.staticIsCompatibleVersionString(RealVoltDB.m_defaultVersionString));
     }
 
     @Test
-    public void testBasics() throws InterruptedException {
-        MixedVersionCluster cluster = new MixedVersionCluster(
-                new String[] {"4.1", "4.1.2", "4.1"},
+    public void testStartupConfigurations() throws InterruptedException {
+        MixedVersionCluster cluster = null;
+
+        // should work
+        cluster = new MixedVersionCluster(
+                new String[] {"4.1.1", "4.1.2", "4.1.1"},
                 new String[] {"^4\\.1(\\.\\d+)*\\z", "^4\\.1(\\.\\d+)*\\z", "^4\\.1(\\.\\d+)*\\z"});
 
         assertTrue(cluster.start());
         cluster.shutdown();
 
-        cluster = new MixedVersionCluster(
-                new String[] {"4.1", "4.1hp", "4.1hp"},
-                new String[] {"^4\\.1(\\.\\d+)*\\z", "^4\\.1(\\w+)*\\z", "^4\\.1(\\w+)*\\z"});
-
-        assertTrue(cluster.start());
-        cluster.shutdown();
-
+        // Three different versions are not allowed simultaniously
         cluster = new MixedVersionCluster(
                 new String[] {"4.1", "5.6", "4.1"},
                 new String[] {"^4\\.1(\\.\\d+)*\\z", "^5\\.6(\\.\\d+)*\\z", "^4\\.1(\\.\\d+)*\\z"});
@@ -111,5 +129,55 @@ public class TestMixedVersionClusters {
             fail();
         }
         catch (RuntimeException e) {}
+
+        // 4.1 doesn't know about 4.1hp, but 4.1hp knows about 4.1
+        cluster = new MixedVersionCluster(
+                new String[] {"4.1", "4.1hp", "4.1hp"},
+                new String[] {"^4\\.1(\\.\\d+)*\\z", "^4\\.1(\\w+)*\\z", "^4\\.1(\\w+)*\\z"});
+
+        assertTrue(cluster.start());
+        cluster.shutdown();
+
+        // These versions are not allowed by the regex
+        cluster = new MixedVersionCluster(
+                new String[] {"4.1", "5.6", "4.1"},
+                new String[] {"^4\\.1(\\.\\d+)*\\z", "^5\\.6(\\.\\d+)*\\z", "^4\\.1(\\.\\d+)*\\z"});
+
+        try {
+            cluster.start();
+            cluster.shutdown();
+            fail();
+        }
+        catch (RuntimeException e) {}
+    }
+
+    @Test
+    public void testJoins() throws InterruptedException {
+        if (!MiscUtils.isPro()) { return; } // join tests are pro only
+
+        MixedVersionCluster cluster = null;
+
+        // test some rejoins
+        cluster = new MixedVersionCluster(
+                new String[] {"4.1.1", "4.1.1", "4.1.1"},
+                new String[] {"^4\\.1(\\.\\d+)*\\z", "^4\\.1(\\.\\d+)*\\z", "^4\\.1(\\.\\d+)*\\z"});
+
+        assertTrue(cluster.start());
+
+        assertTrue(cluster.killAndRejoin("4.1.2", "^4\\.1(\\.\\d+)*\\z"));
+        assertTrue(cluster.killAndRejoin("4.1hp", "^4\\.1(\\.\\d+)*(\\w+)*\\z"));
+
+        cluster.shutdown();
+
+        // test that three versions fail
+        cluster = new MixedVersionCluster(
+                new String[] {"4.1.1", "4.1.2", "4.1.1"},
+                new String[] {"^4\\.1(\\.\\d+)*\\z", "^4\\.1(\\.\\d+)*\\z", "^4\\.1(\\.\\d+)*\\z"});
+
+        assertTrue(cluster.start());
+
+        assertFalse(cluster.killAndRejoin("4.1.3", "^4\\.1(\\.\\d+)*\\z"));
+
+        cluster.shutdown();
     }
 }

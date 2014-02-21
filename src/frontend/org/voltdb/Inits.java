@@ -56,8 +56,6 @@ import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 
-import com.google_voltpatches.common.collect.ImmutableSet;
-
 /**
  * This breaks up VoltDB initialization tasks into discrete units.
  * To add a task, create a nested subclass of InitWork in the Inits class.
@@ -304,8 +302,7 @@ public class Inits {
                             catalogBytes);
                 }
                 catch (IOException e) {
-                    e.printStackTrace();
-                    VoltDB.crashGlobalVoltDB("Unable to distribute catalog.", true, e);
+                    VoltDB.crashGlobalVoltDB("Unable to distribute catalog.", false, e);
                 }
                 catch (org.apache.zookeeper_voltpatches.KeeperException e) {
                     VoltDB.crashGlobalVoltDB("Unable to publish catalog.", false, e);

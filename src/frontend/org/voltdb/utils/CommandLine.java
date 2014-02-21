@@ -589,6 +589,7 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("ipc");
         }
 
+        // handle overrides for testing hotfix version compatibility
         if (m_versionStringOverrideForTest != null) {
             assert(m_versionCompatibilityRegexOverrideForTest != null);
             cmdline.add("versionoverride");

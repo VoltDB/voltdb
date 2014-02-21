@@ -157,8 +157,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    private static final String m_defaultVersionString = "4.1";
-    private static final String m_defaultHotfixableRegexPattern = "^4\\.1(\\.\\d+)*\\z";
+    static final String m_defaultVersionString = "4.1";
+    // by default, 4.1 is only compatible with 4.1
+    static final String m_defaultHotfixableRegexPattern = "^4\\.1\\z";
+    // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
     HostMessenger m_messenger = null;
@@ -347,6 +349,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_pathToStartupCatalog = m_config.m_pathToCatalog;
             m_replicationActive = false;
             m_configLogger = null;
+            // use CLI overrides for testing hotfix version compatibility
             if (m_config.m_versionStringOverrideForTest != null) {
                 m_versionString = m_config.m_versionStringOverrideForTest;
             }
@@ -1963,6 +1966,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public String getVersionString() {
         return m_versionString;
+    }
+
+    static boolean staticIsCompatibleVersionString(String versionString) {
+        return versionString.matches(m_defaultHotfixableRegexPattern);
     }
 
     @Override
