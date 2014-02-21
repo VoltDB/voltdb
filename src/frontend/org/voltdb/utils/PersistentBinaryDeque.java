@@ -92,6 +92,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
     //Segments that are no longer being written to and can be polled
     //These segments are "immutable". They will not be modified until deletion
     private final Deque<PBDSegment> m_segments = new ArrayDeque<PBDSegment>();
+    private int m_numObjects = 0;
     private volatile boolean m_closed = false;
 
     /**
@@ -148,10 +149,11 @@ public class PersistentBinaryDeque implements BinaryDeque {
                         PBDSegment qs = new PBDSegment( index, pathname );
                         try {
                             qs.open(false);
+                            m_numObjects += qs.getNumEntries();
+                            segments.put( index, qs);
                         } catch (IOException e) {
                             new RuntimeException(e);
                         }
-                        segments.put( index, qs);
                     }
                     return false;
                 }
@@ -220,6 +222,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 throw new IOException("Failed to offer object in PBD");
             }
         }
+        incrementNumObjects();
         assertions();
     }
 
@@ -273,6 +276,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
             while (currentSegmentContents.peek() != null) {
                 writeSegment.offer(currentSegmentContents.pollFirst(), false);
+                incrementNumObjects();
             }
 
             m_segments.push(writeSegment);
@@ -302,6 +306,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
         if (retcont == null) return null;
 
+        decrementNumObjects();
         assertions();
         return wrapRetCont(segment, retcont);
     }
@@ -423,12 +428,14 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 //Get the number of objects and then iterator over them
                 int numObjects = readBuffer.getInt();
                 int size = readBuffer.getInt();
+                int objectsProcessed = 0;
                 exportLog.debug("PBD " + m_nonce + " has " + numObjects + " objects to parse and truncate");
                 for (int ii = 0; ii < numObjects; ii++) {
                     final int nextObjectLength = readBuffer.getInt();
                     final int nextObjectFlags = readBuffer.getInt();
                     final boolean compressed = nextObjectFlags == PBDSegment.FLAG_COMPRESSED;
                     final int uncompressedLength = compressed ? (int)Snappy.uncompressedLength(buffAddr + readBuffer.position(), nextObjectLength) : nextObjectLength;
+                    objectsProcessed++;
                     //Copy the next object into a separate heap byte buffer
                     //do the old limit stashing trick to avoid buffer overflow
                     ByteBuffer nextObject = null;
@@ -458,7 +465,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
                         //Nothing to do, leave the object alone and move to the next
                         continue;
                     } else {
-                        long startSize = fc.size();
                         //If the returned bytebuffer is empty, remove the object and truncate the file
                         if (retval.remaining() == 0) {
                             if (ii == 0) {
@@ -470,6 +476,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                                  */
                                 lastSegmentIndex = segmentIndex - 1;
                             } else {
+                                addToNumObjects(-(numObjects - (objectsProcessed - 1)));
                                 //Don't forget to update the number of entries in the file
                                 ByteBuffer numObjectsBuffer = ByteBuffer.allocate(4);
                                 numObjectsBuffer.putInt(0, ii);
@@ -481,6 +488,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                             }
 
                         } else {
+                            addToNumObjects(-(numObjects - objectsProcessed));
                             //Partial object truncation
                             ByteBuffer copy = ByteBuffer.allocate(retval.remaining());
                             copy.put(retval);
@@ -533,6 +541,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             if (segment.m_index <= lastSegmentIndex) {
                 break;
             }
+            addToNumObjects(-segment.getNumEntries());
             iterator.remove();
             segment.closeAndDelete();
         }
@@ -553,10 +562,42 @@ public class PersistentBinaryDeque implements BinaryDeque {
         assertions();
     }
 
+    private void addToNumObjects(int num) {
+        assert(m_numObjects >= 0);
+        m_numObjects += num;
+    }
+    private void incrementNumObjects() {
+        assert(m_numObjects >= 0);
+         m_numObjects++;
+    }
+
+    private void decrementNumObjects() {
+        m_numObjects--;
+        assert(m_numObjects >= 0);
+    }
+
+    @Override
+    public int getNumObjects() {
+        return m_numObjects;
+    }
+
+    private static final boolean assertionsOn;
+    static {
+        boolean assertOn = false;
+        assert(assertOn = true);
+        assertionsOn = assertOn;
+    }
+
     private void assertions() {
-        /*
-         * None of these assertions were useful anymore, if we think of new ones put
-         * them here
-         */
+        if (!assertionsOn) return;
+        int numObjects = 0;
+        for (PBDSegment segment : m_segments) {
+            try {
+                numObjects += segment.getNumEntries() - segment.m_objectReadIndex;
+            } catch (Exception e) {
+                Throwables.propagate(e);
+            }
+        }
+        assert(numObjects == m_numObjects);
     }
 }

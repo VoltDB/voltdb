@@ -94,17 +94,6 @@ public class StreamBlock {
     private final boolean m_isPersisted;
 
     ByteBuffer unreleasedBuffer() {
-        ByteBuffer responseBuffer = ByteBuffer.allocate((int)(4 + unreleasedSize()));
-        responseBuffer.order(ByteOrder.LITTLE_ENDIAN);
-        responseBuffer.putInt((int)unreleasedSize());
-        responseBuffer.order(ByteOrder.BIG_ENDIAN);
-        m_buffer.b.position((int)m_releaseOffset);
-        responseBuffer.put(m_buffer.b);
-        responseBuffer.flip();
-        return responseBuffer;
-    }
-
-    ByteBuffer unreleasedBufferV2() {
         return m_buffer.b.slice().asReadOnlyBuffer();
     }
 

@@ -249,9 +249,11 @@ public class StreamBlockQueue {
     public long sizeInBytes() {
         long memoryBlockUsage = 0;
         for (StreamBlock b : m_memoryDeque) {
-            memoryBlockUsage += b.unreleasedSize(); //Use only unreleased size.
+            memoryBlockUsage += b.unreleasedSize(); //Use only unreleased size, but throw in the USO
+                                                    //to make book keeping consistent when flushed to disk
         }
-        return memoryBlockUsage + m_persistentDeque.sizeInBytes();
+        //Subtract USO from on disk size
+        return memoryBlockUsage + m_persistentDeque.sizeInBytes() - (8 * m_persistentDeque.getNumObjects());
     }
 
     public void close() throws IOException {

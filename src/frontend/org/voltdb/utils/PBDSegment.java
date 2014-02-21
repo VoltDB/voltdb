@@ -59,7 +59,7 @@ class PBDSegment {
 
     //Index of the next object to read, not an offset into the file
     //The offset is maintained by the ByteBuffer. Used to determine if there is another object
-    private int m_objectReadIndex = 0;
+    int m_objectReadIndex = 0;
     private int m_bytesRead = 0;
 
     //ID of this segment
@@ -213,8 +213,7 @@ class PBDSegment {
         }
 
         //No more entries to read
-        int numEntries = getNumEntries();
-        if (m_objectReadIndex == numEntries) {
+        if (!hasMoreEntries()) {
             return null;
         }
 

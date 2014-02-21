@@ -648,7 +648,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_pollFuture = fut;
             } else {
                 fut.set(
-                        new AckingContainer(first_unpolled_block.unreleasedBufferV2(),
+                        new AckingContainer(first_unpolled_block.unreleasedBuffer(),
                                 first_unpolled_block.uso() + first_unpolled_block.totalUso()));
                 m_pollFuture = null;
             }
