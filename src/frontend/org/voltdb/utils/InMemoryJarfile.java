@@ -154,24 +154,19 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
     protected void writeToOutputStream(OutputStream output) throws IOException {
         JarOutputStream jarOut = new JarOutputStream(output);
 
-        try {
-            for (Entry<String, byte[]> e : super.entrySet()) {
-                assert(e.getValue() != null);
+        for (Entry<String, byte[]> e : super.entrySet()) {
+            assert(e.getValue() != null);
 
-                JarEntry entry = new JarEntry(e.getKey());
-                entry.setSize(e.getValue().length);
-                entry.setTime(System.currentTimeMillis());
-                jarOut.putNextEntry(entry);
-                jarOut.write(e.getValue());
-                jarOut.flush();
-                jarOut.closeEntry();
-            }
+            JarEntry entry = new JarEntry(e.getKey());
+            entry.setSize(e.getValue().length);
+            entry.setTime(System.currentTimeMillis());
+            jarOut.putNextEntry(entry);
+            jarOut.write(e.getValue());
+            jarOut.flush();
+            jarOut.closeEntry();
+        }
 
-            jarOut.finish();
-        }
-        finally {
-            jarOut.close();
-        }
+        jarOut.finish();
     }
 
     ///////////////////////////////////////////////////////
