@@ -17,7 +17,8 @@
 
 package org.voltdb.planner.parseinfo;
 
-import java.util.Collection;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.TupleValueExpression;
@@ -39,8 +40,19 @@ public abstract class StmtTableScan {
 
     // table alias
     protected String m_tableAlias = null;
+    protected List<SchemaColumn> m_scanColumnsList = new ArrayList<>();
 
-    protected StmtTableScan(String tableAlias) { m_tableAlias = tableAlias; }
+    protected StmtTableScan(String tableAlias) {
+        m_tableAlias = tableAlias;
+    }
+
+    public String getTableAlias() {
+        return m_tableAlias;
+    }
+
+    public List<SchemaColumn> getScanColumns() {
+        return m_scanColumnsList;
+    }
 
     abstract public TABLE_SCAN_TYPE getScanType();
 
@@ -50,11 +62,7 @@ public abstract class StmtTableScan {
 
     abstract public String getPartitionColumnName();
 
-    public String getTableAlias() { return m_tableAlias; }
-
-    abstract public Collection<SchemaColumn> getScanColumns();
-
-    abstract public Collection<Index> getIndexes();
+    abstract public List<Index> getIndexes();
 
     public void setPartitioning(PartitioningForStatement partitioning) {}
 

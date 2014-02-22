@@ -18,9 +18,11 @@
 package org.voltdb.planner.parseinfo;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.TupleValueExpression;
@@ -49,7 +51,7 @@ public class StmtSubqueryScan extends StmtTableScan {
 
 
     // Store a unique list of the subquery result columns actually used by the parent query.
-    protected Map<String, SchemaColumn> m_scanColumns = new HashMap<String, SchemaColumn>();
+    private Set<String> m_scanColumnsSet = new HashSet<>();
 
     public StmtSubqueryScan(String tableAlias, AbstractParsedStmt subquery) {
         super(tableAlias);
@@ -79,7 +81,8 @@ public class StmtSubqueryScan extends StmtTableScan {
 
     @Override
     public String getTableName() {
-        return null;
+        // return its alias instead
+        return m_tableAlias;
     }
 
     /**
@@ -110,9 +113,9 @@ public class StmtSubqueryScan extends StmtTableScan {
         return null;
     }
 
-    static final Collection<Index> noIndexesSupportedOnSubqueryScans = new ArrayList<Index>();
+    static final List<Index> noIndexesSupportedOnSubqueryScans = new ArrayList<Index>();
     @Override
-    public Collection<Index> getIndexes() {
+    public List<Index> getIndexes() {
         return noIndexesSupportedOnSubqueryScans;
     }
 
@@ -126,11 +129,6 @@ public class StmtSubqueryScan extends StmtTableScan {
 
     public void setBestCostPlan(CompiledPlan costPlan) {
         m_bestCostPlan = costPlan;
-    }
-
-    @Override
-    public Collection<SchemaColumn> getScanColumns() {
-        return m_scanColumns.values();
     }
 
     @Override
@@ -151,10 +149,11 @@ public class StmtSubqueryScan extends StmtTableScan {
         expr.setValueSize(schemaCol.getSize());
 
 
-        if (m_scanColumns.get(columnName) == null) {
+        if (!m_scanColumnsSet.contains(columnName)) {
             SchemaColumn scol = new SchemaColumn("", m_tableAlias,
                     columnName, columnName, (TupleValueExpression) expr.clone());
-            m_scanColumns.put(columnName, scol);
+            m_scanColumnsSet.add(columnName);
+            m_scanColumnsList.add(scol);
         }
     }
 

@@ -30,38 +30,34 @@ import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.HashAggregatePlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
+import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.types.JoinType;
+import org.voltdb.types.PlanNodeType;
 
 public class TestSubQueries extends PlannerTestCase {
 
-    public void testXin() {
-            AbstractPlanNode pn = compile("select * FROM  (SELECT A FROM R1), (SELECT A FROM R2) ");
-            System.out.println(pn.toExplainPlanString());
-
-    }
-
     final String SYSTEM_SUBQUERY = "SYSTEM_SUBQUERY";
 
-    private void checkSimpleSubSelects(AbstractPlanNode scanNode, String tableName, String tableAlias, String... columns) {
+    private void checkSimpleSubSelects(AbstractPlanNode scanNode, String tableName, String... columns) {
         System.out.println(scanNode.toExplainPlanString());
 
         assertTrue(scanNode instanceof SeqScanPlanNode);
         SeqScanPlanNode snode = (SeqScanPlanNode) scanNode;
         if (tableName != null) {
             if (tableName.startsWith(SYSTEM_SUBQUERY)) {
-                assertTrue(snode.getTargetTableAlias().contains(SYSTEM_SUBQUERY));
+                assertTrue(snode.getTargetTableName().contains(SYSTEM_SUBQUERY));
             } else {
-                assertEquals(tableName, snode.getTargetTableAlias());
+                assertEquals(tableName, snode.getTargetTableName());
             }
-        }
-
-        if (tableAlias != null) {
-            assertEquals(tableAlias, snode.getTargetTableAlias());
         }
 
         NodeSchema schema = snode.getOutputSchema();
@@ -107,77 +103,76 @@ public class TestSubQueries extends PlannerTestCase {
 
             pn = compile("select A, C FROM (SELECT A, C FROM R1) " + alias);
             pn = pn.getChild(0);
-            checkSimpleSubSelects(pn, tbName, null, "A", "C");
+            checkSimpleSubSelects(pn, tbName,  "A", "C");
             pn = pn.getChild(0);
-            checkSimpleSubSelects(pn, "R1", "R1", "A", "C");
+            checkSimpleSubSelects(pn, "R1", "A", "C");
 
 
             pn = compile("select A, C FROM (SELECT A, C FROM R1) "+ alias +" WHERE A > 0");
             pn = pn.getChild(0);
-            checkSimpleSubSelects(pn, tbName, null, "A", "C");
+            checkSimpleSubSelects(pn, tbName,  "A", "C");
             checkPredicateComparisonExpression(pn, tbName);
             pn = pn.getChild(0);
-            checkSimpleSubSelects(pn, "R1", "R1", "A", "C");
+            checkSimpleSubSelects(pn, "R1", "A", "C");
 
 
             pn = compile(String.format("select A, C FROM (SELECT A, C FROM R1) %s WHERE %sA < 0", alias, colRef));
             pn = pn.getChild(0);
-            checkSimpleSubSelects(pn, tbName, null, "A", "C");
+            checkSimpleSubSelects(pn, tbName,  "A", "C");
             checkPredicateComparisonExpression(pn, tbName);
             pn = pn.getChild(0);
-            checkSimpleSubSelects(pn, "R1", "R1", "A", "C");
+            checkSimpleSubSelects(pn, "R1", "A", "C");
 
 
             pn = compile(String.format("select A1, C1 FROM (SELECT A A1, C C1 FROM R1) %s WHERE %sA1 < 0", alias, colRef));
             pn = pn.getChild(0);
-            checkSimpleSubSelects(pn, tbName, null, "A1", "C1");
+            checkSimpleSubSelects(pn, tbName,  "A1", "C1");
             checkPredicateComparisonExpression(pn, tbName);
             pn = pn.getChild(0);
-            checkSimpleSubSelects(pn, "R1", "R1", "A", "C");
+            checkSimpleSubSelects(pn, "R1", "A", "C");
 
             // With projection.
             pn = compile(String.format("select C1 FROM (SELECT A A1, C C1 FROM R1) %s WHERE %sA1 < 0", alias, colRef));
             pn = pn.getChild(0);
-            checkSimpleSubSelects(pn, tbName, null, "C1");
+            checkSimpleSubSelects(pn, tbName,  "C1");
             assertEquals(((SeqScanPlanNode) pn).getInlinePlanNodes().size(), 1);
             checkPredicateComparisonExpression(pn, tbName);
             pn = pn.getChild(0);
-            checkSimpleSubSelects(pn, "R1", "R1", "A", "C");
+            checkSimpleSubSelects(pn, "R1", "A", "C");
 
             // Complex columns in sub selects
             pn = compile(String.format("select C1 FROM (SELECT A+3 A1, C C1 FROM R1) %s WHERE %sA1 < 0", alias, colRef));
             pn = pn.getChild(0);
-            checkSimpleSubSelects(pn, tbName, null, "C1");
+            checkSimpleSubSelects(pn, tbName,  "C1");
             assertEquals(((SeqScanPlanNode) pn).getInlinePlanNodes().size(), 1);
             checkPredicateComparisonExpression(pn, tbName);
             pn = pn.getChild(0);
-            checkSimpleSubSelects(pn, "R1", "R1", "A1", "C");
+            checkSimpleSubSelects(pn, "R1", "A1", "C");
 
             pn = compile(String.format("select C1 FROM (SELECT A+3, C C1 FROM R1) %s WHERE %sC1 < 0", alias, colRef));
             pn = pn.getChild(0);
-            checkSimpleSubSelects(pn, tbName, null, "C1");
+            checkSimpleSubSelects(pn, tbName,  "C1");
             assertEquals(((SeqScanPlanNode) pn).getInlinePlanNodes().size(), 1);
             checkPredicateComparisonExpression(pn, tbName);
             pn = pn.getChild(0);
-            checkSimpleSubSelects(pn, "R1", "R1", null, "C");
+            checkSimpleSubSelects(pn, "R1",  "C1", "C");
 
 
             // select *
             pn = compile(String.format("select A, C FROM (SELECT * FROM R1) %s WHERE %sA < 0", alias, colRef));
             pn = pn.getChild(0);
-            checkSimpleSubSelects(pn, tbName, null, "A", "C");
+            checkSimpleSubSelects(pn, tbName,  "A", "C");
             checkPredicateComparisonExpression(pn, tbName);
             pn = pn.getChild(0);
-            // Pushed projection down into the sub selects
-            checkSimpleSubSelects(pn, "R1", "R1", "A", "C");
+            checkSimpleSubSelects(pn, "R1", "A", "C", "D");
 
 
-            pn = compile(String.format("select * FROM (SELECT A, C FROM R1) %s WHERE %sA < 0", alias, colRef));
+            pn = compile(String.format("select * FROM (SELECT A, D FROM R1) %s WHERE %sA < 0", alias, colRef));
             pn = pn.getChild(0);
-            checkSimpleSubSelects(pn, tbName, null, "A", "C");
+            checkSimpleSubSelects(pn, tbName,  "A", "D");
             checkPredicateComparisonExpression(pn, tbName);
             pn = pn.getChild(0);
-            checkSimpleSubSelects(pn, "R1", "R1", "A", "C");
+            checkSimpleSubSelects(pn, "R1", "A", "D");
         }
     }
 
@@ -188,13 +183,13 @@ public class TestSubQueries extends PlannerTestCase {
         pn = compile("select A2 FROM " +
                 "(SELECT A1 AS A2 FROM (SELECT A AS A1 FROM R1 WHERE A < 3) T1 WHERE T1.A1 > 0) T2  WHERE T2.A2 = 3");
         pn = pn.getChild(0);
-        checkSimpleSubSelects(pn, "T2", null, "A2");
+        checkSimpleSubSelects(pn, "T2",  "A2");
         checkPredicateComparisonExpression(pn, "T2");
         pn = pn.getChild(0);
-        checkSimpleSubSelects(pn, "T1", null, "A1");
+        checkSimpleSubSelects(pn, "T1",  "A1");
         checkPredicateComparisonExpression(pn, "T1");
         pn = pn.getChild(0);
-        checkSimpleSubSelects(pn, "R1", null, "A");
+        checkSimpleSubSelects(pn, "R1",  "A");
         checkPredicateComparisonExpression(pn, "R1");
     }
 
@@ -210,14 +205,14 @@ public class TestSubQueries extends PlannerTestCase {
         assertTrue(nlpn instanceof NestLoopPlanNode);
         assertEquals(2, nlpn.getChildCount());
         pn = nlpn.getChild(0);
-        checkSimpleSubSelects(pn, "T1", null, "A");
+        checkSimpleSubSelects(pn, "T1",  "A");
         pn= pn.getChild(0);
-        checkSimpleSubSelects(pn, "R1", null, "A");
+        checkSimpleSubSelects(pn, "R1",  "A");
 
         pn = nlpn.getChild(1);
-        checkSimpleSubSelects(pn, "T2", null, "C");
+        checkSimpleSubSelects(pn, "T2",  "C");
         pn= pn.getChild(0);
-        checkSimpleSubSelects(pn, "R2", null, "C");
+        checkSimpleSubSelects(pn, "R2",  "C");
 
 
         // sub-selected table joins without alias
@@ -228,14 +223,14 @@ public class TestSubQueries extends PlannerTestCase {
         assertTrue(nlpn instanceof NestLoopPlanNode);
         assertEquals(2, nlpn.getChildCount());
         pn = nlpn.getChild(0);
-        checkSimpleSubSelects(pn, SYSTEM_SUBQUERY, null, "A");
+        checkSimpleSubSelects(pn, SYSTEM_SUBQUERY,  "A");
         pn= pn.getChild(0);
-        checkSimpleSubSelects(pn, "R1", null, "A");
+        checkSimpleSubSelects(pn, "R1",  "A");
 
         pn = nlpn.getChild(1);
-        checkSimpleSubSelects(pn, SYSTEM_SUBQUERY, null, "C");
+        checkSimpleSubSelects(pn, SYSTEM_SUBQUERY,  "C");
         pn= pn.getChild(0);
-        checkSimpleSubSelects(pn, "R2", null, "C");
+        checkSimpleSubSelects(pn, "R2",  "C");
     }
 
     public void testSubSelects_Function() {
@@ -251,9 +246,9 @@ public class TestSubQueries extends PlannerTestCase {
             // Function expression
             pn = compile("select ABS(C) FROM (SELECT A, C FROM R1)" + alias);
             pn = pn.getChild(0);
-            checkSimpleSubSelects(pn, tbName, null, "C1" );
+            checkSimpleSubSelects(pn, tbName,  "C1" );
             pn = pn.getChild(0);
-            checkSimpleSubSelects(pn, "R1", null, "A", "C" );
+            checkSimpleSubSelects(pn, "R1",  "A", "C" );
 
             // Should this really be supported ?
             failToCompile("select A, ABS(C) FROM (SELECT A A1, C FROM R1)" + alias,
@@ -264,37 +259,154 @@ public class TestSubQueries extends PlannerTestCase {
             // Use alias column from sub select instead.
             pn = compile("select A1, ABS(C) FROM (SELECT A A1, C FROM R1)" + alias);
             pn = pn.getChild(0);
-            checkSimpleSubSelects(pn, tbName, null, "A1", "C2" ); // hsql auto generated column alias C2.
+            checkSimpleSubSelects(pn, tbName,  "A1", "C2" ); // hsql auto generated column alias C2.
             pn = pn.getChild(0);
-            checkSimpleSubSelects(pn, "R1", null, "A", "C" );
+            checkSimpleSubSelects(pn, "R1",  "A", "C" );
 
             pn = compile("select A1 + 3, ABS(C) FROM (SELECT A A1, C FROM R1)" + alias);
             pn = pn.getChild(0);
-            checkSimpleSubSelects(pn, tbName, null, "C1", "C2" );
+            checkSimpleSubSelects(pn, tbName,  "C1", "C2" );
             assertEquals(((SeqScanPlanNode) pn).getInlinePlanNodes().size(), 1);
             pn = pn.getChild(0);
-            checkSimpleSubSelects(pn, "R1", null, "A", "C" );
+            checkSimpleSubSelects(pn, "R1",  "A", "C" );
 
 
             pn = compile("select A1 + 3, ABS(C) FROM (SELECT A A1, C FROM R1) " + alias + " WHERE ABS(A1) > 3");
             pn = pn.getChild(0);
-            checkSimpleSubSelects(pn, tbName, null, "C1", "C2" );
+            checkSimpleSubSelects(pn, tbName,  "C1", "C2" );
             assertEquals(((SeqScanPlanNode) pn).getInlinePlanNodes().size(), 1);
             pn = pn.getChild(0);
-            checkSimpleSubSelects(pn, "R1", null, "A", "C" );
+            checkSimpleSubSelects(pn, "R1",  "A", "C" );
         }
     }
 
     public void testSubSelects_Aggregation_Groupby() {
         AbstractPlanNode pn;
 
-        pn = compile("select A, C FROM (SELECT * FROM R1 WHERE A > 3 Limit 3) ");
+        pn = compile("select A, C FROM (SELECT * FROM R1 WHERE A > 3 Limit 3) T1 ");
+        pn = pn.getChild(0);
+        checkSimpleSubSelects(pn, "T1",  "A", "C" );
+        pn = pn.getChild(0);
+        checkSimpleSubSelects(pn, "R1",  "A", "C", "D");
+        checkPredicateComparisonExpression(pn, "R1");
+        assertEquals(((SeqScanPlanNode) pn).getInlinePlanNodes().size(), 2);
+        assertNotNull(((SeqScanPlanNode) pn).getInlinePlanNode(PlanNodeType.PROJECTION));
+        assertNotNull(((SeqScanPlanNode) pn).getInlinePlanNode(PlanNodeType.LIMIT));
+
+        // inline limit and projection node.
+        pn = compile("select A, SUM(D) FROM (SELECT A, D FROM R1 WHERE A > 3 Limit 3 ) T1 Group by A");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof HashAggregatePlanNode);
+        pn = pn.getChild(0);
+        checkSimpleSubSelects(pn, "T1",  "A", "D" );
+        pn = pn.getChild(0);
+        checkSimpleSubSelects(pn, "R1",  "A", "D" );
+        checkPredicateComparisonExpression(pn, "R1");
+        assertEquals(((SeqScanPlanNode) pn).getInlinePlanNodes().size(), 2);
+        assertNotNull(((SeqScanPlanNode) pn).getInlinePlanNode(PlanNodeType.PROJECTION));
+        assertNotNull(((SeqScanPlanNode) pn).getInlinePlanNode(PlanNodeType.LIMIT));
+
+        // add order by node, wihtout inline limit and projection node.
+        pn = compile("select A, SUM(D) FROM (SELECT A, D FROM R1 WHERE A > 3 ORDER BY D Limit 3 ) T1 Group by A");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof HashAggregatePlanNode);
+        pn = pn.getChild(0);
+        checkSimpleSubSelects(pn, "T1",  "A", "D" );
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof LimitPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof OrderByPlanNode);
+        pn = pn.getChild(0);
+        checkSimpleSubSelects(pn, "R1",  "A", "C", "D" );
+        checkPredicateComparisonExpression(pn, "R1");
+        assertEquals(((SeqScanPlanNode) pn).getInlinePlanNodes().size(), 0);
 
 
-//        pn = compile("select A, SUM(C) FROM (SELECT * FROM R1 WHERE A > 3 Limit 3)  Group by A");
+        pn = compile("select A, SUM(D) FROM (SELECT A, D FROM R1 WHERE A > 3 ORDER BY D Limit 3 ) T1 Group by A HAVING SUM(D) < 3");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof HashAggregatePlanNode);
+        assertNotNull(((HashAggregatePlanNode)pn).getPostPredicate());
+        pn = pn.getChild(0);
+        checkSimpleSubSelects(pn, "T1",  "A", "D" );
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof LimitPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof OrderByPlanNode);
+        pn = pn.getChild(0);
+        checkSimpleSubSelects(pn, "R1",  "A", "C", "D" );
+        checkPredicateComparisonExpression(pn, "R1");
+        assertEquals(((SeqScanPlanNode) pn).getInlinePlanNodes().size(), 0);
 
 
+        pn = compile("select A, SUM(D)*COUNT(*) FROM (SELECT A, D FROM R1 WHERE A > 3 ORDER BY D Limit 3 ) T1 Group by A HAVING SUM(D) < 3");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode); // complex aggregation
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof HashAggregatePlanNode);
+        assertNotNull(((HashAggregatePlanNode)pn).getPostPredicate());
+        pn = pn.getChild(0);
+        checkSimpleSubSelects(pn, "T1",  "A", "D" );
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof LimitPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof OrderByPlanNode);
+        pn = pn.getChild(0);
+        checkSimpleSubSelects(pn, "R1",  "A", "C", "D" );
+        checkPredicateComparisonExpression(pn, "R1");
+        assertEquals(((SeqScanPlanNode) pn).getInlinePlanNodes().size(), 0);
+
+
+
+        pn = compile("select A, SUM(D) FROM (SELECT A, D FROM R1 WHERE A > 3 ORDER BY D Limit 3 ) T1 Group by A HAVING AVG(D) < 3");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode); // complex aggregation
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof HashAggregatePlanNode);
+        assertNotNull(((HashAggregatePlanNode)pn).getPostPredicate());
+        pn = pn.getChild(0);
+        checkSimpleSubSelects(pn, "T1",  "A", "D" );
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof LimitPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof OrderByPlanNode);
+        pn = pn.getChild(0);
+        checkSimpleSubSelects(pn, "R1",  "A", "C", "D" );
+        checkPredicateComparisonExpression(pn, "R1");
+        assertEquals(((SeqScanPlanNode) pn).getInlinePlanNodes().size(), 0);
     }
+
+    public void testXin() {
+        AbstractPlanNode pn;
+
+        pn = compile("select A, SUM(D) FROM (SELECT A, D FROM R1 WHERE A > 3 ORDER BY D Limit 3 ) T1 Group by A");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof HashAggregatePlanNode);
+        pn = pn.getChild(0);
+        checkSimpleSubSelects(pn, "T1",  "A", "D" );
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof LimitPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof OrderByPlanNode);
+        pn = pn.getChild(0);
+        checkSimpleSubSelects(pn, "R1",  "A", "C", "D" );
+        checkPredicateComparisonExpression(pn, "R1");
+        assertEquals(((SeqScanPlanNode) pn).getInlinePlanNodes().size(), 0);
+    }
+
+    public void testUnsupportedSubqueries() {
+        failToCompile("DELETE FROM R1 WHERE A IN (SELECT A A1 FROM R1 WHERE A>1)", "Unsupported subquery syntax");
+    }
+
 
     public void testParameters() {
         AbstractPlanNode pn = compile("select A1 FROM (SELECT A A1 FROM R1 WHERE A>?) TEMP WHERE A1<?");
@@ -368,31 +480,26 @@ public class TestSubQueries extends PlannerTestCase {
         {
             List<AbstractPlanNode> lpn = compileToFragments("SELECT A, C FROM R1 LEFT JOIN (SELECT A, C FROM P1) TEMP ON TEMP.C = R1.C ");
             assertTrue(lpn.size() == 2);
-//            AbstractPlanNode n = lpn.get(0).getChild(0).getChild(0);
-//            assertTrue(n instanceof NestLoopPlanNode);
-//            assertEquals(JoinType.LEFT, ((NestLoopPlanNode) n).getJoinType());
-//            n = n.getChild(0);
-//            assertTrue(n instanceof SeqScanPlanNode);
-//            assertEquals("R1", ((SeqScanPlanNode) n).getTargetTableName());
-//            n = lpn.get(1).getChild(0);
-//            assertTrue(n instanceof SeqScanPlanNode);
-//            assertEquals("TEMP", ((SeqScanPlanNode) n).getTargetTableName());
-//            assertEquals(1, n.getChildCount());
-//            n = n.getChild(0);
-//            assertTrue(n instanceof ProjectionPlanNode);
-//            assertTrue(n.getChild(0) instanceof IndexScanPlanNode);
+            AbstractPlanNode n = lpn.get(0).getChild(0).getChild(0);
+            assertTrue(n instanceof NestLoopPlanNode);
+            assertEquals(JoinType.LEFT, ((NestLoopPlanNode) n).getJoinType());
+            n = n.getChild(0);
+            assertTrue(n instanceof SeqScanPlanNode);
+            assertEquals("R1", ((SeqScanPlanNode) n).getTargetTableName());
+            n = lpn.get(1).getChild(0);
+            assertTrue(n instanceof SeqScanPlanNode);
+            assertEquals("TEMP", ((SeqScanPlanNode) n).getTargetTableName());
+            assertEquals(1, n.getChildCount());
+            n = n.getChild(0);
+            assertTrue(n instanceof ProjectionPlanNode);
+            assertTrue(n.getChild(0) instanceof IndexScanPlanNode);
         }
     }
-
-    //    public void testWhereSubquery() {
-    //        AbstractPlanNode pn = compile("DELETE FROM R1 WHERE A IN (SELECT A A1 FROM R1 WHERE A>1)");
-    //        pn = pn.getChild(0);
-    //    }
 
 
     @Override
     protected void setUp() throws Exception {
-        setupSchema(TestJoinOrder.class.getResource("testsub-queries-ddl.sql"), "testsubqueries", false);
+        setupSchema(TestSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "dd", false);
     }
 
 }
