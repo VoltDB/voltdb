@@ -50,6 +50,8 @@ public class SysProcFragmentId
     public static final long PF_plannerAggregator = 23;
 
     // @Shutdown
+    public static final long PF_shutdownSync = 26;
+    public static final long PF_shutdownSyncDone = 27;
     public static final long PF_shutdownCommand = 28;
     public static final long PF_procedureDone = 29;
 
@@ -87,6 +89,11 @@ public class SysProcFragmentId
 
         return (fragId == PF_saveTest || fragId == PF_createSnapshotTargets ||
                 fragId == PF_snapshotSaveQuiesce);
+    }
+
+    public static boolean isSnapshotSaveTestFragment(byte[] planHash) {
+        long fragId = VoltSystemProcedure.hashToFragId(planHash);
+        return fragId == PF_saveTest;
     }
 
     //This method exists because there is no procedure name in fragment task message
@@ -178,6 +185,8 @@ public class SysProcFragmentId
     public static final long PF_balancePartitions = 230;
     public static final long PF_balancePartitionsAggregate = 231;
     public static final long PF_balancePartitionsData = 232;
+    public static final long PF_balancePartitionsClearIndex = 233;
+    public static final long PF_balancePartitionsClearIndexAggregate = 234;
 
     public static final long PF_validatePartitioning = 240;
     public static final long PF_validatePartitioningResults = 241;

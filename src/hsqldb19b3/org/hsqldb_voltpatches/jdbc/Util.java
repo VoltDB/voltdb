@@ -232,7 +232,7 @@ public class Util {
 //                     connection failure                006
 //
 //                     transaction resolution unknown    007
-// org.hsqldb.Trace - sql-error-messages
+// org.hsqldb_voltpatches.Trace - sql-error-messages
 //
 // 080=08000 socket creation error                             - better 08001 ?
 // 085=08000 Unexpected exception when setting up TLS
@@ -738,7 +738,7 @@ public class Util {
 //            }
 //
 //        try {
-//            return org.hsqldb.Types.getTypeNr(o.getClass().getName());
+//            return org.hsqldb_voltpatches.Types.getTypeNr(o.getClass().getName());
 //        }  catch (Exception e) {
 //            return o instanceof Serializable ? Types.OTHER : Types.JAVA_OBJECT;
 //        }

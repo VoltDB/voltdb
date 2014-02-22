@@ -115,10 +115,20 @@ public class HTTPClientInterface {
                 int port = VoltDB.instance().getConfig().m_port;
                 int adminPort = VoltDB.instance().getConfig().m_adminPort;
                 String externalInterface = VoltDB.instance().getConfig().m_externalInterface;
-                if (externalInterface == null || externalInterface.isEmpty()) {
-                    externalInterface = "localhost";
+                String adminInterface = "localhost";
+                String clientInterface = "localhost";
+                if (externalInterface != null && !externalInterface.isEmpty()) {
+                    clientInterface = externalInterface;
+                    adminInterface = externalInterface;
                 }
-                m_connections = new AuthenticatedConnectionCache(10, externalInterface, port, adminPort);
+                //If individual override is available use them.
+                if (VoltDB.instance().getConfig().m_clientInterface.length() > 0) {
+                    clientInterface = VoltDB.instance().getConfig().m_clientInterface;
+                }
+                if (VoltDB.instance().getConfig().m_adminInterface.length() > 0) {
+                    adminInterface = VoltDB.instance().getConfig().m_adminInterface;
+                }
+                m_connections = new AuthenticatedConnectionCache(10, clientInterface, port, adminInterface, adminPort);
             }
 
             String username = request.getParameter("User");

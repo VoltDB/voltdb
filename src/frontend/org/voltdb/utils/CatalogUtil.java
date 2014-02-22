@@ -984,6 +984,8 @@ public abstract class CatalogUtil {
             catDeployment.getSystemsettings().add("systemsettings");
         int maxtemptablesize = 100;
         int snapshotpriority = 6;
+        int elasticPauseTime = 50;
+        int elasticThroughput = 2;
         if (deployment.getSystemsettings() != null)
         {
             Temptables temptables = deployment.getSystemsettings().getTemptables();
@@ -995,9 +997,16 @@ public abstract class CatalogUtil {
             if (snapshot != null) {
                 snapshotpriority = snapshot.getPriority();
             }
+            SystemSettingsType.Elastic elastic = deployment.getSystemsettings().getElastic();
+            if (elastic != null) {
+                elasticPauseTime = deployment.getSystemsettings().getElastic().getDuration();
+                elasticThroughput = deployment.getSystemsettings().getElastic().getThroughput();
+            }
         }
         syssettings.setMaxtemptablesize(maxtemptablesize);
         syssettings.setSnapshotpriority(snapshotpriority);
+        syssettings.setElasticpausetime(elasticPauseTime);
+        syssettings.setElasticthroughput(elasticThroughput);
     }
 
     private static void validateDirectory(String type, File path, boolean crashOnFailedValidation) {

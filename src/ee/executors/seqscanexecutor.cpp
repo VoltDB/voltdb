@@ -182,7 +182,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         int tuple_skipped = 0;
 
         TempTable* output_temp_table = dynamic_cast<TempTable*>(output_table);
-        ProgressMonitorProxy pmp(m_engine, target_table);
+        ProgressMonitorProxy pmp(m_engine, this, target_table);
         while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
 
         {

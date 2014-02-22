@@ -36,10 +36,10 @@ import java.util.Locale;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.lib.HashMap;
-import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.lib.StringUtil;
 import org.hsqldb_voltpatches.lib.java.JavaSystem;
 import org.hsqldb_voltpatches.rights.Grantee;
+import org.hsqldb_voltpatches.lib.OrderedHashSet;
 
 /**
  * Implementation of collation support for CHAR and VARCHAR data.

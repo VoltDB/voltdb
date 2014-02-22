@@ -74,6 +74,7 @@ public class FragmentTask extends TransactionTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
+        waitOnDurabilityBackpressureFuture();
         if (hostLog.isDebugEnabled()) {
             hostLog.debug("STARTING: " + this);
         }

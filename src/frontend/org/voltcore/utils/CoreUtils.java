@@ -40,6 +40,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -71,6 +72,21 @@ public class CoreUtils {
 
     public static final int SMALL_STACK_SIZE = 1024 * 256;
     public static final int MEDIUM_STACK_SIZE = 1024 * 512;
+
+    public static final ListenableFuture<Object> COMPLETED_FUTURE = new ListenableFuture<Object>() {
+        @Override
+        public void addListener(Runnable listener, Executor executor) { executor.execute(listener); }
+        @Override
+        public boolean cancel(boolean mayInterruptIfRunning) { return false; }
+        @Override
+        public boolean isCancelled() { return false;  }
+        @Override
+        public boolean isDone() { return true; }
+        @Override
+        public Object get() { return null; }
+        @Override
+        public Object get(long timeout, TimeUnit unit) { return null; }
+    };
 
     /**
      * Get a single thread executor that caches it's thread meaning that the thread will terminate
@@ -329,7 +345,7 @@ public class CoreUtils {
                         }
                     }
                 }
-            }, 3600, TimeUnit.SECONDS);
+            }, 1, TimeUnit.DAYS);
 
     /**
      * Return the local IP address, if it's resolvable.  If not,
