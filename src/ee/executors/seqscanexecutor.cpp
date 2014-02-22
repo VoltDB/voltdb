@@ -160,7 +160,6 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         //
         TableTuple tuple(target_table->schema());
         TableIterator iterator = target_table->iterator();
-        // Sub-query will break it, at that time generalize it within a function
         AbstractExpression *predicate = node->getPredicate();
 
         if (predicate)
@@ -180,11 +179,9 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
         int tuple_ctr = 0;
         int tuple_skipped = 0;
-
         TempTable* output_temp_table = dynamic_cast<TempTable*>(output_table);
         ProgressMonitorProxy pmp(m_engine, this, target_table);
         while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
-
         {
             VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
                        tuple.debug(target_table->name()).c_str(), tuple_ctr,

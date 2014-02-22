@@ -47,6 +47,7 @@
 
 #include "common/debuglog.h"
 #include "common/serializeio.h"
+#include "common/types.h"
 #include "expressions/expressionutil.h"
 
 #include <sstream>
@@ -54,9 +55,6 @@
 #include <stdexcept>
 
 namespace voltdb {
-
-const std::map<ValueType, int> AbstractExpression::valueTypeSizeInBytes =
-        AbstractExpression::create_map_valueTypeSizeInBytes();
 
 // ------------------------------------------------------------------
 // AbstractExpression
@@ -202,13 +200,7 @@ AbstractExpression::buildExpressionTree_recurse(PlannerDomValue obj)
     assert(value_type != VALUE_TYPE_INVALID);
 
     // add the value size
-    int valueSize = 0;
-    if (obj.hasNonNullKey("VALUE_SIZE")) {
-        valueSize = obj.valueForKey("VALUE_SIZE").asInt();
-    } else {
-        // Use a hash map to get the length for common type
-        valueSize = AbstractExpression::valueTypeSizeInBytes.find(value_type)->second;
-    }
+    int valueSize = obj.valueForKey("VALUE_SIZE").asInt();
 
     // recurse to children
     try {

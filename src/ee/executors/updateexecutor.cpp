@@ -171,8 +171,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
     assert(m_inputTuple.sizeInValues() == m_inputTable->columnCount());
     assert(targetTuple.sizeInValues() == targetTable->columnCount());
     TableIterator input_iterator = m_inputTable->iterator();
-    assert(input_iterator.isTempTableIterator());
-    while (input_iterator.tempNext(m_inputTuple)) {
+    while (input_iterator.next(m_inputTuple)) {
         //
         // OPTIMIZATION: Single-Sited Query Plans
         // If our beloved UpdatePlanNode is apart of a single-site query plan,

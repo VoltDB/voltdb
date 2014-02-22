@@ -228,8 +228,6 @@ public class PlannerTool {
         }
         finally {
             if (m_plannerStats != null) {
-                // TODO(xin): size function takes 4% of cached planner time.
-                // Get the information from the cacheUse by removing the size function.
                 m_plannerStats.endStatsCollection(m_cache.getLiteralCacheSize(), m_cache.getCoreCacheSize(), cacheUse, -1);
             }
         }

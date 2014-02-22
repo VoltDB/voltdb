@@ -18,9 +18,7 @@
 package org.voltdb;
 import java.math.BigDecimal;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -367,28 +365,6 @@ public enum VoltType {
                 s_classes.put(cls, type);
             }
         }
-    }
-
-    private final static Set<VoltType> s_numericTypes;
-    private final static Map<VoltType, Integer> s_typesFixedLengthInBytes;
-    static {
-        s_numericTypes = new HashSet<VoltType>();
-        s_numericTypes.add(TINYINT);
-        s_numericTypes.add(SMALLINT);
-        s_numericTypes.add(INTEGER);
-        s_numericTypes.add(BIGINT);
-        s_numericTypes.add(TIMESTAMP);
-        s_numericTypes.add(FLOAT);
-
-        s_typesFixedLengthInBytes = new HashMap<VoltType, Integer>();
-        // Note: Keep it in sync with types.h in EE.
-        for (VoltType vt: s_numericTypes) {
-            s_typesFixedLengthInBytes.put(vt, vt.getLengthInBytesForFixedTypes());
-        }
-    }
-
-    public static Integer getFixedLengthInBytes(VoltType vtype) {
-        return s_typesFixedLengthInBytes.get(vtype);
     }
 
     /**
@@ -778,17 +754,30 @@ public enum VoltType {
      * @return True if integer type. False if not.
      */
     public boolean isInteger() {
-        if (s_numericTypes.contains(this) && this != FLOAT) {
+        switch(this)  {
+        case TINYINT:
+        case SMALLINT:
+        case INTEGER:
+        case BIGINT:
+        case TIMESTAMP:
             return true;
+        default:
+            return false;
         }
-        return false;
     }
 
     public boolean isMaxValuePaddable() {
-        if (s_numericTypes.contains(this)) {
+        switch (this) {
+        case TINYINT:
+        case SMALLINT:
+        case INTEGER:
+        case BIGINT:
+        case TIMESTAMP:
+        case FLOAT:
             return true;
+        default:
+            return false;
         }
-        return false;
     }
 
     public static Object getPaddedMaxTypeValue(VoltType type) {
@@ -807,10 +796,16 @@ public enum VoltType {
     }
 
     public boolean isNumber() {
-        if (s_numericTypes.contains(this) && this != TIMESTAMP) {
-            return true;
+        switch (this) {
+            case TINYINT:
+            case SMALLINT:
+            case INTEGER:
+            case BIGINT:
+            case FLOAT:
+                return true;
+            default:
+                return false;
         }
-        return false;
     }
 
     // Used by TheHashinator.getPartitionForParameter() to determine if the

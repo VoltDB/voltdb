@@ -149,18 +149,6 @@ class AbstractExpression {
     bool m_hasParameter;
     ValueType m_valueType;
     int m_valueSize;
-
-    static std::map<ValueType,int> create_map_valueTypeSizeInBytes() {
-        std::map<ValueType,int> m;
-        m[VALUE_TYPE_TINYINT] = 1;
-        m[VALUE_TYPE_SMALLINT] = 1;
-        m[VALUE_TYPE_INTEGER] = 1;
-        m[VALUE_TYPE_BIGINT] = 1;
-        m[VALUE_TYPE_DOUBLE] = 1;
-        m[VALUE_TYPE_TIMESTAMP] = 1;
-        return m;
-    }
-    static const std::map<ValueType, int> valueTypeSizeInBytes;
 };
 
 }

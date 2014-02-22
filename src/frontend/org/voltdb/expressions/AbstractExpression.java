@@ -458,10 +458,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         stringer.key(Members.TYPE.name()).value(m_type.toString());
         stringer.key(Members.VALUE_TYPE.name()).value(m_valueType == null ? null : m_valueType.name());
-
-        if (VoltType.getFixedLengthInBytes(m_valueType) == null) {
-            stringer.key(Members.VALUE_SIZE.name()).value(m_valueSize);
-        }
+        stringer.key(Members.VALUE_SIZE.name()).value(m_valueSize);
 
         if (m_left != null) {
             assert (m_left instanceof JSONString);
@@ -542,11 +539,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         expr.m_type = type;
 
         expr.m_valueType = VoltType.typeFromString(obj.getString(Members.VALUE_TYPE.name()));
-        if (obj.has(Members.VALUE_SIZE.name())) {
-            expr.m_valueSize = obj.getInt(Members.VALUE_SIZE.name());
-        } else {
-            expr.m_valueSize = VoltType.getFixedLengthInBytes(expr.m_valueType);
-        }
+        expr.m_valueSize = obj.getInt(Members.VALUE_SIZE.name());
 
         expr.m_left = AbstractExpression.fromJSONChild(obj, Members.LEFT.name(), tableScan);
         expr.m_right = AbstractExpression.fromJSONChild(obj, Members.RIGHT.name(), tableScan);

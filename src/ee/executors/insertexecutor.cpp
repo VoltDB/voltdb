@@ -139,8 +139,6 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     //
     assert (tbTuple.sizeInValues() == m_inputTable->columnCount());
     TableIterator iterator = m_inputTable->iterator();
-
-    assert(iterator.isTempTableIterator());
     while (iterator.next(tbTuple)) {
         VOLT_TRACE("Inserting tuple '%s' into target table '%s' with table schema: %s",
                    tbTuple.debug(targetTable->name()).c_str(), targetTable->name().c_str(),

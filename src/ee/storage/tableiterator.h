@@ -81,21 +81,21 @@ public:
      * @return true if succeeded. false if no more active tuple is there.
     */
     bool next(TableTuple &out);
-    bool hasNext() const;
+    bool hasNext();
     int getLocation() const;
-
-    bool persistentNext(TableTuple &out);
-    bool tempNext(TableTuple &out);
-
-    bool isTempTableIterator() const;
 
 private:
     // Get an iterator via table->iterator()
     TableIterator(Table *, TBMapI);
     TableIterator(Table *, std::vector<TBPtr>::iterator);
 
+
+    bool persistentNext(TableTuple &out);
+    bool tempNext(TableTuple &out);
+
     void reset(TBMapI);
     void reset(std::vector<TBPtr>::iterator);
+    bool continuationPredicate();
 
     /*
      * Configuration parameter that controls whether the table iterator
@@ -174,12 +174,8 @@ inline void TableIterator::reset(TBMapI start) {
     m_currentBlock = NULL;
 }
 
-inline bool TableIterator::hasNext() const {
+inline bool TableIterator::hasNext() {
     return m_foundTuples < m_activeTuples;
-}
-
-inline bool TableIterator::isTempTableIterator() const {
-    return m_tempTableIterator;
 }
 
 // This function should be replaced by specific iteration functions
@@ -197,6 +193,10 @@ inline bool TableIterator::persistentNext(TableTuple &out) {
     while (m_foundTuples < m_activeTuples) {
         if (m_currentBlock == NULL ||
             m_blockOffset >= m_currentBlock->unusedTupleBoundry()) {
+//            assert(m_blockIterator != m_table->m_data.end());
+//            if (m_blockIterator == m_table->m_data.end()) {
+//                throwFatalException("Could not find the expected number of tuples during a table scan");
+//            }
             m_dataPtr = m_blockIterator.key();
             m_currentBlock = m_blockIterator.data();
             m_blockOffset = 0;
@@ -212,10 +212,16 @@ inline bool TableIterator::persistentNext(TableTuple &out) {
         ++m_location;
         ++m_blockOffset;
 
+        //assert(out.isActive());
+
+        const bool active = out.isActive();
+        const bool pendingDelete = out.isPendingDelete();
+        const bool isPendingDeleteOnUndoRelease = out.isPendingDeleteOnUndoRelease();
         // Return this tuple only when this tuple is not marked as deleted.
-        if (out.isActive()) {
+        if (active) {
             ++m_foundTuples;
-            if (!out.isPendingDelete() && !out.isPendingDeleteOnUndoRelease()) {
+            if (!(pendingDelete || isPendingDeleteOnUndoRelease)) {
+                //assert(m_foundTuples == m_location);
                 return true;
             }
         }
@@ -240,10 +246,15 @@ inline bool TableIterator::tempNext(TableTuple &out) {
         assert(m_dataPtr < m_currentBlock.get()->address() + m_table->m_tableAllocationTargetSize);
         assert(m_dataPtr < m_currentBlock.get()->address() + (m_table->m_tupleLength * m_table->m_tuplesPerBlock));
 
+
+        //assert(m_foundTuples == m_location);
+
         ++m_location;
         ++m_blockOffset;
 
+        //assert(out.isActive());
         ++m_foundTuples;
+        //assert(m_foundTuples == m_location);
         return true;
     }
 

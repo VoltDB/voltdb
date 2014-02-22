@@ -99,9 +99,7 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
     distinctExpression->substitute(params);
 
     std::set<NValue, NValue::ltNValue> found_values;
-
-    assert (iterator.isTempTableIterator());
-    while (iterator.tempNext(tuple)) {
+    while (iterator.next(tuple)) {
         //
         // Check whether this value already exists in our list
         //
