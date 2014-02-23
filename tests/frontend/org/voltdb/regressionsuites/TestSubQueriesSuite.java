@@ -141,9 +141,9 @@ public class TestSubQueriesSuite extends RegressionSuite {
         builder.addServerConfig(config);
 
         // Cluster
-//        config = new LocalCluster("testunion-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-//        if (!config.compile(project)) fail();
-//        builder.addServerConfig(config);
+        config = new LocalCluster("testunion-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        if (!config.compile(project)) fail();
+        builder.addServerConfig(config);
 
         // HSQLDB
         config = new LocalCluster("testunion-cluster.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);

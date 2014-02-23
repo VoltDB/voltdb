@@ -18,7 +18,9 @@
 package org.voltdb.planner.parseinfo;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.TupleValueExpression;
@@ -40,7 +42,10 @@ public abstract class StmtTableScan {
 
     // table alias
     protected String m_tableAlias = null;
+
+    // Store a unique list of scan columns.
     protected List<SchemaColumn> m_scanColumnsList = new ArrayList<>();
+    protected Set<String> m_scanColumnNameSet = new HashSet<>();
 
     protected StmtTableScan(String tableAlias) {
         m_tableAlias = tableAlias;

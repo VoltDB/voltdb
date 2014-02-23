@@ -18,9 +18,7 @@
 package org.voltdb.planner.parseinfo;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Index;
@@ -37,10 +35,6 @@ public class StmtTargetTableScan extends StmtTableScan {
     private final Table m_table;
     private List<Index> m_indexes;
     private List<Column> m_columns;
-
-    // Store a unique list of the columns actually used by this table instance.
-    private Set<String> m_scanColumnsSet = new HashSet<>();
-    private List<SchemaColumn> m_scanColumnsList = new ArrayList<>();
 
     public StmtTargetTableScan(Table table, String tableAlias) {
         super(tableAlias);
@@ -109,12 +103,11 @@ public class StmtTargetTableScan extends StmtTableScan {
     @Override
     public void resolveTVE(TupleValueExpression expr, String columnName) {
         expr.resolveForTable(m_table);
-        if (!m_scanColumnsSet.contains(columnName)) {
+        if (!m_scanColumnNameSet.contains(columnName)) {
             SchemaColumn scol = new SchemaColumn(m_table.getTypeName(), m_tableAlias,
                     columnName, columnName, (TupleValueExpression) expr.clone());
-            m_scanColumnsSet.add(columnName);
+            m_scanColumnNameSet.add(columnName);
             m_scanColumnsList.add(scol);
         }
     }
-
 }

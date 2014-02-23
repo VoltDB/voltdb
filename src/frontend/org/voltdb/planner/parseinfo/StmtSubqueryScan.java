@@ -19,10 +19,8 @@ package org.voltdb.planner.parseinfo;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.TupleValueExpression;
@@ -48,10 +46,6 @@ public class StmtSubqueryScan extends StmtTableScan {
     private CompiledPlan m_bestCostPlan = null;
     // The partitioning object for that sub-query
     PartitioningForStatement m_partitioning = null;
-
-
-    // Store a unique list of the subquery result columns actually used by the parent query.
-    private Set<String> m_scanColumnsSet = new HashSet<>();
 
     public StmtSubqueryScan(String tableAlias, AbstractParsedStmt subquery) {
         super(tableAlias);
@@ -81,7 +75,6 @@ public class StmtSubqueryScan extends StmtTableScan {
 
     @Override
     public String getTableName() {
-        // return its alias instead
         return m_tableAlias;
     }
 
@@ -149,10 +142,10 @@ public class StmtSubqueryScan extends StmtTableScan {
         expr.setValueSize(schemaCol.getSize());
 
 
-        if (!m_scanColumnsSet.contains(columnName)) {
+        if (!m_scanColumnNameSet.contains(columnName)) {
             SchemaColumn scol = new SchemaColumn("", m_tableAlias,
                     columnName, columnName, (TupleValueExpression) expr.clone());
-            m_scanColumnsSet.add(columnName);
+            m_scanColumnNameSet.add(columnName);
             m_scanColumnsList.add(scol);
         }
     }
