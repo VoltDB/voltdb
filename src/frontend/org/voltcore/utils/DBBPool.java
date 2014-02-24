@@ -332,11 +332,11 @@ public final class DBBPool {
 
         @Override
         public void discard() {
-            checkDoubleFree();
+            final ByteBuffer buf = checkDoubleFree();
             try {
-                bytesAllocatedGlobally.getAndAdd(-b().capacity());
-                logDeallocation(b().capacity());
-                DBBPool.cleanByteBuffer(b());
+                bytesAllocatedGlobally.getAndAdd(-buf.capacity());
+                logDeallocation(buf.capacity());
+                DBBPool.cleanByteBuffer(buf);
             } catch (Throwable e) {
                 // The client code doesn't want to link to the VoltDB class, so this hack was born.
                 // It should be temporary as the goal is to remove client code dependency on
