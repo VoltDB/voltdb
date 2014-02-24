@@ -63,6 +63,8 @@ import java.util.List;
 import org.mockito.Mockito;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
+import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 
 /** Hack subclass of VoltClient that fakes callProcedure. */
 public class MockVoltClient implements Client, ReplicaProcCaller{
@@ -322,4 +324,10 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
         // TODO Auto-generated method stub
         return null;
     }
+
+    @Override
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack blfcb) {
+    	return null;
+    }
+
 }

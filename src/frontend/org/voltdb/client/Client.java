@@ -24,6 +24,9 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.List;
 
+import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
+import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
+
 /**
  *  <p>
  *  A <code>Client</code> that connects to one or more nodes in a volt cluster
@@ -292,4 +295,16 @@ public interface Client {
      * @throws IOException on any file write error.
      */
     public void writeSummaryCSV(ClientStats stats, String path) throws IOException;
+    
+    /**
+     * <p>Create a new VoltBulkLoader.</p>
+     *
+     * <p>This is a synchronous operation.</p>
+     *
+     * @param name of table that bulk inserts are to be applied to.
+     * @param number of rows to collect for the table before starting a bulk insert.
+     * @param user defined callback procedure used for notification of failed inserts.
+     * @throws Exception if tableName can't be found in the catalog.
+     */
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack blfcb) throws Exception;
 }
