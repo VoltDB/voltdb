@@ -37,6 +37,7 @@ import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.utils.BuildDirectoryUtils;
 
@@ -94,6 +95,14 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         assertEquals(col.getSize(), sz);
     }
 
+    //Check given col does exists
+    public void verifyTableColumnExists(VoltCompiler compiler, String tableName, String colName) {
+        Database db = compiler.m_catalog.getClusters().get("cluster").getDatabases().get("database");
+        Table table = db.getTables().get(tableName);
+        Column col = table.getColumns().get(colName);
+        assertNotNull(col);
+    }
+
     //Check given col does not exists
     public void verifyTableColumnGone(VoltCompiler compiler, String tableName, String colName) {
         Database db = compiler.m_catalog.getClusters().get("cluster").getDatabases().get("database");
@@ -102,11 +111,38 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         assertNull(col);
     }
 
+    //Check given index exists
+    public void verifyIndexExists(VoltCompiler compiler, String tableName, String idxName) {
+        Database db = compiler.m_catalog.getClusters().get("cluster").getDatabases().get("database");
+        Table table = db.getTables().get(tableName);
+        Index idx = table.getIndexes().get(idxName);
+        assertNotNull(idx);
+    }
+
+    //Check given index exists
+    public void verifyIndexGone(VoltCompiler compiler, String tableName, String idxName) {
+        Database db = compiler.m_catalog.getClusters().get("cluster").getDatabases().get("database");
+        Table table = db.getTables().get(tableName);
+        if (table == null) {
+            //Index must be gone.
+            return;
+        }
+        Index idx = table.getIndexes().get(idxName);
+        assertNull(idx);
+    }
+
     //Check given table is gone
     public void verifyTableGone(VoltCompiler compiler, String tableName) {
         Database db = compiler.m_catalog.getClusters().get("cluster").getDatabases().get("database");
         Table table = db.getTables().get(tableName);
         assertNull(table);
+    }
+
+    //Check given table exists
+    public void verifyTableExists(VoltCompiler compiler, String tableName) {
+        Database db = compiler.m_catalog.getClusters().get("cluster").getDatabases().get("database");
+        Table table = db.getTables().get(tableName);
+        assertNotNull(table);
     }
 
     public void testAlterTable() throws IOException {
@@ -368,7 +404,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
     //Index
     public void testAlterTableDropColumnWithIndex() throws IOException {
         final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
+                = "create table mytable (pkey integer, column2_integer integer);\n"
                 + "create unique index pkey_idx on mytable(pkey);\n"
                 + "alter table mytable drop column column2_integer;\n";
 
@@ -377,6 +413,22 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
         verifyTableColumnGone(compiler, "mytable", "column2_integer");
+        verifyIndexExists(compiler, "mytable", "pkey_idx");
+    }
+
+    public void testAlterTableDropColumnWithIndexRecreateColumn() throws IOException {
+        final String simpleSchema1
+                = "create table mytable (pkey integer, column2_integer integer);\n"
+                + "create unique index pkey_idx on mytable(pkey);\n"
+                + "alter table mytable drop column pkey;\n"
+                + "alter table mytable add column pkey integer;\n";
+
+        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
+        final VoltCompiler compiler = new VoltCompiler();
+        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertTrue(success);
+        verifyTableColumnExists(compiler, "mytable", "pkey");
+        verifyIndexGone(compiler, "mytable", "pkey_idx");
     }
 
     public void testAlterTableDropRelatedColumnWithIndex() throws IOException {
@@ -391,6 +443,8 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
         verifyTableColumnGone(compiler, "mytable", "pkey");
+        verifyIndexExists(compiler, "mytable", "pkey_idxx");
+        verifyIndexGone(compiler, "mytable", "pkey_idx");
     }
 
     public void testAlterTableBadVarchar() throws IOException {
@@ -477,7 +531,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         assertEquals(1, foundSZError);
     }
 
-    public void testTooManyColumnThenLessColumnTable() throws IOException, HSQLInterface.HSQLParseException {
+    public void testTooManyColumnThenDropBelowLimit() throws IOException, HSQLInterface.HSQLParseException {
         String schemaPath = "";
         URL url = TestVoltCompilerAlterDropTable.class.getResource("toowidetable-ddl.sql");
         schemaPath = URLDecoder.decode(url.getPath(), "UTF-8");
@@ -495,6 +549,42 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
         verifyTableColumnGone(compiler, "MANY_COLUMNS", "COL01022");
+    }
+
+    public void testAlterTableRowLimit() throws IOException {
+        //Just enough big row one byte over and we will fail to compile.
+        String simpleSchema1 = "create table mytable (val1 varchar(1048572), val2 varchar(1048572));\n";
+        String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
+        VoltCompiler compiler = new VoltCompiler();
+        boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertTrue(success);
+
+        //Still over after alter
+        simpleSchema1 = "create table mytable (val1 varchar(1048576), val2 varchar(1048576));"
+                + "alter table mytable alter column val1 varchar(1048572);\n";
+        projectPath = getSimpleProjectPathForDDL(simpleSchema1);
+        compiler = new VoltCompiler();
+        success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertFalse(success);
+
+        //Going under after alter
+        simpleSchema1 = "create table mytable (val1 varchar(1048576), val2 varchar(1048576));"
+                + "alter table mytable alter column val1 varchar(1048572);\n"
+                + "alter table mytable alter column val2 varchar(1048572);\n";
+        projectPath = getSimpleProjectPathForDDL(simpleSchema1);
+        compiler = new VoltCompiler();
+        success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertTrue(success);
+
+        //Going over: after alter going under and back over
+        simpleSchema1 = "create table mytable (val1 varchar(1048576), val2 varchar(1048576));"
+                + "alter table mytable alter column val1 varchar(1048572);\n"
+                + "alter table mytable alter column val2 varchar(1048572);\n"
+                + "alter table mytable alter column val1 varchar(1048576);\n";
+        projectPath = getSimpleProjectPathForDDL(simpleSchema1);
+        compiler = new VoltCompiler();
+        success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertFalse(success);
     }
 
     //We will be successful in compiling but a WARN should appear.
@@ -668,6 +758,19 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         verifyTableColumnSize(compiler, "mytable", "pkey2", 500);
     }
 
+    public void testAlterTableAddNonNULLPartitionThenPartitionOnOriginalColumn() throws IOException {
+        final String simpleSchema1
+                = "create table mytable  (pkey varchar(20) NOT NULL, column2_integer integer);\n"
+                + "alter table mytable add column pkey2 varchar(500) NOT NULL;\n"
+                + "PARTITION TABLE mytable ON COLUMN pkey;\n";
+
+        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
+        final VoltCompiler compiler = new VoltCompiler();
+        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertTrue(success);
+        verifyTableColumnSize(compiler, "mytable", "pkey2", 500);
+    }
+
     //DROP TABLE TESTS from here
     public void testDropTable() throws IOException {
         final String simpleSchema1
@@ -702,6 +805,35 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
         verifyTableColumnTypes(compiler, "mytable", "pkey", VoltType.INTEGER);
+    }
+
+    public void testDropTableWithIndex() throws IOException {
+        final String simpleSchema1
+                = "create table mytable  (pkey integer, column2_integer integer);\n"
+                + "create unique index pkey_idx on mytable(pkey);\n"
+                + "drop table mytable;\n";
+
+        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
+        final VoltCompiler compiler = new VoltCompiler();
+        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertTrue(success);
+        verifyTableGone(compiler, "mytable");
+        verifyIndexGone(compiler, "mytable", "pkey_idx");
+    }
+
+    public void testDropTableWithIndexAndReCreateTable() throws IOException {
+        final String simpleSchema1
+                = "create table mytable  (pkey integer, column2_integer integer);\n"
+                + "create unique index pkey_idx on mytable(pkey);\n"
+                + "drop table mytable;\n"
+                + "create table mytable  (pkey integer, column2_integer integer);\n";
+
+        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
+        final VoltCompiler compiler = new VoltCompiler();
+        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertTrue(success);
+        verifyTableExists(compiler, "mytable");
+        verifyIndexGone(compiler, "mytable", "pkey_idx");
     }
 
     //Should fail as table should not exist
