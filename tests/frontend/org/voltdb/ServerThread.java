@@ -35,8 +35,6 @@ import org.voltdb.utils.MiscUtils;
 public class ServerThread extends Thread {
     VoltDB.Configuration m_config;
     boolean initialized = false;
-    // Startup sleep time in milliseconds for testing retry logic, etc..
-    int m_startupDelayMS = 0;
 
     public ServerThread(VoltDB.Configuration config) {
         m_config = config;
@@ -127,15 +125,6 @@ public class ServerThread extends Thread {
 
     @Override
     public void run() {
-        if (m_startupDelayMS > 0) {
-            try {
-                System.out.printf("Delaying server thread initialization by %d ms...\n", m_startupDelayMS);
-                Thread.sleep(m_startupDelayMS);
-            }
-            catch (InterruptedException e) {
-                throw new RuntimeException("Initial sleep was interrupted.");
-            }
-        }
         VoltDB.initialize(m_config);
         VoltDB.instance().run();
     }
@@ -163,10 +152,6 @@ public class ServerThread extends Thread {
         while (VoltDB.instance().isRunning()) {
             Thread.sleep(1);
         }
-    }
-
-    public void setStartupDelayMS(int startupDelayMS) {
-        m_startupDelayMS = startupDelayMS;
     }
 
     /**

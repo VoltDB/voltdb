@@ -140,7 +140,7 @@ public class JDBC4ClientConnection implements Closeable {
             config.setMaxOutstandingTxns(maxOutstandingTxns);
 
         // Create client and connect.
-        initializeClientConnection(false);
+        initializeClientConnection();
     }
 
     /**
@@ -148,7 +148,7 @@ public class JDBC4ClientConnection implements Closeable {
      * @throws UnknownHostException
      * @throws IOException
      */
-    private void initializeClientConnection(boolean retry) throws UnknownHostException, IOException
+    private void initializeClientConnection() throws UnknownHostException, IOException
     {
         // Make sure client is non-null only when fully connected.
         Client clientTmp = this.client;
@@ -163,7 +163,7 @@ public class JDBC4ClientConnection implements Closeable {
             }
         }
 
-        // Make connections and retry as needed if allowed.
+        // Make client connections.
         clientTmp = ClientFactory.createClient(this.config);
         for (String server : this.servers) {
             clientTmp.createConnection(server);
@@ -183,7 +183,7 @@ public class JDBC4ClientConnection implements Closeable {
     protected ClientImpl getClient() throws UnknownHostException, IOException
     {
         if (this.client == null) {
-            this.initializeClientConnection(true);
+            this.initializeClientConnection();
         }
         return (ClientImpl) this.client;
     }
@@ -220,7 +220,7 @@ public class JDBC4ClientConnection implements Closeable {
      * Drop the client connection, e.g. when a NoConnectionsException is caught.
      * It will try to reconnect as needed and appropriate.
      */
-    protected void drop_client() {
+    protected void dropClient() {
         // Force dispose() to get rid of the client.
         this.users = 1;
         this.dispose();
@@ -266,7 +266,7 @@ public class JDBC4ClientConnection implements Closeable {
         }
         catch (NoConnectionsException e) {
             this.statistics.update(procedure, System.currentTimeMillis() - start, false);
-            this.drop_client();
+            this.dropClient();
             throw e;
         }
     }
@@ -333,7 +333,7 @@ public class JDBC4ClientConnection implements Closeable {
                     procedure, parameters);
         }
         catch (NoConnectionsException e) {
-            this.drop_client();
+            this.dropClient();
             throw e;
         }
     }
@@ -366,7 +366,7 @@ public class JDBC4ClientConnection implements Closeable {
             }), procedure, parameters);
         }
         catch (NoConnectionsException e) {
-            this.drop_client();
+            this.dropClient();
             throw e;
         }
         return future;
@@ -470,7 +470,7 @@ public class JDBC4ClientConnection implements Closeable {
             this.client.drain();
         }
         catch (NoConnectionsException e) {
-            this.drop_client();
+            this.dropClient();
             throw e;
         }
     }
@@ -509,9 +509,8 @@ public class JDBC4ClientConnection implements Closeable {
             return this.getClient().updateApplicationCatalog(catalogPath, deploymentPath);
         }
         catch (NoConnectionsException e) {
-            this.drop_client();
+            this.dropClient();
             throw e;
         }
     }
 }
-
