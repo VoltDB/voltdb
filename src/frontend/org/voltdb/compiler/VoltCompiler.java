@@ -2098,10 +2098,9 @@ public class VoltCompiler {
                         "Failed to find class file %s in jar.", cpath));
             }
 
-            Pattern nameRE = Pattern.compile("\\A(" + stem + "\\$[^/]+).class\\z");
-
             // load from an on-disk jar
             if ("jar".equals(curl.getProtocol())) {
+                Pattern nameRE = Pattern.compile("\\A(" + stem + "\\$[^/]+).class\\z");
                 String jarFN;
                 try {
                     jarFN = URLDecoder.decode(curl.getFile(), "UTF-8");
@@ -2141,6 +2140,7 @@ public class VoltCompiler {
             }
             // load directly from a classfile
             else if ("file".equals(curl.getProtocol())) {
+                Pattern nameRE = Pattern.compile("/(" + stem + "\\$[^/]+).class\\z");
                 File sourceDH = new File(curl.getFile()).getParentFile();
                 for (File f: sourceDH.listFiles()) {
                     Matcher mtc = nameRE.matcher(f.getAbsolutePath());
