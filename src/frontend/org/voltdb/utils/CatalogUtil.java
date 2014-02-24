@@ -139,26 +139,84 @@ public abstract class CatalogUtil {
     public static String loadCatalogFromJar(byte[] catalogBytes, VoltLogger log)
             throws IOException
     {
-        InMemoryJarfile jarfile = loadCatalogJar(catalogBytes, log);
+        // Throws IOException on load failure.
+        InMemoryJarfile jarfile = loadInMemoryJarFile(catalogBytes);
         byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
-        // Expect non-null here because loadCatalogJar() should have thrown an exception.
-        assert(serializedCatalogBytes != null);
         return new String(serializedCatalogBytes, Constants.UTF8ENCODING);
     }
 
     /**
-     * Load a catalog from the jar bytes and provide the loaded in-memory jar.
-     * Access at this level is mainly for testing. Most callers only need the
-     * final catalog bytes, and should call loadCatalogFromJar() instead.
+     * Load a catalog from the jar bytes.
      *
      * @param catalogBytes
      * @param log
-     * @return The in-memory jar containing the loaded catalog.
+     * @return The serialized string of the catalog content.
      * @throws IOException
      *             If the catalog cannot be loaded because it's incompatible, or
      *             if there is no version information in the catalog.
      */
-    public static InMemoryJarfile loadCatalogJar(byte[] catalogBytes, VoltLogger log)
+    public static String loadAndUpgradeCatalogFromJar(byte[] catalogBytes, VoltLogger log)
+            throws IOException
+    {
+        // Throws IOException on load failure.
+        InMemoryJarfile jarfile = loadInMemoryJarFile(catalogBytes);
+        // Let VoltCompiler do a version check and upgrade the catalog on the fly.
+        // I.e. jarfile may be modified.
+        VoltCompiler compiler = new VoltCompiler();
+        compiler.upgradeCatalogAsNeeded(jarfile);
+        byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
+        return new String(serializedCatalogBytes, Constants.UTF8ENCODING);
+    }
+
+    /**
+     * Get the catalog build info from the jar bytes.
+     * Performs sanity checks on the build info and version strings.
+     *
+     * @param jarfile in-memory catalog jar file
+     * @return build info lines
+     * @throws IOException If the catalog or the version string cannot be loaded.
+     */
+    public static String[] getBuildInfoFromJar(InMemoryJarfile jarfile)
+            throws IOException
+    {
+        // Read the raw build info bytes.
+        byte[] buildInfoBytes = jarfile.get(CATALOG_BUILDINFO_FILENAME);
+        if (buildInfoBytes == null) {
+            throw new IOException("Catalog build information not found - please build your application using the current version of VoltDB.");
+        }
+
+        // Convert the bytes to a string and split by lines.
+        String buildInfo;
+        buildInfo = new String(buildInfoBytes, Constants.UTF8ENCODING);
+        String[] buildInfoLines = buildInfo.split("\n");
+
+        // Sanity check the number of lines and the version string.
+        if (buildInfoLines.length < 1) {
+            throw new IOException("Catalog build info has no version string.");
+        }
+        String versionFromCatalog = buildInfoLines[0].trim();
+        if (!CatalogUtil.isCatalogVersionValid(versionFromCatalog)) {
+            throw new IOException(String.format(
+                    "Catalog build info version (%s) is bad.", versionFromCatalog));
+        }
+
+        // Trim leading/trailing whitespace.
+        for (int i = 0; i < buildInfoLines.length; ++i) {
+            buildInfoLines[i] = buildInfoLines[i].trim();
+        }
+
+        return buildInfoLines;
+    }
+
+    /**
+     * Load an in-memory catalog jar file from jar bytes.
+     *
+     * @param catalogBytes
+     * @param log
+     * @return The in-memory jar containing the loaded catalog.
+     * @throws IOException If the catalog cannot be loaded.
+     */
+    public static InMemoryJarfile loadInMemoryJarFile(byte[] catalogBytes)
             throws IOException
     {
         assert(catalogBytes != null);
@@ -169,11 +227,6 @@ public abstract class CatalogUtil {
         if (null == serializedCatalogBytes) {
             throw new IOException("Database catalog not found - please build your application using the current version of VoltDB.");
         }
-
-        // Let VoltCompiler do a version check and upgrade the catalog on the fly.
-        // I.e. jarfile may be modified.
-        VoltCompiler compiler = new VoltCompiler();
-        compiler.upgradeCatalogAsNeeded(jarfile);
 
         return jarfile;
     }
@@ -506,16 +559,16 @@ public abstract class CatalogUtil {
     }
 
     /**
-     * Check if a catalog compiled with the given version of VoltDB is
-     * compatible with the current version of VoltDB.
+     * Check if a catalog version string is valid.
      *
      * @param catalogVersionStr
      *            The version string of the VoltDB that compiled the catalog.
-     * @return true if it's compatible, false otherwise.
+     * @return true if it's valid, false otherwise.
      */
 
-    public static boolean isCatalogCompatible(String catalogVersionStr)
+    public static boolean isCatalogVersionValid(String catalogVersionStr)
     {
+        // Do we have a version string?
         if (catalogVersionStr == null || catalogVersionStr.isEmpty()) {
             return false;
         }
@@ -523,13 +576,10 @@ public abstract class CatalogUtil {
         //Check that it is a properly formed version string
         Object[] catalogVersion = MiscUtils.parseVersionString(catalogVersionStr);
         if (catalogVersion == null) {
-            throw new IllegalArgumentException("Invalid version string " + catalogVersionStr);
-        }
-
-        if (!catalogVersionStr.equals(VoltDB.instance().getVersionString())) {
             return false;
         }
 
+        // It's valid.
         return true;
     }
 

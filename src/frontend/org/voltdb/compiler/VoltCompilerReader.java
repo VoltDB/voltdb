@@ -23,8 +23,7 @@ import java.io.Reader;
 import org.voltdb.utils.InMemoryJarfile;
 
 /**
- * @author scooper
- *
+ * Abstract base for readers used during catalog compile or upgrade.
  */
 public abstract class VoltCompilerReader extends Reader
 {
