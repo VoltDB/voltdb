@@ -110,7 +110,7 @@ public class CSVTableSaveFile {
 
                 try {
                     final VoltTable vt = PrivateVoltTableFactory
-                            .createVoltTableFromBuffer(c.b, true);
+                            .createVoltTableFromBuffer(c.b(), true);
                     Pair<Integer, byte[]> p = VoltTableUtil.toCSV( vt, m_delimiter, null, lastNumCharacters);
                     lastNumCharacters = p.getFirst();
                     byte csvBytes[] = p.getSecond();

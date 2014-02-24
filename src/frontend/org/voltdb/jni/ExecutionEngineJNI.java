@@ -75,7 +75,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      **/
     private final BBContainer deserializerBufferOrigin = org.voltcore.utils.DBBPool.allocateDirect(1024 * 1024 * 10);
     private FastDeserializer deserializer =
-        new FastDeserializer(deserializerBufferOrigin.b);
+        new FastDeserializer(deserializerBufferOrigin.b());
 
     /*
      * For large result sets the EE will allocate new memory for the results
@@ -84,7 +84,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     private ByteBuffer fallbackBuffer = null;
 
     private final BBContainer exceptionBufferOrigin = org.voltcore.utils.DBBPool.allocateDirect(1024 * 1024 * 5);
-    private ByteBuffer exceptionBuffer = exceptionBufferOrigin.b;
+    private ByteBuffer exceptionBuffer = exceptionBufferOrigin.b();
 
     /**
      * initialize the native Engine object.
@@ -136,8 +136,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
         psetBuffer = DBBPool.allocateDirect(size);
 
-        int errorCode = nativeSetBuffers(pointer, psetBuffer.b,
-                psetBuffer.b.capacity(),
+        int errorCode = nativeSetBuffers(pointer, psetBuffer.b(),
+                psetBuffer.b().capacity(),
                 deserializer.buffer(), deserializer.buffer().capacity(),
                 exceptionBuffer, exceptionBuffer.capacity());
         checkErrorCode(errorCode);
@@ -145,11 +145,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     final void clearPsetAndEnsureCapacity(int size) {
         assert(psetBuffer != null);
-        if (size > psetBuffer.b.capacity()) {
+        if (size > psetBuffer.b().capacity()) {
             setupPsetBuffer(size);
         }
         else {
-            psetBuffer.b.clear();
+            psetBuffer.b().clear();
         }
     }
 
@@ -260,12 +260,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         for (int i = 0; i < batchSize; ++i) {
             if (parameterSets[i] instanceof ByteBuffer) {
                 ByteBuffer buf = (ByteBuffer) parameterSets[i];
-                psetBuffer.b.put(buf);
+                psetBuffer.b().put(buf);
             }
             else {
                 ParameterSet pset = (ParameterSet) parameterSets[i];
                 try {
-                    pset.flattenToBuffer(psetBuffer.b);
+                    pset.flattenToBuffer(psetBuffer.b());
                 }
                 catch (final IOException exception) {
                     throw new RuntimeException("Error serializing parameters for SQL batch element: " +
@@ -547,7 +547,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         // serialize the param set
         clearPsetAndEnsureCapacity(parameterSet.getSerializedSize());
         try {
-            parameterSet.flattenToBuffer(psetBuffer.b);
+            parameterSet.flattenToBuffer(psetBuffer.b());
         } catch (final IOException exception) {
             throw new RuntimeException(exception); // can't happen
         }
@@ -564,7 +564,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             // serialize the param set
             clearPsetAndEnsureCapacity(parameterSet.getSerializedSize());
             try {
-                parameterSet.flattenToBuffer(psetBuffer.b);
+                parameterSet.flattenToBuffer(psetBuffer.b());
             } catch (final IOException exception) {
                 throw new RuntimeException(exception); // can't happen
             }
@@ -594,8 +594,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
         byte retval[] = null;
         try {
-            psetBuffer.b.putLong(taskType.taskId);
-            psetBuffer.b.put(task);
+            psetBuffer.b().putLong(taskType.taskId);
+            psetBuffer.b().put(task);
 
             //Clear is destructive, do it before the native call
             deserializer.clear();

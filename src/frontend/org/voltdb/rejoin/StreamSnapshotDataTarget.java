@@ -172,8 +172,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
          * subsystem.
          */
         protected int send(Mailbox mb, MessageFactory msgFactory, BBContainer message) throws IOException {
-            if (message.b.isDirect()) {
-                byte[] data = CompressionService.compressBuffer(message.b);
+            if (message.b().isDirect()) {
+                byte[] data = CompressionService.compressBuffer(message.b());
                 mb.send(m_destHSId, msgFactory.makeDataMessage(m_targetId, data));
 
                 if (rejoinLog.isTraceEnabled()) {
@@ -184,8 +184,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             } else {
                 byte compressedBytes[] =
                     CompressionService.compressBytes(
-                        message.b.array(), message.b.position(),
-                        message.b.remaining());
+                        message.b().array(), message.b().position(),
+                        message.b().remaining());
 
                 mb.send(m_destHSId, msgFactory.makeDataMessage(m_targetId, compressedBytes));
 
@@ -419,11 +419,11 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 send(StreamSnapshotMessageType.SCHEMA, tableId, schema);
             }
 
-            chunk.b.put((byte) StreamSnapshotMessageType.DATA.ordinal());
-            chunk.b.putInt(m_blockIndex); // put chunk index
-            chunk.b.putInt(tableId); // put table ID
+            chunk.b().put((byte) StreamSnapshotMessageType.DATA.ordinal());
+            chunk.b().putInt(m_blockIndex); // put chunk index
+            chunk.b().putInt(tableId); // put table ID
 
-            chunk.b.position(0);
+            chunk.b().position(0);
 
             return send(m_blockIndex++, chunk);
         } finally {
@@ -577,7 +577,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     public int getInContainerRowCount(BBContainer tupleData) {
         // according to TableOutputStream.cpp:TupleOutputStream::endRows() the row count is
         // at offset 4 (second integer)
-        ByteBuffer bb = tupleData.b.duplicate();
+        ByteBuffer bb = tupleData.b().duplicate();
         bb.position(getHeaderSize());
         bb.getInt(); // skip first four (partition id)
 

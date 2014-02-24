@@ -71,6 +71,7 @@ public class TableSaveFile
 
         @Override
         public void discard() {
+            checkDoubleFree();
             if (m_hasMoreChunks == false) {
                 m_origin.discard();
             } else {
@@ -674,12 +675,12 @@ public class TableSaveFile
                          * Put in the header that was cached in the constructor,
                          * then copy the tuple data.
                          */
-                        c.b.clear();
-                        c.b.limit(nextChunkLength  + m_tableHeader.capacity());
+                        c.b().clear();
+                        c.b().limit(nextChunkLength  + m_tableHeader.capacity());
                         m_tableHeader.position(0);
-                        c.b.put(m_tableHeader);
+                        c.b().put(m_tableHeader);
                         //Doesn't move buffer position, does change the limit
-                        CompressionService.decompressBuffer(fileInputBuffer, c.b);
+                        CompressionService.decompressBuffer(fileInputBuffer, c.b());
                         completedRead = true;
                     } finally {
                         if (!completedRead) {
@@ -704,7 +705,7 @@ public class TableSaveFile
                     /*
                      * VoltTable wants the buffer at the home position 0
                      */
-                    c.b.position(0);
+                    c.b().position(0);
 
                     synchronized (TableSaveFile.this) {
                         m_availableChunks.offer(c);
@@ -875,35 +876,35 @@ public class TableSaveFile
                          * It will have to be moved back to the beginning of the tuple data
                          * after the header once the CRC has been calculated.
                          */
-                        c.b.clear();
+                        c.b().clear();
                         //The length of the chunk already includes space for the 4-byte row count
                         //even though it is at the end, but we need to also leave at the end for the CRC calc
                         if (isCompressed()) {
-                            c.b.limit(nextChunkLength  + m_tableHeader.capacity() + 4);
+                            c.b().limit(nextChunkLength  + m_tableHeader.capacity() + 4);
                         } else {
                             //Before compression the chunk length included the stuff added in the EE
                             //like the 2 CRCs and partition id. It is only -8 because we still need the 4-bytes
                             //of padding to move the row count in when constructing the volt table format.
-                            c.b.limit((nextChunkLength - 8)  + m_tableHeader.capacity());
+                            c.b().limit((nextChunkLength - 8)  + m_tableHeader.capacity());
                         }
                         m_tableHeader.position(0);
-                        c.b.put(m_tableHeader);
-                        c.b.position(c.b.position() + 4);//Leave space for row count to be moved into
-                        checksumStartPosition = c.b.position();
+                        c.b().put(m_tableHeader);
+                        c.b().position(c.b().position() + 4);//Leave space for row count to be moved into
+                        checksumStartPosition = c.b().position();
                         if (isCompressed()) {
-                            CompressionService.decompressBuffer(fileInputBuffer, c.b);
-                            c.b.position(c.b.limit());
+                            CompressionService.decompressBuffer(fileInputBuffer, c.b());
+                            c.b().position(c.b().limit());
                         } else {
-                            while (c.b.hasRemaining()) {
-                                final int read = m_saveFile.read(c.b);
+                            while (c.b().hasRemaining()) {
+                                final int read = m_saveFile.read(c.b());
                                 if (read == -1) {
                                     throw new EOFException();
                                 }
                             }
                         }
-                        c.b.position(c.b.position() - 4);
-                        rowCount = c.b.getInt();
-                        c.b.position(checksumStartPosition);
+                        c.b().position(c.b().position() - 4);
+                        rowCount = c.b().getInt();
+                        c.b().position(checksumStartPosition);
                         completedRead = true;
                     } finally {
                         if (!completedRead) {
@@ -919,8 +920,8 @@ public class TableSaveFile
                      */
                     final int calculatedCRC =
                             m_checksumType == ChecksumType.CRC32C  ?
-                                    DBBPool.getCRC32C(c.address(), c.b.position(), c.b.remaining()) :
-                                        DBBPool.getCRC32(c.address(), c.b.position(), c.b.remaining());
+                                    DBBPool.getCRC32C(c.address(), c.b().position(), c.b().remaining()) :
+                                        DBBPool.getCRC32(c.address(), c.b().position(), c.b().remaining());
                     if (calculatedCRC != nextChunkCRC) {
                         m_corruptedPartitions.add(nextChunkPartitionId);
                         if (m_continueOnCorruptedChunk) {
@@ -954,10 +955,10 @@ public class TableSaveFile
                      */
                     boolean success = false;
                     try {
-                        c.b.limit(c.b.limit() - 4);
-                        c.b.position(checksumStartPosition - 4);
-                        c.b.putInt(rowCount);
-                        c.b.position(0);
+                        c.b().limit(c.b().limit() - 4);
+                        c.b().position(checksumStartPosition - 4);
+                        c.b().putInt(rowCount);
+                        c.b().position(0);
                         success = true;
                     } finally {
                         if (!success) {
@@ -1012,7 +1013,7 @@ public class TableSaveFile
             Container c = m_buffers.poll();
             if (c == null) {
                 final BBContainer originContainer = DBBPool.allocateDirect(DEFAULT_CHUNKSIZE);
-                final ByteBuffer b = originContainer.b;
+                final ByteBuffer b = originContainer.b();
                 c = new Container(b, originContainer, nextChunkPartitionId);
             }
             /*
@@ -1020,7 +1021,7 @@ public class TableSaveFile
              * chunk so it can be a final public field. The buffer, address, and origin
              * container remain the same.
              */
-            c = new Container(c.b, c.m_origin, nextChunkPartitionId);
+            c = new Container(c.b(), c.m_origin, nextChunkPartitionId);
             return c;
         }
 

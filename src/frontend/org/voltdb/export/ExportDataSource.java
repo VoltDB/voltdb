@@ -57,6 +57,8 @@ import com.google_voltpatches.common.io.Files;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import sun.nio.ch.DirectBuffer;
+
 import java.util.concurrent.RejectedExecutionException;
 
 /**
@@ -453,8 +455,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             new BBContainer(buffer) {
                                 @Override
                                 public void discard() {
-                                    if (b.isDirect()) {
-                                        DBBPool.deleteCharArrayMemory(address());
+                                    final ByteBuffer buf = checkDoubleFree();
+                                    if (buf.isDirect()) {
+                                        DBBPool.deleteCharArrayMemory(((DirectBuffer) buf).address());
                                     }
                                     deleted.set(true);
                                 }
@@ -666,6 +669,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         @Override
         public void discard() {
+            checkDoubleFree();
             try {
                 ack(m_uso);
             } finally {

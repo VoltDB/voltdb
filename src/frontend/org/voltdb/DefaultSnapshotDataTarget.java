@@ -204,15 +204,15 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         fs.write(jsonBytes);
 
         final BBContainer container = fs.getBBContainer();
-        container.b.position(4);
-        container.b.putInt(container.b.remaining() - 4);
-        container.b.position(0);
+        container.b().position(4);
+        container.b().putInt(container.b().remaining() - 4);
+        container.b().position(0);
 
         final byte schemaBytes[] = PrivateVoltTableFactory.getSchemaBytes(schemaTable);
 
         final PureJavaCrc32 crc = new PureJavaCrc32();
-        ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b.remaining() + schemaBytes.length);
-        aggregateBuffer.put(container.b);
+        ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b().remaining() + schemaBytes.length);
+        aggregateBuffer.put(container.b());
         aggregateBuffer.put(schemaBytes);
         aggregateBuffer.flip();
         crc.update(aggregateBuffer.array(), 4, aggregateBuffer.capacity() - 4);
@@ -381,14 +381,14 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     DBBPool.allocateDirectAndPool(SnapshotSiteProcessor.m_snapshotBufferCompressedLen);
             //Skip 4-bytes so the partition ID is not compressed
             //That way if we detect a corruption we know what partition is bad
-            tupleData.b.position(tupleData.b.position() + 4);
+            tupleData.b().position(tupleData.b().position() + 4);
             /*
              * Leave 12 bytes, it's going to be a 4-byte length prefix, a 4-byte partition id,
              * and a 4-byte CRC32C of just the header bytes, in addition to the compressed payload CRC
              * that is 16 bytes, but 4 of those are done by CompressionService
              */
-            cont.b.position(12);
-            compressionTask = CompressionService.compressAndCRC32cBufferAsync(tupleData.b, cont);
+            cont.b().position(12);
+            compressionTask = CompressionService.compressAndCRC32cBufferAsync(tupleData.b(), cont);
         }
         final Future<BBContainer> compressionTaskFinal = compressionTask;
 
@@ -411,7 +411,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     if (prependLength) {
                         BBContainer payloadContainer = compressionTaskFinal.get();
                         try {
-                            final ByteBuffer payloadBuffer = payloadContainer.b;
+                            final ByteBuffer payloadBuffer = payloadContainer.b();
                             payloadBuffer.position(0);
 
                             ByteBuffer lengthPrefix = ByteBuffer.allocate(12);
@@ -419,7 +419,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                             //Length prefix does not include 4 header items, just compressd payload
                             //that follows
                             lengthPrefix.putInt(payloadBuffer.remaining() - 16);//length prefix
-                            lengthPrefix.putInt(tupleData.b.getInt(0)); // partitionId
+                            lengthPrefix.putInt(tupleData.b().getInt(0)); // partitionId
 
                             /*
                              * Checksum the header and put it in the payload buffer
@@ -441,8 +441,8 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                             payloadContainer.discard();
                         }
                     } else {
-                        while (tupleData.b.hasRemaining()) {
-                            totalWritten += m_channel.write(tupleData.b);
+                        while (tupleData.b().hasRemaining()) {
+                            totalWritten += m_channel.write(tupleData.b());
                         }
                     }
                     m_bytesWritten += totalWritten;

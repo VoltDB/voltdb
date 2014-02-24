@@ -184,11 +184,12 @@ public class TestExecutionEngine extends TestCase {
 
         BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
         try {
-            origin.b.clear();
-            BBContainer container = new BBContainer(origin.b){
+            origin.b().clear();
+            BBContainer container = new BBContainer(origin.b()){
 
                 @Override
                 public void discard() {
+                    checkDoubleFree();
                 }};
 
             List<BBContainer> output = new ArrayList<BBContainer>();
@@ -197,33 +198,33 @@ public class TestExecutionEngine extends TestCase {
                                                                    TableStreamType.RECOVERY,
                                                                    output).getSecond()[0];
             assertTrue(serialized > 0);
-            container.b.limit(serialized);
-            destinationEngine.get().processRecoveryMessage( container.b, container.address() );
+            container.b().limit(serialized);
+            destinationEngine.get().processRecoveryMessage( container.b(), container.address() );
 
 
             serialized = sourceEngine.tableStreamSerializeMore(WAREHOUSE_TABLEID,
                                                                TableStreamType.RECOVERY,
                                                                output).getSecond()[0];
             assertEquals( 5, serialized);
-            assertEquals( RecoveryMessageType.Complete.ordinal(), container.b.get());
+            assertEquals( RecoveryMessageType.Complete.ordinal(), container.b().get());
 
             assertEquals( sourceEngine.tableHashCode(WAREHOUSE_TABLEID), destinationEngine.get().tableHashCode(WAREHOUSE_TABLEID));
 
-            container.b.clear();
+            container.b().clear();
             serialized = sourceEngine.tableStreamSerializeMore(STOCK_TABLEID,
                                                                TableStreamType.RECOVERY,
                                                                output).getSecond()[0];
             assertTrue(serialized > 0);
-            container.b.limit(serialized);
-            destinationEngine.get().processRecoveryMessage( container.b, container.address());
+            container.b().limit(serialized);
+            destinationEngine.get().processRecoveryMessage( container.b(), container.address());
 
 
             serialized = sourceEngine.tableStreamSerializeMore(STOCK_TABLEID,
                                                                TableStreamType.RECOVERY,
                                                                output).getSecond()[0];
             assertEquals( 5, serialized);
-            assertEquals( RecoveryMessageType.Complete.ordinal(), container.b.get());
-            assertEquals( STOCK_TABLEID, container.b.getInt());
+            assertEquals( RecoveryMessageType.Complete.ordinal(), container.b().get());
+            assertEquals( STOCK_TABLEID, container.b().getInt());
 
             assertEquals( sourceEngine.tableHashCode(STOCK_TABLEID), destinationEngine.get().tableHashCode(STOCK_TABLEID));
         } finally {
@@ -298,10 +299,12 @@ public class TestExecutionEngine extends TestCase {
         // Humor serializeMore() by providing a buffer, even though it's not used.
         BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
         try {
-            origin.b.clear();
-            BBContainer container = new BBContainer(origin.b){
+            origin.b().clear();
+            BBContainer container = new BBContainer(origin.b()){
                 @Override
-                public void discard() {}
+                public void discard() {
+                    checkDoubleFree();
+                }
             };
             List<BBContainer> output = new ArrayList<BBContainer>();
             output.add(container);

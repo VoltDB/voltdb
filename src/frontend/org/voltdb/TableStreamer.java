@@ -152,8 +152,8 @@ public class TableStreamer {
         UnmodifiableIterator<SnapshotTableTask> iterator = m_tableTasks.iterator();
         for (DBBPool.BBContainer container : buffers) {
             int headerSize = iterator.next().m_target.getHeaderSize();
-            container.b.clear();
-            container.b.position(headerSize);
+            container.b().clear();
+            container.b().position(headerSize);
         }
     }
 
@@ -181,8 +181,8 @@ public class TableStreamer {
             /*
              * Finalize the buffer by setting position to 0 and limit to the last used byte
              */
-            container.b.limit(serialized[serializedIndex++] + task.m_target.getHeaderSize());
-            container.b.position(0);
+            container.b().limit(serialized[serializedIndex++] + task.m_target.getHeaderSize());
+            container.b().position(0);
 
             Callable<DBBPool.BBContainer> valueForTarget = Callables.returning(container);
             if (task.m_filters != null) {

@@ -84,22 +84,22 @@ public class NIOReadStream {
             BBContainer first = m_readBuffers.peekFirst();
             if (first == null) {
                 // Steal the write buffer
-                m_writeBuffer.b.flip();
+                m_writeBuffer.b().flip();
                 m_readBuffers.add(m_writeBuffer);
                 first = m_writeBuffer;
                 m_writeBuffer = null;
             }
-            assert first.b.remaining() > 0;
+            assert first.b().remaining() > 0;
 
             // Copy bytes from first into output
-            int bytesRemaining = first.b.remaining();
+            int bytesRemaining = first.b().remaining();
             int bytesToCopy = output.length - bytesCopied;
             if (bytesToCopy > bytesRemaining) bytesToCopy = bytesRemaining;
-            first.b.get(output, bytesCopied, bytesToCopy);
+            first.b().get(output, bytesCopied, bytesToCopy);
             bytesCopied += bytesToCopy;
             m_totalAvailable -= bytesToCopy;
 
-            if (first.b.remaining() == 0) {
+            if (first.b().remaining() == 0) {
                 // read an entire block: move it to the empty buffers list
                 m_readBuffers.poll();
                 first.discard();
@@ -121,14 +121,14 @@ public class NIOReadStream {
             while (bytesRead < maxBytes && lastRead > 0) {
                 if (m_writeBuffer == null) {
                     m_writeBuffer = pool.acquire();
-                    m_writeBuffer.b.clear();
+                    m_writeBuffer.b().clear();
                 }
 
-                lastRead = channel.read(m_writeBuffer.b);
+                lastRead = channel.read(m_writeBuffer.b());
 
                 // EOF, no data read
                 if (lastRead < 0 && bytesRead == 0) {
-                    if (m_writeBuffer.b.position() == 0) {
+                    if (m_writeBuffer.b().position() == 0) {
                         m_writeBuffer.discard();
                         m_writeBuffer = null;
                     }
@@ -138,14 +138,14 @@ public class NIOReadStream {
                 //Data read
                 if (lastRead > 0) {
                     bytesRead += lastRead;
-                    if (!m_writeBuffer.b.hasRemaining()) {
-                        m_writeBuffer.b.flip();
+                    if (!m_writeBuffer.b().hasRemaining()) {
+                        m_writeBuffer.b().flip();
                         m_readBuffers.add(m_writeBuffer);
                         m_writeBuffer = null;
                     } else {
                         break;
                     }
-                } else if (m_writeBuffer.b.position() == 0) {
+                } else if (m_writeBuffer.b().position() == 0) {
                     m_writeBuffer.discard();
                     m_writeBuffer = null;
                 }

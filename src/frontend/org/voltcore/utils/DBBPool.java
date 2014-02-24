@@ -39,6 +39,14 @@ public final class DBBPool {
 
     private static final VoltLogger TRACE = new VoltLogger("DBBPOOL");
 
+    private static final boolean ASSERTIONS_ON;
+
+    static {
+        boolean assertionsOn = false;
+        assert(assertionsOn = true);
+        ASSERTIONS_ON = assertionsOn;
+    }
+
     /**
      * Abstract base class for a ByteBuffer container. A container serves to hold a reference
      * to the pool/arena/whatever the ByteBuffer was allocated from and possibly the address
@@ -52,17 +60,81 @@ public final class DBBPool {
         /**
          * The buffer
          */
-        final public ByteBuffer b;
+        final private ByteBuffer b;
+        private volatile Throwable m_freeThrowable;
+        private final Throwable m_allocationThrowable;
 
         public BBContainer(ByteBuffer b) {
+            if (ASSERTIONS_ON) {
+                m_allocationThrowable = new Throwable(Thread.currentThread().getName());
+            } else {
+                m_allocationThrowable = null;
+            }
             this.b = b;
         }
 
-        public long address() {
+        final public long address() {
+            checkUseAfterFree();
             return ((DirectBuffer)b).address();
         }
 
-        abstract public void discard();
+        public void discard() {
+            checkDoubleFree();
+        }
+
+        final public ByteBuffer b() {
+            checkUseAfterFree();
+            return b;
+        }
+
+        final public ByteBuffer bD() {
+            checkUseAfterFree();
+            return b.duplicate();
+        }
+
+        final public ByteBuffer bDR() {
+            checkUseAfterFree();
+            return b.asReadOnlyBuffer();
+        }
+
+        private void checkUseAfterFree() {
+            if (ASSERTIONS_ON) {
+                if (m_freeThrowable != null) {
+                    System.err.println("Use after free in DBBPool");
+                    System.err.println("Free was by:");
+                    m_freeThrowable.printStackTrace();
+                    System.err.println("Use was by:");
+                    new Throwable(Thread.currentThread().getName()).printStackTrace();
+                    System.exit(-1);
+                }
+            }
+        }
+
+        protected ByteBuffer checkDoubleFree() {
+            if (ASSERTIONS_ON) {
+                synchronized (this) {
+                    if (m_freeThrowable != null) {
+                        System.err.println("Double free in DBBPool");
+                        System.err.println("Original free was by:");
+                        m_freeThrowable.printStackTrace();
+                        System.err.println("Current free was by:");
+                        new Throwable(Thread.currentThread().getName()).printStackTrace();
+                        System.exit(-1);
+                    }
+                    m_freeThrowable = new Throwable(Thread.currentThread().getName());
+                }
+            }
+            return b;
+        }
+
+        @Override
+        public void finalize() {
+            if (m_freeThrowable == null) {
+                System.err.println("BBContainer was never discarded allocated by:");
+                m_allocationThrowable.printStackTrace();
+                System.exit(-1);
+            }
+        }
     }
 
     /**
@@ -77,7 +149,7 @@ public final class DBBPool {
 
         @Override
         public final void discard() {
-
+            super.discard();
         }
     }
 
@@ -185,13 +257,14 @@ public final class DBBPool {
             cont = allocateDirect(capacity);
         }
         final BBContainer origin = cont;
-        cont = new BBContainer(origin.b) {
+        cont = new BBContainer(origin.b()) {
             @Override
             public void discard() {
-                m_pooledBuffers.get(b.capacity()).offer(origin);
+                checkDoubleFree();
+                m_pooledBuffers.get(b().capacity()).offer(origin);
             }
         };
-        cont.b.clear();
+        cont.b().clear();
         return cont;
     }
 
@@ -259,10 +332,11 @@ public final class DBBPool {
 
         @Override
         public void discard() {
+            checkDoubleFree();
             try {
-                bytesAllocatedGlobally.getAndAdd(-b.capacity());
-                logDeallocation(b.capacity());
-                DBBPool.cleanByteBuffer(b);
+                bytesAllocatedGlobally.getAndAdd(-b().capacity());
+                logDeallocation(b().capacity());
+                DBBPool.cleanByteBuffer(b());
             } catch (Throwable e) {
                 // The client code doesn't want to link to the VoltDB class, so this hack was born.
                 // It should be temporary as the goal is to remove client code dependency on

@@ -97,7 +97,7 @@ public class TestFastSerializer extends TestCase {
         out.write(huge);
         out.writeInt(0x01020304);
 
-        byte[] bytes = out.getBBContainer().b.array();
+        byte[] bytes = out.getBBContainer().b().array();
         assertEquals(0x01, bytes[huge.length]);
         assertEquals(0x02, bytes[huge.length+1]);
         assertEquals(0x03, bytes[huge.length+2]);
@@ -119,10 +119,10 @@ public class TestFastSerializer extends TestCase {
 
     public void testDirect() throws IOException {
         directOut = new FastSerializer(false, true);
-        assertTrue(directOut.getBBContainer().b.isDirect());
+        assertTrue(directOut.getBBContainer().b().isDirect());
         testHugeMessage();
         // Should still be direct after resizing.
-        assertTrue(directOut.getBBContainer().b.isDirect());
+        assertTrue(directOut.getBBContainer().b().isDirect());
         directOut.getBBContainer().discard();
     }
 }

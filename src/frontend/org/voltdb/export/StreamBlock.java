@@ -31,8 +31,8 @@ public class StreamBlock {
         m_buffer = cont;
         m_uso = uso;
         //The first 8 bytes are space for us to store the USO if we end up persisting
-        m_buffer.b.position(HEADER_SIZE);
-        m_totalUso = m_buffer.b.remaining();
+        m_buffer.b().position(HEADER_SIZE);
+        m_totalUso = m_buffer.b().remaining();
         m_isPersisted = isPersisted;
     }
 
@@ -94,12 +94,12 @@ public class StreamBlock {
     private final boolean m_isPersisted;
 
     ByteBuffer unreleasedBuffer() {
-        return m_buffer.b.slice().asReadOnlyBuffer();
+        return m_buffer.b().slice().asReadOnlyBuffer();
     }
 
     BBContainer asBBContainer() {
-        m_buffer.b.putLong(0, uso());
-        m_buffer.b.position(0);
+        m_buffer.b().putLong(0, uso());
+        m_buffer.b().position(0);
         return m_buffer;
     }
 }
