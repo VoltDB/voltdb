@@ -440,6 +440,7 @@ public class VoltDB {
                     m_ipcPort = Integer.valueOf(portStr);
                 }
                 else if (arg.equals("forcecatalogupgrade")) {
+                    hostLog.info("Forced catalog upgrade will occur due to command line option.");
                     m_forceCatalogUpgrade = true;
                 }
                 // version string override for testing online upgrade
