@@ -441,7 +441,8 @@ public class ExportManager
                     }
                 } else {
                     exportLog.error("Invalid export generation in overflow directory " + generationDirectory
-                            + " this will need to be manually cleaned up. number of files left: " + list.length);
+                            + " this will need to be manually cleaned up. number of files left: "
+                            + (list != null ? list.length : 0));
                 }
             }
         }
