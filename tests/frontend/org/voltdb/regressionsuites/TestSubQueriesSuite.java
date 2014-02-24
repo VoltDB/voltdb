@@ -45,6 +45,10 @@ public class TestSubQueriesSuite extends RegressionSuite {
         client.callProcedure("@AdHoc", "DELETE FROM P1;");
     }
 
+    private void loadData(Client client) {
+
+    }
+
     public void testSimpleSubQueries()
             throws NoConnectionsException, IOException, ProcCallException
     {
@@ -131,12 +135,15 @@ public class TestSubQueriesSuite extends RegressionSuite {
         project.addSchema(TestSubQueriesSuite.class.getResource("testsubqueries-ddl.sql"));
         project.addStmtProcedure("InsertR1", "INSERT INTO R1 VALUES(?, ?, ?);");
         project.addStmtProcedure("InsertR2", "INSERT INTO R2 VALUES(?, ?);");
-        project.addStmtProcedure("InsertR3", "INSERT INTO R3 VALUES(?, ?);");
         project.addStmtProcedure("InsertP1", "INSERT INTO P1 VALUES(?, ?);");
         project.addStmtProcedure("InsertP2", "INSERT INTO P2 VALUES(?, ?);");
-        project.addStmtProcedure("InsertP3", "INSERT INTO P3 VALUES(?, ?);");
 
         config = new LocalCluster("testunion-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        if (!config.compile(project)) fail();
+        builder.addServerConfig(config);
+
+        // HSQLDB
+        config = new LocalCluster("testunion-cluster.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
@@ -145,10 +152,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
         if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
-        // HSQLDB
-        config = new LocalCluster("testunion-cluster.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
         return builder;
     }
 

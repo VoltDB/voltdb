@@ -670,7 +670,7 @@ inline int64_t VoltDBEngine::pullTuplesRemainingUntilProgressReport(AbstractExec
 inline int64_t VoltDBEngine::pushTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed) {
     m_tuplesProcessedSinceReport += tuplesProcessed;
     if (m_tuplesProcessedSinceReport >= m_tupleReportThreshold) {
-//        reportProgessToTopend();
+        reportProgessToTopend();
     }
     return m_tupleReportThreshold; // size of next batch
 }
