@@ -2074,7 +2074,6 @@ public class VoltCompiler {
 
         // if loading from an InMemoryJarFile, the process is a bit different...
         if (cl instanceof JarLoader) {
-            assert(false);
             String[] classes = ((JarLoader) cl).getInnerClassesForClass(c.getName());
             for (String innerName : classes) {
                 Class<?> clz = null;
