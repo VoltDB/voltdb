@@ -610,16 +610,18 @@ public class TestCatalogUtil extends TestCase {
         }
 
         // one minor version older than the min supported
-        int[] minCompatibleVersion = MiscUtils.parseVersionString(VoltDB.instance().getVersionString());
+        Object[] minCompatibleVersion = MiscUtils.parseVersionString(VoltDB.instance().getVersionString());
 
         for (int i = minCompatibleVersion.length - 1; i >= 0; i--) {
-            if (minCompatibleVersion[i] != 0) {
-                minCompatibleVersion[i]--;
-                break;
+            if (minCompatibleVersion[i] instanceof Integer) {
+                if (((Integer) minCompatibleVersion[i]) != 0) {
+                    minCompatibleVersion[i] = ((Integer) minCompatibleVersion[i]) - 1;
+                    break;
+                }
             }
         }
-        ArrayList<Integer> arrayList = new ArrayList<Integer>();
-        for (int part : minCompatibleVersion) {
+        ArrayList<Object> arrayList = new ArrayList<Object>();
+        for (Object part : minCompatibleVersion) {
             arrayList.add(part);
         }
         String version = Joiner.on('.').join(arrayList);
@@ -628,10 +630,15 @@ public class TestCatalogUtil extends TestCase {
 
         // one minor version newer than the current version
         final String currentVersion = VoltDB.instance().getVersionString();
-        int[] parseCurrentVersion = MiscUtils.parseVersionString(currentVersion);
-        parseCurrentVersion[parseCurrentVersion.length - 1]++;
-        arrayList = new ArrayList<Integer>();
-        for (int part : parseCurrentVersion) {
+        Object[] parseCurrentVersion = MiscUtils.parseVersionString(currentVersion);
+        for (int i = parseCurrentVersion.length - 1; i >= 0; i--) {
+            if (parseCurrentVersion[i] instanceof Integer) {
+                parseCurrentVersion[i] = ((Integer) parseCurrentVersion[i]) + 1;
+                break;
+            }
+        }
+        arrayList = new ArrayList<Object>();
+        for (Object part : parseCurrentVersion) {
             arrayList.add(part);
         }
         String futureVersion = Joiner.on('.').join(arrayList);
@@ -642,8 +649,8 @@ public class TestCatalogUtil extends TestCase {
         assertFalse(CatalogUtil.isCatalogCompatible(longerVersion));
 
         // shorter version string
-        int[] longVersion = MiscUtils.parseVersionString("2.3.1");
-        int[] shortVersion = MiscUtils.parseVersionString("2.3");
+        Object[] longVersion = MiscUtils.parseVersionString("2.3.1");
+        Object[] shortVersion = MiscUtils.parseVersionString("2.3");
         assertEquals(-1, MiscUtils.compareVersions(shortVersion, longVersion));
 
         // current version should work
