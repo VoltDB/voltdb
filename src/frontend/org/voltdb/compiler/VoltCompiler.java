@@ -38,7 +38,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Matcher;
@@ -139,7 +138,6 @@ public class VoltCompiler {
 
     private static final VoltLogger compilerLog = new VoltLogger("COMPILER");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
-    @SuppressWarnings("unused")
     private static final VoltLogger Log = new VoltLogger("org.voltdb.compiler.VoltCompiler");
 
     private ClassLoader m_classLoader = ClassLoader.getSystemClassLoader();
@@ -374,6 +372,7 @@ public class VoltCompiler {
 
     /**
      * Compile optionally using a (DEPRECATED) project.xml file.
+     * This internal method prepares to compile with or without a project file.
      *
      * @param projectFileURL URL of the project file or NULL if not used.
      * @param jarOutputPath The location to put the finished JAR to.
@@ -571,16 +570,13 @@ public class VoltCompiler {
     }
 
     /**
-     * Compile from project file and, optionally, additional DDL files.
+     * Compile from project file (without explicit DDL file paths).
      * @param projectFileURL  project file URL/path
-     * @param additionalDDLFilePaths  additional input ddl files
      * @return  compiled catalog
      * @throws VoltCompilerException
      */
-    public Catalog compileCatalogFromProject(
-            final String projectFileURL,
-            final String... additionalDDLFilePaths)
-                    throws VoltCompilerException
+    public Catalog compileCatalogFromProject(final String projectFileURL)
+            throws VoltCompilerException
     {
         VoltCompilerReader projectReader = null;
         try {
@@ -593,7 +589,8 @@ public class VoltCompiler {
         }
         DatabaseType database = getProjectDatabase(projectReader);
         InMemoryJarfile jarOutput = new InMemoryJarfile();
-        return compileCatalogInternal(database, DDLPathsToReaderList(additionalDDLFilePaths), jarOutput);
+        // Provide an empty DDL reader list.
+        return compileCatalogInternal(database, DDLPathsToReaderList(), jarOutput);
     }
 
     /**
@@ -2270,65 +2267,41 @@ public class VoltCompiler {
     public void upgradeCatalogAsNeeded(InMemoryJarfile outputJar)
                     throws IOException
     {
-        byte[] buildInfoBytes = outputJar.get(CatalogUtil.CATALOG_BUILDINFO_FILENAME);
-        if (buildInfoBytes == null) {
-            throw new IOException("Catalog build information not found - please build your application using the current version of VoltDB.");
-        }
-        String buildInfo;
-        buildInfo = new String(buildInfoBytes, Constants.UTF8ENCODING);
-        String[] buildInfoLines = buildInfo.split("\n");
-        if (buildInfoLines.length != 5) {
-            throw new IOException("Catalog built with an old version of VoltDB - please build your application using the current version of VoltDB.");
-        }
-        String versionFromCatalog = buildInfoLines[0].trim();
+        // getBuildInfoFromJar() performs some validation.
+        String[] buildInfoLines = CatalogUtil.getBuildInfoFromJar(outputJar);
+        String versionFromCatalog = buildInfoLines[0];
 
         // Check if it's compatible (or the upgrade is being forced).
         // getConfig() may return null if it's being mocked for a test.
         if (   VoltDB.Configuration.m_forceCatalogUpgrade
-            || !CatalogUtil.isCatalogCompatible(versionFromCatalog)) {
+            || !versionFromCatalog.equals(VoltDB.instance().getVersionString())) {
+
+            // Check if there's a project.
+            VoltCompilerReader projectReader =
+                    (outputJar.containsKey("project.xml")
+                        ? new VoltCompilerJarFileReader(outputJar, "project.xml")
+                        : null);
 
             // Patch the buildinfo.
             String versionFromVoltDB = VoltDB.instance().getVersionString();
             buildInfoLines[0] = versionFromVoltDB;
             buildInfoLines[1] = String.format("voltdb-auto-upgrade-to-%s", versionFromVoltDB);
-            buildInfoBytes = StringUtils.join(buildInfoLines, "\n").getBytes();
+            byte[] buildInfoBytes = StringUtils.join(buildInfoLines, "\n").getBytes();
             outputJar.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, buildInfoBytes);
 
-            /*
-             * Get the schema file names from project.xml, if provided, to avoid
-             * duplications when discovering .sql files in the jar (below).
-             * Note that the jar has the ddl files in the root directory, so
-             * name matching is fine.
-             */
-            Set<String> ddlNames = new HashSet<String>();
-            VoltCompilerReader projectReader =
-                    (outputJar.containsKey("project.xml")
-                        ? new VoltCompilerJarFileReader(outputJar, "project.xml")
-                        : null);
-            if (projectReader != null) {
-                DatabaseType database = getProjectDatabase(projectReader);
-                SchemasType schemas = database.getSchemas();
-                if (schemas != null) {
-                    for (SchemasType.Schema schema : schemas.getSchema()) {
-                        ddlNames.add(new File(schema.getPath()).getName());
-                    }
-                }
-            }
-
-            // Recompile the DDL.
+            // Gather DDL files for recompilation if not using a project file.
             List<VoltCompilerReader> ddlReaderList = new ArrayList<VoltCompilerReader>();
-            Entry<String, byte[]> entry = outputJar.firstEntry();
-            while (entry != null) {
-                String path = entry.getKey();
-                //TODO: It would be better to have a manifest that explicitly lists
-                // ddl files instead of using a brute force *.sql glob.
-                if (path.toLowerCase().endsWith(".sql")) {
-                    // Don't duplicate project.xml schema names.
-                    if (!ddlNames.contains(new File(path).getName())) {
+            if (projectReader == null) {
+                Entry<String, byte[]> entry = outputJar.firstEntry();
+                while (entry != null) {
+                    String path = entry.getKey();
+                    //TODO: It would be better to have a manifest that explicitly lists
+                    // ddl files instead of using a brute force *.sql glob.
+                    if (path.toLowerCase().endsWith(".sql")) {
                         ddlReaderList.add(new VoltCompilerJarFileReader(outputJar, path));
                     }
+                    entry = outputJar.higherEntry(entry.getKey());
                 }
-                entry = outputJar.higherEntry(entry.getKey());
             }
 
             // Use the in-memory jarfile-provided class loader so that procedure
