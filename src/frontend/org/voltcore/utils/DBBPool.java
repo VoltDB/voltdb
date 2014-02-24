@@ -260,8 +260,8 @@ public final class DBBPool {
         cont = new BBContainer(origin.b()) {
             @Override
             public void discard() {
-                checkDoubleFree();
-                m_pooledBuffers.get(b().capacity()).offer(origin);
+                final ByteBuffer b = checkDoubleFree();
+                m_pooledBuffers.get(b.capacity()).offer(origin);
             }
         };
         cont.b().clear();
