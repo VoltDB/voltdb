@@ -23,8 +23,11 @@
 
 package org.voltcore.messaging;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.Selector;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -354,5 +357,198 @@ public class TestMessaging extends TestCase {
         }
         msg1.shutdown();
         msg2.shutdown();
+    }
+
+    public void testMultiMailbox() throws Exception {
+        HostMessenger msg1 = new HostMessenger(getConfig());
+        msg1.start();
+        HostMessenger msg2 = new HostMessenger(getConfig());
+        msg2.start();
+        HostMessenger msg3 = new HostMessenger(getConfig());
+        msg3.start();
+
+        System.out.println("Waiting for socketjoiners...");
+        msg1.waitForGroupJoin(3);
+        System.out.println("Finished socket joiner for msg1");
+        msg2.waitForGroupJoin(3);
+        System.out.println("Finished socket joiner for msg2");
+        msg3.waitForGroupJoin(3);
+        System.out.println("Finished socket joiner for msg3");
+
+        assertTrue(msg1.getHostId() != msg2.getHostId() && msg2.getHostId() != msg3.getHostId());
+        //assertTrue(msg2.getHostId() == 1);
+        //assertTrue(msg3.getHostId() == 2);
+
+        Mailbox mb1 = msg1.createMailbox();
+        Mailbox mb2 = msg2.createMailbox();
+        Mailbox mb3 = msg3.createMailbox();
+        Mailbox mb4 = msg3.createMailbox();
+        Mailbox mb5 = msg1.createMailbox();
+
+        long siteId5 = mb5.getHSId();
+
+        long siteId2 = mb2.getHSId();
+
+        long siteId3 = mb3.getHSId();
+        long siteId4 = mb4.getHSId();
+
+
+
+        MsgTest.initWithSize(16);
+        MsgTest mt = new MsgTest();
+        mt.setValues();
+
+        int msgCount = 0;
+
+        mb1.send(new long[] {siteId2,siteId3,siteId5,siteId4}, mt);
+        long now = System.currentTimeMillis();
+        MsgTest mt2 = null, mt3 = null, mt4 = null, mt5 = null;
+
+        // run (for no more than 5s) until all 4 messages have arrived
+        // this code is really weird, but it is more accurate than just
+        // running until you get 4 messages. It actually makes sure they
+        // are the right messages.
+        while (msgCount < 4) {
+            assertTrue((System.currentTimeMillis() - now) < 5000);
+
+            if (mt2 == null) {
+                mt2 = (MsgTest) mb2.recv();
+                if (mt2 != null) {
+                    assertTrue(mt2.verify());
+                    msgCount++;
+                }
+            }
+            if (mt3 == null) {
+                mt3 = (MsgTest) mb3.recv();
+                if (mt3 != null) {
+                    assertTrue(mt3.verify());
+                    msgCount++;
+                }
+            }
+            if (mt4 == null) {
+                mt4 = (MsgTest) mb4.recv();
+                if (mt4 != null) {
+                    assertTrue(mt4.verify());
+                    msgCount++;
+                }
+            }
+            if (mt5 == null) {
+                mt5 = (MsgTest) mb5.recv();
+                if (mt5 != null) {
+                    assertTrue(mt5.verify());
+                    msgCount++;
+                }
+            }
+        }
+
+        mb3.send(new long[] {siteId5}, mt);
+
+        assertEquals(((SiteMailbox)mb2).getWaitingCount(), 0);
+        assertEquals(((SiteMailbox)mb3).getWaitingCount(), 0);
+        assertEquals(((SiteMailbox)mb4).getWaitingCount(), 0);
+
+        // check that there is a single message for mb5
+        // again, weird code, but I think it's right (jhugg)
+        int wc = 0;
+        now = System.currentTimeMillis();
+        while (wc != 1) {
+            assertTrue((System.currentTimeMillis() - now) < 5000);
+            wc = ((SiteMailbox)mb5).getWaitingCount();
+            if (wc == 0)
+            assertTrue(wc < 2);
+        }
+        msg1.shutdown();
+        msg2.shutdown();
+        msg3.shutdown();
+    }
+
+    /*public void testForStress1() {
+        final int siteCount = 3;
+
+        MsgTest.initWithSize(64);
+
+        MsgTestEndpoint[] endpoints = new MsgTestEndpoint[siteCount];
+
+        for (int i = 0; i < siteCount; i++)
+            endpoints[i] = new MsgTestEndpoint();
+
+        for (int i = 0; i < siteCount; i++)
+            endpoints[i].start();
+
+        for (int i = 0; i < siteCount; i++)
+            try {
+                endpoints[i].join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+    }*/
+
+    class MockNewNode extends Thread {
+        AtomicBoolean m_ready = new AtomicBoolean(false);
+
+        void waitUntilReady() {
+            while (!m_ready.get())
+                Thread.yield();
+        }
+
+        @Override
+        public void run() {
+            try {
+                HostMessenger.Config config = new HostMessenger.Config(m_portGenerator);
+                HostMessenger msg = new HostMessenger(config);
+                msg.start();
+                m_ready.set(true);
+                msg.waitForGroupJoin(2);
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    public void testFailAndRejoin() throws Exception {
+        /* Why is throwing away a selector interesting !? */
+        try {
+            Selector.open();
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
+        }
+
+        HostMessenger msg1 = new HostMessenger(getConfig());
+        msg1.start();
+        HostMessenger msg2 = new HostMessenger(getConfig());
+        msg2.start();
+        System.out.println("Waiting for socketjoiners...");
+        msg1.waitForGroupJoin(2);
+        System.out.println("Finished socket joiner for msg1");
+        msg2.waitForGroupJoin(2);
+        System.out.println("Finished socket joiner for msg2");
+
+        // kill host #2
+        // triggers the fault manager
+        msg2.closeForeignHostSocket(msg1.getHostId());
+        msg2.shutdown();
+        // this is just to wait for the fault manager to kick in
+        Thread.sleep(50);
+
+        // wait until the fault manager has kicked in
+        for (int i = 0; msg1.countForeignHosts() > 0; i++) {
+            if (i > 10) fail();
+            Thread.sleep(50);
+        }
+        assertEquals(0, msg1.countForeignHosts());
+
+        // rejoin the network in a new thread
+        MockNewNode newnode = new MockNewNode();
+        newnode.start();
+        newnode.waitUntilReady();
+        // this is just for extra safety
+        Thread.sleep(50);
+
+        // this timeout is rather lousy, but neither is it exception safe!
+        newnode.join(1000);
+        if (newnode.isAlive()) fail();
+
+        msg1.shutdown();
     }
 }

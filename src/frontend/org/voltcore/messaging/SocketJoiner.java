@@ -267,12 +267,12 @@ public class SocketJoiner {
         }
     }
 
+    /**
+     * Read a length prefixed JSON message
+     */
     private JSONObject readJSONObjFromWire(SocketChannel sc, String remoteAddressForErrorMsg) throws IOException, JSONException {
-        /*
-         * Read a length prefixed JSON message
-         */
+        // length prefix
         ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
-
         while (lengthBuffer.remaining() > 0) {
             int read = sc.read(lengthBuffer);
             if (read == -1) {
@@ -281,6 +281,7 @@ public class SocketJoiner {
         }
         lengthBuffer.flip();
 
+        // content
         ByteBuffer messageBytes = ByteBuffer.allocate(lengthBuffer.getInt());
         while (messageBytes.hasRemaining()) {
             int read = sc.read(messageBytes);
@@ -607,7 +608,6 @@ public class SocketJoiner {
                 ByteBuffer pushHostId = ByteBuffer.allocate(4 + jsBytes.length);
                 pushHostId.putInt(jsBytes.length);
                 pushHostId.put(jsBytes).flip();
-                LOG.info("Sending hostid info json to primary N.");
                 while (pushHostId.hasRemaining()) {
                     hostSocket.write(pushHostId);
                 }
@@ -639,6 +639,9 @@ public class SocketJoiner {
                 hostLog.info("Clock skew to across all nodes in the cluster is " + overallSkew);
             }
 
+            /*
+             * Limit the number of active versions to 2.
+             */
             if (activeVersions.size() > 2) {
                 String versions = "";
                 // get the list of non-local versions

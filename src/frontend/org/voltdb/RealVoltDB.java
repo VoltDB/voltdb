@@ -289,20 +289,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         return m_licenseApi;
     }
 
-    public static int sleeptime = 0;
-
     /**
      * Initialize all the global components, then initialize all the m_sites.
      */
     @Override
     public void initialize(VoltDB.Configuration config) {
-
-        try {
-            Thread.sleep(sleeptime);
-        } catch (InterruptedException e1) {
-            // TODO Auto-generated catch block
-            e1.printStackTrace();
-        }
 
         synchronized(m_startAndStopLock) {
             // check that this is a 64 bit VM
@@ -349,13 +340,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_pathToStartupCatalog = m_config.m_pathToCatalog;
             m_replicationActive = false;
             m_configLogger = null;
-            // use CLI overrides for testing hotfix version compatibility
-            if (m_config.m_versionStringOverrideForTest != null) {
-                m_versionString = m_config.m_versionStringOverrideForTest;
-            }
-            if (m_config.m_versionCompatibilityRegexOverrideForTest != null) {
-                m_hotfixableRegexPattern = m_config.m_versionCompatibilityRegexOverrideForTest;
-            }
             ActivePlanRepository.clear();
 
             // set up site structure
@@ -386,6 +370,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
 
             m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
+
+            readBuildInfo(config.m_isEnterprise ? "Enterprise Edition" : "Community Edition");
+            // use CLI overrides for testing hotfix version compatibility
+            if (m_config.m_versionStringOverrideForTest != null) {
+                m_versionString = m_config.m_versionStringOverrideForTest;
+            }
+            if (m_config.m_versionCompatibilityRegexOverrideForTest != null) {
+                m_hotfixableRegexPattern = m_config.m_versionCompatibilityRegexOverrideForTest;
+            }
 
             buildClusterMesh(isRejoin || m_joining);
 
@@ -1968,6 +1961,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         return m_versionString;
     }
 
+    /**
+     * Used for testing when you don't have an instance. Should do roughly what
+     * {@link #isCompatibleVersionString(String)} does.
+     */
     static boolean staticIsCompatibleVersionString(String versionString) {
         return versionString.matches(m_defaultHotfixableRegexPattern);
     }
