@@ -78,9 +78,6 @@ public class JDBC4ClientConnection implements Closeable {
      */
     protected long defaultAsyncTimeout = 60000;
 
-    // Retry attempts in seconds.
-    private static int[] RETRY_ATTEMPTS = new int[]{10, 10, 10, 30, 60, 60};
-
     /**
      * Creates a new native client wrapper from the given parameters (internal use only).
      *
@@ -169,32 +166,7 @@ public class JDBC4ClientConnection implements Closeable {
         // Make connections and retry as needed if allowed.
         clientTmp = ClientFactory.createClient(this.config);
         for (String server : this.servers) {
-            try {
-                int iretry;
-                for (iretry = 0; iretry < JDBC4ClientConnection.RETRY_ATTEMPTS.length; ++iretry) {
-                    try {
-                        clientTmp.createConnection(server);
-                        break;
-                    }
-                    catch (IOException e) {
-                        if (!retry) {
-                            throw e;
-                        }
-                        System.err.printf("Retrying connection to \"%s\" in %d seconds...\n",
-                                          server, JDBC4ClientConnection.RETRY_ATTEMPTS[iretry]);
-                        Thread.sleep(JDBC4ClientConnection.RETRY_ATTEMPTS[iretry] * 1000);
-                    }
-                }
-                if (iretry == JDBC4ClientConnection.RETRY_ATTEMPTS.length ) {
-                    throw new IOException(String.format(
-                            "Client connection failed after %d retries.", iretry));
-                }
-            }
-            catch (InterruptedException ie) {
-                this.client = null;
-                throw new IOException("Client connection retry sleep was interrupted " +
-                                      "before a connection could be made.");
-            }
+            clientTmp.createConnection(server);
         }
 
         // If no exception escaped this method it's a good client.
