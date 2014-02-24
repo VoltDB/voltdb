@@ -44,6 +44,8 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
 
     String testout_jar;
 
+    String myproc = "CREATE PROCEDURE MyTableProcedure AS SELECT column2_integer FROM mytable;\n";
+
     @Override
     public void setUp() {
         testout_jar = BuildDirectoryUtils.getBuildDirectoryPath() + File.pathSeparator + "testout.jar";
@@ -124,7 +126,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         final String simpleSchema1
                 = "create table mytable  (pkey integer, column2_integer integer);\n"
                 + "alter table mytable add column newcol varchar(50);\n"
-                + "create procedure from class " + MyTableProcedure.class.getCanonicalName() + ";\n";
+                + myproc;
 
         final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
         final VoltCompiler compiler = new VoltCompiler();
@@ -138,7 +140,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         final String simpleSchema1
                 = "create table mytable  (pkey integer, column2_integer integer);\n"
                 + "alter table mytable drop column column2_integer;\n"
-                + "create procedure from class " + MyTableProcedure.class.getCanonicalName() + ";\n";
+                + myproc;
 
         final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
         final VoltCompiler compiler = new VoltCompiler();
@@ -154,28 +156,17 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         assertEquals(1, foundPlanError);
     }
 
-    public void testAlterTableWithProcedureUsingRightColumn() throws IOException {
+    public void testAlterTableWithProcedureUsingDroppableColumn() throws IOException {
         final String simpleSchema1
                 = "create table mytable  (pkey integer, column2_integer integer);\n"
                 + "alter table mytable drop column pkey;\n"
-                + "create procedure from class " + MyTableProcedure.class.getCanonicalName() + ";\n";
+                + myproc;
 
         final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
         final VoltCompiler compiler = new VoltCompiler();
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
-    }
-
-    public void testAlterTableDropColumn() throws IOException {
-        final String simpleSchema1
-                = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "alter table mytable drop column column2_integer;\n";
-
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
-        verifyTableColumnGone(compiler, "mytable", "column2_integer");
+        verifyTableColumnGone(compiler, "mytable", "pkey");
     }
 
     public void testAlterTableOnView() throws IOException {
@@ -284,7 +275,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         verifyTableColumnGone(compiler, "mytable", "pkey");
     }
 
-    public void testAlterTableAlterColumnWithSumView() throws IOException {
+    public void testAlterTableAlterColumnWithCountView() throws IOException {
         final String simpleSchema1
                 = "create table mytable  (pkey integer, column2_integer integer);\n"
                 + "CREATE VIEW v_mytable\n"
@@ -314,6 +305,36 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         assertEquals(1, foundDepError);
     }
 
+    public void testAlterTableAlterColumnWithSumViewToNonSummableType() throws IOException {
+        final String simpleSchema1
+                = "create table mytable  (pkey integer, column2_integer integer);\n"
+                + "CREATE VIEW v_mytable\n"
+                + "(\n"
+                + "  pkey\n"
+                + ", num_cont\n"
+                + ")\n"
+                + "AS\n"
+                + "   SELECT pkey\n"
+                + "        , SUM(pkey)\n"
+                + "     FROM mytable\n"
+                + " GROUP BY pkey\n"
+                + ";"
+                + "alter table mytable alter column pkey VARCHAR(20);\n";
+
+        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
+        final VoltCompiler compiler = new VoltCompiler();
+        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertFalse(success);
+        //dependent objects exist
+        int foundDepError = 0;
+        for (VoltCompiler.Feedback f : compiler.m_errors) {
+            if (f.message.toLowerCase().contains("dependent objects exist")) {
+                foundDepError++;
+            }
+        }
+        assertEquals(1, foundDepError);
+    }
+
     public void testAlterTableAlterColumnPossibleWithSumView() throws IOException {
         final String simpleSchema1
                 = "create table mytable  (pkey integer, column2_integer integer);\n"
@@ -324,7 +345,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + ")\n"
                 + "AS\n"
                 + "   SELECT pkey\n"
-                + "        , COUNT(pkey)\n"
+                + "        , SUM(pkey)\n"
                 + "     FROM mytable\n"
                 + " GROUP BY pkey\n"
                 + ";"
@@ -503,7 +524,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
     public void testAlterUnknownTable() throws IOException {
         final String simpleSchema1
                 = "create table mytable  (pkey integer, column2_integer integer);\n"
-                + "alter table mytablefoo add column newcol varchar(50);\n";
+                + "alter table mytablenonexistent add column newcol varchar(50);\n";
 
         final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
         final VoltCompiler compiler = new VoltCompiler();
@@ -573,7 +594,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         assertEquals(1, foundMissingError);
     }
 
-    public void testAlterTableConstraintChangeOfPartitionColumn() throws IOException {
+    public void testAlterTableSizeChangeAndConstraintChangeOfPartitionColumn() throws IOException {
         final String simpleSchema1
                 = "create table mytable  (pkey varchar(20) NOT NULL, column2_integer integer);\n"
                 + "PARTITION TABLE mytable ON COLUMN pkey;"
@@ -593,7 +614,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         assertEquals(1, foundConstraintError);
     }
 
-    public void testAlterTableSizeChangeAndConstraintOfPartitionColumn() throws IOException {
+    public void testAlterTableSizeChangeAndAddConstraintOfPartitionColumn() throws IOException {
         final String simpleSchema1
                 = "create table mytable  (pkey varchar(20) NOT NULL, column2_integer integer);\n"
                 + "PARTITION TABLE mytable ON COLUMN pkey;"
@@ -688,7 +709,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         final String simpleSchema1
                 = "create table mytable  (pkey integer, column2_integer integer);\n"
                 + "drop table mytable;\n"
-                + "create procedure from class " + MyTableProcedure.class.getCanonicalName() + ";\n";
+                + myproc;
 
         final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
         final VoltCompiler compiler = new VoltCompiler();
