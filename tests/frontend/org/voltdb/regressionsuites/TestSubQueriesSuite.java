@@ -37,28 +37,24 @@ public class TestSubQueriesSuite extends RegressionSuite {
         super(name);
     }
 
-    private void clearSeqTables(Client client)
-            throws NoConnectionsException, IOException, ProcCallException
-    {
-        client.callProcedure("@AdHoc", "DELETE FROM R1;");
-        client.callProcedure("@AdHoc", "DELETE FROM R2;");
-        client.callProcedure("@AdHoc", "DELETE FROM P1;");
-    }
+    private void loadData(Client client) throws NoConnectionsException, IOException, ProcCallException   {
+        client.callProcedure("@AdHoc", "Truncate table R1");
+        client.callProcedure("@AdHoc", "Truncate table R2");
+        client.callProcedure("@AdHoc", "Truncate table P1");
 
-    private void loadData(Client client) {
+        // Data for R1
+        client.callProcedure("R1.insert", -1, -1, -1);
+        client.callProcedure("R1.insert",  1,  1,  1);
+        client.callProcedure("R1.insert",  2,  2,  2);
+        client.callProcedure("R1.insert",  3,  3,  3);
 
-    }
+        // Data for R2
+        client.callProcedure("R2.insert", 2, 2);
+        client.callProcedure("R2.insert", 3, 3);
+        client.callProcedure("R2.insert", 4, 4);
 
-    public void testSimpleSubQueries()
-            throws NoConnectionsException, IOException, ProcCallException
-    {
-        Client client = getClient();
-        clearSeqTables(client);
-        subtestSingleSubQuery(client);
-        clearSeqTables(client);
-        subtestNestedSubQueries(client);
-        clearSeqTables(client);
-        subtestTwoSubQueries(client);
+        // Data for P1
+
     }
 
     /**
@@ -67,21 +63,15 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    private void subtestSingleSubQuery(Client client)
-            throws NoConnectionsException, IOException, ProcCallException
+    public void testSingleSubQuery() throws NoConnectionsException, IOException, ProcCallException
     {
-        client.callProcedure("InsertR1", -1, -1, -1); // eliminated
-        client.callProcedure("InsertR1", 1, 1, 1); //
-        client.callProcedure("InsertR1", 2, 2, 2); //
-        client.callProcedure("InsertR1", 3, 3, 3); //
-        VoltTable result = client.callProcedure("@AdHoc", "select A, C FROM (SELECT A, C FROM R1) TEMP WHERE TEMP.A > 0;")
-                                 .getResults()[0];
-        System.out.println(result.toString());
-        assertEquals(3, result.getRowCount());
-        result = client.callProcedure("@AdHoc", "select A1, C1 FROM (SELECT A A1, C C1 FROM R1) TEMP WHERE TEMP.A1 > 0;")
-                .getResults()[0];
-        System.out.println(result.toString());
-        assertEquals(3, result.getRowCount());
+        Client client = getClient();
+        loadData(client);
+        VoltTable vt;
+
+        vt = client.callProcedure("@AdHoc", "select A, C FROM (SELECT A, C FROM R1) T1 WHERE T1.A > 2;").getResults()[0];
+        System.out.println(vt);
+        validateTableOfLongs(vt, new long[][] { {3, 3}});
     }
 
     /**
@@ -90,18 +80,35 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    private void subtestNestedSubQueries(Client client)
-            throws NoConnectionsException, IOException, ProcCallException
+    public void testNestedSubQueries() throws NoConnectionsException, IOException, ProcCallException
     {
-        client.callProcedure("InsertR1", -1, -1, -1); // eliminated
-        client.callProcedure("InsertR1", 1, 1, 1); // eliminated
-        client.callProcedure("InsertR1", 2, 2, 2); // eliminated
-        client.callProcedure("InsertR1", 3, 3, 3); //
-        VoltTable result = client.callProcedure("@AdHoc",
-                "select A2 FROM (SELECT A1 AS A2 FROM (SELECT A AS A1 FROM R1) TEMP1 WHERE TEMP1.A1 > 0) TEMP2 WHERE TEMP2.A2 = 3")
-                                 .getResults()[0];
-        System.out.println(result.toString());
-        assertEquals(1, result.getRowCount());
+        Client client = getClient();
+        loadData(client);
+        VoltTable vt;
+
+        vt = client.callProcedure("@AdHoc",
+                "select A FROM (SELECT A FROM R1 WHERE A > 0) T2 " +
+                "order by A").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{1}, {2}, {3}});
+
+        vt = client.callProcedure("@AdHoc",
+                "select A2 FROM (SELECT A1 AS A2 FROM (SELECT A AS A1 FROM R1) T1 WHERE T1.A1 > 0) T2 " +
+                "WHERE T2.A2 >= 3").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{3}});
+
+        vt = client.callProcedure("@AdHoc",
+                "select A2+1 FROM (SELECT A1 AS A2 FROM (SELECT A AS A1 FROM R1) T1 WHERE T1.A1 > 0) T2 " +
+                "WHERE T2.A2 >= 3").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{4}});
+
+        vt = client.callProcedure("@AdHoc",
+                "select A2+1 AS A3 FROM (SELECT A1 AS A2 FROM (SELECT A AS A1 FROM R1) T1 WHERE T1.A1 > 0) T2 " +
+                "WHERE T2.A2 >= 2 Order by A3").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{3}, {4}});
+
+
+        // Test group by queries, order by, limit, offset
+
     }
 
     /**
@@ -110,20 +117,16 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    private void subtestTwoSubQueries(Client client)
-            throws NoConnectionsException, IOException, ProcCallException
+    public void testTwoSubQueries() throws NoConnectionsException, IOException, ProcCallException
     {
-        client.callProcedure("InsertR1", -1, -1, -1); // eliminated
-        client.callProcedure("InsertR1", 1, 1, 1); // eliminated
-        client.callProcedure("InsertR1", 2, 2, 2); //
-        client.callProcedure("InsertR1", 3, 3, 3); //
-        client.callProcedure("InsertR2", 2, 2); //
-        client.callProcedure("InsertR2", 3, 3); //
-        client.callProcedure("InsertR2", 4, 4); //eliminated
-//        VoltTable result = client.callProcedure("@AdHoc",
-//                "select A, C FROM (SELECT A FROM R1) TEMP1, (SELECT C FROM R2) TEMP2 WHERE TEMP1.A = TEMP2.C").getResults()[0];
-//        System.out.println(result.toString());
-//        assertEquals(2, result.getRowCount());
+        Client client = getClient();
+        loadData(client);
+
+        VoltTable vt;
+        vt = client.callProcedure("@AdHoc",
+                "select A, C FROM (SELECT A FROM R1) T1, (SELECT C FROM R2) T2 WHERE T1.A = T2.C ORDER BY A").getResults()[0];
+        System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] {{2, 2}, {3, 3}});
     }
 
     static public junit.framework.Test suite()
@@ -133,10 +136,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
 
         project.addSchema(TestSubQueriesSuite.class.getResource("testsubqueries-ddl.sql"));
-        project.addStmtProcedure("InsertR1", "INSERT INTO R1 VALUES(?, ?, ?);");
-        project.addStmtProcedure("InsertR2", "INSERT INTO R2 VALUES(?, ?);");
-        project.addStmtProcedure("InsertP1", "INSERT INTO P1 VALUES(?, ?);");
-        project.addStmtProcedure("InsertP2", "INSERT INTO P2 VALUES(?, ?);");
 
         config = new LocalCluster("testunion-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         if (!config.compile(project)) fail();

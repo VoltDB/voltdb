@@ -387,7 +387,7 @@ public abstract class AbstractParsedStmt {
                 tableScan = new StmtTargetTableScan(getTableFromDB(tableName), tableAlias);
             } else {
                 // Temp table always have name SYSTEM_SUBQUERY + hashCode.
-                tableScan = new StmtSubqueryScan(tableAlias, subquery);
+                tableScan = new StmtSubqueryScan(subquery, tableAlias);
             }
             tableAliasMap.put(tableAlias, tableScan);
         }

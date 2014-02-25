@@ -1183,6 +1183,12 @@ final class RangeVariable {
 
         if (rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
             if (rangeTable instanceof TableDerived) {
+                if (tableAlias == null || (tableAlias != null && tableAlias.name == null )) {
+                    // VoltDB require derived sub select table with user specified alias
+                    throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
+                            "SQL Syntax error: Every derived table must have its own alias.");
+                }
+
                 VoltXMLElement subQuery = ((TableDerived) rangeTable).dataExpression.voltGetXML(session);
                 scan.children.add(subQuery);
             }

@@ -204,7 +204,6 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
      * Set the sub-query flag
      * @param isSubQuery
      */
-
     public void setSubQuery(boolean isSubQuery) {
         m_isSubQuery = isSubQuery;
     }
@@ -226,6 +225,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 assert(m_children.size() == 1);
                 m_children.get(0).generateOutputSchema(db);
                 m_tableSchema = m_children.get(0).getOutputSchema();
+                // step to transfer derived table schema to upper level
+                m_tableSchema = m_tableSchema.replaceTableClone(getTargetTableAlias());
+
             } else {
                 m_tableSchema = new NodeSchema();
                 CatalogMap<Column> cols = db.getTables().getIgnoreCase(m_targetTableName).getColumns();

@@ -60,7 +60,7 @@ public class PlannerTestCase extends TestCase {
             String result = ex.toString();
             for (String pattern : patterns) {
                 if ( ! result.contains(pattern)) {
-                    System.out.println("Did not find pattern '" + pattern + "' in error string '" + result + "'");
+                    System.err.println("Did not find pattern '" + pattern + "' in error string '" + result + "'");
                     fail();
                 }
             }

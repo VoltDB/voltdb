@@ -30,7 +30,6 @@ import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -52,14 +51,32 @@ public class TestSubQueries extends PlannerTestCase {
     }
 
     final String SYSTEM_SUBQUERY = "SYSTEM_SUBQUERY";
+    //  final String tableAliases [] = {" ", " T1"};
+    //  final String fromTables [] = {SYSTEM_SUBQUERY, "T1"};
 
-    private void checkOutputSchema(AbstractScanPlanNode snode, String... columns) {
-        NodeSchema schema = snode.getOutputSchema();
+    // Not going to test subtable without alias now.
+    // Add "SYSTEM_SUBQUERY" if it's supported in future.
+
+    final String tableAliases [] = {" T1"};
+    final String fromTables [] =   {"T1"};
+    final String columnRefs [] =   {" T1."};
+
+
+    private void checkOutputSchema(AbstractPlanNode planNode, String... columns) {
+        checkOutputSchema(null, planNode, columns);
+    }
+
+    private void checkOutputSchema(String tableAlias, AbstractPlanNode planNode, String... columns) {
+        NodeSchema schema = planNode.getOutputSchema();
         List<SchemaColumn> schemaColumn = schema.getColumns();
         assertEquals(columns.length, schemaColumn.size());
 
         for (int i = 0; i < schemaColumn.size(); ++i) {
             SchemaColumn col = schemaColumn.get(i);
+            if (tableAlias != null) {
+                assertTrue(col.getTableAlias().contains(tableAlias));
+            }
+
             // Try to check column. If not available, check its column alias instead.
             if (columns[i] != null) {
                 if (col.getColumnName() == null || col.getColumnName().equals("")) {
@@ -71,7 +88,6 @@ public class TestSubQueries extends PlannerTestCase {
             }
         }
     }
-
 
     private void checkSimpleSubSelects(AbstractPlanNode scanNode, String tableName, String... columns) {
         System.out.println(scanNode.toExplainPlanString());
@@ -123,9 +139,6 @@ public class TestSubQueries extends PlannerTestCase {
     public void testSubSelects_Simple() {
         AbstractPlanNode pn;
 
-        String tableAliases [] = {" ",             " T1" };
-        String columnRefs [] =   {"",              " T1."};
-        String fromTables [] =   {SYSTEM_SUBQUERY, "T1"  };
         for (int i = 0; i < tableAliases.length; i++) {
             String alias = tableAliases[i];
             String colRef = columnRefs[i];
@@ -225,9 +238,6 @@ public class TestSubQueries extends PlannerTestCase {
 
     public void testSubSelects_Function() {
         AbstractPlanNode pn;
-
-        String tableAliases [] = {" ", " T1"};
-        String fromTables [] = {SYSTEM_SUBQUERY, "T1"};
 
         for (int i = 0; i < tableAliases.length; i++) {
             String alias = tableAliases[i];
@@ -421,15 +431,21 @@ public class TestSubQueries extends PlannerTestCase {
     }
 
     public void testTry() {
-        //        AbstractPlanNode pn;
+                AbstractPlanNode pn;
         //        List<AbstractPlanNode> planNodes;
         //        AbstractPlanNode nlpn;
         //        for (AbstractPlanNode p: planNodes) System.out.println(p.toExplainPlanString());
+
+        pn = compile("select A, C FROM (SELECT A, C FROM R1) T1 order by A ");
+        System.out.println(pn.toExplainPlanString());
     }
 
-    public void testSubSelects_Unsupported_Join() {
-        String errorJoinMsg = "Join of multiple partitioned tables has insufficient join criteria.";
+    public void testSubSelects_Unsupported_Cases() {
+        String errorMessage = "Every derived table must have its own alias.";
+        failToCompile("select C FROM (SELECT C FROM R1)  ", errorMessage);
 
+        // Unsupported joins.
+        String errorJoinMsg = "Join of multiple partitioned tables has insufficient join criteria.";
         failToCompile("select A, C FROM (SELECT A FROM P1) T1, (SELECT C FROM P2) T2 WHERE T1.A = T2.C ",
                 errorJoinMsg);
         failToCompile("select D1, D2 FROM (SELECT A, D D1 FROM P1 ) T1, (SELECT A, D D2 FROM P2 ) T2 WHERE T1.A = T2.A",
@@ -442,7 +458,51 @@ public class TestSubQueries extends PlannerTestCase {
                 errorJoinMsg);
         failToCompile("select D1, D2 FROM " +
                 "(SELECT A, D D1 FROM P1) T1, (SELECT A, D D2 FROM P2) T2 WHERE T1.A = 1 AND T2.A = 2", errorJoinMsg);
+    }
 
+    public void testSubSelects_Edge_Cases() {
+        AbstractPlanNode pn;
+
+        pn = compile("select T1.A FROM (SELECT A FROM R1) T1, (SELECT A FROM R2)T2 ");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        checkOutputSchema("T1", pn, "A");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof NestLoopPlanNode);
+        checkOutputSchema(pn, "A", "A");
+        checkSimpleSubSelects(pn.getChild(0), "T1", "A");
+        checkSimpleSubSelects(pn.getChild(0).getChild(0), "R1", "A");
+        checkSimpleSubSelects(pn.getChild(1), "T2", "A");
+        checkSimpleSubSelects(pn.getChild(1).getChild(0), "R2", "A");
+
+
+        pn = compile("select T2.A FROM (SELECT A FROM R1) T1, (SELECT A FROM R2)T2 ");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        checkOutputSchema("T2", pn, "A");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof NestLoopPlanNode);
+        checkOutputSchema(pn, "A", "A");
+        checkSimpleSubSelects(pn.getChild(0), "T1", "A");
+        checkSimpleSubSelects(pn.getChild(0).getChild(0), "R1", "A");
+        checkSimpleSubSelects(pn.getChild(1), "T2", "A");
+        checkSimpleSubSelects(pn.getChild(1).getChild(0), "R2", "A");
+
+
+        // TODO(xin): hsql does not complain about the ambiguous column A, but use 'T1' as default.
+        // FIX(xin): throw compiler exception for this query.
+        pn = compile("select A FROM (SELECT A FROM R1) T1, (SELECT A FROM R2)T2 ");
+//      System.out.println(pn.toExplainPlanString());
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        checkOutputSchema("T1", pn, "A");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof NestLoopPlanNode);
+        checkOutputSchema(pn, "A", "A");
+        checkSimpleSubSelects(pn.getChild(0), "T1", "A");
+        checkSimpleSubSelects(pn.getChild(0).getChild(0), "R1", "A");
+        checkSimpleSubSelects(pn.getChild(1), "T2", "A");
+        checkSimpleSubSelects(pn.getChild(1).getChild(0), "R2", "A");
     }
 
     public void testSubSelects_Simple_Joins() {
@@ -484,31 +544,12 @@ public class TestSubQueries extends PlannerTestCase {
         checkSimpleSubSelects(pn, "T2",  "C");
         pn= pn.getChild(0);
         checkSimpleSubSelects(pn, "R2",  "C");
-
-
-        // sub-selected table joins without alias
-        pn = compile("select A, C FROM (SELECT A FROM R1), (SELECT C FROM R2) WHERE A = C");
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        nlpn = pn.getChild(0);
-        assertTrue(nlpn instanceof NestLoopPlanNode);
-        assertEquals(2, nlpn.getChildCount());
-        pn = nlpn.getChild(0);
-        checkSimpleSubSelects(pn, SYSTEM_SUBQUERY,  "A");
-        pn= pn.getChild(0);
-        checkSimpleSubSelects(pn, "R1",  "A");
-
-        pn = nlpn.getChild(1);
-        checkSimpleSubSelects(pn, SYSTEM_SUBQUERY,  "C");
-        pn= pn.getChild(0);
-        checkSimpleSubSelects(pn, "R2",  "C");
     }
 
     public void testSubSelects_Joins() {
         AbstractPlanNode pn;
         List<AbstractPlanNode> planNodes;
         AbstractPlanNode nlpn;
-
 
         // Two sub-queries. One is partitioned and the other one is replicated
         planNodes = compileToFragments("select A, C FROM (SELECT A FROM R1) T1, (SELECT C FROM P1) T2 WHERE T1.A = T2.C ");
@@ -572,6 +613,16 @@ public class TestSubQueries extends PlannerTestCase {
         checkSimpleSubSelects(pn, "P1", "A", "C");
     }
 
+
+    public void testSubSelects_With_Unions() {
+        AbstractPlanNode pn;
+        //        List<AbstractPlanNode> planNodes;
+        //        AbstractPlanNode nlpn;
+        //        for (AbstractPlanNode p: planNodes) System.out.println(p.toExplainPlanString());
+
+        pn = compile("select A, C FROM (SELECT A, C FROM R1 UNION SELECT A, C FROM R2 UNION SELECT A, C FROM R3) T1 order by A ");
+        System.out.println(pn.toExplainPlanString());
+    }
 
     public void testSubSelects_Indexes() {
 

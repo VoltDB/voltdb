@@ -102,7 +102,6 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
         if (m_isSubQuery) {
             assert(m_children.size() == 1);
             m_children.get(0).resolveColumnIndexes();
-            return;
         }
         super.resolveColumnIndexes();
     }
