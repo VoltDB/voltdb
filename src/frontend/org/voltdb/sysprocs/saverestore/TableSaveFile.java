@@ -78,7 +78,7 @@ public class TableSaveFile
         public void discard() {
             checkDoubleFree();
             discarded = true;
-            necessaryDiscards.decrementAndGet();
+//            necessaryDiscards.decrementAndGet();
             if (m_hasMoreChunks == false) {
                 m_origin.discard();
             } else {
