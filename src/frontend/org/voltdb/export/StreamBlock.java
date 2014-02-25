@@ -64,7 +64,7 @@ public class StreamBlock {
      */
     void discard() {
         final int count = m_refCount.decrementAndGet();
-        if (m_refCount.decrementAndGet() == 0) {
+        if (count == 0) {
             m_buffer.discard();
             m_buffer = null;
         } else if (count < 0) {
