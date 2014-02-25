@@ -326,7 +326,11 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 m_discarded = true;
                 retcont.discard();
                 segment.m_discardCount++;
-                assert(m_segments.contains(segment));
+                assert(m_closed || m_segments.contains(segment));
+
+                //Don't do anything else if we are closed
+                if (m_closed) return;
+
                 //Segment is potentially ready for deletion
                 try {
                     if (segment.m_discardCount == segment.getNumEntries()) {
@@ -357,6 +361,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         if (m_closed) {
             return;
         }
+        m_closed = true;
         if (!m_segments.peekLast().hasMoreEntries()) {
             m_segments.pollLast().closeAndDelete();
         }
@@ -401,6 +406,8 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
     @Override
     public synchronized void closeAndDelete() throws IOException {
+        if (m_closed) return;
+        m_closed = true;
         for (PBDSegment qs : m_segments) {
             qs.closeAndDelete();
         }

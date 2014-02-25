@@ -36,7 +36,10 @@ public class StreamBlock {
         m_isPersisted = isPersisted;
     }
 
-    void deleteContent() {
+    /*
+     * Call discard on the underlying buffer used for storage
+     */
+    void discard() {
         m_buffer.discard();
         m_buffer = null;
     }

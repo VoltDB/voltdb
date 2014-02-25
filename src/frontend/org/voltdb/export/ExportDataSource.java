@@ -284,7 +284,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 try {
                     lastUso = sb.uso() + sb.totalUso();
                 } finally {
-                    sb.deleteContent();
+                    sb.discard();
                 }
             } else if (releaseOffset >= sb.uso()) {
                 sb.releaseUso(releaseOffset);
@@ -642,7 +642,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             } finally {
                 //Try hard not to leak memory
                 for (StreamBlock sb : blocksToDelete) {
-                    sb.deleteContent();
+                    sb.discard();
                 }
             }
 
