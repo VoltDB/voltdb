@@ -195,7 +195,9 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
         final PureJavaCrc32 crc = new PureJavaCrc32();
         ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b().remaining() + schemaContainer.b().remaining());
         aggregateBuffer.put(container.b());
+        container.discard();
         aggregateBuffer.put(schemaContainer.b());
+        schemaContainer.discard();
         aggregateBuffer.flip();
         crc.update(aggregateBuffer.array(), 4, aggregateBuffer.capacity() - 4);
 
