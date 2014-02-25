@@ -130,7 +130,7 @@ public final class DBBPool {
         @Override
         public void finalize() {
             if (m_freeThrowable == null) {
-                System.err.println("BBContainer was never discarded allocated by:");
+                System.err.println("BBContainer " + Integer.toHexString(this.hashCode()) + " was never discarded allocated by:");
                 m_allocationThrowable.printStackTrace();
                 System.exit(-1);
             }

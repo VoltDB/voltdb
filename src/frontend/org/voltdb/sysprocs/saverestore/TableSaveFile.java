@@ -30,6 +30,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.Checksum;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
@@ -60,11 +61,15 @@ public class TableSaveFile
         CRC32, CRC32C
     }
 
+//    private AtomicInteger necessaryDiscards = new AtomicInteger();
     public class Container extends BBContainer {
         public final int partitionId;
         private final BBContainer m_origin;
+        private boolean discarded = false;
         Container(ByteBuffer b, BBContainer origin, int partitionId) {
             super(b);
+//            System.err.println("TSF " + Integer.toHexString(TableSaveFile.this.hashCode()) + " creating container " + Integer.toHexString(this.hashCode()) + " origin " + Integer.toHexString(this.hashCode()));
+//            necessaryDiscards.incrementAndGet();
             m_origin = origin;
             this.partitionId = partitionId;
         }
@@ -72,12 +77,22 @@ public class TableSaveFile
         @Override
         public void discard() {
             checkDoubleFree();
+            discarded = true;
+            necessaryDiscards.decrementAndGet();
             if (m_hasMoreChunks == false) {
                 m_origin.discard();
             } else {
                 m_buffers.add(m_origin);
             }
         }
+
+//        @Override
+//        public void finalize() {
+//            if (!discarded) {
+//                System.err.println("TSF " + Integer.toHexString(TableSaveFile.this.hashCode()) + " failed to discard " + Integer.toHexString(this.hashCode()));
+//                System.exit(-1);
+//            }
+//        }
     }
 
     /**
@@ -101,6 +116,8 @@ public class TableSaveFile
             Integer[] relevantPartitionIds,
             boolean continueOnCorruptedChunk) throws IOException
             {
+//                System.err.println("Constructing TSF " + Integer.toHexString(this.hashCode()));
+                new Throwable().printStackTrace();
                 m_fd = fis.getFD();
                 FileChannel dataIn = fis.getChannel();
         try {
@@ -382,6 +399,15 @@ public class TableSaveFile
     }
 
     public void close() throws IOException {
+//        System.err.println("Starting close " + Integer.toHexString(this.hashCode()) + " with necessary discards " + necessaryDiscards.get());
+//        System.gc();
+//        System.runFinalization();
+//        try {
+//            Thread.sleep(200);
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+//        }
+//        System.err.println("Finishing close " + Integer.toHexString(this.hashCode()));
         if (m_chunkReaderThread != null) {
             m_chunkReaderThread.interrupt();
             try {
@@ -422,7 +448,9 @@ public class TableSaveFile
             throw m_chunkReaderException;
         }
         if (!m_hasMoreChunks) {
-            return m_availableChunks.poll();
+            final Container c = m_availableChunks.poll();
+//            System.err.println("TSF " + Integer.toHexString(this.hashCode()) + " Returning chunk " + (c != null ? Integer.toHexString(c.hashCode()) : null));
+            return c;
         }
 
         if (m_chunkReader == null) {
@@ -441,13 +469,15 @@ public class TableSaveFile
                     throw new IOException(e);
                 }
             }
+        }
+        if (c != null) {
+            m_chunkReads.release();
+        } else {
             if (m_chunkReaderException != null) {
                 throw m_chunkReaderException;
             }
         }
-        if (c != null) {
-            m_chunkReads.release();
-        }
+//        System.err.println("TSF " + Integer.toHexString(this.hashCode()) + " Returning chunk " + (c != null ? Integer.toHexString(c.hashCode()) : null));
         return c;
     }
 
@@ -563,6 +593,7 @@ public class TableSaveFile
                     return;
                 }
                 boolean expectedAnotherChunk = false;
+                Container c = null;
                 try {
 
                     /*
@@ -660,7 +691,7 @@ public class TableSaveFile
                      * be sucked straight in. There is a little funny business to overwrite the
                      * partition id that is not part of the serialization format
                      */
-                    Container c = getOutputBuffer(nextChunkPartitionId);
+                    c = getOutputBuffer(nextChunkPartitionId);
 
                     /*
                      * If the length value is wrong or not all data made it to disk this read will
@@ -688,7 +719,6 @@ public class TableSaveFile
                             for (int partitionId : m_partitionIds) {
                                 m_corruptedPartitions.add(partitionId);
                             }
-                            c.discard();
                             if (m_continueOnCorruptedChunk) {
                                 m_chunkReads.release();
                                 continue;
@@ -704,7 +734,6 @@ public class TableSaveFile
                      */
                     if (m_relevantPartitionIds != null) {
                         if (!m_relevantPartitionIds.contains(nextChunkPartitionId)) {
-                            c.discard();
                             m_chunkReads.release();
                             continue;
                         }
@@ -717,6 +746,7 @@ public class TableSaveFile
 
                     synchronized (TableSaveFile.this) {
                         m_availableChunks.offer(c);
+                        c = null;
                         TableSaveFile.this.notifyAll();
                     }
                 } catch (EOFException eof) {
@@ -753,6 +783,8 @@ public class TableSaveFile
                         m_chunkReaderException = new IOException(e);
                         TableSaveFile.this.notifyAll();
                     }
+                } finally {
+                    if (c != null) c.discard();
                 }
             }
             DBBPool.cleanByteBuffer(fileInputBuffer);
@@ -773,6 +805,7 @@ public class TableSaveFile
                     return;
                 }
                 boolean expectedAnotherChunk = false;
+                Container c = null;
                 try {
 
                     /*
@@ -864,7 +897,7 @@ public class TableSaveFile
                      * be sucked straight in. There is a little funny business to overwrite the
                      * partition id that is not part of the serialization format
                      */
-                    Container c = getOutputBuffer(nextChunkPartitionId);
+                    c = getOutputBuffer(nextChunkPartitionId);
 
                     /*
                      * If the length value is wrong or not all data made it to disk this read will
@@ -933,7 +966,6 @@ public class TableSaveFile
                                         DBBPool.getCRC32(c.address(), c.b().position(), c.b().remaining());
                     if (calculatedCRC != nextChunkCRC) {
                         m_corruptedPartitions.add(nextChunkPartitionId);
-                        c.discard();
                         if (m_continueOnCorruptedChunk) {
                             m_chunkReads.release();
                             continue;
@@ -948,7 +980,6 @@ public class TableSaveFile
                      */
                     if (m_relevantPartitionIds != null) {
                         if (!m_relevantPartitionIds.contains(nextChunkPartitionId)) {
-                            c.discard();
                             m_chunkReads.release();
                             continue;
                         }
@@ -979,6 +1010,7 @@ public class TableSaveFile
 
                     synchronized (TableSaveFile.this) {
                         m_availableChunks.offer(c);
+                        c = null;
                         TableSaveFile.this.notifyAll();
                     }
                 } catch (EOFException eof) {
@@ -1014,6 +1046,8 @@ public class TableSaveFile
                         m_chunkReaderException = new IOException(e);
                         TableSaveFile.this.notifyAll();
                     }
+                } finally {
+                    if (c != null) c.discard();
                 }
             }
             DBBPool.cleanByteBuffer(fileInputBuffer);
@@ -1023,14 +1057,18 @@ public class TableSaveFile
             if (c == null) {
                 final BBContainer originContainer = DBBPool.allocateDirect(DEFAULT_CHUNKSIZE);
                 final ByteBuffer b = originContainer.b();
-                return new Container(b, originContainer, nextChunkPartitionId);
+                final Container retcont = new Container(b, originContainer, nextChunkPartitionId);
+//                System.err.println("Constructed container " + Integer.toHexString(retcont.hashCode()) + " origin " + Integer.toHexString(originContainer.hashCode()));
+                return retcont;
             }
             /*
              * Need to reconstruct the container with the partition id of the next
              * chunk so it can be a final public field. The buffer, address, and origin
              * container remain the same.
              */
-            return new Container(c.b(), c, nextChunkPartitionId);
+            final Container retcont = new Container(c.b(), c, nextChunkPartitionId);
+//            System.err.println("Constructed container " + Integer.toHexString(retcont.hashCode()) + " origin " + Integer.toHexString(c.hashCode()));
+            return retcont;
         }
 
         @Override
@@ -1053,5 +1091,12 @@ public class TableSaveFile
             }
         }
 
+//        @Override
+//        public void finalize() {
+//            if (necessaryDiscards.get() > 0) {
+//                System.err.println("TSF " + Integer.toHexString(this.hashCode()) + " finalized with necessary discards " + necessaryDiscards.get());
+//                System.exit(-1);
+//            }
+//        }
     }
 }
