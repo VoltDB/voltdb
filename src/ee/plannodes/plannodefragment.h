@@ -56,6 +56,7 @@
 #include "common/serializeio.h"
 #include "catalog/catalog.h"
 #include "catalog/database.h"
+#include "expressions/abstractexpression.h"
 
 namespace voltdb {
 
@@ -74,9 +75,6 @@ class PlanNodeFragment {
 
     // construct a new fragment from the catalog's serialization
     static PlanNodeFragment * createFromCatalog(const std::string);
-
-    // construct a new fragment from a serialized json object
-    static PlanNodeFragment* fromJSONObject(PlannerDomValue obj);
 
     // construct a new fragment from a root node (used by testcode)
     PlanNodeFragment(AbstractPlanNode *root_node);
@@ -100,12 +98,22 @@ class PlanNodeFragment {
     std::string debug();
 
     // Get the list of parameters used to execute this plan fragment
-    std::vector<std::pair< int, voltdb::ValueType> > getParameters() { return parameters; }
+    std::vector<std::pair< int, voltdb::ValueType> > getParameters() { return m_parameters; }
 
   private:
 
-    // reads execute list from plannodelist json objects
-    void loadFromJSONObject(PlannerDomValue obj);
+    // construct a new fragment from a serialized json object
+    static void fromJSONObject(PlannerDomValue planNodesArray, std::vector<AbstractPlanNode*>& planNodes,
+        std::map<CatalogId, AbstractPlanNode*>& idToNodeMap);
+    // reads parameters from json objects
+    static void loadParametersFromJSONObject(PlannerDomValue parametersArray,
+        std::vector<std::pair< int, voltdb::ValueType> >& parameters);
+    // reads subqueries from json objects
+    static std::unique_ptr<PlanNodeFragment>
+    loadSubqueriesFromJSONObject(PlannerDomValue rootObj, std::unique_ptr<PlanNodeFragment> pnf);
+    // reads subquery parameters
+    static void loadSubqueryParametersFromJSONObject(PlannerDomValue subqueryParamsObj,
+        std::vector<std::vector<std::pair< int, voltdb::AbstractExpression*> >*>& subqueryParameters);
 
     // serialized java type: org.voltdb.plannodes.PlanNode[List|Tree]
     std::string m_serializedType;
@@ -113,10 +121,19 @@ class PlanNodeFragment {
     std::map<CatalogId, AbstractPlanNode*> m_idToNodeMap;
     // pointers to nodes in execution order
     std::vector<AbstractPlanNode*> m_executionList;
+    // pointers to subqueries nodes in execution order grouped by subqueries
+    // the (subquery id -1) is an index into the array.
+    std::vector<std::vector<AbstractPlanNode*>*> m_subqueryExecutionListArray;
     // pointers to nodes in serialization order
     std::vector<AbstractPlanNode*> m_planNodes;
+    // pointers to subqueries nodes in serialization order grouped by subqueries
+    // the (subquery id -1) is an index into the array.
+    std::vector<std::vector<AbstractPlanNode*>*> m_subqueryPlanNodesArray;
     // Pairs of argument index and type for parameters to the fragment
-    std::vector<std::pair< int, voltdb::ValueType> > parameters;
+    std::vector<std::pair< int, voltdb::ValueType> > m_parameters;
+    // Pairs of parameter index and TVE grouped by subqueries
+    // the (subquery id -1) is an index into the array.
+    std::vector<std::vector<std::pair< int, voltdb::AbstractExpression*> >*> m_subqueryParameters;
 };
 
 

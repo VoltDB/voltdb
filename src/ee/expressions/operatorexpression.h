@@ -133,6 +133,21 @@ private:
     ValueType m_targetType;
 };
 
+class OperatorExistsExpression : public AbstractExpression {
+public:
+    OperatorExistsExpression(AbstractExpression *left)
+        : AbstractExpression(EXPRESSION_TYPE_OPERATOR_EXISTS, left, NULL) {
+    };
+
+    NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
+        assert (m_left);
+        return m_left->eval(tuple1, tuple2);
+    }
+
+    std::string debugInfo(const std::string &spacer) const {
+        return (spacer + "ExistsExpression");
+    }
+};
 
 class OperatorAlternativeExpression : public AbstractExpression {
 public:

@@ -76,6 +76,13 @@ hashRangeFactory(PlannerDomValue obj) {
     return new HashRangeExpression(hashColumnValue.asInt(), ranges, static_cast<int>(rangesArray.arrayLen()));
 }
 
+/** Parse JSON parameters to create a subquery expression */
+static AbstractExpression*
+subqueryFactory(PlannerDomValue obj) {
+    int subqueryId = obj.valueForKey("SUBQUERY_ID").asInt();
+    return new SubqueryExpression(subqueryId);
+}
+
 /** Function static helper templated functions to vivify an optimal
     comparison class. */
 static AbstractExpression*
@@ -216,6 +223,10 @@ operatorFactory(ExpressionType et,
 
      case (EXPRESSION_TYPE_OPERATOR_IS_NULL):
          ret = new OperatorIsNullExpression(lc);
+         break;
+
+     case (EXPRESSION_TYPE_OPERATOR_EXISTS):
+         ret = new OperatorExistsExpression(lc);
          break;
 
      case (EXPRESSION_TYPE_OPERATOR_MOD):
@@ -402,6 +413,7 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     case (EXPRESSION_TYPE_OPERATOR_MOD):
     case (EXPRESSION_TYPE_OPERATOR_NOT):
     case (EXPRESSION_TYPE_OPERATOR_IS_NULL):
+    case (EXPRESSION_TYPE_OPERATOR_EXISTS):
         ret = operatorFactory(et, lc, rc);
     break;
 
@@ -488,6 +500,12 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     case (EXPRESSION_TYPE_OPERATOR_ALTERNATIVE):
         ret = new OperatorAlternativeExpression(lc, rc);
         break;
+
+    // Subquery
+    case (EXPRESSION_TYPE_SUBQUERY):
+        ret = subqueryFactory(obj);
+        break;
+
         // must handle all known expressions in this factory
     default:
 

@@ -300,6 +300,12 @@ enum ExpressionType {
     EXPRESSION_TYPE_AGGREGATE_AVG                   = 45,
 
     // -----------------------------
+    // Subquery
+    // -----------------------------
+    EXPRESSION_TYPE_OPERATOR_EXISTS                 = 60,
+    EXPRESSION_TYPE_SUBQUERY                        = 61,
+
+    // -----------------------------
     // Functions
     // -----------------------------
     EXPRESSION_TYPE_FUNCTION                        = 100,

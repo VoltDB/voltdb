@@ -34,7 +34,7 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
 
     public enum Members {
         EXECUTE_LIST,
-        SUBQUERY_EXECUTE_LISTS,
+        SUBQUERIES_EXECUTE_LISTS,
         SUBQUERY_ID;
     }
 
@@ -166,7 +166,7 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
             }
             stringer.endArray(); //end execution list
 
-            stringer.key(Members.SUBQUERY_EXECUTE_LISTS.name()).array();
+            stringer.key(Members.SUBQUERIES_EXECUTE_LISTS.name()).array();
             for (Map.Entry<Integer, List<AbstractPlanNode>> nodeListEntry : m_subqueryLists.entrySet()) {
                 stringer.object().key(Members.SUBQUERY_ID.name());
                 stringer.value(nodeListEntry.getKey());
