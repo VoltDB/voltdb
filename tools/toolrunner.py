@@ -132,7 +132,8 @@ def main(description='(no description)',
          standalone=False,
          directory=None,
          verbose=False,
-         libpath=''):
+         libpath='',
+         command_name=None):
     """
     Main entry point for commands not running in a virtual environment.
     :param description:
@@ -143,6 +144,8 @@ def main(description='(no description)',
     """
     cmd_path = sys.argv[0]
     cmd_dir, cmd_name = os.path.split(os.path.realpath(cmd_path))
+    if not command_name is None:
+        cmd_name = command_name
     base_dir = os.path.dirname(cmd_dir)
     go(cmd_name, cmd_dir, base_dir, description, standalone, directory, verbose, libpath, *sys.argv[1:])
 
