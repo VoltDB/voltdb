@@ -179,6 +179,7 @@ class Distributer {
                 synchronized (Distributer.this) {
                     m_subscriptionRequestPending = false;
                 }
+                return;
             }
             //Fast path subscribing retry if the connection was lost before getting a response
             if (response.getStatus() == ClientResponse.CONNECTION_LOST && !m_connections.isEmpty()) {
