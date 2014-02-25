@@ -651,7 +651,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_pollFuture = fut;
             } else {
                 fut.set(
-                        new AckingContainer(first_unpolled_block.unreleasedBuffer(),
+                        new AckingContainer(first_unpolled_block.unreleasedContainer(),
                                 first_unpolled_block.uso() + first_unpolled_block.totalUso()));
                 m_pollFuture = null;
             }
@@ -662,14 +662,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     class AckingContainer extends BBContainer {
         final long m_uso;
-        public AckingContainer(ByteBuffer buf, long uso) {
-            super(buf);
+        final BBContainer m_backingCont;
+        public AckingContainer(BBContainer cont, long uso) {
+            super(cont.b());
             m_uso = uso;
+            m_backingCont = cont;
         }
 
         @Override
         public void discard() {
             checkDoubleFree();
+            m_backingCont.discard();
             try {
                 ack(m_uso);
             } finally {

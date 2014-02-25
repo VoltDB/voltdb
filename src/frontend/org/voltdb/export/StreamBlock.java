@@ -19,10 +19,31 @@ package org.voltdb.export;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.VoltDB;
 
+/*
+ * The stream block has a default reference count of 1 for being in the queue.
+ * It acquires another if it is handed of for processing in another thread.
+ *
+ * This prevents the memory from being deallocated when the data is pushed to disk
+ * as part of a sync. In those scenarios we let the processing thread deallocate
+ * when it is finished, and the ack will handle deleting the persisted version of the block.
+ *
+ * For buffers that are disk backed they won't go through that
+ * transition without the coop of the processor so there is no race.
+ *
+ * There are basically two schemes for tracking data, reference counting for managing allocations
+ * and acking for the logical stream data and they serve different purposes. Acking determines
+ * when the data needs to go away. Reference counting is just there to gracefully handle data being
+ * pushed to disk while it is being processed.
+ *
+ * Interactions with disk based data are serialized through the ExportDataSource thread while
+ * freeing the memory can be done safely from either thread because the allocator is concurrent.
+ */
 public class StreamBlock {
 
     public static final int HEADER_SIZE = 8;
@@ -36,12 +57,19 @@ public class StreamBlock {
         m_isPersisted = isPersisted;
     }
 
+    private final AtomicInteger m_refCount = new AtomicInteger(1);
+
     /*
      * Call discard on the underlying buffer used for storage
      */
     void discard() {
-        m_buffer.discard();
-        m_buffer = null;
+        final int count = m_refCount.decrementAndGet();
+        if (m_refCount.decrementAndGet() == 0) {
+            m_buffer.discard();
+            m_buffer = null;
+        } else if (count < 0) {
+            VoltDB.crashLocalVoltDB("Broken refcounting in export", true, null);
+        }
     }
 
     long uso() {
@@ -96,13 +124,28 @@ public class StreamBlock {
      */
     private final boolean m_isPersisted;
 
-    ByteBuffer unreleasedBuffer() {
-        return m_buffer.b().slice().asReadOnlyBuffer();
+    BBContainer unreleasedContainer() {
+        m_refCount.incrementAndGet();
+        return getRefCountingContainer(m_buffer.b().slice().asReadOnlyBuffer());
     }
 
+    private BBContainer getRefCountingContainer(ByteBuffer buf) {
+        return new BBContainer(buf) {
+            @Override
+            public void discard() {
+                checkDoubleFree();
+                StreamBlock.this.discard();
+            }
+        };
+    }
+
+    /*
+     * Does not increment the refcount, uses the implicit 1 count
+     * and should only be called once to get a container for pushing the data to disk
+     */
     BBContainer asBBContainer() {
         m_buffer.b().putLong(0, uso());
         m_buffer.b().position(0);
-        return m_buffer;
+        return getRefCountingContainer(m_buffer.b().asReadOnlyBuffer());
     }
 }
