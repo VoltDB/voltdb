@@ -572,4 +572,8 @@ public class FastSerializer implements DataOutput {
         buf.putInt(m_procNameBytes.length);
         buf.put(m_procNameBytes);
     }
+
+    public void discard() {
+        buffer.discard();
+    }
 }

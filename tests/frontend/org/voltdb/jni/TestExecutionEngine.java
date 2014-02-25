@@ -182,15 +182,17 @@ public class TestExecutionEngine extends TestCase {
         sourceEngine.activateTableStream( STOCK_TABLEID, TableStreamType.RECOVERY, Long.MAX_VALUE,
                                           new SnapshotPredicates(-1).toBytes());
 
-        BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
-        try {
-            origin.b().clear();
-            BBContainer container = new BBContainer(origin.b()){
+        final BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
+        origin.b().clear();
+        final BBContainer container = new BBContainer(origin.b()){
 
-                @Override
-                public void discard() {
-                    checkDoubleFree();
-                }};
+            @Override
+            public void discard() {
+                checkDoubleFree();
+                origin.discard();
+            }};
+        try {
+
 
             List<BBContainer> output = new ArrayList<BBContainer>();
             output.add(container);
@@ -228,7 +230,7 @@ public class TestExecutionEngine extends TestCase {
 
             assertEquals( sourceEngine.tableHashCode(STOCK_TABLEID), destinationEngine.get().tableHashCode(STOCK_TABLEID));
         } finally {
-            origin.discard();
+            container.discard();
         }
     }
 
@@ -297,20 +299,21 @@ public class TestExecutionEngine extends TestCase {
         sourceEngine.activateTableStream(STOCK_TABLEID, TableStreamType.ELASTIC_INDEX, Long.MAX_VALUE, predicates.toBytes());
 
         // Humor serializeMore() by providing a buffer, even though it's not used.
-        BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
+        final BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
+        origin.b().clear();
+        BBContainer container = new BBContainer(origin.b()){
+            @Override
+            public void discard() {
+                checkDoubleFree();
+                origin.discard();
+            }
+        };
         try {
-            origin.b().clear();
-            BBContainer container = new BBContainer(origin.b()){
-                @Override
-                public void discard() {
-                    checkDoubleFree();
-                }
-            };
             List<BBContainer> output = new ArrayList<BBContainer>();
             output.add(container);
             assertEquals(0, sourceEngine.tableStreamSerializeMore(STOCK_TABLEID, TableStreamType.ELASTIC_INDEX, output).getSecond()[0]);
         } finally {
-            origin.discard();
+            container.discard();
         }
     }
 
@@ -344,5 +347,7 @@ public class TestExecutionEngine extends TestCase {
         super.tearDown();
         sourceEngine.release();
         sourceEngine = null;
+        System.gc();
+        System.runFinalization();
     }
 }
