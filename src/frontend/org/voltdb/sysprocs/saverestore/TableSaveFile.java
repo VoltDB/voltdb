@@ -117,7 +117,7 @@ public class TableSaveFile
             boolean continueOnCorruptedChunk) throws IOException
             {
 //                System.err.println("Constructing TSF " + Integer.toHexString(this.hashCode()));
-                new Throwable().printStackTrace();
+//                new Throwable().printStackTrace();
                 m_fd = fis.getFD();
                 FileChannel dataIn = fis.getChannel();
         try {
