@@ -280,9 +280,16 @@ public class SocketJoiner {
             }
         }
         lengthBuffer.flip();
+        int length = lengthBuffer.getInt();
+
+        // don't allow for a crazy unallocatable json payload
+        if (length > 16 * 1024) {
+            throw new IOException(
+                    "Length prefix on wire for expected JSON string is greater than 16K max.");
+        }
 
         // content
-        ByteBuffer messageBytes = ByteBuffer.allocate(lengthBuffer.getInt());
+        ByteBuffer messageBytes = ByteBuffer.allocate(length);
         while (messageBytes.hasRemaining()) {
             int read = sc.read(messageBytes);
             if (read == -1) {
