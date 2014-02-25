@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -83,6 +83,7 @@ class StreamBlock;
 class Topend;
 class TupleBlock;
 class PersistentTableUndoDeleteAction;
+class PersistentTableUndoTruncateTableAction;
 
 const size_t COLUMN_DESCRIPTOR_SIZE = 1 + 4 + 4; // type, name offset, name length
 
@@ -103,6 +104,7 @@ class Table {
     friend class StatsSource;
     friend class TupleBlock;
     friend class PersistentTableUndoDeleteAction;
+    friend class PersistentTableUndoTruncateTableAction;
 
   private:
     Table();
@@ -188,6 +190,10 @@ class Table {
         return m_nonInlinedMemorySize;
     }
 
+    virtual int tupleLimit() const {
+        return INT_MIN;
+    }
+
     // ------------------------------------------------------------------
     // COLUMNS
     // ------------------------------------------------------------------
@@ -195,7 +201,6 @@ class Table {
     const std::vector<std::string>& getColumnNames() const {
         return m_columnNames;
     }
-
 
     inline const TupleSchema* schema() const {
         return m_schema;

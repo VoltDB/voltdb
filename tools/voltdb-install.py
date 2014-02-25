@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2013 VoltDB Inc.
+# Copyright (C) 2008-2014 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -220,7 +220,7 @@ class Metadata:
             provides    = 'voltdb',
             conflicts   = 'voltdb',
             replaces    = 'voltdb',
-            depends     = 'default-jdk,libc6',
+            depends     = 'openjdk-7-jdk,libc6',
             priority    = 'extra',
             section     = 'database',
             maintainer  = 'VoltDB',
@@ -253,20 +253,30 @@ Conflicts: %(conflicts)s
 Replaces: %(replaces)s
 Description: %(description)s
 '''
-
+        """
+        Developer Notes: so much of voltdb_install.py is hardwired to install voltdb into a tree like {prefix}/voltdb/...
+        In the future it seems desireable to change this to something like {prefix}/{edition}/...
+        Doing so would eliminate the split between pkgname and voltdbdir
+        Also, link /usr/lib/voltdb... to directory /usr/share/voltdb/lib
+        """
         self.rpm_control = dict(
             pkgname     = self.edition,
             pkgversion  = self.version,
             pkgrelease  = 1,
             arch        = 'x86_64',
+            provides    = self.edition,
+            conflicts   = self.edition,
             summary     = self.summary,
             license     = self.license,
-            prefix      = '/usr'
+            maintainer  = 'VoltDB',
+            prefix      = '/usr',
+            voltdbdir = 'voltdb'
             )
 
         self.rpm_control_template = '''\
 %%define        __spec_install_post %%{nil}
 %%define          debug_package %%{nil}
+%%define        voltdbdir %(voltdbdir)s
 
 Summary: %(summary)s
 Name: %(pkgname)s
@@ -276,14 +286,19 @@ License: %(license)s
 Group: Applications/Databases
 Distribution: .el6
 SOURCE0 : %%{name}-%%{version}.tar.gz
+Vendor: %(maintainer)s
 URL: http://www.voltdb.com
-Provides: voltdb
-Conflicts: voltdb
+Provides: %(provides)s
+Conflicts: %(conflicts)s
 Requires: libgcc >= 4.1.2, libstdc++ >= 4.1.2, python >= 2.6
-Requires: java >= 1.7_13, java-devel >= 1.7_13
+Requires: java >= 1:1.7.0
+Requires: java7-devel >= 1:1.7.0
+Summary: VoltDB is a blazingly fast in memory (IMDB) NewSQL database system.
 Prefix: %(prefix)s
 
-BuildRoot: %%{_tmppath}/%%{name}-%%{version}-%%{release}
+# this var is ignored by el6 rpmbuild (but not el5 rpmbuild)
+# el6 rpm uses _buildroot in .rpmmacro to do the same thing
+BuildRoot: %%{_buildrootdir}/%%{name}-%%{version}-%%{release}.%%{_arch}
 
 %%description
 VoltDB is a blazingly fast in memory (IMDB) NewSQL database system.
@@ -301,6 +316,15 @@ drives business value.
 %%prep
 %%setup -q
 
+cat << \EOF > %%{name}-req
+#!/bin/sh
+%%{__perl_requires} $* |\
+sed -e '/perl(.*)/d'
+EOF
+
+%%global __perl_requires %%{_builddir}/%%{name}-%%{version}/%%{name}-req
+chmod +x %%{__perl_requires}
+
 %%build
 
 %%install
@@ -312,6 +336,8 @@ drives business value.
 %%include myfiles
 
 %%post
+echo "To make a copy of the VoltDB sample programs run the command: cp -r %%{prefix}/share/%%{voltdbdir}/examples <your-new-examples-directory>"
+echo "Thanks for installing VoltDB!"
 
 %%preun
 %%include preuncmd
@@ -319,8 +345,8 @@ drives business value.
 %%postun
 # remove voltdb directory tree
 if [ -n "%%{name}" ]; then
-    rm -rf %%{prefix}/lib/%%{name}
-    rm -rf %%{prefix}/share/%%{name}
+    rm -rf %%{prefix}/lib/%%{voltdbdir}
+    rm -rf %%{prefix}/share/%%{voltdbdir}
 fi
 
 %%changelog
@@ -408,6 +434,7 @@ actions = (
     Action('management/*.sh',         'usr/share/voltdb/management'),
     Action('management/*.xml',        'usr/share/voltdb/management'),
     Action('management/*.properties', 'usr/share/voltdb/management'),
+    Action('third_party/python',      'usr/share/voltdb/third_party/python'),
     Action('voltdb/log4j*',           'usr/share/voltdb/voltdb'),
     Action('voltdb/*',                'usr/lib/voltdb'),
     Action('*',                       'usr/share/voltdb', recursive = False),
@@ -566,14 +593,15 @@ def rpm():
             shutil.rmtree(meta.build_root)
 
     # setup the rpmbuild working tree
-    for D in ["BUILD","SOURCES","RPMS","SPECS","SRPMS", "tmp"]:
+    for D in ["BUILD","SOURCES","RPMS","SPECS","SRPMS", "BUILDROOT"]:
         p = os.path.join(blddir, D)
         if not os.path.exists(p):
             os.makedirs(os.path.join(blddir, D))
 
     with open(os.path.join(os.environ["HOME"], ".rpmmacros"), 'w') as fout:
         fout.write("%%_topdir\t%s\n" % blddir)
-        fout.write("%_tmppath\t%{_topdir}/tmp\n")
+        fout.write("%_buildrootdir\t%{_topdir}/BUILDROOT\n")
+        fout.write("%_buildroot\t%{_buildrootdir}/%{name}-%{version}-%{release}.%{_arch}\n")
 
     # assemble the SPEC file
     syms = copy(locals())
@@ -582,13 +610,12 @@ def rpm():
         fout.write(meta.rpm_control_template % syms)
 
     voltdb_dist = "%(pkgname)s-%(pkgversion)s" % syms
-    voltdb_build = voltdb_dist + "-%(pkgrelease)d" % syms
+    voltdb_build = voltdb_dist + "-%(pkgrelease)d.%(arch)s" % syms
 
     # stage the voltdb distribution files where rpmbuild needs them
-    buildroot = os.path.join(blddir, "tmp", voltdb_build)
+    buildroot = os.path.join(blddir, "BUILDROOT", voltdb_build)
     meta.options.prefix = buildroot
     install()
-    #shutil.move(os.path.join(blddir,"usr"), os.path.join(blddir,"tmp",voltdb_build,"usr"))
 
     # make a list of the files that rpmbuild will package
     # only FILES that go into the rpm should be listed
@@ -596,11 +623,11 @@ def rpm():
     # also spit out command lists for the %post and %preun sections
     # that will link/unlink the binaries from /usr/bin
     with ChDir(buildroot):
-        files = [] 
+        files = []
         for l in pipe_cmd("find", ".", "-not", "-type", "d"):
             files.append(string.lstrip(l, '.'))
 
-        links = [] 
+        links = []
         for l in pipe_cmd("find", ".", "-type", "l"):
             print l
             links.append(string.lstrip(l, '.'))
@@ -608,7 +635,7 @@ def rpm():
     with open(os.path.join(blddir, "SPECS", "myfiles"), 'w') as fout:
         for f in files:
             fout.write("\"%s\"\n" % f)
-        
+
     with open(os.path.join(blddir, "SPECS", "preuncmd"), 'w') as uout:
         for l in links:
             uout.write("unlink %s\n" % l)
@@ -625,7 +652,7 @@ def rpm():
         run_cmd("rpmbuild", "-bb", "voltdb.spec")
 
     # snag our new package
-    shutil.copy(os.path.join(blddir, "RPMS", "x86_64", 
+    shutil.copy(os.path.join(blddir, "RPMS", "x86_64",
             '%(pkgname)s-%(pkgversion)s-%(pkgrelease)d.%(arch)s.rpm' % syms),
                  meta.output_root)
 

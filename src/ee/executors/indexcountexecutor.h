@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -50,7 +50,7 @@ private:
     bool p_init(AbstractPlanNode*, TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
 
-    long countNulls(AbstractExpression * countNullExpr);
+    long countNulls(TableIndex * tableIndex, AbstractExpression * countNullExpr);
 
     // Data in this class is arranged roughly in the order it is read for
     // p_execute(). Please don't reshuffle it only in the name of beauty.
@@ -61,8 +61,6 @@ private:
     int m_numOfEndkeys;
 
     // Search key
-    TableTuple m_searchKey;
-    TableTuple m_endKey;
     AbstractExpression** m_searchKeyArray;
     AbstractExpression** m_endKeyArray;
 
@@ -71,8 +69,7 @@ private:
 
     // IndexCount Information
     TempTable* m_outputTable;
-    PersistentTable* m_targetTable;
-    TableIndex *m_index;
+
 
     // arrange the memory mgmt aids at the bottom to try to maximize
     // cache hits (by keeping them out of the way of useful runtime data)

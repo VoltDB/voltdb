@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -231,12 +231,14 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDestr
     JNIEnv *env, jobject obj,
     jlong engine_ptr) {
     VoltDBEngine *engine = castToEngine(engine_ptr);
-    static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-    updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
     if (engine == NULL) {
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
     }
+    JNITopend* topend = static_cast<JNITopend*>(engine->getTopend());
+    topend->updateJNIEnv(env);
+    updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
     delete engine;
+    delete topend;
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
 }
 

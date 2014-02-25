@@ -38,6 +38,7 @@ import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.persist.HsqlDatabaseProperties;
 import org.hsqldb_voltpatches.scriptio.ScriptWriterBase;
+import org.hsqldb_voltpatches.store.ValuePool;
 import org.hsqldb_voltpatches.types.Type;
 
 /**
@@ -58,7 +59,7 @@ public class ParserCommand extends ParserDDL {
         Statement cs = compilePart();
 
         if (token.tokenType == Tokens.X_ENDPARSE) {
-            if (cs.getSchemaName() == null) {
+            if (cs.getSchemalName() == null) {
                 cs.setSchemaHsqlName(session.getCurrentSchemaHsqlName());
             }
 
@@ -1285,7 +1286,7 @@ public class ParserCommand extends ParserDDL {
 
             e.resolveTypes(session, null);
 
-            if (e.isParam) {
+            if (e.isParam()) {
                 e.dataType = Type.SQL_VARCHAR;
             }
 

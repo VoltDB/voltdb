@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -78,22 +78,6 @@ public class LimitPlanNode extends AbstractPlanNode {
         if (m_limitExpression != null) {
             m_limitExpression.validate();
         }
-    }
-
-    /**
-     * Accessor for flag marking the plan as guaranteeing an identical result/effect
-     * when "replayed" against the same database state, such as during replication or CL recovery.
-     * @return true only if child is order-deterministic
-     */
-    @Override
-    public boolean isContentDeterministic() {
-        boolean precondition = m_children.get(0).isOrderDeterministic();
-        if (precondition) {
-            return true;
-        }
-        m_nondeterminismDetail = "a limit on unordered content may return different rows: " +
-            m_children.get(0).nondeterminismDetail();
-        return false;
     }
 
     /**

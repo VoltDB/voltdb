@@ -294,7 +294,10 @@ public class TableWorks {
 
                     // create an autonamed index
                     index = table.createAndAddIndexStructure(indexName,
-                            c.getMainColumns(), null, null, true, true, false).setAssumeUnique(c.assumeUnique);
+                            c.getMainColumns(), null, null, true, true, false);
+                    // A VoltDB extension to support the assume unique attribute
+                    index = index.setAssumeUnique(c.assumeUnique);
+                    // End of VoltDB extension
                     c.core.mainTable = table;
                     c.core.mainIndex = index;
 
@@ -513,45 +516,6 @@ public class TableWorks {
         return newindex;
     }
 
-    /**
-     * A VoltDB extended variant of addIndex that supports indexed generalized non-column expressions.
-     *
-     * @param cols int[]
-     * @param indexExprs Expression[]
-     * @param name HsqlName
-     * @param unique boolean
-     * @return new index
-     */
-    Index addExprIndex(int[] cols, Expression[] indexExprs, HsqlName name, boolean unique) {
-
-        Index newExprIndex;
-
-        if (table.isEmpty(session) || table.isIndexingMutable()) {
-            PersistentStore store = session.sessionData.getRowStore(table);
-
-            newExprIndex = table.createExprIndex(store, name, cols, indexExprs, unique, false);
-        } else {
-            newExprIndex = table.createExprIndexStructure(name, cols, indexExprs, unique, false);
-
-            Table tn = table.moveDefinition(session, table.tableType, null,
-                                            null, newExprIndex, -1, 0, emptySet,
-                                            emptySet);
-            // for all sessions move the data
-            tn.moveData(session, table, -1, 0);
-            database.persistentStoreCollection.releaseStore(table);
-
-            table = tn;
-
-            setNewTableInSchema(table);
-            updateConstraints(table, emptySet);
-        }
-
-        database.schemaManager.addSchemaObject(newExprIndex);
-        database.schemaManager.recompileDependentObjects(table);
-
-        return newExprIndex;
-    } /* addExprIndex */
-
     void addPrimaryKey(Constraint constraint, HsqlName name) {
 
         if (table.hasPrimaryKey()) {
@@ -586,7 +550,12 @@ public class TableWorks {
      * @param cols int[]
      * @param name HsqlName
      */
+    // A VoltDB extension to support the assume unique attribute
     void addUniqueConstraint(int[] cols, HsqlName name, boolean assumeUnique) {
+    /* disable 1 line ...
+    void addUniqueConstraint(int[] cols, HsqlName name) {
+    ... disabled 1 line */
+    // End of VoltDB extension
 
         database.schemaManager.checkSchemaObjectNotExists(name);
 
@@ -601,7 +570,10 @@ public class TableWorks {
         Index index = table.createIndexStructure(indexname, cols, null, null,
             true, true, false);
         Constraint constraint = new Constraint(name, table, index,
-                                               Constraint.UNIQUE).setAssumeUnique(assumeUnique);
+                                               Constraint.UNIQUE);
+        // A VoltDB extension to support the assume unique attribute
+        constraint = constraint.setAssumeUnique(assumeUnique);
+        // End of VoltDB extension
         Table tn = table.moveDefinition(session, table.tableType, null,
                                         constraint, index, -1, 0, emptySet,
                                         emptySet);
@@ -616,38 +588,6 @@ public class TableWorks {
         updateConstraints(table, emptySet);
         database.schemaManager.recompileDependentObjects(table);
     }
-
-    /**
-     * A VoltDB extended variant of addUniqueConstraint that supports indexed generalized non-column expressions.
-     * @param cols
-     * @param indexExprs
-     * @param name HsqlName
-     */
-    public void addUniqueExprConstraint(int[] cols, Expression[] indexExprs, HsqlName name, boolean assumeUnique) {
-        database.schemaManager.checkSchemaObjectNotExists(name);
-
-        if (table.getUniqueConstraintForExprs(indexExprs) != null) {
-            throw Error.error(ErrorCode.X_42522);
-        }
-
-        // create an autonamed index
-        HsqlName indexname = database.nameManager.newAutoName("IDX",
-            name.name, table.getSchemaName(), table.getName(),
-            SchemaObject.INDEX);
-        Index exprIndex = table.createExprIndexStructure(indexname, cols, indexExprs, true, true);
-        Constraint constraint = new Constraint(name, table, exprIndex, Constraint.UNIQUE).setAssumeUnique(assumeUnique);
-        Table tn = table.moveDefinition(session, table.tableType, null,
-                                        constraint, exprIndex, -1, 0, emptySet, emptySet);
-        tn.moveData(session, table, -1, 0);
-        database.persistentStoreCollection.releaseStore(table);
-
-        table = tn;
-
-        database.schemaManager.addSchemaObject(constraint);
-        setNewTableInSchema(table);
-        updateConstraints(table, emptySet);
-        database.schemaManager.recompileDependentObjects(table);
-    } /* addUniqueExprConstraint */
 
     void addCheckConstraint(Constraint c) {
 
@@ -1215,4 +1155,78 @@ public class TableWorks {
         column.setNullable(true);
         table.setColumnTypeVars(colIndex);
     }
+
+    /************************* Volt DB Extensions *************************/
+
+    /**
+     * A VoltDB extended variant of addIndex that supports indexed generalized non-column expressions.
+     *
+     * @param cols int[]
+     * @param indexExprs Expression[]
+     * @param name HsqlName
+     * @param unique boolean
+     * @return new index
+     */
+    Index addExprIndex(int[] col, Expression[] indexExprs, HsqlName name, boolean unique) {
+
+        Index newindex;
+
+        if (table.isEmpty(session) || table.isIndexingMutable()) {
+            newindex = table.createAndAddExprIndexStructure(name, col, indexExprs, unique, false);
+        } else {
+            newindex = table.createIndexStructure(name, col, null, null,
+                    unique, false, false).withExpressions(indexExprs);
+
+            Table tn = table.moveDefinition(session, table.tableType, null,
+                                            null, newindex, -1, 0, emptySet,
+                                            emptySet);
+            // for all sessions move the data
+            tn.moveData(session, table, -1, 0);
+            database.persistentStoreCollection.releaseStore(table);
+
+            table = tn;
+
+            setNewTableInSchema(table);
+            updateConstraints(table, emptySet);
+        }
+
+        database.schemaManager.addSchemaObject(newindex);
+        database.schemaManager.recompileDependentObjects(table);
+
+        return newindex;
+    } /* addExprIndex */
+
+    /**
+     * A VoltDB extended variant of addUniqueConstraint that supports indexed generalized non-column expressions.
+     * @param cols
+     * @param indexExprs
+     * @param name HsqlName
+     */
+    public void addUniqueExprConstraint(int[] cols, Expression[] indexExprs, HsqlName name, boolean assumeUnique) {
+        database.schemaManager.checkSchemaObjectNotExists(name);
+
+        if (table.getUniqueConstraintForExprs(indexExprs) != null) {
+            throw Error.error(ErrorCode.X_42522);
+        }
+
+        // create an autonamed index
+        HsqlName indexname = database.nameManager.newAutoName("IDX",
+            name.name, table.getSchemaName(), table.getName(),
+            SchemaObject.INDEX);
+        Index exprIndex = table.createIndexStructure(indexname, cols, null, null, true, true, false);
+        exprIndex = exprIndex.withExpressions(indexExprs);
+        Constraint constraint = new Constraint(name, table, exprIndex, Constraint.UNIQUE).setAssumeUnique(assumeUnique);
+        Table tn = table.moveDefinition(session, table.tableType, null,
+                                        constraint, exprIndex, -1, 0, emptySet, emptySet);
+        tn.moveData(session, table, -1, 0);
+        database.persistentStoreCollection.releaseStore(table);
+
+        table = tn;
+
+        database.schemaManager.addSchemaObject(constraint);
+        setNewTableInSchema(table);
+        updateConstraints(table, emptySet);
+        database.schemaManager.recompileDependentObjects(table);
+    } /* addUniqueExprConstraint */
+    /**********************************************************************/
 }

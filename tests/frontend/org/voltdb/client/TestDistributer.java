@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -28,7 +28,11 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -51,6 +55,9 @@ public class TestDistributer extends TestCase {
         volatile boolean gotPing = false;
         AtomicBoolean sendResponses = new AtomicBoolean(true);
         AtomicBoolean sendProcTimeout = new AtomicBoolean(false);
+        volatile Semaphore invokedSubscribe = new Semaphore(0);
+        volatile Semaphore invokedTopology = new Semaphore(0);
+        volatile Semaphore invokedSystemInformation = new Semaphore(0);
 
         @Override
         public int getMaxRead() {
@@ -63,14 +70,25 @@ public class TestDistributer extends TestCase {
                 StoredProcedureInvocation spi = new StoredProcedureInvocation();
                 spi.initFromBuffer(message);
 
+                final String proc = spi.getProcName();
+
                 // record if we got a ping
-                if (spi.getProcName().equals("@Ping"))
+                if (proc.equals("@Ping"))
                     gotPing = true;
 
                 if (sendResponses.get()) {
-                    VoltTable vt[] = new VoltTable[1];
-                    vt[0] = new VoltTable(new VoltTable.ColumnInfo("Foo", VoltType.BIGINT));
-                    vt[0].addRow(1);
+                    VoltTable vt[] = new VoltTable[0];
+                    if (proc.equals("@Subscribe")) {
+                        invokedSubscribe.release();
+                    } else if (proc.equals("@Statistics")) {
+                        invokedTopology.release();
+                    } else if (proc.equals("@SystemCatalog")) {
+                        invokedSystemInformation.release();
+                    } else {
+                        vt = new VoltTable[1];
+                        vt[0] = new VoltTable(new VoltTable.ColumnInfo("Foo", VoltType.BIGINT));
+                        vt[0].addRow(1);
+                    }
                     ClientResponseImpl response;
                     if (sendProcTimeout.get()) {
                         response = new ClientResponseImpl(ClientResponseImpl.CONNECTION_TIMEOUT, vt,
@@ -214,10 +232,12 @@ public class TestDistributer extends TestCase {
                         client.write(responseBuffer);
 
                         client.configureBlocking(false);
+                        channels.add(client);
                         if (handleConnection) {
                             network.registerChannel( client, handler);
                         }
                     }
+                    Thread.yield();
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -233,16 +253,25 @@ public class TestDistributer extends TestCase {
             }
             catch (IOException ignored) {
             }
+            for (SocketChannel sc : channels) {
+                try {
+                    sc.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
 
-        public void shutdown() {
+        public void shutdown() throws InterruptedException {
             shutdown.set(true);
+            join();
         }
 
-        AtomicBoolean shutdown = new AtomicBoolean(false);
+        private AtomicBoolean shutdown = new AtomicBoolean(false);
         volatile ServerSocketChannel socket = null;
         volatile MockInputHandler handler = null;
         volatile VoltNetworkPool network;
+        List<SocketChannel> channels = new ArrayList<SocketChannel>();
     }
 
     private static class CSL extends ClientStatusListenerExt {
@@ -296,11 +325,9 @@ public class TestDistributer extends TestCase {
         finally {
             if (volt0 != null) {
                 volt0.shutdown();
-                volt0.join();
             }
             if (volt1 != null) {
                 volt1.shutdown();
-                volt1.join();
             }
         }
     }
@@ -363,15 +390,12 @@ public class TestDistributer extends TestCase {
         finally {
             if (volt0 != null) {
                 volt0.shutdown();
-                volt0.join();
             }
             if (volt1 != null) {
                 volt1.shutdown();
-                volt1.join();
             }
             if (volt2 != null) {
                 volt2.shutdown();
-                volt2.join();
             }
         }
     }
@@ -437,8 +461,7 @@ public class TestDistributer extends TestCase {
 
         // clean up
         dist.shutdown();
-        volt.shutdown.set(true);
-        volt.join();
+        volt.shutdown();
     }
 
     /**
@@ -490,8 +513,7 @@ public class TestDistributer extends TestCase {
 
         // clean up
         dist.shutdown();
-        volt.shutdown.set(true);
-        volt.join();
+        volt.shutdown();
     }
 
     /**
@@ -549,8 +571,7 @@ public class TestDistributer extends TestCase {
 
         // clean up
         dist.shutdown();
-        volt.shutdown.set(true);
-        volt.join();
+        volt.shutdown();
     }
 
     public void testClient() throws Exception {
@@ -566,17 +587,16 @@ public class TestDistributer extends TestCase {
 
            // this call blocks for a result!
            clt.callProcedure("Foo", new Integer(1));
-           assertEquals(3, volt.handler.roundTrips.get());
+           assertEquals(4, volt.handler.roundTrips.get());
 
            // this call doesn't block! (use drain)
            clt.callProcedure(new ProcCallback(), "Bar", new Integer(2));
            clt.drain();
-           assertEquals(4, volt.handler.roundTrips.get());
+           assertEquals(5, volt.handler.roundTrips.get());
        }
        finally {
            if (volt != null) {
                volt.shutdown();
-               volt.join();
            }
        }
     }
@@ -592,11 +612,7 @@ public class TestDistributer extends TestCase {
             volt0.start();
 
             ClientConfig config = new ClientConfig();
-            /*
-             * The library will immediately generate two transactions
-             * to init client affinity
-             */
-            config.setMaxOutstandingTxns(7);
+            config.setMaxOutstandingTxns(8);
             config.setConnectionResponseTimeout(2000);
 
             final Client client = ClientFactory.createClient(config);
@@ -643,6 +659,78 @@ public class TestDistributer extends TestCase {
             assertTrue(e.getMessage().equals(hostname));
         }
         assertTrue(threwException);
+    }
+
+    public void testSubscription() throws Exception {
+        Distributer.RESUBSCRIPTION_DELAY_MS = 1;
+        MockVolt volt0 = new MockVolt(20000);
+        MockVolt volt1 = new MockVolt(20001);
+        volt0.start();
+        volt1.start();
+
+        try {
+        Client c = ClientFactory.createClient();
+        c.createConnection("localhost", 20000);
+
+        //Test that metadata was retrieved
+        assertTrue(volt0.handler.invokedSubscribe.tryAcquire(10, TimeUnit.SECONDS));
+        assertTrue(volt0.handler.invokedSystemInformation.tryAcquire(10, TimeUnit.SECONDS));
+        assertTrue(volt0.handler.invokedTopology.tryAcquire( 10, TimeUnit.SECONDS));
+
+        c.createConnection("localhost", 20001);
+
+        Thread.sleep(50);
+        //Should not have invoked anything
+        assertFalse(volt1.handler.invokedSubscribe.tryAcquire());
+        assertFalse(volt1.handler.invokedSystemInformation.tryAcquire());
+        assertFalse(volt1.handler.invokedTopology.tryAcquire());
+
+        volt0.shutdown();
+
+        Thread.sleep(50);
+        //Test that topology is retrieved and re-subscribed
+        assertTrue(volt1.handler.invokedSubscribe.tryAcquire(10, TimeUnit.SECONDS));
+        assertTrue(volt1.handler.invokedTopology.tryAcquire( 10, TimeUnit.SECONDS));
+        //Don't need to get the catalog again due to node failure
+        assertFalse(volt1.handler.invokedSystemInformation.tryAcquire());
+        } finally {
+            volt0.shutdown();
+            volt1.shutdown();
+        }
+    }
+
+    public void testSubscribeConnectionLost() throws Exception {
+        Distributer.RESUBSCRIPTION_DELAY_MS = 1;
+        MockVolt volt0 = new MockVolt(20000);
+        volt0.handleConnection = false;
+        MockVolt volt1 = new MockVolt(20001);
+        volt0.start();
+        volt1.start();
+
+        try {
+            Client c = ClientFactory.createClient();
+            c.createConnection("localhost", 20000);
+
+            c.createConnection("localhost", 20001);
+
+            Thread.sleep(50);
+            //Should not have invoked anything
+            assertFalse(volt1.handler.invokedSubscribe.tryAcquire());
+            assertFalse(volt1.handler.invokedSystemInformation.tryAcquire());
+            assertFalse(volt1.handler.invokedTopology.tryAcquire());
+
+            volt0.shutdown();
+
+            Thread.sleep(50);
+            //Test that topology is retrieved and re-subscribed
+            assertTrue(volt1.handler.invokedSubscribe.tryAcquire(10, TimeUnit.SECONDS));
+            assertTrue(volt1.handler.invokedTopology.tryAcquire( 10, TimeUnit.SECONDS));
+            //Don't need to get the catalog again due to node failure
+            assertTrue(volt1.handler.invokedSystemInformation.tryAcquire());
+        } finally {
+            volt0.shutdown();
+            volt1.shutdown();
+        }
     }
 
 }

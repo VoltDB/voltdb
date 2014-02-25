@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -72,7 +72,7 @@ public abstract class AbstractParsedStmt {
     public HashMap<String, Integer> tableAliasIndexMap = new HashMap<String, Integer>();
 
     protected final String[] m_paramValues;
-    protected final Database m_db;
+    public final Database m_db;
 
     static final String INSERT_NODE_NAME = "insert";
     static final String UPDATE_NODE_NAME = "update";
@@ -376,6 +376,8 @@ public abstract class AbstractParsedStmt {
             tableCache.m_tableAlias = tableAlias;
             tableCache.m_table = getTableFromDB(tableName);
             assert(tableCache.m_table != null);
+            tableCache.populateColumnDictionary();
+
             stmtCache.add(tableCache);
             tableAliasIndexMap.put(tableAlias, nextIndex);
         }
@@ -1004,6 +1006,22 @@ public abstract class AbstractParsedStmt {
 
     public ParameterValueExpression[] getParameters() {
         return m_paramList;
+    }
+
+    public boolean hasLimitOrOffset()
+    {
+        // This dummy implementation for DML statements should never be called.
+        // The interface is established on AbstractParsedStmt for support
+        // in ParsedSelectStmt and ParsedUnionStmt.
+        return false;
+    }
+
+    public boolean isOrderDeterministic()
+    {
+        // This dummy implementation for DML statements should never be called.
+        // The interface is established on AbstractParsedStmt for support
+        // in ParsedSelectStmt and ParsedUnionStmt.
+        throw new RuntimeException("isOrderDeterministic not supported by DML statements");
     }
 
 }

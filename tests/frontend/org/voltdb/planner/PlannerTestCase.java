@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -36,6 +36,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 public class PlannerTestCase extends TestCase {
 
     private PlannerTestAideDeCamp m_aide;
+    private boolean m_byDefaultInferPartitioning = true;
     private boolean m_byDefaultPlanForSinglePartition;
 
     protected void failToCompile(String sql, String... patterns)
@@ -52,7 +53,7 @@ public class PlannerTestCase extends TestCase {
             paramCount++;
         }
         try {
-            m_aide.compile(sql, paramCount, m_byDefaultPlanForSinglePartition, null);
+            m_aide.compile(sql, paramCount, m_byDefaultInferPartitioning, m_byDefaultPlanForSinglePartition, null);
             fail();
         }
         catch (PlanningErrorException ex) {
@@ -86,13 +87,6 @@ public class PlannerTestCase extends TestCase {
     final int paramCount = 0;
     String noJoinOrder = null;
     /** A helper here where the junit test can assert success */
-    protected List<AbstractPlanNode> compileSinglePartitionToFragments(String sql)
-    {
-        boolean planForSinglePartitionTrue = true;
-        return compileWithJoinOrderToFragments(sql, planForSinglePartitionTrue, noJoinOrder);
-    }
-
-    /** A helper here where the junit test can assert success */
     protected List<AbstractPlanNode> compileToFragments(String sql)
     {
         boolean planForSinglePartitionFalse = false;
@@ -111,13 +105,8 @@ public class PlannerTestCase extends TestCase {
                                                                    boolean planForSinglePartition,
                                                                    String joinOrder)
     {
-        int paramCount = 0;
-        for (int ii = 0; ii < sql.length(); ii++) {
-            // Yes, we ARE assuming that test queries don't contain quoted question marks.
-            if (sql.charAt(ii) == '?') {
-                paramCount++;
-            }
-        }
+        // Yes, we ARE assuming that test queries don't contain quoted question marks.
+        int paramCount = StringUtils.countMatches(sql, "?");
         return compileWithJoinOrderToFragments(sql, paramCount, planForSinglePartition, joinOrder);
     }
 
@@ -126,16 +115,17 @@ public class PlannerTestCase extends TestCase {
                                                                    boolean planForSinglePartition,
                                                                    String joinOrder)
     {
-        List<AbstractPlanNode> pn = m_aide.compile(sql, paramCount, planForSinglePartition, joinOrder);
+        List<AbstractPlanNode> pn = m_aide.compile(sql, paramCount, m_byDefaultInferPartitioning, m_byDefaultPlanForSinglePartition, joinOrder);
         assertTrue(pn != null);
         assertFalse(pn.isEmpty());
+        assertTrue(pn.get(0) != null);
         if (planForSinglePartition) {
             assertTrue(pn.size() == 1);
         }
         return pn;
     }
 
-    protected AbstractPlanNode compileWithJoinOrder(String sql, String joinOrder)
+    protected AbstractPlanNode compileSPWithJoinOrder(String sql, String joinOrder)
     {
         try {
             return compileWithCountedParamsAndJoinOrder(sql, joinOrder);
@@ -147,33 +137,17 @@ public class PlannerTestCase extends TestCase {
         }
     }
 
-    protected AbstractPlanNode compileWithInvalidJoinOrder(String sql, String joinOrder) throws Exception
+    protected void compileWithInvalidJoinOrder(String sql, String joinOrder) throws Exception
     {
-        return compileWithCountedParamsAndJoinOrder(sql, joinOrder);
+        compileWithJoinOrderToFragments(sql, paramCount, m_byDefaultPlanForSinglePartition, joinOrder);
     }
 
 
     private AbstractPlanNode compileWithCountedParamsAndJoinOrder(String sql, String joinOrder) throws Exception
     {
-        int paramCount = 0;
-        for (int ii = 0; ii < sql.length(); ii++) {
-            // Yes, we ARE assuming that test queries don't contain quoted question marks.
-            if (sql.charAt(ii) == '?') {
-                paramCount++;
-            }
-        }
-        return compileWithJoinOrder(sql, paramCount, joinOrder);
-    }
-
-    /** A helper here where the junit test can assert success */
-    private AbstractPlanNode compileWithJoinOrder(String sql, int paramCount, String joinOrder) throws Exception
-    {
-        List<AbstractPlanNode> pn = compileWithJoinOrderToFragments(sql, paramCount,
-                                                                    m_byDefaultPlanForSinglePartition, joinOrder);
-        assertTrue(pn != null);
-        assertFalse(pn.isEmpty());
-        assertTrue(pn.get(0) != null);
-        return pn.get(0);
+        // Yes, we ARE assuming that test queries don't contain quoted question marks.
+        int paramCount = StringUtils.countMatches(sql, "?");
+        return compileSPWithJoinOrder(sql, paramCount, joinOrder);
     }
 
     /** A helper here where the junit test can assert success */
@@ -181,22 +155,22 @@ public class PlannerTestCase extends TestCase {
     {
         // Yes, we ARE assuming that test queries don't contain quoted question marks.
         int paramCount = StringUtils.countMatches(sql, "?");
-        return compile(sql, paramCount);
+        return compileSPWithJoinOrder(sql, paramCount, null);
     }
 
     /** A helper here where the junit test can assert success */
-    protected AbstractPlanNode compile(String sql, int paramCount)
+    protected AbstractPlanNode compileSPWithJoinOrder(String sql, int paramCount, String joinOrder)
     {
-        List<AbstractPlanNode> pn = null;
+        List<AbstractPlanNode> pns = null;
         try {
-            pn = compileWithJoinOrderToFragments(sql, paramCount, m_byDefaultPlanForSinglePartition, null);
+            pns = compileWithJoinOrderToFragments(sql, paramCount, m_byDefaultPlanForSinglePartition, joinOrder);
         }
         catch (Exception ex) {
             ex.printStackTrace();
             fail();
         }
-        assertTrue(pn.get(0) != null);
-        return pn.get(0);
+        assertTrue(pns.get(0) != null);
+        return pns.get(0);
     }
 
 
@@ -206,6 +180,13 @@ public class PlannerTestCase extends TestCase {
         m_aide = new PlannerTestAideDeCamp(ddlURL, basename);
         m_byDefaultPlanForSinglePartition = planForSinglePartition;
     }
+
+    protected void setupSchema(boolean inferPartitioning, URL ddlURL, String basename) throws Exception
+    {
+        m_byDefaultInferPartitioning = inferPartitioning;
+        m_aide = new PlannerTestAideDeCamp(ddlURL, basename);
+    }
+
 
     Database getDatabase() {
         return m_aide.getDatabase();

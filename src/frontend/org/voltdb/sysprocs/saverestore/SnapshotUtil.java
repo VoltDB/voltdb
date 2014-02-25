@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -42,7 +42,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.concurrent.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedTransferQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.json_voltpatches.JSONArray;
@@ -1283,7 +1286,7 @@ public class SnapshotUtil {
                     VoltDB.crashLocalVoltDB("Failed to initiate snapshot", false, null);
                 } else if (resp.getStatus() != ClientResponseImpl.SUCCESS) {
                     VoltDB.crashLocalVoltDB("Failed to initiate snapshot: "
-                                            + resp.getStatusString(), true, resp.getException());
+                                            + resp.getStatusString(), true, null);
                 }
 
                 assert resp != null;
@@ -1340,7 +1343,7 @@ public class SnapshotUtil {
             }
         });
 
-        final SnapshotDaemon sd = VoltDB.instance().getClientInterfaces().get(0).getSnapshotDaemon();
+        final SnapshotDaemon sd = VoltDB.instance().getClientInterface().getSnapshotDaemon();
         Runnable work = new Runnable() {
             @Override
             public void run() {

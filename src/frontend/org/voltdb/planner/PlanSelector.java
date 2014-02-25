@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -148,11 +148,11 @@ public class PlanSelector implements Cloneable {
     /** Picks the best cost plan for a given raw plan
      * @param rawplan
      */
-    public void considerCandidatePlan(CompiledPlan rawplan) {
+    public void considerCandidatePlan(CompiledPlan rawplan, AbstractParsedStmt parsedStmt) {
         //System.out.println(String.format("[Raw plan]:%n%s", rawplan.rootPlanGraph.toExplainPlanString()));
 
         // run the set of microptimizations, which may return many plans (or not)
-        List<CompiledPlan> optimizedPlans = MicroOptimizationRunner.applyAll(rawplan, m_db, m_detMode);
+        List<CompiledPlan> optimizedPlans = MicroOptimizationRunner.applyAll(rawplan, m_detMode, parsedStmt);
 
         // iterate through the subset of plans
         for (CompiledPlan plan : optimizedPlans) {

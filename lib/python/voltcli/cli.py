@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2013 VoltDB Inc.
+# Copyright (C) 2008-2014 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -322,10 +322,11 @@ class CLIParser(ExtendedHelpOptionParser):
     Command/sub-command (verb) argument and option parsing and validation.
     """
 
-    def __init__(self, verbs, base_options, usage, description, version):
+    def __init__(self, prog, verbs, base_options, usage, description, version):
         """
         Command line processor constructor.
         """
+        self.prog         = prog
         self.verb         = None
         self.verbs        = verbs
         self.verb_names   = verbs.keys()
@@ -333,6 +334,7 @@ class CLIParser(ExtendedHelpOptionParser):
         self.verb_names.sort()
         self.base_options.sort()
         optparse.OptionParser.__init__(self,
+            prog        = prog,
             description = description,
             usage       = usage,
             version     = version)
@@ -451,7 +453,7 @@ class CLIParser(ExtendedHelpOptionParser):
         self.verb = self.verbs[verb_name]
 
         # Change the messaging from generic to verb-specific.
-        self.set_usage(get_verb_usage(self.verb))
+        self.set_usage(self._get_verb_usage(self.verb, brief=False))
         self.set_description(self.verb.cli_spec.get_attr('description', 'No description provided'))
 
         # Parse the command-specific options.
@@ -509,20 +511,25 @@ class CLIParser(ExtendedHelpOptionParser):
             sys.stdout = scraper
             self.print_help()
         finally:
-            sys.stdout = stdout_save
+            sys.stdout = stdout_saves
         return ''.join(scraper.usage)
 
     def on_format_epilog(self):
         if not self.verb:
             return self._format_verb_list()
-        if self.verb.get_argument_count() == 0:
-            return ''
-        rows = [(get_argument_usage(a), a.help) for a in self.verb.iter_arguments()]
-        lines = ['Arguments:', utility.format_table(rows, indent = 2)]
+        blocks = []
+        if self.verb.get_argument_count() > 0:
+            rows = [(get_argument_usage(a), a.help) for a in self.verb.iter_arguments()]
+            blocks.append('\n'.join(['Arguments:', utility.format_table(rows, indent = 2)]))
+        # other_info is used for the multi-verb variation list.
+        other_info = self.verb.cli_spec.get_attr('other_info', None)
+        if other_info:
+            blocks.append(other_info.strip())
+        # Automatically wrap description2 as a paragraph.
         description2 = self.verb.cli_spec.get_attr('description2', None)
         if description2:
-            lines.extend(('', description2))
-        return '\n%s\n' % ('\n'.join(lines))
+            blocks.append(utility.paragraph(description2))
+        return '\n%s' % '\n\n'.join(blocks)
 
     def _abort(self, *msgs):
         utility.error(*msgs)
@@ -537,13 +544,46 @@ class CLIParser(ExtendedHelpOptionParser):
         for verb_name in self.verb_names:
             verb = self.verbs[verb_name]
             if not verb.cli_spec.hideverb:
+                usage = self._get_verb_usage(verb, brief=True)
                 if verb.cli_spec.baseverb:
-                    rows2.append((get_verb_usage(verb), verb.cli_spec.description))
+                    rows2.append((usage, verb.cli_spec.description))
                 else:
-                    rows1.append((get_verb_usage(verb), verb.cli_spec.description))
+                    rows1.append((usage, verb.cli_spec.description))
         table1 = utility.format_table(rows1, caption = 'Verb Descriptions', separator = '  ')
         table2 = utility.format_table(rows2, caption = 'Common Verbs', separator = '  ')
         return '%s\n%s' % (table1, table2)
+
+    def _iter_options(self, verb):
+        options = []
+        for option in self.base_options:
+            yield option
+        if verb:
+            for option in verb.iter_options():
+                yield option
+
+    def _iter_visible_options(self, verb):
+        for option in self._iter_options(verb):
+            if option.kwargs.get('help', None) != optparse.SUPPRESS_HELP:
+                yield option
+
+    def _count_visible_options(self, verb):
+        return len([o for o in self._iter_visible_options(verb)])
+
+    def _get_verb_usage(self, verb, brief=False):
+        """
+        Provide the full usage string, including argument names, for a verb.
+        """
+        args = [get_argument_usage(a) for a in verb.iter_arguments()]
+        usage = [self.prog, verb.name]
+        if not brief:
+            num_visible_options = self._count_visible_options(verb)
+            if num_visible_options > 0:
+                usage.append('[ OPTIONS ... ]')
+        if verb.cli_spec.usage:
+            usage.append(verb.cli_spec.usage)
+        if args:
+            usage.append(' '.join(args))
+        return ' '.join(usage)
 
 #===============================================================================
 class CLISpec(object):
@@ -611,23 +651,6 @@ def get_argument_usage(a):
     else:
         fmt = '%s%s'
     return fmt % (a.name.upper(), ellipsis)
-
-#===============================================================================
-def get_verb_usage(verb):
-#===============================================================================
-    """
-    Provide the full usage string, including argument names, for a verb.
-    """
-    if verb.cli_spec.usage:
-        usage2 = ' %s' % verb.cli_spec.usage
-    else:
-        usage2 = ''
-    args = [get_argument_usage(a) for a in verb.iter_arguments()]
-    if args:
-        sargs = ' %s' % (' '.join(args))
-    else:
-        sargs = ''
-    return ''.join([verb.name, usage2, sargs])
 
 #===============================================================================
 def preprocess_options(base_options, cmdargs):

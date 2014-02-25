@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,7 +21,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltdb.ParameterSet;
-import org.voltdb.messaging.FastSerializer;
+import org.voltdb.utils.SerializationHelper;
 
 /**
  * Client stored procedure invocation object. Server uses an internal
@@ -50,7 +50,9 @@ public class ProcedureInvocation {
         m_originalUniqueId = originalUniqueId;
         m_clientHandle = handle;
         m_procName = procName;
-        m_parameters = ParameterSet.fromArrayWithCopy(parameters);
+        m_parameters = (parameters != null
+                            ? ParameterSet.fromArrayWithCopy(parameters)
+                            : ParameterSet.emptyParameterSet());
 
         // auto-set the type if both txn IDs are set
         if (m_originalTxnId == -1 && m_originalUniqueId == -1) {
@@ -79,6 +81,10 @@ public class ProcedureInvocation {
         return size;
     }
 
+    public int getPassedParamCount() {
+        return m_parameters.size();
+    }
+
     public Object getPartitionParamValue(int index) {
         return m_parameters.toArray()[index];
     }
@@ -89,7 +95,7 @@ public class ProcedureInvocation {
             buf.putLong(m_originalTxnId);
             buf.putLong(m_originalUniqueId);
         }
-        FastSerializer.writeString(m_procNameBytes, buf);
+        SerializationHelper.writeVarbinary(m_procNameBytes, buf);
         buf.putLong(m_clientHandle);
         m_parameters.flattenToBuffer(buf);
         return buf;

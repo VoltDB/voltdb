@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -41,6 +41,9 @@ import org.voltdb.client.ClientConfigForTest;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.common.Constants;
+
+import com.google_voltpatches.common.net.HostAndPort;
 
 /**
  * Base class for a set of JUnit tests that perform regression tests
@@ -213,10 +216,14 @@ public class RegressionSuite extends TestCase {
         final Random r = new Random();
         final String listener = listeners.get(r.nextInt(listeners.size()));
         byte[] hashedPassword = ConnectionUtil.getHashedPassword(m_password);
+        HostAndPort hNp = HostAndPort.fromString(listener);
+        int port = Constants.DEFAULT_PORT;
+        if (hNp.hasPort()) {
+            port = hNp.getPort();
+        }
         final SocketChannel channel = (SocketChannel)
             ConnectionUtil.getAuthenticatedConnection(
-                    listener,
-                    m_username, hashedPassword, port(0))[0];
+                    hNp.getHostText(), m_username, hashedPassword, port)[0];
         channel.configureBlocking(true);
         if (!noTearDown) {
             synchronized (m_clientChannels) {
@@ -327,6 +334,41 @@ public class RegressionSuite extends TestCase {
             } else {
                 VoltType type = vt.getColumnType(i);
                 assertEquals(Long.parseLong(type.getNullValue().toString()), actual);
+            }
+        }
+    }
+
+    // ALL OF THE VALIDATION SCHEMAS IN THIS TEST ARE BASED OFF OF
+    // THE VOLTDB DOCS, RATHER THAN REUSING THE CODE THAT GENERATES THEM.
+    // IN SOME MAGICAL FUTURE MAYBE THEY ALL CAN BE GENERATED FROM THE
+    // SAME METADATA.
+    static public void validateSchema(VoltTable result, VoltTable expected)
+    {
+        assertEquals(expected.getColumnCount(), result.getColumnCount());
+        for (int i = 0; i < result.getColumnCount(); i++) {
+            assertEquals("Failed name column: " + i, expected.getColumnName(i), result.getColumnName(i));
+            assertEquals("Failed type column: " + i, expected.getColumnType(i), result.getColumnType(i));
+        }
+    }
+
+    static public void validStatisticsForTableLimit(Client client, String tableName, long limit) throws Exception {
+        long start = System.currentTimeMillis();
+        while (true) {
+            Thread.sleep(1000);
+            if (System.currentTimeMillis() - start > 10000) fail("Took too long");
+
+            VoltTable[] results = client.callProcedure("@Statistics", "TABLE", 0).getResults();
+            for (VoltTable t: results) { System.out.println(t.toString()); }
+            if (results[0].getRowCount() == 0) continue;
+
+            for (VoltTable vt: results) {
+                while(vt.advanceRow()) {
+                    String name = vt.getString("TABLE_NAME");
+                    if (tableName.equals(name)) {
+                        assertEquals(limit, vt.getLong("TUPLE_LIMIT"));
+                        return;
+                    }
+                }
             }
         }
     }

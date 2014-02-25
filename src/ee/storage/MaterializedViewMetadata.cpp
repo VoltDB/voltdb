@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-
+#include "storage/MaterializedViewMetadata.h"
 #include <cassert>
 #include <cstdio>
 #include <vector>
@@ -26,7 +26,6 @@
 #include "catalog/columnref.h"
 #include "catalog/column.h"
 #include "catalog/table.h"
-#include "catalog/materializedviewinfo.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/tuplevalueexpression.h"
 #include "expressions/constantvalueexpression.h"
@@ -34,7 +33,6 @@
 #include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
 #include "storage/persistenttable.h"
-#include "storage/MaterializedViewMetadata.h"
 #include "boost/foreach.hpp"
 #include "boost/shared_array.hpp"
 
@@ -52,6 +50,8 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
 {
     // best not to have to worry about the destination table disappearing out from under the source table that feeds it.
     VOLT_TRACE("construct materializedViewMetadata...");
+
+    m_mvInfo = mvInfo;
 
     m_target->incrementRefcount();
     srcTable->addMaterializedView(this);
@@ -481,18 +481,12 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
     // clear the tuple that will be built to insert or overwrite
     memset(m_updatedTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
 
-    //printf("  Existing tuple: %s.\n", m_existingTuple.debugNoHeader().c_str());
-    //fflush(stdout);
-
     // set up the first column, which is a count
     NValue count = m_existingTuple.getNValue((int)m_groupByColumnCount).op_decrement();
 
-    //printf("  Count is: %ld.\n", (long)(count.getBigInt()));
-    //fflush(stdout);
-
     // check if we should remove the tuple
     if (count.isZero()) {
-        m_target->deleteTuple(m_existingTuple, true);
+        m_target->deleteTuple(m_existingTuple, fallible);
         return;
     }
     // assume from here that we're just updating the existing row

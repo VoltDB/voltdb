@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,6 +17,7 @@
 
 package org.voltcore.utils;
 
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
@@ -24,7 +25,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop_voltpatches.hbase.utils.DirectMemoryUtils;
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.VoltDB;
 
 /**
  * A pool of {@link java.nio.ByteBuffer ByteBuffers} that are
@@ -290,7 +290,18 @@ public final class DBBPool {
                 logDeallocation(b.capacity());
                 DirectMemoryUtils.destroyDirectByteBuffer(b);
             } catch (Throwable e) {
-                VoltDB.crashLocalVoltDB("Failed to deallocate direct byte buffer", false, e);
+                // The client code doesn't want to link to the VoltDB class, so this hack was born.
+                // It should be temporary as the goal is to remove client code dependency on
+                // DBBPool in the medium term.
+                try {
+                    Class<?> vdbClz = Class.forName("org.voltdb.VoltDB");
+                    Method m = vdbClz.getMethod("crashLocalVoltDB", String.class, boolean.class, Throwable.class);
+                    m.invoke(null, "Failed to deallocate direct byte buffer", false, e);
+                } catch (Exception ignored) {
+                    System.err.println("Failed to deallocate direct byte buffer");
+                    e.printStackTrace();
+                    System.exit(-1);
+                }
             }
         }
     }

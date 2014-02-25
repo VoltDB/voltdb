@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,6 +30,8 @@ import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import com.google_voltpatches.common.primitives.Ints;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -538,8 +540,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         final SpProcedureTask task =
             new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg, m_drGateway);
         if (!msg.isReadOnly()) {
-            if (!m_cl.log(msg, msg.getSpHandle(), m_durabilityListener, task)) {
-                m_pendingTasks.offer(task);
+            ListenableFuture<Object> durabilityBackpressureFuture =
+                    m_cl.log(msg, msg.getSpHandle(), null, m_durabilityListener, task);
+            if (durabilityBackpressureFuture != null) {
+                m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
             }
         } else {
             m_pendingTasks.offer(task);
@@ -824,8 +828,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                                  m_pendingTasks, msg, null);
         }
         if (logThis) {
-            if (!m_cl.log(msg.getInitiateTask(), msg.getSpHandle(), m_durabilityListener, task)) {
-                m_pendingTasks.offer(task);
+            ListenableFuture<Object> durabilityBackpressureFuture =
+                    m_cl.log(msg.getInitiateTask(), msg.getSpHandle(), Ints.toArray(msg.getInvolvedPartitions()),
+                             m_durabilityListener, task);
+            if (durabilityBackpressureFuture != null) {
+                m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
             } else {
                 /* Getting here means that the task is the first fragment of an MP txn and
                  * synchronous command logging is on, so create a backlog for future tasks of

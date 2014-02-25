@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -22,11 +22,16 @@
  */
 package org.voltcore.network;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedTransferQueue;
 
+import com.google_voltpatches.common.base.Throwables;
 import org.voltcore.utils.DeferredSerialization;
 
 public class MockWriteStream implements WriteStream {
+    public BlockingQueue<ByteBuffer[]> m_messages = new LinkedTransferQueue<ByteBuffer[]>();
 
     @Override
     public boolean hadBackPressure() {
@@ -35,12 +40,16 @@ public class MockWriteStream implements WriteStream {
 
     @Override
     public void enqueue(DeferredSerialization ds) {
-        throw new UnsupportedOperationException();
+        try {
+            m_messages.offer(ds.serialize());
+        } catch (IOException e) {
+            Throwables.propagate(e);
+        }
     }
 
     @Override
     public void enqueue(ByteBuffer b) {
-        throw new UnsupportedOperationException();
+        m_messages.offer(new ByteBuffer[] { b });
     }
 
     @Override
@@ -60,8 +69,7 @@ public class MockWriteStream implements WriteStream {
 
     @Override
     public void enqueue(ByteBuffer[] b) {
-        // TODO Auto-generated method stub
-
+        m_messages.offer(b);
     }
 
 }

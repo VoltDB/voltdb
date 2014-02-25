@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -166,7 +166,7 @@ struct IntsKey
              * in this next uint64_t.
              */
             if (intraKeyOffset < 0) {
-                intraKeyOffset = sizeof(uint64_t) - 1;
+                intraKeyOffset = static_cast<int>(sizeof(uint64_t) - 1);
                 keyOffset++;
             }
         }
@@ -182,7 +182,7 @@ struct IntsKey
             retval |= (0xFF & (data[keyOffset] >> (intraKeyOffset * 8))) << (ii * 8);
             intraKeyOffset--;
             if (intraKeyOffset < 0) {
-                intraKeyOffset = sizeof(uint64_t) - 1;
+                intraKeyOffset = static_cast<int>(sizeof(uint64_t) - 1);
                 keyOffset++;
             }
         }
@@ -192,7 +192,7 @@ struct IntsKey
     std::string debug( const voltdb::TupleSchema *keySchema) const {
         std::ostringstream buffer;
         int keyOffset = 0;
-        int intraKeyOffset = sizeof(uint64_t) - 1;
+        int intraKeyOffset = static_cast<int>(sizeof(uint64_t) - 1);
         const int columnCount = keySchema->columnCount();
         for (int ii = 0; ii < columnCount; ii++) {
             switch(keySchema->columnType(ii)) {
@@ -233,7 +233,7 @@ struct IntsKey
         const TupleSchema *keySchema = tuple->getSchema();
         const int columnCount = keySchema->columnCount();
         int keyOffset = 0;
-        int intraKeyOffset = sizeof(uint64_t) - 1;
+        int intraKeyOffset = static_cast<int>(sizeof(uint64_t) - 1);
         for (int ii = 0; ii < columnCount; ii++) {
             switch(keySchema->columnType(ii)) {
             case voltdb::VALUE_TYPE_BIGINT: {
@@ -272,7 +272,7 @@ struct IntsKey
         ::memset(data, 0, keySize * sizeof(uint64_t));
         const int columnCount = keySchema->columnCount();
         int keyOffset = 0;
-        int intraKeyOffset = sizeof(uint64_t) - 1;
+        int intraKeyOffset = static_cast<int>(sizeof(uint64_t) - 1);
         if (indexed_expressions.size() != 0) {
             for (int ii = 0; ii < columnCount; ii++) {
                 AbstractExpression* ae = indexed_expressions[ii];

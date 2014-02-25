@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,10 +25,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 
 /**
@@ -78,29 +80,25 @@ import org.voltdb.expressions.TupleValueExpression;
  * See the comment in SelectSubPlanAssembler.getSelectSubPlanForJoin
  */
 public class PartitioningForStatement implements Cloneable{
-
     /**
-     * This value can be provided any non-null value to force single-partition statement planning and
-     * (at least currently) the disabling of any kind of analysis of single-partition suitability --
-     * except to forbid single-partition execution of replicated table DML.
+     * This value is only meaningful if m_inferPartitioning is false.
+     * It can be set true to force single-partition statement planning and
+     * to forbid single-partition planning/execution of replicated table DML.
      * Since that would corrupt the replication, it is flagged as an error.
      * Otherwise, no attempt is made to validate that a single partition statement would
      * have the same result as the same query run on all partitions.
-     * It is up to the caller to decide whether that is an issue.
+     * It is up to the user to decide whether that is an issue.
+     * It can be set to false to force multi-partition statement planning.
+     * This MAY involve sub-optimal dispatch of fragments to partitions with no matching data.
+     * Currently, even inserts into partitioned tables are allowed to successfully execute
+     * on "wrong" partitions, but they are prevented at the lowest level from taking effect there.
      */
-    private final Object m_specifiedValue;
-    /**
-     * This value can be initialized to true to give the planner permission
-     * to not only analyze whether the statement CAN be run single-partition,
-     * but also to decide that it WILL and to alter the plan accordingly.
-     * If initialized to false, the analysis is considered to be for advisory purposes only,
-     * so the planner may not commit to plan changes that are specific to single-partition execution.
-     */
-    private final boolean m_lockIn;
+    private final boolean m_forceSP;
+
     /**
      * Enables inference of single partitioning from statement.
      */
-    private final boolean m_inferSP;
+    private final boolean m_inferPartitioning;
     /*
      * For partitioned table DML, caches the partitioning column for later matching with its prospective value.
      * If that value is constant or a parameter, SP is an option.
@@ -112,6 +110,7 @@ public class PartitioningForStatement implements Cloneable{
      * If null, SP may not be safe, or the partitioning may be based on something less obvious like a parameter or constant expression.
      */
     private Object m_inferredValue = null;
+    private int m_inferredParameterIndex = -1;
     /*
      * Any constant/parameter-based expressions found to be equality-filtering partitioning columns.
      */
@@ -131,9 +130,10 @@ public class PartitioningForStatement implements Cloneable{
      */
     private int m_countOfIndependentlyPartitionedTables = -1;
     /*
-     * If true, SP execution is strictly forbidden, even if requested.
+     * If true, and the target table it replicated,
+     * SP execution is strictly forbidden, even if requested.
      */
-    private boolean m_replicatedTableDML = false;
+    private boolean m_isDML = false;
     /*
      * The table and column name of a partitioning column, typically the first scanned, if there are more than one,
      * proposed in feedback messages for possible use in single-partitioning annotations and attributes.
@@ -144,14 +144,26 @@ public class PartitioningForStatement implements Cloneable{
      * @param specifiedValue non-null if only SP plans are to be assumed
      * @param lockInInferredPartitioningConstant true if MP plans should be automatically optimized for SP where possible
      */
-    public PartitioningForStatement(Object specifiedValue, boolean lockInInferredPartitioningConstant, boolean inferSP) {
-        m_specifiedValue = specifiedValue;
-        m_lockIn = lockInInferredPartitioningConstant;
-        m_inferSP = inferSP;
+    private PartitioningForStatement(boolean inferPartitioning, boolean forceSP) {
+        m_forceSP = forceSP;
+        m_inferPartitioning = inferPartitioning;
     }
 
-    public boolean shouldInferSP() {
-        return m_inferSP;
+    public static PartitioningForStatement forceSP() {
+        return new PartitioningForStatement(false, true);
+    }
+
+    public static PartitioningForStatement forceMP() {
+        return new PartitioningForStatement(false, false);
+    }
+
+    public static PartitioningForStatement inferPartitioning() {
+        return new PartitioningForStatement(true, /* default to MP */ false);
+    }
+
+
+    public boolean isInferred() {
+        return m_inferPartitioning;
     }
 
     /**
@@ -159,65 +171,42 @@ public class PartitioningForStatement implements Cloneable{
      */
     @Override
     public Object clone() {
-        return new PartitioningForStatement(m_specifiedValue, m_lockIn, m_inferSP);
+        return new PartitioningForStatement(m_inferPartitioning, m_forceSP);
     }
 
     /**
      * accessor
      */
     public boolean wasSpecifiedAsSingle() {
-        return m_specifiedValue != null;
-    }
-
-
-    /**
-     * smart accessor that doesn't allow contradiction of an original non-null value setting.
-     */
-    public void setInferredValue(Object best) {
-        if (m_specifiedValue != null) {
-            // The only correct value is the one that was specified.
-            // TODO: A later implementation may support gentler "validation" of a specified partitioning value
-            assert(m_specifiedValue.equals(best));
-            return;
-        }
-        m_inferredValue = best;
+        return m_forceSP && ! m_inferPartitioning;
     }
 
     /**
      * @param string table.column name of a(nother) equality-filtered partitioning column
      * @param constExpr -- a constant/parameter-based expression that equality-filters the partitioning column
      */
-    public void addPartitioningExpression(String fullColumnName, AbstractExpression constExpr) {
+    public void addPartitioningExpression(String fullColumnName, AbstractExpression constExpr,
+                                          VoltType valueType) {
         if (m_fullColumnName == null) {
             m_fullColumnName = fullColumnName;
         }
         m_inferredExpression.add(constExpr);
+        if (constExpr instanceof ParameterValueExpression) {
+            ParameterValueExpression pve = (ParameterValueExpression)constExpr;
+            m_inferredParameterIndex = pve.getParameterIndex();
+        } else {
+            m_inferredValue = ConstantValueExpression.extractPartitioningValue(valueType, constExpr);
+        }
     }
 
-    /**
-     * smart accessor giving precedence to the constructor-specified value over any inferred value
-     * @return
-     */
-    public Object effectivePartitioningValue() {
-        if (m_specifiedValue != null) {
-            // For now, the only correct value is the one that was specified.
-            // TODO: A later implementation may support gentler "validation" of a specified partitioning value
-            assert(m_inferredValue == null);
-            return m_specifiedValue;
-        }
-        if (m_lockIn) {
-            return m_inferredValue;
-        }
-        return null;
-    }
-
-    /**
-     * accessor
-     * @return
-     */
-    public Object inferredPartitioningValue() {
+    public Object getInferredPartitioningValue() {
         return m_inferredValue;
     }
+
+    public int getInferredParameterIndex() {
+        return m_inferredParameterIndex;
+    }
+
 
     /**
      * accessor
@@ -237,28 +226,26 @@ public class PartitioningForStatement implements Cloneable{
     }
 
     /**
-     * Returns the discovered single partition expression (if it exists), unless the
-     * user gave a partitioning a-priori, and then it will return null.
+     * Returns true if there exists a single partition expression
      */
-    public AbstractExpression effectivePartitioningExpression() {
-        if (m_lockIn) {
-            return singlePartitioningExpression();
-        }
-        return null;
+    public boolean isInferredSingle() {
+        return m_inferPartitioning &&
+                (((m_countOfIndependentlyPartitionedTables == 0) && ! m_isDML)  ||
+                        (m_inferredExpression.size() == 1));
     }
 
     /**
      * Returns true if the statement will require two fragments.
      */
     public boolean requiresTwoFragments() {
-        if (getCountOfPartitionedTables() == 0) {
-            return false;
-        }
-        if (effectivePartitioningValue() != null) {
-            return false;
-        }
-        if (effectivePartitioningExpression() != null) {
-            return false;
+        if (m_inferPartitioning) {
+            if (isInferredSingle()) {
+                return false;
+            }
+        } else {
+            if (m_forceSP || (m_countOfPartitionedTables == 0)) {
+                return false;
+            }
         }
         return true;
     }
@@ -278,15 +265,13 @@ public class PartitioningForStatement implements Cloneable{
      * accessor
      */
     public boolean getIsReplicatedTableDML() {
-        return m_replicatedTableDML;
+        return m_isDML && (m_countOfIndependentlyPartitionedTables == 0);
     }
 
     /**
-     * @param replicatedTableDML
+     * @param parameter potentially enabling replicatedTableDML check
      */
-    public void setIsReplicatedTableDML(boolean replicatedTableDML) {
-        m_replicatedTableDML = replicatedTableDML;
-    }
+    public void setIsDML() { m_isDML = true; }
 
     /**
      * accessor
@@ -301,10 +286,9 @@ public class PartitioningForStatement implements Cloneable{
      * @param partitioncolumn
      */
     public void setPartitioningColumn(Column partitioncolumn) {
-        if (m_inferSP) {
+        if (m_inferPartitioning) {
             m_partitionCol = partitioncolumn; // Not used in SELECT plans.
         }
-
     }
 
     /**
@@ -380,9 +364,9 @@ public class PartitioningForStatement implements Cloneable{
                     if (constExpr instanceof TupleValueExpression) {
                         continue;
                     }
-                    addPartitioningExpression(tokenPartitionKey.getTableName() + '.' + tokenPartitionKey.getColumnName(), constExpr);
-                    Object partitioningObject = ConstantValueExpression.extractPartitioningValue(tokenPartitionKey.getValueType(), constExpr);
-                    setInferredValue(partitioningObject);
+                    VoltType valueType = tokenPartitionKey.getValueType();
+                    addPartitioningExpression(tokenPartitionKey.getTableName() +
+                            '.' + tokenPartitionKey.getColumnName(), constExpr, valueType);
                     // Only need one constant value.
                     break;
                 }

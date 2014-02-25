@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -38,9 +38,9 @@ class Topend {
 
     // Update the topend on query progress and give the topend a chance to tell the
     // query to stop.
-    // Return true if the Topend wants the EE to stop processing the current fragment
-    // or false if it should continue.
-    virtual bool fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
+    // Return 0 if the Topend wants the EE to stop processing the current fragment
+    // or the number of tuples the EE should process before repeating this call.
+    virtual int64_t fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
                 std::string targetTableName, int64_t targetTableSize, int64_t tuplesProcessed) = 0;
 
     virtual std::string planForFragmentId(int64_t fragmentId) = 0;

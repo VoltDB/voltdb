@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -92,8 +92,6 @@ public class ClientThread extends Thread {
 
         String sql1 = String.format("select * from partitioned where cid = %d order by rid desc limit 1", cid);
         String sql2 = String.format("select * from replicated  where cid = %d order by rid desc limit 1", cid);
-        String sql3 = String.format("select count(*) FROM dimension WHERE cid = %d", cid);
-        String sql4 = String.format("insert into dimension (cid, desc) VALUES (%d, %d)", cid, cid);
         VoltTable t1;
         VoltTable t2;
         while (true) {
@@ -101,13 +99,12 @@ public class ClientThread extends Thread {
                   t1 = client.callProcedure("@AdHoc", sql1).getResults()[0];
                   t2 = client.callProcedure("@AdHoc", sql2).getResults()[0];
                   // init the dimension table to have one record for each cid.
-                  if (client.callProcedure("@AdHoc", sql3).getResults()[0].fetchRow(0).getLong(0) == 0) {
-                      client.callProcedure("@AdHoc", sql4);
-                  }
+                  client.callProcedure("PopulateDimension", cid);
                   break;
             }
             catch (Exception e) {
                 log.warn("ClientThread threw exception in initialization, will retry", e);
+                try { Thread.sleep(3000); } catch (Exception e2) {}
             }
         }
 

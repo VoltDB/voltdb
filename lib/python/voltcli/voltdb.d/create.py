@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2013 VoltDB Inc.
+# Copyright (C) 2008-2014 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -26,7 +26,12 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 @VOLT.Command(
-    bundles = VOLT.ServerBundle('create'),
+    bundles = VOLT.ServerBundle('create',
+                                needs_catalog=True,
+                                supports_live=False,
+                                default_host=True,
+                                safemode_available=False,
+                                supports_daemon=True),
     options = (
         # Hidden option to restore the hashinator in addition to the tables.
         VOLT.BooleanOption('-r', '--replica', 'replica', 'start replica cluster', default = False),

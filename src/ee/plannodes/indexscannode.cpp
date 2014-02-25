@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -129,10 +129,12 @@ void IndexScanPlanNode::loadFromJSONObject(PlannerDomValue obj) {
         m_skip_null_predicate = AbstractExpression::buildExpressionTree(exprValue);
     }
 
-    PlannerDomValue searchKeyExprArray = obj.valueForKey("SEARCHKEY_EXPRESSIONS");
-    for (int i = 0; i < searchKeyExprArray.arrayLen(); i++) {
-        AbstractExpression *expr = AbstractExpression::buildExpressionTree(searchKeyExprArray.valueAtIndex(i));
-        m_searchkey_expressions.push_back(expr);
+    if (obj.hasNonNullKey("SEARCHKEY_EXPRESSIONS")) {
+        PlannerDomValue searchKeyExprArray = obj.valueForKey("SEARCHKEY_EXPRESSIONS");
+        for (int i = 0; i < searchKeyExprArray.arrayLen(); i++) {
+            AbstractExpression *expr = AbstractExpression::buildExpressionTree(searchKeyExprArray.valueAtIndex(i));
+            m_searchkey_expressions.push_back(expr);
+        }
     }
 }
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,10 +26,11 @@ import java.net.InetSocketAddress;
 import java.util.concurrent.Future;
 
 public class MockConnection implements Connection {
+    public final MockWriteStream m_writeStream = new MockWriteStream();
 
     @Override
     public WriteStream writeStream() {
-        throw new UnsupportedOperationException();
+        return m_writeStream;
     }
 
     @Override

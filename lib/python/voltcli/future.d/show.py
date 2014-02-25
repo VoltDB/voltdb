@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2013 VoltDB Inc.
+# Copyright (C) 2008-2014 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -37,7 +37,7 @@ def show_config(runner):
         for filter in runner.opts.arg:
             n = 0
             for (key, value) in runner.config.query_pairs(filter = filter):
-                sys.stdout.write('%s=%s\n' % (key, d[key]))
+                sys.stdout.write('%s=%s\n' % (key, value))
                 n += 1
             if n == 0:
                 sys.stdout.write('%s *not found*\n' % filter)

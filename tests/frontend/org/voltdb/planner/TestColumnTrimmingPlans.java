@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -28,9 +28,9 @@ public class TestColumnTrimmingPlans extends PlannerTestCase
 {
     @Override
     protected void setUp() throws Exception {
-        boolean planForSinglePartition = true;
-        setupSchema(TestColumnTrimmingPlans.class.getResource("testplans-trimming-ddl.sql"),
-                    "testtrimmingplans", planForSinglePartition);
+        boolean inferPartitioning = true;
+        setupSchema(inferPartitioning, TestColumnTrimmingPlans.class.getResource("testplans-trimming-ddl.sql"),
+                    "testtrimmingplans");
     }
 
     @Override

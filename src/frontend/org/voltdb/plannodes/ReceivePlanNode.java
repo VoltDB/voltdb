@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,9 +28,7 @@ import org.voltdb.types.PlanNodeType;
 
 public class ReceivePlanNode extends AbstractPlanNode {
 
-    boolean m_isOrderDeterministic = false;
-    boolean m_isContentDeterministic = true;
-    String m_nondeterminismDetail = "no ordering was asserted for Receive Plan Node";
+    final static String m_nondeterminismDetail = "multi-fragment plan results can arrive out of order";
 
     public ReceivePlanNode() {
         super();
@@ -102,17 +100,7 @@ public class ReceivePlanNode extends AbstractPlanNode {
      */
     @Override
     public boolean isOrderDeterministic() {
-        return m_isOrderDeterministic;
-    }
-
-    /**
-     * Accessor for flag marking the plan as guaranteeing an identical result/effect
-     * when "replayed" against the same database state, such as during replication or CL recovery.
-     * @return previously cached value.
-     */
-    @Override
-    public boolean isContentDeterministic() {
-        return m_isContentDeterministic;
+        return false;
     }
 
     /**
@@ -120,22 +108,6 @@ public class ReceivePlanNode extends AbstractPlanNode {
      */
     @Override
     public String nondeterminismDetail() { return m_nondeterminismDetail; }
-
-    /**
-     * Write accessor for determinism flags and optional description.
-     * This must be cached before fragmentation makes the child info harder to reach.
-     */
-    public void cacheDeterminism() {
-        AbstractPlanNode childNode = getChild(0);
-        m_isOrderDeterministic = childNode.isOrderDeterministic();
-        if (m_isOrderDeterministic) {
-            m_nondeterminismDetail = null;
-            m_isContentDeterministic = true;
-        } else {
-            m_nondeterminismDetail = childNode.nondeterminismDetail();
-            m_isContentDeterministic = childNode.isContentDeterministic();
-        }
-    }
 
     @Override
     public boolean reattachFragment( SendPlanNode child  ) {

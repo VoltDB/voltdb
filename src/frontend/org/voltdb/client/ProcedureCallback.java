@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,9 +23,12 @@ package org.voltdb.client;
  * stored procedure invocation.
  */
 public interface ProcedureCallback {
+
     /**
-     * Implementation of callback to be provided by client applications
+     * Implementation of callback to be provided by client applications.
+     *
      * @param clientResponse Response to the stored procedure invocation this callback is associated with
+     * @throws Exception on any Exception.
      */
     abstract public void clientCallback(ClientResponse clientResponse) throws Exception;
 }

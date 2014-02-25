@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -152,7 +152,7 @@ public class PlanAssembler {
     /**
      * Return true if tableList includes at least one matview.
      */
-    private boolean tableListIncludesView(List<Table> tableList) {
+    private static boolean tableListIncludesView(List<Table> tableList) {
         for (Table table : tableList) {
             if (table.getMaterializer() != null) {
                 return true;
@@ -213,64 +213,60 @@ public class PlanAssembler {
             subAssembler = new SelectSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
             return;
         }
-        //TODO: eliminate this redundant "else after a return" and un-indent this block.
-        else {
-            // check that no modification happens to views
-            if (tableListIncludesView(parsedStmt.tableList)) {
-                throw new RuntimeException(
-                "Illegal to modify a materialized view.");
-            }
 
-            // Check that only multi-partition writes are made to replicated tables.
-            // figure out which table we're updating/deleting
-            assert (parsedStmt.tableList.size() == 1);
-            Table targetTable = parsedStmt.tableList.get(0);
-            if (targetTable.getIsreplicated()) {
-                if (m_partitioning.wasSpecifiedAsSingle()) {
-                    String msg = "Trying to write to replicated table '" + targetTable.getTypeName()
-                                 + "' in a single-partition procedure.";
-                    throw new PlanningErrorException(msg);
-                }
-            } else if (m_partitioning.wasSpecifiedAsSingle() == false) {
-                m_partitioning.setPartitioningColumn(targetTable.getPartitioncolumn());
-            }
-
-            if (parsedStmt instanceof ParsedInsertStmt) {
-                m_parsedInsert = (ParsedInsertStmt) parsedStmt;
-                // The currently handled inserts are too simple to even require a subplan assembler. So, done.
-                return;
-            }
-
-            if (parsedStmt instanceof ParsedUpdateStmt) {
-                if (tableListIncludesExportOnly(parsedStmt.tableList)) {
-                    throw new RuntimeException(
-                    "Illegal to update an export table.");
-                }
-                m_parsedUpdate = (ParsedUpdateStmt) parsedStmt;
-            } else if (parsedStmt instanceof ParsedDeleteStmt) {
-                if (tableListIncludesExportOnly(parsedStmt.tableList)) {
-                    throw new RuntimeException(
-                    "Illegal to delete from an export table.");
-                }
-                m_parsedDelete = (ParsedDeleteStmt) parsedStmt;
-            } else {
-                throw new RuntimeException(
-                        "Unknown subclass of AbstractParsedStmt.");
-            }
-            if ( ! m_partitioning.wasSpecifiedAsSingle()) {
-                //TODO: When updates and deletes can contain joins, this step may have to be
-                // deferred so that the valueEquivalence set can be analyzed per join order.
-                // This appears to be an unfortunate side effect of how the HSQL interface
-                // misleadingly organizes the placement of join/where filters on the statement tree.
-                // This throws off the accounting of equivalence join filters until they can be
-                // normalized in analyzeJoinFilters, but that normalization process happens on a
-                // per-join-order basis, and so, so must this analysis.
-                HashMap<AbstractExpression, Set<AbstractExpression>>
-                    valueEquivalence = parsedStmt.analyzeValueEquivalence();
-                m_partitioning.analyzeForMultiPartitionAccess(parsedStmt.stmtCache, valueEquivalence);
-            }
-            subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
+        // check that no modification happens to views
+        if (tableListIncludesView(parsedStmt.tableList)) {
+            throw new RuntimeException("Illegal to modify a materialized view.");
         }
+
+        m_partitioning.setIsDML();
+
+        // Check that only multi-partition writes are made to replicated tables.
+        // figure out which table we're updating/deleting
+        assert (parsedStmt.tableList.size() == 1);
+        Table targetTable = parsedStmt.tableList.get(0);
+        if (targetTable.getIsreplicated()) {
+            if (m_partitioning.wasSpecifiedAsSingle()) {
+                String msg = "Trying to write to replicated table '" + targetTable.getTypeName()
+                        + "' in a single-partition procedure.";
+                throw new PlanningErrorException(msg);
+            }
+        } else if (m_partitioning.wasSpecifiedAsSingle() == false) {
+            m_partitioning.setPartitioningColumn(targetTable.getPartitioncolumn());
+        }
+
+        if (parsedStmt instanceof ParsedInsertStmt) {
+            m_parsedInsert = (ParsedInsertStmt) parsedStmt;
+            // The currently handled inserts are too simple to even require a subplan assembler. So, done.
+            return;
+        }
+
+        if (parsedStmt instanceof ParsedUpdateStmt) {
+            if (tableListIncludesExportOnly(parsedStmt.tableList)) {
+                throw new RuntimeException("Illegal to update an export table.");
+            }
+            m_parsedUpdate = (ParsedUpdateStmt) parsedStmt;
+        } else if (parsedStmt instanceof ParsedDeleteStmt) {
+            if (tableListIncludesExportOnly(parsedStmt.tableList)) {
+                throw new RuntimeException("Illegal to delete from an export table.");
+            }
+            m_parsedDelete = (ParsedDeleteStmt) parsedStmt;
+        } else {
+            throw new RuntimeException("Unknown subclass of AbstractParsedStmt.");
+        }
+        if ( ! m_partitioning.wasSpecifiedAsSingle()) {
+            //TODO: When updates and deletes can contain joins, this step may have to be
+            // deferred so that the valueEquivalence set can be analyzed per join order.
+            // This appears to be an unfortunate side effect of how the HSQL interface
+            // misleadingly organizes the placement of join/where filters on the statement tree.
+            // This throws off the accounting of equivalence join filters until they can be
+            // normalized in analyzeJoinFilters, but that normalization process happens on a
+            // per-join-order basis, and so, so must this analysis.
+            HashMap<AbstractExpression, Set<AbstractExpression>>
+                valueEquivalence = parsedStmt.analyzeValueEquivalence();
+            m_partitioning.analyzeForMultiPartitionAccess(parsedStmt.stmtCache, valueEquivalence);
+        }
+        subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
     }
 
     /**
@@ -295,7 +291,7 @@ public class PlanAssembler {
             if (rawplan == null)
                 break;
             // Update the best cost plan so far
-            m_planSelector.considerCandidatePlan(rawplan);
+            m_planSelector.considerCandidatePlan(rawplan, parsedStmt);
         }
         return m_planSelector.m_bestPlan;
     }
@@ -317,27 +313,16 @@ public class PlanAssembler {
      *         computable plans.
      */
     private CompiledPlan getNextPlan() {
-        CompiledPlan retval = new CompiledPlan();
+        CompiledPlan retval;
         AbstractParsedStmt nextStmt = null;
         if (m_parsedUnion != null) {
             nextStmt = m_parsedUnion;
             retval = getNextUnionPlan();
-            if (retval != null) {
-                retval.readOnly = true;
-            }
         } else if (m_parsedSelect != null) {
             nextStmt = m_parsedSelect;
-            retval.rootPlanGraph = getNextSelectPlan();
-            retval.readOnly = true;
-            if (retval.rootPlanGraph != null)
-            {
-                // Check PlanColumn resource leakage later by recording the select stmt.
-                retval.selectStmt = m_parsedSelect;
-                boolean orderIsDeterministic = m_parsedSelect.isOrderDeterministic();
-                boolean contentIsDeterministic = (m_parsedSelect.hasLimitOrOffset() == false) || orderIsDeterministic;
-                retval.statementGuaranteesDeterminism(contentIsDeterministic, orderIsDeterministic);
-            }
+            retval = getNextSelectPlan();
         } else {
+            retval = new CompiledPlan();
             retval.readOnly = false;
             if (m_parsedInsert != null) {
                 nextStmt = m_parsedInsert;
@@ -357,9 +342,10 @@ public class PlanAssembler {
                         "setupForNewPlans not called or not successfull.");
             }
             assert (nextStmt.tableList.size() == 1);
-            if (nextStmt.tableList.get(0).getIsreplicated())
+            if (nextStmt.tableList.get(0).getIsreplicated()) {
                 retval.replicatedTableDML = true;
-            retval.statementGuaranteesDeterminism(true, true); // Until we support DML w/ subqueries/limits
+            }
+            retval.statementGuaranteesDeterminism(false, true); // Until we support DML w/ subqueries/limits
         }
 
         if (retval == null || retval.rootPlanGraph == null) {
@@ -368,7 +354,6 @@ public class PlanAssembler {
 
         assert (nextStmt != null);
         retval.parameters = nextStmt.getParameters();
-        retval.setPartitioningKey(m_partitioning.effectivePartitioningValue());
         return retval;
     }
 
@@ -391,8 +376,6 @@ public class PlanAssembler {
         m_recentErrorMsg = null;
 
         ArrayList<CompiledPlan> childrenPlans = new ArrayList<CompiledPlan>();
-        boolean orderIsDeterministic = true;
-        boolean contentIsDeterministic = true;
 
         PartitioningForStatement commonPartitioning = null;
 
@@ -413,8 +396,6 @@ public class PlanAssembler {
                 return null;
             }
             childrenPlans.add(bestChildPlan);
-            orderIsDeterministic = orderIsDeterministic && bestChildPlan.isOrderDeterministic();
-            contentIsDeterministic = contentIsDeterministic && bestChildPlan.isContentDeterministic();
 
             // Make sure that next child's plans won't override current ones.
             planId = processor.m_planId;
@@ -481,7 +462,9 @@ public class PlanAssembler {
             retval.rootPlanGraph = subUnionRoot;
         retval.readOnly = true;
         retval.sql = m_planSelector.m_sql;
-        retval.statementGuaranteesDeterminism(contentIsDeterministic, orderIsDeterministic);
+        boolean orderIsDeterministic = m_parsedUnion.isOrderDeterministic();
+        boolean hasLimitOrOffset = m_parsedUnion.hasLimitOrOffset();
+        retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
 
         // compute the cost - total of all children
         retval.cost = 0.0;
@@ -491,7 +474,7 @@ public class PlanAssembler {
         return retval;
     }
 
-    private AbstractPlanNode getNextSelectPlan() {
+    private CompiledPlan getNextSelectPlan() {
         assert (subAssembler != null);
 
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
@@ -555,7 +538,7 @@ public class PlanAssembler {
                         "This special case join between an outer replicated table and " +
                         "an inner partitioned table is too complex and is not supported.");
             } else {
-                root = subAssembler.addSendReceivePair(root);
+                root = SubPlanAssembler.addSendReceivePair(root);
                 // Root is a receive node here.
                 assert(root instanceof ReceivePlanNode);
 
@@ -611,7 +594,13 @@ public class PlanAssembler {
             root = handleLimitOperator(root);
         }
 
-        return root;
+        CompiledPlan retval = new CompiledPlan();
+        retval.rootPlanGraph = root;
+        retval.readOnly = true;
+        boolean orderIsDeterministic = m_parsedSelect.isOrderDeterministic();
+        boolean hasLimitOrOffset = m_parsedSelect.hasLimitOrOffset();
+        retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
+        return retval;
     }
 
     private boolean needProjectionNode (AbstractPlanNode root) {
@@ -637,7 +626,7 @@ public class PlanAssembler {
     }
 
     // ENG-4909 Bug: currently disable NESTLOOPINDEX plan for IN
-    private boolean disableNestedLoopIndexJoinForInComparison (AbstractPlanNode root, AbstractParsedStmt parsedStmt) {
+    private static boolean disableNestedLoopIndexJoinForInComparison (AbstractPlanNode root, AbstractParsedStmt parsedStmt) {
         if (root.getPlanNodeType() == PlanNodeType.NESTLOOPINDEX) {
             assert(parsedStmt != null);
             return true;
@@ -685,31 +674,32 @@ public class PlanAssembler {
         // If the scan matches all rows, we can throw away the scan
         // nodes and use a truncate delete node.
         // Assume all index scans have filters in this context, so only consider seq scans.
-        if (m_partitioning.wasSpecifiedAsSingle() &&
-                (subSelectRoot instanceof SeqScanPlanNode) &&
+        if ( (subSelectRoot instanceof SeqScanPlanNode) &&
                 (((SeqScanPlanNode) subSelectRoot).getPredicate() == null)) {
             deleteNode.setTruncate(true);
-            return deleteNode;
+
+            if (m_partitioning.wasSpecifiedAsSingle()) {
+                return deleteNode;
+            }
+        } else {
+            // connect the nodes to build the graph
+            deleteNode.addAndLinkChild(subSelectRoot);
+            // OPTIMIZATION: Projection Inline
+            // If the root node we got back from createSelectTree() is an
+            // AbstractScanNode, then
+            // we put the Projection node we just created inside of it
+            // When we inline this projection into the scan, we're going
+            // to overwrite any original projection that we might have inlined
+            // in order to simply cull the columns from the persistent table.
+            subSelectRoot.addInlinePlanNode(projectionNode);
         }
 
-        // OPTIMIZATION: Projection Inline
-        // If the root node we got back from createSelectTree() is an
-        // AbstractScanNode, then
-        // we put the Projection node we just created inside of it
-        // When we inline this projection into the scan, we're going
-        // to overwrite any original projection that we might have inlined
-        // in order to simply cull the columns from the persistent table.
-        subSelectRoot.addInlinePlanNode(projectionNode);
-        // connect the nodes to build the graph
-        deleteNode.addAndLinkChild(subSelectRoot);
-
-        if (m_partitioning.wasSpecifiedAsSingle() ||
-            (m_partitioning.effectivePartitioningExpression() != null)) {
+        if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
             return deleteNode;
         }
 
         // Send the local result counts to the coordinator.
-        AbstractPlanNode recvNode = subAssembler.addSendReceivePair(deleteNode);
+        AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(deleteNode);
         // add a sum or a limit and send on top of the union
         return addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
     }
@@ -781,13 +771,12 @@ public class PlanAssembler {
         // connect the nodes to build the graph
         updateNode.addAndLinkChild(subSelectRoot);
 
-        if (m_partitioning.wasSpecifiedAsSingle() ||
-            (m_partitioning.effectivePartitioningExpression() != null)) {
+        if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
             return updateNode;
         }
 
         // Send the local result counts to the coordinator.
-        AbstractPlanNode recvNode = subAssembler.addSendReceivePair(updateNode);
+        AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(updateNode);
         // add a sum or a limit and send on top of the union
         return addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
     }
@@ -882,13 +871,13 @@ public class PlanAssembler {
                         const_expr.refineValueType(VoltType.get((byte) column.getType()), column.getSize());
                     }
                 }
+                assert(expr != null);
             }
 
             // Hint that this statement can be executed SP.
             if (column.equals(m_partitioning.getColumn())) {
                 String fullColumnName = targetTable.getTypeName() + "." + column.getTypeName();
-                m_partitioning.addPartitioningExpression(fullColumnName, expr);
-                m_partitioning.setInferredValue(ConstantValueExpression.extractPartitioningValue(expr.getValueType(), expr));
+                m_partitioning.addPartitioningExpression(fullColumnName, expr, expr.getValueType());
             }
 
             // add column to the materialize node.
@@ -904,19 +893,13 @@ public class PlanAssembler {
         // connect the insert and the materialize nodes together
         insertNode.addAndLinkChild(materializeNode);
 
-        if (m_partitioning.wasSpecifiedAsSingle() ||
-            (m_partitioning.effectivePartitioningExpression() != null)) {
+        if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
             insertNode.setMultiPartition(false);
             return insertNode;
         }
 
         insertNode.setMultiPartition(true);
-        // The following is the moral equivalent of addSendReceivePair
-        SendPlanNode sendNode = new SendPlanNode();
-        sendNode.addAndLinkChild(insertNode);
-        AbstractPlanNode recvNode = new ReceivePlanNode();
-        recvNode.addAndLinkChild(sendNode);
-
+        AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(insertNode);
         // add a count or a limit and send on top of the union
         return addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
     }
@@ -929,11 +912,9 @@ public class PlanAssembler {
      * @param isReplicated Whether or not the target table is a replicated table.
      * @return
      */
-    AbstractPlanNode addSumOrLimitAndSendToDMLNode(AbstractPlanNode dmlRoot, boolean isReplicated)
+    static AbstractPlanNode addSumOrLimitAndSendToDMLNode(AbstractPlanNode dmlRoot, boolean isReplicated)
     {
         AbstractPlanNode sumOrLimitNode;
-        SendPlanNode sendNode = new SendPlanNode();
-
         if (isReplicated) {
             // Replicated table DML result doesn't need to be summed. All partitions should
             // modify the same number of tuples in replicated table, so just pick the result from
@@ -977,6 +958,7 @@ public class PlanAssembler {
 
         // connect the nodes to build the graph
         sumOrLimitNode.addAndLinkChild(dmlRoot);
+        SendPlanNode sendNode = new SendPlanNode();
         sendNode.addAndLinkChild(sumOrLimitNode);
 
         return sendNode;
@@ -1026,30 +1008,28 @@ public class PlanAssembler {
             return root;
         }
 
-        // Ignore ORDER BY in cases where there can be at most one row.
-        if (m_parsedSelect.guaranteesUniqueRow()) {
-            return root;
-        }
-
         SortDirectionType sortDirection = SortDirectionType.INVALID;
 
         // Skip the explicit ORDER BY plan step if an IndexScan is already providing the equivalent ordering.
         // Note that even tree index scans that produce values in their own "key order" only report
         // their sort direction != SortDirectionType.INVALID
         // when they enforce an ordering equivalent to the one requested in the ORDER BY clause.
-        if (root.getPlanNodeType() == PlanNodeType.INDEXSCAN) {
-            sortDirection = ((IndexScanPlanNode) root).getSortDirection();
-            if (sortDirection != SortDirectionType.INVALID) {
-                return root;
-            }
+        // Even an intervening non-hash aggregate will not interfere in this optimization.
+        AbstractPlanNode nonAggPlan = root;
+        if (root.getPlanNodeType() == PlanNodeType.AGGREGATE) {
+            nonAggPlan = root.getChild(0);
         }
-        // Optimization for NestLoopIndex on IN list
-        // skip the explicit ORDER BY plan step if NestLoopIndex is providing the equivalent ordering
-        if (root instanceof AbstractJoinPlanNode) {
-            sortDirection = ((AbstractJoinPlanNode)root).getSortDirection();
-            if (sortDirection != SortDirectionType.INVALID) {
-                return root;
-            }
+        if (nonAggPlan instanceof IndexScanPlanNode) {
+            sortDirection = ((IndexScanPlanNode)nonAggPlan).getSortDirection();
+        }
+        // Optimization for NestLoopIndex on IN list, possibly other cases of ordered join results.
+        // Skip the explicit ORDER BY plan step if NestLoopIndex is providing the equivalent ordering
+        else if (nonAggPlan instanceof AbstractJoinPlanNode) {
+            sortDirection = ((AbstractJoinPlanNode)nonAggPlan).getSortDirection();
+        }
+
+        if (sortDirection != SortDirectionType.INVALID) {
+            return root;
         }
 
         OrderByPlanNode orderByNode = new OrderByPlanNode();
@@ -1059,83 +1039,6 @@ public class PlanAssembler {
                                               : SortDirectionType.DESC);
         }
         orderByNode.addAndLinkChild(root);
-
-        // get all of the columns in the sort
-        List<AbstractExpression> orderExpressions = orderByNode.getSortExpressions();
-
-        // In theory, for every table in the query, there needs to exist a uniqueness constraint
-        // (primary key or other unique index) on some of the ORDER BY values regardless of whether
-        // the associated index is used in the selected plan.
-        // If the index scan was used at the top of the plan, and its sort order was valid
-        // -- meaning covering the entire ORDER BY clause --
-        // this function would have already returned without adding an orderByNode.
-        // The interesting cases, including issue ENG-3335, are
-        // -- when the index scan is in the distributed part of the plan
-        //    Then, the orderByNode is required to re-order the results at the coordinator.
-        // -- when the index was not the one selected for the plan.
-        // -- when the index is defined on a left-most child of a join the distributed part of the plan
-        //    Then, the orderByNode is required to re-order the results at the coordinator.
-
-        // Start by eliminating joins since, in general, a join (one-to-many) may produce multiple joined rows for each unique input row.
-        // TODO: In theory, it is possible to analyze the join criteria and/or projected columns
-        // to determine whether the particular join preserves the uniqueness of its index-scanned input.
-        boolean allScansAreDeterministic = true;
-        for (Table table : m_parsedSelect.tableList) {
-
-            allScansAreDeterministic = false;
-            // search indexes for one that makes the order by deterministic
-            for (Index index : table.getIndexes()) {
-                // skip non-unique indexes
-                if (!index.getUnique()) {
-                    continue;
-                }
-
-                // get the list of expressions for the index
-                List<AbstractExpression> indexExpressions = new ArrayList<AbstractExpression>();
-
-                String jsonExpr = index.getExpressionsjson();
-                // if this is a pure-column index...
-                if (jsonExpr.isEmpty()) {
-                    for (ColumnRef cref : index.getColumns()) {
-                        Column col = cref.getColumn();
-                        // Can not set table Alias here, only table name
-                        TupleValueExpression tve = new TupleValueExpression(table.getTypeName(),
-                                                                            col.getName(),
-                                                                            col.getIndex());
-                        tve.setValueSize(col.getSize());
-                        tve.setValueType(VoltType.get((byte) col.getType()));
-                        indexExpressions.add(tve);
-                    }
-                }
-                // if this is a fancy expression-based index...
-                else {
-                    try {
-                        indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr);
-                    } catch (JSONException e) {
-                        e.printStackTrace(); // danger will robinson
-                        assert(false);
-                        return null;
-                    }
-                }
-
-                // If the sort covers the index, then it's a unique sort.
-                //TODO: The statement's equivalence sets would be handy here to recognize cases like
-                //    WHERE A.unique_id = 1 AND A.b_id = 2 and B.unique_id = A.b_id ORDER BY B.unique_id
-                if (orderExpressions.containsAll(indexExpressions)) {
-                    allScansAreDeterministic = true;
-                    break;
-                }
-            }
-
-            if ( ! allScansAreDeterministic) {
-                break;
-            }
-        }
-
-        if (allScansAreDeterministic) {
-            orderByNode.setOrderingByUniqueColumns();
-        }
-
         return orderByNode;
     }
 
@@ -1332,8 +1235,11 @@ public class PlanAssembler {
             AggregatePlanNode topAggNode = null;
             if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
                 AbstractPlanNode candidate = root.getChild(0).getChild(0);
-                // do the type check here, no need to find substitute if it is already an IndexScan node
-                if (candidate.getPlanNodeType() == PlanNodeType.SEQSCAN) {
+                // For a seqscan feeding a GROUP BY, consider substituting an IndexScan that pre-sorts
+                // by the GROUP BY keys. This is a much bigger win if the aggregation can get pushed
+                // down so that the ordering is not lost by the lack of a mergesort in the RECEIVE node,
+                // but it shouldn't hurt (much?) anyway.
+                if (candidate.getPlanNodeType() == PlanNodeType.SEQSCAN && m_parsedSelect.isGrouped()) {
                     candidate = indexAccessForGroupByExprs(candidate);
                     if (candidate.getPlanNodeType() == PlanNodeType.INDEXSCAN) {
                         candidate.clearParents();
@@ -1341,7 +1247,10 @@ public class PlanAssembler {
                         root.getChild(0).addAndLinkChild(candidate);
                     }
                 }
-            } else {
+            }
+            else if (root.getPlanNodeType() == PlanNodeType.SEQSCAN && m_parsedSelect.isGrouped()) {
+                // For a seqscan feeding a GROUP BY, consider substituting an IndexScan that pre-sorts
+                // by the GROUP BY keys.
                 root = indexAccessForGroupByExprs(root);
             }
             // A hash is required to build up per-group aggregates in parallel vs.
@@ -1364,17 +1273,44 @@ public class PlanAssembler {
             // This is the less ambitious aspect of issue ENG-4096. The more ambitious aspect
             // is that the ability to by-pass use of the hash could actually motivate selection of
             // a compatible index scan, even when one would not be motivated by a WHERE or ORDER BY clause.
-
-            if (m_parsedSelect.isGrouped() &&
-                (root.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
-                 ((IndexScanPlanNode) root).getSortDirection() == SortDirectionType.INVALID)) {
+            boolean needHashAgg = m_parsedSelect.isGrouped();
+            if (needHashAgg) {
+                boolean predeterminedOrdering = false;
+                if (root instanceof IndexScanPlanNode) {
+                    if (((IndexScanPlanNode)root).getSortDirection() == SortDirectionType.INVALID) {
+                        if (((IndexScanPlanNode)root).isForGroupingOnly()) {
+                            needHashAgg = false;
+                        }
+                    } else {
+                        predeterminedOrdering = true;
+                    }
+                }
+                else if (root instanceof AbstractJoinPlanNode) {
+                    if (((AbstractJoinPlanNode)root).getSortDirection() != SortDirectionType.INVALID) {
+                        predeterminedOrdering = true;
+                    }
+                }
+                if (predeterminedOrdering) {
+                    // The ordering predetermined by indexed access is known to cover (at least) the
+                    // ORDER BY columns.
+                    // Yet, any additional non-ORDER-BY columns in the GROUP BY clause will still
+                    // require hashing to keep them grouped.
+                    // Aggregate hashing is currently an all or nothing operation,
+                    // so ALL of the GROUP BY columns (in any order) need to make up a prefix
+                    // of the ORDER BY columns to allow the plan to skip the hashing.
+                    if (m_parsedSelect.groupByIsAnOrderByPermutation()) {
+                        needHashAgg = false;
+                    }
+                }
+            }
+            if (needHashAgg) {
                 aggNode = new HashAggregatePlanNode();
-                if (!m_parsedSelect.mvFixInfo.needed()) {
+                if ( ! m_parsedSelect.mvFixInfo.needed()) {
                     topAggNode = new HashAggregatePlanNode();
                 }
             } else {
                 aggNode = new AggregatePlanNode();
-                if (!m_parsedSelect.mvFixInfo.needed()) {
+                if ( ! m_parsedSelect.mvFixInfo.needed()) {
                     topAggNode = new AggregatePlanNode();
                 }
             }
@@ -1535,17 +1471,38 @@ public class PlanAssembler {
         return handleDistinct(root);
     }
 
-    AbstractPlanNode indexAccessForGroupByExprs(AbstractPlanNode root) {
-        if (root.getPlanNodeType() == PlanNodeType.SEQSCAN && m_parsedSelect.isGrouped()) {
-            Table targetTable = m_catalogDb.getTables().get(((SeqScanPlanNode)root).getTargetTableName());
+    private AbstractPlanNode indexAccessForGroupByExprs(AbstractPlanNode root) {
+        ArrayList<ParsedColInfo> groupBys = m_parsedSelect.groupByColumns;
+
+        // Can't use index access to optimize a multi-table-based GROUP BY
+        String fromTableAlias = null;
+        for (ParsedColInfo col : groupBys) {
+            List<AbstractExpression> baseTVEs = col.expression.findBaseTVEs();
+            for (AbstractExpression baseTVE : baseTVEs) {
+                String nextTableAlias = ((TupleValueExpression)baseTVE).getTableAlias();
+                assert(nextTableAlias != null);
+                if (fromTableAlias == null) {
+                    fromTableAlias = nextTableAlias;
+                } else if ( ! fromTableAlias.equals(nextTableAlias)) {
+                    return root;
+                }
+            }
+        }
+        assert(fromTableAlias != null);
+        // This method of accessing the underlying table will probably not survive the up-coming
+        // changes to support subquery scans.
+        // Even when this method is replaced, a null target table will be a possibility.
+        // That case should by-pass this GROUP BY optimization.
+        Table targetTable = m_catalogDb.getTables().get(((SeqScanPlanNode)root).getTargetTableName());
+        if (targetTable != null) {
             CatalogMap<Index> allIndexes = targetTable.getIndexes();
-            ArrayList<ParsedColInfo> groupBys = m_parsedSelect.groupByColumns;
 
             for (Index index : allIndexes) {
-                if (!IndexType.isScannable(index.getType())) {
+                if ( ! IndexType.isScannable(index.getType())) {
                     continue;
                 }
 
+                ArrayList<AbstractExpression> allBindings = new ArrayList<AbstractExpression>();
                 boolean replacable = true;
                 String exprsjson = index.getExpressionsjson();
                 if (exprsjson.isEmpty()) {
@@ -1553,34 +1510,41 @@ public class PlanAssembler {
                     if (groupBys.size() > indexedColRefs.size()) {
                         continue;
                     }
-                    for (int i = 0; i < groupBys.size(); i++) {
-                        // don't compare column idx here, because resolveColumnIndex is not yet called
-                        if (groupBys.get(i).expression.getExpressionType() != ExpressionType.VALUE_TUPLE) {
+
+                    for (ParsedColInfo gbCol : groupBys) {
+                        AbstractExpression expr = gbCol.expression;
+                        if ( ! (expr instanceof TupleValueExpression)) {
                             replacable = false;
                             break;
                         }
+                        TupleValueExpression grouptve = (TupleValueExpression)expr;
+                        if ( ! fromTableAlias.equals(grouptve.getTableAlias())) {
+                            replacable = false;
+                            break;
+                        }
+                        String gbColName = grouptve.getColumnName();
                         // ignore order of keys in GROUP BY expr
                         boolean foundMatch = false;
                         for (int j = 0; j < groupBys.size(); j++) {
-                            if (indexedColRefs.get(j).getColumn().getName().equals(groupBys.get(i).columnName)) {
+                            // don't compare column index here, because resolveColumnIndex is not yet called
+                            if (indexedColRefs.get(j).getColumn().getName().equals(gbColName)) {
                                 foundMatch = true;
                                 break;
                             }
                         }
-                        if (!foundMatch) {
+                        if ( ! foundMatch) {
                             replacable = false;
                             break;
                         }
                     }
-                    if (replacable) {
-                        IndexScanPlanNode indexScanNode = new IndexScanPlanNode((SeqScanPlanNode)root, null, index, SortDirectionType.ASC);
-                        return indexScanNode;
-                    }
                 } else {
                     // either pure expression index or mix of expressions and simple columns
                     List<AbstractExpression> indexedExprs = null;
+                    int idx = m_parsedSelect.tableAliasIndexMap.get(fromTableAlias);
+                    StmtTableScan fromTableScan = m_parsedSelect.stmtCache.get(idx);
+
                     try {
-                        indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson);
+                        indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, fromTableScan);
                     } catch (JSONException e) {
                         e.printStackTrace();
                         assert(false);
@@ -1589,25 +1553,32 @@ public class PlanAssembler {
                     if (groupBys.size() > indexedExprs.size()) {
                         continue;
                     }
-                    for (int i = 0; i < groupBys.size(); i++) {
+                    for (ParsedColInfo gbCol : groupBys) {
+                        AbstractExpression expr = gbCol.expression;
                         // ignore order of keys in GROUP BY expr
                         boolean foundMatch = false;
                         for (int j = 0; j < groupBys.size(); j++) {
-                            if (groupBys.get(i).expression.equals(indexedExprs.get(j))) {
+                            AbstractExpression indexExpr = indexedExprs.get(j);
+                            List<AbstractExpression> binding = expr.bindingToIndexedExpression(indexExpr);
+                            if (binding != null) {
+                                allBindings.addAll(binding);
                                 foundMatch = true;
                                 break;
                             }
                         }
-                        if (!foundMatch) {
+                        if ( ! foundMatch) {
                             replacable = false;
                             break;
                         }
                     }
-                    if (replacable) {
-                        IndexScanPlanNode indexScanNode = new IndexScanPlanNode((SeqScanPlanNode)root, null, index, SortDirectionType.ASC);
-                        return indexScanNode;
-                    }
                 }
+                if ( ! replacable) {
+                    continue;
+                }
+                IndexScanPlanNode indexScanNode = new IndexScanPlanNode((SeqScanPlanNode)root, null, index, SortDirectionType.INVALID);
+                indexScanNode.setForGroupingOnly();
+                indexScanNode.setBindings(allBindings);
+                return indexScanNode;
             }
         }
         return root;
@@ -1831,7 +1802,7 @@ public class PlanAssembler {
      * @param expr The distinct expression
      * @return The new root node.
      */
-    AbstractPlanNode addDistinctNode(AbstractPlanNode root, AbstractExpression expr)
+    static AbstractPlanNode addDistinctNode(AbstractPlanNode root, AbstractExpression expr)
     {
         DistinctPlanNode distinctNode = new DistinctPlanNode();
         distinctNode.setDistinctExpression(expr);
@@ -1848,7 +1819,7 @@ public class PlanAssembler {
      * @return The set of column names affected by indexes with duplicates
      *         removed.
      */
-    public Set<String> getIndexedColumnSetForTable(Table table) {
+    public static Set<String> getIndexedColumnSetForTable(Table table) {
         HashSet<String> columns = new HashSet<String>();
 
         for (Index index : table.getIndexes()) {

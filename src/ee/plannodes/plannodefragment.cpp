@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -124,12 +124,6 @@ PlanNodeFragment::fromJSONObject(PlannerDomValue obj)
         std::vector<AbstractPlanNode*> &children = (*node)->getChildren();
         for (int zz = 0; zz < childIds.size(); zz++) {
             children.push_back(pnf->m_idToNodeMap[childIds[zz]]);
-        }
-
-        const std::vector<CatalogId> parentIds = (*node)->getParentIds();
-        std::vector<AbstractPlanNode*> &parents = (*node)->getParents();
-        for (int zz = 0; zz < parentIds.size(); zz++) {
-            parents.push_back(pnf->m_idToNodeMap[parentIds[zz]]);
         }
     }
     pnf->loadFromJSONObject(obj);

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,8 +27,8 @@ import org.voltdb.LatencyBucketSet;
  * methods. The context has a time window and can apply to all connections
  * and procedures, or a single of connections and/or procedure.</p>
  *
- * <p>The helper methods such as {@link getTxnThroughput(long)} or
- * {@link kPercentileLatency(double)} perform common operations
+ * <p>The helper methods such as {@link #getTxnThroughput()} or
+ * {@link #kPercentileLatency(double)} perform common operations
  * on the counters.</p>
  *
  * <p>This object is immutable outside of the package scope and does not
@@ -333,11 +333,11 @@ public class ClientStats {
      * <p>Get the raw buckets used for latency tracking in 1ms increments. For example, if
      * a transaction returns in 3.2ms, then the array at index 3 will be incremented by
      * one. It can be thought of as a histogram of latencies. It has
-     * {@link ONE_MS_BUCKET_COUNT} buckets, for a range of
+     * {@link #ONE_MS_BUCKET_COUNT} buckets, for a range of
      * <code>ONE_MS_BUCKET_COUNT x 1ms</code></p>
      *
      * <p>This raw data, along with other bucket sets of different granularity,  is used to
-     * support the {@link kPercentileLatency(double)} method. This returns a copy of the
+     * support the {@link #kPercentileLatency(double)} method. This returns a copy of the
      * internal array so it is threadsafe and mutable if you wish. Note that the buckets
      *
      * @return An array containing counts for different latency values.
@@ -350,11 +350,11 @@ public class ClientStats {
      * <p>Get the raw buckets used for latency tracking in 10ms increments. For example, if
      * a transaction returns in 42ms, then the array at index 4 will be incremented by
      * one. It can be thought of as a histogram of latencies. It has
-     * {@link TEN_MS_BUCKET_COUNT} buckets, for a range of
+     * {@link #TEN_MS_BUCKET_COUNT} buckets, for a range of
      * <code>TEN_MS_BUCKET_COUNT x 10ms</code>.</p>
      *
      * <p>This raw data, along with other bucket sets of different granularity,  is used to
-     * support the {@link kPercentileLatency(double)} method. This returns a copy of the
+     * support the {@link #kPercentileLatency(double)} method. This returns a copy of the
      * internal array so it is threadsafe and mutable if you wish. Note that the buckets
      *
      * @return An array containing counts for different latency values.
@@ -367,11 +367,11 @@ public class ClientStats {
      * <p>Get the raw buckets used for latency tracking in 1ms increments. For example, if
      * a transaction returns in 3.2ms, then the array at index 3 will be incremented by
      * one. It can be thought of as a histogram of latencies. It has
-     * {@link HUNDRED_MS_BUCKET_COUNT} buckets, for a range of
+     * {@link #HUNDRED_MS_BUCKET_COUNT} buckets, for a range of
      * <code>HUNDRED_MS_BUCKET_COUNT x 100ms</code>.</p>
      *
      * <p>This raw data, along with other bucket sets of different granularity,  is used to
-     * support the {@link kPercentileLatency(double)} method. This returns a copy of the
+     * support the {@link #kPercentileLatency(double)} method. This returns a copy of the
      * internal array so it is threadsafe and mutable if you wish. Note that the buckets
      *
      * @return An array containing counts for different latency values.
@@ -415,8 +415,8 @@ public class ClientStats {
      * of transactions in the period will also increase error. Finally, note that
      * latency isn't tracked for transactions are outside values tracked by the
      * largest set of buckets. If k=X implies latency greater than
-     * <code>{@link HUNDRED_MS_BUCKET_COUNT} * 100</code>, then it will return
-     * a number larger than <code>{@link HUNDRED_MS_BUCKET_COUNT} * 100</code>,
+     * <code>{@link #HUNDRED_MS_BUCKET_COUNT} * 100</code>, then it will return
+     * a number larger than <code>{@link #HUNDRED_MS_BUCKET_COUNT} * 100</code>,
      * but nothing more is promised.</p>
      *
      * @param percentile A floating point number between 0.0 and 1.0.
@@ -443,6 +443,11 @@ public class ClientStats {
         return m_latencyBy100ms.msPerBucket * m_latencyBy100ms.numberOfBuckets * 2;
     }
 
+    /**
+     * Generate a human-readable report of latencies in the form of a histogram.
+     *
+     * @return String containing human-readable report.
+     */
     public String latencyHistoReport() {
         StringBuilder sb = new StringBuilder();
 
@@ -478,8 +483,8 @@ public class ClientStats {
      * <p>Return an average throughput of transactions acknowledged per
      * second for the duration covered by this stats instance.</p>
      *
-     * <p>Essentially <code>{@link getInvocationsCompleted()} divided by
-     * ({@link getStartTimestamp()} - {@link getEndTimestamp()} / 1000.0)</code>,
+     * <p>Essentially <code>{@link #getInvocationsCompleted()} divided by
+     * ({@link #getStartTimestamp()} - {@link #getEndTimestamp()} / 1000.0)</code>,
      * but with additional safety checks.</p>
      *
      * @return Throughput in transactions acknowledged per second.
@@ -500,8 +505,8 @@ public class ClientStats {
      * <p>Return an average throughput of bytes sent per second over the
      * network for the duration covered by this stats instance.</p>
      *
-     * <p>Essentially <code>{@link getBytesWritten()} divided by
-     * ({@link getStartTimestamp()} - {@link getEndTimestamp()} / 1000.0)</code>,
+     * <p>Essentially <code>{@link #getBytesWritten()} divided by
+     * ({@link #getStartTimestamp()} - {@link #getEndTimestamp()} / 1000.0)</code>,
      * but with additional safety checks.</p>
      *
      * @return Throughput in bytes sent per second.
@@ -523,8 +528,8 @@ public class ClientStats {
      * <p>Return an average throughput of bytes read per second from the
      * network for the duration covered by this stats instance.</p>
      *
-     * <p>Essentially <code>{@link getBytesRead()} divided by
-     * ({@link getStartTimestamp()} - {@link getEndTimestamp()} / 1000.0)</code>,
+     * <p>Essentially <code>{@link #getBytesRead()} divided by
+     * ({@link #getStartTimestamp()} - {@link #getEndTimestamp()} / 1000.0)</code>,
      * but with additional safety checks.</p>
      *
      * @return Throughput in bytes read per second.
@@ -543,7 +548,7 @@ public class ClientStats {
     }
 
     /* (non-Javadoc)
-     * @see java.lang.Object#clone()
+     * @see java.lang.Object#toString()
      */
     @Override
     public String toString() {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,15 +29,17 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Random;
 import java.util.TreeMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+
+import jsr166y.ThreadLocalRandom;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -48,13 +50,12 @@ import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.JdbcDatabaseMetaDataGenerator;
-import org.voltdb.LegacyHashinator;
-import org.voltdb.TheHashinator;
-import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
-import org.voltdb.iv2.MpInitiator;
+import org.voltdb.client.HashinatorLite.HashinatorLiteType;
+import org.voltdb.common.Constants;
+
+import com.google_voltpatches.common.base.Throwables;
 
 /**
  *   De/multiplexes transactions across a cluster
@@ -64,7 +65,9 @@ import org.voltdb.iv2.MpInitiator;
  */
 class Distributer {
 
+    static int RESUBSCRIPTION_DELAY_MS = Integer.getInteger("RESUBSCRIPTION_DELAY_MS", 10000);
     static final long PING_HANDLE = Long.MAX_VALUE;
+    public static final Long ASYNC_TOPO_HANDLE = PING_HANDLE - 1;
     static final long USE_DEFAULT_TIMEOUT = 0;
 
     // handles used internally are negative and decrement for each call
@@ -107,11 +110,13 @@ class Distributer {
     private final Map<Integer, NodeConnection> m_hostIdToConnection = new HashMap<Integer, NodeConnection>();
     private final Map<String, Procedure> m_procedureInfo = new HashMap<String, Procedure>();
     //This is the instance of the Hashinator we picked from TOPO used only for client affinity.
-    private TheHashinator m_hashinator = null;
+    private HashinatorLite m_hashinator = null;
     //This is a global timeout that will be used if a per-procedure timeout is not provided with the procedure call.
     private final long m_procedureCallTimeoutMS;
     private static final long MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
     private final long m_connectionResponseTimeoutMS;
+    private final Map<Integer, ClientAffinityStats> m_clientAffinityStats =
+        new HashMap<Integer, ClientAffinityStats>();
 
     public final RateLimiter m_rateLimiter = new RateLimiter();
 
@@ -128,6 +133,17 @@ class Distributer {
 
     private String m_buildString;
 
+    /*
+     * The connection we have issued our subscriptions to. If the connection is lost
+     * we will need to request subscription from a different node
+     */
+    private NodeConnection m_subscribedConnection = null;
+    //Track if a request is pending so we don't accidentally handle a failed node twice
+    private boolean m_subscriptionRequestPending = false;
+
+    //Until catalog subscription is implemented, only fetch it once
+    private boolean m_fetchedCatalog = false;
+
     /**
      * Handles topology updates for client affinity
      */
@@ -135,6 +151,7 @@ class Distributer {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
+            if (clientResponse.getStatus() != ClientResponse.SUCCESS) return;
             try {
                 synchronized (Distributer.this) {
                     VoltTable results[] = clientResponse.getResults();
@@ -150,12 +167,56 @@ class Distributer {
     }
 
     /**
+     * Handles @Subscribe response
+     */
+    class SubscribeCallback implements ProcedureCallback {
+
+        @Override
+        public void clientCallback(ClientResponse response) throws Exception {
+            //Fast path subscribing retry if the connection was lost before getting a response
+            if (response.getStatus() == ClientResponse.CONNECTION_LOST && !m_connections.isEmpty()) {
+                subscribeToNewNode();
+                return;
+            } else if (response.getStatus() == ClientResponse.CONNECTION_LOST) {
+                return;
+            }
+
+            //Slow path, god knows why it didn't succeed, could be a bug. Don't firehose attempts.
+            if (response.getStatus() != ClientResponse.SUCCESS && !m_ex.isShutdown()) {
+                System.err.println("Error response received subscribing to topology updates.\n " +
+                                   "Performance may be reduced on topology updates. Error was \"" +
+                                    response.getStatusString() + "\"");
+                //Retry on the off chance that it will work the Nth time, or work at a different node
+                m_ex.schedule(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            subscribeToNewNode();
+                        } catch (Throwable t) {
+                            t.printStackTrace();
+                            Throwables.propagate(t);
+                        }
+                    }
+                }, 2, TimeUnit.MINUTES);
+                return;
+            }
+            //If success, the code in NodeConnection.stopping needs to know it has to handle selecting
+            //a new node to for subscriptions, so set the pending request to false to let that code
+            //know that the failure won't be handled in the callback
+            synchronized (Distributer.this) {
+                m_subscriptionRequestPending = false;
+            }
+        }
+    }
+
+    /**
      * Handles procedure updates for client affinity
      */
     class ProcUpdateCallback implements ProcedureCallback {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
+            if (clientResponse.getStatus() != ClientResponse.SUCCESS) return;
             try {
                 synchronized (Distributer.this) {
                     VoltTable results[] = clientResponse.getResults();
@@ -163,7 +224,9 @@ class Distributer {
                         VoltTable vt = results[0];
                         updateProcedurePartitioning(vt);
                     }
+                    m_fetchedCatalog = true;
                 }
+
             }
             catch (Exception e) {
                 e.printStackTrace();
@@ -377,6 +440,19 @@ class Distributer {
                 if (response.getClientHandle() == PING_HANDLE) {
                     m_outstandingPing = false;
                     return;
+                } else if (response.getClientHandle() == ASYNC_TOPO_HANDLE) {
+                    /*
+                     * Really didn't want to add this block because it is not DRY
+                     * for the exception handling, but trying to set + reset the async topo callback
+                     * turned out to be pretty challenging
+                     */
+                    cb = new TopoUpdateCallback();
+                    try {
+                        cb.clientCallback(response);
+                    } catch (Exception e) {
+                        uncaughtException(cb, response, e);
+                    }
+                    return;
                 }
 
                 CallbackBookeeping stuff = m_callbacks.remove(response.getClientHandle());
@@ -495,6 +571,25 @@ class Distributer {
                                 m_connections.size(),
                                 m_closeCause);
                     }
+
+                    /*
+                     * Deal with the fact that this may have been the connection that subscriptions were issued
+                     * to. If a subscription request was pending, don't handle selecting a new node here
+                     * let the callback see the failure and retry
+                     */
+                    if (m_useClientAffinity &&
+                        m_subscribedConnection == this &&
+                        m_subscriptionRequestPending == false &&
+                        !m_ex.isShutdown()) {
+                        //Don't subscribe to a new node immediately
+                        //to somewhat prevent a thundering herd
+                        m_ex.schedule(new Runnable() {
+                            @Override
+                            public void run() {
+                                subscribeToNewNode();
+                            }
+                        }, new Random().nextInt(RESUBSCRIPTION_DELAY_MS), TimeUnit.MILLISECONDS);
+                    }
                 }
                 m_isConnected = false;
 
@@ -593,7 +688,7 @@ class Distributer {
             boolean useClientAffinity) {
         m_useMultipleThreads = useMultipleThreads;
         m_network = new VoltNetworkPool(
-            m_useMultipleThreads ? Math.max(1, (int)(CoreUtils.availableProcessors() / 4) ) : 1, null);
+            m_useMultipleThreads ? Math.max(1, CoreUtils.availableProcessors() / 4 ) : 1, null);
         m_network.start();
         m_procedureCallTimeoutMS = procedureCallTimeoutMS;
         m_connectionResponseTimeoutMS = connectionResponseTimeoutMS;
@@ -657,13 +752,68 @@ class Distributer {
                 m_hostIdToConnection.put(hostId, cxn);
             }
 
-            ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
-            //The handle is specific to topology updates and has special cased handling
-            queue(spi, new TopoUpdateCallback(), true, USE_DEFAULT_TIMEOUT);
+            if (m_subscribedConnection == null) {
+                subscribeToNewNode();
+            }
+        }
+    }
 
-            spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@SystemCatalog", "PROCEDURES");
-            //The handle is specific to procedure updates and has special cased handling
-            queue(spi, new ProcUpdateCallback(), true, USE_DEFAULT_TIMEOUT);
+    /*
+     * Subscribe to receive async updates on a new node connection. This will set m_subscribed
+     * connection to the provided connection.
+     *
+     * If we are subscribing to a new connection on node failure this will also fetch the topology post node
+     * failure. If the cluster hasn't finished resolving the failure it is fine, we will get the new topo through\
+     */
+    private void subscribeToNewNode() {
+        //Technically necessary to synchronize for safe publication of this store
+        NodeConnection cxn = null;
+        synchronized (Distributer.this) {
+            m_subscribedConnection = null;
+            if (!m_connections.isEmpty()) {
+                cxn = m_connections.get(new Random().nextInt(m_connections.size()));
+                m_subscriptionRequestPending = true;
+                m_subscribedConnection = cxn;
+            } else {
+                return;
+            }
+        }
+        try {
+
+            //Subscribe to topology updates before retrieving the current topo
+            //so there isn't potential for lost updates
+            ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Subscribe", "TOPOLOGY");
+            final ByteBuffer buf = serializeSPI(spi);
+            cxn.createWork(spi.getHandle(),
+                    spi.getProcName(),
+                    serializeSPI(spi),
+                    new SubscribeCallback(),
+                    true,
+                    USE_DEFAULT_TIMEOUT);
+
+            spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
+            //The handle is specific to topology updates and has special cased handling
+            cxn.createWork(spi.getHandle(),
+                    spi.getProcName(),
+                    serializeSPI(spi),
+                    new TopoUpdateCallback(),
+                    true,
+                    USE_DEFAULT_TIMEOUT);
+
+            //Don't need to retrieve procedure updates every time we do a new subscription
+            //since catalog changes aren't correlated with node failure the same way topo is
+            if (!m_fetchedCatalog) {
+                spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@SystemCatalog", "PROCEDURES");
+                //The handle is specific to procedure updates and has special cased handling
+                cxn.createWork(spi.getHandle(),
+                        spi.getProcName(),
+                        serializeSPI(spi),
+                        new ProcUpdateCallback(),
+                        true,
+                        USE_DEFAULT_TIMEOUT);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
@@ -705,10 +855,14 @@ class Distributer {
              */
             if (m_useClientAffinity && (m_hashinator != null)) {
                 final Procedure procedureInfo = m_procedureInfo.get(invocation.getProcName());
+                Integer hashedPartition = -1;
 
                 if (procedureInfo != null) {
-                    Integer hashedPartition = MpInitiator.MP_INIT_PID;
-                    if (!procedureInfo.multiPart) {
+                    hashedPartition = Constants.MP_INIT_PID;
+                    if (( ! procedureInfo.multiPart) &&
+                        // User may have passed too few parameters to allow dispatching.
+                        // Avoid an indexing error here to fall through to the proper ProcCallException.
+                            (procedureInfo.partitionParameter < invocation.getPassedParamCount())) {
                         hashedPartition = m_hashinator.getHashedPartitionForParameter(
                                 procedureInfo.partitionParameterType,
                                 invocation.getPartitionParamValue(procedureInfo.partitionParameter));
@@ -749,6 +903,29 @@ class Distributer {
                     // and let the round-robin choice pick a connection
                     cxn = null;
                 }
+                ClientAffinityStats stats = m_clientAffinityStats.get(hashedPartition);
+                if (stats == null) {
+                    stats = new ClientAffinityStats(hashedPartition, 0, 0, 0, 0);
+                    m_clientAffinityStats.put(hashedPartition, stats);
+                }
+                if (cxn != null) {
+                    if (procedureInfo != null && procedureInfo.readOnly) {
+                        stats.addAffinityRead();
+                    }
+                    else {
+                        stats.addAffinityWrite();
+                    }
+                }
+                // account these here because we lose the partition ID and procedure info once we
+                // bust out of this scope.
+                else {
+                    if (procedureInfo != null && procedureInfo.readOnly) {
+                        stats.addRrRead();
+                    }
+                    else {
+                        stats.addRrWrite();
+                    }
+                }
             }
             if (cxn == null) {
                 for (int i=0; i < totalConnections; ++i) {
@@ -774,13 +951,11 @@ class Distributer {
          * createWork synchronizes on an individual connection which allows for more concurrency
          */
         if (cxn != null) {
-            ByteBuffer buf = ByteBuffer.allocate(4 + invocation.getSerializedSize());
-            buf.putInt(buf.capacity() - 4);
+            ByteBuffer buf = null;
             try {
-                invocation.flattenToBuffer(buf);
-                buf.flip();
+                buf = serializeSPI(invocation);
             } catch (Exception e) {
-                throw new RuntimeException(e);
+                Throwables.propagate(e);
             }
             cxn.createWork(invocation.getHandle(), invocation.getProcName(), buf, cb, ignoreBackpressure, timeout);
         }
@@ -831,7 +1006,8 @@ class Distributer {
     }
 
     ClientStatsContext createStatsContext() {
-        return new ClientStatsContext(this, getStatsSnapshot(), getIOStatsSnapshot());
+        return new ClientStatsContext(this, getStatsSnapshot(), getIOStatsSnapshot(),
+                getAffinityStatsSnapshot());
     }
 
     Map<Long, Map<String, ClientStats>> getStatsSnapshot() {
@@ -876,6 +1052,18 @@ class Distributer {
         return retval;
     }
 
+    Map<Integer, ClientAffinityStats> getAffinityStatsSnapshot()
+    {
+        Map<Integer, ClientAffinityStats> retval = new HashMap<Integer, ClientAffinityStats>();
+        // these get modified under this lock in queue()
+        synchronized(this) {
+            for (Entry<Integer, ClientAffinityStats> e : m_clientAffinityStats.entrySet()) {
+                retval.put(e.getKey(), (ClientAffinityStats)e.getValue().clone());
+            }
+        }
+        return retval;
+    }
+
     public synchronized Object[] getInstanceId() {
         return m_clusterInstanceId;
     }
@@ -907,14 +1095,13 @@ class Distributer {
         //First table contains the description of partition ids master/slave relationships
         VoltTable vt = tables[0];
 
-        //In future let TOPO return cooked bytes when cooked and we use correct recipie
+        //In future let TOPO return cooked bytes when cooked and we use correct recipe
         boolean cooked = false;
         if (tables.length == 1) {
             //Just in case the new client connects to the old version of Volt that only returns 1 topology table
             // We're going to get the MPI back in this table, so subtract it out from the number of partitions.
             int numPartitions = vt.getRowCount() - 1;
-            m_hashinator = TheHashinator.getHashinator(LegacyHashinator.class,
-                    LegacyHashinator.getConfigureBytes(numPartitions), cooked);
+            m_hashinator = new HashinatorLite(numPartitions); // legacy only
         } else {
             //Second table contains the hash function
             boolean advanced = tables[1].advanceRow();
@@ -923,9 +1110,10 @@ class Distributer {
                                    "performance will be lower because transactions can't be routed at this client");
                 return;
             }
-            m_hashinator = TheHashinator.getHashinator(
-                    HashinatorType.valueOf(tables[1].getString("HASHTYPE")).hashinatorClass,
-                    tables[1].getVarbinary("HASHCONFIG"), cooked);
+            m_hashinator = new HashinatorLite(
+                    HashinatorLiteType.valueOf(tables[1].getString("HASHTYPE")),
+                    tables[1].getVarbinary("HASHCONFIG"),
+                    cooked);
         }
         m_partitionMasters.clear();
         m_partitionReplicas.clear();
@@ -960,11 +1148,11 @@ class Distributer {
                 String jsString = vt.getString(6);
                 String procedureName = vt.getString(2);
                 JSONObject jsObj = new JSONObject(jsString);
-                boolean readOnly = jsObj.getBoolean(JdbcDatabaseMetaDataGenerator.JSON_READ_ONLY);
-                if (jsObj.getBoolean(JdbcDatabaseMetaDataGenerator.JSON_SINGLE_PARTITION)) {
-                    int partitionParameter = jsObj.getInt(JdbcDatabaseMetaDataGenerator.JSON_PARTITION_PARAMETER);
+                boolean readOnly = jsObj.getBoolean(Constants.JSON_READ_ONLY);
+                if (jsObj.getBoolean(Constants.JSON_SINGLE_PARTITION)) {
+                    int partitionParameter = jsObj.getInt(Constants.JSON_PARTITION_PARAMETER);
                     int partitionParameterType =
-                        jsObj.getInt(JdbcDatabaseMetaDataGenerator.JSON_PARTITION_PARAMETER_TYPE);
+                        jsObj.getInt(Constants.JSON_PARTITION_PARAMETER_TYPE);
                     m_procedureInfo.put(procedureName,
                             new Procedure(false,readOnly, partitionParameter, partitionParameterType));
                 } else {
@@ -1003,10 +1191,19 @@ class Distributer {
         return m_hashinator.getHashedPartitionForParameter(typeValue, value);
     }
 
-    public HashinatorType getHashinatorType() {
+    public HashinatorLiteType getHashinatorType() {
         if (m_hashinator == null) {
-            return HashinatorType.LEGACY;
+            return HashinatorLiteType.LEGACY;
         }
         return m_hashinator.getConfigurationType();
+    }
+
+    private ByteBuffer serializeSPI(ProcedureInvocation pi) throws IOException {
+        ByteBuffer buf = ByteBuffer.allocate(pi.getSerializedSize() + 4);
+        buf.putInt(buf.capacity() - 4);
+        pi.flattenToBuffer(buf);
+        buf.flip();
+        return buf;
+
     }
 }

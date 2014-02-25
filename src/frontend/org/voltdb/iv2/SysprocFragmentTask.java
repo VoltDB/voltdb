@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -96,6 +96,7 @@ public class SysprocFragmentTask extends TransactionTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
+        waitOnDurabilityBackpressureFuture();
         if (!m_txnState.isReadOnly()) {
             if (m_txnState.getBeginUndoToken() == Site.kInvalidUndoToken) {
                 m_txnState.setBeginUndoToken(siteConnection.getLatestUndoToken());
@@ -135,6 +136,12 @@ public class SysprocFragmentTask extends TransactionTask
                     "The rejoining node's VoltDB process will now exit.", false, null);
         }
 
+        //If this is a snapshot save test we have the nonce of the snapshot
+        //Provide it to the site so it can decide to enable recording in the task log
+        //if it is our rejoin snapshot start
+        if (SysProcFragmentId.isSnapshotSaveTestFragment(m_fragmentMsg.getPlanHash(0))) {
+            siteConnection.notifyOfSnapshotNonce((String)m_fragmentMsg.getParameterSetForFragment(0).toArray()[1]);
+        }
         taskLog.logTask(m_fragmentMsg);
 
         respondWithDummy();

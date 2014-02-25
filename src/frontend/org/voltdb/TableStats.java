@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -46,5 +46,6 @@ public class TableStats extends SiteStatsSource {
         columns.add(new ColumnInfo("TUPLE_ALLOCATED_MEMORY", VoltType.INTEGER));
         columns.add(new ColumnInfo("TUPLE_DATA_MEMORY", VoltType.INTEGER));
         columns.add(new ColumnInfo("STRING_DATA_MEMORY", VoltType.INTEGER));
+        columns.add(new ColumnInfo("TUPLE_LIMIT", VoltType.INTEGER));
     }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,6 +17,7 @@
 
 package org.voltdb.iv2;
 
+import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -24,9 +25,14 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Sets;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.CatalogContext;
@@ -43,10 +49,15 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.sysprocs.BalancePartitionsRequest;
+import org.voltdb.utils.MiscUtils;
 
 public class MpScheduler extends Scheduler
 {
-    VoltLogger tmLog = new VoltLogger("TM");
+    static VoltLogger tmLog = new VoltLogger("TM");
+
+    // null if running community, fallback to MpProcedureTask
+    private static final Constructor<?> NpProcedureTaskConstructor = loadNpProcedureTaskClass();
 
     private final Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
@@ -282,13 +293,58 @@ public class MpScheduler extends Scheduler
                     message.getConnectionId(),
                     message.isForReplay());
         // Multi-partition initiation (at the MPI)
-        final MpProcedureTask task =
-            new MpProcedureTask(m_mailbox, procedureName,
+        MpProcedureTask task = null;
+        if (isNpTxn(message) && NpProcedureTaskConstructor != null) {
+            Set<Integer> involvedPartitions = getBalancePartitions(message);
+            if (involvedPartitions != null) {
+                HashMap<Integer, Long> involvedPartitionMasters = Maps.newHashMap(m_partitionMasters);
+                involvedPartitionMasters.keySet().retainAll(involvedPartitions);
+
+                task = instantiateNpProcedureTask(m_mailbox, procedureName,
+                        m_pendingTasks, mp, involvedPartitionMasters,
+                        m_buddyHSIds.get(m_nextBuddy), false);
+            }
+
+            // if cannot figure out the involved partitions, run it as an MP txn
+        }
+
+        if (task == null) {
+            task = new MpProcedureTask(m_mailbox, procedureName,
                     m_pendingTasks, mp, m_iv2Masters, m_partitionMasters,
                     m_buddyHSIds.get(m_nextBuddy), false);
+        }
+
         m_nextBuddy = (m_nextBuddy++) % m_buddyHSIds.size();
         m_outstandingTxns.put(task.m_txnState.txnId, task.m_txnState);
         m_pendingTasks.offer(task);
+    }
+
+    /**
+     * Hacky way to only run @BalancePartitions as n-partition transactions for now.
+     * @return true if it's an n-partition transaction
+     */
+    private boolean isNpTxn(Iv2InitiateTaskMessage msg)
+    {
+        return msg.getStoredProcedureName().startsWith("@") &&
+                msg.getStoredProcedureName().equalsIgnoreCase("@BalancePartitions") &&
+                (byte) msg.getParameters()[1] != 1; // clearIndex is MP, normal rebalance is NP
+    }
+
+    /**
+     * Extract the two involved partitions from the @BalancePartitions request.
+     */
+    private Set<Integer> getBalancePartitions(Iv2InitiateTaskMessage msg)
+    {
+        try {
+            JSONObject jsObj = new JSONObject((String) msg.getParameters()[0]);
+            BalancePartitionsRequest request = new BalancePartitionsRequest(jsObj);
+
+            return Sets.newHashSet(request.partitionPairs.get(0).srcPartition,
+                    request.partitionPairs.get(0).destPartition);
+        } catch (JSONException e) {
+            hostLog.warn("Unable to determine partitions for @BalancePartitions", e);
+            return null;
+        }
     }
 
     @Override
@@ -324,10 +380,27 @@ public class MpScheduler extends Scheduler
                     message.isForReplay());
         m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getUniqueId());
         // Multi-partition initiation (at the MPI)
-        final MpProcedureTask task =
-            new MpProcedureTask(m_mailbox, procedureName,
+        MpProcedureTask task = null;
+        if (isNpTxn(message) && NpProcedureTaskConstructor != null) {
+            Set<Integer> involvedPartitions = getBalancePartitions(message);
+            if (involvedPartitions != null) {
+                HashMap<Integer, Long> involvedPartitionMasters = Maps.newHashMap(m_partitionMasters);
+                involvedPartitionMasters.keySet().retainAll(involvedPartitions);
+
+                task = instantiateNpProcedureTask(m_mailbox, procedureName,
+                        m_pendingTasks, mp, involvedPartitionMasters,
+                        m_buddyHSIds.get(m_nextBuddy), true);
+            }
+
+            // if cannot figure out the involved partitions, run it as an MP txn
+        }
+
+        if (task == null) {
+            task = new MpProcedureTask(m_mailbox, procedureName,
                     m_pendingTasks, mp, m_iv2Masters, m_partitionMasters,
                     m_buddyHSIds.get(m_nextBuddy), true);
+        }
+
         m_nextBuddy = (m_nextBuddy++) % m_buddyHSIds.size();
         m_outstandingTxns.put(task.m_txnState.txnId, task.m_txnState);
         m_pendingTasks.offer(task);
@@ -420,7 +493,7 @@ public class MpScheduler extends Scheduler
      */
     public void handleEOLMessage()
     {
-        Iv2EndOfLogMessage msg = new Iv2EndOfLogMessage(true);
+        Iv2EndOfLogMessage msg = new Iv2EndOfLogMessage(m_partitionId);
         MPIEndOfLogTransactionState txnState = new MPIEndOfLogTransactionState(msg);
         MPIEndOfLogTask task = new MPIEndOfLogTask(m_mailbox, m_pendingTasks,
                                                    txnState, m_iv2Masters);
@@ -435,5 +508,37 @@ public class MpScheduler extends Scheduler
     @Override
     public void enableWritingIv2FaultLog() {
         // This is currently a no-op for the MPI
+    }
+
+    /**
+     * Load the pro class for n-partition transactions.
+     * @return null if running in community or failed to load the class
+     */
+    private static Constructor<?> loadNpProcedureTaskClass()
+    {
+        Class<?> klass = MiscUtils.loadProClass("org.voltdb.iv2.NpProcedureTask", "N-Partition", MiscUtils.isPro());
+        if (klass != null) {
+            try {
+                return klass.getConstructor(Mailbox.class, String.class, TransactionTaskQueue.class,
+                        Iv2InitiateTaskMessage.class, Map.class, long.class, boolean.class);
+            } catch (NoSuchMethodException e) {
+                hostLog.error("Unabled to get the constructor for pro class NpProcedureTask", e);
+                return null;
+            }
+        } else {
+            return null;
+        }
+    }
+
+    private static MpProcedureTask instantiateNpProcedureTask(Object...params)
+    {
+        if (NpProcedureTaskConstructor != null) {
+            try {
+                return (MpProcedureTask) NpProcedureTaskConstructor.newInstance(params);
+            } catch (Exception e) {
+                tmLog.error("Unable to instantiate NpProcedureTask", e);
+            }
+        }
+        return null;
     }
 }

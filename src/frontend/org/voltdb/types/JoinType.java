@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,7 +17,9 @@
 
 package org.voltdb.types;
 
-import java.util.*;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  *
@@ -45,7 +47,7 @@ public enum JoinType {
     static {
         for (JoinType vt : EnumSet.allOf(JoinType.class)) {
             JoinType.idx_lookup.put(vt.ordinal(), vt);
-            JoinType.name_lookup.put(vt.name().toLowerCase().intern(), vt);
+            JoinType.name_lookup.put(vt.name().toLowerCase(), vt);
         }
     }
 
@@ -63,7 +65,7 @@ public enum JoinType {
     }
 
     public static JoinType get(String name) {
-        JoinType ret = JoinType.name_lookup.get(name.toLowerCase().intern());
+        JoinType ret = JoinType.name_lookup.get(name.toLowerCase());
         return (ret == null ? JoinType.INVALID : ret);
     }
 

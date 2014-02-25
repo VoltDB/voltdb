@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,7 +25,6 @@ package org.voltdb.utils;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.util.ArrayList;
 import java.util.List;
 
 import junit.framework.TestCase;
@@ -49,8 +48,6 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.types.ConstraintType;
-
-import com.google_voltpatches.common.base.Joiner;
 
 public class TestCatalogUtil extends TestCase {
 
@@ -597,57 +594,11 @@ public class TestCatalogUtil extends TestCase {
     }
 
     public void testCatalogVersionCheck() {
-        // really old version shouldn't work
-        assertFalse(CatalogUtil.isCatalogCompatible("0.3"));
-
         // non-sensical version shouldn't work
-        try {
-            CatalogUtil.isCatalogCompatible("nonsense");
-            fail("No exception thrown when bad version string given");
-        }
-        catch (IllegalArgumentException ex) {
-            //
-        }
-
-        // one minor version older than the min supported
-        int[] minCompatibleVersion = MiscUtils.parseVersionString(VoltDB.instance().getVersionString());
-
-        for (int i = minCompatibleVersion.length - 1; i >= 0; i--) {
-            if (minCompatibleVersion[i] != 0) {
-                minCompatibleVersion[i]--;
-                break;
-            }
-        }
-        ArrayList<Integer> arrayList = new ArrayList<Integer>();
-        for (int part : minCompatibleVersion) {
-            arrayList.add(part);
-        }
-        String version = Joiner.on('.').join(arrayList);
-        assertNotNull(version);
-        assertFalse(CatalogUtil.isCatalogCompatible(version));
-
-        // one minor version newer than the current version
-        final String currentVersion = VoltDB.instance().getVersionString();
-        int[] parseCurrentVersion = MiscUtils.parseVersionString(currentVersion);
-        parseCurrentVersion[parseCurrentVersion.length - 1]++;
-        arrayList = new ArrayList<Integer>();
-        for (int part : parseCurrentVersion) {
-            arrayList.add(part);
-        }
-        String futureVersion = Joiner.on('.').join(arrayList);
-        assertFalse(CatalogUtil.isCatalogCompatible(futureVersion));
-
-        // longer version string
-        String longerVersion = currentVersion + ".2";
-        assertFalse(CatalogUtil.isCatalogCompatible(longerVersion));
-
-        // shorter version string
-        int[] longVersion = MiscUtils.parseVersionString("2.3.1");
-        int[] shortVersion = MiscUtils.parseVersionString("2.3");
-        assertEquals(-1, MiscUtils.compareVersions(shortVersion, longVersion));
+        assertFalse(CatalogUtil.isCatalogVersionValid("nonsense"));
 
         // current version should work
-        assertTrue(CatalogUtil.isCatalogCompatible(VoltDB.instance().getVersionString()));
+        assertTrue(CatalogUtil.isCatalogVersionValid(VoltDB.instance().getVersionString()));
     }
 
     // I'm not testing the legacy behavior here, just IV2
@@ -766,7 +717,7 @@ public class TestCatalogUtil extends TestCase {
 
         VoltCompiler compiler = new VoltCompiler();
         String x[] = {tmpDdl.getAbsolutePath()};
-        Catalog cat = compiler.compileCatalog(null, x);
+        Catalog cat = compiler.compileCatalogFromDDL(x);
 
         long crc = CatalogUtil.compileDeploymentAndGetCRC(cat, bad_deployment, true, false);
         assertTrue("Deployment file failed to parse", crc != -1);
@@ -781,7 +732,7 @@ public class TestCatalogUtil extends TestCase {
         final File tmpGood = VoltProjectBuilder.writeStringToTempFile(withGoodCustomExport);
         DeploymentType good_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpGood));
 
-        Catalog cat2 = compiler.compileCatalog(null, x);
+        Catalog cat2 = compiler.compileCatalogFromDDL(x);
         crc = CatalogUtil.compileDeploymentAndGetCRC(cat2, good_deployment, true, false);
         assertTrue("Deployment file failed to parse", crc != -1);
 
@@ -800,7 +751,7 @@ public class TestCatalogUtil extends TestCase {
         final File tmpBuiltin = VoltProjectBuilder.writeStringToTempFile(withBuiltinExport);
         DeploymentType builtin_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpBuiltin));
 
-        Catalog cat3 = compiler.compileCatalog(null, x);
+        Catalog cat3 = compiler.compileCatalogFromDDL(x);
         crc = CatalogUtil.compileDeploymentAndGetCRC(cat3, builtin_deployment, true, false);
         assertTrue("Deployment file failed to parse", crc != -1);
 

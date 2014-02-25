@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -110,6 +110,7 @@ public class plannerTester {
     }
 
     public static void main( String[] args ) {
+        int numError = 0;
         for(String str : args) {
             if( str.startsWith("-C=")) {
                 String subStr = str.split("=")[1];
@@ -190,6 +191,7 @@ public class plannerTester {
                     configCompileSave(config, m_isSave);
                 } catch (Exception e) {
                     e.printStackTrace();
+                    ++numError;
                 }
             }
         }
@@ -208,10 +210,12 @@ public class plannerTester {
                     configDiff(config);
                 } catch (Exception e) {
                     e.printStackTrace();
+                    ++numError;
                 }
             }
             int numTest = m_numPass + m_numFail;
-            String summary = "\nTest: "+numTest+"\nPass: "+m_numPass+"\nFail: "+m_numFail+"\n";
+            String summary = "\nTest: "+numTest+"\nPass: "+m_numPass+"\nFail: "+
+                    m_numFail+"\nError: "+numError+"\n";
             System.out.print(summary);
             try {
                 m_reportWriter.write(summary);
@@ -222,11 +226,13 @@ public class plannerTester {
             }
             System.out.println("Report file created at "+m_reportPath+"plannerTester.report");
         }
-        if( m_numFail == 0 ) {
-            System.exit(0);
-        } else {
+        if( numError != 0 ) {
+            System.exit(2);
+        }
+        if( m_numFail != 0 ) {
             System.exit(1);
         }
+        System.exit(0);
     }
 
     public static void printUsage() {
@@ -255,7 +261,7 @@ public class plannerTester {
 
     }
 
-    public static boolean setUp( String config ) throws IOException {
+    public static boolean setUp( String config ) throws Exception {
         m_baselinePath = (m_fixedBaselinePath != null) ? m_fixedBaselinePath : (config + "/baseline/");
         String ddlFilePath = null;
         m_stmts.clear();
@@ -315,15 +321,10 @@ public class plannerTester {
             System.err.println("ERROR: syntax error : config file '" + config + "/config' has no 'SQL:' section or SQL statements");
             success = false;
         }
-        try {
-            if (success) {
-                File ddlFile = new File(ddlFilePath);
-                URL ddlURL = ddlFile.toURI().toURL();
-                s_singleton.setupSchema(ddlURL, config, false);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
+        if (success) {
+            File ddlFile = new File(ddlFilePath);
+            URL ddlURL = ddlFile.toURI().toURL();
+            s_singleton.setupSchema(ddlURL, config, false);
         }
         return success;
     }
@@ -404,7 +405,7 @@ public class plannerTester {
         return joinNodeList;
     }
 
-    public static void configCompileSave(String config, boolean isSave) throws Exception {
+    private static void configCompileSave(String config, boolean isSave) throws Exception {
         if ( ! setUp( config )) {
             return;
         }
@@ -437,7 +438,7 @@ public class plannerTester {
 
     //parameters : path to baseline and the new plans
     //size : number of total files in the baseline directory
-    public static void configDiff(String config) throws IOException {
+    public static void configDiff(String config) throws Exception {
         if ( ! setUp( config )) {
             return;
         }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -30,7 +30,6 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 
-import java.util.Arrays;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -42,7 +41,6 @@ import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
-import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 
 public class TestAsyncCompilerAgent {
@@ -74,7 +72,6 @@ public class TestAsyncCompilerAgent {
     /**
      * Checks if a proper response is sent back when the max queue depth is
      * reached.
-     * @throws MessagingException
      * @throws InterruptedException
      */
     @Test
@@ -99,26 +96,24 @@ public class TestAsyncCompilerAgent {
         final AtomicReference<AsyncCompilerResult> result = new AtomicReference<AsyncCompilerResult>();
         final long threadId = Thread.currentThread().getId();
         for (int i = 0; i < AsyncCompilerAgent.MAX_QUEUE_DEPTH + 2; ++i) {
-            AdHocPlannerWork work =
-                    new AdHocPlannerWork(100l, false, 0, 0, "localhost", false, null,
-                            "select * from a", Arrays.asList(new String[] {"select * from a"}), 0, null, false, true,
-                            ProcedureInvocationType.ORIGINAL, 0, 0,
-                            new AsyncCompilerWorkCompletionHandler() {
-
-                                @Override
-                                public void onCompletion(
-                                        AsyncCompilerResult compilerResult) {
-                                    completedRequests.incrementAndGet();
-                                    /*
-                                     * A rejected request will be handled in the current thread invoking deliver
-                                     * so use that to record the error response
-                                     */
-                                    if (Thread.currentThread().getId() == threadId) {
-                                        result.set(compilerResult);
-                                    }
-                                }
-
-                    });
+            AsyncCompilerWorkCompletionHandler handler = new AsyncCompilerWorkCompletionHandler() {
+                @Override
+                public void onCompletion(AsyncCompilerResult compilerResult) {
+                    completedRequests.incrementAndGet();
+                    /*
+                     * A rejected request will be handled in the current thread invoking deliver
+                     * so use that to record the error response
+                     */
+                    if (Thread.currentThread().getId() == threadId) {
+                        result.set(compilerResult);
+                    }
+                }
+            };
+            // This API that underlies dynamic ad hoc invocation from a stored procedure is
+            // also handy here for setting up a mocked up planner work request for testing purposes.
+            AdHocPlannerWork work = AdHocPlannerWork.makeStoredProcAdHocPlannerWork(100, "select * from a",
+                                                                                    null, false, null,
+                                                                                    handler);
             LocalObjectMessage msg = new LocalObjectMessage(work);
             msg.m_sourceHSId = 100;
             m_agent.m_mailbox.deliver(msg);

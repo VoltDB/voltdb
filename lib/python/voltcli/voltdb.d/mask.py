@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2013 VoltDB Inc.
+# Copyright (C) 2008-2014 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -61,5 +61,5 @@ def mask(runner):
 
     # Build the positional and keyword argument lists and invoke the scrambler
     args = runner.opts.deploymentfile
-    runner.java.execute(CatalogPasswordScrambler, None, *args)
+    runner.java_execute(CatalogPasswordScrambler, None, *args)
 

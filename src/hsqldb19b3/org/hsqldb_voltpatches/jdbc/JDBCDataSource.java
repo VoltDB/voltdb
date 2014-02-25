@@ -35,17 +35,20 @@ import java.io.PrintWriter;
 import java.io.Serializable;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.sql.SQLFeatureNotSupportedException;
-import java.sql.Wrapper;
 import java.util.Properties;
-import java.util.logging.Logger;
 
 import javax.naming.NamingException;
 import javax.naming.Reference;
 import javax.naming.Referenceable;
 import javax.naming.StringRefAddr;
-import javax.sql.CommonDataSource;
 import javax.sql.DataSource;
+
+import org.hsqldb_voltpatches.jdbc.JDBCDriver;
+
+//#ifdef JAVA6
+import java.sql.Wrapper;
+
+import javax.sql.CommonDataSource;
 
 //#endif JAVA6
 
@@ -446,7 +449,10 @@ public class JDBCDataSource implements Serializable, Referenceable, DataSource
         this.user = user;
     }
 
-    public Logger getParentLogger() throws SQLFeatureNotSupportedException {
-        throw new SQLFeatureNotSupportedException();
+    /************************* Volt DB Extensions *************************/
+
+    public java.util.logging.Logger getParentLogger() throws java.sql.SQLFeatureNotSupportedException {
+        throw new java.sql.SQLFeatureNotSupportedException();
     }
+    /**********************************************************************/
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -132,12 +132,18 @@ std::string NValue::debug() const {
     int64_t addr;
     buffer << getTypeName(type) << "::";
     switch (type) {
+      case VALUE_TYPE_BOOLEAN:
+        buffer << (getBoolean() ? "true" : "false");
+        break;
       case VALUE_TYPE_TINYINT:
-        buffer << static_cast<int32_t>(getTinyInt()); break;
+        buffer << static_cast<int32_t>(getTinyInt());
+        break;
       case VALUE_TYPE_SMALLINT:
-        buffer << getSmallInt(); break;
+        buffer << getSmallInt();
+        break;
       case VALUE_TYPE_INTEGER:
-        buffer << getInteger(); break;
+        buffer << getInteger();
+        break;
       case VALUE_TYPE_BIGINT:
       case VALUE_TYPE_TIMESTAMP:
         buffer << getBigInt();
@@ -163,7 +169,7 @@ std::string NValue::debug() const {
         buffer << createStringFromDecimal();
         break;
       default:
-          buffer << getTypeName(type);
+          buffer << "(no details)";
     }
     std::string ret(buffer.str());
     return (ret);

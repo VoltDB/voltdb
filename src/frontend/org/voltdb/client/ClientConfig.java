@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -39,8 +39,8 @@ public class ClientConfig {
     boolean m_useClientAffinity = true;
 
     /**
-     * Configuration for a client with no authentication credentials that will
-     * work with a server with security disabled. Also specifies no status listener.
+     * <p>Configuration for a client with no authentication credentials that will
+     * work with a server with security disabled. Also specifies no status listener.</p>
      */
     public ClientConfig() {
         m_username = "";
@@ -50,21 +50,25 @@ public class ClientConfig {
     }
 
     /**
-     * Configuration for a client that specifies authentication credentials. The username and
-     * password can be null or the empty string.
-     * @param username
-     * @param password
+     * <p>Configuration for a client that specifies authentication credentials. The username and
+     * password can be null or the empty string.</p>
+     *
+     * @param username Cleartext username.
+     * @param password Cleartext password.
      */
     public ClientConfig(String username, String password) {
         this(username, password, true, (ClientStatusListenerExt) null);
     }
 
     /**
-     * Configuration for a client that specifies authentication credentials. The username and
-     * password can be null or the empty string. Also specifies a status listener.
-     * @param username
-     * @param password
-     * @param listener
+     * <p>Configuration for a client that specifies authentication credentials. The username and
+     * password can be null or the empty string. Also specifies a status listener.</p>
+     *
+     * @deprecated {@link ClientStatusListener} deprecated in favor of {@link ClientStatusListenerExt}
+     * in
+     * @param username Cleartext username.
+     * @param password Cleartext password.
+     * @param listener {@link ClientStatusListener} implementation to receive callbacks.
      */
     @Deprecated
     public ClientConfig(String username, String password, ClientStatusListener listener) {
@@ -72,23 +76,25 @@ public class ClientConfig {
     }
 
     /**
-     * Configuration for a client that specifies authentication credentials. The username and
-     * password can be null or the empty string. Also specifies a status listener.
-     * @param username
-     * @param password
-     * @param listener
+     * <p>Configuration for a client that specifies authentication credentials. The username and
+     * password can be null or the empty string. Also specifies a status listener.</p>
+     *
+     * @param username Cleartext username.
+     * @param password Cleartext password.
+     * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
      */
     public ClientConfig(String username, String password, ClientStatusListenerExt listener) {
         this(username,password,true,listener);
     }
 
     /**
-     * Configuration for a client that specifies authentication credentials. The username and
-     * password can be null or the empty string. Also specifies a status listener.
-     * @param username
-     * @param password
-     * @param listener
-     * @param cleartext
+     * <p>Configuration for a client that specifies authentication credentials. The username and
+     * password can be null or the empty string. Also specifies a status listener.</p>
+     *
+     * @param username Cleartext username.
+     * @param password A cleartext or hashed passowrd.
+     * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
+     * @param cleartext Whether the password is hashed.
      */
     public ClientConfig(String username, String password, boolean cleartext, ClientStatusListenerExt listener) {
         if (username == null) {
@@ -106,16 +112,16 @@ public class ClientConfig {
     }
 
     /**
-     * Set the timeout for procedure call. If the timeout expires before the call returns,
+     * <p>Set the timeout for procedure call. If the timeout expires before the call returns,
      * the procedure callback will be called with status {@link ClientResponse#CONNECTION_TIMEOUT}.
      * Synchronous procedures will throw an exception. If a response comes back after the
      * expiration has triggered, then a callback method
      * {@link ClientStatusListenerExt#lateProcedureResponse(ClientResponse, String, int)}
-     * will be called.
+     * will be called.</p>
      *
-     * Default value is 2 minutes if not set. Value of 0 means forever.
+     * Default value is 2 minutes if not set. Value of 0 means forever.</p>
      *
-     * Note that while specified in MS, this timeout is only accurate to within a second or so.
+     * Note that while specified in MS, this timeout is only accurate to within a second or so.</p>
      *
      * @param ms Timeout value in milliseconds.
      */
@@ -128,14 +134,14 @@ public class ClientConfig {
     }
 
     /**
-     * Set the timeout for reading from a connection. If a connection receives no responses,
+     * <p>Set the timeout for reading from a connection. If a connection receives no responses,
      * either from procedure calls or &amp;Pings, for the timeout time in milliseconds,
      * then the connection will be assumed dead and the closed connection callback will
-     * be called.
+     * be called.</p>
      *
-     * Default value is 2 minutes if not set. Value of 0 means forever.
+     * <p>Default value is 2 minutes if not set. Value of 0 means forever.</p>
      *
-     * Note that while specified in MS, this timeout is only accurate to within a second or so.
+     * <p>Note that while specified in MS, this timeout is only accurate to within a second or so.</p>
      *
      * @param ms Timeout value in milliseconds.
      */
@@ -148,39 +154,47 @@ public class ClientConfig {
     }
 
     /**
-     * Deprecated because memory pooling no longer uses arenas. Has no effect
-     * Set the maximum size of memory pool arenas before falling back to using heap byte buffers.
-     * @param maxArenaSizes
+     * <p>Set the maximum size of memory pool arenas before falling back to using heap byte buffers.</p>
+     *
+     * @deprecated Deprecated because memory pooling no longer uses arenas. Has no effect.
+     * @param maxArenaSizes Maximum size of each arena.
      */
     @Deprecated
     public void setMaxArenaSizes(int maxArenaSizes[]) {
     }
 
     /**
-     * By default a single network thread is created and used to do IO and invoke callbacks.
+     * <p>By default a single network thread is created and used to do IO and invoke callbacks.
      * When set to true, Runtime.getRuntime().availableProcessors() / 2 threads are created.
      * Multiple server connections are required for more threads to be involved, a connection
-     * is assigned exclusively to a connection.
+     * is assigned exclusively to a connection.</p>
+     *
+     * @param heavyweight Whether to create additional threads for high IO or
+     * high processing workloads.
      */
     public void setHeavyweight(boolean heavyweight) {
         m_heavyweight = heavyweight;
     }
 
     /**
-     * Deprecated and has no effect
-     * Provide a hint indicating how large messages will be once serialized. Ensures
-     * efficient message buffer allocation.
-     * @param size
+     * <p>Provide a hint indicating how large messages will be once serialized. Ensures
+     * efficient message buffer allocation.</p>
+     *
+     * @deprecated Has no effect.
+     * @param size The expected size of the outgoing message.
      */
     @Deprecated
     public void setExpectedOutgoingMessageSize(int size) {
     }
 
     /**
-     * Set the maximum number of outstanding requests that will be submitted before
+     * <p>Set the maximum number of outstanding requests that will be submitted before
      * blocking. Similar to the number of concurrent connections in a traditional synchronous API.
-     * Defaults to 2k.
-     * @param maxOutstanding
+     * Defaults to 2k.</p>
+     *
+     * @param maxOutstanding The maximum outstanding transactions before calls to
+     * {@link Client#callProcedure(ProcedureCallback, String, Object...)} will block
+     * or return false (depending on settings).
      */
     public void setMaxOutstandingTxns(int maxOutstanding) {
         if (maxOutstanding < 1) {
@@ -191,10 +205,11 @@ public class ClientConfig {
     }
 
     /**
-     * Set the maximum number of transactions that can be run in 1 second. Note this
-     * specified a rate, not a ceiling. If the limit is set to 10, you can't send 10 in
+     * <p>Set the maximum number of transactions that can be run in 1 second. Note this
+     * specifies a rate, not a ceiling. If the limit is set to 10, you can't send 10 in
      * the first half of the second and 5 in the later half; the client will let you send
-     * about 1 transaction every 100ms. Default is {@see Integer#MAX_VALUE}.
+     * about 1 transaction every 100ms. Default is {link Integer#MAX_VALUE}.</p>
+     *
      * @param maxTxnsPerSecond Requested ceiling on rate of call in transaction per second.
      */
     public void setMaxTransactionsPerSecond(int maxTxnsPerSecond) {
@@ -206,32 +221,34 @@ public class ClientConfig {
     }
 
     /**
-     * Enable the Auto Tuning feature, which dynamically adjusts the maximum
+     * <p>Enable the Auto Tuning feature, which dynamically adjusts the maximum
      * allowable transaction number with the goal of maintaining a target latency.
      * The latency value used is the internal latency as reported by the servers.
-     * The internal latency is a good measure of system saturation.
-     * {@see ClientConfig#setAutoTuneTargetInternalLatency(int) setAutoTuneTargetInternalLatency}
+     * The internal latency is a good measure of system saturation.</p>
+     *
+     * <p>See {@link #setAutoTuneTargetInternalLatency(int)}.</p>
      */
     public void enableAutoTune() {
         m_autoTune = true;
     }
 
     /**
-     * Only works with IV2 enabled, is on by default and harmless if IV2 is not enable.
+     * <p>Attempts to route transactions to the correct master partition improving latency
+     * and throughput</p>
      *
-     * If you are using persistent connections you definitely want this.
+     * <p>If you are using persistent connections you definitely want this.</p>
      *
-     * Attempts to route transactions to the correct master partition improving latency
-     * and throughput
+     * @param on Enable or disable the affinity feature.
      */
     public void setClientAffinity(boolean on) {
         m_useClientAffinity = on;
     }
 
     /**
-     * Set the target latency for the Auto Tune feature. Note this represents internal
+     * <p>Set the target latency for the Auto Tune feature. Note this represents internal
      * latency as reported by the server(s), not round-trip latency measured by the
-     * client. Default value is 5 if this is not called.
+     * client. Default value is 5 if this is not called.</p>
+     *
      * @param targetLatency New target latency in milliseconds.
      */
     public void setAutoTuneTargetInternalLatency(int targetLatency) {

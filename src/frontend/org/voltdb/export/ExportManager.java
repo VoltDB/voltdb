@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -44,10 +44,10 @@ import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorProperty;
 import org.voltdb.catalog.Database;
 import org.voltdb.utils.LogKeys;
-import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
+import org.voltdb.utils.VoltFile;
 
 /**
  * Bridges the connection to an OLAP system and the buffers passed
@@ -230,19 +230,12 @@ public class ExportManager
             List<Pair<Integer, Long>> partitions)
     throws ExportManager.SetupException
     {
-        /*
-         * If a node is rejoining it is because it crashed. Export overflow isn't crash safe so it isn't possible
-         * to recover the data. Delete it instead.
-         */
-        if (isRejoin) {
-            deleteExportOverflowData(catalogContext);
-        }
         ExportManager em = new ExportManager(myHostId, catalogContext, messenger, partitions);
         Connector connector = getConnector(catalogContext);
 
         m_self = em;
         if (connector != null && connector.getEnabled() == true) {
-            em.createInitialExportProcessor(catalogContext, connector, true, partitions);
+            em.createInitialExportProcessor(catalogContext, connector, true, partitions, isRejoin);
         }
     }
 
@@ -270,23 +263,6 @@ public class ExportManager
         }
     }
 
-    private static void deleteExportOverflowData(CatalogContext context) {
-        File exportOverflowDirectory = new File(context.cluster.getExportoverflow());
-        exportLog.info("Deleting export overflow data from " + exportOverflowDirectory);
-        if (!exportOverflowDirectory.exists()) {
-            return;
-        }
-        File files[] = exportOverflowDirectory.listFiles();
-        if (files != null) {
-            for (File f : files) {
-                try {
-                    VoltFile.recursivelyDelete(f);
-                } catch (IOException e) {
-                    VoltDB.crashLocalVoltDB("Error deleting export overflow data", true, e);
-                }
-            }
-        }
-    }
     /**
      * Get the global instance of the ExportManager.
      * @return The global single instance of the ExportManager.
@@ -348,7 +324,8 @@ public class ExportManager
             CatalogContext catalogContext,
             final Connector conn,
             boolean startup,
-            List<Pair<Integer, Long>> partitions) {
+            List<Pair<Integer, Long>> partitions,
+            boolean isRejoin) {
         try {
             exportLog.info("Creating connector " + m_loaderClass);
             ExportDataProcessor newProcessor = null;
@@ -378,7 +355,7 @@ public class ExportManager
                 final ExportGeneration currentGeneration = new ExportGeneration(
                             catalogContext.m_uniqueId,
                             m_onGenerationDrained,
-                            exportOverflowDirectory);
+                        exportOverflowDirectory, isRejoin);
                 currentGeneration.initializeGenerationFromCatalog(conn, m_hostId, m_messenger, partitions);
                 m_generations.put( catalogContext.m_uniqueId, currentGeneration);
             }
@@ -456,8 +433,17 @@ public class ExportManager
             if (generation.initializeGenerationFromDisk(conn, m_messenger)) {
                 m_generations.put( generation.m_timestamp, generation);
             } else {
-                exportLog.error("Invalid export generation in overflow directory " + generationDirectory +
-                        " this will have to be cleaned up manually.");
+                String list[] = generationDirectory.list();
+                if (list != null && list.length == 0) {
+                    try {
+                        VoltFile.recursivelyDelete(generationDirectory);
+                    } catch (IOException ioe) {
+                    }
+                } else {
+                    exportLog.error("Invalid export generation in overflow directory " + generationDirectory
+                            + " this will need to be manually cleaned up. number of files left: "
+                            + (list != null ? list.length : 0));
+                }
             }
         }
     }
@@ -495,7 +481,7 @@ public class ExportManager
             newGeneration = new ExportGeneration(
                     catalogContext.m_uniqueId,
                     m_onGenerationDrained,
-                    exportOverflowDirectory);
+                    exportOverflowDirectory, false);
         } catch (IOException e1) {
             VoltDB.crashLocalVoltDB("Error processing catalog update in export system", true, e1);
         }
@@ -508,7 +494,7 @@ public class ExportManager
          * This occurs when export is turned on/off at runtime.
          */
         if (m_processor.get() == null) {
-            createInitialExportProcessor(catalogContext, conn, false, partitions);
+            createInitialExportProcessor(catalogContext, conn, false, partitions, false);
         }
     }
 

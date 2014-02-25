@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,9 +17,13 @@
 
 package org.voltcore.logging;
 
+import com.google_voltpatches.common.base.Throwables;
+import org.voltcore.utils.CoreUtils;
+
 import java.io.StringWriter;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.util.concurrent.ExecutorService;
 
 /**
  * Class that implements the core functionality of a Log4j logger
@@ -29,6 +33,28 @@ import java.lang.reflect.Method;
  */
 public class VoltLogger {
     final CoreVoltLogger m_logger;
+
+    private static final String m_threadName = "Async Logger";
+    private static final ExecutorService m_es = CoreUtils.getSingleThreadExecutor(m_threadName);
+
+    private static final boolean m_disableAsync = Boolean.getBoolean("DISABLE_ASYNC_LOGGING");
+
+    static {
+        Runtime.getRuntime().addShutdownHook(new Thread("Async logger final sync") {
+            @Override
+            public void run() {
+                try {
+                    m_es.submit(new Runnable() {
+                        @Override
+                    public void run() {}
+                    }).get();
+                } catch (Exception e) {
+                    Throwables.getRootCause(e).printStackTrace();
+                }
+            }
+        });
+    }
+
 
     /**
      * Abstraction of core functionality shared between Log4j and
@@ -43,12 +69,75 @@ public class VoltLogger {
         public long getLogLevels(VoltLogger loggers[]);
     }
 
+    /*
+     * Submit all tasks asynchronously to the thread to preserve message order,
+     * but don't wait for the task to complete for info, debug, trace, and warn
+     */
+    private void submit(final Level l, final Object message, final Throwable t, boolean wait) {
+        if (m_disableAsync) m_logger.log(l, message, t);
+        final Thread currentThread = Thread.currentThread();
+        final Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                Thread.currentThread().setName(currentThread.getName());
+                try {
+                    m_logger.log(l, message, t);
+                } finally {
+                    Thread.currentThread().setName(m_threadName);
+                }
+            }
+        };
+        if (wait) {
+            try {
+                m_es.submit(r).get();
+            } catch (Exception e) {
+                Throwables.propagate(e);
+            }
+        } else {
+            m_es.execute(r);
+        }
+    }
+
+    private void submitl7d(final Level level, final String key, final Object[] params, final Throwable t) {
+        if (m_disableAsync) m_logger.l7dlog(level, key, params, t);
+        final Thread currentThread = Thread.currentThread();
+        final Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                Thread.currentThread().setName(currentThread.getName());
+                try {
+                    m_logger.l7dlog(level, key, params, t);
+                } finally {
+                    Thread.currentThread().setName(m_threadName);
+                }
+            }
+        };
+        switch (level) {
+            case INFO:
+            case WARN:
+            case DEBUG:
+            case TRACE:
+                m_es.execute(r);
+                break;
+            case FATAL:
+            case ERROR:
+                try {
+                    m_es.submit(r).get();
+                } catch (Exception e) {
+                    Throwables.propagate(e);
+                }
+                break;
+            default:
+                throw new AssertionError("Unrecognized level " + level);
+        }
+    }
+
     public void debug(Object message) {
-        m_logger.log(Level.DEBUG, message, null);
+        submit(Level.DEBUG, message, null, false);
     }
 
     public void debug(Object message, Throwable t) {
-        m_logger.log(Level.DEBUG, message, t);
+        submit(Level.DEBUG, message, t, false);
     }
 
     public boolean isDebugEnabled() {
@@ -56,27 +145,27 @@ public class VoltLogger {
     }
 
     public void error(Object message) {
-        m_logger.log(Level.ERROR, message, null);
+        submit(Level.ERROR, message, null, true);
     }
 
     public void error(Object message, Throwable t) {
-        m_logger.log(Level.ERROR, message, t);
+        submit(Level.ERROR, message, t, true);
     }
 
     public void fatal(Object message) {
-        m_logger.log(Level.FATAL, message, null);
+        submit(Level.FATAL, message, null, true);
     }
 
     public void fatal(Object message, Throwable t) {
-        m_logger.log(Level.FATAL, message, t);
+        submit(Level.FATAL, message, t, true);
     }
 
     public void info(Object message) {
-        m_logger.log(Level.INFO, message, null);
+        submit(Level.INFO, message, null, false);
     }
 
     public void info(Object message, Throwable t) {
-        m_logger.log(Level.INFO, message, t);
+        submit(Level.INFO, message, t, false);
     }
 
     public boolean isInfoEnabled() {
@@ -84,11 +173,11 @@ public class VoltLogger {
     }
 
     public void trace(Object message) {
-        m_logger.log(Level.TRACE, message, null);
+       submit(Level.TRACE, message, null, false);
     }
 
     public void trace(Object message, Throwable t) {
-        m_logger.log(Level.TRACE, message, t);
+       submit(Level.TRACE, message, t, false);
     }
 
     public boolean isTraceEnabled() {
@@ -96,19 +185,19 @@ public class VoltLogger {
     }
 
     public void warn(Object message) {
-        m_logger.log(Level.WARN, message, null);
+        submit(Level.WARN, message, null, false);
     }
 
     public void warn(Object message, Throwable t) {
-        m_logger.log(Level.WARN, message, t);
+        submit(Level.WARN, message, t, false);
     }
 
-    public void l7dlog(Level level, String key, Throwable t) {
-        m_logger.l7dlog(level, key, null, t);
+    public void l7dlog(final Level level, final String key, final Throwable t) {
+        submitl7d(level, key, null, t);
     }
 
-    public void l7dlog(Level level, String key, Object[] params, Throwable t) {
-        m_logger.l7dlog(level, key, params, t);
+    public void l7dlog(final Level level, final String key, final Object[] params, final Throwable t) {
+        submitl7d(level, key, params, t);
     }
 
     public void addSimpleWriterAppender(StringWriter writer) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,7 +19,6 @@ package org.voltdb.messaging;
 
 import java.io.DataOutput;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -30,9 +29,11 @@ import org.voltdb.ParameterSet;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.common.Constants;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.SerializationHelper;
 
 /**
  * <code>DataInputStream</code> subclass to write objects that implement
@@ -229,20 +230,13 @@ public class FastSerializer implements DataOutput {
      * wrapping the byte buffer.
      */
     public static void writeString(String string, ByteBuffer buffer) throws IOException {
-        final int NULL_STRING_INDICATOR = -1;
         if (string == null) {
-            buffer.putInt(NULL_STRING_INDICATOR);
+            buffer.putInt(VoltType.NULL_STRING_LENGTH);
             return;
         }
 
-        int len = 0;
-        byte[] strbytes = {};
-        try {
-            strbytes = string.getBytes("UTF-8");
-            len = strbytes.length;
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
+        byte[] strbytes = string.getBytes(Constants.UTF8ENCODING);
+        int len = strbytes.length;
 
         buffer.putInt(len);
         buffer.put(strbytes);
@@ -257,20 +251,13 @@ public class FastSerializer implements DataOutput {
      * @throws IOException Rethrows any IOExceptions thrown.
      */
     public void writeString(String string) throws IOException {
-        final int NULL_STRING_INDICATOR = -1;
         if (string == null) {
-            writeInt(NULL_STRING_INDICATOR);
+            writeInt(VoltType.NULL_STRING_LENGTH);
             return;
         }
 
-        int len = 0;
-        byte[] strbytes = {};
-        try {
-            strbytes = string.getBytes("UTF-8");
-            len = strbytes.length;
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
+        byte[]  strbytes = string.getBytes(Constants.UTF8ENCODING);
+        int len = strbytes.length;
 
         writeInt(len);
         write(strbytes);
@@ -284,16 +271,14 @@ public class FastSerializer implements DataOutput {
      * @throws IOException Rethrows any IOExceptions thrown.
      */
     public void writeVarbinary(byte[] bin) throws IOException {
-        final int MAX_LENGTH = VoltType.MAX_VALUE_LENGTH;
-        final int NULL_STRING_INDICATOR = -1;
         if (bin == null) {
-            writeInt(NULL_STRING_INDICATOR);
+            writeInt(VoltType.NULL_STRING_LENGTH);
             return;
         }
 
-        if (bin.length > MAX_LENGTH) {
+        if (bin.length > VoltType.MAX_VALUE_LENGTH) {
             throw new IOException("Varbinary exceeds maximum length of "
-                                  + MAX_LENGTH + " bytes.");
+                                  + VoltType.MAX_VALUE_LENGTH + " bytes.");
         }
         writeInt(bin.length);
         write(bin);
@@ -353,7 +338,7 @@ public class FastSerializer implements DataOutput {
                 buf.putInt(-1); // null length prefix
             }
             else {
-                writeArray(values[i], buf);
+                SerializationHelper.writeArray(values[i], buf);
             }
         }
     }
@@ -371,15 +356,6 @@ public class FastSerializer implements DataOutput {
         }
     }
 
-    public static void writeArray(byte[] values, ByteBuffer buf) throws IOException {
-        if (values.length > VoltType.MAX_VALUE_LENGTH) {
-            throw new IOException("Array exceeds maximum length of "
-                                  + VoltType.MAX_VALUE_LENGTH + " bytes");
-        }
-        buf.putInt(values.length);
-        buf.put(values);
-    }
-
     public void writeArray(byte[][] values) throws IOException {
         if (values.length > VoltType.MAX_VALUE_LENGTH) {
             throw new IOException("Array exceeds maximum length of "
@@ -388,7 +364,7 @@ public class FastSerializer implements DataOutput {
         writeShort(values.length);
         for (int i = 0; i < values.length; ++i) {
             if (values[i] == null) {
-                writeInt(-1);
+                writeInt(VoltType.NULL_STRING_LENGTH);
             }
             else {
                 writeArray(values[i]);
@@ -405,17 +381,6 @@ public class FastSerializer implements DataOutput {
         write(values);
     }
 
-    public static void writeArray(short[] values, ByteBuffer buf) throws IOException {
-        if (values.length > Short.MAX_VALUE) {
-            throw new IOException("Array exceeds maximum length of "
-                                  + Short.MAX_VALUE + " bytes");
-        }
-        buf.putShort((short)values.length);
-        for (int i = 0; i < values.length; ++i) {
-            buf.putShort(values[i]);
-        }
-    }
-
     public void writeArray(short[] values) throws IOException {
         if (values.length > Short.MAX_VALUE) {
             throw new IOException("Array exceeds maximum length of "
@@ -424,17 +389,6 @@ public class FastSerializer implements DataOutput {
         writeShort(values.length);
         for (int i = 0; i < values.length; ++i) {
             writeShort(values[i]);
-        }
-    }
-
-    public static void writeArray(int[] values, ByteBuffer buf) throws IOException {
-        if (values.length > Short.MAX_VALUE) {
-            throw new IOException("Array exceeds maximum length of "
-                                  + Short.MAX_VALUE + " bytes");
-        }
-        buf.putShort((short)values.length);
-        for (int i = 0; i < values.length; ++i) {
-            buf.putInt(values[i]);
         }
     }
 
@@ -449,17 +403,6 @@ public class FastSerializer implements DataOutput {
         }
     }
 
-    public static void writeArray(long[] values, ByteBuffer buf) throws IOException {
-        if (values.length > Short.MAX_VALUE) {
-            throw new IOException("Array exceeds maximum length of "
-                                  + Short.MAX_VALUE + " bytes");
-        }
-        buf.putShort((short)values.length);
-        for (int i = 0; i < values.length; ++i) {
-            buf.putLong(values[i]);
-        }
-    }
-
     public void writeArray(long[] values) throws IOException {
         if (values.length > Short.MAX_VALUE) {
             throw new IOException("Array exceeds maximum length of "
@@ -468,17 +411,6 @@ public class FastSerializer implements DataOutput {
         writeShort(values.length);
         for (int i = 0; i < values.length; ++i) {
             writeLong(values[i]);
-        }
-    }
-
-    public static void writeArray(double[] values, ByteBuffer buf) throws IOException {
-        if (values.length > Short.MAX_VALUE) {
-            throw new IOException("Array exceeds maximum length of "
-                                  + Short.MAX_VALUE + " bytes");
-        }
-        buf.putShort((short)values.length);
-        for (int i = 0; i < values.length; ++i) {
-            buf.putDouble(values[i]);
         }
     }
 
@@ -504,18 +436,6 @@ public class FastSerializer implements DataOutput {
         }
     }
 
-    public static void writeArray(TimestampType[] values, ByteBuffer buf) throws IOException {
-        if (values.length > Short.MAX_VALUE) {
-            throw new IOException("Array exceeds maximum length of "
-                                  + Short.MAX_VALUE + " bytes");
-        }
-        buf.putShort((short)values.length);
-        for (int i = 0; i < values.length; ++i) {
-            if (values[i] == null) buf.putLong(Long.MIN_VALUE);
-            else buf.putLong(values[i].getTime());
-        }
-    }
-
     public void writeArray(TimestampType[] values) throws IOException {
         if (values.length > Short.MAX_VALUE) {
             throw new IOException("Array exceeds maximum length of "
@@ -528,34 +448,19 @@ public class FastSerializer implements DataOutput {
         }
     }
 
-    public static void writeArray(BigDecimal[] values, ByteBuffer buf) throws IOException {
-        if (values.length > Short.MAX_VALUE) {
-            throw new IOException("Array exceeds maximum length of "
-                                  + Short.MAX_VALUE + " bytes");
-        }
-        buf.putShort((short)values.length);
-        for (int i = 0; i < values.length; ++i) {
-            if (values[i] == null) {
-                VoltDecimalHelper.serializeNull(buf);
-            }
-            else {
-                VoltDecimalHelper.serializeBigDecimal(values[i], buf);
-            }
-        }
-    }
-
     public void writeArray(BigDecimal[] values) throws IOException {
         if (values.length > Short.MAX_VALUE) {
             throw new IOException("Array exceeds maximum length of "
                                   + Short.MAX_VALUE + " bytes");
         }
         writeShort(values.length);
+        growIfNeeded(16); // sizeof bigdecimal
         for (int i = 0; i < values.length; ++i) {
             if (values[i] == null) {
-                VoltDecimalHelper.serializeNull(this);
+                VoltDecimalHelper.serializeNull(buffer.b);
             }
             else {
-                VoltDecimalHelper.serializeBigDecimal(values[i], this);
+                VoltDecimalHelper.serializeBigDecimal(values[i], buffer.b);
             }
         }
     }
@@ -660,9 +565,8 @@ public class FastSerializer implements DataOutput {
     }
 
     public static void writeString(byte[] m_procNameBytes, ByteBuffer buf) throws IOException {
-        final int NULL_STRING_INDICATOR = -1;
         if (m_procNameBytes == null) {
-            buf.putInt(NULL_STRING_INDICATOR);
+            buf.putInt(VoltType.NULL_STRING_LENGTH);
             return;
         }
         buf.putInt(m_procNameBytes.length);

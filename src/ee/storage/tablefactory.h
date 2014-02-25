@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -83,7 +83,8 @@ public:
         int partitionColumn = -1, // defaults provided for ease of testing.
         bool exportEnabled = false,
         bool exportOnly = false,
-        int tableAllocationTargetSize = 0);
+        int tableAllocationTargetSize = 0,
+        int tuplelimit = INT_MAX);
 
     /**
     * Creates an empty temp table with given name and columns.

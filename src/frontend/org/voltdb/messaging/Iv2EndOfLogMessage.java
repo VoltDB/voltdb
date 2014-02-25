@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,7 +21,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
-import org.voltdb.messaging.VoltDbMessageFactory;
+import org.voltdb.iv2.MpInitiator;
 
 /**
  * Informs the initiators that the command log for this partition has reached
@@ -30,24 +30,21 @@ import org.voltdb.messaging.VoltDbMessageFactory;
  */
 public class Iv2EndOfLogMessage extends TransactionInfoBaseMessage
 {
-    // true if this EOL message is from the MPI to the SPIs indicating the
-    // end of MP transactions
-    private boolean m_isMP = false;
+    // what partition has reached end of log
+    private int m_pid;
 
     public Iv2EndOfLogMessage() {
         super();
     }
 
-    public Iv2EndOfLogMessage(boolean isMP)
+    public Iv2EndOfLogMessage(int pid)
     {
         super(0l, 0l, 0l, 0l, false, true);
-        m_isMP = isMP;
+        m_pid = pid;
     }
 
-    public boolean isMP()
-    {
-        return m_isMP;
-    }
+    public boolean isMP() { return m_pid == MpInitiator.MP_INIT_PID; }
+    public int getPid() { return m_pid; }
 
     @Override
     public boolean isSinglePartition() {
@@ -57,7 +54,7 @@ public class Iv2EndOfLogMessage extends TransactionInfoBaseMessage
     @Override
     public int getSerializedSize() {
         int msgsize = super.getSerializedSize();
-        msgsize += 1; // m_isMP
+        msgsize += 4; // m_pid
         return msgsize;
     }
 
@@ -65,7 +62,7 @@ public class Iv2EndOfLogMessage extends TransactionInfoBaseMessage
     public void initFromBuffer(ByteBuffer buf) throws IOException
     {
         super.initFromBuffer(buf);
-        m_isMP = buf.get() == 1;
+        m_pid = buf.getInt();
     }
 
     @Override
@@ -73,7 +70,7 @@ public class Iv2EndOfLogMessage extends TransactionInfoBaseMessage
     {
         buf.put(VoltDbMessageFactory.IV2_EOL_ID);
         super.flattenToBuffer(buf);
-        buf.put(m_isMP ? 1 : (byte) 0);
+        buf.putInt(m_pid);
 
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
@@ -81,6 +78,6 @@ public class Iv2EndOfLogMessage extends TransactionInfoBaseMessage
 
     @Override
     public String toString() {
-        return "END OF COMMAND LOG FOR PARTITION, MP: " + m_isMP;
+        return "END OF COMMAND LOG FOR PARTITION, PARTITION ID: " + m_pid;
     }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,9 +24,10 @@ package org.voltdb.client;
 public abstract class ClientFactory {
 
     /**
-     * Create a {@link Client} with no connections. The Client will be optimized to send stored procedure invocations
+     * <p>Create a {@link Client} with no connections. The Client will be optimized to send stored procedure invocations
      * that are 128 bytes in size. Authentication will use a blank username and password unless
-     * you use the @deprecated createConnection methods.
+     * you use the @deprecated createConnection methods.</p>
+     *
      * @return Newly constructed {@link Client}
      */
     public static Client createClient() {
@@ -34,10 +35,11 @@ public abstract class ClientFactory {
     }
 
     /**
-     * Recommended method for creating a client. Using a ClientConfig object ensures
+     * <p>Recommended method for creating a client. Using a ClientConfig object ensures
      * that a client application is isolated from changes to the configuration options.
      * Authentication credentials are provided at construction time with this method
-     * instead of when invoking createConnection.
+     * instead of when invoking createConnection.</p>
+     *
      * @param config A ClientConfig object specifying what type of client to create
      * @return A configured client
      */

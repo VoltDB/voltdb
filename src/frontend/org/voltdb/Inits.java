@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -53,10 +53,9 @@ import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.HTTPAdminListener;
+import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
-
-import com.google_voltpatches.common.collect.ImmutableSet;
 
 /**
  * This breaks up VoltDB initialization tasks into discrete units.
@@ -234,6 +233,42 @@ public class Inits {
         }
     }
 
+    /**
+     * Read catalog bytes from URL
+     *
+     * @param catalogUrl
+     * @return catalog bytes
+     * @throws IOException
+     */
+    private static byte[] readCatalog(String catalogUrl) throws IOException
+    {
+        assert (catalogUrl != null);
+
+        final int MAX_CATALOG_SIZE = 40 * 1024 * 1024; // 40mb
+
+        InputStream fin = null;
+        try {
+            URL url = new URL(catalogUrl);
+            fin = url.openStream();
+        } catch (MalformedURLException ex) {
+            // Invalid URL. Try as a file.
+            fin = new FileInputStream(catalogUrl);
+        }
+        byte[] buffer = new byte[MAX_CATALOG_SIZE];
+        int readBytes = 0;
+        int totalBytes = 0;
+        try {
+            while (readBytes >= 0) {
+                totalBytes += readBytes;
+                readBytes = fin.read(buffer, totalBytes, buffer.length - totalBytes - 1);
+            }
+        } finally {
+            fin.close();
+        }
+
+        return Arrays.copyOf(buffer, totalBytes);
+    }
+
     class DistributeCatalog extends InitWork {
         DistributeCatalog() {
             dependsOn(CreateRestoreAgentAndPlan.class);
@@ -243,7 +278,6 @@ public class Inits {
         public void run() {
             // if I'm the leader, send out the catalog
             if (m_rvdb.m_myHostId == m_rvdb.m_hostIdWithStartupCatalog) {
-                final int MAX_CATALOG_SIZE = 40 * 1024 * 1024; // 40mb
 
                 if (m_rvdb.m_pathToStartupCatalog == null) {
                     VoltDB.crashGlobalVoltDB("The catalog file location is missing, " +
@@ -252,33 +286,15 @@ public class Inits {
                 }
 
                 try {
-                    InputStream fin = null;
-                    try {
-                        URL url = new URL(m_rvdb.m_pathToStartupCatalog);
-                        fin = url.openStream();
-                    } catch (MalformedURLException ex) {
-                        // Invalid URL. Try as a file.
-                        fin = new FileInputStream(m_rvdb.m_pathToStartupCatalog);
-                    }
-                    byte[] buffer = new byte[MAX_CATALOG_SIZE];
-                    int readBytes = 0;
-                    int totalBytes = 0;
-                    try {
-                        while (readBytes >= 0) {
-                            totalBytes += readBytes;
-                            readBytes = fin.read(buffer, totalBytes, buffer.length - totalBytes - 1);
-                        }
-                    } finally {
-                        fin.close();
-                    }
+                    // Get the catalog bytes and byte count.
+                    byte[] catalogBytes = readCatalog(m_rvdb.m_pathToStartupCatalog);
+
                     //Export needs a cluster global unique id for the initial catalog version
                     long catalogUniqueId =
                             UniqueIdGenerator.makeIdFromComponents(
                                     System.currentTimeMillis(),
                                     0,
                                     MpInitiator.MP_INIT_PID);
-                    byte[] catalogBytes = Arrays.copyOf(buffer, totalBytes);
-                    buffer = null;
                     hostLog.debug(String.format("Sending %d catalog bytes", catalogBytes.length));
 
                     long catalogTxnId;
@@ -336,7 +352,7 @@ public class Inits {
             } while (catalogStuff == null);
 
             try {
-                m_rvdb.m_serializedCatalog = CatalogUtil.loadCatalogFromJar(catalogStuff.bytes, hostLog);
+                m_rvdb.m_serializedCatalog = CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.bytes, hostLog);
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to load catalog", true, e);
             }
@@ -431,6 +447,37 @@ public class Inits {
         StartHTTPServer() {
         }
 
+        //Setup http server with given port and interface
+        private void setupHttpServer(String httpInterface, int httpPort, boolean findAny, boolean mustListen) {
+
+            boolean success = false;
+            for (; true; httpPort++) {
+                try {
+                    m_rvdb.m_adminListener = new HTTPAdminListener(m_rvdb.m_jsonEnabled, httpInterface, httpPort);
+                    success = true;
+                    break;
+                } catch (Exception e1) {
+                    if (mustListen) {
+                        hostLog.fatal("HTTP service unable to bind to port " + httpPort + ". Exiting.", e1);
+                        System.exit(-1);
+                    }
+                }
+                if (!findAny) {
+                    break;
+                }
+            }
+            if (!success) {
+                m_rvdb.m_httpPortExtraLogMessage = "HTTP service unable to bind to ports 8080 through "
+                        + String.valueOf(httpPort - 1);
+                if (mustListen) {
+                    System.exit(-1);
+                }
+                m_config.m_httpPort = -1;
+                return;
+            }
+            m_config.m_httpPort = httpPort;
+        }
+
         @Override
         public void run() {
             // start the httpd dashboard/jsonapi. A port value of -1 means disabled
@@ -443,33 +490,20 @@ public class Inits {
                     m_rvdb.m_jsonEnabled = m_deployment.getHttpd().getJsonapi().isEnabled();
                 }
             }
-
-            // if not set by the user, just find a free port
-            if (httpPort == 0) {
+            // if set by cli use that.
+            if (m_config.m_httpPort != Integer.MAX_VALUE) {
+                setupHttpServer(m_config.m_httpPortInterface, m_config.m_httpPort, false, true);
+                // if not set by the user, just find a free port
+            } else if (httpPort == 0) {
                 // if not set by the user, start at 8080
                 httpPort = 8080;
-
-                for (; true; httpPort++) {
-                    try {
-                        m_rvdb.m_adminListener = new HTTPAdminListener(m_rvdb.m_jsonEnabled, httpPort);
-                        break;
-                    } catch (Exception e1) {}
+                setupHttpServer("", httpPort, true, false);
+            } else if (httpPort != -1) {
+                if (!m_deployment.getHttpd().isEnabled()) {
+                    return;
                 }
-                if (httpPort == 8081)
-                    m_rvdb.m_httpPortExtraLogMessage = "HTTP service unable to bind to port 8080";
-                else if (httpPort > 8081)
-                    m_rvdb.m_httpPortExtraLogMessage = "HTTP service unable to bind to ports 8080 through "
-                            + String.valueOf(httpPort - 1);
+                setupHttpServer("", httpPort, false, true);
             }
-            else if (httpPort != -1) {
-                try {
-                    m_rvdb.m_adminListener = new HTTPAdminListener(m_rvdb.m_jsonEnabled, httpPort);
-                } catch (Exception e1) {
-                    hostLog.fatal("HTTP service unable to bind to port " + httpPort + ". Exiting.");
-                    System.exit(-1);
-                }
-            }
-            m_config.m_httpPort = httpPort;
         }
     }
 
@@ -665,22 +699,21 @@ public class Inits {
 
                 try {
                     m_rvdb.m_restoreAgent = new RestoreAgent(
-                                                      m_rvdb.m_messenger.getZK(),
+                                                      m_rvdb.m_messenger,
                                                       m_rvdb.getSnapshotCompletionMonitor(),
                                                       m_rvdb,
-                                                      m_rvdb.m_myHostId,
                                                       m_config.m_startAction,
                                                       cl.getEnabled(),
                                                       cl.getLogpath(),
                                                       cl.getInternalsnapshotpath(),
                                                       snapshotPath,
                                                       allPartitions,
-                                                      ImmutableSet.copyOf(m_rvdb.m_messenger.getLiveHostIds()),
                                                       CatalogUtil.getVoltDbRoot(m_deployment.getPaths()).getAbsolutePath());
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Unable to construct the RestoreAgent", true, e);
                 }
 
+                m_rvdb.m_globalServiceElector.registerService(m_rvdb.m_restoreAgent);
                 m_rvdb.m_restoreAgent.setCatalogContext(m_rvdb.m_catalogContext);
                 // Generate plans and get (hostID, catalogPath) pair
                 Pair<Integer,String> catalog = m_rvdb.m_restoreAgent.findRestoreCatalog();
@@ -688,11 +721,31 @@ public class Inits {
                 // if the restore agent found a catalog, set the following info
                 // so the right node can send it out to the others
                 if (catalog != null) {
-                    hostLog.debug("Found catalog to load on host " + catalog.getFirst() +
-                                  ": " + catalog.getSecond());
-                    m_rvdb.m_hostIdWithStartupCatalog = catalog.getFirst().intValue();
+                    // Make sure the catalog corresponds to the current server version.
+                    // Prevent automatic upgrades by rejecting mismatched versions.
+                    int hostId = catalog.getFirst().intValue();
+                    String catalogPath = catalog.getSecond();
+                    try {
+                        byte[] catalogBytes = readCatalog(catalogPath);
+                        InMemoryJarfile inMemoryJar = CatalogUtil.loadInMemoryJarFile(catalogBytes);
+                        // This call pre-checks and returns the build info/version.
+                        String[] buildInfo = CatalogUtil.getBuildInfoFromJar(inMemoryJar);
+                        String catalogVersion = buildInfo[0];
+                        String serverVersion = m_rvdb.getVersionString();
+                        if (!catalogVersion.equals(serverVersion)) {
+                            VoltDB.crashLocalVoltDB(String.format(
+                                    "Unable to load version %s catalog \"%s\" "
+                                    + "from snapshot into a version %s server.",
+                                    catalogVersion, catalogPath, serverVersion), false, null);
+                        }
+                    }
+                    catch (IOException e) {
+                        VoltDB.crashLocalVoltDB("Unable to load catalog for version check.", false, e);
+                    }
+                    hostLog.debug("Found catalog to load on host " + hostId + ": " + catalogPath);
+                    m_rvdb.m_hostIdWithStartupCatalog = hostId;
                     assert(m_rvdb.m_hostIdWithStartupCatalog >= 0);
-                    m_rvdb.m_pathToStartupCatalog = catalog.getSecond();
+                    m_rvdb.m_pathToStartupCatalog = catalogPath;
                     assert(m_rvdb.m_pathToStartupCatalog != null);
                 }
             }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -82,7 +82,7 @@ public:
         // If any stream handles the notification, it's "handled".
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
             assert(streamPtr != NULL);
-            handled |= streamPtr->m_context->notifyTupleInsert(tuple);
+            handled = streamPtr->m_context->notifyTupleInsert(tuple) || handled;
         }
         return handled;
     }
@@ -96,7 +96,7 @@ public:
         // If any context handles the notification, it's "handled".
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
             assert(streamPtr != NULL);
-            handled |= streamPtr->m_context->notifyTupleUpdate(tuple);
+            handled = streamPtr->m_context->notifyTupleUpdate(tuple) || handled;
         }
         return handled;
     }
@@ -110,7 +110,7 @@ public:
         // Any active stream can reject freeing the tuple.
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
             assert(streamPtr != NULL);
-            freeable &= streamPtr->m_context->notifyTupleDelete(tuple);
+            freeable = streamPtr->m_context->notifyTupleDelete(tuple) && freeable;
         }
         return freeable;
     }

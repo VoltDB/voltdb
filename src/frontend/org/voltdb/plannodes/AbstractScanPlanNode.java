@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -32,6 +32,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.StmtTableScan;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.CatalogUtil;
 
@@ -53,6 +54,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     // The target table is the table that the plannode wants to perform some operation on.
     protected String m_targetTableName = "";
     protected String m_targetTableAlias = null;
+
+    protected StmtTableScan m_tableScan = null;
 
     protected AbstractScanPlanNode() {
         super();
@@ -98,22 +101,6 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     }
 
     /**
-     * Does the plan guarantee an identical result/effect
-     * when "replayed" against the same database state, such as during replication or CL recovery.
-     * @return true unless the scan has an inline limit and no particular order.
-     */
-    @Override
-    public boolean isContentDeterministic() {
-        AbstractPlanNode limit = this.getInlinePlanNode(PlanNodeType.LIMIT);
-        if ((limit == null) || isOrderDeterministic()) {
-            return true;
-        } else {
-            m_nondeterminismDetail = "a limit on an unordered scan may return different rows";
-            return false;
-        }
-    }
-
-    /**
      * @return the target_table_name
      */
     public String getTargetTableName() {
@@ -139,6 +126,14 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
      */
     public void setTargetTableAlias(String alias) {
         m_targetTableAlias = alias;
+    }
+
+    public void setTableScan(StmtTableScan tableScan) {
+        m_tableScan = tableScan;
+    }
+
+    public StmtTableScan getTableScan() {
+        return m_tableScan;
     }
 
     /**
@@ -333,8 +328,10 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
 
-        stringer.key(Members.PREDICATE.name());
-        stringer.value(m_predicate);
+        if (m_predicate != null) {
+            stringer.key(Members.PREDICATE.name());
+            stringer.value(m_predicate);
+        }
         stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_targetTableName);
         stringer.key(Members.TARGET_TABLE_ALIAS.name()).value(m_targetTableAlias);
     }
@@ -342,10 +339,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
-        m_predicate = AbstractExpression.fromJSONChild(jobj, Members.PREDICATE.name());
+        m_predicate = AbstractExpression.fromJSONChild(jobj, Members.PREDICATE.name(), m_tableScan);
         m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
         m_targetTableAlias = jobj.getString( Members.TARGET_TABLE_ALIAS.name() );
-
     }
 
     @Override

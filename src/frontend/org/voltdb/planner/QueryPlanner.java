@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,10 +17,11 @@
 
 package org.voltdb.planner;
 
+import java.util.List;
+
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
-import org.voltcore.utils.Pair;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Cluster;
@@ -28,13 +29,13 @@ import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.ScalarValueHints;
-import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.NodeSchema;
+import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
+import org.voltdb.types.PlanNodeType;
 
 /**
  * The query planner accepts catalog data, SQL statements from the catalog, then
@@ -113,7 +114,6 @@ public class QueryPlanner {
         m_HSQL = HSQL;
         m_db = catalogDb;
         m_cluster = catalogCluster;
-        m_partitioning = partitioning;
         m_estimates = estimates;
         m_partitioning = partitioning;
         m_maxTablesPerJoin = maxTablesPerJoin;
@@ -180,6 +180,14 @@ public class QueryPlanner {
         return m_paramzInfo.paramLiteralValues;
     }
 
+    public ParameterSet extractedParamValues(VoltType[] parameterTypes) throws Exception {
+        if (m_paramzInfo == null) {
+            return null;
+        }
+        Object[] paramArray = m_paramzInfo.extractedParamValues(parameterTypes);
+        return ParameterSet.fromArrayNoCopy(paramArray);
+    }
+
     /**
      * Get the best plan for the SQL statement given, assuming the given costModel.
      *
@@ -201,27 +209,20 @@ public class QueryPlanner {
                 CompiledPlan plan = compileFromXML(m_paramzInfo.parameterizedXmlSQL,
                                                    m_paramzInfo.paramLiteralValues);
 
-                Pair<Integer, Object[]> info = buildParameterSetFromExtractedLiteralsAndReturnPartitionIndex(
-                        plan.parameterTypes());
-                plan.partitioningKeyIndex = info.getFirst();
-                if (info.getSecond().length > CompiledPlan.MAX_PARAM_COUNT) {
-                    throw new PlanningErrorException("Throw and catch to force a non-parameterized plan");
+                VoltType[] paramTypes = plan.parameterTypes();
+                if (paramTypes.length <= CompiledPlan.MAX_PARAM_COUNT) {
+                    Object[] params = m_paramzInfo.extractedParamValues(paramTypes);
+                    plan.extractedParamValues = ParameterSet.fromArrayNoCopy(params);
+                    m_wasParameterizedPlan = true;
+                    return plan;
                 }
-                plan.extractedParamValues = ParameterSet.fromArrayNoCopy(info.getSecond());
-
-                // set the partition key value for SP plans
-                if (plan.partitioningKeyIndex >= 0) {
-                    plan.setPartitioningKey(plan.extractedParamValues.toArray()[plan.partitioningKeyIndex]);
-                }
-
-                m_wasParameterizedPlan = true;
-                return plan;
+                // fall through to try replan without parameterization.
             }
             catch (Exception e) {
                 // ignore any errors planning with parameters
                 // fall through to re-planning without them
 
-                // note, real planning errors ignored here should be rethrown below
+                // note, expect real planning errors ignored here to be thrown again below
                 m_recentErrorMsg = null;
             }
         }
@@ -232,45 +233,6 @@ public class QueryPlanner {
             throw new PlanningErrorException(m_recentErrorMsg);
         }
         return plan;
-    }
-
-    /**
-     * After parameterizing a parsed SQL statement, the types of the params are
-     * not always accurate. Once we have the full plan, we can create java
-     * objects that are the right type for the parameter in question.
-     *
-     * This method is separate from the core planner path so that if you get a
-     * parameterized parsed statement from the planner, and have a full plan for
-     * it in the cache, then you can convert the parameters ParameterizationInfo
-     * pulled out into the right types for the plan.
-     */
-    public Pair<Integer, Object[]> buildParameterSetFromExtractedLiteralsAndReturnPartitionIndex(
-            VoltType[] paramTypes) throws Exception
-    {
-        assert(m_paramzInfo.paramLiteralValues.length == paramTypes.length);
-        Object[] params = new Object[m_paramzInfo.paramLiteralValues.length];
-
-        // the extracted params are all strings at first.
-        // after the planner infers their types, fix them up
-        // the only exception is that nulls are Java NULL, and not the string "null".
-        for (int i = 0; i < m_paramzInfo.paramLiteralValues.length; i++) {
-            params[i] = ParameterizationInfo.valueForStringWithType(
-                    m_paramzInfo.paramLiteralValues[i], paramTypes[i]);
-        }
-
-        // handle the case where the statement is partitioned on a newly parameterized value
-        int partitionIndex = -1;
-        if (m_partitioning.effectivePartitioningValue() == null) {
-            AbstractExpression expr = m_partitioning.effectivePartitioningExpression();
-            if (expr != null) {
-                if (expr instanceof ParameterValueExpression) {
-                    ParameterValueExpression pve = (ParameterValueExpression) expr;
-                    partitionIndex = pve.getParameterIndex();
-                }
-            }
-        }
-
-        return new Pair<Integer, Object[]>(partitionIndex, params, false);
     }
 
     /**
@@ -304,6 +266,10 @@ public class QueryPlanner {
         // find the plan with minimal cost
         CompiledPlan bestPlan = assembler.getBestCostPlan(parsedStmt);
 
+        // This processing of bestPlan outside/after getBestCostPlan
+        // allows getBestCostPlan to be called both here and
+        // in PlanAssembler.getNextUnion on each branch of a union.
+
         // make sure we got a winner
         if (bestPlan == null) {
             m_recentErrorMsg = assembler.getErrorMessage();
@@ -313,7 +279,7 @@ public class QueryPlanner {
             return null;
         }
 
-        if (bestPlan.readOnly == true) {
+        if (bestPlan.readOnly) {
             SendPlanNode sendNode = new SendPlanNode();
             // connect the nodes to build the graph
             sendNode.addAndLinkChild(bestPlan.rootPlanGraph);
@@ -324,8 +290,9 @@ public class QueryPlanner {
         // Execute the generateOutputSchema and resolveColumnIndexes Once from the top plan node for only best plan
         bestPlan.rootPlanGraph.generateOutputSchema(m_db);
         bestPlan.rootPlanGraph.resolveColumnIndexes();
-        if (bestPlan.selectStmt != null) {
-            checkPlanColumnLeakage(bestPlan, bestPlan.selectStmt);
+        if (parsedStmt instanceof ParsedSelectStmt) {
+            List<SchemaColumn> columns = bestPlan.rootPlanGraph.getOutputSchema().getColumns();
+            ((ParsedSelectStmt)parsedStmt).checkPlanColumnMatch(columns);
         }
 
         // Output the best plan debug info
@@ -336,31 +303,48 @@ public class QueryPlanner {
         bestPlan.resetPlanNodeIds();
 
         // split up the plan everywhere we see send/recieve into multiple plan fragments
-        Fragmentizer.fragmentize(bestPlan, m_db);
+        fragmentize(bestPlan);
         return bestPlan;
     }
 
     private void checkPlanColumnLeakage(CompiledPlan plan, ParsedSelectStmt stmt) {
         NodeSchema output_schema = plan.rootPlanGraph.getOutputSchema();
         // Sanity-check the output NodeSchema columns against the display columns
-        if (stmt.displayColumns.size() != output_schema.size())
-        {
+        if (stmt.displayColumns.size() != output_schema.size()) {
             throw new PlanningErrorException("Mismatched plan output cols " +
             "to parsed display columns");
         }
-        for (ParsedColInfo display_col : stmt.displayColumns)
-        {
+        for (ParsedColInfo display_col : stmt.displayColumns) {
             SchemaColumn col = output_schema.find(display_col.tableName,
                                                   display_col.tableAlias,
                                                   display_col.columnName,
                                                   display_col.alias);
-            if (col == null)
-            {
+            if (col == null) {
                 throw new PlanningErrorException("Mismatched plan output cols " +
                                                  "to parsed display columns");
             }
         }
-        plan.columns = output_schema;
     }
 
+    private static void fragmentize(CompiledPlan plan) {
+        List<AbstractPlanNode> receives = plan.rootPlanGraph.findAllNodesOfType(PlanNodeType.RECEIVE);
+
+        if (receives.isEmpty()) return;
+
+        assert (receives.size() == 1);
+
+        ReceivePlanNode recvNode = (ReceivePlanNode) receives.get(0);
+        assert(recvNode.getChildCount() == 1);
+        AbstractPlanNode childNode = recvNode.getChild(0);
+        assert(childNode instanceof SendPlanNode);
+        SendPlanNode sendNode = (SendPlanNode) childNode;
+
+        // disconnect the send and receive nodes
+        sendNode.clearParents();
+        recvNode.clearChildren();
+
+        plan.subPlanGraph = sendNode;
+
+        return;
+    }
 }

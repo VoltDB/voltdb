@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,20 +29,20 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.*;
+import org.apache.zookeeper_voltpatches.KeeperException.BadVersionException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
-import org.apache.zookeeper_voltpatches.WatchedEvent;
-import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.Watcher.Event.EventType;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.junit.After;
 import org.junit.Before;
@@ -160,7 +160,7 @@ public class TestZK extends ZKTestBase {
     }
 
     @Test
-    public void testWatches() throws Exception {
+    public void testChildWatches() throws Exception {
         ZooKeeper zk = getClient(0);
         ZooKeeper zk2 = getClient(1);
         final Semaphore sem = new Semaphore(0);
@@ -190,6 +190,94 @@ public class TestZK extends ZKTestBase {
 
         zk.delete("/foo2", -1);
         sem.acquire();
+    }
+
+    @Test
+    public void testDataWatches() throws Exception {
+        ZooKeeper zk = getClient(0);
+        ZooKeeper zk2 = getClient(1);
+        final Semaphore sem = new Semaphore(0);
+        zk2.create("/foo", new byte[1], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        zk.getData("/foo", new Watcher() {
+            @Override
+            public void process(WatchedEvent event) {
+                if (event.getType() == EventType.NodeDataChanged) {
+                    sem.release();
+                    System.out.println(event);
+                }
+            }
+        }, null);
+
+        zk2.setData("/foo", new byte[2], -1);
+
+        Stat stat = new Stat();
+        zk.getData("/foo", false, stat);
+
+        boolean threwException = false;
+        try {
+            zk2.setData("/foo", new byte[3], stat.getVersion());
+            zk.setData("/foo", new byte[3], stat.getVersion());
+        } catch (BadVersionException e) {
+            threwException = true;
+            e.printStackTrace();
+        }
+        assertTrue(threwException);
+    }
+
+    private Thread getThread(final ZooKeeper zk, final int count) {
+        return new Thread() {
+            @Override
+            public void run() {
+                try {
+                    for (int ii = 0; ii < count; ii++) {
+                        while (true) {
+                            Stat stat = new Stat();
+                            ByteBuffer buf = ByteBuffer.wrap(zk.getData("/foo", false, stat));
+                            int value = buf.getInt();
+                            value++;
+                            buf.clear();
+                            buf.putInt(value);
+                            try {
+                                zk.setData("/foo", buf.array(), stat.getVersion());
+                            } catch (BadVersionException e) {
+                                continue;
+                            }
+                            //System.out.println("CASed " + value);
+                            break;
+                        }
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+    }
+
+    @Test
+    public void testCAS() throws Exception {
+        ZooKeeper zk = getClient(0);
+        ZooKeeper zk2 = getClient(1);
+        ZooKeeper zk3 = getClient(2);
+        ZooKeeper zk4 = getClient(3);
+
+        zk2.create("/foo", new byte[4], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+
+        final int count = 100;
+        Thread t1 = getThread(zk, count);
+        Thread t2 = getThread(zk2, count);
+        Thread t3 = getThread(zk3, count);
+        Thread t4 = getThread(zk4, count);
+        t1.start();
+        t2.start();
+        t3.start();
+        t4.start();
+        t1.join();
+        t2.join();
+        t3.join();
+        t4.join();
+
+        ByteBuffer buf = ByteBuffer.wrap(zk.getData("/foo", false, null));
+        assertEquals(count * 4 , buf.getInt());
     }
 
     @Test

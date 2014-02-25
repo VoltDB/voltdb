@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -108,13 +108,14 @@ class SerializeOutput;
 class PersistentTable;
 class Table;
 class CatalogDelegate;
+class TableCatalogDelegate;
 class PlanNodeFragment;
 class ExecutorContext;
 class RecoveryProtoMsg;
 
 const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
 const size_t PLAN_CACHE_SIZE = 1024 * 10;
-// how many tuples to scan before calling into java
+// how many initial tuples to scan before calling into java
 const int64_t LONG_OP_THRESHOLD = 10000;
 
 /**
@@ -130,6 +131,14 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         /** Constructor for test code: this does not enable JNI callbacks. */
         VoltDBEngine() :
+          m_currentIndexInBatch(0),
+          m_allTuplesScanned(0),
+          m_tuplesProcessedInBatch(0),
+          m_tuplesProcessedInFragment(0),
+          m_tuplesProcessedSinceReport(0),
+          m_tupleReportThreshold(LONG_OP_THRESHOLD),
+          m_lastAccessedTable(NULL),
+          m_lastAccessedExec(NULL),
           m_currentUndoQuantum(NULL),
           m_hashinator(NULL),
           m_staticParams(MAX_PARAM_COUNT),
@@ -162,6 +171,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // Serializes table_id to out. Returns true if successful.
         bool serializeTable(int32_t tableId, SerializeOutput* out) const;
 
+        TableCatalogDelegate* getTableDelegate(std::string name) const;
+        catalog::Database* getDatabase() const { return m_database; }
+        catalog::Table* getCatalogTable(std::string name) const;
+
         // -------------------------------------------------
         // Execution Functions
         // -------------------------------------------------
@@ -178,36 +191,11 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                  int64_t uniqueId,
                                  int64_t undoToken);
 
-        /**
-         * Execute a single plan fragment.
-         */
-        int executePlanFragment(int64_t planfragmentId,
-                                int64_t inputDependencyId,
-                                const NValueArray &params,
-                                int64_t spHandle,
-                                int64_t lastCommittedSpHandle,
-                                int64_t uniqueId,
-                                bool first,
-                                bool last);
-
         inline int getUsedParamcnt() const { return m_usedParamcnt;}
 
         /** index of the batch piece being executed */
-        int m_currentIndexInBatch;
-        int64_t m_allTuplesScanned;
-        int64_t m_tuplesProcessedInBatch;
-        int64_t m_tuplesProcessedInFragment;
-        Table *m_lastAccessedTable;
-        std::string *m_lastAccessedPlanNodeName;
-
         inline int getIndexInBatch() {
             return m_currentIndexInBatch;
-        }
-        inline void setLastAccessedTable(Table *table) {
-            m_lastAccessedTable = table;
-        }
-        inline void setLastAccessedPlanNodeName(std::string *name) {
-            m_lastAccessedPlanNodeName = name;
         }
 
         // Created to transition existing unit tests to context abstraction.
@@ -216,7 +204,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         // Executors can call this to note a certain number of tuples have been
         // scanned or processed.index
-        inline void noteTuplesProcessedForProgressMonitoring(int tuplesProcessed);
+        inline int64_t pullTuplesRemainingUntilProgressReport(AbstractExecutor* exec, Table* target_table);
+        inline int64_t pushTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed);
+        inline void pushFinalTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed);
 
         // -------------------------------------------------
         // Dependency Transfer Functions
@@ -430,6 +420,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * Returns serialized representation of the results
          */
         void executeTask(TaskType taskType, const char* taskParams);
+
+        void rebuildTableCollections();
     private:
 
         /*
@@ -451,7 +443,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                           TempTableLimits* limits);
         bool initCluster();
         void processCatalogDeletes(int64_t timestamp);
-        void rebuildTableCollections();
         void initMaterializedViews(bool addAll);
         bool updateCatalogDatabaseReference();
 
@@ -463,6 +454,18 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * Call into the topend with information about how executing a plan fragment is going.
          */
         void reportProgessToTopend();
+
+        /**
+         * Execute a single plan fragment.
+         */
+        int executePlanFragment(int64_t planfragmentId,
+                                int64_t inputDependencyId,
+                                const NValueArray &params,
+                                int64_t spHandle,
+                                int64_t lastCommittedSpHandle,
+                                int64_t uniqueId,
+                                bool first,
+                                bool last);
 
         /**
          * Keep a list of executors for runtime - intentionally near the top of VoltDBEngine
@@ -498,7 +501,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                 >
             >
         > PlanSet;
-        PlanSet m_plans;
 
         /**
          * Get a vector of executors for a given fragment id.
@@ -508,12 +510,22 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         ExecutorVector *getExecutorVectorForFragmentId(const int64_t fragId);
 
-        voltdb::UndoLog m_undoLog;
-        voltdb::UndoQuantum *m_currentUndoQuantum;
-
         // -------------------------------------------------
         // Data Members
         // -------------------------------------------------
+        int m_currentIndexInBatch;
+        int64_t m_allTuplesScanned;
+        int64_t m_tuplesProcessedInBatch;
+        int64_t m_tuplesProcessedInFragment;
+        int64_t m_tuplesProcessedSinceReport;
+        int64_t m_tupleReportThreshold;
+        Table *m_lastAccessedTable;
+        AbstractExecutor* m_lastAccessedExec;
+
+        PlanSet m_plans;
+        voltdb::UndoLog m_undoLog;
+        voltdb::UndoQuantum *m_currentUndoQuantum;
+
         int64_t m_siteId;
         int32_t m_partitionId;
         int32_t m_clusterIndex;
@@ -647,13 +659,25 @@ inline void VoltDBEngine::resetReusedResultOutputBuffer(const size_t headerSize)
  * Track total tuples accessed for this query.
  * Set up statistics for long running operations thru m_engine if total tuples accessed passes the threshold.
  */
-inline void VoltDBEngine::noteTuplesProcessedForProgressMonitoring(int tuplesProcessed) {
-#ifndef ENABLE_POST_4_0
-    m_tuplesProcessedInFragment += tuplesProcessed;
-    if((m_tuplesProcessedInFragment % LONG_OP_THRESHOLD) == 0) {
+inline int64_t VoltDBEngine::pullTuplesRemainingUntilProgressReport(AbstractExecutor* exec, Table* target_table) {
+    if (target_table) {
+        m_lastAccessedTable = target_table;
+    }
+    m_lastAccessedExec = exec;
+    return m_tupleReportThreshold - m_tuplesProcessedSinceReport;
+}
+
+inline int64_t VoltDBEngine::pushTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed) {
+    m_tuplesProcessedSinceReport += tuplesProcessed;
+    if (m_tuplesProcessedSinceReport >= m_tupleReportThreshold) {
         reportProgessToTopend();
     }
-#endif
+    return m_tupleReportThreshold; // size of next batch
+}
+
+inline void VoltDBEngine::pushFinalTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed) {
+    pushTuplesProcessedForProgressMonitoring(tuplesProcessed);
+    m_lastAccessedExec = NULL;
 }
 
 } // namespace voltdb
