@@ -186,6 +186,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         deserializerBufferOrigin.discard();
         exceptionBuffer = null;
         exceptionBufferOrigin.discard();
+        psetBuffer.discard();
         LOG.trace("Released Execution Engine.");
     }
 

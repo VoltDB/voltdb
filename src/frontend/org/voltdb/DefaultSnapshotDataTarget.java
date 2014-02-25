@@ -213,6 +213,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         final PureJavaCrc32 crc = new PureJavaCrc32();
         ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b().remaining() + schemaBytes.length);
         aggregateBuffer.put(container.b());
+        container.discard();
         aggregateBuffer.put(schemaBytes);
         aggregateBuffer.flip();
         crc.update(aggregateBuffer.array(), 4, aggregateBuffer.capacity() - 4);
@@ -403,6 +404,8 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                             m_simulateBlockedWrite.await();
                         }
                         if (m_simulateFullDiskWritingChunk) {
+                            //Make sure to consume the result of the compression
+                            compressionTaskFinal.get().discard();
                             throw new IOException("Disk full");
                         }
                     }

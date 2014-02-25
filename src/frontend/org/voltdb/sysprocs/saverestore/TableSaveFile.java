@@ -75,7 +75,7 @@ public class TableSaveFile
             if (m_hasMoreChunks == false) {
                 m_origin.discard();
             } else {
-                m_buffers.add(this);
+                m_buffers.add(m_origin);
             }
         }
     }
@@ -391,6 +391,7 @@ public class TableSaveFile
             }
         }
         synchronized (this) {
+            m_hasMoreChunks = false;
             while (!m_availableChunks.isEmpty()) {
                 m_availableChunks.poll().discard();
             }
@@ -475,7 +476,7 @@ public class TableSaveFile
     private final long m_txnId;
     private final long m_timestamp;
     private boolean m_hasMoreChunks = true;
-    private ConcurrentLinkedQueue<Container> m_buffers = new ConcurrentLinkedQueue<Container>();
+    private ConcurrentLinkedQueue<BBContainer> m_buffers = new ConcurrentLinkedQueue<BBContainer>();
     private final ArrayDeque<Container> m_availableChunks = new ArrayDeque<Container>();
     private final HashSet<Integer> m_relevantPartitionIds;
     private final ChecksumType m_checksumType;
@@ -687,6 +688,13 @@ public class TableSaveFile
                             for (int partitionId : m_partitionIds) {
                                 m_corruptedPartitions.add(partitionId);
                             }
+                            c.discard();
+                            if (m_continueOnCorruptedChunk) {
+                                m_chunkReads.release();
+                                continue;
+                            } else {
+                                throw new IOException("Failed decompression of saved table chunk");
+                            }
                         }
                     }
 
@@ -721,6 +729,7 @@ public class TableSaveFile
                         TableSaveFile.this.notifyAll();
                     }
                 } catch (IOException e) {
+                    e.printStackTrace();
                     synchronized (TableSaveFile.this) {
                         m_hasMoreChunks = false;
                         m_chunkReaderException = e;
@@ -924,8 +933,8 @@ public class TableSaveFile
                                         DBBPool.getCRC32(c.address(), c.b().position(), c.b().remaining());
                     if (calculatedCRC != nextChunkCRC) {
                         m_corruptedPartitions.add(nextChunkPartitionId);
+                        c.discard();
                         if (m_continueOnCorruptedChunk) {
-                            c.discard();
                             m_chunkReads.release();
                             continue;
                         } else {
@@ -1010,19 +1019,18 @@ public class TableSaveFile
             DBBPool.cleanByteBuffer(fileInputBuffer);
         }
         private Container getOutputBuffer(final int nextChunkPartitionId) {
-            Container c = m_buffers.poll();
+            BBContainer c = m_buffers.poll();
             if (c == null) {
                 final BBContainer originContainer = DBBPool.allocateDirect(DEFAULT_CHUNKSIZE);
                 final ByteBuffer b = originContainer.b();
-                c = new Container(b, originContainer, nextChunkPartitionId);
+                return new Container(b, originContainer, nextChunkPartitionId);
             }
             /*
              * Need to reconstruct the container with the partition id of the next
              * chunk so it can be a final public field. The buffer, address, and origin
              * container remain the same.
              */
-            c = new Container(c.b(), c.m_origin, nextChunkPartitionId);
-            return c;
+            return new Container(c.b(), c, nextChunkPartitionId);
         }
 
         @Override
