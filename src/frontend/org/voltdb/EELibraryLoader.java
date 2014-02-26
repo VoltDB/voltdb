@@ -51,7 +51,7 @@ public class EELibraryLoader {
                     String versionString = VoltDB.instance().getEELibraryVersionString();
                     // this fallback is for test code only
                     if (versionString == null) {
-                        versionString = RealVoltDB.m_defaultVersionString;
+                        versionString = VoltDB.instance().getVersionString();
                     }
                     assert(versionString != null);
                     final String libname = "voltdb-" + versionString;
