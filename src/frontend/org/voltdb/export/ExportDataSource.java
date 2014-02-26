@@ -410,14 +410,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private void pushExportBufferImpl(
             long uso,
-            final long bufferPtr,
             ByteBuffer buffer,
             boolean sync,
             boolean endOfStream) throws Exception {
         final java.util.concurrent.atomic.AtomicBoolean deleted = new java.util.concurrent.atomic.AtomicBoolean(false);
         if (endOfStream) {
             assert(!m_endOfStream);
-            assert(bufferPtr == 0);
             assert(buffer == null);
             assert(!sync);
 
@@ -457,7 +455,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                 public void discard() {
                                     final ByteBuffer buf = checkDoubleFree();
                                     if (buf.isDirect()) {
-                                        DBBPool.deleteCharArrayMemory(((DirectBuffer) buf).address());
+                                        DBBPool.cleanByteBuffer(buf);
                                     }
                                     deleted.set(true);
                                 }
@@ -465,7 +463,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 } catch (IOException e) {
                     exportLog.error(e);
                     if (!deleted.get()) {
-                        DBBPool.deleteCharArrayMemory(bufferPtr);
+                        DBBPool.cleanByteBuffer(buffer);
                     }
                 }
             } else {
@@ -493,7 +491,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public void pushExportBuffer(
             final long uso,
-            final long bufferPtr,
             final ByteBuffer buffer,
             final boolean sync,
             final boolean endOfStream) {
@@ -506,7 +503,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 try {
-                    pushExportBufferImpl(uso, bufferPtr, buffer, sync, endOfStream);
+                    pushExportBufferImpl(uso, buffer, sync, endOfStream);
                 } catch (Throwable t) {
                     VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
                 } finally {

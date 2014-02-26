@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop_voltpatches.hbase.utils.DirectMemoryUtils;
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
+import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashSet;
 import org.voltcore.logging.VoltLogger;
 import sun.misc.Cleaner;
 import sun.nio.ch.DirectBuffer;
@@ -355,10 +356,25 @@ public final class DBBPool {
     }
 
 
+
+//    private static NonBlockingHashSet<Long> m_deletedStuff = new NonBlockingHashSet<Long>();
+
     /*
      * Delete a char array that was allocated on the native heap
+     *
+     * If you want to debug issues with double free, uncomment m_deletedStuff
+     * and the code that populates it and comment out the call to nativeDeleteCharArrayMemory
+     * and it will validate that nothing is ever deleted twice at the cost of unbounded memory usage
      */
-    public static native void deleteCharArrayMemory(long pointer);
+    private static void deleteCharArrayMemory(long pointer) {
+//        if (!m_deletedStuff.add(pointer)) {
+//            new Throwable("Deleted " + Long.toHexString(pointer) + " twice").printStackTrace();
+//            System.exit(-1);
+//        }
+        nativeDeleteCharArrayMemory(pointer);
+    }
+
+    private static native void nativeDeleteCharArrayMemory(long pointer);
 
     /*
      * Allocate a direct byte buffer that bypasses all GC and Java limits
@@ -368,10 +384,16 @@ public final class DBBPool {
      */
     public static native ByteBuffer allocateUnsafeByteBuffer(long size);
 
+    /*
+     * For managed buffers runs the cleaner, if there is no cleaner,
+     * called deleteCharArrayMemory on the address
+     */
     public static void cleanByteBuffer(ByteBuffer buf) {
         if (buf == null) return;
         if (!buf.isDirect()) return;
-        final Cleaner cleaner = ((DirectBuffer)buf).cleaner();
+        final DirectBuffer dbuf = (DirectBuffer) buf;
+        final Cleaner cleaner = dbuf.cleaner();
         if (cleaner != null) cleaner.clean();
+        else deleteCharArrayMemory(dbuf.address());
     }
 }

@@ -72,7 +72,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                           LOG.error("Avoided double discard in PBD");
                           return;
                       }
-                      DBBPool.deleteCharArrayMemory(((DirectBuffer)buf).address());
+                      DBBPool.cleanByteBuffer(buf);
                       discarded = true;
                   }
               };
