@@ -364,7 +364,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 // use the heartbeat to unclog the priority queue if clogged
                 long lastSeenTxnFromInitiator = m_txnQueue.noteTransactionRecievedAndReturnLastSeen(
                         info.getInitiatorHSId(), info.getTxnId(),
-                        true, ((HeartbeatMessage) info).getLastSafeTxnId());
+                        ((HeartbeatMessage) info).getLastSafeTxnId());
 
                 // respond to the initiator with the last seen transaction
                 HeartbeatResponseMessage response = new HeartbeatResponseMessage(
@@ -379,8 +379,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             HeartbeatResponseMessage hrm = (HeartbeatResponseMessage)message;
             m_safetyState.updateLastSeenTxnIdFromExecutorBySiteId(
                     hrm.getExecHSId(),
-                    hrm.getLastReceivedTxnId(),
-                    hrm.isBlocked());
+                    hrm.getLastReceivedTxnId());
         } else if (message instanceof LocalObjectMessage) {
             LocalObjectMessage lom = (LocalObjectMessage)message;
             if (lom.payload instanceof Runnable) {
@@ -463,7 +462,6 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             if (!m_transactionsById.containsKey(atm.m_txnId) && atm.m_txnId >= m_minTxnIdAfterRecovery) {
                 m_txnQueue.noteTransactionRecievedAndReturnLastSeen(atm.m_initiatorHSId,
                         atm.m_txnId,
-                        false,
                         atm.m_lastSafeTxnId);
 
                 AgreementTransactionState transactionState =
@@ -530,7 +528,6 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 }
                 m_txnQueue.noteTransactionRecievedAndReturnLastSeen(initiatorHSId,
                         txnId,
-                        false,
                         lastSafeTxnId);
                 AgreementRejoinTransactionState transactionState =
                     new AgreementRejoinTransactionState(txnId, initiatorHSId, joiningHSId, null);
@@ -781,7 +778,6 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
 
                     m_txnQueue.noteTransactionRecievedAndReturnLastSeen(m_hsId,
                             txnId,
-                            false,
                             m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(m_hsId));
 
                     AgreementRejoinTransactionState arts =
