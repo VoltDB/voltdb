@@ -91,6 +91,11 @@ public class SysProcFragmentId
                 fragId == PF_snapshotSaveQuiesce);
     }
 
+    public static boolean isSnapshotSaveTestFragment(byte[] planHash) {
+        long fragId = VoltSystemProcedure.hashToFragId(planHash);
+        return fragId == PF_saveTest;
+    }
+
     //This method exists because there is no procedure name in fragment task message
     // for sysprocs and we cant distinguish if this needs to be replayed or not.
     public static boolean isDurableFragment(byte[] planHash) {
@@ -180,6 +185,8 @@ public class SysProcFragmentId
     public static final long PF_balancePartitions = 230;
     public static final long PF_balancePartitionsAggregate = 231;
     public static final long PF_balancePartitionsData = 232;
+    public static final long PF_balancePartitionsClearIndex = 233;
+    public static final long PF_balancePartitionsClearIndexAggregate = 234;
 
     public static final long PF_validatePartitioning = 240;
     public static final long PF_validatePartitioningResults = 241;

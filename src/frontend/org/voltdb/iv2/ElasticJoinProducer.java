@@ -223,6 +223,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     public TaskLog constructTaskLog(String voltroot)
     {
         m_taskLog = initializeTaskLog(voltroot, m_partitionId);
+        m_taskLog.enableRecording();
         return this;
     }
 
@@ -286,4 +287,12 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     {
         m_taskLog.close();
     }
+
+    @Override
+    public void enableRecording() {
+        //Implemented by the nest task log, it is enabled immediately on construction
+    }
+
+    @Override
+    public void notifyOfSnapshotNonce(String nonce) {}//don't need to do anything
 }

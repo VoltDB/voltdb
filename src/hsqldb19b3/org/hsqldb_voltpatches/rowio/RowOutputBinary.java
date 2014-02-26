@@ -34,9 +34,9 @@ package org.hsqldb_voltpatches.rowio;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
+import org.hsqldb_voltpatches.Row;
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
-import org.hsqldb_voltpatches.Row;
 import org.hsqldb_voltpatches.Types;
 import org.hsqldb_voltpatches.lib.StringConverter;
 import org.hsqldb_voltpatches.lib.java.JavaSystem;

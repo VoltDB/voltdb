@@ -90,7 +90,6 @@ public class ParserDQL extends ParserBase {
      *
      * @param sql a new SQL character sequence to replace the current one
      */
-    @Override
     void reset(String sql) {
 
         super.reset(sql);
@@ -472,18 +471,24 @@ public class ParserDQL extends ParserBase {
         while (true) {
             if (session.isProcessingScript) {
 
-                /*
-                 * NOTE: Adding "strictSQLNames" as a param to the next two method
-                 * calls is a VoltDB addition to make reserved words more consistent.
-                 * SEE: ENG-912
-                 */
-
                 // for old scripts
+                // A VoltDB extension to make reserved words more consistent.
+                // Adding "strictSQLNames" as a param to the next two method calls.
+                // SEE: ENG-912
                 if (!isSimpleName(strictSQLNames)) {
+                /* disable 1 line ...
+                if (!isSimpleName()) {
+                ... disabled 1 line */
+                // End of VoltDB extension
                     token.isDelimitedIdentifier = true;
                 }
             } else {
+                // A VoltDB extension to make reserved words more consistent.
                 checkIsSimpleName(strictSQLNames);
+                /* disable 1 line ...
+                checkIsSimpleName();
+                ... disabled 1 line */
+                // End of VoltDB extension
             }
 
             if (!set.add(token.tokenString)) {
@@ -1152,14 +1157,14 @@ public class ParserDQL extends ParserBase {
 
         boolean valid = true;
 
-        if (e1.isParam) {
+        if (e1.isParam()) {
             e1.setDataType(session, Type.SQL_INTEGER);
         } else {
             valid = (e1.getDataType().typeCode == Types.SQL_INTEGER
                      && ((Integer) e1.getValue(null)).intValue() >= 0);
         }
 
-        if (e2.isParam) {
+        if (e2.isParam()) {
             e2.setDataType(session, Type.SQL_INTEGER);
         } else {
             valid &= (e2.getDataType().typeCode == Types.SQL_INTEGER
@@ -1236,14 +1241,14 @@ public class ParserDQL extends ParserBase {
 
         boolean valid = true;
 
-        if (e1.isParam) {
+        if (e1.isParam()) {
             e1.setDataType(session, Type.SQL_INTEGER);
         } else {
             valid = (e1.getDataType().typeCode == Types.SQL_INTEGER
                      && ((Integer) e1.getValue(null)).intValue() >= 0);
         }
 
-        if (e2.isParam) {
+        if (e2.isParam()) {
             e2.setDataType(session, Type.SQL_INTEGER);
         } else {
             valid &= (e2.getDataType().typeCode == Types.SQL_INTEGER
@@ -1580,7 +1585,7 @@ public class ParserDQL extends ParserBase {
                     return null;
                 }
 
-            // fall through
+            // $FALL-THROUGH$
             case Tokens.QUESTION :
                 e = new ExpressionColumn(OpTypes.DYNAMIC_PARAM);
 
@@ -2040,7 +2045,7 @@ public class ParserDQL extends ParserBase {
                         break;
                     }
 
-                // fall through
+                // $FALL-THROUGH$
                 default :
                     end = true;
                     break;
@@ -2088,7 +2093,7 @@ public class ParserDQL extends ParserBase {
                         break;
                     }
 
-                // fall through
+                // $FALL-THROUGH$
                 default :
                     end = true;
                     break;
@@ -2852,11 +2857,11 @@ public class ParserDQL extends ParserBase {
 
         Expression right = XreadRowValuePredicand();
 
-        if (a.isParam && left.isParam) {
+        if (a.isParam() && left.isParam()) {
             throw Error.error(ErrorCode.X_42567);
         }
 
-        if (a.isParam && right.isParam) {
+        if (a.isParam() && right.isParam()) {
             throw Error.error(ErrorCode.X_42567);
         }
 
@@ -2941,7 +2946,7 @@ public class ParserDQL extends ParserBase {
         Expression e      = null;
 
         read();
-        // START of added VoltDB support for x IN ?
+        // A VoltDB extension to add support for x IN ?
         if (token.tokenType == Tokens.QUESTION &&
             ! isCheckOrTriggerCondition) {
             read();
@@ -2952,7 +2957,7 @@ public class ParserDQL extends ParserBase {
             r.exprSubType = OpTypes.ANY_QUANTIFIED;
             return r;
         }
-        // END of added VoltDB support for x IN ?
+        // End of VoltDB extension
         readThis(Tokens.OPENBRACKET);
 
         int position = getPosition();
@@ -3780,7 +3785,7 @@ public class ParserDQL extends ParserBase {
 
         Type typeObject = readTypeDefinition(true);
 
-        if (l.isParam) {
+        if (l.isParam()) {
             l.setDataType(session, typeObject);
         }
 
@@ -3789,46 +3794,6 @@ public class ParserDQL extends ParserBase {
         readThis(Tokens.CLOSEBRACKET);
 
         return l;
-    }
-
-    /** This wraps either an Expression result of readSQLFunction or a throwable Exception discovered
-     *  in the process of reading that Expression.
-     *  It allows different parser paths to be tried without losing exception
-     *  information OR needlessly throwing, catching, and recovering from those exceptions.
-     *  The main purpose of this class is to avoid using Exception for "normal case" flow control,
-     *  so that more significant exception throws can be tracked down more easily.
-     *  This helped a lot in the development of VoltDB-specific SQL functions.
-     *  It might have been slightly more traditional to collect the HsqlException 's initializers and
-     *  only construct the HsqlException when ready to throw it.
-     *  But having an HsqlException handy allowed better integration with the existing logic for
-     *  conditional re-throws.
-     */
-    static class ExpressionOrException {
-        private Expression m_good;
-        private HsqlException m_bad;
-
-        ExpressionOrException(Expression good) { m_good = good; }
-        ExpressionOrException(HsqlException bad) { m_bad = bad; }
-
-        // It MAY be safe to extract the Expression,
-        // but if there was an exception, throw that now, instead.
-        Expression orThrow() throws HsqlException {
-            if (m_bad != null)
-                throw m_bad;
-            return m_good;
-        }
-
-        // Allow checking, to ensure whether the Expression value is valid.
-        public HsqlException exception() {
-            return m_bad;
-        }
-
-        // It is safe to extract the Expression when there is known not to be an Exception.
-        public Expression knownGood() {
-            // TODO Auto-generated method stub
-            assert(m_bad == null);
-            return m_good;
-        }
     }
 
     /**
@@ -3842,17 +3807,25 @@ public class ParserDQL extends ParserBase {
         String  prePrefix      = token.namePrePrefix;
 
         if (isUndelimitedSimpleName()) {
+            // A VoltDB extension to augment the standard sql function set.
             FunctionSQL function;
-            // These are VoltDB-specific extensions to the standard sql function set.
             function = FunctionForVoltDB.newVoltDBFunction(name, token.tokenType);
-
             if (function == null) {
                 // These seem to be JDBC ("Open Group"?) aliases and extensions to the standard sql functions.
                 function = FunctionCustom.newCustomFunction(token.tokenString, token.tokenType);
             }
+            /* disable 3 lines ...
+            FunctionSQL function =
+                FunctionCustom.newCustomFunction(token.tokenString,
+                                                 token.tokenType);
+            ... disabled 3 lines */
+            // End of VoltDB extension
+
             if (function != null) {
                 int pos = getPosition();
 
+                // A VoltDB extension to avoid abusing the exception handling mechanism
+                // for normal flow control.
                 HsqlException ex = null;
                 try {
                     ExpressionOrException result = readSQLFunction(function, false);
@@ -3864,6 +3837,12 @@ public class ParserDQL extends ParserBase {
                     ex = caught;
                 }
                 if (ex != null) {
+                /* disable 3 lines ...
+                try {
+                    return readSQLFunction(function);
+                } catch (HsqlException ex) {
+                ... disabled 3 lines */
+                // End of VoltDB extension
                     ex.setLevel(compileContext.subQueryDepth);
 
                     if (lastError == null
@@ -4033,12 +4012,14 @@ public class ParserDQL extends ParserBase {
     }
 
     Expression readSQLFunction(FunctionSQL function) {
+        // A VoltDB extension to avoid using exceptions for flow control.
         // Throwing exceptions as they are detected ensures that the normal code path
         // returns a valid expression.
         return readSQLFunction(function, true).knownGood();
     }
 
     ExpressionOrException readSQLFunction(FunctionSQL function, boolean preferToThrow) {
+        // End of VoltDB extension
 
         read();
 
@@ -4046,11 +4027,17 @@ public class ParserDQL extends ParserBase {
         short[] parseList = function.parseList;
 
         if (parseList.length == 0) {
+            // A VoltDB extension to avoid using exceptions for flow control.
             return new ExpressionOrException(function);
+            /* disable 1 line ...
+            return function;
+            ... disabled 1 line */
+            // End of VoltDB extension
         }
 
         HsqlArrayList exprList = new HsqlArrayList();
 
+        // A VoltDB extension to avoid using exceptions for flow control.
         HsqlException e = null;
         try {
             e = readExpression(exprList, parseList, 0, parseList.length, false, false);
@@ -4062,6 +4049,13 @@ public class ParserDQL extends ParserBase {
                 if ( ! preferToThrow) {
                     return new ExpressionOrException(e);
                 }
+        /* disable 4 lines ...
+        try {
+            readExpression(exprList, parseList, 0, parseList.length, false);
+        } catch (HsqlException e) {
+            if (function.parseListAlt == null) {
+        ... disabled 4 lines */
+        // End of VoltDB extension
                 throw e;
             }
 
@@ -4070,6 +4064,7 @@ public class ParserDQL extends ParserBase {
             parseList = function.parseListAlt;
             exprList  = new HsqlArrayList();
 
+            // A VoltDB extension to avoid using exceptions for flow control.
             e = readExpression(exprList, parseList, 0, parseList.length, false, preferToThrow);
             if (e != null) {
                 if ( ! preferToThrow ) {
@@ -4079,6 +4074,10 @@ public class ParserDQL extends ParserBase {
                 // But better late than sorry.
                 throw e;
             }
+            /* disable 1 line ...
+            readExpression(exprList, parseList, 0, parseList.length, false);
+            ... disabled 1 line */
+            // End of VoltDB extension
         }
 
         Expression[] expr = new Expression[exprList.size()];
@@ -4086,9 +4085,15 @@ public class ParserDQL extends ParserBase {
         exprList.toArray(expr);
         function.setArguments(expr);
 
+        // A VoltDB extension to avoid using exceptions for flow control.
         return new ExpressionOrException(function.getFunctionExpression());
+        /* disable 1 line ...
+        return function.getFunctionExpression();
+        ... disabled 1 line */
+        // End of VoltDB extension
     }
 
+    // A VoltDB extension to avoid using exceptions for flow control.
     /***
      *
      * @param exprList
@@ -4105,6 +4110,11 @@ public class ParserDQL extends ParserBase {
      */
     private HsqlException readExpression(HsqlArrayList exprList, short[] parseList, int start,
                                           int count, boolean isOption, boolean preferToThrow) {
+    /* disable 2 lines ...
+    void readExpression(HsqlArrayList exprList, short[] parseList, int start,
+                        int count, boolean isOption) {
+    ... disabled 2 lines */
+    // End of VoltDB extension
 
         for (int i = start; i < start + count; i++) {
             int exprType = parseList[i];
@@ -4143,6 +4153,7 @@ public class ParserDQL extends ParserBase {
                     int elementCount     = parseList[i++];
                     int initialExprIndex = exprList.size();
 
+                    // A VoltDB extension to avoid using exceptions for flow control.
                     HsqlException ex = null;
                     try {
                         ex = readExpression(exprList, parseList, i, elementCount, true, false);
@@ -4150,6 +4161,13 @@ public class ParserDQL extends ParserBase {
                         ex = caught;
                     }
                     if (ex != null) {
+                    /* disable 4 lines ...
+                    try {
+                        readExpression(exprList, parseList, i, elementCount,
+                                       true);
+                    } catch (HsqlException ex) {
+                    ... disabled 4 lines */
+                    // End of VoltDB extension
                         ex.setLevel(compileContext.subQueryDepth);
 
                         if (lastError == null
@@ -4190,6 +4208,7 @@ public class ParserDQL extends ParserBase {
                     while (true) {
                         int initialExprIndex = exprList.size();
 
+                        // A VoltDB extension to avoid using exceptions for flow control.
                         if (preferToThrow) {
                             readExpression(exprList, parseList, parseIndex,
                                            elementCount, true, true);
@@ -4212,6 +4231,11 @@ public class ParserDQL extends ParserBase {
                                 return ex;
                             }
                         }
+                        /* disable 2 lines ...
+                        readExpression(exprList, parseList, parseIndex,
+                                       elementCount, true);
+                        ... disabled 2 lines */
+                        // End of VoltDB extension
 
                         if (exprList.size() == initialExprIndex) {
                             break;
@@ -4229,9 +4253,11 @@ public class ParserDQL extends ParserBase {
                     if (ArrayUtil.find(parseList, token.tokenType, i
                                        + 1, elementCount) == -1) {
                         if (!isOption) {
+                            // A VoltDB extension to avoid using exceptions for flow control.
                             if ( ! preferToThrow) {
                                 return unexpectedToken();
                             }
+                            // End of VoltDB extension
                             throw unexpectedToken();
                         }
                     } else {
@@ -4253,9 +4279,11 @@ public class ParserDQL extends ParserBase {
                 case Tokens.COMMA :
                 default :
                     if (token.tokenType != exprType) {
+                        // A VoltDB extension to avoid using exceptions for flow control.
                         if ( ! preferToThrow) {
                             return unexpectedToken();
                         }
+                        // End of VoltDB extension
                         throw unexpectedToken();
                     }
 
@@ -4264,7 +4292,9 @@ public class ParserDQL extends ParserBase {
                     continue;
             }
         }
+        // A VoltDB extension to avoid using exceptions for flow control.
         return null; // Successful return -- no exception to pass back.
+        // End of VoltDB extension
     }
 
     private Expression readSequenceExpression() {
@@ -4864,4 +4894,47 @@ public class ParserDQL extends ParserBase {
             return set;
         }
     }
+
+    /************************* Volt DB Extensions *************************/
+
+    /** This wraps either an Expression result of readSQLFunction or a throwable Exception discovered
+     *  in the process of reading that Expression.
+     *  It allows different parser paths to be tried without losing exception
+     *  information OR needlessly throwing, catching, and recovering from those exceptions.
+     *  The main purpose of this class is to avoid using Exception for "normal case" flow control,
+     *  so that more significant exception throws can be tracked down more easily.
+     *  This helped a lot in the development of VoltDB-specific SQL functions.
+     *  It might have been slightly more traditional to collect the HsqlException 's initializers and
+     *  only construct the HsqlException when ready to throw it.
+     *  But having an HsqlException handy allowed better integration with the existing logic for
+     *  conditional re-throws.
+     */
+    static class ExpressionOrException {
+        private Expression m_good;
+        private HsqlException m_bad;
+
+        ExpressionOrException(Expression good) { m_good = good; }
+        ExpressionOrException(HsqlException bad) { m_bad = bad; }
+
+        // It MAY be safe to extract the Expression,
+        // but if there was an exception, throw that now, instead.
+        Expression orThrow() throws HsqlException {
+            if (m_bad != null)
+                throw m_bad;
+            return m_good;
+        }
+
+        // Allow checking, to ensure whether the Expression value is valid.
+        public HsqlException exception() {
+            return m_bad;
+        }
+
+        // It is safe to extract the Expression when there is known not to be an Exception.
+        public Expression knownGood() {
+            // TODO Auto-generated method stub
+            assert(m_bad == null);
+            return m_good;
+        }
+    }
+    /**********************************************************************/
 }

@@ -185,7 +185,6 @@ public class RB extends ValidatingResourceBundle {
 
     private Map keyIdToString = new HashMap();
 
-    @Override
     protected Map getKeyIdToString() {
         return keyIdToString;
     }

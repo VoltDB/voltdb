@@ -47,7 +47,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google_voltpatches.common.base.Predicate;
+import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.base.Throwables;
+
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -115,6 +120,11 @@ import com.google_voltpatches.common.util.concurrent.MoreExecutors;
  */
 public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
+    static long TOPOLOGY_CHANGE_CHECK_MS = Long.getLong("TOPOLOGY_CHANGE_CHECK_MS", 5000);
+
+    //Same as in Distributer.java
+    public static final long ASYNC_TOPO_HANDLE = Long.MAX_VALUE - 1;
+
     // reasons a connection can fail
     public static final byte AUTHENTICATION_FAILURE = -1;
     public static final byte MAX_CONNECTIONS_LIMIT_ERROR = 1;
@@ -160,6 +170,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     private final ConcurrentHashMap<Long, ClientInterfaceHandleManager> m_cihm =
             new ConcurrentHashMap<Long, ClientInterfaceHandleManager>(2048, .75f, 128);
+
+    private final RateLimitedClientNotifier m_notifier = new RateLimitedClientNotifier();
+
     private final Cartographer m_cartographer;
 
     /**
@@ -299,11 +312,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         public void shutdown() throws InterruptedException {
             //sync prevents interruption while shuttown down executor
-            synchronized (this) {
-                m_running = false;
-                m_thread.interrupt();
+            if (m_thread != null) {
+                synchronized (this) {
+                    m_running = false;
+                    m_thread.interrupt();
+                }
+                m_thread.join();
             }
-            m_thread.join();
         }
 
         //Thread for Running authentication of client.
@@ -745,6 +760,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             ClientInterfaceHandleManager cihm = m_cihm.remove(connectionId());
             cihm.freeOutstandingTxns();
             cihm.m_acg.removeMember(this);
+            m_notifier.removeConnection(c);
         }
 
         /*
@@ -1663,6 +1679,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (task.procName.equals("@GetPartitionKeys")) {
                 return dispatchGetPartitionKeys(task);
             }
+            if (task.procName.equals("@Subscribe")) {
+                return dispatchSubscribe( handler, task);
+            }
         }
 
         // Deserialize the client's request and map to a catalog stored procedure
@@ -1855,6 +1874,35 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     task.clientHandle);
         }
         return null;
+    }
+
+    private ClientResponseImpl dispatchSubscribe(ClientInputHandler c, StoredProcedureInvocation task) {
+        final ParameterSet ps = task.getParams();
+        final Object params[] = ps.toArray();
+        String err = null;
+        final ClientInterfaceHandleManager cihm = m_cihm.get(c.connectionId());
+        //Not sure if it can actually be null, not really important if it is
+        if (cihm == null) return null;
+        for (int ii = 0; ii < params.length; ii++) {
+            final Object param = params[ii];
+            if (param == null) {
+                err = "Parameter index " + ii + " was null"; break;
+            }
+            if (!(param instanceof String)) {
+                err = "Parameter index " + ii + " was not a String"; break;
+            }
+
+            if (param.equals("TOPOLOGY")) {
+                cihm.setWantsTopologyUpdates(true);
+            } else {
+                err = "Parameter \"" + param + "\" is not recognized/supported"; break;
+            }
+        }
+        return new ClientResponseImpl(
+                       err == null ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE,
+                       new VoltTable[] { },
+                       err,
+                       task.clientHandle);
     }
 
     private ClientResponseImpl dispatchGetPartitionKeys(StoredProcedureInvocation task) {
@@ -2141,8 +2189,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return ft;
     }
 
+    private ScheduledFuture<?> m_deadConnectionFuture;
+    private ScheduledFuture<?> m_topologyCheckFuture;
     public void schedulePeriodicWorks() {
-        VoltDB.instance().scheduleWork(new Runnable() {
+        m_deadConnectionFuture = VoltDB.instance().scheduleWork(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -2153,6 +2203,104 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
             }
         }, 200, 200, TimeUnit.MILLISECONDS);
+        /*
+         * Every five seconds check if the topology of the cluster has changed,
+         * and if it has push an update to the clients. This should be an inexpensive operation
+         * that operates on cached data and it ensures that clients eventually converge on the current
+         * topology
+         */
+        m_topologyCheckFuture = VoltDB.instance().scheduleWork(new Runnable() {
+            @Override
+            public void run() {
+                checkForTopologyChanges();
+            }
+        }, 0, TOPOLOGY_CHANGE_CHECK_MS, TimeUnit.MILLISECONDS);
+    }
+
+    /*
+     * Boiler plate for a supplier to provide to the client notifier that allows new versions of
+     * the topology to be published to the supplier
+     *
+     * Also a predicate for filtering out clients that don't actually want the updates
+     */
+    private final AtomicReference<DeferredSerialization> m_currentTopologyValues =
+            new AtomicReference<>(null);
+    private final Supplier<DeferredSerialization> m_currentTopologySupplier = new Supplier<DeferredSerialization>() {
+        @Override
+        public DeferredSerialization get() {
+            return m_currentTopologyValues.get();
+        }
+    };
+
+    /*
+     * A predicate to allow the client notifier to skip clients
+     * that don't want a specific kind of update
+     */
+    private final Predicate<ClientInterfaceHandleManager> m_wantsTopologyUpdatesPredicate =
+            new Predicate<ClientInterfaceHandleManager>() {
+                @Override
+                public boolean apply(ClientInterfaceHandleManager input) {
+                    return input.wantsTopologyUpdates();
+                }};
+
+    /*
+     * Submit a task to the stats agent to retrieve the topology. Supply a dummy
+     * client response adapter to fake a connection. The adapter converts the response
+     * to a listenable future and we add a listener to pick up the resulting topology
+     * and check if it has changed. If it has changed, queue a task to the notifier
+     * to propagate the update to clients.
+     */
+    private void checkForTopologyChanges() {
+        final Pair<SimpleClientResponseAdapter, ListenableFuture<ClientResponseImpl>> p =
+                SimpleClientResponseAdapter.getAsListenableFuture();
+        final ListenableFuture<ClientResponseImpl> fut = p.getSecond();
+        fut.addListener(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    final ClientResponseImpl r = fut.get();
+                    if (r.getStatus() != ClientResponse.SUCCESS) {
+                        hostLog.warn("Received error response retrieving topology: " + r.getStatusString());
+                        return;
+                    }
+
+                    final int size = r.getSerializedSize();
+                    final ByteBuffer buf = ByteBuffer.allocate(size + 4);
+                    buf.putInt(size);
+                    r.flattenToBuffer(buf);
+                    buf.flip();
+
+                    //Check for no change
+                    final ByteBuffer oldValue =
+                            m_currentTopologyValues.get() != null ?
+                                    m_currentTopologyValues.get().serialize()[0] : null;
+                    if (buf.equals(oldValue)) return;
+
+                    m_currentTopologyValues.set(new DeferredSerialization() {
+                        @Override
+                        public ByteBuffer[] serialize() throws IOException {
+                            return new ByteBuffer[] { buf.duplicate() };
+                        }
+                        @Override
+                        public void cancel() {}
+                    });
+                    if (oldValue != null) {
+                        m_notifier.queueNotification(
+                                m_cihm.values(),
+                                m_currentTopologySupplier,
+                                m_wantsTopologyUpdatesPredicate);
+                    }
+
+                } catch (Throwable t) {
+                    hostLog.error("Error checking for topology updates", Throwables.getRootCause(t));
+                }
+            }
+        }, MoreExecutors.sameThreadExecutor());
+        final StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        spi.setProcName("@Statistics");
+        spi.setParams("TOPO", 0);
+        spi.setClientHandle(ASYNC_TOPO_HANDLE);
+        dispatchStatistics(OpsSelector.STATISTICS, spi, p.getFirst());
     }
 
     private static final long CLIENT_HANGUP_TIMEOUT = Long.getLong("CLIENT_HANGUP_TIMEOUT", 30000);
@@ -2188,6 +2336,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     // to the dispatcher..  Or write a "stop reading and flush
     // all your read buffers" events .. or something ..
     protected void shutdown() throws InterruptedException {
+        if (m_deadConnectionFuture != null) {
+            m_deadConnectionFuture.cancel(false);
+            try {m_deadConnectionFuture.get();} catch (Throwable t) {}
+        }
+        if (m_topologyCheckFuture != null) {
+            m_topologyCheckFuture.cancel(false);
+            try {m_topologyCheckFuture.get();} catch (Throwable t) {}
+        }
         if (m_maxConnectionUpdater != null) {
             m_maxConnectionUpdater.cancel(false);
         }
@@ -2208,6 +2364,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
             m_localReplicasBuilder.join();
         }
+        m_notifier.shutdown();
     }
 
     private volatile Thread m_localReplicasBuilder = null;
@@ -2260,6 +2417,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             m_adminAcceptor.start();
         }
         mayActivateSnapshotDaemon();
+        m_notifier.start();
     }
 
     /**
@@ -2502,7 +2660,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     public void sendEOLMessage(int partitionId) {
         final long initiatorHSId = m_cartographer.getHSIdForMaster(partitionId);
-        Iv2EndOfLogMessage message = new Iv2EndOfLogMessage(false);
+        Iv2EndOfLogMessage message = new Iv2EndOfLogMessage(partitionId);
         m_mailbox.send(initiatorHSId, message);
     }
 
@@ -2546,4 +2704,5 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 new VoltTable[0], errorMessage, task.clientHandle);
         return clientResponse;
     }
+
 }

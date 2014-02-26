@@ -37,10 +37,10 @@ import org.hsqldb_voltpatches.Database;
 import org.hsqldb_voltpatches.NumberSequence;
 import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.Table;
-import org.hsqldb_voltpatches.lib.DataOutputStream;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.rowio.RowOutputBinary;
 import org.hsqldb_voltpatches.rowio.RowOutputInterface;
+import org.hsqldb_voltpatches.lib.DataOutputStream;
 
 /**
  * @author Fred Toussi (fredt@users dot sourceforge.net)

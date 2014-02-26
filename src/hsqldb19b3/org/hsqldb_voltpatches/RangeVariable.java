@@ -31,7 +31,6 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.index.Index;
@@ -677,12 +676,10 @@ final class RangeVariable {
             isBeforeFirst      = true;
         }
 
-        @Override
         public boolean isBeforeFirst() {
             return isBeforeFirst;
         }
 
-        @Override
         public boolean next() {
 
             if (isBeforeFirst) {
@@ -704,32 +701,26 @@ final class RangeVariable {
             }
         }
 
-        @Override
         public Row getCurrentRow() {
             return currentRow;
         }
 
-        @Override
         public Object[] getCurrent() {
             return currentData;
         }
 
-        @Override
         public long getRowid() {
             return currentRow == null ? 0
                                       : currentRow.getId();
         }
 
-        @Override
         public Object getRowidObject() {
             return currentRow == null ? null
                                       : Long.valueOf(currentRow.getId());
         }
 
-        @Override
         public void remove() {}
 
-        @Override
         public void reset() {
 
             if (it != null) {
@@ -741,7 +732,6 @@ final class RangeVariable {
             isBeforeFirst = true;
         }
 
-        @Override
         public int getRangePosition() {
             return rangePosition;
         }
@@ -775,12 +765,10 @@ final class RangeVariable {
             }
         }
 
-        @Override
         public boolean isBeforeFirst() {
             return isBeforeFirst;
         }
 
-        @Override
         public boolean next() {
 
             if (isBeforeFirst) {
@@ -796,10 +784,8 @@ final class RangeVariable {
             return findNext();
         }
 
-        @Override
         public void remove() {}
 
-        @Override
         public void reset() {
 
             if (it != null) {
@@ -813,7 +799,6 @@ final class RangeVariable {
             isBeforeFirst = true;
         }
 
-        @Override
         public int getRangePosition() {
             return rangeVar.rangePosition;
         }
@@ -1039,10 +1024,8 @@ final class RangeVariable {
             it                 = rangeVar.rangeIndex.firstRow(session, store);
         }
 
-        @Override
         protected void initialiseIterator() {}
 
-        @Override
         protected boolean findNext() {
 
             boolean result;
@@ -1098,12 +1081,10 @@ final class RangeVariable {
             this.rangeIterators = rangeIterators;
         }
 
-        @Override
         public boolean isBeforeFirst() {
             return isBeforeFirst;
         }
 
-        @Override
         public boolean next() {
 
             while (currentIndex >= 0) {
@@ -1140,12 +1121,10 @@ final class RangeVariable {
             return false;
         }
 
-        @Override
         public void reset() {}
     }
 
-
-    /*************** VOLTDB *********************/
+    /************************* Volt DB Extensions *************************/
 
     /**
      * VoltDB added method to get a non-catalog-dependent
@@ -1156,7 +1135,7 @@ final class RangeVariable {
      * @throws HSQLParseException
      */
     VoltXMLElement voltGetRangeVariableXML(Session session)
-    throws HSQLParseException
+    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         Index        index;
         Index        primaryIndex;
@@ -1167,7 +1146,8 @@ final class RangeVariable {
         primaryKey   = rangeTable.getPrimaryKey();
 
         if (rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
-            throw new HSQLParseException("VoltDB does not support subqueries, consider using views instead");
+            throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
+                    "VoltDB does not support subqueries, consider using views instead");
         }
 
         // get the index for this scan (/filter)
@@ -1267,4 +1247,5 @@ final class RangeVariable {
         }
         return super.toString() + name;
     }
+    /**********************************************************************/
 }
