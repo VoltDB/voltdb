@@ -115,7 +115,7 @@ public class PerPartitionTable {
 
         Node<E> addLast(E e) {
             final Node<E> l = last;
-            final Node<E> newNode = new Node<>(l, e, null);
+            final Node<E> newNode = new Node<E>(l, e, null);
             last = newNode;
             if (l == null)
                 first = newNode;
