@@ -109,6 +109,7 @@ public:
     uint16_t getUninlinedObjectColumnInfoIndex(const int objectColumnIndex) const;
 
     bool equals(const TupleSchema *other) const;
+    bool isCompatibleForCopy(const TupleSchema *other) const;
 
 private:
     // holds per column info
