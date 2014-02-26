@@ -88,7 +88,10 @@ class VoltBulkLoaderRow {
             if (--batchCnt <= 0) {
                 if (m_tableForClosedBulkLoader.m_partitionQueuedRowCnt.get() >  0) {
                     // A row squeaked through so reinsert this row to repeat the close attempt
-                    m_tableForClosedBulkLoader.drainTableQueue(VoltBulkLoaderRow.this);
+                    try {
+                        m_tableForClosedBulkLoader.drainTableQueue(VoltBulkLoaderRow.this);
+                    }
+                    catch (InterruptedException e) {}
                 }
                 else {
                     m_closeCompleteLatch.countDown();

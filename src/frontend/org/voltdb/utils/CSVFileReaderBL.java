@@ -174,6 +174,9 @@ class CSVFileReaderBL implements Runnable {
             } catch (IOException ex) {
                 m_log.error("Failed to read CSV line from file: " + ex);
                 break;
+            } catch (InterruptedException e) {
+                m_log.error("CSVLoader interrupted: " + e);
+                break;
             }
         }
 

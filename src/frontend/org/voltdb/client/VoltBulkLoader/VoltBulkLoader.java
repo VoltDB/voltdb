@@ -30,10 +30,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterConverter;
-import org.voltdb.TheHashinator;
+import org.voltdb.client.HashinatorLite;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
@@ -148,10 +147,8 @@ public class VoltBulkLoader {
             @Override
             public void clientCallback(ClientResponse response) throws Exception {
                 //one insert at a time callback
-                if (response.getStatus() != ClientResponse.SUCCESS) {
+                if (response.getStatus() != ClientResponse.SUCCESS)
                     m_notificationCallBack.failureCallback(m_row.rowHandle, m_row.objectList, response);
-                    m_log.error(response.getStatusString());
-                }
                 m_loaderCompletedCnt.incrementAndGet();
                 if (m_failedBatchSentRowCnt.decrementAndGet() == 0) {
                     if (m_failedBatchProcessor_cdl != null) {
@@ -170,7 +167,6 @@ public class VoltBulkLoader {
                     currRow = m_failedQueue.take();
                     //If we see a syncRow process the special condition.
                     if (currRow.isNotificationRow()) {
-                        m_log.debug("notificationRow for table " + m_tableName + " received by failure process");
                         assert(m_failedBatchProcessor_cdl == null);
                         BulkLoaderNotification notifier = ((BulkLoaderNotification)currRow.rowHandle);
                         m_failedBatchProcessor_cdl = notifier.getLatch();
@@ -203,37 +199,27 @@ public class VoltBulkLoader {
                                 new PartitionFailureExecuteProcedureCallback(currRow);
                         if (!m_isMP) {
                             Object rpartitionParam =
-                                    TheHashinator.valueToBytes(table.fetchRow(0).get(m_partitionedColumnIndex, m_partitionColumnType));
+                                    HashinatorLite.valueToBytes(table.fetchRow(0).get(m_partitionedColumnIndex, m_partitionColumnType));
                             m_clientImpl.callProcedure(callback, m_procName, rpartitionParam, m_tableName, table);
                         }
                         else
                             m_clientImpl.callProcedure(callback, m_procName, m_tableName, table);
                     } catch (IOException ioex) {
                         //Put this processor in error so we exit
-                        m_log.warn("Fallback to single row inserts failed, failures will not be processed: " + ioex);
                         m_failedQueue.clear();
                         m_failedQueue = null;
                         break;
                     }
                 } catch (InterruptedException ex) {
                     //Put this processor in error so we exit
-                    m_log.debug("Stopped failure processor.");
                     m_failedQueue.clear();
                     m_failedQueue = null;
                     break;
                 }
             }
-            m_log.debug("Done Processing failed bulk rows for table: " + m_tableName);
         }
     }
 
-
-    private static final VoltLogger m_log = new VoltLogger("BULKLOADER");
-    static {
-        // Initialize logger in Partition Processor
-        PartitionProcessor.initializeLogger(m_log);
-        PerPartitionTable.initializeLogger(m_log);
-    }
 
     // Constructor allocated through the Client to ensure consistency of VoltBulkLoaderGlobals
     public VoltBulkLoader(VoltBulkLoaderGlobals vblGlobals, String tableName, int maxBatchSize,
@@ -281,9 +267,6 @@ public class VoltBulkLoader {
                 if (remarks != null && remarks.equalsIgnoreCase("PARTITION_COLUMN")) {
                     m_partitionColumnType = vtype;
                     m_partitionedColumnIndex = idx;
-                    m_log.debug("Table " + tableName + " Partition Column Name is: "
-                            + procInfo.getString("COLUMN_NAME"));
-                    m_log.debug("Table " + tableName + " Partition Column Type is: " + vtype.toString());
                 }
             }
         }
@@ -291,7 +274,6 @@ public class VoltBulkLoader {
 
         if (m_columnCnt == 0) {
             //VoltBulkLoader will exit.
-            m_log.error("Table " + tableName + " Not found");
             throw new Exception("Table Name parameter does not match any known table.");
         }
         m_columnTypes = getColumnTypes();
@@ -332,8 +314,6 @@ public class VoltBulkLoader {
             m_firstPartitionTable = 0;
             m_lastPartitionTable = m_maxPartitionProcessors-2;
             queueDepthMultiplier = Math.max(5, 1000/(m_maxPartitionProcessors-1));
-            m_log.debug("Number of Partitions: " + (m_maxPartitionProcessors-1));
-            m_log.info("Bulk Loader will attempt to load rows in batches of size: " + maxBatchSize);
             m_procName = "@LoadSinglepartitionTable" ;
         }
         else {
@@ -416,7 +396,7 @@ public class VoltBulkLoader {
      * @param caller supplied object used to distinguish failed insert attempts
      * @param list of fields associated with a single row
      */
-    public void insertRow(Object rowHandle, Object... fieldList) {
+    public void insertRow(Object rowHandle, Object... fieldList)  throws InterruptedException {
         int partitionId = 0;
         //Find partition to send this row to and put on correct PerPartitionTable.
         if (fieldList == null || fieldList.length <= 0) {
@@ -425,7 +405,6 @@ public class VoltBulkLoader {
                 errMsg = "Error: insertRow received empty fieldList";
             else
                 errMsg = "Error: insertRow received empty fieldList for row: " + rowHandle.toString();
-            m_log.error(errMsg);
             generateError(rowHandle, fieldList, errMsg);
             return;
         }
@@ -437,7 +416,17 @@ public class VoltBulkLoader {
             else
                 errMsg = "Error: insertRow received incorrect number of columns; " + fieldList.length +
                         " found, " + m_columnCnt + " expected for row: " + rowHandle.toString();
-            m_log.error(errMsg);
+            generateError(rowHandle, fieldList, errMsg);
+            return;
+        }
+        if (fieldList.length != m_columnCnt) {
+            String errMsg;
+            if (rowHandle == null)
+                errMsg = "Error: insertRow received incorrect number of columns; " + fieldList.length +
+                        " found, " + m_columnCnt + " expected";
+            else
+                errMsg = "Error: insertRow received incorrect number of columns; " + fieldList.length +
+                        " found, " + m_columnCnt + " expected for row: " + rowHandle.toString();
             generateError(rowHandle, fieldList, errMsg);
             return;
         }
@@ -451,7 +440,6 @@ public class VoltBulkLoader {
                         m_partitionColumnType.getValue(), fieldList[m_partitionedColumnIndex]);
                 m_partitionTable[partitionId].insertRowInTable(newRow);
             } catch (VoltTypeException e) {
-                m_log.error(e.getMessage());
                 generateError(rowHandle, fieldList, e.getMessage());
                 return;
             }

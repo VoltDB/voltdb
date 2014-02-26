@@ -25,9 +25,8 @@ import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.ParameterConverter;
-import org.voltdb.TheHashinator;
+import org.voltdb.client.HashinatorLite;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
@@ -69,18 +68,12 @@ public class PerPartitionTable {
     final AtomicLong m_partitionQueuedRowCnt = new AtomicLong(0);
     //Size of the batches this table submits (minimum of all values provided by VoltBulkLoaders)
     int m_minBatchTriggerSize;
-    //Shared log.
-    private static VoltLogger m_log;
     //Insert procedure name
     final String m_procName;
     //Name of table
     final String m_tableName;
     //List of callbacks for which we have not seen a response from the client.
     rmLinkedList<PartitionProcedureCallback> m_activeCallbacks = new rmLinkedList<PartitionProcedureCallback>();
-
-    static public void initializeLogger(VoltLogger logger) {
-        m_log = logger;
-    }
 
     // Node wrapping each Client callback that is still outstanding.
     static class Node<E> {
@@ -186,19 +179,14 @@ public class PerPartitionTable {
         public void clientCallback(ClientResponse response) throws Exception {
             m_partitionOutstandingBatchCnt.decrementAndGet();
             if (response.getStatus() != ClientResponse.SUCCESS) {
-                // Batch failed queue it for individual processing and find out which actually m_errored.
-                m_log.info("Unable to insert rows in a batch.  Attempting to insert them one-by-one.");
-                m_log.info("Note: this will result in reduced insertion performance.");
-                m_log.debug("Batch Failed Will be processed by Failure Processor: " + response.getStatusString());
-                // Update statistics for all loaders
+                // Batch failed queue it for individual processing.
                 for (LoaderPair currPair : m_waitingLoaders) {
                     currPair.loader.m_loaderBatchedRowCnt.addAndGet(-1*currPair.rowCnt);
                     currPair.loader.m_failedBatchQueuedRowCnt.addAndGet(currPair.rowCnt);
                     currPair.loader.m_availLoaderPairs.push(currPair);
                 }
-                for (VoltBulkLoaderRow currRow : m_batchRowList) {
+                for (VoltBulkLoaderRow currRow : m_batchRowList)
                     currRow.loader.m_failedQueue.add(currRow);
-                }
             }
             else {
                 // Update statistics for all loaders
@@ -278,19 +266,9 @@ public class PerPartitionTable {
             m_partitionProcessorQueue.add(this);
     }
 
-    synchronized void insertRowInTable(VoltBulkLoaderRow nextRow) {
-        try {
-            if (!m_partitionRowQueue.offer(nextRow)) {
-                m_log.debug("Failed to insert row in table queue, waiting and doing put.");
-                m_partitionRowQueue.put(nextRow);
-            }
-        } catch (InterruptedException e) {
-            if (nextRow.rowHandle == null)
-                m_log.error("Failed to insert row (interrupted)");
-            else
-                m_log.error("Failed to insert row (interrupted): " + nextRow.rowHandle.toString());
-            return;
-        }
+    synchronized void insertRowInTable(VoltBulkLoaderRow nextRow) throws InterruptedException {
+        if (!m_partitionRowQueue.offer(nextRow))
+            m_partitionRowQueue.put(nextRow);
         if (m_partitionQueuedRowCnt.incrementAndGet() % m_minBatchTriggerSize == 0)
             // A sync row will typically cause the table to be split into 2 requests
             m_partitionProcessorQueue.add(this);
@@ -302,19 +280,9 @@ public class PerPartitionTable {
             m_partitionProcessorQueue.add(this);
     }
 
-    synchronized void drainTableQueue(VoltBulkLoaderRow nextRow) {
-        try {
-            if (!m_partitionRowQueue.offer(nextRow)) {
-                m_log.debug("Failed to insert row in table queue, waiting and doing put.");
-                m_partitionRowQueue.put(nextRow);
-            }
-        } catch (InterruptedException e) {
-            if (nextRow.rowHandle == null)
-                m_log.error("Failed to insert row (interrupted)");
-            else
-                m_log.error("Failed to insert row (interrupted): " + nextRow.rowHandle.toString());
-            return;
-        }
+    synchronized void drainTableQueue(VoltBulkLoaderRow nextRow) throws InterruptedException {
+        if (!m_partitionRowQueue.offer(nextRow))
+            m_partitionRowQueue.put(nextRow);
         m_partitionQueuedRowCnt.incrementAndGet();
         m_partitionProcessorQueue.add(this);
     }
@@ -401,8 +369,7 @@ public class PerPartitionTable {
             return;
         }
 
-        Object rpartitionParam =
-                TheHashinator.valueToBytes(table.fetchRow(0).get(
+        Object rpartitionParam = HashinatorLite.valueToBytes(table.fetchRow(0).get(
                 m_partitionedColumnIndex, m_partitionColumnType));
         try {
             m_clientImpl.callProcedure(callback, m_procName, rpartitionParam, m_tableName, table);
