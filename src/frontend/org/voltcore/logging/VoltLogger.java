@@ -110,7 +110,7 @@ public class VoltLogger {
             return;
         }
 
-        if (!m_logger.isEnabledFor(l)) return;
+        if (!m_logger.isEnabledFor(level)) return;
 
         final Thread currentThread = Thread.currentThread();
         final Runnable r = new Runnable() {
