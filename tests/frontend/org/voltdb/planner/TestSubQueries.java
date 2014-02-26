@@ -384,6 +384,47 @@ public class TestSubQueries extends PlannerTestCase {
         checkPredicateComparisonExpression(pn, "R1");
         assertEquals(((SeqScanPlanNode) pn).getInlinePlanNodes().size(), 1);
         assertNotNull(((SeqScanPlanNode) pn).getInlinePlanNode(PlanNodeType.PROJECTION));
+
+
+
+        // Aggregation inside of the from clause
+        pn = compile("select A FROM (SELECT A, SUM(C) FROM R1 WHERE A > 3 GROUP BY A ORDER BY A Limit 3) T1 ");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof SeqScanPlanNode);
+        checkSimpleSubSelects(pn, "T1", "A");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof LimitPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof OrderByPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof HashAggregatePlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof SeqScanPlanNode);
+        checkSimpleSubSelects(pn, "R1", "A", "C");
+
+
+        pn = compile("select SC, SUM(A) as SA FROM (SELECT A, SUM(C) as SC, MAX(D) as MD FROM R1 " +
+                "WHERE A > 3 GROUP BY A ORDER BY A Limit 3) T1  " +
+                "Group by SC");
+
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof HashAggregatePlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof SeqScanPlanNode);
+        checkSimpleSubSelects(pn, "T1", "A", "SC");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof LimitPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof OrderByPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof HashAggregatePlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof SeqScanPlanNode);
+        checkSimpleSubSelects(pn, "R1", "A", "C", "D");
     }
 
     public void testSubSelects_Distributed() {
@@ -431,12 +472,22 @@ public class TestSubQueries extends PlannerTestCase {
     }
 
     public void testTry() {
-                AbstractPlanNode pn;
         //        List<AbstractPlanNode> planNodes;
         //        AbstractPlanNode nlpn;
         //        for (AbstractPlanNode p: planNodes) System.out.println(p.toExplainPlanString());
 
-        pn = compile("select A, C FROM (SELECT A, C FROM R1) T1 order by A ");
+//        List<AbstractPlanNode> planNodes =
+//                compileToFragments("select * from p2, (select * from (SELECT A, D D1 FROM P1 WHERE A=2) T1) T2 where p2.D= T2.D1 ");
+//        assertTrue(planNodes.size() == 2);
+//        for (AbstractPlanNode p: planNodes) System.out.println(p.toExplainPlanString());
+
+        AbstractPlanNode pn;
+//        pn = compileForSinglePartition("select * from p2, (select * from (SELECT A, D D1 FROM P1 WHERE A=2) T1) T2 where p2.D= T2.D1");
+//        System.out.println(pn.toExplainPlanString());
+
+
+        pn = compileForSinglePartition("select A, C FROM (SELECT A FROM R1) T1, (SELECT C FROM P1) T2 " +
+                "WHERE T1.A = T2.C ");
         System.out.println(pn.toExplainPlanString());
     }
 
@@ -458,6 +509,13 @@ public class TestSubQueries extends PlannerTestCase {
                 errorJoinMsg);
         failToCompile("select D1, D2 FROM " +
                 "(SELECT A, D D1 FROM P1) T1, (SELECT A, D D2 FROM P2) T2 WHERE T1.A = 1 AND T2.A = 2", errorJoinMsg);
+
+        failToCompile("select * from p2, (select * from (SELECT A, D D1 FROM P1) T1) T2 where p2.D= T2.D1",
+                errorJoinMsg);
+
+        // FIXME(xin): This should be supported
+        failToCompile("select * from p2, (select * from (SELECT A, D D1 FROM P1 WHERE A=2) T1) T2 where p2.D= T2.D1",
+                errorJoinMsg);
     }
 
     public void testSubSelects_Edge_Cases() {
@@ -611,6 +669,74 @@ public class TestSubQueries extends PlannerTestCase {
         assertTrue(pn instanceof ProjectionPlanNode); // Why projection node here? Incorrect?
         pn = pn.getChild(0);
         checkSimpleSubSelects(pn, "P1", "A", "C");
+
+
+        // This should be a single fragment plan if planner can detect "A = 3".
+        // FIXME(xin)
+        planNodes = compileToFragments("select A, C FROM (SELECT A FROM R1) T1, (SELECT C FROM P1 where A = 3) T2 " +
+                "WHERE T1.A = T2.C ");
+        assertTrue(planNodes.size() == 2); // In future, this should be 1.
+        for (AbstractPlanNode p: planNodes) System.out.println(p.toExplainPlanString());
+
+        pn = planNodes.get(0);
+        assertTrue(pn instanceof SendPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ReceivePlanNode);
+
+        pn = planNodes.get(1);
+        assertTrue(pn instanceof SendPlanNode);
+        nlpn = pn.getChild(0);
+        assertTrue(nlpn instanceof NestLoopPlanNode);
+        pn = nlpn.getChild(0);
+        checkSimpleSubSelects(pn, "T1", "A");
+        pn = pn.getChild(0);
+        checkSimpleSubSelects(pn, "R1", "A");
+        pn = nlpn.getChild(1);
+        checkSimpleSubSelects(pn, "T2", "C");
+        pn = pn.getChild(0);
+        checkIndexedSubSelects(pn, "P1", "SYS_IDX_P1_PK_TREE", "C");
+
+
+        //
+        // compile for single partition
+        //
+
+        pn = compileForSinglePartition("select A, C FROM (SELECT A FROM R1) T1, (SELECT C FROM P1) T2 " +
+                "WHERE T1.A = T2.C ");
+        System.out.println(pn.toExplainPlanString());
+        assertTrue(pn instanceof SendPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        nlpn = pn.getChild(0);
+        assertTrue(nlpn instanceof NestLoopPlanNode);
+        pn = nlpn.getChild(0);
+        checkSimpleSubSelects(pn, "T1", "A");
+        pn = pn.getChild(0);
+        checkSimpleSubSelects(pn, "R1", "A");
+        pn = nlpn.getChild(1);
+        checkSimpleSubSelects(pn, "T2", "C");
+        pn = pn.getChild(0);
+        checkIndexedSubSelects(pn, "P1", "SYS_IDX_P1_PK_TREE", "C");
+
+
+        pn = compileForSinglePartition("select A, C FROM (SELECT A FROM R1) T1, (SELECT C FROM P1 where A=3) T2 " +
+                "WHERE T1.A = T2.C ");
+        System.out.println(pn.toExplainPlanString());
+        assertTrue(pn instanceof SendPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        nlpn = pn.getChild(0);
+        assertTrue(nlpn instanceof NestLoopPlanNode);
+        pn = nlpn.getChild(0);
+        checkSimpleSubSelects(pn, "T1", "A");
+        pn = pn.getChild(0);
+        checkSimpleSubSelects(pn, "R1", "A");
+        pn = nlpn.getChild(1);
+        checkSimpleSubSelects(pn, "T2", "C");
+        pn = pn.getChild(0);
+        checkIndexedSubSelects(pn, "P1", "SYS_IDX_P1_PK_TREE", "C");
     }
 
 
@@ -623,11 +749,6 @@ public class TestSubQueries extends PlannerTestCase {
         pn = compile("select A, C FROM (SELECT A, C FROM R1 UNION SELECT A, C FROM R2 UNION SELECT A, C FROM R3) T1 order by A ");
         System.out.println(pn.toExplainPlanString());
     }
-
-    public void testSubSelects_Indexes() {
-
-    }
-
 
     public void testSubSelects_Parameters() {
         AbstractPlanNode pn = compile("select A1 FROM (SELECT A A1 FROM R1 WHERE A > ?) TEMP WHERE A1 < ?");

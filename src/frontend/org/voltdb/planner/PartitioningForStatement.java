@@ -142,8 +142,8 @@ public class PartitioningForStatement implements Cloneable{
      * @param lockInInferredPartitioningConstant true if MP plans should be automatically optimized for SP where possible
      */
     private PartitioningForStatement(boolean inferPartitioning, boolean forceSP) {
-        m_forceSP = forceSP;
         m_inferPartitioning = inferPartitioning;
+        m_forceSP = forceSP;
     }
 
     public static PartitioningForStatement forceSP() {

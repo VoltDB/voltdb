@@ -93,6 +93,13 @@ public class PlannerTestCase extends TestCase {
         return compileWithJoinOrderToFragments(sql, planForSinglePartitionFalse, noJoinOrder);
     }
 
+    protected List<AbstractPlanNode> compileToFragmentsForSinglePartition(String sql)
+    {
+        boolean planForSinglePartitionFalse = false;
+        return compileWithJoinOrderToFragments(sql, planForSinglePartitionFalse, noJoinOrder);
+    }
+
+
     /** A helper here where the junit test can assert success */
     protected List<AbstractPlanNode> compileWithJoinOrderToFragments(String sql, String joinOrder)
     {
@@ -156,6 +163,22 @@ public class PlannerTestCase extends TestCase {
         // Yes, we ARE assuming that test queries don't contain quoted question marks.
         int paramCount = StringUtils.countMatches(sql, "?");
         return compileSPWithJoinOrder(sql, paramCount, null);
+    }
+
+    /** A helper here where the junit test can assert success */
+    protected AbstractPlanNode compileForSinglePartition(String sql)
+    {
+        // Yes, we ARE assuming that test queries don't contain quoted question marks.
+        int paramCount = StringUtils.countMatches(sql, "?");
+        boolean m_infer = m_byDefaultInferPartitioning;
+        boolean m_forceSP = m_byDefaultInferPartitioning;
+        m_byDefaultInferPartitioning = false;
+        m_byDefaultPlanForSinglePartition = true;
+
+        AbstractPlanNode pn = compileSPWithJoinOrder(sql, paramCount, null);
+        m_byDefaultInferPartitioning = m_infer;
+        m_byDefaultPlanForSinglePartition = m_forceSP;
+        return pn;
     }
 
     /** A helper here where the junit test can assert success */
