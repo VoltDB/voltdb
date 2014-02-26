@@ -332,6 +332,23 @@ public final class CompressionService {
         });
     }
 
+    public static Future<byte[]> compressBBContainerAndDiscard(final BBContainer cont) {
+        return submitCompressionTask(new Callable<byte[]>() {
+                @Override
+                public byte[] call() throws Exception {
+                    try {
+                        if (cont.b.isDirect()) {
+                            return CompressionService.compressBuffer(cont.b);
+                        } else {
+                            return CompressionService.compressBytes(cont.b.array(), cont.b.arrayOffset() + cont.b.position(), cont.b.remaining());
+                        }
+                    } finally {
+                        cont.discard();
+                    }
+                }
+        });
+    }
+
     public static <T> Future<T> submitCompressionTask(Callable<T> task) {
         VoltDBInterface instance = VoltDB.instance();
         if (VoltDB.instance() != null) {
