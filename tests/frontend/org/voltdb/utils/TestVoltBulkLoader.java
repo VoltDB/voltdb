@@ -45,6 +45,29 @@ import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.TimestampType;
 
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2014 VoltDB Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+
 public class TestVoltBulkLoader extends TestCase {
 
     protected String pathToCatalog;
@@ -62,38 +85,38 @@ public class TestVoltBulkLoader extends TestCase {
     Random rnd = new Random(28);
 
     public class TestFailureCallback implements BulkLoaderFailureCallBack {
-    	ArrayList<Integer> failureRows = new ArrayList<Integer>(20);
-		@Override
-		public void failureCallback(Object rowHandle, Object[] fieldList, ClientResponse response) {
-			failureRows.add((Integer)rowHandle);
-		}
-		
-		public boolean failureRowListMatches(ArrayList<Integer> expectedFailureList) {
-		    int i = 0;
-		    int j = 0;
-		    Collections.sort(failureRows);
-		    
-		    boolean success = true;
-		    while (i < failureRows.size() && j < expectedFailureList.size()) {
-		        if (failureRows.get(i) < expectedFailureList.get(j)) {
-		            System.out.println(String.format("The unexpected failure for row %d", failureRows.get(i)));
-		            i++;// Increase I move to next element
-		            success = false;
-		        }
-		        else if (expectedFailureList.get(j) < failureRows.get(i)) {
-		            System.out.println(String.format("The missing expected failure for row %d", failureRows.get(i)));
-		            j++;// Increase J move to next element
-		            success = false;
-		        }
-		        else {
-		            j++;
-		            i++;// If same increase I & J both
-		        }
-		    }
-		    return (success && i==j && i==failureRows.size() && j==expectedFailureList.size());
-		}
-		
-	}
+        ArrayList<Integer> failureRows = new ArrayList<Integer>(20);
+        @Override
+        public void failureCallback(Object rowHandle, Object[] fieldList, ClientResponse response) {
+            failureRows.add((Integer)rowHandle);
+        }
+
+        public boolean failureRowListMatches(ArrayList<Integer> expectedFailureList) {
+            int i = 0;
+            int j = 0;
+            Collections.sort(failureRows);
+
+            boolean success = true;
+            while (i < failureRows.size() && j < expectedFailureList.size()) {
+                if (failureRows.get(i) < expectedFailureList.get(j)) {
+                    System.out.println(String.format("The unexpected failure for row %d", failureRows.get(i)));
+                    i++;// Increase I move to next element
+                    success = false;
+                }
+                else if (expectedFailureList.get(j) < failureRows.get(i)) {
+                    System.out.println(String.format("The missing expected failure for row %d", failureRows.get(i)));
+                    j++;// Increase J move to next element
+                    success = false;
+                }
+                else {
+                    j++;
+                    i++;// If same increase I & J both
+                }
+            }
+            return (success && i==j && i==failureRows.size() && j==expectedFailureList.size());
+        }
+
+    }
 
     public void prepare() {
         if (!reportDir.endsWith("/"))
@@ -135,7 +158,7 @@ public class TestVoltBulkLoader extends TestCase {
         int myBatchSize = 200;
         TimestampType currentTime = new TimestampType();
         Object [][]myData = {
-        	{1 ,1,1,11111111,"first",1.10,1.11,currentTime},
+            {1 ,1,1,11111111,"first",1.10,1.11,currentTime},
             {2,2,2,222222,"second",3.30,"NULL",currentTime},
             {3,3,3,333333," third ",null,3.33,currentTime},
             {4,4,4,444444," NULL ",4.40 ,4.44,currentTime},
@@ -306,7 +329,7 @@ public class TestVoltBulkLoader extends TestCase {
         int myBatchSize = 200;
         //Both \N and \\N as csv input are treated as NULL
         Object [][]myData = {
-        	{1,Constants.CSV_NULL,1,11111111,null,1.10,1.11},
+            {1,Constants.CSV_NULL,1,11111111,null,1.10,1.11},
             {2,Constants.QUOTED_CSV_NULL,1,11111111,null,1.10,1.11},
             {3,Constants.CSV_NULL,1,11111111,"  \\" + Constants.CSV_NULL + "  ",1.10,1.11},
             {4,Constants.CSV_NULL,1,11111111,"  " + Constants.QUOTED_CSV_NULL + "  ",1.10,1.11},
@@ -422,9 +445,9 @@ public class TestVoltBulkLoader extends TestCase {
         int myBatchSize = 200;
 
         Object [][]myData = {
-        	{"~\"escapequotes",1,1,1},
-        	{"~\\nescapenewline",2,2,2},
-        	{"~'escapeprimesymbol",3,3,3}
+            {"~\"escapequotes",1,1,1},
+            {"~\\nescapenewline",2,2,2},
+            {"~'escapeprimesymbol",3,3,3}
         };
         Integer[] failures = {};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
@@ -443,10 +466,10 @@ public class TestVoltBulkLoader extends TestCase {
         int myBatchSize = 200;
 
         Object [][]myData = {
-        	{"nospace",1,1,1},
-        	{"   frontspace",2,2,2},
-        	{"rearspace   ",3,3,3},
-        	{"\" inquotespace \"   ",4,4,4}
+            {"nospace",1,1,1},
+            {"   frontspace",2,2,2},
+            {"rearspace   ",3,3,3},
+            {"\" inquotespace \"   ",4,4,4}
         };
         Integer[] failures = {};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
@@ -463,12 +486,12 @@ public class TestVoltBulkLoader extends TestCase {
                         "clm_smallint smallint default 0, " +
                         "); ";
         int myBatchSize = 200;
-        
+
         Object [][]myData = {
-        	{"\"openquote",1,1,1},
-        	{"second",2,2,2},
-        	{"third",3,3,3},
-        	{"123456789012345678901",4,4,4}
+            {"\"openquote",1,1,1},
+            {"second",2,2,2},
+            {"third",3,3,3},
+            {"123456789012345678901",4,4,4}
         };
         Integer[] failures = {4};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
@@ -510,7 +533,7 @@ public class TestVoltBulkLoader extends TestCase {
                 + "clm_timestamp timestamp default null, "
                 + "PRIMARY KEY(clm_integer) "
                 + "); "
-                
+
                 + "create table BLAH2 ("
                 + "clm_integer integer not null, "
                 + // column that is partitioned on
@@ -564,8 +587,8 @@ public class TestVoltBulkLoader extends TestCase {
         Integer[] failures2 = {};
         ArrayList<Integer> expectedFailures2 = new ArrayList<Integer>(Arrays.asList(failures2));
         test_multiplexing( mySchema, true, true, true,
-        		"BLAH", myData1, myBatchSize1, expectedFailures1, false,
-        		"BLAH2", myData2, myBatchSize2, expectedFailures2, false);
+                "BLAH", myData1, myBatchSize1, expectedFailures1, false,
+                "BLAH2", myData2, myBatchSize2, expectedFailures2, false);
     }
 
     //Test multiple tables with no errors (MultiPartition).
@@ -583,7 +606,7 @@ public class TestVoltBulkLoader extends TestCase {
                 + "clm_timestamp timestamp default null, "
                 + "PRIMARY KEY(clm_integer) "
                 + "); "
-                
+
                 + "create table BLAH2 ("
                 + "clm_integer integer not null, "
                 + // column that is partitioned on
@@ -637,8 +660,8 @@ public class TestVoltBulkLoader extends TestCase {
         Integer[] failures2 = {};
         ArrayList<Integer> expectedFailures2 = new ArrayList<Integer>(Arrays.asList(failures2));
         test_multiplexing( mySchema, true, true, true,
-        		"BLAH", myData1, myBatchSize1, expectedFailures1, false,
-        		"BLAH2", myData2, myBatchSize2, expectedFailures2, false);
+                "BLAH", myData1, myBatchSize1, expectedFailures1, false,
+                "BLAH2", myData2, myBatchSize2, expectedFailures2, false);
     }
 
     //Test single table with multiple clients.
@@ -704,10 +727,10 @@ public class TestVoltBulkLoader extends TestCase {
         Integer[] failures2 = {};
         ArrayList<Integer> expectedFailures2 = new ArrayList<Integer>(Arrays.asList(failures2));
         test_multiplexing( mySchema, true, true, false,
-        		"BLAH", myData1, myBatchSize1, expectedFailures1, false,
-        		"BLAH", myData2, myBatchSize2, expectedFailures2, false);
+                "BLAH", myData1, myBatchSize1, expectedFailures1, false,
+                "BLAH", myData2, myBatchSize2, expectedFailures2, false);
     }
-    
+
     //Test single tables with multiple loaders.
     public void testSingleTableOnMultipleLoaders() throws Exception {
         String mySchema =
@@ -771,10 +794,10 @@ public class TestVoltBulkLoader extends TestCase {
         Integer[] failures2 = {};
         ArrayList<Integer> expectedFailures2 = new ArrayList<Integer>(Arrays.asList(failures2));
         test_multiplexing( mySchema, false, true, false,
-        		"BLAH", myData1, myBatchSize1, expectedFailures1, false,
-        		"BLAH", myData2, myBatchSize2, expectedFailures2, false);
+                "BLAH", myData1, myBatchSize1, expectedFailures1, false,
+                "BLAH", myData2, myBatchSize2, expectedFailures2, false);
     }
-    
+
     //Test single tables with multiple loaders.
     public void testSingleTableOnMultipleLoadersWithAbort() throws Exception {
         String mySchema =
@@ -838,10 +861,10 @@ public class TestVoltBulkLoader extends TestCase {
         Integer[] failures2 = {};
         ArrayList<Integer> expectedFailures2 = new ArrayList<Integer>(Arrays.asList(failures2));
         test_multiplexing( mySchema, false, true, false,
-        		"BLAH", myData1, myBatchSize1, expectedFailures1, true,
-        		"BLAH", myData2, myBatchSize2, expectedFailures2, false);
+                "BLAH", myData1, myBatchSize1, expectedFailures1, true,
+                "BLAH", myData2, myBatchSize2, expectedFailures2, false);
     }
-    
+
     //Test single table with single loader.
     public void testSingleTableOnSingleLoader() throws Exception {
         String mySchema =
@@ -905,10 +928,10 @@ public class TestVoltBulkLoader extends TestCase {
         Integer[] failures2 = {};
         ArrayList<Integer> expectedFailures2 = new ArrayList<Integer>(Arrays.asList(failures2));
         test_multiplexing( mySchema, false, false, false,
-        		"BLAH", myData1, myBatchSize1, expectedFailures1, false,
-        		"BLAH", myData2, myBatchSize2, expectedFailures2, false);
+                "BLAH", myData1, myBatchSize1, expectedFailures1, false,
+                "BLAH", myData2, myBatchSize2, expectedFailures2, false);
     }
-    
+
     //Test single table with single loader (MultiPartition).
     public void testSingleTableOnSingleLoaderMP() throws Exception {
         String mySchema =
@@ -972,10 +995,10 @@ public class TestVoltBulkLoader extends TestCase {
         Integer[] failures2 = {};
         ArrayList<Integer> expectedFailures2 = new ArrayList<Integer>(Arrays.asList(failures2));
         test_multiplexing( mySchema, false, false, true,
-        		"BLAH", myData1, myBatchSize1, expectedFailures1, false,
-        		"BLAH", myData2, myBatchSize2, expectedFailures2, false);
+                "BLAH", myData1, myBatchSize1, expectedFailures1, false,
+                "BLAH", myData2, myBatchSize2, expectedFailures2, false);
     }
-   
+
     public void test_Interface( String my_schema, Object[][] my_data, int my_batchSize,  ArrayList<Integer> expectedFailList) throws Exception {
         try{
             pathToCatalog = Configuration.getPathToCatalogForTest("vbl.jar");
@@ -1017,31 +1040,31 @@ public class TestVoltBulkLoader extends TestCase {
                 assertEquals(miscnt, 0);
             }
 
-        	int rowCnt=1;
+            int rowCnt=1;
             try{
-            	for (Object[] nextRow : my_data) {
-            		Integer rowId = new Integer(rowCnt);
-            		bulkLoader.insertRow(rowId, nextRow);
-            		rowCnt++;
-            		if (rnd.nextInt() % 30 == 0)
-            			//  Randomly inject a flush
-            			bulkLoader.flush();
-            	}
+                for (Object[] nextRow : my_data) {
+                    Integer rowId = new Integer(rowCnt);
+                    bulkLoader.insertRow(rowId, nextRow);
+                    rowCnt++;
+                    if (rnd.nextInt() % 30 == 0)
+                        //  Randomly inject a flush
+                        bulkLoader.flush();
+                }
             }
             catch( Exception e) {
                 System.err.print( e.getMessage() );
             }
             System.out.println(String.format("Attempted inserting %d rows", --rowCnt));
-            
+
             if (rnd.nextBoolean()) {
-            	// One in 10 tests generate a sync and VoltBulkLoader internal state verification
-            	bulkLoader.drain();
-            	assert(bulkLoader.getOutstandingRowCount() == 0);
-            	assert(bulkLoader.getCompletedRowCount() == rowCnt);
+                // One in 10 tests generate a sync and VoltBulkLoader internal state verification
+                bulkLoader.drain();
+                assert(bulkLoader.getOutstandingRowCount() == 0);
+                assert(bulkLoader.getCompletedRowCount() == rowCnt);
             }
-            
+
             bulkLoader.close();
-        	assert(bulkLoader.getCompletedRowCount() == rowCnt);
+            assert(bulkLoader.getCompletedRowCount() == rowCnt);
             assert(testCallback.failureRowListMatches(expectedFailList));
         }
         finally {
@@ -1061,8 +1084,8 @@ public class TestVoltBulkLoader extends TestCase {
 
 
     public void test_multiplexing( String my_schema, boolean multipleClients, boolean multipleLoaders, boolean multiPartTable,
-    		String my_tableName1, Object[][] my_data1, int my_batchSize1, ArrayList<Integer> expectedFailList1, boolean abort1,
-    		String my_tableName2, Object[][] my_data2, int my_batchSize2, ArrayList<Integer> expectedFailList2, boolean abort2) throws Exception {
+            String my_tableName1, Object[][] my_data1, int my_batchSize1, ArrayList<Integer> expectedFailList1, boolean abort1,
+            String my_tableName2, Object[][] my_data2, int my_batchSize2, ArrayList<Integer> expectedFailList2, boolean abort2) throws Exception {
         try{
             pathToCatalog = Configuration.getPathToCatalogForTest("vbl.jar");
             pathToDeployment = Configuration.getPathToCatalogForTest("vbl.xml");
@@ -1072,13 +1095,13 @@ public class TestVoltBulkLoader extends TestCase {
             boolean sameTable = my_tableName1.equals(my_tableName2);
             assert(!(abort1 && abort2));
             if (abort1 || abort2)
-            	// No point in testing abort with a single loader
-            	assert(multipleLoaders);
-            
+                // No point in testing abort with a single loader
+                assert(multipleLoaders);
+
             if (!multiPartTable) {
-            	builder.addPartitionInfo(my_tableName1, "clm_integer");
-            	if (!sameTable)
-            		builder.addPartitionInfo(my_tableName2, "clm_integer");
+                builder.addPartitionInfo(my_tableName1, "clm_integer");
+                if (!sameTable)
+                    builder.addPartitionInfo(my_tableName2, "clm_integer");
             }
             boolean success = builder.compile(pathToCatalog, 2, 1, 0);
             assertTrue(success);
@@ -1103,30 +1126,30 @@ public class TestVoltBulkLoader extends TestCase {
                 multipleLoaders = true;
             }
             else
-            	client2 = client1;
+                client2 = client1;
 
             prepare();
             TestFailureCallback testCallback1 = new TestFailureCallback();
             TestFailureCallback testCallback2 = new TestFailureCallback();
-            
+
             VoltBulkLoader bulkLoader1 = client1.getNewBulkLoader(my_tableName1, my_batchSize1, testCallback1);
             VoltBulkLoader bulkLoader2;
             if (multipleLoaders) {
-            	bulkLoader2 = client2.getNewBulkLoader(my_tableName2, my_batchSize2, testCallback2);
-            	if (!multipleClients && sameTable) {
-            		assert(bulkLoader1.getMaxBatchSize() == Math.min(my_batchSize1, my_batchSize2));
-            		assert(bulkLoader1.getMaxBatchSize() == bulkLoader2.getMaxBatchSize());
-            	}
+                bulkLoader2 = client2.getNewBulkLoader(my_tableName2, my_batchSize2, testCallback2);
+                if (!multipleClients && sameTable) {
+                    assert(bulkLoader1.getMaxBatchSize() == Math.min(my_batchSize1, my_batchSize2));
+                    assert(bulkLoader1.getMaxBatchSize() == bulkLoader2.getMaxBatchSize());
+                }
             }
             else
-            	bulkLoader2 = bulkLoader1;
-            	
+                bulkLoader2 = bulkLoader1;
+
             // do the test
 
             VoltTable modCount1;
             modCount1 = client1.callProcedure("@AdHoc", "SELECT * FROM " + my_tableName1 + ";").getResults()[0];
             System.out.println("data inserted to table " + my_tableName1 + ":\n" + modCount1);
-            
+
             // Call validate partitioning to check if we are good.
             VoltTable valTable1;
             valTable1 = client1.callProcedure("@ValidatePartitioning", null, null).getResults()[0];
@@ -1135,12 +1158,12 @@ public class TestVoltBulkLoader extends TestCase {
                 long miscnt = valTable1.getLong("MISPARTITIONED_ROWS");
                 assertEquals(miscnt, 0);
             }
-            
+
             if (multipleClients) {
                 VoltTable modCount2;
                 modCount2 = client2.callProcedure("@AdHoc", "SELECT * FROM " + my_tableName2 + ";").getResults()[0];
                 System.out.println("data inserted to table " + my_tableName2 + ":\n" + modCount2);
-                
+
                 // Call validate partitioning to check if we are good.
                 VoltTable valTable2;
                 valTable2 = client2.callProcedure("@ValidatePartitioning", null, null).getResults()[0];
@@ -1151,68 +1174,68 @@ public class TestVoltBulkLoader extends TestCase {
                 }
             }
 
-        	int rowCnt1=1;
-        	int rowCnt2=1;
+            int rowCnt1=1;
+            int rowCnt2=1;
             try{
-    		    while (rowCnt1 <= my_data1.length || rowCnt2 <= my_data2.length) {
-    		    	if (rowCnt1 <= my_data1.length) {
-                		Integer rowId = new Integer(rowCnt1);
-                		bulkLoader1.insertRow(rowId, my_data1[rowCnt1-1]);
-                		rowCnt1++;
-//                		if (rnd.nextInt() % 30 == 0)
-//                			//  Randomly inject a flush
-//                			bulkLoader1.flush();
-    		    	}
-    		    	if (rowCnt2 <= my_data2.length) {
-                		Integer rowId = new Integer(rowCnt2);
-                		bulkLoader2.insertRow(rowId, my_data2[rowCnt2-1]);
-                		rowCnt2++;
-//                		if (rnd.nextInt() % 30 == 0)
-//                			//  Randomly inject a flush
-//                			bulkLoader2.flush();
-    		    	}
-    		    }
+                while (rowCnt1 <= my_data1.length || rowCnt2 <= my_data2.length) {
+                    if (rowCnt1 <= my_data1.length) {
+                        Integer rowId = new Integer(rowCnt1);
+                        bulkLoader1.insertRow(rowId, my_data1[rowCnt1-1]);
+                        rowCnt1++;
+//                      if (rnd.nextInt() % 30 == 0)
+//                          //  Randomly inject a flush
+//                          bulkLoader1.flush();
+                    }
+                    if (rowCnt2 <= my_data2.length) {
+                        Integer rowId = new Integer(rowCnt2);
+                        bulkLoader2.insertRow(rowId, my_data2[rowCnt2-1]);
+                        rowCnt2++;
+//                      if (rnd.nextInt() % 30 == 0)
+//                          //  Randomly inject a flush
+//                          bulkLoader2.flush();
+                    }
+                }
             }
             catch( Exception e) {
                 System.err.print( e.getMessage() );
             }
             System.out.println(String.format("Attempted inserting %d rows in Table %s and %d rows in Table %s",
-            		--rowCnt1, my_tableName1, --rowCnt2, my_tableName2));
+                    --rowCnt1, my_tableName1, --rowCnt2, my_tableName2));
 
             if (abort1) {
-            	bulkLoader1.abort();
+                bulkLoader1.abort();
             }
             else
             if (abort2)
-            	bulkLoader2.abort();
-            
+                bulkLoader2.abort();
+
             if (!abort1 && rnd.nextInt() % 4 == 0) {
-            	// One in 4 tests generate a sync and VoltBulkLoader internal state verification
-            	bulkLoader1.drain();
-            	assert(bulkLoader1.getOutstandingRowCount() == 0);
-            	assert(bulkLoader1.getCompletedRowCount() == rowCnt1);
+                // One in 4 tests generate a sync and VoltBulkLoader internal state verification
+                bulkLoader1.drain();
+                assert(bulkLoader1.getOutstandingRowCount() == 0);
+                assert(bulkLoader1.getCompletedRowCount() == rowCnt1);
             }
             if (multipleLoaders && !abort2 && rnd.nextInt() % 4 == 0) {
-            	bulkLoader2.drain();
-            	assert(bulkLoader2.getOutstandingRowCount() == 0);
-            	assert(bulkLoader2.getCompletedRowCount() == rowCnt2);
+                bulkLoader2.drain();
+                assert(bulkLoader2.getOutstandingRowCount() == 0);
+                assert(bulkLoader2.getCompletedRowCount() == rowCnt2);
             }
-            
+
             bulkLoader1.close();
             if (multipleLoaders)
-            	bulkLoader2.close();
+                bulkLoader2.close();
             assert(abort1 || testCallback1.failureRowListMatches(expectedFailList1));
             assert(abort2 || testCallback2.failureRowListMatches(expectedFailList2));
         }
         finally {
             if (client1 != null) {
-            	client1.close();
+                client1.close();
                 if (multipleClients && client2 != null) {
-                	client2.close();
+                    client2.close();
                     client2 = null;
                 }
                 client1 = null;
-           	}
+            }
 
             if (localServer != null) {
                 localServer.shutdown();

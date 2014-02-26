@@ -1,3 +1,20 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2014 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package org.voltdb.client.VoltBulkLoader;
 
 import java.util.concurrent.CountDownLatch;
@@ -10,8 +27,8 @@ import org.voltcore.logging.VoltLogger;
  * Process partition specific data. If the table is not partitioned only one instance of this processor will be used
  */
 public class PartitionProcessor implements Runnable {
-	// Global object used for testing when to exit the thread
-	final VoltBulkLoaderGlobals m_vblGlobals;
+    // Global object used for testing when to exit the thread
+    final VoltBulkLoaderGlobals m_vblGlobals;
     //Partition for which this processor thread is processing.
     final int m_partitionId;
     //This is just so we can identity thread name and log information.
@@ -27,22 +44,22 @@ public class PartitionProcessor implements Runnable {
     final boolean m_isMP;
 
     static public void initializeLogger(VoltLogger logger) {
-    	m_log = logger;
+        m_log = logger;
     }
-    
+
     public PartitionProcessor(int partitionId, boolean isMP, VoltBulkLoaderGlobals vblGlobals) {
         m_partitionId = partitionId;
-    	m_vblGlobals = vblGlobals;
-        if (isMP) { 
-        	m_processorName = "MP-PartitionProcessor";
+        m_vblGlobals = vblGlobals;
+        if (isMP) {
+            m_processorName = "MP-PartitionProcessor";
         }
         else {
-        	m_processorName = "PartitionProcessor-" + partitionId;
+            m_processorName = "PartitionProcessor-" + partitionId;
         }
-       	
-    	m_PendingTables = new LinkedBlockingQueue<PerPartitionTable>();
-    	m_isMP = isMP;
-    	m_processor_cdl = m_vblGlobals.m_processor_cdl;
+
+        m_PendingTables = new LinkedBlockingQueue<PerPartitionTable>();
+        m_isMP = isMP;
+        m_processor_cdl = m_vblGlobals.m_processor_cdl;
    }
 
     //This is to keep track of when to report how many rows inserted, shared by all processors.
@@ -50,29 +67,29 @@ public class PartitionProcessor implements Runnable {
 
     // while there are pending tables m_shutdownPartitionProcessors is false keep inserting bulk tables.
     private void processLoadTable() {
-    	PerPartitionTable nextPartitionTable;
-    	if (m_isMP) {
-        	try {
-        		while (true) {
-    				nextPartitionTable = m_PendingTables.take();
-    				if (m_vblGlobals.m_shutdownPartitionProcessors)
-    					break;
-    				nextPartitionTable.processMpNextTable();
-        		}
-    		} catch (InterruptedException e) {
+        PerPartitionTable nextPartitionTable;
+        if (m_isMP) {
+            try {
+                while (true) {
+                    nextPartitionTable = m_PendingTables.take();
+                    if (m_vblGlobals.m_shutdownPartitionProcessors)
+                        break;
+                    nextPartitionTable.processMpNextTable();
+                }
+            } catch (InterruptedException e) {
             }
-    	}
-    	else {
-        	try {
-        		while (true) {
-    				nextPartitionTable = m_PendingTables.take();
-    				if (m_vblGlobals.m_shutdownPartitionProcessors)
-    					break;
-    				nextPartitionTable.processSpNextTable();
-    			}
-    		} catch (InterruptedException e) {
+        }
+        else {
+            try {
+                while (true) {
+                    nextPartitionTable = m_PendingTables.take();
+                    if (m_vblGlobals.m_shutdownPartitionProcessors)
+                        break;
+                    nextPartitionTable.processSpNextTable();
+                }
+            } catch (InterruptedException e) {
             }
-    	}
+        }
     }
 
 
@@ -81,11 +98,11 @@ public class PartitionProcessor implements Runnable {
 
         try {
             //Process the Partition queue.
-      		processLoadTable();
+            processLoadTable();
 
-      		m_PendingTables.clear();
+            m_PendingTables.clear();
         } finally {
-        	m_processor_cdl.countDown();
+            m_processor_cdl.countDown();
             m_log.debug("Done Processing partition: " + m_partitionId);
         }
     }

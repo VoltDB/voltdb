@@ -295,12 +295,12 @@ public interface Client {
      * @throws IOException on any file write error.
      */
     public void writeSummaryCSV(ClientStats stats, String path) throws IOException;
-    
+
     /**
-     * <p>Create a new VoltBulkLoader.</p>
-     *
-     * <p>This is a synchronous operation.</p>
-     *
+     * <p>Creates a new instance of a VoltBulkLoader that is bound to this Client.
+     * Multiple instances of a VoltBulkLoader created by a single Client will share some
+     * resources, particularly if they are inserting into the same table.</p>
+     * 
      * @param name of table that bulk inserts are to be applied to.
      * @param number of rows to collect for the table before starting a bulk insert.
      * @param user defined callback procedure used for notification of failed inserts.

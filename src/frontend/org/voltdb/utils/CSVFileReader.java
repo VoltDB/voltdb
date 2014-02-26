@@ -104,8 +104,8 @@ class CSVFileReader implements Runnable {
             return false;
         }
         return true;
-	}
-    
+    }
+
     //Callback for single row procedure invoke called for rows in failed batch.
     public class PartitionSingleExecuteProcedureCallback implements ProcedureCallback {
         final CSVLineWithMetaData m_csvLine;
@@ -126,7 +126,7 @@ class CSVFileReader implements Runnable {
                 }
                 String[] info = {m_csvLine.rawLine.toString(), response.getStatusString()};
                 if (synchronizeErrorInfo(m_csvLine.lineNumber, info)) {
-                	m_errored = true;
+                    m_errored = true;
                     return;
                 }
                 m_log.error(response.getStatusString());
@@ -177,7 +177,7 @@ class CSVFileReader implements Runnable {
                     break;
                 }
                 m_totalRowCount.incrementAndGet();
-            	int currLineNumber = m_listReader.getLineNumber();
+                int currLineNumber = m_listReader.getLineNumber();
 
                 String[] correctedLine = lineList.toArray(new String[lineList.size()]);
 
@@ -192,13 +192,13 @@ class CSVFileReader implements Runnable {
                 }
 
                 CSVLineWithMetaData lineData = new CSVLineWithMetaData(correctedLine, lineList,
-                		currLineNumber);
+                        currLineNumber);
 
                 try {
                     PartitionSingleExecuteProcedureCallback cbmt =
                             new PartitionSingleExecuteProcedureCallback(lineData);
                     if (m_csvClient.callProcedure(cbmt, m_insertProcedure, (Object[]) correctedLine)) {
-                    	m_processedCount.incrementAndGet();
+                        m_processedCount.incrementAndGet();
                     } else {
                         m_log.fatal("Failed to send CSV insert to VoltDB cluster.");
                         System.exit(1);

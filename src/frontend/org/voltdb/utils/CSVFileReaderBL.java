@@ -58,34 +58,34 @@ class CSVFileReaderBL implements Runnable {
     VoltType[] m_columnTypes;
     int m_columnCount;
     final AtomicLong m_failedInsertCount = new AtomicLong(0);
-    
-    static {
-    	m_blankStrings.put(VoltType.NUMERIC, "0");
-    	m_blankStrings.put(VoltType.TINYINT, "0");
-    	m_blankStrings.put(VoltType.SMALLINT, "0");
-    	m_blankStrings.put(VoltType.INTEGER, "0");
-    	m_blankStrings.put(VoltType.BIGINT, "0");
-    	m_blankStrings.put(VoltType.FLOAT, "0.0");
-    	m_blankStrings.put(VoltType.TIMESTAMP, null);
-    	m_blankStrings.put(VoltType.STRING, "");
-    	m_blankStrings.put(VoltType.DECIMAL, "0");
-    	m_blankStrings.put(VoltType.VARBINARY, "");
 
-//    	m_blankValues.put(VoltType.NUMERIC, VoltType.NUMERIC.getNullValue());
-    	m_blankValues.put(VoltType.TINYINT, VoltType.TINYINT.getNullValue());
-    	m_blankValues.put(VoltType.SMALLINT, VoltType.SMALLINT.getNullValue());
-    	m_blankValues.put(VoltType.INTEGER, VoltType.INTEGER.getNullValue());
-    	m_blankValues.put(VoltType.BIGINT, VoltType.BIGINT.getNullValue());
-    	m_blankValues.put(VoltType.FLOAT, VoltType.FLOAT.getNullValue());
-    	m_blankValues.put(VoltType.TIMESTAMP, VoltType.TIMESTAMP.getNullValue());
-    	m_blankValues.put(VoltType.STRING, VoltType.STRING.getNullValue());
-    	m_blankValues.put(VoltType.DECIMAL, VoltType.DECIMAL.getNullValue());
-    	m_blankValues.put(VoltType.VARBINARY, VoltType.VARBINARY.getNullValue());
+    static {
+        m_blankStrings.put(VoltType.NUMERIC, "0");
+        m_blankStrings.put(VoltType.TINYINT, "0");
+        m_blankStrings.put(VoltType.SMALLINT, "0");
+        m_blankStrings.put(VoltType.INTEGER, "0");
+        m_blankStrings.put(VoltType.BIGINT, "0");
+        m_blankStrings.put(VoltType.FLOAT, "0.0");
+        m_blankStrings.put(VoltType.TIMESTAMP, null);
+        m_blankStrings.put(VoltType.STRING, "");
+        m_blankStrings.put(VoltType.DECIMAL, "0");
+        m_blankStrings.put(VoltType.VARBINARY, "");
+
+//      m_blankValues.put(VoltType.NUMERIC, VoltType.NUMERIC.getNullValue());
+        m_blankValues.put(VoltType.TINYINT, VoltType.TINYINT.getNullValue());
+        m_blankValues.put(VoltType.SMALLINT, VoltType.SMALLINT.getNullValue());
+        m_blankValues.put(VoltType.INTEGER, VoltType.INTEGER.getNullValue());
+        m_blankValues.put(VoltType.BIGINT, VoltType.BIGINT.getNullValue());
+        m_blankValues.put(VoltType.FLOAT, VoltType.FLOAT.getNullValue());
+        m_blankValues.put(VoltType.TIMESTAMP, VoltType.TIMESTAMP.getNullValue());
+        m_blankValues.put(VoltType.STRING, VoltType.STRING.getNullValue());
+        m_blankValues.put(VoltType.DECIMAL, VoltType.DECIMAL.getNullValue());
+        m_blankValues.put(VoltType.VARBINARY, VoltType.VARBINARY.getNullValue());
     }
-    
+
     //Errors we keep track only upto maxerrors
     final static Map<Long, String[]> m_errorInfo = new TreeMap<Long, String[]>();
-    
+
     public static void initializeReader(CSVLoader.CSVConfig config, Client csvClient, ICsvListReader reader) {
         m_config = config;
         m_csvClient = csvClient;
@@ -93,14 +93,14 @@ class CSVFileReaderBL implements Runnable {
     }
 
     public class csvFailureCallback implements BulkLoaderFailureCallBack {
-		@Override
-		public void failureCallback(Object rowHandle, Object[] fieldList, ClientResponse response) {
-			m_failedInsertCount.incrementAndGet();
-			CSVLineWithMetaData lineData = (CSVLineWithMetaData) rowHandle;
+        @Override
+        public void failureCallback(Object rowHandle, Object[] fieldList, ClientResponse response) {
+            m_failedInsertCount.incrementAndGet();
+            CSVLineWithMetaData lineData = (CSVLineWithMetaData) rowHandle;
             String[] info = {lineData.rawLine.toString(), response.getStatusString()};
-			synchronizeErrorInfo(lineData.lineNumber, info);
-		}
-	}
+            synchronizeErrorInfo(lineData.lineNumber, info);
+        }
+    }
 
     @Override
     public void run() {
@@ -109,7 +109,7 @@ class CSVFileReaderBL implements Runnable {
 
         csvFailureCallback errorCB = new csvFailureCallback();
         try {
-        	bulkLoader = clientImpl.getNewBulkLoader(m_config.table, m_config.batch, errorCB);
+            bulkLoader = clientImpl.getNewBulkLoader(m_config.table, m_config.batch, errorCB);
         }
         catch (Exception e) {
             m_log.info("CSV Loader failed: " + e.getMessage());
@@ -146,7 +146,7 @@ class CSVFileReaderBL implements Runnable {
                 String[] correctedLine = lineList.toArray(new String[lineList.size()]);
 
                 if (correctedLine == null || correctedLine.length <= 0) {
-                	continue;
+                    continue;
                 }
                 Object row_args[] = new Object[correctedLine.length];
                 String lineCheckResult;
@@ -161,7 +161,7 @@ class CSVFileReaderBL implements Runnable {
 
                 // TODO: since we don't deal with failure retries anymore, don't pass correctedLine
                 CSVLineWithMetaData lineData = new CSVLineWithMetaData(correctedLine, lineList,
-                		m_listReader.getLineNumber());
+                        m_listReader.getLineNumber());
                 bulkLoader.insertRow(lineData, row_args);
             } catch (SuperCsvException e) {
                 //Catch rows that can not be read by superCSV m_listReader.
@@ -246,13 +246,13 @@ class CSVFileReaderBL implements Runnable {
                     row_args[i] = m_blankValues.get(m_columnTypes[i]);
                 }
                 else {
-                	try {
-	                    final VoltType type = m_columnTypes[i];
-	                    row_args[i] = ParameterConverter.tryToMakeCompatible(type.classFromType(), slot[i]);
-                	}
-                	catch (VoltTypeException e) {
-                		return e.getMessage();
-                	}
+                    try {
+                        final VoltType type = m_columnTypes[i];
+                        row_args[i] = ParameterConverter.tryToMakeCompatible(type.classFromType(), slot[i]);
+                    }
+                    catch (VoltTypeException e) {
+                        return e.getMessage();
+                    }
                 }
             }
         }

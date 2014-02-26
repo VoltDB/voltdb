@@ -283,54 +283,54 @@ public class CSVLoader {
             long insertCount;
             long ackCount;
             long rowsQueued;
-            
+
             if (config.useSuppliedProcedure) {
-	            if (!CSVFileReader.initializeReader(cfg, csvClient, listReader)) {
-	                System.exit(-1);
-	            }
-		
-	            CSVFileReader csvReader = new CSVFileReader();
-	            Thread readerThread = new Thread(csvReader);
-	            readerThread.setName("CSVFileReader");
-	            readerThread.setDaemon(true);
-	
-	            readerThread.start();
-	            readerThread.join();
-	
-	            readerTime = (csvReader.m_parsingTime) / 1000000;
-	
-	            insertTimeEnd = System.currentTimeMillis();
-	
-	            csvClient.drain();
-	            csvClient.close();
-	            insertCount = csvReader.m_processedCount.get();
-	            ackCount = csvReader.m_acknowledgedCount.get();
-	            rowsQueued = CSVFileReader.m_totalRowCount.get();
+                if (!CSVFileReader.initializeReader(cfg, csvClient, listReader)) {
+                    System.exit(-1);
+                }
+
+                CSVFileReader csvReader = new CSVFileReader();
+                Thread readerThread = new Thread(csvReader);
+                readerThread.setName("CSVFileReader");
+                readerThread.setDaemon(true);
+
+                readerThread.start();
+                readerThread.join();
+
+                readerTime = (csvReader.m_parsingTime) / 1000000;
+
+                insertTimeEnd = System.currentTimeMillis();
+
+                csvClient.drain();
+                csvClient.close();
+                insertCount = csvReader.m_processedCount.get();
+                ackCount = csvReader.m_acknowledgedCount.get();
+                rowsQueued = CSVFileReader.m_totalRowCount.get();
             }
             else {
-            	//CSVFileReaderBL.initializeReader(cfg, csvClient, listReader);
-            	CSVFileReaderBL.m_config = cfg;
-            	CSVFileReaderBL.m_csvClient = csvClient;
-            	CSVFileReaderBL.m_listReader = listReader;
-	
-	            CSVFileReaderBL csvReader = new CSVFileReaderBL();
-	            Thread readerThread = new Thread(csvReader);
-	            readerThread.setName("CSVFileReader");
-	            readerThread.setDaemon(true);
+                //CSVFileReaderBL.initializeReader(cfg, csvClient, listReader);
+                CSVFileReaderBL.m_config = cfg;
+                CSVFileReaderBL.m_csvClient = csvClient;
+                CSVFileReaderBL.m_listReader = listReader;
 
-	            //Wait for reader to finish.
-	            readerThread.start();
-	            readerThread.join();
-	        	
-	            readerTime = (csvReader.m_parsingTime) / 1000000;
-	
-	            insertTimeEnd = System.currentTimeMillis();
+                CSVFileReaderBL csvReader = new CSVFileReaderBL();
+                Thread readerThread = new Thread(csvReader);
+                readerThread.setName("CSVFileReader");
+                readerThread.setDaemon(true);
 
-	            csvClient.close();
-	            readerTime = (csvReader.m_parsingTime) / 1000000;
-	            insertCount = csvReader.bulkLoader.getCompletedRowCount();
-	            ackCount = insertCount - csvReader.m_failedInsertCount.get();
-	            rowsQueued = CSVFileReaderBL.m_totalRowCount.get();
+                //Wait for reader to finish.
+                readerThread.start();
+                readerThread.join();
+
+                readerTime = (csvReader.m_parsingTime) / 1000000;
+
+                insertTimeEnd = System.currentTimeMillis();
+
+                csvClient.close();
+                readerTime = (csvReader.m_parsingTime) / 1000000;
+                insertCount = csvReader.bulkLoader.getCompletedRowCount();
+                ackCount = insertCount - csvReader.m_failedInsertCount.get();
+                rowsQueued = CSVFileReaderBL.m_totalRowCount.get();
             }
 
             //Close the reader.
@@ -341,7 +341,7 @@ public class CSVLoader {
             } finally {
                 m_log.debug("Rows Queued by Reader: " + rowsQueued);
             }
-            
+
             m_log.debug("Parsing CSV file took " + readerTime + " milliseconds.");
             m_log.debug("Inserting Data took " + ((insertTimeEnd - insertTimeStart) - readerTime) + " milliseconds.");
             m_log.info("Read " + insertCount + " rows from file and successfully inserted "
@@ -453,7 +453,7 @@ public class CSVLoader {
             long trueSkip;
             long totolLineCnt;
             long totalRowCnt;
-            
+
             if (config.useSuppliedProcedure) {
                 totolLineCnt = CSVFileReader.m_totalLineCount.get();
                 totalRowCnt = CSVFileReader.m_totalRowCount.get();
@@ -461,7 +461,7 @@ public class CSVLoader {
                 totolLineCnt = CSVFileReaderBL.m_totalLineCount.get();
                 totalRowCnt = CSVFileReaderBL.m_totalRowCount.get();
             }
-            
+
             //get the actual number of lines skipped
             if (config.skip < totolLineCnt) {
                 trueSkip = config.skip;
@@ -504,22 +504,22 @@ public class CSVLoader {
 
     private static void close_cleanup() throws IOException,
             InterruptedException {
-    	if (config != null) {
-    		if (config.useSuppliedProcedure) {
-    	        //Reset all this for tests which uses main to load csv data.
-    	        CSVFileReader.m_errorInfo.clear();
-    	        CSVFileReader.m_errored = false;
-    	        CSVFileReader.m_totalLineCount = new AtomicLong(0);
-    	        CSVFileReader.m_totalRowCount = new AtomicLong(0);
-    		}
-    		else {
-    	        //Reset all this for tests which uses main to load csv data.
-    	        CSVFileReaderBL.m_errorInfo.clear();
-    	        CSVFileReaderBL.m_errored = false;
-    	        CSVFileReaderBL.m_totalLineCount = new AtomicLong(0);
-    	        CSVFileReaderBL.m_totalRowCount = new AtomicLong(0);
-    		}
-    	}
+        if (config != null) {
+            if (config.useSuppliedProcedure) {
+                //Reset all this for tests which uses main to load csv data.
+                CSVFileReader.m_errorInfo.clear();
+                CSVFileReader.m_errored = false;
+                CSVFileReader.m_totalLineCount = new AtomicLong(0);
+                CSVFileReader.m_totalRowCount = new AtomicLong(0);
+            }
+            else {
+                //Reset all this for tests which uses main to load csv data.
+                CSVFileReaderBL.m_errorInfo.clear();
+                CSVFileReaderBL.m_errored = false;
+                CSVFileReaderBL.m_totalLineCount = new AtomicLong(0);
+                CSVFileReaderBL.m_totalRowCount = new AtomicLong(0);
+            }
+        }
 
         out_invaliderowfile.close();
         out_logfile.close();

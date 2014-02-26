@@ -327,7 +327,7 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
 
     @Override
     public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack blfcb) {
-    	return null;
+        return null;
     }
 
 }
