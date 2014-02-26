@@ -660,7 +660,7 @@ public class SocketJoiner {
                 // trim the trailing comma + space
                 versions = versions.substring(0, versions.length() - 2);
 
-                VoltDB.crashLocalVoltDB("Cluster aldready is running mixed voltdb versions (" + versions +").\n" +
+                VoltDB.crashLocalVoltDB("Cluster already is running mixed voltdb versions (" + versions +").\n" +
                                         "Adding version " + localVersionString + " would add a third version.\n" +
                                         "VoltDB hotfix support supports only two unique versions simulaniously.", false, null);
             }
