@@ -1276,10 +1276,10 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltcore_utils_DBBPool_nativeDeleteCha
 
 /*
  * Class:     org_voltcore_utils_DBBPool
- * Method:    allocateUnsafeByteBuffer
+ * Method:    nativeAllocateUnsafeByteBuffer
  * Signature: (J)Ljava/nio/ByteBuffer;
  */
-SHAREDLIB_JNIEXPORT jobject JNICALL Java_org_voltcore_utils_DBBPool_allocateUnsafeByteBuffer
+SHAREDLIB_JNIEXPORT jobject JNICALL Java_org_voltcore_utils_DBBPool_nativeAllocateUnsafeByteBuffer
   (JNIEnv *jniEnv, jclass, jlong size) {
     char *memory = new char[size];
     jobject buffer = jniEnv->NewDirectByteBuffer( memory, size);

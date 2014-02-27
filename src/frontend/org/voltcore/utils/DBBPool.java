@@ -19,15 +19,17 @@ package org.voltcore.utils;
 
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
-import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashSet;
 import org.voltcore.logging.VoltLogger;
 
 import sun.misc.Cleaner;
 import sun.nio.ch.DirectBuffer;
+
+import com.google_voltpatches.common.base.Preconditions;
 
 /**
  * A pool of {@link java.nio.ByteBuffer ByteBuffers} that are
@@ -83,7 +85,7 @@ public final class DBBPool {
             checkDoubleFree();
         }
 
-        final public ByteBuffer b() {
+        public ByteBuffer b() {
             checkUseAfterFree();
             return b;
         }
@@ -98,7 +100,7 @@ public final class DBBPool {
             return b.asReadOnlyBuffer();
         }
 
-        private void checkUseAfterFree() {
+        protected void checkUseAfterFree() {
             if (ASSERTIONS_ON) {
                 if (m_freeThrowable != null) {
                     System.err.println("Use after free in DBBPool");
@@ -143,8 +145,8 @@ public final class DBBPool {
      * @author aweisberg
      *
      */
-    private static final class BBWrapperContainer extends BBContainer {
-        protected BBWrapperContainer(ByteBuffer b) {
+    public static final class BBWrapperContainer extends BBContainer {
+        private BBWrapperContainer(ByteBuffer b) {
             super( b );
         }
 
@@ -152,6 +154,54 @@ public final class DBBPool {
         public final void discard() {
             super.discard();
         }
+    }
+
+    public static final class DBBWrapperContainer extends BBContainer {
+        private DBBWrapperContainer(ByteBuffer b) {
+            super( b );
+        }
+
+        @Override
+        public final void discard() {
+            final ByteBuffer buf = checkDoubleFree();
+            DBBPool.cleanByteBuffer(buf);
+        }
+    }
+
+    public static class MBBWrapperContainer extends BBContainer {
+        private MBBWrapperContainer(MappedByteBuffer buf) {
+            super(buf);
+        }
+
+        @Override
+        public MappedByteBuffer b() {
+            return (MappedByteBuffer)super.b();
+        }
+
+        @Override
+        public void discard() {
+            final ByteBuffer buf = checkDoubleFree();
+            DBBPool.cleanByteBuffer(buf);
+        }
+    }
+
+    /**
+     * Static factory method to wrap a ByteBuffer in a BBContainer that is not
+     * associated with any pool
+     * @param b
+     */
+    public static final BBWrapperContainer wrapBB(ByteBuffer b) {
+        return new BBWrapperContainer(b);
+    }
+
+    public static final DBBWrapperContainer wrapDBB(ByteBuffer b) {
+        Preconditions.checkArgument(b.isDirect());
+        return new DBBWrapperContainer(b);
+    }
+
+    public static final MBBWrapperContainer wrapMBB(ByteBuffer b) {
+        Preconditions.checkArgument(b.isDirect());
+        return new MBBWrapperContainer((MappedByteBuffer)b);
     }
 
     /**
@@ -228,15 +278,6 @@ public final class DBBPool {
      * @return First 8 bytes of  Murmur hash3_x64_128 of value
      */
     public static native int getMurmur3128( long value);
-
-    /**
-     * Static factory method to wrap a ByteBuffer in a BBContainer that is not
-     * associated with any pool
-     * @param b
-     */
-    public static final BBWrapperContainer wrapBB(ByteBuffer b) {
-        return new BBWrapperContainer(b);
-    }
 
     private static final NonBlockingHashMap<Integer, ConcurrentLinkedQueue<BBContainer>> m_pooledBuffers =
             new NonBlockingHashMap<Integer, ConcurrentLinkedQueue<BBContainer>>();
@@ -357,7 +398,7 @@ public final class DBBPool {
 
 
 
-//    private static NonBlockingHashSet<Long> m_deletedStuff = new NonBlockingHashSet<Long>();
+    private static NonBlockingHashMap<Long, Throwable> m_deletedStuff = new NonBlockingHashMap<Long, Throwable>();
 
     /*
      * Delete a char array that was allocated on the native heap
@@ -367,14 +408,18 @@ public final class DBBPool {
      * and it will validate that nothing is ever deleted twice at the cost of unbounded memory usage
      */
     private static void deleteCharArrayMemory(long pointer) {
-//        if (!m_deletedStuff.add(pointer)) {
-//            new Throwable("Deleted " + Long.toHexString(pointer) + " twice").printStackTrace();
-//            System.exit(-1);
-//        }
-        nativeDeleteCharArrayMemory(pointer);
+        if (m_deletedStuff.putIfAbsent(pointer, new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " here")) != null) {
+            new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " twice").printStackTrace();
+            System.exit(-1);
+        }
+//        nativeDeleteCharArrayMemory(pointer);
     }
 
     private static native void nativeDeleteCharArrayMemory(long pointer);
+
+    public static DBBWrapperContainer allocateUnsafeByteBuffer(long size) {
+        return DBBPool.wrapDBB(nativeAllocateUnsafeByteBuffer(size));
+    }
 
     /*
      * Allocate a direct byte buffer that bypasses all GC and Java limits
@@ -382,13 +427,13 @@ public final class DBBPool {
      * and will come from the new/delete in C++. The pointer can be freed
      * using deleteCharArrayMemory.
      */
-    public static native ByteBuffer allocateUnsafeByteBuffer(long size);
+    private static native ByteBuffer nativeAllocateUnsafeByteBuffer(long size);
 
     /*
      * For managed buffers runs the cleaner, if there is no cleaner,
      * called deleteCharArrayMemory on the address
      */
-    public static void cleanByteBuffer(ByteBuffer buf) {
+    private static void cleanByteBuffer(ByteBuffer buf) {
         if (buf == null) return;
         if (!buf.isDirect()) return;
         final DirectBuffer dbuf = (DirectBuffer) buf;

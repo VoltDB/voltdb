@@ -57,9 +57,6 @@ import com.google_voltpatches.common.io.Files;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
-import sun.nio.ch.DirectBuffer;
-
-import java.util.concurrent.RejectedExecutionException;
 
 /**
  *  Allows an ExportDataProcessor to access underlying table queues
@@ -448,6 +445,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             + " Buffer info: " + uso + " Size: " + buffer.capacity());
                     return;
                 }
+                final BBContainer cont = DBBPool.wrapDBB(buffer);
                 try {
                     m_committedBuffers.offer(new StreamBlock(
                             new BBContainer(buffer) {
@@ -455,7 +453,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                 public void discard() {
                                     final ByteBuffer buf = checkDoubleFree();
                                     if (buf.isDirect()) {
-                                        DBBPool.cleanByteBuffer(buf);
+                                        cont.discard();
                                     }
                                     deleted.set(true);
                                 }
@@ -463,7 +461,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 } catch (IOException e) {
                     exportLog.error(e);
                     if (!deleted.get()) {
-                        DBBPool.cleanByteBuffer(buffer);
+                        cont.discard();
                     }
                 }
             } else {

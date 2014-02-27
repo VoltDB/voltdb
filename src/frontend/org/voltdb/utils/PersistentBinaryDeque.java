@@ -16,13 +16,10 @@
  */
 package org.voltdb.utils;
 
-import java.io.EOFException;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.io.RandomAccessFile;
-import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
@@ -41,9 +38,9 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 
 import com.google_voltpatches.common.base.Joiner;
+import org.voltcore.utils.DBBPool.MBBWrapperContainer;
 import org.voltdb.EELibraryLoader;
 import org.xerial.snappy.Snappy;
-import sun.nio.ch.DirectBuffer;
 
 /**
  * A deque that specializes in providing persistence of binary objects to disk. Any object placed
@@ -61,8 +58,8 @@ public class PersistentBinaryDeque implements BinaryDeque {
     public static class UnsafeOutputContainerFactory implements OutputContainerFactory {
         @Override
         public BBContainer getContainer(int minimumSize) {
-              final ByteBuffer retbuf = DBBPool.allocateUnsafeByteBuffer(minimumSize);
-              final BBContainer retcont = new BBContainer(retbuf) {
+              final BBContainer origin = DBBPool.allocateUnsafeByteBuffer(minimumSize);
+              final BBContainer retcont = new BBContainer(origin.b()) {
                   private boolean discarded = false;
 
                   @Override
@@ -72,8 +69,8 @@ public class PersistentBinaryDeque implements BinaryDeque {
                           LOG.error("Avoided double discard in PBD");
                           return;
                       }
-                      DBBPool.cleanByteBuffer(buf);
                       discarded = true;
+                      origin.discard();
                   }
               };
               return retcont;
@@ -174,6 +171,11 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 lastKey = key;
             } else {
                 if (lastKey + 1 != key) {
+                    try {
+                        for (PBDSegment pbds : segments.values()) {
+                            pbds.close();
+                        }
+                    } catch (Exception ex) {}
                     throw new IOException("Missing " + nonce +
                             " pbd segments between " + lastKey + " and " + key + " in directory " + path +
                             ". The data files found in the export overflow directory were inconsistent.");
@@ -426,115 +428,17 @@ public class PersistentBinaryDeque implements BinaryDeque {
          * When it finds the truncation point
          */
         Long lastSegmentIndex = null;
-        ByteBuffer decompressionBuffer = ByteBuffer.allocateDirect(1024 * 512);
-        for (PBDSegment segment : m_segments) {
-            long segmentIndex = segment.m_index;
-
-            File segmentFile = segment.m_file;
-            RandomAccessFile ras = new RandomAccessFile(segmentFile, "rw");
-            FileChannel fc = ras.getChannel();
-            ByteBuffer readBuffer = fc.map(MapMode.READ_WRITE, 0, fc.size());
-            final long buffAddr = ((DirectBuffer)readBuffer).address();
-            try {
-                //Get the number of objects and then iterator over them
-                int numObjects = readBuffer.getInt();
-                int size = readBuffer.getInt();
-                int objectsProcessed = 0;
-                exportLog.debug("PBD " + m_nonce + " has " + numObjects + " objects to parse and truncate");
-                for (int ii = 0; ii < numObjects; ii++) {
-                    final int nextObjectLength = readBuffer.getInt();
-                    final int nextObjectFlags = readBuffer.getInt();
-                    final boolean compressed = nextObjectFlags == PBDSegment.FLAG_COMPRESSED;
-                    final int uncompressedLength = compressed ? (int)Snappy.uncompressedLength(buffAddr + readBuffer.position(), nextObjectLength) : nextObjectLength;
-                    objectsProcessed++;
-                    //Copy the next object into a separate heap byte buffer
-                    //do the old limit stashing trick to avoid buffer overflow
-                    ByteBuffer nextObject = null;
-                    if (compressed) {
-                        decompressionBuffer.clear();
-                        if (decompressionBuffer.remaining() < uncompressedLength ) {
-                            DBBPool.cleanByteBuffer(decompressionBuffer);
-                            decompressionBuffer = ByteBuffer.allocateDirect(uncompressedLength);
-                        }
-                        nextObject = decompressionBuffer;
-                        final long sourceAddr = (buffAddr + readBuffer.position());
-                        final long destAddr = ((DirectBuffer)nextObject).address();
-                        Snappy.rawUncompress(sourceAddr, nextObjectLength, destAddr);
-                        readBuffer.position(readBuffer.position() + nextObjectLength);
-                    } else {
-                        final int oldLimit = readBuffer.limit();
-                        readBuffer.limit(readBuffer.position() + nextObjectLength);
-                        nextObject = readBuffer.slice();
-                        readBuffer.position(readBuffer.limit());
-                        readBuffer.limit(oldLimit);
-                    }
-
-                    //Handoff the object to the truncator and await a decision
-                    ByteBuffer retval = truncator.parse(nextObject);
-                    if (retval == null) {
-                        DBBPool.cleanByteBuffer(nextObject);
-                        //Nothing to do, leave the object alone and move to the next
-                        continue;
-                    } else {
-                        //If the returned bytebuffer is empty, remove the object and truncate the file
-                        if (retval.remaining() == 0) {
-                            if (ii == 0) {
-                                /*
-                                 * If truncation is occuring at the first object
-                                 * Whammo! Delete the file. Do it by setting the lastSegmentIndex
-                                 * to 1 previous. We may end up with an empty finished segment
-                                 * set.
-                                 */
-                                lastSegmentIndex = segmentIndex - 1;
-                            } else {
-                                addToNumObjects(-(numObjects - (objectsProcessed - 1)));
-                                //Don't forget to update the number of entries in the file
-                                ByteBuffer numObjectsBuffer = ByteBuffer.allocate(4);
-                                numObjectsBuffer.putInt(0, ii);
-                                fc.position(0);
-                                while (numObjectsBuffer.hasRemaining()) {
-                                    fc.write(numObjectsBuffer);
-                                }
-                                fc.truncate(readBuffer.position() - (nextObjectLength + PBDSegment.m_objectHeaderBytes));
-                            }
-
-                        } else {
-                            addToNumObjects(-(numObjects - objectsProcessed));
-                            //Partial object truncation
-                            ByteBuffer copy = ByteBuffer.allocate(retval.remaining());
-                            copy.put(retval);
-                            copy.flip();
-                            readBuffer.position(readBuffer.position() - (nextObjectLength + PBDSegment.m_objectHeaderBytes));
-                            readBuffer.putInt(copy.remaining());
-                            readBuffer.putInt(0);
-                            readBuffer.put(copy);
-
-                            readBuffer.putInt(0, ii + 1);
-
-                            /*
-                             * SHOULD REALLY make a copy of the original and then swap them with renaming
-                             */
-                            fc.truncate(readBuffer.position());
-                        }
-                        //Set last segment and break the loop over this segment
-                        if (lastSegmentIndex == null) {
-                            lastSegmentIndex = segmentIndex;
-                        }
-                        DBBPool.cleanByteBuffer(nextObject);
-                        break;
-                    }
-                }
-
-                //If this is set the just processed segment was the last one
-                if (lastSegmentIndex != null) {
-                    break;
-                }
-            } finally {
-                fc.close();
-                DBBPool.cleanByteBuffer(readBuffer);
+        BBContainer decompressionBuffer = DBBPool.allocateDirect(1024 * 512);
+        try {
+            for (PBDSegment segment : m_segments) {
+                SegmentTruncater segmentTruncater = new SegmentTruncater(truncator, lastSegmentIndex, decompressionBuffer, segment).invoke();
+                if (segmentTruncater.is()) break;
+                decompressionBuffer = segmentTruncater.getDecompressionBuffer();
+                lastSegmentIndex = segmentTruncater.getLastSegmentIndex();
             }
+        } finally {
+            decompressionBuffer.discard();
         }
-        DBBPool.cleanByteBuffer(decompressionBuffer);
 
         /*
          * If it was found that no truncation is necessary, lastSegmentIndex will be null.
@@ -573,6 +477,119 @@ public class PersistentBinaryDeque implements BinaryDeque {
         assertions();
     }
 
+//    private SegmentTruncater SegmentTruncater(BinaryDequeTruncator truncator, Long lastSegmentIndex, BBContainer decompressionBuffer, PBDSegment segment) throws IOException {
+//        long segmentIndex = segment.m_index;
+//
+//        File segmentFile = segment.m_file;
+//        RandomAccessFile ras = new RandomAccessFile(segmentFile, "rw");
+//        FileChannel fc = ras.getChannel();
+//        MBBWrapperContainer readBufferC = DBBPool.wrapMBB(fc.map(MapMode.READ_WRITE, 0, fc.size()));
+//        final ByteBuffer readBuffer = readBufferC.b();
+//        final long buffAddr = readBufferC.address();
+//        try {
+//            //Get the number of objects and then iterator over them
+//            int numObjects = readBuffer.getInt();
+//            int size = readBuffer.getInt();
+//            int objectsProcessed = 0;
+//            exportLog.debug("PBD " + m_nonce + " has " + numObjects + " objects to parse and truncate");
+//            for (int ii = 0; ii < numObjects; ii++) {
+//                final int nextObjectLength = readBuffer.getInt();
+//                final int nextObjectFlags = readBuffer.getInt();
+//                final boolean compressed = nextObjectFlags == PBDSegment.FLAG_COMPRESSED;
+//                final int uncompressedLength = compressed ? (int) Snappy.uncompressedLength(buffAddr + readBuffer.position(), nextObjectLength) : nextObjectLength;
+//                objectsProcessed++;
+//                //Copy the next object into a separate heap byte buffer
+//                //do the old limit stashing trick to avoid buffer overflow
+//                BBContainer nextObject = null;
+//                if (compressed) {
+//                    decompressionBuffer.b().clear();
+//                    if (decompressionBuffer.b().remaining() < uncompressedLength ) {
+//                        decompressionBuffer.discard();
+//                        decompressionBuffer = DBBPool.allocateDirect(uncompressedLength);
+//                    }
+//                    nextObject = DBBPool.wrapBB(decompressionBuffer.b());
+//                    final long sourceAddr = (buffAddr + readBuffer.position());
+//                    final long destAddr = nextObject.address();
+//                    Snappy.rawUncompress(sourceAddr, nextObjectLength, destAddr);
+//                    readBuffer.position(readBuffer.position() + nextObjectLength);
+//                } else {
+//                    final int oldLimit = readBuffer.limit();
+//                    readBuffer.limit(readBuffer.position() + nextObjectLength);
+//                    nextObject = DBBPool.wrapBB(readBuffer.slice());
+//                    readBuffer.position(readBuffer.limit());
+//                    readBuffer.limit(oldLimit);
+//                }
+//                try {
+//                    //Handoff the object to the truncator and await a decision
+//                    ByteBuffer retval = truncator.parse(nextObject.b());
+//                    if (retval == null) {
+//                        //Nothing to do, leave the object alone and move to the next
+//                        continue;
+//                    } else {
+//                        //If the returned bytebuffer is empty, remove the object and truncate the file
+//                        if (retval.remaining() == 0) {
+//                            if (ii == 0) {
+//                                /*
+//                                 * If truncation is occuring at the first object
+//                                 * Whammo! Delete the file. Do it by setting the lastSegmentIndex
+//                                 * to 1 previous. We may end up with an empty finished segment
+//                                 * set.
+//                                 */
+//                                lastSegmentIndex = segmentIndex - 1;
+//                            } else {
+//                                addToNumObjects(-(numObjects - (objectsProcessed - 1)));
+//                                //Don't forget to update the number of entries in the file
+//                                ByteBuffer numObjectsBuffer = ByteBuffer.allocate(4);
+//                                numObjectsBuffer.putInt(0, ii);
+//                                fc.position(0);
+//                                while (numObjectsBuffer.hasRemaining()) {
+//                                    fc.write(numObjectsBuffer);
+//                                }
+//                                fc.truncate(readBuffer.position() - (nextObjectLength + PBDSegment.m_objectHeaderBytes));
+//                            }
+//
+//                        } else {
+//                            addToNumObjects(-(numObjects - objectsProcessed));
+//                            //Partial object truncation
+//                            ByteBuffer copy = ByteBuffer.allocate(retval.remaining());
+//                            copy.put(retval);
+//                            copy.flip();
+//                            readBuffer.position(readBuffer.position() - (nextObjectLength + PBDSegment.m_objectHeaderBytes));
+//                            readBuffer.putInt(copy.remaining());
+//                            readBuffer.putInt(0);
+//                            readBuffer.put(copy);
+//
+//                            readBuffer.putInt(0, ii + 1);
+//
+//                            /*
+//                             * SHOULD REALLY make a copy of the original and then swap them with renaming
+//                             */
+//                            fc.truncate(readBuffer.position());
+//                        }
+//                        //Set last segment and break the loop over this segment
+//                        if (lastSegmentIndex == null) {
+//                            lastSegmentIndex = segmentIndex;
+//                        }
+//                        break;
+//                    }
+//                } finally {
+//                    nextObject.discard();
+//                }
+//            }
+//
+//            //If this is set the just processed segment was the last one
+//            if (lastSegmentIndex != null) {
+//                myResult = true;
+//                return this;
+//            }
+//        } finally {
+//            fc.close();
+//            readBufferC.discard();
+//        }
+//        myResult = false;
+//        return this;
+//    }
+
     private void addToNumObjects(int num) {
         assert(m_numObjects >= 0);
         m_numObjects += num;
@@ -610,5 +627,145 @@ public class PersistentBinaryDeque implements BinaryDeque {
             }
         }
         assert(numObjects == m_numObjects);
+    }
+
+    private class SegmentTruncater {
+        private boolean myResult;
+        private BinaryDequeTruncator truncator;
+        private Long lastSegmentIndex;
+        private BBContainer decompressionBuffer;
+        private PBDSegment segment;
+
+        public SegmentTruncater(BinaryDequeTruncator truncator, Long lastSegmentIndex, BBContainer decompressionBuffer, PBDSegment segment) {
+            this.truncator = truncator;
+            this.lastSegmentIndex = lastSegmentIndex;
+            this.decompressionBuffer = decompressionBuffer;
+            this.segment = segment;
+        }
+
+        boolean is() {
+            return myResult;
+        }
+
+        public Long getLastSegmentIndex() {
+            return lastSegmentIndex;
+        }
+
+        public BBContainer getDecompressionBuffer() {
+            return decompressionBuffer;
+        }
+
+        public SegmentTruncater invoke() throws IOException {
+            long segmentIndex = segment.m_index;
+
+            File segmentFile = segment.m_file;
+            RandomAccessFile ras = new RandomAccessFile(segmentFile, "rw");
+            FileChannel fc = ras.getChannel();
+            MBBWrapperContainer readBufferC = DBBPool.wrapMBB(fc.map(MapMode.READ_WRITE, 0, fc.size()));
+            final ByteBuffer readBuffer = readBufferC.b();
+            final long buffAddr = readBufferC.address();
+            try {
+                //Get the number of objects and then iterator over them
+                int numObjects = readBuffer.getInt();
+                int size = readBuffer.getInt();
+                int objectsProcessed = 0;
+                exportLog.debug("PBD " + m_nonce + " has " + numObjects + " objects to parse and truncate");
+                for (int ii = 0; ii < numObjects; ii++) {
+                    final int nextObjectLength = readBuffer.getInt();
+                    final int nextObjectFlags = readBuffer.getInt();
+                    final boolean compressed = nextObjectFlags == PBDSegment.FLAG_COMPRESSED;
+                    final int uncompressedLength = compressed ? (int) Snappy.uncompressedLength(buffAddr + readBuffer.position(), nextObjectLength) : nextObjectLength;
+                    objectsProcessed++;
+                    //Copy the next object into a separate heap byte buffer
+                    //do the old limit stashing trick to avoid buffer overflow
+                    BBContainer nextObject = null;
+                    if (compressed) {
+                        decompressionBuffer.b().clear();
+                        if (decompressionBuffer.b().remaining() < uncompressedLength ) {
+                            decompressionBuffer.discard();
+                            decompressionBuffer = DBBPool.allocateDirect(uncompressedLength);
+                        }
+                        nextObject = DBBPool.wrapBB(decompressionBuffer.b());
+                        final long sourceAddr = (buffAddr + readBuffer.position());
+                        final long destAddr = nextObject.address();
+                        Snappy.rawUncompress(sourceAddr, nextObjectLength, destAddr);
+                        readBuffer.position(readBuffer.position() + nextObjectLength);
+                    } else {
+                        final int oldLimit = readBuffer.limit();
+                        readBuffer.limit(readBuffer.position() + nextObjectLength);
+                        nextObject = DBBPool.wrapBB(readBuffer.slice());
+                        readBuffer.position(readBuffer.limit());
+                        readBuffer.limit(oldLimit);
+                    }
+                    try {
+                        //Handoff the object to the truncator and await a decision
+                        ByteBuffer retval = truncator.parse(nextObject.b());
+                        if (retval == null) {
+                            //Nothing to do, leave the object alone and move to the next
+                            continue;
+                        } else {
+                            //If the returned bytebuffer is empty, remove the object and truncate the file
+                            if (retval.remaining() == 0) {
+                                if (ii == 0) {
+                                    /*
+                                     * If truncation is occuring at the first object
+                                     * Whammo! Delete the file. Do it by setting the lastSegmentIndex
+                                     * to 1 previous. We may end up with an empty finished segment
+                                     * set.
+                                     */
+                                    lastSegmentIndex = segmentIndex - 1;
+                                } else {
+                                    addToNumObjects(-(numObjects - (objectsProcessed - 1)));
+                                    //Don't forget to update the number of entries in the file
+                                    ByteBuffer numObjectsBuffer = ByteBuffer.allocate(4);
+                                    numObjectsBuffer.putInt(0, ii);
+                                    fc.position(0);
+                                    while (numObjectsBuffer.hasRemaining()) {
+                                        fc.write(numObjectsBuffer);
+                                    }
+                                    fc.truncate(readBuffer.position() - (nextObjectLength + PBDSegment.m_objectHeaderBytes));
+                                }
+
+                            } else {
+                                addToNumObjects(-(numObjects - objectsProcessed));
+                                //Partial object truncation
+                                ByteBuffer copy = ByteBuffer.allocate(retval.remaining());
+                                copy.put(retval);
+                                copy.flip();
+                                readBuffer.position(readBuffer.position() - (nextObjectLength + PBDSegment.m_objectHeaderBytes));
+                                readBuffer.putInt(copy.remaining());
+                                readBuffer.putInt(0);
+                                readBuffer.put(copy);
+
+                                readBuffer.putInt(0, ii + 1);
+
+                                /*
+                                 * SHOULD REALLY make a copy of the original and then swap them with renaming
+                                 */
+                                fc.truncate(readBuffer.position());
+                            }
+                            //Set last segment and break the loop over this segment
+                            if (lastSegmentIndex == null) {
+                                lastSegmentIndex = segmentIndex;
+                            }
+                            break;
+                        }
+                    } finally {
+                        nextObject.discard();
+                    }
+                }
+
+                //If this is set the just processed segment was the last one
+                if (lastSegmentIndex != null) {
+                    myResult = true;
+                    return this;
+                }
+            } finally {
+                fc.close();
+                readBufferC.discard();
+            }
+            myResult = false;
+            return this;
+        }
     }
 }
