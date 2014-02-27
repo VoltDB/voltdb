@@ -400,7 +400,7 @@ public final class DBBPool {
 
 
 
-//    private static NonBlockingHashMap<Long, Throwable> m_deletedStuff = new NonBlockingHashMap<Long, Throwable>();
+    private static NonBlockingHashMap<Long, Throwable> m_deletedStuff = new NonBlockingHashMap<Long, Throwable>();
 
     /*
      * Delete a char array that was allocated on the native heap
@@ -410,12 +410,12 @@ public final class DBBPool {
      * and it will validate that nothing is ever deleted twice at the cost of unbounded memory usage
      */
     private static void deleteCharArrayMemory(long pointer) {
-//        if (m_deletedStuff.putIfAbsent(pointer, new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " here")) != null) {
-//            m_deletedStuff.get(pointer).printStackTrace();
-//            new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " twice").printStackTrace();
-//            System.exit(-1);
-//        }
-        nativeDeleteCharArrayMemory(pointer);
+        if (m_deletedStuff.putIfAbsent(pointer, new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " here")) != null) {
+            m_deletedStuff.get(pointer).printStackTrace();
+            new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " twice").printStackTrace();
+            System.exit(-1);
+        }
+//        nativeDeleteCharArrayMemory(pointer);
     }
 
     private static native void nativeDeleteCharArrayMemory(long pointer);

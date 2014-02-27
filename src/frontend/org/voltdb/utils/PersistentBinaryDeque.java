@@ -463,7 +463,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                                 decompressionBuffer.discard();
                                 decompressionBuffer = DBBPool.allocateDirect(uncompressedLength);
                             }
-                            nextObject = DBBPool.wrapBB(decompressionBuffer.b());
+                            nextObject = DBBPool.dummyWrapBB(decompressionBuffer.b());
                             final long sourceAddr = (buffAddr + readBuffer.position());
                             final long destAddr = nextObject.address();
                             Snappy.rawUncompress(sourceAddr, nextObjectLength, destAddr);
@@ -471,7 +471,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                         } else {
                             final int oldLimit = readBuffer.limit();
                             readBuffer.limit(readBuffer.position() + nextObjectLength);
-                            nextObject = DBBPool.wrapBB(readBuffer.slice());
+                            nextObject = DBBPool.dummyWrapBB(readBuffer.slice());
                             readBuffer.position(readBuffer.limit());
                             readBuffer.limit(oldLimit);
                         }

@@ -204,9 +204,9 @@ class PBDSegment {
     }
 
     BBContainer poll(OutputContainerFactory factory) throws IOException {
-        final ByteBuffer mbuf = m_buf.b();
         final long mBufAddr = m_buf.address();
         if (!m_haveMAdvised) {
+            final ByteBuffer mbuf = m_buf.b();
             m_haveMAdvised = true;
             final long retval = PosixAdvise.madvise(
                     m_buf.address(),

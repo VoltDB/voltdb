@@ -321,8 +321,8 @@ public class TestPersistentBinaryDeque {
         final ByteBuffer buffer1 = getFilledBuffer(16);
         final ByteBuffer buffer2 = getFilledBuffer(32);
         BBContainer pushContainers[] = new BBContainer[2];
-        pushContainers[0] = DBBPool.wrapBB(buffer1);
-        pushContainers[1] = DBBPool.wrapBB(buffer2);
+        pushContainers[0] = DBBPool.dummyWrapBB(buffer1);
+        pushContainers[1] = DBBPool.dummyWrapBB(buffer2);
 
         m_pbd.push(pushContainers);
         assertEquals( 1024 * 1024 * 2 * 98, m_pbd.sizeInBytes());
@@ -337,22 +337,30 @@ public class TestPersistentBinaryDeque {
 
         //Poll the two at the front and check that the contents are what is expected
         BBContainer retval1 = m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
-        buffer1.clear();
-        assert(retval1.b().equals(buffer1));
-        assertEquals(1024 * 1024 * 2 * 97, m_pbd.sizeInBytes());
+        try {
+            buffer1.clear();
+            System.err.println(Long.toHexString(buffer1.getLong(0)) + " " + Long.toHexString(retval1.b().getLong(0)));
+            assertEquals(retval1.b(), buffer1);
+            assertEquals(1024 * 1024 * 2 * 97, m_pbd.sizeInBytes());
 
-        BBContainer retval2 = m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
-        buffer2.clear();
-        assertTrue(retval2.b().equals(buffer2));
-        assertEquals(1024 * 1024 * 2 * 96, m_pbd.sizeInBytes());
+            BBContainer retval2 = m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            try {
+                buffer2.clear();
+                assertEquals(retval2.b(), buffer2);
+                assertEquals(1024 * 1024 * 2 * 96, m_pbd.sizeInBytes());
 
 
-        //Expect the file for the two polled objects to still be there
-        //until the discard
-        names = getSortedDirectoryListing();
-        assertEquals( 4, names.size());
-        retval1.discard();
-        retval2.discard();
+                //Expect the file for the two polled objects to still be there
+                //until the discard
+                names = getSortedDirectoryListing();
+                assertEquals( 4, names.size());
+            } finally {
+                retval2.discard();
+            }
+
+        } finally {
+            retval1.discard();
+        }
 
         assertEquals(1024 * 1024 * 2 * 96, m_pbd.sizeInBytes());
 
