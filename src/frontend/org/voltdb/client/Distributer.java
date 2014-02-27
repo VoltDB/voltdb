@@ -173,6 +173,14 @@ class Distributer {
 
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
+            //Pre 4.1 clusers don't know about subscribe, don't stress over it.
+            if (response.getStatusString() != null &&
+                response.getStatusString().contains("@Subscribe was not found")) {
+                synchronized (Distributer.this) {
+                    m_subscriptionRequestPending = false;
+                }
+                return;
+            }
             //Fast path subscribing retry if the connection was lost before getting a response
             if (response.getStatus() == ClientResponse.CONNECTION_LOST && !m_connections.isEmpty()) {
                 subscribeToNewNode();
