@@ -66,13 +66,19 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
-import org.voltdb.utils.CompressionService;
 
 public class CoreUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     public static final int SMALL_STACK_SIZE = 1024 * 256;
     public static final int MEDIUM_STACK_SIZE = 1024 * 512;
+
+    public static volatile Runnable m_threadLocalDeallocator = new Runnable() {
+        @Override
+        public void run() {
+
+        }
+    };
 
     public static final ListenableFuture<Object> COMPLETED_FUTURE = new ListenableFuture<Object>() {
         @Override
@@ -292,7 +298,7 @@ public class CoreUtils {
                         } catch (Throwable t) {
                             hostLog.error("Exception thrown in thread " + threadName, t);
                         } finally {
-                            CompressionService.releaseThreadLocal();
+                            m_threadLocalDeallocator.run();
                         }
                     }
                 };

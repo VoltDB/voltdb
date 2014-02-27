@@ -703,17 +703,18 @@ public class TableSaveFile
                      */
                     boolean completedRead = false;
                     try {
+                        final ByteBuffer buf = c.b();
                         /*
                          * Assemble a VoltTable out of the chunk of tuples.
                          * Put in the header that was cached in the constructor,
                          * then copy the tuple data.
                          */
-                        c.b().clear();
-                        c.b().limit(nextChunkLength  + m_tableHeader.capacity());
+                        buf.clear();
+                        buf.limit(nextChunkLength  + m_tableHeader.capacity());
                         m_tableHeader.position(0);
-                        c.b().put(m_tableHeader);
+                        buf.put(m_tableHeader);
                         //Doesn't move buffer position, does change the limit
-                        CompressionService.decompressBuffer(fileInputBuffer, c.b());
+                        CompressionService.decompressBuffer(fileInputBuffer, buf);
                         completedRead = true;
                     } finally {
                         if (!completedRead) {

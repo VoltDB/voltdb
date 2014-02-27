@@ -382,12 +382,13 @@ public class NIOWriteStream implements WriteStream {
                         outCont.b().clear();
                         m_queuedBuffers.offer(outCont);
                     }
-                    if (outCont.b().remaining() >= buf.remaining()) {
-                        outCont.b().put(buf);
+                    ByteBuffer outBuf = outCont.b();
+                    if (outBuf.remaining() >= buf.remaining()) {
+                        outBuf.put(buf);
                     } else {
                         final int oldLimit = buf.limit();
-                        buf.limit(buf.position() + outCont.b().remaining());
-                        outCont.b().put(buf);
+                        buf.limit(buf.position() + outBuf.remaining());
+                        outBuf.put(buf);
                         buf.limit(oldLimit);
                     }
                 }

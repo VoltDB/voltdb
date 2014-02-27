@@ -83,6 +83,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 
 import org.voltdb.utils.MinimumRatioMaintainer;
@@ -561,7 +562,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 " encountered an " + "unexpected error and will die, taking this VoltDB node down.";
             VoltDB.crashLocalVoltDB(errmsg, true, t);
         }
-        shutdown();
+
+        try {
+            shutdown();
+        } finally {
+            CompressionService.releaseThreadLocal();        }
     }
 
     ParticipantTransactionState global_replay_mpTxn = null;

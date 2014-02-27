@@ -37,6 +37,15 @@ import org.xerial.snappy.Snappy;
 
 public final class CompressionService {
 
+    static {
+        CoreUtils.m_threadLocalDeallocator = new Runnable() {
+            @Override
+            public void run() {
+                releaseThreadLocal();
+            }
+        };
+    }
+
     private static class IOBuffers {
         private final BBContainer input;
         private final BBContainer output;
@@ -114,22 +123,23 @@ public final class CompressionService {
         });
     }
 
-    public static Future<BBContainer> compressAndCRC32cBufferAsync(final ByteBuffer inBuffer, final BBContainer outBuffer) {
+    public static Future<BBContainer> compressAndCRC32cBufferAsync(final ByteBuffer inBuffer, final BBContainer outBufferC) {
         assert(inBuffer.isDirect());
-        assert(outBuffer.b().isDirect());
+        assert(outBufferC.b().isDirect());
         return submitCompressionTask(new Callable<BBContainer>() {
 
             @Override
             public BBContainer call() throws Exception {
+                final ByteBuffer outBuffer = outBufferC.b();
                 //Reserve 4-bytes for the CRC
-                final int crcPosition = outBuffer.b().position();
-                outBuffer.b().position(outBuffer.b().position() + 4);
-                final int crcCalcStart = outBuffer.b().position();
-                compressBuffer(inBuffer, outBuffer.b());
+                final int crcPosition = outBuffer.position();
+                outBuffer.position(outBuffer.position() + 4);
+                final int crcCalcStart = outBuffer.position();
+                compressBuffer(inBuffer, outBuffer);
                 final int crc32c =
-                        DBBPool.getCRC32C( outBuffer.address(), crcCalcStart, outBuffer.b().limit() - crcCalcStart);
-                outBuffer.b().putInt(crcPosition, crc32c);
-                return outBuffer;
+                        DBBPool.getCRC32C( outBufferC.address(), crcCalcStart, outBuffer.limit() - crcCalcStart);
+                outBuffer.putInt(crcPosition, crc32c);
+                return outBufferC;
             }
 
         });
@@ -231,11 +241,12 @@ public final class CompressionService {
             m_buffers.set(buffers);
         }
 
-        input.b().clear();
-        input.b().put(bytes);
-        input.b().flip();
+        final ByteBuffer inputBuffer = input.b();
+        inputBuffer.clear();
+        inputBuffer.put(bytes);
+        inputBuffer.flip();
 
-        final int uncompressedLength = Snappy.uncompressedLength(input.b());
+        final int uncompressedLength = Snappy.uncompressedLength(inputBuffer);
         final int outputCapacity = output.b().capacity();
         if (outputCapacity < uncompressedLength) {
             output.discard();
@@ -243,13 +254,14 @@ public final class CompressionService {
             buffers = new IOBuffers(input, output);
             m_buffers.set(buffers);
         }
-        output.b().clear();
+        final ByteBuffer outputBuffer = output.b();
+        outputBuffer.clear();
 
-        final int actualUncompressedLength = Snappy.uncompress(input.b(), output.b());
+        final int actualUncompressedLength = Snappy.uncompress(inputBuffer, outputBuffer);
         assert(uncompressedLength == actualUncompressedLength);
 
         byte result[] = new byte[actualUncompressedLength];
-        output.b().get(result);
+        outputBuffer.get(result);
         return result;
     }
 

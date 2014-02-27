@@ -367,12 +367,15 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         } catch (Throwable t) {
             return Futures.immediateFailedFuture(t);
         }
-        final BBContainer tupleData = tupleDataTemp;
+        final BBContainer tupleDataCont = tupleDataTemp;
+
 
         if (m_writeFailed) {
-            tupleData.discard();
+            tupleDataCont.discard();
             return null;
         }
+
+        ByteBuffer tupleData = tupleDataCont.b();
 
         m_outstandingWriteTasks.incrementAndGet();
 
@@ -382,14 +385,14 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     DBBPool.allocateDirectAndPool(SnapshotSiteProcessor.m_snapshotBufferCompressedLen);
             //Skip 4-bytes so the partition ID is not compressed
             //That way if we detect a corruption we know what partition is bad
-            tupleData.b().position(tupleData.b().position() + 4);
+            tupleData.position(tupleData.position() + 4);
             /*
              * Leave 12 bytes, it's going to be a 4-byte length prefix, a 4-byte partition id,
              * and a 4-byte CRC32C of just the header bytes, in addition to the compressed payload CRC
              * that is 16 bytes, but 4 of those are done by CompressionService
              */
             cont.b().position(12);
-            compressionTask = CompressionService.compressAndCRC32cBufferAsync(tupleData.b(), cont);
+            compressionTask = CompressionService.compressAndCRC32cBufferAsync(tupleData, cont);
         }
         final Future<BBContainer> compressionTaskFinal = compressionTask;
 
@@ -410,6 +413,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                         }
                     }
 
+                    final ByteBuffer tupleData = tupleDataCont.b();
                     int totalWritten = 0;
                     if (prependLength) {
                         BBContainer payloadContainer = compressionTaskFinal.get();
@@ -422,7 +426,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                             //Length prefix does not include 4 header items, just compressd payload
                             //that follows
                             lengthPrefix.putInt(payloadBuffer.remaining() - 16);//length prefix
-                            lengthPrefix.putInt(tupleData.b().getInt(0)); // partitionId
+                            lengthPrefix.putInt(tupleData.getInt(0)); // partitionId
 
                             /*
                              * Checksum the header and put it in the payload buffer
@@ -444,8 +448,8 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                             payloadContainer.discard();
                         }
                     } else {
-                        while (tupleData.b().hasRemaining()) {
-                            totalWritten += m_channel.write(tupleData.b());
+                        while (tupleData.hasRemaining()) {
+                            totalWritten += m_channel.write(tupleData);
                         }
                     }
                     m_bytesWritten += totalWritten;
@@ -457,7 +461,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     throw e;
                 } finally {
                     try {
-                        tupleData.discard();
+                        tupleDataCont.discard();
                     } finally {
                         m_outstandingWriteTasksLock.lock();
                         try {
