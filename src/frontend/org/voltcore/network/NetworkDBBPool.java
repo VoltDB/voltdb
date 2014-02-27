@@ -31,9 +31,10 @@ public class NetworkDBBPool {
        final BBContainer cont = m_buffers.poll();
        if (cont == null) {
            final BBContainer originContainer = DBBPool.allocateDirect(1024 * 32);
-           return new BBContainer(originContainer.b) {
+           return new BBContainer(originContainer.b()) {
                 @Override
                 public void discard() {
+                    checkDoubleFree();
                     //If we had to allocate over the desired limit, start discarding
                     if (m_buffers.size() > LIMIT) {
                         originContainer.discard();
@@ -43,9 +44,10 @@ public class NetworkDBBPool {
                 }
            };
        }
-       return new BBContainer(cont.b) {
+       return new BBContainer(cont.b()) {
            @Override
            public void discard() {
+               checkDoubleFree();
                m_buffers.push(cont);
            }
        };

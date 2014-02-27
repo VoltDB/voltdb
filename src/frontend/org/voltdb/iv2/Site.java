@@ -683,6 +683,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     hostLog.warn("Interrupted during shutdown", e);
                 }
             }
+            if (m_rejoinTaskLog != null) {
+                try {
+                    m_rejoinTaskLog.close();
+                } catch (IOException e) {
+                    hostLog.error("Exception closing rejoin task log", e);
+                }
+            }
         } catch (InterruptedException e) {
             hostLog.warn("Interrupted shutdown execution site.", e);
         }

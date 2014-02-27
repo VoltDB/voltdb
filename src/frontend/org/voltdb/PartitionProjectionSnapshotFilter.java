@@ -39,7 +39,7 @@ public class PartitionProjectionSnapshotFilter implements SnapshotDataFilter {
             @Override
             public BBContainer call() throws Exception {
                 final BBContainer cont = input.call();
-                final int partitionId = cont.b.getInt(m_partitionIdOffset);
+                final int partitionId = cont.b().getInt(m_partitionIdOffset);
                 boolean hasPartition = false;
 
                 for (int acceptedPartitionId : m_partitions) {

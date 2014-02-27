@@ -57,6 +57,8 @@ import com.google_voltpatches.common.io.Files;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import sun.nio.ch.DirectBuffer;
+
 import java.util.concurrent.RejectedExecutionException;
 
 /**
@@ -282,7 +284,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 try {
                     lastUso = sb.uso() + sb.totalUso();
                 } finally {
-                    sb.deleteContent();
+                    sb.discard();
                 }
             } else if (releaseOffset >= sb.uso()) {
                 sb.releaseUso(releaseOffset);
@@ -408,14 +410,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private void pushExportBufferImpl(
             long uso,
-            final long bufferPtr,
             ByteBuffer buffer,
             boolean sync,
             boolean endOfStream) throws Exception {
         final java.util.concurrent.atomic.AtomicBoolean deleted = new java.util.concurrent.atomic.AtomicBoolean(false);
         if (endOfStream) {
             assert(!m_endOfStream);
-            assert(bufferPtr == 0);
             assert(buffer == null);
             assert(!sync);
 
@@ -453,8 +453,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             new BBContainer(buffer) {
                                 @Override
                                 public void discard() {
-                                    if (b.isDirect()) {
-                                        DBBPool.deleteCharArrayMemory(address());
+                                    final ByteBuffer buf = checkDoubleFree();
+                                    if (buf.isDirect()) {
+                                        DBBPool.cleanByteBuffer(buf);
                                     }
                                     deleted.set(true);
                                 }
@@ -462,7 +463,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 } catch (IOException e) {
                     exportLog.error(e);
                     if (!deleted.get()) {
-                        DBBPool.deleteCharArrayMemory(bufferPtr);
+                        DBBPool.cleanByteBuffer(buffer);
                     }
                 }
             } else {
@@ -490,7 +491,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public void pushExportBuffer(
             final long uso,
-            final long bufferPtr,
             final ByteBuffer buffer,
             final boolean sync,
             final boolean endOfStream) {
@@ -503,7 +503,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 try {
-                    pushExportBufferImpl(uso, bufferPtr, buffer, sync, endOfStream);
+                    pushExportBufferImpl(uso, buffer, sync, endOfStream);
                 } catch (Throwable t) {
                     VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
                 } finally {
@@ -639,7 +639,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             } finally {
                 //Try hard not to leak memory
                 for (StreamBlock sb : blocksToDelete) {
-                    sb.deleteContent();
+                    sb.discard();
                 }
             }
 
@@ -648,7 +648,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_pollFuture = fut;
             } else {
                 fut.set(
-                        new AckingContainer(first_unpolled_block.unreleasedBuffer(),
+                        new AckingContainer(first_unpolled_block.unreleasedContainer(),
                                 first_unpolled_block.uso() + first_unpolled_block.totalUso()));
                 m_pollFuture = null;
             }
@@ -659,13 +659,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     class AckingContainer extends BBContainer {
         final long m_uso;
-        public AckingContainer(ByteBuffer buf, long uso) {
-            super(buf);
+        final BBContainer m_backingCont;
+        public AckingContainer(BBContainer cont, long uso) {
+            super(cont.b());
             m_uso = uso;
+            m_backingCont = cont;
         }
 
         @Override
         public void discard() {
+            checkDoubleFree();
+            m_backingCont.discard();
             try {
                 ack(m_uso);
             } finally {

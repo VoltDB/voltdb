@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
+import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashSet;
 import org.voltcore.logging.VoltLogger;
 
 import sun.misc.Cleaner;
@@ -39,6 +40,14 @@ public final class DBBPool {
 
     private static final VoltLogger TRACE = new VoltLogger("DBBPOOL");
 
+    private static final boolean ASSERTIONS_ON;
+
+    static {
+        boolean assertionsOn = false;
+        assert(assertionsOn = true);
+        ASSERTIONS_ON = assertionsOn;
+    }
+
     /**
      * Abstract base class for a ByteBuffer container. A container serves to hold a reference
      * to the pool/arena/whatever the ByteBuffer was allocated from and possibly the address
@@ -52,17 +61,81 @@ public final class DBBPool {
         /**
          * The buffer
          */
-        final public ByteBuffer b;
+        final private ByteBuffer b;
+        private volatile Throwable m_freeThrowable;
+        private final Throwable m_allocationThrowable;
 
         public BBContainer(ByteBuffer b) {
+            if (ASSERTIONS_ON) {
+                m_allocationThrowable = new Throwable(Thread.currentThread().getName());
+            } else {
+                m_allocationThrowable = null;
+            }
             this.b = b;
         }
 
-        public long address() {
+        final public long address() {
+            checkUseAfterFree();
             return ((DirectBuffer)b).address();
         }
 
-        abstract public void discard();
+        public void discard() {
+            checkDoubleFree();
+        }
+
+        final public ByteBuffer b() {
+            checkUseAfterFree();
+            return b;
+        }
+
+        final public ByteBuffer bD() {
+            checkUseAfterFree();
+            return b.duplicate();
+        }
+
+        final public ByteBuffer bDR() {
+            checkUseAfterFree();
+            return b.asReadOnlyBuffer();
+        }
+
+        private void checkUseAfterFree() {
+            if (ASSERTIONS_ON) {
+                if (m_freeThrowable != null) {
+                    System.err.println("Use after free in DBBPool");
+                    System.err.println("Free was by:");
+                    m_freeThrowable.printStackTrace();
+                    System.err.println("Use was by:");
+                    new Throwable(Thread.currentThread().getName()).printStackTrace();
+                    System.exit(-1);
+                }
+            }
+        }
+
+        protected ByteBuffer checkDoubleFree() {
+            if (ASSERTIONS_ON) {
+                synchronized (this) {
+                    if (m_freeThrowable != null) {
+                        System.err.println("Double free in DBBPool");
+                        System.err.println("Original free was by:");
+                        m_freeThrowable.printStackTrace();
+                        System.err.println("Current free was by:");
+                        new Throwable(Thread.currentThread().getName()).printStackTrace();
+                        System.exit(-1);
+                    }
+                    m_freeThrowable = new Throwable(Thread.currentThread().getName());
+                }
+            }
+            return b;
+        }
+
+        @Override
+        public void finalize() {
+            if (m_freeThrowable == null) {
+                System.err.println("BBContainer " + Integer.toHexString(this.hashCode()) + " was never discarded allocated by:");
+                m_allocationThrowable.printStackTrace();
+                System.exit(-1);
+            }
+        }
     }
 
     /**
@@ -77,7 +150,7 @@ public final class DBBPool {
 
         @Override
         public final void discard() {
-
+            super.discard();
         }
     }
 
@@ -185,13 +258,14 @@ public final class DBBPool {
             cont = allocateDirect(capacity);
         }
         final BBContainer origin = cont;
-        cont = new BBContainer(origin.b) {
+        cont = new BBContainer(origin.b()) {
             @Override
             public void discard() {
+                final ByteBuffer b = checkDoubleFree();
                 m_pooledBuffers.get(b.capacity()).offer(origin);
             }
         };
-        cont.b.clear();
+        cont.b().clear();
         return cont;
     }
 
@@ -259,10 +333,11 @@ public final class DBBPool {
 
         @Override
         public void discard() {
+            final ByteBuffer buf = checkDoubleFree();
             try {
-                bytesAllocatedGlobally.getAndAdd(-b.capacity());
-                logDeallocation(b.capacity());
-                DBBPool.cleanByteBuffer(b);
+                bytesAllocatedGlobally.getAndAdd(-buf.capacity());
+                logDeallocation(buf.capacity());
+                DBBPool.cleanByteBuffer(buf);
             } catch (Throwable e) {
                 // The client code doesn't want to link to the VoltDB class, so this hack was born.
                 // It should be temporary as the goal is to remove client code dependency on
@@ -281,10 +356,25 @@ public final class DBBPool {
     }
 
 
+
+//    private static NonBlockingHashSet<Long> m_deletedStuff = new NonBlockingHashSet<Long>();
+
     /*
      * Delete a char array that was allocated on the native heap
+     *
+     * If you want to debug issues with double free, uncomment m_deletedStuff
+     * and the code that populates it and comment out the call to nativeDeleteCharArrayMemory
+     * and it will validate that nothing is ever deleted twice at the cost of unbounded memory usage
      */
-    public static native void deleteCharArrayMemory(long pointer);
+    private static void deleteCharArrayMemory(long pointer) {
+//        if (!m_deletedStuff.add(pointer)) {
+//            new Throwable("Deleted " + Long.toHexString(pointer) + " twice").printStackTrace();
+//            System.exit(-1);
+//        }
+        nativeDeleteCharArrayMemory(pointer);
+    }
+
+    private static native void nativeDeleteCharArrayMemory(long pointer);
 
     /*
      * Allocate a direct byte buffer that bypasses all GC and Java limits
@@ -294,10 +384,16 @@ public final class DBBPool {
      */
     public static native ByteBuffer allocateUnsafeByteBuffer(long size);
 
+    /*
+     * For managed buffers runs the cleaner, if there is no cleaner,
+     * called deleteCharArrayMemory on the address
+     */
     public static void cleanByteBuffer(ByteBuffer buf) {
         if (buf == null) return;
         if (!buf.isDirect()) return;
-        final Cleaner cleaner = ((DirectBuffer)buf).cleaner();
+        final DirectBuffer dbuf = (DirectBuffer) buf;
+        final Cleaner cleaner = dbuf.cleaner();
         if (cleaner != null) cleaner.clean();
+        else deleteCharArrayMemory(dbuf.address());
     }
 }

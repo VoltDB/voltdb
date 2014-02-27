@@ -164,8 +164,8 @@ class PBDSegment {
     }
 
     boolean offer(BBContainer cont, boolean compress) throws IOException {
-        final ByteBuffer buf = cont.b;
-        final int remaining = cont.b.remaining();
+        final ByteBuffer buf = cont.b();
+        final int remaining = cont.b().remaining();
         if (remaining < 32 || !buf.isDirect()) compress = false;
         final int maxCompressedSize = compress ? Snappy.maxCompressedLength(remaining) : remaining;
         if (m_buf.remaining() < maxCompressedSize + m_objectHeaderBytes) return false;
@@ -232,7 +232,7 @@ class PBDSegment {
         if (compressed) {
             //Get storage for output
             final BBContainer retcont = factory.getContainer(nextUncompressedLength);
-            final ByteBuffer retbuf = retcont.b;
+            final ByteBuffer retbuf = retcont.b();
 
             //Limit to appropriate uncompressed size
             retbuf.limit(nextUncompressedLength);

@@ -67,11 +67,12 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
                   @Override
                   public synchronized void discard() {
+                      final ByteBuffer buf = checkDoubleFree();
                       if (discarded) {
                           LOG.error("Avoided double discard in PBD");
                           return;
                       }
-                      DBBPool.deleteCharArrayMemory(address());
+                      DBBPool.cleanByteBuffer(buf);
                       discarded = true;
                   }
               };
@@ -206,7 +207,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         PBDSegment tail = m_segments.peekLast();
         //If we are mostly empty, don't do compression, otherwise compress to reduce space and IO
-        final boolean compress = object.b.isDirect() && m_segments.size() > 1 || tail.sizeInBytes() > 1024 * 512;
+        final boolean compress = object.b().isDirect() && m_segments.size() > 1 || tail.sizeInBytes() > 1024 * 512;
         if (!tail.offer(object, compress)) {
             //Check to see if the tail is completely consumed so we can close and delete it
             if (!tail.hasMoreEntries() && tail.m_discardCount == tail.getNumEntries()) {
@@ -240,7 +241,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         //that will fit in a single write segment
         int available = PBDSegment.m_chunkSize - 4;
         for (BBContainer object : objects) {
-            int needed = PBDSegment.m_objectHeaderBytes + object.b.remaining();
+            int needed = PBDSegment.m_objectHeaderBytes + object.b().remaining();
 
             if (available - needed < 0) {
                 if (needed > PBDSegment.m_chunkSize - 4) {
@@ -308,22 +309,28 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         decrementNumObjects();
         assertions();
-        assert(retcont.b != null);
+        assert(retcont.b() != null);
         return wrapRetCont(segment, retcont);
     }
 
     private BBContainer wrapRetCont(final PBDSegment segment, final BBContainer retcont) {
-        return new BBContainer(retcont.b) {
+        return new BBContainer(retcont.b()) {
             private boolean m_discarded = false;
             @Override
             public void discard() {
+                checkDoubleFree();
                 if (m_discarded) {
                     LOG.error("PBD Container discarded more than once");
                     return;
                 }
+                m_discarded = true;
                 retcont.discard();
                 segment.m_discardCount++;
-                assert(m_segments.contains(segment));
+                assert(m_closed || m_segments.contains(segment));
+
+                //Don't do anything else if we are closed
+                if (m_closed) return;
+
                 //Segment is potentially ready for deletion
                 try {
                     if (segment.m_discardCount == segment.getNumEntries()) {
@@ -354,6 +361,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         if (m_closed) {
             return;
         }
+        m_closed = true;
         if (!m_segments.peekLast().hasMoreEntries()) {
             m_segments.pollLast().closeAndDelete();
         }
@@ -398,6 +406,8 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
     @Override
     public synchronized void closeAndDelete() throws IOException {
+        if (m_closed) return;
+        m_closed = true;
         for (PBDSegment qs : m_segments) {
             qs.closeAndDelete();
         }

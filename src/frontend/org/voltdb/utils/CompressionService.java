@@ -109,19 +109,19 @@ public final class CompressionService {
 
     public static Future<BBContainer> compressAndCRC32cBufferAsync(final ByteBuffer inBuffer, final BBContainer outBuffer) {
         assert(inBuffer.isDirect());
-        assert(outBuffer.b.isDirect());
+        assert(outBuffer.b().isDirect());
         return submitCompressionTask(new Callable<BBContainer>() {
 
             @Override
             public BBContainer call() throws Exception {
                 //Reserve 4-bytes for the CRC
-                final int crcPosition = outBuffer.b.position();
-                outBuffer.b.position(outBuffer.b.position() + 4);
-                final int crcCalcStart = outBuffer.b.position();
-                compressBuffer(inBuffer, outBuffer.b);
+                final int crcPosition = outBuffer.b().position();
+                outBuffer.b().position(outBuffer.b().position() + 4);
+                final int crcCalcStart = outBuffer.b().position();
+                compressBuffer(inBuffer, outBuffer.b());
                 final int crc32c =
-                        DBBPool.getCRC32C( outBuffer.address(), crcCalcStart, outBuffer.b.limit() - crcCalcStart);
-                outBuffer.b.putInt(crcPosition, crc32c);
+                        DBBPool.getCRC32C( outBuffer.address(), crcCalcStart, outBuffer.b().limit() - crcCalcStart);
+                outBuffer.b().putInt(crcPosition, crc32c);
                 return outBuffer;
             }
 

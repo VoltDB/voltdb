@@ -91,15 +91,10 @@ public class StreamBlockQueue {
         } else {
             //If the container is not null, unpack it.
             final BBContainer fcont = cont;
-            long uso = cont.b.getLong(0);
+            long uso = cont.b().getLong(0);
             //Pass the stream block a subset of the bytes, provide
             //a container that discards the original returned by the persistent deque
-            StreamBlock block = new StreamBlock( new BBContainer(fcont.b) {
-                    @Override
-                    public void discard() {
-                        fcont.discard();
-                    }
-                },
+            StreamBlock block = new StreamBlock( fcont,
                 uso,
                 true);
 
@@ -258,16 +253,17 @@ public class StreamBlockQueue {
 
     public void close() throws IOException {
         sync(true);
-        m_memoryDeque.clear();
         m_persistentDeque.close();
+        for (StreamBlock sb : m_memoryDeque) {
+            sb.discard();
+        }
+        m_memoryDeque.clear();
     }
 
     public void closeAndDelete() throws IOException {
         m_persistentDeque.closeAndDelete();
         for (StreamBlock sb : m_memoryDeque) {
-            if (!sb.isPersisted()) {
-                sb.deleteContent();
-            }
+            sb.discard();
         }
     }
 

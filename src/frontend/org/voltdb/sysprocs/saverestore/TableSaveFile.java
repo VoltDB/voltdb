@@ -30,6 +30,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.Checksum;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
@@ -60,23 +61,38 @@ public class TableSaveFile
         CRC32, CRC32C
     }
 
+//    private AtomicInteger necessaryDiscards = new AtomicInteger();
     public class Container extends BBContainer {
         public final int partitionId;
         private final BBContainer m_origin;
+        private boolean discarded = false;
         Container(ByteBuffer b, BBContainer origin, int partitionId) {
             super(b);
+//            System.err.println("TSF " + Integer.toHexString(TableSaveFile.this.hashCode()) + " creating container " + Integer.toHexString(this.hashCode()) + " origin " + Integer.toHexString(this.hashCode()));
+//            necessaryDiscards.incrementAndGet();
             m_origin = origin;
             this.partitionId = partitionId;
         }
 
         @Override
         public void discard() {
+            checkDoubleFree();
+            discarded = true;
+//            necessaryDiscards.decrementAndGet();
             if (m_hasMoreChunks == false) {
                 m_origin.discard();
             } else {
-                m_buffers.add(this);
+                m_buffers.add(m_origin);
             }
         }
+
+//        @Override
+//        public void finalize() {
+//            if (!discarded) {
+//                System.err.println("TSF " + Integer.toHexString(TableSaveFile.this.hashCode()) + " failed to discard " + Integer.toHexString(this.hashCode()));
+//                System.exit(-1);
+//            }
+//        }
     }
 
     /**
@@ -100,6 +116,8 @@ public class TableSaveFile
             Integer[] relevantPartitionIds,
             boolean continueOnCorruptedChunk) throws IOException
             {
+//                System.err.println("Constructing TSF " + Integer.toHexString(this.hashCode()));
+//                new Throwable().printStackTrace();
                 m_fd = fis.getFD();
                 FileChannel dataIn = fis.getChannel();
         try {
@@ -381,6 +399,15 @@ public class TableSaveFile
     }
 
     public void close() throws IOException {
+//        System.err.println("Starting close " + Integer.toHexString(this.hashCode()) + " with necessary discards " + necessaryDiscards.get());
+//        System.gc();
+//        System.runFinalization();
+//        try {
+//            Thread.sleep(200);
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+//        }
+//        System.err.println("Finishing close " + Integer.toHexString(this.hashCode()));
         if (m_chunkReaderThread != null) {
             m_chunkReaderThread.interrupt();
             try {
@@ -390,6 +417,7 @@ public class TableSaveFile
             }
         }
         synchronized (this) {
+            m_hasMoreChunks = false;
             while (!m_availableChunks.isEmpty()) {
                 m_availableChunks.poll().discard();
             }
@@ -420,7 +448,9 @@ public class TableSaveFile
             throw m_chunkReaderException;
         }
         if (!m_hasMoreChunks) {
-            return m_availableChunks.poll();
+            final Container c = m_availableChunks.poll();
+//            System.err.println("TSF " + Integer.toHexString(this.hashCode()) + " Returning chunk " + (c != null ? Integer.toHexString(c.hashCode()) : null));
+            return c;
         }
 
         if (m_chunkReader == null) {
@@ -439,13 +469,15 @@ public class TableSaveFile
                     throw new IOException(e);
                 }
             }
+        }
+        if (c != null) {
+            m_chunkReads.release();
+        } else {
             if (m_chunkReaderException != null) {
                 throw m_chunkReaderException;
             }
         }
-        if (c != null) {
-            m_chunkReads.release();
-        }
+//        System.err.println("TSF " + Integer.toHexString(this.hashCode()) + " Returning chunk " + (c != null ? Integer.toHexString(c.hashCode()) : null));
         return c;
     }
 
@@ -474,7 +506,7 @@ public class TableSaveFile
     private final long m_txnId;
     private final long m_timestamp;
     private boolean m_hasMoreChunks = true;
-    private ConcurrentLinkedQueue<Container> m_buffers = new ConcurrentLinkedQueue<Container>();
+    private ConcurrentLinkedQueue<BBContainer> m_buffers = new ConcurrentLinkedQueue<BBContainer>();
     private final ArrayDeque<Container> m_availableChunks = new ArrayDeque<Container>();
     private final HashSet<Integer> m_relevantPartitionIds;
     private final ChecksumType m_checksumType;
@@ -561,6 +593,7 @@ public class TableSaveFile
                     return;
                 }
                 boolean expectedAnotherChunk = false;
+                Container c = null;
                 try {
 
                     /*
@@ -658,7 +691,7 @@ public class TableSaveFile
                      * be sucked straight in. There is a little funny business to overwrite the
                      * partition id that is not part of the serialization format
                      */
-                    Container c = getOutputBuffer(nextChunkPartitionId);
+                    c = getOutputBuffer(nextChunkPartitionId);
 
                     /*
                      * If the length value is wrong or not all data made it to disk this read will
@@ -674,17 +707,23 @@ public class TableSaveFile
                          * Put in the header that was cached in the constructor,
                          * then copy the tuple data.
                          */
-                        c.b.clear();
-                        c.b.limit(nextChunkLength  + m_tableHeader.capacity());
+                        c.b().clear();
+                        c.b().limit(nextChunkLength  + m_tableHeader.capacity());
                         m_tableHeader.position(0);
-                        c.b.put(m_tableHeader);
+                        c.b().put(m_tableHeader);
                         //Doesn't move buffer position, does change the limit
-                        CompressionService.decompressBuffer(fileInputBuffer, c.b);
+                        CompressionService.decompressBuffer(fileInputBuffer, c.b());
                         completedRead = true;
                     } finally {
                         if (!completedRead) {
                             for (int partitionId : m_partitionIds) {
                                 m_corruptedPartitions.add(partitionId);
+                            }
+                            if (m_continueOnCorruptedChunk) {
+                                m_chunkReads.release();
+                                continue;
+                            } else {
+                                throw new IOException("Failed decompression of saved table chunk");
                             }
                         }
                     }
@@ -695,7 +734,6 @@ public class TableSaveFile
                      */
                     if (m_relevantPartitionIds != null) {
                         if (!m_relevantPartitionIds.contains(nextChunkPartitionId)) {
-                            c.discard();
                             m_chunkReads.release();
                             continue;
                         }
@@ -704,10 +742,11 @@ public class TableSaveFile
                     /*
                      * VoltTable wants the buffer at the home position 0
                      */
-                    c.b.position(0);
+                    c.b().position(0);
 
                     synchronized (TableSaveFile.this) {
                         m_availableChunks.offer(c);
+                        c = null;
                         TableSaveFile.this.notifyAll();
                     }
                 } catch (EOFException eof) {
@@ -720,6 +759,7 @@ public class TableSaveFile
                         TableSaveFile.this.notifyAll();
                     }
                 } catch (IOException e) {
+                    e.printStackTrace();
                     synchronized (TableSaveFile.this) {
                         m_hasMoreChunks = false;
                         m_chunkReaderException = e;
@@ -743,6 +783,8 @@ public class TableSaveFile
                         m_chunkReaderException = new IOException(e);
                         TableSaveFile.this.notifyAll();
                     }
+                } finally {
+                    if (c != null) c.discard();
                 }
             }
             DBBPool.cleanByteBuffer(fileInputBuffer);
@@ -763,6 +805,7 @@ public class TableSaveFile
                     return;
                 }
                 boolean expectedAnotherChunk = false;
+                Container c = null;
                 try {
 
                     /*
@@ -854,7 +897,7 @@ public class TableSaveFile
                      * be sucked straight in. There is a little funny business to overwrite the
                      * partition id that is not part of the serialization format
                      */
-                    Container c = getOutputBuffer(nextChunkPartitionId);
+                    c = getOutputBuffer(nextChunkPartitionId);
 
                     /*
                      * If the length value is wrong or not all data made it to disk this read will
@@ -875,35 +918,35 @@ public class TableSaveFile
                          * It will have to be moved back to the beginning of the tuple data
                          * after the header once the CRC has been calculated.
                          */
-                        c.b.clear();
+                        c.b().clear();
                         //The length of the chunk already includes space for the 4-byte row count
                         //even though it is at the end, but we need to also leave at the end for the CRC calc
                         if (isCompressed()) {
-                            c.b.limit(nextChunkLength  + m_tableHeader.capacity() + 4);
+                            c.b().limit(nextChunkLength  + m_tableHeader.capacity() + 4);
                         } else {
                             //Before compression the chunk length included the stuff added in the EE
                             //like the 2 CRCs and partition id. It is only -8 because we still need the 4-bytes
                             //of padding to move the row count in when constructing the volt table format.
-                            c.b.limit((nextChunkLength - 8)  + m_tableHeader.capacity());
+                            c.b().limit((nextChunkLength - 8)  + m_tableHeader.capacity());
                         }
                         m_tableHeader.position(0);
-                        c.b.put(m_tableHeader);
-                        c.b.position(c.b.position() + 4);//Leave space for row count to be moved into
-                        checksumStartPosition = c.b.position();
+                        c.b().put(m_tableHeader);
+                        c.b().position(c.b().position() + 4);//Leave space for row count to be moved into
+                        checksumStartPosition = c.b().position();
                         if (isCompressed()) {
-                            CompressionService.decompressBuffer(fileInputBuffer, c.b);
-                            c.b.position(c.b.limit());
+                            CompressionService.decompressBuffer(fileInputBuffer, c.b());
+                            c.b().position(c.b().limit());
                         } else {
-                            while (c.b.hasRemaining()) {
-                                final int read = m_saveFile.read(c.b);
+                            while (c.b().hasRemaining()) {
+                                final int read = m_saveFile.read(c.b());
                                 if (read == -1) {
                                     throw new EOFException();
                                 }
                             }
                         }
-                        c.b.position(c.b.position() - 4);
-                        rowCount = c.b.getInt();
-                        c.b.position(checksumStartPosition);
+                        c.b().position(c.b().position() - 4);
+                        rowCount = c.b().getInt();
+                        c.b().position(checksumStartPosition);
                         completedRead = true;
                     } finally {
                         if (!completedRead) {
@@ -919,12 +962,11 @@ public class TableSaveFile
                      */
                     final int calculatedCRC =
                             m_checksumType == ChecksumType.CRC32C  ?
-                                    DBBPool.getCRC32C(c.address(), c.b.position(), c.b.remaining()) :
-                                        DBBPool.getCRC32(c.address(), c.b.position(), c.b.remaining());
+                                    DBBPool.getCRC32C(c.address(), c.b().position(), c.b().remaining()) :
+                                        DBBPool.getCRC32(c.address(), c.b().position(), c.b().remaining());
                     if (calculatedCRC != nextChunkCRC) {
                         m_corruptedPartitions.add(nextChunkPartitionId);
                         if (m_continueOnCorruptedChunk) {
-                            c.discard();
                             m_chunkReads.release();
                             continue;
                         } else {
@@ -938,7 +980,6 @@ public class TableSaveFile
                      */
                     if (m_relevantPartitionIds != null) {
                         if (!m_relevantPartitionIds.contains(nextChunkPartitionId)) {
-                            c.discard();
                             m_chunkReads.release();
                             continue;
                         }
@@ -954,10 +995,10 @@ public class TableSaveFile
                      */
                     boolean success = false;
                     try {
-                        c.b.limit(c.b.limit() - 4);
-                        c.b.position(checksumStartPosition - 4);
-                        c.b.putInt(rowCount);
-                        c.b.position(0);
+                        c.b().limit(c.b().limit() - 4);
+                        c.b().position(checksumStartPosition - 4);
+                        c.b().putInt(rowCount);
+                        c.b().position(0);
                         success = true;
                     } finally {
                         if (!success) {
@@ -969,6 +1010,7 @@ public class TableSaveFile
 
                     synchronized (TableSaveFile.this) {
                         m_availableChunks.offer(c);
+                        c = null;
                         TableSaveFile.this.notifyAll();
                     }
                 } catch (EOFException eof) {
@@ -1004,24 +1046,29 @@ public class TableSaveFile
                         m_chunkReaderException = new IOException(e);
                         TableSaveFile.this.notifyAll();
                     }
+                } finally {
+                    if (c != null) c.discard();
                 }
             }
             DBBPool.cleanByteBuffer(fileInputBuffer);
         }
         private Container getOutputBuffer(final int nextChunkPartitionId) {
-            Container c = m_buffers.poll();
+            BBContainer c = m_buffers.poll();
             if (c == null) {
                 final BBContainer originContainer = DBBPool.allocateDirect(DEFAULT_CHUNKSIZE);
-                final ByteBuffer b = originContainer.b;
-                c = new Container(b, originContainer, nextChunkPartitionId);
+                final ByteBuffer b = originContainer.b();
+                final Container retcont = new Container(b, originContainer, nextChunkPartitionId);
+//                System.err.println("Constructed container " + Integer.toHexString(retcont.hashCode()) + " origin " + Integer.toHexString(originContainer.hashCode()));
+                return retcont;
             }
             /*
              * Need to reconstruct the container with the partition id of the next
              * chunk so it can be a final public field. The buffer, address, and origin
              * container remain the same.
              */
-            c = new Container(c.b, c.m_origin, nextChunkPartitionId);
-            return c;
+            final Container retcont = new Container(c.b(), c, nextChunkPartitionId);
+//            System.err.println("Constructed container " + Integer.toHexString(retcont.hashCode()) + " origin " + Integer.toHexString(c.hashCode()));
+            return retcont;
         }
 
         @Override
@@ -1044,5 +1091,12 @@ public class TableSaveFile
             }
         }
 
+//        @Override
+//        public void finalize() {
+//            if (necessaryDiscards.get() > 0) {
+//                System.err.println("TSF " + Integer.toHexString(this.hashCode()) + " finalized with necessary discards " + necessaryDiscards.get());
+//                System.exit(-1);
+//            }
+//        }
     }
 }

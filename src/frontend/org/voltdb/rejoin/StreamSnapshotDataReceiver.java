@@ -111,17 +111,17 @@ implements Runnable {
                     // this thread could hold on to a buffer it may not need and other receivers
                     // will be blocked if the pool has no more buffers left.
                     container = bufferQueue.take();
-                    ByteBuffer messageBuffer = container.b;
+                    ByteBuffer messageBuffer = container.b();
                     messageBuffer.clear();
 
                     compressionBuffer = compressionBufferQueue.take();
-                    compressionBuffer.b.clear();
-                    compressionBuffer.b.limit(data.length);
-                    compressionBuffer.b.put(data);
-                    compressionBuffer.b.flip();
+                    compressionBuffer.b().clear();
+                    compressionBuffer.b().limit(data.length);
+                    compressionBuffer.b().put(data);
+                    compressionBuffer.b().flip();
                     int uncompressedSize =
                             CompressionService.decompressBuffer(
-                                    compressionBuffer.b,
+                                    compressionBuffer.b(),
                                     messageBuffer);
                     messageBuffer.limit(uncompressedSize);
                     m_queue.offer(Pair.of(dataMsg.m_sourceHSId, Pair.of(dataMsg.getTargetId(), container)));
