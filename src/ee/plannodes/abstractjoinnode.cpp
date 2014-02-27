@@ -48,6 +48,7 @@
 #include "expressions/abstractexpression.h"
 
 #include <stdexcept>
+#include <sstream>
 
 using namespace std;
 using namespace voltdb;

@@ -767,7 +767,7 @@ TEST_F(NValueTest, TestCastToString) {
     Pool* testPool = new Pool();
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, false, "", 0);
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0);
 
     NValue tinyInt = ValueFactory::getTinyIntValue(120);
     NValue smallInt = ValueFactory::getSmallIntValue(120);
@@ -2068,7 +2068,7 @@ TEST_F(NValueTest, TestSubstring)
     Pool* testPool = new Pool();
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, false, "", 0);
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0);
     std::vector<std::string> testData;
     testData.push_back("abcdefg");
     testData.push_back("âbcdéfg");
@@ -2160,7 +2160,7 @@ TEST_F(NValueTest, TestExtract)
     Pool* testPool = new Pool();
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, false, "", 0);
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0);
 
     NValue result;
     NValue midSeptember = ValueFactory::getTimestampValue(1000000000000000);
@@ -2356,7 +2356,7 @@ TEST_F(NValueTest, TestInList)
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
     ExecutorContext* poolHolder =
-        new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, false, "", 0);
+        new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0);
 
     int int_set1[] = { 10, 2, -3 };
     int int_set2[] = { 0, 1, 100, 10000, 1000000 };
@@ -2564,7 +2564,7 @@ TEST_F(NValueTest, TestDedupAndSort) {
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
     ExecutorContext* poolHolder =
-    new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, false, "", 0);
+    new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0);
 
     std::vector<NValue> vectorValues;
     NValue arrayValue;
@@ -2770,7 +2770,7 @@ TEST_F(NValueTest, TestTimestampStringParse)
     Pool* testPool = new Pool();
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, false, "", 0);
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0);
 
     bool failed = false;
     const char* trials[] = {

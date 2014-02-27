@@ -110,7 +110,7 @@ public:
 class TupleStreamWrapperTest : public Test {
 public:
     TupleStreamWrapperTest() : m_wrapper(NULL), m_schema(NULL), m_tuple(NULL),
-        m_context(new ExecutorContext( 1, 1, NULL, &m_topend, NULL, true, "localhost", 2)) {
+        m_context(new ExecutorContext( 1, 1, NULL, &m_topend, NULL, NULL, true, "localhost", 2)) {
         srand(0);
 
         // set up the schema used to fill the new buffer

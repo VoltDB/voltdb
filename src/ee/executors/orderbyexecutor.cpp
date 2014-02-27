@@ -155,11 +155,6 @@ OrderByExecutor::p_execute(const NValueArray &params)
         limit_node->getLimitAndOffsetByReference(params, limit, offset);
     }
 
-    // substitute parameters in the order by expressions
-    for (int i = 0; i < node->getSortExpressions().size(); i++) {
-        node->getSortExpressions()[i]->substitute(params);
-    }
-
     VOLT_TRACE("Running OrderBy '%s'", m_abstractNode->debug().c_str());
     VOLT_TRACE("Input Table:\n '%s'", input_table->debug().c_str());
     TableIterator iterator = input_table->iterator();

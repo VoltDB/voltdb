@@ -15,6 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "common/NValue.hpp"
+
 namespace voltdb {
 
 /** implement the SQL ABS (absolute value) function for all numeric types */

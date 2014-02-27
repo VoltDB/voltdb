@@ -18,6 +18,8 @@
 #ifndef STRINGFUNCTIONS_H
 #define STRINGFUNCTIONS_H
 
+#include "common/NValue.hpp"
+
 namespace voltdb {
 
 static inline int32_t getCharLength(const char *valueChars, const size_t length) {

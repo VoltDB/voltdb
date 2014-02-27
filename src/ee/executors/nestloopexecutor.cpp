@@ -118,7 +118,6 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     //
     AbstractExpression *preJoinPredicate = node->getPreJoinPredicate();
     if (preJoinPredicate) {
-        preJoinPredicate->substitute(params);
         VOLT_TRACE ("Pre Join predicate: %s", preJoinPredicate == NULL ?
                     "NULL" : preJoinPredicate->debug(true).c_str());
     }
@@ -127,7 +126,6 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     //
     AbstractExpression *joinPredicate = node->getJoinPredicate();
     if (joinPredicate) {
-        joinPredicate->substitute(params);
         VOLT_TRACE ("Join predicate: %s", joinPredicate == NULL ?
                     "NULL" : joinPredicate->debug(true).c_str());
     }
@@ -136,7 +134,6 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     //
     AbstractExpression *wherePredicate = node->getWherePredicate();
     if (wherePredicate) {
-        wherePredicate->substitute(params);
         VOLT_TRACE ("Where predicate: %s", wherePredicate == NULL ?
                     "NULL" : wherePredicate->debug(true).c_str());
     }
