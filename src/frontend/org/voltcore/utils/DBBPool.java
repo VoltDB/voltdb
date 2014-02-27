@@ -142,7 +142,6 @@ public final class DBBPool {
 
     /**
      * Wrapper for HeapByteBuffers that allows them to pose as ByteBuffers from a pool.
-     * @author aweisberg
      *
      */
     public static final class BBWrapperContainer extends BBContainer {
@@ -168,8 +167,8 @@ public final class DBBPool {
         }
     }
 
-    public static class MBBWrapperContainer extends BBContainer {
-        private MBBWrapperContainer(MappedByteBuffer buf) {
+    public static class MBBContainer extends BBContainer {
+        private MBBContainer(MappedByteBuffer buf) {
             super(buf);
         }
 
@@ -185,23 +184,26 @@ public final class DBBPool {
         }
     }
 
+    public static final BBContainer dummyWrapBB(ByteBuffer b) {
+        return new BBWrapperContainer(b);
+    }
+
     /**
      * Static factory method to wrap a ByteBuffer in a BBContainer that is not
      * associated with any pool
      * @param b
      */
-    public static final BBWrapperContainer wrapBB(ByteBuffer b) {
-        return new BBWrapperContainer(b);
+    public static final BBContainer wrapBB(ByteBuffer b) {
+        if (b.isDirect()) {
+            return new DBBWrapperContainer(b);
+        } else {
+            return new BBWrapperContainer(b);
+        }
     }
 
-    public static final DBBWrapperContainer wrapDBB(ByteBuffer b) {
+    public static final MBBContainer wrapMBB(ByteBuffer b) {
         Preconditions.checkArgument(b.isDirect());
-        return new DBBWrapperContainer(b);
-    }
-
-    public static final MBBWrapperContainer wrapMBB(ByteBuffer b) {
-        Preconditions.checkArgument(b.isDirect());
-        return new MBBWrapperContainer((MappedByteBuffer)b);
+        return new MBBContainer((MappedByteBuffer)b);
     }
 
     /**
@@ -398,7 +400,7 @@ public final class DBBPool {
 
 
 
-//    private static NonBlockingHashMap<Long, Throwable> m_deletedStuff = new NonBlockingHashMap<Long, Throwable>();
+    private static NonBlockingHashMap<Long, Throwable> m_deletedStuff = new NonBlockingHashMap<Long, Throwable>();
 
     /*
      * Delete a char array that was allocated on the native heap
@@ -408,17 +410,18 @@ public final class DBBPool {
      * and it will validate that nothing is ever deleted twice at the cost of unbounded memory usage
      */
     private static void deleteCharArrayMemory(long pointer) {
-//        if (m_deletedStuff.putIfAbsent(pointer, new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " here")) != null) {
-//            new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " twice").printStackTrace();
-//            System.exit(-1);
-//        }
-        nativeDeleteCharArrayMemory(pointer);
+        if (m_deletedStuff.putIfAbsent(pointer, new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " here")) != null) {
+            m_deletedStuff.get(pointer).printStackTrace();
+            new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " twice").printStackTrace();
+            System.exit(-1);
+        }
+//        nativeDeleteCharArrayMemory(pointer);
     }
 
     private static native void nativeDeleteCharArrayMemory(long pointer);
 
-    public static DBBWrapperContainer allocateUnsafeByteBuffer(long size) {
-        return DBBPool.wrapDBB(nativeAllocateUnsafeByteBuffer(size));
+    public static BBContainer allocateUnsafeByteBuffer(long size) {
+        return DBBPool.wrapBB(nativeAllocateUnsafeByteBuffer(size));
     }
 
     /*

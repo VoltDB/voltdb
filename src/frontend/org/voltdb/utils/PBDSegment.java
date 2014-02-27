@@ -27,7 +27,7 @@ import java.nio.channels.FileChannel.MapMode;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltcore.utils.DBBPool.MBBWrapperContainer;
+import org.voltcore.utils.DBBPool.MBBContainer;
 import org.voltdb.utils.BinaryDeque.OutputContainerFactory;
 import org.xerial.snappy.Snappy;
 
@@ -48,7 +48,7 @@ class PBDSegment {
     final File m_file;
     private RandomAccessFile m_ras;
     private FileChannel m_fc;
-    private MBBWrapperContainer m_buf;
+    private MBBContainer m_buf;
     private ByteBuffer m_readBuf;
 
     //If this is the first time polling a segment, madvise the entire thing
@@ -255,7 +255,7 @@ class PBDSegment {
             ByteBuffer retbuf = m_readBuf.slice();
             m_readBuf.position(m_readBuf.limit());
             m_readBuf.limit(oldLimit);
-            return DBBPool.wrapBB(retbuf);
+            return DBBPool.dummyWrapBB(retbuf);
         }
     }
 

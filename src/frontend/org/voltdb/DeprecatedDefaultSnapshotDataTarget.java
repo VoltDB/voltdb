@@ -218,7 +218,7 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
          */
         m_acceptOneWrite = true;
         ListenableFuture<?> writeFuture =
-                write(Callables.returning((BBContainer)DBBPool.wrapBB(aggregateBuffer)), false);
+                write(Callables.returning(DBBPool.wrapBB(aggregateBuffer)), false);
         try {
             writeFuture.get();
         } catch (InterruptedException e) {
