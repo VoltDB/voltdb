@@ -21,12 +21,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
-import org.voltdb.iv2.MpInitiator;
 
 /**
- * Informs the initiators that the command log for this partition has reached
- * the end. The SPI should release any MP txn for replay immediately when it
- * sees the first fragment.
+ * Used between CommandLogReinitiators to informs the MP replayer that the
+ * command log for this partition has reached the end, or sent from the MPI to
+ * SPIs to indicate the end of MPs.
  */
 public class Iv2EndOfLogMessage extends TransactionInfoBaseMessage
 {
@@ -43,7 +42,6 @@ public class Iv2EndOfLogMessage extends TransactionInfoBaseMessage
         m_pid = pid;
     }
 
-    public boolean isMP() { return m_pid == MpInitiator.MP_INIT_PID; }
     public int getPid() { return m_pid; }
 
     @Override

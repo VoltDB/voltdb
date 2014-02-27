@@ -32,8 +32,7 @@ import org.voltdb.types.ExpressionType;
 public class ParameterValueExpression extends AbstractValueExpression {
 
     public enum Members {
-        PARAM_IDX,
-        PARAM_IS_VECTOR;
+        PARAM_IDX;
     }
 
     int m_paramIndex = -1;
@@ -91,9 +90,6 @@ public class ParameterValueExpression extends AbstractValueExpression {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.key(Members.PARAM_IDX.name()).value(m_paramIndex);
-        if (m_paramIsVector) {
-            stringer.key(Members.PARAM_IS_VECTOR.name()).value(m_paramIsVector);
-        }
     }
 
     @Override
@@ -101,9 +97,6 @@ public class ParameterValueExpression extends AbstractValueExpression {
     {
         assert ! obj.isNull(Members.PARAM_IDX.name());
         m_paramIndex = obj.getInt(Members.PARAM_IDX.name());
-        if (!obj.isNull(Members.PARAM_IS_VECTOR.name())) {
-            m_paramIsVector = obj.getBoolean(Members.PARAM_IS_VECTOR.name());
-        }
     }
 
     @Override
