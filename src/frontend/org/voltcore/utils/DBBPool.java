@@ -23,13 +23,13 @@ import java.nio.MappedByteBuffer;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google_voltpatches.common.base.Preconditions;
+import org.apache.hadoop_voltpatches.hbase.utils.DirectMemoryUtils;
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
+import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashSet;
 import org.voltcore.logging.VoltLogger;
-
 import sun.misc.Cleaner;
 import sun.nio.ch.DirectBuffer;
-
-import com.google_voltpatches.common.base.Preconditions;
 
 /**
  * A pool of {@link java.nio.ByteBuffer ByteBuffers} that are
@@ -398,7 +398,7 @@ public final class DBBPool {
 
 
 
-    private static NonBlockingHashMap<Long, Throwable> m_deletedStuff = new NonBlockingHashMap<Long, Throwable>();
+//    private static NonBlockingHashMap<Long, Throwable> m_deletedStuff = new NonBlockingHashMap<Long, Throwable>();
 
     /*
      * Delete a char array that was allocated on the native heap
@@ -408,11 +408,11 @@ public final class DBBPool {
      * and it will validate that nothing is ever deleted twice at the cost of unbounded memory usage
      */
     private static void deleteCharArrayMemory(long pointer) {
-        if (m_deletedStuff.putIfAbsent(pointer, new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " here")) != null) {
-            new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " twice").printStackTrace();
-            System.exit(-1);
-        }
-//        nativeDeleteCharArrayMemory(pointer);
+//        if (m_deletedStuff.putIfAbsent(pointer, new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " here")) != null) {
+//            new Throwable("Thread \"" + Thread.currentThread().getName() + "\" deleted " + Long.toHexString(pointer) + " twice").printStackTrace();
+//            System.exit(-1);
+//        }
+        nativeDeleteCharArrayMemory(pointer);
     }
 
     private static native void nativeDeleteCharArrayMemory(long pointer);

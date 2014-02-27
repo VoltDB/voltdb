@@ -61,7 +61,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     /** Create a ByteBuffer (in a container) for serializing arguments to C++. Use a direct
     ByteBuffer as it will be passed directly to the C++ code. */
-    private BBContainer psetBuffer = null;
+    private BBContainer psetBufferC = null;
+    private ByteBuffer psetBuffer = null;
 
     /**
      * A deserializer backed by a direct byte buffer, for fast access from C++.
@@ -131,13 +132,15 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     final void setupPsetBuffer(int size) {
         if (psetBuffer != null) {
-            psetBuffer.discard();
+            psetBufferC.discard();
+            psetBuffer = null;
         }
 
-        psetBuffer = DBBPool.allocateDirect(size);
+        psetBufferC = DBBPool.allocateDirect(size);
+        psetBuffer = psetBufferC.b();
 
-        int errorCode = nativeSetBuffers(pointer, psetBuffer.b(),
-                psetBuffer.b().capacity(),
+        int errorCode = nativeSetBuffers(pointer, psetBuffer,
+                psetBuffer.capacity(),
                 deserializer.buffer(), deserializer.buffer().capacity(),
                 exceptionBuffer, exceptionBuffer.capacity());
         checkErrorCode(errorCode);
@@ -145,11 +148,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     final void clearPsetAndEnsureCapacity(int size) {
         assert(psetBuffer != null);
-        if (size > psetBuffer.b().capacity()) {
+        if (size > psetBuffer.capacity()) {
             setupPsetBuffer(size);
         }
         else {
-            psetBuffer.b().clear();
+            psetBuffer.clear();
         }
     }
 
@@ -186,7 +189,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         deserializerBufferOrigin.discard();
         exceptionBuffer = null;
         exceptionBufferOrigin.discard();
-        psetBuffer.discard();
+        psetBufferC.discard();
+        psetBuffer = null;
         LOG.trace("Released Execution Engine.");
     }
 
@@ -261,12 +265,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         for (int i = 0; i < batchSize; ++i) {
             if (parameterSets[i] instanceof ByteBuffer) {
                 ByteBuffer buf = (ByteBuffer) parameterSets[i];
-                psetBuffer.b().put(buf);
+                psetBuffer.put(buf);
             }
             else {
                 ParameterSet pset = (ParameterSet) parameterSets[i];
                 try {
-                    pset.flattenToBuffer(psetBuffer.b());
+                    pset.flattenToBuffer(psetBuffer);
                 }
                 catch (final IOException exception) {
                     throw new RuntimeException("Error serializing parameters for SQL batch element: " +
@@ -548,7 +552,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         // serialize the param set
         clearPsetAndEnsureCapacity(parameterSet.getSerializedSize());
         try {
-            parameterSet.flattenToBuffer(psetBuffer.b());
+            parameterSet.flattenToBuffer(psetBuffer);
         } catch (final IOException exception) {
             throw new RuntimeException(exception); // can't happen
         }
@@ -565,7 +569,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             // serialize the param set
             clearPsetAndEnsureCapacity(parameterSet.getSerializedSize());
             try {
-                parameterSet.flattenToBuffer(psetBuffer.b());
+                parameterSet.flattenToBuffer(psetBuffer);
             } catch (final IOException exception) {
                 throw new RuntimeException(exception); // can't happen
             }
@@ -595,8 +599,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
         byte retval[] = null;
         try {
-            psetBuffer.b().putLong(taskType.taskId);
-            psetBuffer.b().put(task);
+            psetBuffer.putLong(taskType.taskId);
+            psetBuffer.put(task);
 
             //Clear is destructive, do it before the native call
             deserializer.clear();

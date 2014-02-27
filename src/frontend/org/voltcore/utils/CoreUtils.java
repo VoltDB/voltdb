@@ -73,6 +73,13 @@ public class CoreUtils {
     public static final int SMALL_STACK_SIZE = 1024 * 256;
     public static final int MEDIUM_STACK_SIZE = 1024 * 512;
 
+    public static volatile Runnable m_threadLocalDeallocator = new Runnable() {
+        @Override
+        public void run() {
+
+        }
+    };
+
     public static final ListenableFuture<Object> COMPLETED_FUTURE = new ListenableFuture<Object>() {
         @Override
         public void addListener(Runnable listener, Executor executor) { executor.execute(listener); }
@@ -290,6 +297,8 @@ public class CoreUtils {
                             r.run();
                         } catch (Throwable t) {
                             hostLog.error("Exception thrown in thread " + threadName, t);
+                        } finally {
+                            m_threadLocalDeallocator.run();
                         }
                     }
                 };
