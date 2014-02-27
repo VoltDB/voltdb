@@ -87,6 +87,18 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         assertEquals(0, type.compareTo(VoltType.get((byte) col.getType())));
     }
 
+    //Check given col type if catalog was compiled.
+    public void verifyTableColumnNullable(VoltCompiler compiler, String tableName, String colName, boolean shouldBeNullable) {
+        Database db = compiler.m_catalog.getClusters().get("cluster").getDatabases().get("database");
+        Table table = db.getTables().get(tableName);
+        Column col = table.getColumns().get(colName);
+        if (shouldBeNullable) {
+            assertTrue(col.getNullable());
+        } else {
+            assertFalse(col.getNullable());
+        }
+    }
+
     //Check given col size
     public void verifyTableColumnSize(VoltCompiler compiler, String tableName, String colName, int sz) {
         Database db = compiler.m_catalog.getClusters().get("cluster").getDatabases().get("database");
@@ -466,6 +478,38 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         assertEquals(1, foundSZError);
     }
 
+    public void testAlterTableAddConstraint() throws IOException {
+        final String simpleSchema1
+                = "create table mytable  (pkey varchar(50), column2_integer integer);\n"
+                + "alter table mytable alter column pkey varchar(50) NOT NULL;\n";
+
+        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
+        final VoltCompiler compiler = new VoltCompiler();
+        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertFalse(success);
+        //constraint definition not allowed in statement
+        int foundNoConstraintError = 0;
+        for (VoltCompiler.Feedback f : compiler.m_errors) {
+            if (f.message.toLowerCase().contains("constraint definition not allowed in statement")) {
+                foundNoConstraintError++;
+            }
+        }
+        assertEquals(1, foundNoConstraintError);
+    }
+
+    public void testAlterTableRemoveConstraint() throws IOException {
+        final String simpleSchema1
+                = "create table mytable  (pkey varchar(50) NOT NULL, column2_integer integer);\n"
+                + "alter table mytable alter column pkey varchar(50) NOT NULL;\n";
+
+        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
+        final VoltCompiler compiler = new VoltCompiler();
+        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertTrue(success);
+        //Check that constraint is still valid. This test fails need to fix HSQL then enable it.
+        //verifyTableColumnNullable(compiler, "mytable", "pkey", false);
+    }
+
     public void testAlterTableOverflowVarchar() throws IOException {
         final String simpleSchema1
                 = "create table mytable  (pkey integer, column2_integer integer);\n"
@@ -682,6 +726,26 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
             }
         }
         assertEquals(1, foundMissingError);
+    }
+
+    public void testAlterTableDropOfPartitionColumn() throws IOException {
+        final String simpleSchema1
+                = "create table mytable  (pkey integer NOT NULL, column2_integer integer);\n"
+                + "PARTITION TABLE mytable ON COLUMN pkey;"
+                + "alter table mytable drop column pkey;\n";
+
+        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
+        final VoltCompiler compiler = new VoltCompiler();
+        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertFalse(success);
+        //PARTITION has unknown COLUMN
+        int foundUnknownError = 0;
+        for (VoltCompiler.Feedback f : compiler.m_errors) {
+            if (f.message.contains("PARTITION has unknown COLUMN")) {
+                foundUnknownError++;
+            }
+        }
+        assertEquals(1, foundUnknownError);
     }
 
     public void testAlterTableSizeChangeAndConstraintChangeOfPartitionColumn() throws IOException {
