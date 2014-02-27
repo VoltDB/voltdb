@@ -558,7 +558,7 @@ public class LocalCluster implements VoltServerConfig {
                 }
             }
             // this error case should only be from a timeout
-            if (!allReady) {
+            else if (!allReady) {
                 throw new RuntimeException(
                         "One or more external processes failed to complete initialization.");
             }
