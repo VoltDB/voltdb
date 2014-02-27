@@ -37,7 +37,7 @@ import shlex
 
 from voltcli import utility
 
-re_voltdb_jar = re.compile('^voltdb(client)?-[.0-9]+[.]jar$')
+re_voltdb_jar = re.compile('^voltdb(client)?-[.0-9]+[.]([\w]+\.)*jar$')
 
 config_name = 'volt.cfg'
 config_name_local = 'volt_local.cfg'

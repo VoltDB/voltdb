@@ -573,8 +573,8 @@ public abstract class CatalogUtil {
             return false;
         }
 
-        // Is it properly formed?
-        int[] catalogVersion = MiscUtils.parseVersionString(catalogVersionStr);
+        //Check that it is a properly formed version string
+        Object[] catalogVersion = MiscUtils.parseVersionString(catalogVersionStr);
         if (catalogVersion == null) {
             return false;
         }
