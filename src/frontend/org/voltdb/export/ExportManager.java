@@ -542,7 +542,7 @@ public class ExportManager
         try {
             ExportGeneration generation = instance.m_generations.get(exportGeneration);
             if (generation == null) {
-                DBBPool.wrapDBB(buffer).discard();
+                DBBPool.wrapBB(buffer).discard();
                 /*
                  * If the generation was already drained it is fine for a buffer to come late and miss it
                  */

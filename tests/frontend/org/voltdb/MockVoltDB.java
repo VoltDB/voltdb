@@ -39,6 +39,7 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltZK.MailboxType;
@@ -69,7 +70,7 @@ public class MockVoltDB implements VoltDBInterface
     OperationMode m_startMode = OperationMode.RUNNING;
     ReplicationRole m_replicationRole = ReplicationRole.NONE;
     VoltDB.Configuration voltconfig = null;
-    private final ListeningExecutorService m_es = MoreExecutors.listeningDecorator(Executors.newSingleThreadExecutor());
+    private final ListeningExecutorService m_es = MoreExecutors.listeningDecorator(CoreUtils.getSingleThreadExecutor("Mock Computation Service"));
     public int m_hostId = 0;
     private SiteTracker m_siteTracker;
     private final Map<MailboxType, List<MailboxNodeContent>> m_mailboxMap =

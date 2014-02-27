@@ -445,16 +445,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             + " Buffer info: " + uso + " Size: " + buffer.capacity());
                     return;
                 }
-                final BBContainer cont = DBBPool.wrapDBB(buffer);
+                final BBContainer cont = DBBPool.wrapBB(buffer);
                 try {
                     m_committedBuffers.offer(new StreamBlock(
                             new BBContainer(buffer) {
                                 @Override
                                 public void discard() {
                                     final ByteBuffer buf = checkDoubleFree();
-                                    if (buf.isDirect()) {
-                                        cont.discard();
-                                    }
+                                    cont.discard();
                                     deleted.set(true);
                                 }
                             }, uso, false));

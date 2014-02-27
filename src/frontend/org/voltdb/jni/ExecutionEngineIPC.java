@@ -792,6 +792,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 }
             }
         } catch (final IOException exception) {
+            fser.discard();
             throw new RuntimeException(exception);
         }
 
@@ -818,6 +819,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             m_data.putLong(inputDepIds[i]);
         }
         m_data.put(fser.getBuffer());
+        fser.discard();
 
         try {
             m_data.flip();

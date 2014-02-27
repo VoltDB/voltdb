@@ -41,7 +41,7 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 
 import com.google_voltpatches.common.base.Joiner;
-import org.voltcore.utils.DBBPool.MBBWrapperContainer;
+import org.voltcore.utils.DBBPool.MBBContainer;
 import org.voltdb.EELibraryLoader;
 import org.xerial.snappy.Snappy;
 
@@ -439,7 +439,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 File segmentFile = segment.m_file;
                 RandomAccessFile ras = new RandomAccessFile(segmentFile, "rw");
                 FileChannel fc = ras.getChannel();
-                MBBWrapperContainer readBufferC = DBBPool.wrapMBB(fc.map(MapMode.READ_WRITE, 0, fc.size()));
+                MBBContainer readBufferC = DBBPool.wrapMBB(fc.map(MapMode.READ_WRITE, 0, fc.size()));
                 final ByteBuffer readBuffer = readBufferC.b();
                 final long buffAddr = readBufferC.address();
                 try {
