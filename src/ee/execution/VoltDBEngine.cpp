@@ -166,7 +166,8 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          int32_t partitionId,
                          int32_t hostId,
                          string hostname,
-                         int64_t tempTableMemoryLimit)
+                         int64_t tempTableMemoryLimit,
+                         int32_t compactionThreshold)
 {
     // Be explicit about running in the standard C locale for now.
     locale::global(locale("C"));
@@ -175,6 +176,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_siteId = siteId;
     m_partitionId = partitionId;
     m_tempTableMemoryLimit = tempTableMemoryLimit;
+    m_compactionThreshold = compactionThreshold;
 
     // Instantiate our catalog - it will be populated later on by load()
     m_catalog = boost::shared_ptr<catalog::Catalog>(new catalog::Catalog());
@@ -708,7 +710,8 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
 
             TableCatalogDelegate *tcd = new TableCatalogDelegate(catalogTable->relativeIndex(),
                                                                  catalogTable->path(),
-                                                                 catalogTable->signature());
+                                                                 catalogTable->signature(),
+                                                                 m_compactionThreshold);
 
             // use the delegate to init the table and create indexes n' stuff
             if (tcd->init(*m_database, *catalogTable) != 0) {

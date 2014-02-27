@@ -45,9 +45,9 @@
 using namespace std;
 namespace voltdb {
 
-TableCatalogDelegate::TableCatalogDelegate(int32_t catalogId, string path, string signature) :
+TableCatalogDelegate::TableCatalogDelegate(int32_t catalogId, string path, string signature, int32_t compactionThreshold) :
     CatalogDelegate(catalogId, path), m_table(NULL), m_exportEnabled(false),
-    m_signature(signature)
+    m_signature(signature), m_compactionThreshold(compactionThreshold)
 {
 }
 
@@ -234,7 +234,8 @@ TableCatalogDelegate::getIndexIdString(const TableIndexScheme &indexScheme)
 
 
 Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &catalogDatabase,
-                                                       catalog::Table const &catalogTable)
+                                                       catalog::Table const &catalogTable,
+                                                       const int32_t compactionThreshold)
 {
     // Create a persistent table for this table in our catalog
     int32_t table_id = catalogTable.relativeIndex();
@@ -362,7 +363,8 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
                                                     partitionColumnIndex, exportEnabled,
                                                     tableIsExportOnly,
                                                     0,
-                                                    catalogTable.tuplelimit());
+                                                    catalogTable.tuplelimit(),
+                                                    compactionThreshold);
 
     // add a pkey index if one exists
     if (pkey_index_id.size() != 0) {
@@ -387,7 +389,8 @@ TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
                            catalog::Table const &catalogTable)
 {
     m_table = constructTableFromCatalog(catalogDatabase,
-                                        catalogTable);
+                                        catalogTable,
+                                        m_compactionThreshold);
     if (!m_table) {
         return false; // mixing ints and booleans here :(
     }
@@ -462,7 +465,7 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatab
     ///////////////////////////////////////////////
 
     PersistentTable *newTable =
-        dynamic_cast<PersistentTable*>(constructTableFromCatalog(catalogDatabase, catalogTable));
+        dynamic_cast<PersistentTable*>(constructTableFromCatalog(catalogDatabase, catalogTable, m_compactionThreshold));
     assert(newTable);
     PersistentTable *existingTable = dynamic_cast<PersistentTable*>(m_table);
 
