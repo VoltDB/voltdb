@@ -37,7 +37,6 @@ import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
-import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
@@ -428,10 +427,27 @@ public class TestSubQueries extends PlannerTestCase {
     }
 
     public void testSubSelects_Distributed() {
-        AbstractPlanNode pn;
-
+        String tmpErrorMsg = "Subselect queries only are supported in single partition stored procedure.";
         // Partitioned sub-query
-        List<AbstractPlanNode> lpn = compileToFragments("select A, C FROM (SELECT A, C FROM P1) T1 ");
+        failToCompile("select A, C FROM (SELECT A, C FROM P1) T1 ", tmpErrorMsg);
+        failToCompile("select A FROM (SELECT A, C FROM P1 WHERE A > 3) T1 ", tmpErrorMsg);
+
+        // AdHoc does not detect partitioning for sub-select query.
+        failToCompile("select A, C FROM (SELECT A, C FROM P1 WHERE A = 3) T1 ", tmpErrorMsg);
+
+        // force it to be single partitioned.
+        AbstractPlanNode pn;
+        pn = compileForSinglePartition("select A FROM (SELECT A, C FROM P1 WHERE A > 3) T1");
+        System.out.println(pn.toExplainPlanString());
+        pn = pn.getChild(0);
+        checkSimpleSubSelects(pn, "T1",  "A" );
+        pn = pn.getChild(0);
+        checkIndexedSubSelects(pn, "P1", "SYS_IDX_P1_PK_TREE", "A", "C");
+
+        // In future, turn the next block on when AdHoc multiple partitioned procedure are supported.
+/*
+        List<AbstractPlanNode> lpn;
+        lpn = compileToFragments("select A, C FROM (SELECT A, C FROM P1) T1 ");
         assertTrue(lpn.size() == 2);
         pn = lpn.get(0).getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
@@ -444,7 +460,6 @@ public class TestSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkSimpleSubSelects(pn, "P1",  "A", "C" );
 
-
         lpn = compileToFragments("select A, C FROM (SELECT A, C FROM P1 WHERE A = 3) T1 ");
         assertTrue(lpn.size() == 2);
         pn = lpn.get(0).getChild(0);
@@ -455,7 +470,6 @@ public class TestSubQueries extends PlannerTestCase {
         checkSimpleSubSelects(pn, "T1",  "A", "C" );
         pn = pn.getChild(0);
         checkIndexedSubSelects(pn, "P1", "SYS_IDX_P1_PK_TREE", "A", "C");
-
 
         lpn = compileToFragments("select A FROM (SELECT A, C FROM P1 WHERE A > 3) T1 ");
         assertTrue(lpn.size() == 2);
@@ -469,6 +483,7 @@ public class TestSubQueries extends PlannerTestCase {
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
         checkIndexedSubSelects(pn, "P1", "SYS_IDX_P1_PK_TREE", "A", "C");
+*/
     }
 
     public void testTry() {
@@ -510,12 +525,16 @@ public class TestSubQueries extends PlannerTestCase {
         failToCompile("select D1, D2 FROM " +
                 "(SELECT A, D D1 FROM P1) T1, (SELECT A, D D2 FROM P2) T2 WHERE T1.A = 1 AND T2.A = 2", errorJoinMsg);
 
+
+        String tmpErrorMsg = "Subselect queries only are supported in single partition stored procedure.";
+
+        // parent partition table join with subselect partitioned temp table
         failToCompile("select * from p2, (select * from (SELECT A, D D1 FROM P1) T1) T2 where p2.D= T2.D1",
-                errorJoinMsg);
+                tmpErrorMsg);
 
         // FIXME(xin): This should be supported
-        failToCompile("select * from p2, (select * from (SELECT A, D D1 FROM P1 WHERE A=2) T1) T2 where p2.D= T2.D1",
-                errorJoinMsg);
+        failToCompile("select * from p2, (select * from (SELECT A, D D1 FROM P1 WHERE A=2) T1) T2 where p2.D = T2.D1",
+                tmpErrorMsg);
     }
 
     public void testSubSelects_Edge_Cases() {
@@ -609,6 +628,41 @@ public class TestSubQueries extends PlannerTestCase {
         List<AbstractPlanNode> planNodes;
         AbstractPlanNode nlpn;
 
+        // Left Outer join
+        planNodes = compileToFragments("SELECT A, C FROM R1 LEFT JOIN (SELECT A, C FROM R2) T1 ON T1.C = R1.C ");
+        assertTrue(planNodes.size() == 1);
+        pn = planNodes.get(0).getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        nlpn = pn.getChild(0);
+        assertTrue(nlpn instanceof NestLoopPlanNode);
+        assertEquals(JoinType.LEFT, ((NestLoopPlanNode) nlpn).getJoinType());
+        pn = nlpn.getChild(0);
+        checkSimpleSubSelects(pn, "R1", "A", "C"); // so clever, not select "D"
+        pn = nlpn.getChild(1);
+        checkSimpleSubSelects(pn, "T1", "C"); // so clever, not select "A"
+        pn = pn.getChild(0);
+        checkSimpleSubSelects(pn, "R2", "A", "C");
+
+/*
+        planNodes = compileToFragments("SELECT A, C FROM R1 LEFT JOIN (SELECT A, C FROM P1) T1 ON T1.C = R1.C ");
+        assertTrue(planNodes.size() == 2);
+        pn = planNodes.get(0).getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ReceivePlanNode);
+        nlpn = planNodes.get(1).getChild(0);
+        assertTrue(nlpn instanceof NestLoopPlanNode);
+        assertEquals(JoinType.LEFT, ((NestLoopPlanNode) nlpn).getJoinType());
+        pn = nlpn.getChild(0);
+        checkSimpleSubSelects(pn, "R1", "A", "C"); // so clever, not select "D"
+        pn = nlpn.getChild(1);
+        checkSimpleSubSelects(pn, "T1", "C"); // so clever, not select "A"
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode); // Why projection node here? Incorrect?
+        pn = pn.getChild(0);
+        checkSimpleSubSelects(pn, "P1", "A", "C");
+
+
         // Two sub-queries. One is partitioned and the other one is replicated
         planNodes = compileToFragments("select A, C FROM (SELECT A FROM R1) T1, (SELECT C FROM P1) T2 WHERE T1.A = T2.C ");
         assertTrue(planNodes.size() == 2);
@@ -634,41 +688,6 @@ public class TestSubQueries extends PlannerTestCase {
         assertTrue(pn instanceof ProjectionPlanNode); // Why projection node here? Incorrect?
         pn = pn.getChild(0);
         checkSimpleSubSelects(pn, "P1", "C");
-
-
-        // Left Outer join
-        planNodes = compileToFragments("SELECT A, C FROM R1 LEFT JOIN (SELECT A, C FROM R2) T1 ON T1.C = R1.C ");
-        assertTrue(planNodes.size() == 1);
-        pn = planNodes.get(0).getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        nlpn = pn.getChild(0);
-        assertTrue(nlpn instanceof NestLoopPlanNode);
-        assertEquals(JoinType.LEFT, ((NestLoopPlanNode) nlpn).getJoinType());
-        pn = nlpn.getChild(0);
-        checkSimpleSubSelects(pn, "R1", "A", "C"); // so clever, not select "D"
-        pn = nlpn.getChild(1);
-        checkSimpleSubSelects(pn, "T1", "C"); // so clever, not select "A"
-        pn = pn.getChild(0);
-        checkSimpleSubSelects(pn, "R2", "A", "C");
-
-
-        planNodes = compileToFragments("SELECT A, C FROM R1 LEFT JOIN (SELECT A, C FROM P1) T1 ON T1.C = R1.C ");
-        assertTrue(planNodes.size() == 2);
-        pn = planNodes.get(0).getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof ReceivePlanNode);
-        nlpn = planNodes.get(1).getChild(0);
-        assertTrue(nlpn instanceof NestLoopPlanNode);
-        assertEquals(JoinType.LEFT, ((NestLoopPlanNode) nlpn).getJoinType());
-        pn = nlpn.getChild(0);
-        checkSimpleSubSelects(pn, "R1", "A", "C"); // so clever, not select "D"
-        pn = nlpn.getChild(1);
-        checkSimpleSubSelects(pn, "T1", "C"); // so clever, not select "A"
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode); // Why projection node here? Incorrect?
-        pn = pn.getChild(0);
-        checkSimpleSubSelects(pn, "P1", "A", "C");
 
 
         // This should be a single fragment plan if planner can detect "A = 3".
@@ -697,6 +716,7 @@ public class TestSubQueries extends PlannerTestCase {
         checkSimpleSubSelects(pn, "T2", "C");
         pn = pn.getChild(0);
         checkIndexedSubSelects(pn, "P1", "SYS_IDX_P1_PK_TREE", "C");
+*/
 
 
         //

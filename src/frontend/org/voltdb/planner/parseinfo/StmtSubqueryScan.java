@@ -90,7 +90,7 @@ public class StmtSubqueryScan extends StmtTableScan {
     @Override
     public boolean getIsReplicated() {
         boolean isReplicated = true;
-        for (StmtTableScan tableScan : m_subquery.tableAliasMap.values()) {
+        for (StmtTableScan tableScan : m_subquery.m_tableAliasMap.values()) {
             isReplicated = isReplicated && tableScan.getIsReplicated();
             if ( ! isReplicated) {
                 return false;

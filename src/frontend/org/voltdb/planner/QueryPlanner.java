@@ -256,7 +256,7 @@ public class QueryPlanner {
             m_recentErrorMsg = "Failed to parse SQL statement: " + m_sql;
             return null;
         }
-        if ((parsedStmt.tableList.size() > m_maxTablesPerJoin) && (parsedStmt.joinOrder == null)) {
+        if ((parsedStmt.m_tableList.size() > m_maxTablesPerJoin) && (parsedStmt.m_joinOrder == null)) {
             m_recentErrorMsg = "Failed to parse SQL statement: " + m_sql + " because a join of > 5 tables was requested"
                                + " without specifying a join order. See documentation for instructions on manually" +
                                  " specifying a join order";

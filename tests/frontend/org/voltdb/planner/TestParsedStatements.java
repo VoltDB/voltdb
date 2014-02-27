@@ -86,13 +86,13 @@ public class TestParsedStatements extends TestCase {
         AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(stmtSQL, xmlSQL, null, m_db, null);
         // analyze expressions
         // except for "insert" statements that currently do without a joinTree.
-        if (parsedStmt.joinTree != null) {
-            parsedStmt.joinTree.analyzeJoinExpressions(parsedStmt.noTableSelectionList);
+        if (parsedStmt.m_joinTree != null) {
+            parsedStmt.m_joinTree.analyzeJoinExpressions(parsedStmt.m_noTableSelectionList);
         }
         // output a description of the parsed stmt
         BuildDirectoryUtils.writeFile("statement-hsql-parsed", stmtName + ".txt", parsedStmt.toString(), true);
 
-        assertTrue(parsedStmt.noTableSelectionList.isEmpty());
+        assertTrue(parsedStmt.m_noTableSelectionList.isEmpty());
 
         System.out.println(parsedStmt.toString());
     }

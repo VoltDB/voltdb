@@ -69,7 +69,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     void parseTablesAndParams(VoltXMLElement stmtNode) {
 
         assert(stmtNode.children.size() > 1);
-        tableList.clear();
+        m_tableList.clear();
         for (VoltXMLElement childSQL : stmtNode.children) {
             if (childSQL.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
                 AbstractParsedStmt childStmt = new ParsedSelectStmt(this.m_paramValues, this.m_db);
@@ -77,13 +77,13 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
                 m_children.add(childStmt);
 
                 // Add statement's tables to the consolidated list
-                tableList.addAll(childStmt.tableList);
+                m_tableList.addAll(childStmt.m_tableList);
             } else if (childSQL.name.equalsIgnoreCase(UNION_NODE_NAME)) {
                 ParsedUnionStmt childStmt = new ParsedUnionStmt(this.m_paramValues, this.m_db);
                 childStmt.parseTablesAndParams(childSQL);
                 m_children.add(childStmt);
                 // Add statement's tables to the consolidated list
-                tableList.addAll(childStmt.tableList);
+                m_tableList.addAll(childStmt.m_tableList);
             } else {
                 throw new PlanningErrorException("Unexpected Element in UNION statement: " + childSQL.name);
             }
@@ -101,8 +101,8 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             selectStmt.postParse(sql, joinOrder);
         }
 
-        this.sql = sql;
-        this.joinOrder = joinOrder;
+        this.m_sql = sql;
+        this.m_joinOrder = joinOrder;
     }
 
     public boolean isOrderDeterministic() {

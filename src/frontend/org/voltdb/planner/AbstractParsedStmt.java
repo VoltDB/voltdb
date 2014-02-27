@@ -48,27 +48,27 @@ import org.voltdb.types.JoinType;
 
 public abstract class AbstractParsedStmt {
 
-    public String sql;
+    public String m_sql;
 
     // The initial value is a safety net for the case of parameter-less statements.
     private ParameterValueExpression[] m_paramList = new ParameterValueExpression[0];
 
     protected HashMap<Long, ParameterValueExpression> m_paramsById = new HashMap<Long, ParameterValueExpression>();
 
-    public ArrayList<Table> tableList = new ArrayList<Table>();
+    public ArrayList<Table> m_tableList = new ArrayList<Table>();
     private Table m_DDLIndexedTable = null;
 
-    public ArrayList<AbstractExpression> noTableSelectionList = new ArrayList<AbstractExpression>();
+    public ArrayList<AbstractExpression> m_noTableSelectionList = new ArrayList<AbstractExpression>();
 
-    protected ArrayList<AbstractExpression> aggregationList = null;
+    protected ArrayList<AbstractExpression> m_aggregationList = null;
 
     // Hierarchical join representation
-    public JoinNode joinTree = null;
+    public JoinNode m_joinTree = null;
 
     //User specified join order, null if none is specified
-    public String joinOrder = null;
+    public String m_joinOrder = null;
 
-    public HashMap<String, StmtTableScan> tableAliasMap = new HashMap<String, StmtTableScan>();
+    public HashMap<String, StmtTableScan> m_tableAliasMap = new HashMap<String, StmtTableScan>();
 
     protected final String[] m_paramValues;
     public final Database m_db;
@@ -224,8 +224,8 @@ public abstract class AbstractParsedStmt {
      * @param joinOrder
      */
     void postParse(String sql, String joinOrder) {
-        this.sql = sql;
-        this.joinOrder = joinOrder;
+        this.m_sql = sql;
+        this.m_joinOrder = joinOrder;
     }
 
     /**
@@ -253,9 +253,9 @@ public abstract class AbstractParsedStmt {
         }
         else if (elementName.equals("aggregation")) {
             retval = parseAggregationExpression(root);
-            if (aggregationList != null) {
+            if (m_aggregationList != null) {
                 ExpressionUtil.finalizeValueTypes(retval);
-                aggregationList.add(retval);
+                m_aggregationList.add(retval);
             }
         }
         else if (elementName.equals("function")) {
@@ -360,7 +360,7 @@ public abstract class AbstractParsedStmt {
         if (tableAlias == null) {
             tableAlias = tableName;
         }
-        StmtTableScan tableScan = tableAliasMap.get(tableAlias);
+        StmtTableScan tableScan = m_tableAliasMap.get(tableAlias);
         assert(tableScan != null);
         String columnName = exprNode.attributes.get("column");
         String columnAlias = exprNode.attributes.get("alias");
@@ -381,7 +381,7 @@ public abstract class AbstractParsedStmt {
      */
     private StmtTableScan addTableToStmtCache(String tableName, String tableAlias, AbstractParsedStmt subquery) {
         // Create an index into the query Catalog cache
-        StmtTableScan tableScan = tableAliasMap.get(tableAlias);
+        StmtTableScan tableScan = m_tableAliasMap.get(tableAlias);
         if (tableScan == null) {
             if (subquery == null) {
                 tableScan = new StmtTargetTableScan(getTableFromDB(tableName), tableAlias);
@@ -389,7 +389,7 @@ public abstract class AbstractParsedStmt {
                 // Temp table always have name SYSTEM_SUBQUERY + hashCode.
                 tableScan = new StmtSubqueryScan(subquery, tableAlias);
             }
-            tableAliasMap.put(tableAlias, tableScan);
+            m_tableAliasMap.put(tableAlias, tableScan);
         }
         return tableScan;
     }
@@ -567,11 +567,11 @@ public abstract class AbstractParsedStmt {
      * Build a WHERE expression for a single-table statement.
      */
     public AbstractExpression getSingleTableFilterExpression() {
-        if (joinTree == null) { // Not possible.
-            assert(joinTree != null);
+        if (m_joinTree == null) { // Not possible.
+            assert(m_joinTree != null);
             return null;
         }
-        return joinTree.getSimpleFilterExpression();
+        return m_joinTree.getSimpleFilterExpression();
     }
 
     /**
@@ -599,20 +599,20 @@ public abstract class AbstractParsedStmt {
 
         // The join type of the leaf node is always INNER
         // For a new tree its node's ids start with 0 and keep incrementing by 1
-        int nodeId = (joinTree == null) ? 0 : joinTree.getId() + 1;
+        int nodeId = (m_joinTree == null) ? 0 : m_joinTree.getId() + 1;
 
         JoinNode leafNode;
         if (tableScan instanceof StmtTargetTableScan) {
             Table table = ((StmtTargetTableScan)tableScan).getTargetTable();
-            tableList.add(table);
+            m_tableList.add(table);
             leafNode = new TableLeafNode(nodeId, joinExpr, whereExpr, (StmtTargetTableScan)tableScan);
         } else {
             leafNode = new SubqueryLeafNode(nodeId, joinExpr, whereExpr, (StmtSubqueryScan)tableScan);
         }
 
-        if (joinTree == null) {
+        if (m_joinTree == null) {
             // this is the first table
-            joinTree = leafNode;
+            m_joinTree = leafNode;
         } else {
             // Build the tree by attaching the next table always to the right
             // The node's join type is determined by the type of its right node
@@ -623,8 +623,8 @@ public abstract class AbstractParsedStmt {
                 throw new PlanningErrorException("VoltDB does not support full outer joins");
             }
 
-            JoinNode joinNode = new BranchNode(nodeId + 1, joinType, joinTree, leafNode);
-            joinTree = joinNode;
+            JoinNode joinNode = new BranchNode(nodeId + 1, joinType, m_joinTree, leafNode);
+            m_joinTree = joinNode;
        }
     }
 
@@ -689,8 +689,8 @@ public abstract class AbstractParsedStmt {
      */
     HashMap<AbstractExpression, Set<AbstractExpression>> analyzeValueEquivalence() {
         // collect individual where/join expressions
-        joinTree.analyzeJoinExpressions(noTableSelectionList);
-        return joinTree.getAllEquivalenceFilters();
+        m_joinTree.analyzeJoinExpressions(m_noTableSelectionList);
+        return m_joinTree.getAllEquivalenceFilters();
     }
 
     protected Table getTableFromDB(String tableName) {
@@ -700,7 +700,7 @@ public abstract class AbstractParsedStmt {
 
     @Override
     public String toString() {
-        String retval = "SQL:\n\t" + sql + "\n";
+        String retval = "SQL:\n\t" + m_sql + "\n";
 
         retval += "PARAMETERS:\n\t";
         for (ParameterValueExpression param : m_paramList) {
@@ -708,13 +708,13 @@ public abstract class AbstractParsedStmt {
         }
 
         retval += "\nTABLE SOURCES:\n\t";
-        for (Table table : tableList) {
+        for (Table table : m_tableList) {
             retval += table.getTypeName() + " ";
         }
 
         retval += "\nSCAN COLUMNS:\n";
         boolean hasAll = true;
-        for (StmtTableScan tableScan : tableAliasMap.values()) {
+        for (StmtTableScan tableScan : m_tableAliasMap.values()) {
             if ( ! tableScan.getScanColumns().isEmpty()) {
                 hasAll = false;
                 retval += "\tTable Alias: " + tableScan.getTableAlias() + ":\n";
@@ -729,13 +729,13 @@ public abstract class AbstractParsedStmt {
         }
 
         retval += "\nJOIN TREE :\n";
-        if (joinTree != null ) {
-            retval += joinTree.toString();
+        if (m_joinTree != null ) {
+            retval += m_joinTree.toString();
         }
 
         retval += "NO TABLE SELECTION LIST:\n";
         int i = 0;
-        for (AbstractExpression expr : noTableSelectionList)
+        for (AbstractExpression expr : m_noTableSelectionList)
             retval += "\t(" + String.valueOf(i++) + ") " + expr.toString() + "\n";
 
         return retval;
@@ -749,7 +749,7 @@ public abstract class AbstractParsedStmt {
                     // Propagate parameters from the parent to the child
                     subQuery.m_paramsById.putAll(m_paramsById);
                     subQuery.m_paramList = m_paramList;
-                    subQuery = AbstractParsedStmt.parse(subQuery, sql, childNode.children.get(0), m_paramValues, m_db, joinOrder);
+                    subQuery = AbstractParsedStmt.parse(subQuery, m_sql, childNode.children.get(0), m_paramValues, m_db, m_joinOrder);
 
                     return subQuery;
                 }

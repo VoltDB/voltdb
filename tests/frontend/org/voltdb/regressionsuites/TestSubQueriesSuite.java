@@ -39,8 +39,8 @@ public class TestSubQueriesSuite extends RegressionSuite {
     }
 
 
-    private final String[] procs = {"R1.insert", "R2.insert", "P1.insert", "P2.insert", "P3.insert"};
-    private final String [] tbs =  {"R1","R2","P1","P2","P3"};
+    private final String[] procs = {"R1.insert", "R2.insert", /* "P1.insert", "P2.insert", "P3.insert"*/};
+    private final String [] tbs =  {"R1","R2"/*,"P1","P2","P3"*/};
 
     private void loadData(Client client) throws NoConnectionsException, IOException, ProcCallException {
         ClientResponse cr = null;

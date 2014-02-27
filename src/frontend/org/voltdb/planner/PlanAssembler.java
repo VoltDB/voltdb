@@ -153,16 +153,16 @@ public class PlanAssembler {
 
     String getSQLText() {
         if (m_parsedDelete != null) {
-            return m_parsedDelete.sql;
+            return m_parsedDelete.m_sql;
         }
         else if (m_parsedInsert != null) {
-            return m_parsedInsert.sql;
+            return m_parsedInsert.m_sql;
         }
         else if (m_parsedUpdate != null) {
-            return m_parsedUpdate.sql;
+            return m_parsedUpdate.m_sql;
         }
         else if (m_parsedSelect != null) {
-            return m_parsedSelect.sql;
+            return m_parsedSelect.m_sql;
         }
         assert(false);
         return null;
@@ -217,26 +217,26 @@ public class PlanAssembler {
      */
     void setupForNewPlans(AbstractParsedStmt parsedStmt) {
         m_bestAndOnlyPlanWasGenerated = false;
-        m_partitioning.analyzeTablePartitioning(parsedStmt.tableAliasMap.values());
+        m_partitioning.analyzeTablePartitioning(parsedStmt.m_tableAliasMap.values());
 
         if (parsedStmt instanceof ParsedUnionStmt) {
             m_parsedUnion = (ParsedUnionStmt) parsedStmt;
             return;
         }
         if (parsedStmt instanceof ParsedSelectStmt) {
-            if (tableListIncludesExportOnly(parsedStmt.tableList)) {
+            if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
                 throw new RuntimeException(
                 "Illegal to read an export table.");
             }
             m_parsedSelect = (ParsedSelectStmt) parsedStmt;
             // Simplify the outer join if possible
-            if (m_parsedSelect.joinTree instanceof BranchNode) {
+            if (m_parsedSelect.m_joinTree instanceof BranchNode) {
                 // The execution engine expects to see the outer table on the left side only
                 // which means that RIGHT joins need to be converted to the LEFT ones
-                ((BranchNode)m_parsedSelect.joinTree).toLeftJoin();
+                ((BranchNode)m_parsedSelect.m_joinTree).toLeftJoin();
 
                 // End of the recursion. Nothing to simplify
-                simplifyOuterJoin((BranchNode)m_parsedSelect.joinTree);
+                simplifyOuterJoin((BranchNode)m_parsedSelect.m_joinTree);
             }
 
             subAssembler = new SelectSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
@@ -246,7 +246,7 @@ public class PlanAssembler {
         // @TODO
         // Need to use StmtTableScan instead
         // check that no modification happens to views
-        if (tableListIncludesView(parsedStmt.tableList)) {
+        if (tableListIncludesView(parsedStmt.m_tableList)) {
             throw new RuntimeException("Illegal to modify a materialized view.");
         }
 
@@ -254,8 +254,8 @@ public class PlanAssembler {
 
         // Check that only multi-partition writes are made to replicated tables.
         // figure out which table we're updating/deleting
-        assert (parsedStmt.tableList.size() == 1);
-        Table targetTable = parsedStmt.tableList.get(0);
+        assert (parsedStmt.m_tableList.size() == 1);
+        Table targetTable = parsedStmt.m_tableList.get(0);
         if (targetTable.getIsreplicated()) {
             if (m_partitioning.wasSpecifiedAsSingle()) {
                 String msg = "Trying to write to replicated table '" + targetTable.getTypeName()
@@ -273,12 +273,12 @@ public class PlanAssembler {
         }
 
         if (parsedStmt instanceof ParsedUpdateStmt) {
-            if (tableListIncludesExportOnly(parsedStmt.tableList)) {
+            if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
                 throw new RuntimeException("Illegal to update an export table.");
             }
             m_parsedUpdate = (ParsedUpdateStmt) parsedStmt;
         } else if (parsedStmt instanceof ParsedDeleteStmt) {
-            if (tableListIncludesExportOnly(parsedStmt.tableList)) {
+            if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
                 throw new RuntimeException("Illegal to delete from an export table.");
             }
             m_parsedDelete = (ParsedDeleteStmt) parsedStmt;
@@ -295,7 +295,7 @@ public class PlanAssembler {
             // per-join-order basis, and so, so must this analysis.
             HashMap<AbstractExpression, Set<AbstractExpression>>
                 valueEquivalence = parsedStmt.analyzeValueEquivalence();
-            m_partitioning.analyzeForMultiPartitionAccess(parsedStmt.tableAliasMap.values(), valueEquivalence);
+            m_partitioning.analyzeForMultiPartitionAccess(parsedStmt.m_tableAliasMap.values(), valueEquivalence);
         }
         subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
     }
@@ -364,10 +364,10 @@ public class PlanAssembler {
      */
     private ParsedResultAccumulator getBestCostPlanForSubQueries(AbstractParsedStmt parsedStmt) {
         List<StmtSubqueryScan> subqueryNodes = new ArrayList<StmtSubqueryScan>();
-        if (parsedStmt.joinTree == null) {
+        if (parsedStmt.m_joinTree == null) {
             return null;
         }
-        parsedStmt.joinTree.extractSubQueries(subqueryNodes);
+        parsedStmt.m_joinTree.extractSubQueries(subqueryNodes);
         if (subqueryNodes.isEmpty()) {
             return null;
         }
@@ -433,8 +433,8 @@ public class PlanAssembler {
                 throw new RuntimeException(
                         "setupForNewPlans not called or not successfull.");
             }
-            assert (nextStmt.tableList.size() == 1);
-            if (nextStmt.tableList.get(0).getIsreplicated()) {
+            assert (nextStmt.m_tableList.size() == 1);
+            if (nextStmt.m_tableList.get(0).getIsreplicated()) {
                 retval.replicatedTableDML = true;
             }
             retval.statementGuaranteesDeterminism(false, true); // Until we support DML w/ subqueries/limits
@@ -636,6 +636,11 @@ public class PlanAssembler {
          * inner side of a NestLoop join.
          */
         if (m_partitioning.requiresTwoFragments()) {
+
+            if (m_parsedSelect.m_joinTree.containSubSelects()) {
+                throw new PlanningErrorException("Subselect queries only are supported in single partition stored procedure.");
+            }
+
             boolean mvFixInfoCoordinatorNeeded = true;
             boolean mvFixInfoEdgeCaseOuterJoin = false;
 
@@ -680,7 +685,7 @@ public class PlanAssembler {
                 if (m_parsedSelect.mayNeedAvgPushdown()) {
                     m_parsedSelect.switchOptimalSuiteForAvgPushdown();
                 }
-                if (m_parsedSelect.tableList.size() > 1 && m_parsedSelect.mvFixInfo.needed()
+                if (m_parsedSelect.m_tableList.size() > 1 && m_parsedSelect.mvFixInfo.needed()
                         && subSelectRoot.hasInlinedIndexScanOfTable(m_parsedSelect.mvFixInfo.getMVTableName())) {
                     // MV partitioned joined query needs reAggregation work on coordinator.
                     // Index scan on MV table can not be supported.
@@ -774,8 +779,8 @@ public class PlanAssembler {
         assert (subAssembler != null);
 
         // figure out which table we're deleting from
-        assert (m_parsedDelete.tableList.size() == 1);
-        Table targetTable = m_parsedDelete.tableList.get(0);
+        assert (m_parsedDelete.m_tableList.size() == 1);
+        Table targetTable = m_parsedDelete.m_tableList.get(0);
 
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
         if (subSelectRoot == null) {
@@ -853,7 +858,7 @@ public class PlanAssembler {
         }
 
         UpdatePlanNode updateNode = new UpdatePlanNode();
-        Table targetTable = m_parsedUpdate.tableList.get(0);
+        Table targetTable = m_parsedUpdate.m_tableList.get(0);
         updateNode.setTargetTableName(targetTable.getTypeName());
         // set this to false until proven otherwise
         updateNode.setUpdateIndexes(false);
@@ -930,8 +935,8 @@ public class PlanAssembler {
         m_bestAndOnlyPlanWasGenerated = true;
 
         // figure out which table we're inserting into
-        assert (m_parsedInsert.tableList.size() == 1);
-        Table targetTable = m_parsedInsert.tableList.get(0);
+        assert (m_parsedInsert.m_tableList.size() == 1);
+        Table targetTable = m_parsedInsert.m_tableList.get(0);
 
         // the root of the insert plan is always an InsertPlanNode
         InsertPlanNode insertNode = new InsertPlanNode();
@@ -1324,14 +1329,14 @@ public class PlanAssembler {
         AbstractPlanNode sendNodeChild = sendNode.getChild(0);
 
         HashAggregatePlanNode reAggNodeForReplace = null;
-        if (m_parsedSelect.tableList.size() > 1 && !edgeCaseOuterJoin) {
+        if (m_parsedSelect.m_tableList.size() > 1 && !edgeCaseOuterJoin) {
             reAggNodeForReplace = reAggNode;
         }
         boolean find = mvFixInfo.processScanNodeWithReAggNode(sendNode, reAggNodeForReplace);
         assert(find);
 
         // If it is normal joined query, replace the node under receive node with materialized view scan node.
-        if (m_parsedSelect.tableList.size() > 1 && !edgeCaseOuterJoin) {
+        if (m_parsedSelect.m_tableList.size() > 1 && !edgeCaseOuterJoin) {
             AbstractPlanNode joinNode = sendNodeChild;
             // No agg, limit pushed down at this point.
             assert(joinNode instanceof AbstractJoinPlanNode);
@@ -1635,7 +1640,7 @@ public class PlanAssembler {
             CatalogMap<Index> allIndexes = targetTable.getIndexes();
 
             assert(fromTableAlias != null);
-            StmtTableScan fromTableScan = m_parsedSelect.tableAliasMap.get(fromTableAlias);
+            StmtTableScan fromTableScan = m_parsedSelect.m_tableAliasMap.get(fromTableAlias);
             for (Index index : allIndexes) {
                 if ( ! IndexType.isScannable(index.getType())) {
                     continue;
