@@ -312,6 +312,16 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public String getEELibraryVersionString() {
+        return getVersionString();
+    }
+
+    @Override
+    public boolean isCompatibleVersionString(String versionString) {
+        return true;
+    }
+
+    @Override
     public void initialize(Configuration config)
     {
         m_noLoadLib = config.m_noLoadLibVOLTDB;
