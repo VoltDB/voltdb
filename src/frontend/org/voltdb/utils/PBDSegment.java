@@ -27,10 +27,9 @@ import java.nio.channels.FileChannel.MapMode;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool.MBBWrapperContainer;
 import org.voltdb.utils.BinaryDeque.OutputContainerFactory;
 import org.xerial.snappy.Snappy;
-
-import sun.nio.ch.DirectBuffer;
 
 /**
  * Objects placed in the queue are stored in file segments that are up to 64 megabytes.
@@ -49,9 +48,8 @@ class PBDSegment {
     final File m_file;
     private RandomAccessFile m_ras;
     private FileChannel m_fc;
-    private MappedByteBuffer m_buf;
+    private MBBWrapperContainer m_buf;
     private ByteBuffer m_readBuf;
-    private long m_bufAddr;
 
     //If this is the first time polling a segment, madvise the entire thing
     //into memory
@@ -87,7 +85,7 @@ class PBDSegment {
             open(false);
         }
         if (m_fc.size() > m_segmentHeaderBytes) {
-            final int numEntries = m_buf.getInt(0);
+            final int numEntries = m_buf.b().getInt(0);
             return numEntries;
         } else {
             return 0;
@@ -95,15 +93,17 @@ class PBDSegment {
     }
 
     private void initNumEntries() throws IOException {
-        m_buf.putInt(0, 0);
-        m_buf.putInt(4, 0);
+        final ByteBuffer buf = m_buf.b();
+        buf.putInt(0, 0);
+        buf.putInt(4, 0);
         m_syncedSinceLastEdit = false;
     }
 
     private void incrementNumEntries(int size) throws IOException {
+        final ByteBuffer buf = m_buf.b();
         //First read the existing amount
-        m_buf.putInt(COUNT_OFFSET, m_buf.getInt(COUNT_OFFSET) + 1);
-        m_buf.putInt(SIZE_OFFSET, m_buf.getInt(SIZE_OFFSET) + size);
+        buf.putInt(COUNT_OFFSET, buf.getInt(COUNT_OFFSET) + 1);
+        buf.putInt(SIZE_OFFSET, buf.getInt(SIZE_OFFSET) + size);
         m_syncedSinceLastEdit = false;
     }
 
@@ -119,20 +119,19 @@ class PBDSegment {
 
         if (forWrite) {
             //If this is for writing, map the chunk size RW and put the buf positions at the start
-            m_buf = m_fc.map(MapMode.READ_WRITE, 0, m_chunkSize);
-            m_buf.position(SIZE_OFFSET + 4);
-            m_readBuf = m_buf.duplicate();
+            m_buf = DBBPool.wrapMBB(m_fc.map(MapMode.READ_WRITE, 0, m_chunkSize));
+            m_buf.b().position(SIZE_OFFSET + 4);
+            m_readBuf = m_buf.b().duplicate();
             initNumEntries();
         } else {
             //If it isn't for write, map read only to the actual size and put the write buf position at the end
             //so size is reported correctly
             final long size = m_fc.size();
-            m_buf = m_fc.map(MapMode.READ_ONLY, 0, size);
-            m_readBuf = m_buf.duplicate();
-            m_buf.position((int)size);
+            m_buf = DBBPool.wrapMBB(m_fc.map(MapMode.READ_ONLY, 0, size));
+            m_readBuf = m_buf.b().duplicate();
+            m_buf.b().position((int) size);
             m_readBuf.position(SIZE_OFFSET + 4);
         }
-        m_bufAddr = ((DirectBuffer)m_buf).address();
     }
 
     public void closeAndDelete() throws IOException {
@@ -141,26 +140,29 @@ class PBDSegment {
     }
 
     public void close() throws IOException {
-        if (m_fc != null) {
-            m_fc.close();
-            m_ras = null;
-            m_fc = null;
-            DBBPool.cleanByteBuffer(m_buf);
-            m_buf = null;
-            m_readBuf = null;
+        try {
+            if (m_fc != null) {
+                m_fc.close();
+                m_ras = null;
+                m_fc = null;
+                m_buf.discard();
+                m_buf = null;
+                m_readBuf = null;
+            }
+        } finally {
+            m_closed = true;
         }
-        m_closed = true;
     }
 
     void sync() throws IOException {
         if (!m_syncedSinceLastEdit) {
-            m_buf.force();
+            m_buf.b().force();
         }
         m_syncedSinceLastEdit = true;
     }
 
     boolean hasMoreEntries() throws IOException {
-        return m_objectReadIndex < m_buf.getInt(COUNT_OFFSET);
+        return m_objectReadIndex < m_buf.b().getInt(COUNT_OFFSET);
     }
 
     boolean offer(BBContainer cont, boolean compress) throws IOException {
@@ -168,29 +170,30 @@ class PBDSegment {
         final int remaining = cont.b().remaining();
         if (remaining < 32 || !buf.isDirect()) compress = false;
         final int maxCompressedSize = compress ? Snappy.maxCompressedLength(remaining) : remaining;
-        if (m_buf.remaining() < maxCompressedSize + m_objectHeaderBytes) return false;
+        final ByteBuffer mbuf = m_buf.b();
+        if (mbuf.remaining() < maxCompressedSize + m_objectHeaderBytes) return false;
 
 
         m_syncedSinceLastEdit = false;
         try {
             //Leave space for length prefix and flags
-            final int objSizePosition = m_buf.position();
-            m_buf.position(m_buf.position() + m_objectHeaderBytes);
+            final int objSizePosition = mbuf.position();
+            mbuf.position(mbuf.position() + m_objectHeaderBytes);
 
             int written = maxCompressedSize;
             if (compress) {
                 //Calculate destination pointer and compress directly to file
-                final long destAddr = m_bufAddr + m_buf.position();
-                written = (int)Snappy.rawCompress(((DirectBuffer)buf).address() + buf.position(), remaining, destAddr);
-                m_buf.position(m_buf.position() + written);
+                final long destAddr = m_buf.address() + mbuf.position();
+                written = (int)Snappy.rawCompress(cont.address() + buf.position(), remaining, destAddr);
+                mbuf.position(mbuf.position() + written);
             } else {
-                m_buf.put(buf);
+                mbuf.put(buf);
             }
 
             //Record the size of the compressed object and update buffer positions
             //and whether the object was compressed
-            m_buf.putInt(objSizePosition, written);
-            m_buf.putInt(objSizePosition + 4, compress ? FLAG_COMPRESSED: 0);
+            mbuf.putInt(objSizePosition, written);
+            mbuf.putInt(objSizePosition + 4, compress ? FLAG_COMPRESSED: 0);
             buf.position(buf.limit());
             incrementNumEntries(remaining);
         } finally {
@@ -201,11 +204,13 @@ class PBDSegment {
     }
 
     BBContainer poll(OutputContainerFactory factory) throws IOException {
+        final ByteBuffer mbuf = m_buf.b();
+        final long mBufAddr = m_buf.address();
         if (!m_haveMAdvised) {
             m_haveMAdvised = true;
             final long retval = PosixAdvise.madvise(
-                    m_bufAddr,
-                    m_buf.position(),
+                    m_buf.address(),
+                    mbuf.position(),
                     PosixAdvise.POSIX_MADV_WILLNEED);
             if (retval != 0) {
                 LOG.warn("madvise will need failed: " + retval);
@@ -226,7 +231,7 @@ class PBDSegment {
         //Check for compression
         final boolean compressed = nextFlags == FLAG_COMPRESSED;
         //Determine the length of the object if uncompressed
-        final int nextUncompressedLength = compressed ? (int)Snappy.uncompressedLength(m_bufAddr + m_readBuf.position(), nextCompressedLength) : nextCompressedLength;
+        final int nextUncompressedLength = compressed ? (int)Snappy.uncompressedLength(mBufAddr + m_readBuf.position(), nextCompressedLength) : nextCompressedLength;
         m_bytesRead += nextUncompressedLength;
 
         if (compressed) {
@@ -238,7 +243,7 @@ class PBDSegment {
             retbuf.limit(nextUncompressedLength);
 
             //Uncompress to output buffer
-            final long sourceAddr = m_bufAddr + m_readBuf.position();
+            final long sourceAddr = mBufAddr + m_readBuf.position();
             final long destAddr = retcont.address();
             Snappy.rawUncompress(sourceAddr, nextCompressedLength, destAddr);
             m_readBuf.position(m_readBuf.position() + nextCompressedLength);
@@ -260,6 +265,6 @@ class PBDSegment {
      * although incredibly unlikely
      */
     int sizeInBytes() {
-        return Math.max(0, m_buf.getInt(SIZE_OFFSET) - m_bytesRead);
+        return Math.max(0, m_buf.b().getInt(SIZE_OFFSET) - m_bytesRead);
     }
 }

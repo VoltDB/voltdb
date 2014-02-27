@@ -66,6 +66,7 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import org.voltdb.utils.CompressionService;
 
 public class CoreUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -290,6 +291,8 @@ public class CoreUtils {
                             r.run();
                         } catch (Throwable t) {
                             hostLog.error("Exception thrown in thread " + threadName, t);
+                        } finally {
+                            CompressionService.releaseThreadLocal();
                         }
                     }
                 };

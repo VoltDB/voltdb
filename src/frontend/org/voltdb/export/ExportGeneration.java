@@ -678,7 +678,7 @@ public class ExportGeneration {
         if (sources == null) {
             exportLog.error("Could not find export data sources for partition "
                     + partitionId + " generation " + m_timestamp + " the export data is being discarded");
-            DBBPool.cleanByteBuffer(buffer);
+            DBBPool.wrapDBB(buffer).discard();
             return;
         }
 
@@ -687,7 +687,7 @@ public class ExportGeneration {
             exportLog.error("Could not find export data source for partition " + partitionId +
                     " signature " + signature + " generation " +
                     m_timestamp + " the export data is being discarded");
-            DBBPool.cleanByteBuffer(buffer);
+            DBBPool.wrapDBB(buffer).discard();
             return;
         }
 
