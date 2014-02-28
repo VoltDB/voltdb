@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
@@ -51,7 +52,7 @@ public class JDBC4ClientConnection implements Closeable {
     private final JDBC4PerfCounterMap statistics;
     private final ArrayList<String> servers;
     private final ClientConfig config;
-    private Client client;
+    private AtomicReference<Client> client = new AtomicReference<Client>();
 
     /**
      * The base hash/key for this connection, that uniquely identifies its parameters, as defined by
@@ -148,12 +149,12 @@ public class JDBC4ClientConnection implements Closeable {
      * @throws UnknownHostException
      * @throws IOException
      */
-    private void initializeClientConnection() throws UnknownHostException, IOException
+    private synchronized void initializeClientConnection() throws UnknownHostException, IOException
     {
         // Make sure client is non-null only when fully connected.
-        Client clientTmp = this.client;
+        Client clientTmp = this.client.get();
         this.users = 0;
-        this.client = null;
+        this.client.set(null);
         if (clientTmp != null) {
             try {
                 clientTmp.close();
@@ -170,7 +171,7 @@ public class JDBC4ClientConnection implements Closeable {
         }
 
         // If no exception escaped this method it's a good client.
-        this.client = clientTmp;
+        this.client.set(clientTmp);
         this.users++;
     }
 
@@ -182,10 +183,10 @@ public class JDBC4ClientConnection implements Closeable {
      */
     protected ClientImpl getClient() throws UnknownHostException, IOException
     {
-        if (this.client == null) {
+        if (this.client.get() == null) {
             this.initializeClientConnection();
         }
-        return (ClientImpl) this.client;
+        return (ClientImpl) this.client.get();
     }
 
     /**
@@ -194,7 +195,7 @@ public class JDBC4ClientConnection implements Closeable {
      *
      * @return the reference to this connection to be returned to the calling user.
      */
-    protected JDBC4ClientConnection use() {
+    protected synchronized JDBC4ClientConnection use() {
         this.users++;
         return this;
     }
@@ -203,12 +204,12 @@ public class JDBC4ClientConnection implements Closeable {
      * Used by the pool to indicate a thread/user has stopped using the connection (and optionally
      * close the underlying client if there are no more users against it).
      */
-    protected void dispose() {
+    protected synchronized void dispose() {
         this.users--;
         if (this.users == 0) {
             try {
-                if (this.client != null) {
-                    this.client.close();
+                if (this.client.get() != null) {
+                    this.client.get().close();
                 }
             } catch (Exception x) {
                 // ignore
@@ -220,11 +221,17 @@ public class JDBC4ClientConnection implements Closeable {
      * Drop the client connection, e.g. when a NoConnectionsException is caught.
      * It will try to reconnect as needed and appropriate.
      */
-    protected void dropClient() {
-        // Force dispose() to get rid of the client.
-        this.users = 1;
-        this.dispose();
-        this.client = null;
+    protected synchronized void dropClient() {
+        if (this.client.get() != null) {
+            try {
+                this.client.get().close();
+                this.client.set(null);
+            }
+            catch (Exception x) {
+                // ignore
+            }
+        }
+        this.users = 0;
     }
 
     /**
@@ -378,10 +385,10 @@ public class JDBC4ClientConnection implements Closeable {
      * @return A {@link ClientStatsContext} that correctly represents the client statistics.
      */
     public ClientStatsContext getClientStatsContext() {
-        if (this.client == null) {
+        if (this.client.get() == null) {
             return null;
         }
-        return this.client.createStatsContext();
+        return this.client.get().createStatsContext();
     }
 
     /**
@@ -448,10 +455,10 @@ public class JDBC4ClientConnection implements Closeable {
     }
 
     void writeSummaryCSV(ClientStats stats, String path) throws IOException {
-        if (this.client == null) {
+        if (this.client.get() == null) {
             throw new IOException("Client is unavailable for writing summary CSV.");
         }
-        this.client.writeSummaryCSV(stats, path);
+        this.client.get().writeSummaryCSV(stats, path);
     }
 
     /**
@@ -463,11 +470,11 @@ public class JDBC4ClientConnection implements Closeable {
      * @see Client#drain()
      */
     public void drain() throws InterruptedException, IOException {
-        if (this.client == null) {
+        if (this.client.get() == null) {
             throw new IOException("Client is unavailable for drain().");
         }
         try {
-            this.client.drain();
+            this.client.get().drain();
         }
         catch (NoConnectionsException e) {
             this.dropClient();
@@ -483,10 +490,10 @@ public class JDBC4ClientConnection implements Closeable {
      * @throws IOException
      */
     public void backpressureBarrier() throws InterruptedException, IOException {
-        if (this.client == null) {
+        if (this.client.get() == null) {
             throw new IOException("Client is unavailable for backpressureBarrier().");
         }
-        this.client.backpressureBarrier();
+        this.client.get().backpressureBarrier();
     }
 
     /**
