@@ -158,11 +158,7 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string>
 
     onSetColumns(); // for more initialization
 
-    if (compactionThreshold == 0) {
-        m_compactionThreshold = -1;
-    } else {
-        m_compactionThreshold = compactionThreshold * .01;
-    }
+    m_compactionThreshold = compactionThreshold;
 }
 
 // ------------------------------------------------------------------
