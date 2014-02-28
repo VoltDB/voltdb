@@ -17,11 +17,10 @@
 
 package org.voltdb.compiler;
 
-import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.LineNumberReader;
+import java.io.Reader;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -425,6 +424,9 @@ public class DDLCompiler {
     // any is needed.
     Map<String, String> m_tableNameToDDL = new TreeMap<String, String>();
 
+    // Resolve classes using a custom loader. Needed for catalog version upgrade.
+    final ClassLoader m_classLoader;
+
     private Set<String> tableLimitConstraintCounter = new HashSet<>();
 
     private class DDLStatement {
@@ -434,44 +436,29 @@ public class DDLCompiler {
         int lineNo;
     }
 
-    public DDLCompiler(VoltCompiler compiler, HSQLInterface hsql, VoltDDLElementTracker tracker)  {
+    public DDLCompiler(VoltCompiler compiler,
+                       HSQLInterface hsql,
+                       VoltDDLElementTracker tracker,
+                       ClassLoader classLoader)  {
         assert(compiler != null);
         assert(hsql != null);
         assert(tracker != null);
         this.m_hsql = hsql;
         this.m_compiler = compiler;
         this.m_tracker = tracker;
+        this.m_classLoader = classLoader;
     }
 
     /**
-     * Compile a DDL schema from a file on disk
-     * @param path
-     * @param db
+     * Compile a DDL schema from an abstract reader
+     * @param reader  abstract DDL reader
+     * @param db  database
+     * @param whichProcs  which type(s) of procedures to load
      * @throws VoltCompiler.VoltCompilerException
      */
-    public void loadSchema(String path, Database db, DdlProceduresToLoad whichProcs)
+    public void loadSchema(Reader reader, Database db, DdlProceduresToLoad whichProcs)
             throws VoltCompiler.VoltCompilerException {
-        File inputFile = new File(path);
-        FileReader reader = null;
-        try {
-            reader = new FileReader(inputFile);
-        } catch (FileNotFoundException e) {
-            throw m_compiler.new VoltCompilerException("Unable to open schema file for reading");
-        }
-
         m_currLineNo = 1;
-        loadSchema(path, db, reader, whichProcs);
-    }
-
-    /**
-     * Compile a file from an open input stream
-     * @param path
-     * @param db
-     * @param reader
-     * @throws VoltCompiler.VoltCompilerException
-     */
-    private void loadSchema(String path, Database db, FileReader reader, DdlProceduresToLoad whichProcs)
-            throws VoltCompiler.VoltCompilerException {
 
         DDLStatement stmt = getNextStatement(reader, m_compiler);
         while (stmt != null) {
@@ -588,7 +575,7 @@ public class DDLCompiler {
             String className = checkIdentifierStart(statementMatcher.group(2), statement);
             Class<?> clazz;
             try {
-                clazz = Class.forName(className);
+                clazz = Class.forName(className, true, m_classLoader);
             } catch (ClassNotFoundException e) {
                 throw m_compiler.new VoltCompilerException(String.format(
                         "Cannot load class for procedure: %s",
@@ -1060,7 +1047,7 @@ public class DDLCompiler {
         return kStateReadingComment;
     }
 
-    DDLStatement getNextStatement(FileReader reader, VoltCompiler compiler)
+    DDLStatement getNextStatement(Reader reader, VoltCompiler compiler)
             throws VoltCompiler.VoltCompilerException {
 
         int state = kStateInvalid;

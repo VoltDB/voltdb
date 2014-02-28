@@ -52,6 +52,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.Feedback;
+import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
@@ -381,7 +382,7 @@ public class TestVoltCompiler extends TestCase {
         try {
             assertTrue(builder.compile("/tmp/snapshot_settings_test.jar"));
             final String catalogContents =
-                VoltCompiler.readFileFromJarfile("/tmp/snapshot_settings_test.jar", "catalog.txt");
+                VoltCompilerUtils.readFileFromJarfile("/tmp/snapshot_settings_test.jar", "catalog.txt");
             final Catalog cat = new Catalog();
             cat.execute(catalogContents);
             CatalogUtil.compileDeploymentAndGetCRC(cat, builder.getPathToDeployment(), true, false);
@@ -411,7 +412,7 @@ public class TestVoltCompiler extends TestCase {
             boolean success = project.compile("/tmp/exportsettingstest.jar");
             assertTrue(success);
             final String catalogContents =
-                VoltCompiler.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
+                VoltCompilerUtils.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
             final Catalog cat = new Catalog();
             cat.execute(catalogContents);
 
@@ -444,7 +445,7 @@ public class TestVoltCompiler extends TestCase {
         try {
             assertTrue(project.compile("/tmp/exportsettingstest.jar"));
             final String catalogContents =
-                VoltCompiler.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
+                VoltCompilerUtils.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
             final Catalog cat = new Catalog();
             cat.execute(catalogContents);
             CatalogUtil.compileDeploymentAndGetCRC(cat, project.getPathToDeployment(), true, false);
@@ -695,7 +696,7 @@ public class TestVoltCompiler extends TestCase {
 
         final Catalog c1 = compiler.getCatalog();
 
-        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
 
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
@@ -880,13 +881,42 @@ public class TestVoltCompiler extends TestCase {
 
         final VoltCompiler compiler1 = new VoltCompiler();
         final VoltCompiler compiler2 = new VoltCompiler();
-        final Catalog catalog = compiler1.compileCatalog(projectPath);
+        final Catalog catalog = compileCatalogFromProject(compiler1, projectPath);
         final String cat1 = catalog.serialize();
         final boolean success = compiler2.compileWithProjectXML(projectPath, testout_jar);
-        final String cat2 = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String cat2 = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
 
         assertTrue(success);
         assertTrue(cat1.compareTo(cat2) == 0);
+    }
+
+    private Catalog compileCatalogFromProject(
+            final VoltCompiler compiler,
+            final String projectPath)
+    {
+        try {
+            return compiler.compileCatalogFromProject(projectPath);
+        }
+        catch (VoltCompilerException e) {
+            e.printStackTrace();
+            fail();
+            return null;
+        }
+    }
+
+    private boolean compileFromDDL(
+            final VoltCompiler compiler,
+            final String jarPath,
+            final String... schemaPaths)
+    {
+        try {
+            return compiler.compileFromDDL(jarPath, schemaPaths);
+        }
+        catch (VoltCompilerException e) {
+            e.printStackTrace();
+            fail();
+            return false;
+        }
     }
 
     public void testDDLTableTooManyColumns() throws IOException {
@@ -955,7 +985,7 @@ public class TestVoltCompiler extends TestCase {
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
 
-        final String sql = VoltCompiler.readFileFromJarfile(testout_jar, "tpcc-ddl.sql");
+        final String sql = VoltCompilerUtils.readFileFromJarfile(testout_jar, "tpcc-ddl.sql");
         assertNotNull(sql);
     }
 
@@ -992,7 +1022,7 @@ public class TestVoltCompiler extends TestCase {
         //System.out.println("PRINTING Catalog 1");
         //System.out.println(c1.serialize());
 
-        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
 
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
@@ -1032,7 +1062,7 @@ public class TestVoltCompiler extends TestCase {
 
         assertTrue(success);
 
-        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
 
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
@@ -1076,7 +1106,7 @@ public class TestVoltCompiler extends TestCase {
 
         assertTrue(success);
 
-        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
 
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
@@ -1218,7 +1248,7 @@ public class TestVoltCompiler extends TestCase {
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
         final Catalog c1 = compiler.getCatalog();
-        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
         assertTrue(c2.serialize().equals(c1.serialize()));
@@ -1257,7 +1287,7 @@ public class TestVoltCompiler extends TestCase {
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
         final Catalog c1 = compiler.getCatalog();
-        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
         assertTrue(c2.serialize().equals(c1.serialize()));
@@ -1299,7 +1329,7 @@ public class TestVoltCompiler extends TestCase {
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
         final Catalog c1 = compiler.getCatalog();
-        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
         assertTrue(c2.serialize().equals(c1.serialize()));
@@ -2739,7 +2769,7 @@ public class TestVoltCompiler extends TestCase {
 
         assertTrue(success);
 
-        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
 
         final Catalog c2 = new Catalog();
         c2.execute(catalogContents);
@@ -2776,7 +2806,7 @@ public class TestVoltCompiler extends TestCase {
 
             assertTrue(success);
 
-            final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+            final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
 
             final Catalog c2 = new Catalog();
             c2.execute(catalogContents);
@@ -3096,13 +3126,13 @@ public class TestVoltCompiler extends TestCase {
 
         final VoltCompiler compiler = new VoltCompiler();
 
-        boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
+        boolean success = compileFromDDL(compiler, testout_jar, schemaPath);
         assertTrue(success);
 
-        success = compiler.compileFromDDL(testout_jar, schemaPath + "???");
+        success = compileFromDDL(compiler, testout_jar, schemaPath + "???");
         assertFalse(success);
 
-        success = compiler.compileFromDDL(testout_jar);
+        success = compileFromDDL(compiler, testout_jar);
         assertFalse(success);
     }
 

@@ -56,6 +56,7 @@ import org.voltdb.groovy.GroovyScriptProcedureDelegate;
 import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.InMemoryJarfile;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -67,7 +68,8 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
 
     static void compile(VoltCompiler compiler, HSQLInterface hsql,
             DatabaseEstimates estimates, Catalog catalog, Database db,
-            ProcedureDescriptor procedureDescriptor)
+            ProcedureDescriptor procedureDescriptor,
+            InMemoryJarfile jarOutput)
     throws VoltCompiler.VoltCompilerException {
 
         assert(compiler != null);
@@ -75,7 +77,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         assert(estimates != null);
 
         if (procedureDescriptor.m_singleStmt == null)
-            compileJavaProcedure(compiler, hsql, estimates, catalog, db, procedureDescriptor);
+            compileJavaProcedure(compiler, hsql, estimates, catalog, db, procedureDescriptor, jarOutput);
         else
             compileSingleStmtProcedure(compiler, hsql, estimates, catalog, db, procedureDescriptor);
     }
@@ -264,7 +266,8 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
 
     static void compileJavaProcedure(VoltCompiler compiler, HSQLInterface hsql,
             DatabaseEstimates estimates, Catalog catalog, Database db,
-            ProcedureDescriptor procedureDescriptor)
+            ProcedureDescriptor procedureDescriptor,
+            InMemoryJarfile jarOutput)
     throws VoltCompiler.VoltCompilerException {
 
         final String className = procedureDescriptor.m_className;
@@ -598,7 +601,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         }
 
         // put the compiled code for this procedure into the jarfile
-        compiler.addClassToJar(procClass);
+        compiler.addClassToJar(jarOutput, procClass);
     }
 
     static void compileSingleStmtProcedure(VoltCompiler compiler, HSQLInterface hsql,

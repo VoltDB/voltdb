@@ -17,7 +17,6 @@
 
 package org.voltdb;
 
-import com.google_voltpatches.common.net.HostAndPort;
 import java.io.File;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
@@ -37,6 +36,8 @@ import org.voltcore.utils.PortGenerator;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
+
+import com.google_voltpatches.common.net.HostAndPort;
 
 /**
  * VoltDB provides main() for the VoltDB server
@@ -206,6 +207,9 @@ public class VoltDB {
 
         /** Behavior-less arg used to differentiate command lines from "ps" */
         public String m_tag;
+
+        /** Force catalog upgrade even if version matches. */
+        public static boolean m_forceCatalogUpgrade = false;
 
         public int getZKPort() {
             return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, VoltDB.DEFAULT_ZK_PORT);
@@ -424,6 +428,10 @@ public class VoltDB {
                 } else if (arg.equalsIgnoreCase("ipcport")) {
                     String portStr = args[++i];
                     m_ipcPort = Integer.valueOf(portStr);
+                }
+                else if (arg.equals("forcecatalogupgrade")) {
+                    hostLog.info("Forced catalog upgrade will occur due to command line option.");
+                    m_forceCatalogUpgrade = true;
                 } else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     System.out.println("Please refer to VoltDB documentation for command line usage.");
