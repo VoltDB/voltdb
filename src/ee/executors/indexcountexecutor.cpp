@@ -159,7 +159,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         m_searchKey.setAllNulls();
         VOLT_DEBUG("<Index Count>Initial (all null) search key: '%s'", m_searchKey.debugNoHeader().c_str());
         for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
-            m_searchKeyArray[ctr]->substitute(params);
             NValue candidateValue = m_searchKeyArray[ctr]->eval(NULL, NULL);
             try {
                 m_searchKey.setNValue(ctr, candidateValue);
@@ -201,7 +200,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 break;
             }
         }
-        VOLT_TRACE("Search key after substitutions: '%s'", m_searchKey.debugNoHeader().c_str());
+        VOLT_TRACE("Search key: '%s'", m_searchKey.debugNoHeader().c_str());
     }
 
     if (m_numOfEndkeys != 0) {
@@ -211,7 +210,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         m_endKey.setAllNulls();
         VOLT_DEBUG("Initial (all null) end key: '%s'", m_endKey.debugNoHeader().c_str());
         for (int ctr = 0; ctr < m_numOfEndkeys; ctr++) {
-            m_endKeyArray[ctr]->substitute(params);
             NValue endKeyValue = m_endKeyArray[ctr]->eval(NULL, NULL);
             try {
                 m_endKey.setNValue(ctr, endKeyValue);
@@ -270,7 +268,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     AbstractExpression* countNULLExpr = m_node->getSkipNullPredicate();
     // For reverse scan edge case NULL values and forward scan underflow case.
     if (countNULLExpr != NULL) {
-        countNULLExpr->substitute(params);
         VOLT_DEBUG("COUNT NULL Expression:\n%s", countNULLExpr->debug(true).c_str());
     }
 

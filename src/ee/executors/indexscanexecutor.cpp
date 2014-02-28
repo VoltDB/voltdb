@@ -196,19 +196,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     IndexLookupType localLookupType = m_lookupType;
     SortDirectionType localSortDirection = m_sortDirection;
 
-    // INLINE PROJECTION
-    // Set params to expression tree via substitute()
-    assert(m_numOfColumns == m_outputTable->columnCount());
-    if (m_projectionNode != NULL && m_projectionAllTupleArray == NULL)
-    {
-        for (int ctr = 0; ctr < m_numOfColumns; ctr++)
-        {
-            assert(m_projectionNode->getOutputColumnExpressions()[ctr]);
-            m_projectionExpressions[ctr]->substitute(params);
-            assert(m_projectionExpressions[ctr]);
-        }
-    }
-
     //
     // INLINE LIMIT
     //
@@ -220,7 +207,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     m_searchKey.setAllNulls();
     VOLT_TRACE("Initial (all null) search key: '%s'", m_searchKey.debugNoHeader().c_str());
     for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
-        m_searchKeyArray[ctr]->substitute(params);
         NValue candidateValue = m_searchKeyArray[ctr]->eval(NULL, NULL);
         try {
             m_searchKey.setNValue(ctr, candidateValue);
@@ -287,14 +273,13 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         }
     }
     assert((activeNumOfSearchKeys == 0) || (m_searchKey.getSchema()->columnCount() > 0));
-    VOLT_TRACE("Search key after substitutions: '%s'", m_searchKey.debugNoHeader().c_str());
+    VOLT_TRACE("Search key: '%s'", m_searchKey.debugNoHeader().c_str());
 
     //
     // END EXPRESSION
     //
     AbstractExpression* end_expression = m_node->getEndExpression();
     if (end_expression != NULL) {
-        end_expression->substitute(params);
         VOLT_DEBUG("End Expression:\n%s", end_expression->debug(true).c_str());
     }
 
@@ -303,7 +288,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     //
     AbstractExpression* post_expression = m_node->getPredicate();
     if (post_expression != NULL) {
-        post_expression->substitute(params);
         VOLT_DEBUG("Post Expression:\n%s", post_expression->debug(true).c_str());
     }
     assert (m_index);
@@ -312,7 +296,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     // INITIAL EXPRESSION
     AbstractExpression* initial_expression = m_node->getInitialExpression();
     if (initial_expression != NULL) {
-        initial_expression->substitute(params);
         VOLT_DEBUG("Initial Expression:\n%s", initial_expression->debug(true).c_str());
     }
 
@@ -322,7 +305,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     AbstractExpression* skipNullExpr = m_node->getSkipNullPredicate();
     // For reverse scan edge case NULL values and forward scan underflow case.
     if (skipNullExpr != NULL) {
-        skipNullExpr->substitute(params);
         VOLT_DEBUG("COUNT NULL Expression:\n%s", skipNullExpr->debug(true).c_str());
     }
 

@@ -184,47 +184,37 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     //
     int num_of_searchkeys = (int)inline_node->getSearchKeyExpressions().size();
     for (int ctr = 0; ctr < num_of_searchkeys; ctr++) {
-        VOLT_TRACE("Search Key[%d] before substitution:\n%s",
-                   ctr, inline_node->getSearchKeyExpressions()[ctr]->debug(true).c_str());
-
-        inline_node->getSearchKeyExpressions()[ctr]->substitute(params);
-
-        VOLT_TRACE("Search Key[%d] after substitution:\n%s",
+        VOLT_TRACE("Search Key[%d] :\n%s",
                    ctr, inline_node->getSearchKeyExpressions()[ctr]->debug(true).c_str());
     }
 
     // end expression
     AbstractExpression* end_expression = inline_node->getEndExpression();
     if (end_expression) {
-        end_expression->substitute(params);
         VOLT_TRACE("End Expression:\n%s", end_expression->debug(true).c_str());
     }
 
     // post expression
     AbstractExpression* post_expression = inline_node->getPredicate();
     if (post_expression != NULL) {
-        post_expression->substitute(params);
         VOLT_TRACE("Post Expression:\n%s", post_expression->debug(true).c_str());
     }
 
     // pre join expression
     AbstractExpression* prejoin_expression = node->getPreJoinPredicate();
     if (prejoin_expression != NULL) {
-        prejoin_expression->substitute(params);
         VOLT_TRACE("Prejoin Expression:\n%s", prejoin_expression->debug(true).c_str());
     }
 
     // where expression
     AbstractExpression* where_expression = node->getWherePredicate();
     if (where_expression != NULL) {
-        where_expression->substitute(params);
         VOLT_TRACE("Where Expression:\n%s", where_expression->debug(true).c_str());
     }
 
     // initial expression
     AbstractExpression* initial_expression = inline_node->getInitialExpression();
     if (initial_expression != NULL) {
-        initial_expression->substitute(params);
         VOLT_TRACE("Initial Expression:\n%s", initial_expression->debug(true).c_str());
     }
 
@@ -232,7 +222,6 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     AbstractExpression* skipNullExpr = inline_node->getSkipNullPredicate();
     // For reverse scan edge case NULL values and forward scan underflow case.
     if (skipNullExpr != NULL) {
-        skipNullExpr->substitute(params);
         VOLT_DEBUG("Skip NULL Expression:\n%s", skipNullExpr->debug(true).c_str());
     }
 

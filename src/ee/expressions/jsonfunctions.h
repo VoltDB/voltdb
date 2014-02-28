@@ -27,6 +27,8 @@
 #include <jsoncpp/jsoncpp.h>
 #include <jsoncpp/jsoncpp-forwards.h>
 
+#include "common/NValue.hpp"
+
 namespace voltdb {
 
 /** implement the 2-argument SQL FIELD function */
