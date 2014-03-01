@@ -82,12 +82,20 @@ class PlanNodeFragment {
 
     // first node in serialization order
     AbstractPlanNode * getRootNode() {
-        return m_planNodes.front();
+        assert(!m_stmtPlanNodesArray.empty());
+        return m_stmtPlanNodesArray[0]->front();
     }
 
     // the list of plannodes in execution order
     inline const std::vector<AbstractPlanNode*>& getExecuteList() const {
-        return m_executionList;
+        assert(!m_stmtExecutionListArray.empty());
+        return *m_stmtExecutionListArray[0];
+    }
+
+    // the list of plannodes in execution order for a given sub-statement
+    inline const std::vector<AbstractPlanNode*>& getExecuteList(int stmtId) const {
+        assert( stmtId < m_stmtExecutionListArray.size());
+        return *m_stmtExecutionListArray[stmtId];
     }
 
     // true if this plan fragment contains a delete plan node.  Used
@@ -119,16 +127,12 @@ class PlanNodeFragment {
     std::string m_serializedType;
     // translate id from catalog to pointer to plannode
     std::map<CatalogId, AbstractPlanNode*> m_idToNodeMap;
-    // pointers to nodes in execution order
-    std::vector<AbstractPlanNode*> m_executionList;
-    // pointers to subqueries nodes in execution order grouped by subqueries
-    // the (subquery id -1) is an index into the array.
-    std::vector<std::vector<AbstractPlanNode*>*> m_subqueryExecutionListArray;
-    // pointers to nodes in serialization order
-    std::vector<AbstractPlanNode*> m_planNodes;
-    // pointers to subqueries nodes in serialization order grouped by subqueries
-    // the (subquery id -1) is an index into the array.
-    std::vector<std::vector<AbstractPlanNode*>*> m_subqueryPlanNodesArray;
+    // pointers to nodes in execution order grouped by statement
+    // the statement id is an index into the array. The top statement (parent) always has index 0
+    std::vector<std::vector<AbstractPlanNode*>*> m_stmtExecutionListArray;
+    // pointers to subqueries nodes in serialization order grouped by statement
+    // the statement id is an index into the array. The top statement (parent) always has index 0
+    std::vector<std::vector<AbstractPlanNode*>*> m_stmtPlanNodesArray;
     // Pairs of argument index and type for parameters to the fragment
     std::vector<std::pair< int, voltdb::ValueType> > m_parameters;
     // Pairs of parameter index and TVE grouped by subqueries
