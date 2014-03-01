@@ -204,9 +204,6 @@ class PBDSegment {
         return true;
     }
 
-    //Target for storing the checksum to prevent dead code elimination
-    private static byte unused;
-
     BBContainer poll(OutputContainerFactory factory) throws IOException {
         final long mBufAddr = m_buf.address();
         if (!m_haveMAdvised) {
@@ -271,21 +268,7 @@ class PBDSegment {
              * is trashed at the wrong moment or we are very low on memory
              */
             final BBContainer dummyCont = DBBPool.dummyWrapBB(retbuf);
-            long address = dummyCont.address();
-            //Make address page aligned
-            final int offset = (int)(address % Bits.pageSize());
-            address -= offset;
-            final int numPages = Bits.numPages(retbuf.remaining() + offset);
-            byte checksum = 0;
-            for (int ii = 0; ii < numPages; ii++) {
-                checksum ^= Bits.unsafe.getByte(address);
-                address |= checksum;
-            }
-            //This store will never actually occur, but the compiler doesn't care
-            //for the purposes of dead code elimination
-            if (unused != 0) {
-                unused = checksum;
-            }
+            Bits.readEveryPage(dummyCont);
             return dummyCont;
         }
     }
