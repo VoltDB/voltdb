@@ -2222,6 +2222,7 @@ DBBPool.java preprocessing
           executable='gcc'
           failonerror='true'>
           <arg value='-E'/>
+          <arg value='-CC'/>
           <arg value='-xc' />
           <arg value='-Wp,-P' />
           <arg value='-traditional-cpp' />

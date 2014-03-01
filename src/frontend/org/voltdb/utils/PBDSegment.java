@@ -25,6 +25,7 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Bits;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DBBPool.MBBContainer;
@@ -39,47 +40,6 @@ import org.xerial.snappy.Snappy;
  *
  */
 class PBDSegment {
-
-    private static final sun.misc.Unsafe unsafe;
-
-    private static sun.misc.Unsafe getUnsafe() {
-        try {
-            return sun.misc.Unsafe.getUnsafe();
-        } catch (SecurityException se) {
-            try {
-                return java.security.AccessController.doPrivileged
-                        (new java.security
-                                .PrivilegedExceptionAction<sun.misc.Unsafe>() {
-                            public sun.misc.Unsafe run() throws Exception {
-                                java.lang.reflect.Field f = sun.misc
-                                        .Unsafe.class.getDeclaredField("theUnsafe");
-                                f.setAccessible(true);
-                                return (sun.misc.Unsafe) f.get(null);
-                            }});
-            } catch (java.security.PrivilegedActionException e) {
-                throw new RuntimeException("Could not initialize intrinsics",
-                        e.getCause());
-            }
-        }
-    }
-
-    private static final int PAGE_SIZE;
-
-    static {
-        sun.misc.Unsafe unsafeTemp = null;
-        try {
-            unsafeTemp = getUnsafe();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        unsafe = unsafeTemp;
-        PAGE_SIZE = unsafe.pageSize();
-    }
-
-    private static int NUM_PAGES(int size) {
-        return (size + PAGE_SIZE  - 1) / PAGE_SIZE;
-    }
-
     private static final VoltLogger LOG = new VoltLogger("HOST");
 
     public static final int FLAG_COMPRESSED = 1;
@@ -313,12 +273,12 @@ class PBDSegment {
             final BBContainer dummyCont = DBBPool.dummyWrapBB(retbuf);
             long address = dummyCont.address();
             //Make address page aligned
-            final int offset = (int)(address % PAGE_SIZE);
+            final int offset = (int)(address % Bits.pageSize());
             address -= offset;
-            final int numPages = NUM_PAGES(retbuf.remaining() + offset);
+            final int numPages = Bits.numPages(retbuf.remaining() + offset);
             byte checksum = 0;
             for (int ii = 0; ii < numPages; ii++) {
-                checksum ^= unsafe.getByte(address);
+                checksum ^= Bits.unsafe.getByte(address);
                 address |= checksum;
             }
             //This store will never actually occur, but the compiler doesn't care

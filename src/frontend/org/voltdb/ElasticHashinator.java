@@ -21,17 +21,15 @@ import java.io.IOException;
 import java.lang.Thread.State;
 import java.nio.ByteBuffer;
 import java.util.*;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.SortedMapDifference;
+
 import org.apache.cassandra_voltpatches.MurmurHash3;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Bits;
 import org.voltcore.utils.Pair;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -39,7 +37,9 @@ import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.collect.ImmutableSortedMap;
 import com.google_voltpatches.common.collect.UnmodifiableIterator;
+
 import org.voltdb.utils.CompressionService;
+
 import sun.misc.Cleaner;
 
 /**
@@ -53,39 +53,6 @@ public class ElasticHashinator extends TheHashinator {
 
     public static int DEFAULT_TOTAL_TOKENS =
         Integer.parseInt(System.getProperty("ELASTIC_TOTAL_TOKENS", "16384"));
-
-    private static final sun.misc.Unsafe unsafe;
-
-    private static sun.misc.Unsafe getUnsafe() {
-        try {
-            return sun.misc.Unsafe.getUnsafe();
-        } catch (SecurityException se) {
-            try {
-                return java.security.AccessController.doPrivileged
-                        (new java.security
-                                .PrivilegedExceptionAction<sun.misc.Unsafe>() {
-                            public sun.misc.Unsafe run() throws Exception {
-                                java.lang.reflect.Field f = sun.misc
-                                        .Unsafe.class.getDeclaredField("theUnsafe");
-                                f.setAccessible(true);
-                                return (sun.misc.Unsafe) f.get(null);
-                            }});
-            } catch (java.security.PrivilegedActionException e) {
-                throw new RuntimeException("Could not initialize intrinsics",
-                        e.getCause());
-            }
-        }
-    }
-
-    static {
-        sun.misc.Unsafe unsafeTemp = null;
-        try {
-            unsafeTemp = getUnsafe();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        unsafe = unsafeTemp;
-    }
 
     /**
      * Tokens on the ring. A value hashes to a token if the token is the first value <=
@@ -150,8 +117,8 @@ public class ElasticHashinator extends TheHashinator {
                 ImmutableSortedMap.Builder<Integer, Integer> builder = ImmutableSortedMap.naturalOrder();
                 for (int ii = 0; ii < m_tokenCount; ii++) {
                     final long ptr = m_tokens + (ii * 8);
-                    final int token = unsafe.getInt(ptr);
-                    final int partition = unsafe.getInt(ptr + 4);
+                    final int token = Bits.unsafe.getInt(ptr);
+                    final int partition = Bits.unsafe.getInt(ptr + 4);
                     builder.put(token, partition);
                 }
                 return builder.build();
@@ -168,14 +135,14 @@ public class ElasticHashinator extends TheHashinator {
         m_tokensMap = Suppliers.ofInstance(ImmutableSortedMap.copyOf(tokens));
         Preconditions.checkArgument(m_tokensMap.get().firstEntry().getKey().equals(Integer.MIN_VALUE));
         final int bytes = 8 * tokens.size();
-        m_tokens = unsafe.allocateMemory(bytes);
+        m_tokens = Bits.unsafe.allocateMemory(bytes);
         trackAllocatedHashinatorBytes(bytes);
         m_cleaner = Cleaner.create(this, new Deallocator(m_tokens, bytes));
         int ii = 0;
         for (Map.Entry<Integer, Integer> e : tokens.entrySet()) {
             final long ptr = m_tokens + (ii * 8);
-            unsafe.putInt(ptr, e.getKey());
-            unsafe.putInt(ptr + 4, e.getValue());
+            Bits.unsafe.putInt(ptr, e.getKey());
+            Bits.unsafe.putInt(ptr + 4, e.getValue());
             ii++;
         }
         m_tokenCount = tokens.size();
@@ -216,10 +183,10 @@ public class ElasticHashinator extends TheHashinator {
         int lastToken = Integer.MIN_VALUE;
         for (int ii = 0; ii < m_tokenCount; ii++) {
             final long ptr = m_tokens + (ii * 8);
-            final int token = unsafe.getInt(ptr);
+            final int token = Bits.unsafe.getInt(ptr);
             Preconditions.checkArgument(token >= lastToken);
             lastToken = token;
-            final int pid = unsafe.getInt(ptr + 4);
+            final int pid = Bits.unsafe.getInt(ptr + 4);
             buf.putInt(token);
             buf.putInt(pid);
         }
@@ -233,7 +200,7 @@ public class ElasticHashinator extends TheHashinator {
      */
     public int partitionForToken(int hash) {
         long token = getTokenPtr(hash);
-        return unsafe.getInt(token + 4);
+        return Bits.unsafe.getInt(token + 4);
     }
 
     /**
@@ -460,7 +427,7 @@ public class ElasticHashinator extends TheHashinator {
         for (int zz = 3; zz >= 0; zz--) {
             int lastToken = Integer.MIN_VALUE;
             for (int ii = 0; ii < m_tokenCount; ii++) {
-                int token = unsafe.getInt(m_tokens + (ii * 8));
+                int token = Bits.unsafe.getInt(m_tokens + (ii * 8));
                 Preconditions.checkArgument(token >= lastToken);
                 lastToken = token;
                 token = token >>> (zz * 8);
@@ -469,7 +436,7 @@ public class ElasticHashinator extends TheHashinator {
             }
         }
         for (int ii = 0; ii < m_tokenCount; ii++) {
-            buf.putInt(unsafe.getInt(m_tokens + (ii * 8) + 4));
+            buf.putInt(Bits.unsafe.getInt(m_tokens + (ii * 8) + 4));
         }
 
         try {
@@ -495,7 +462,7 @@ public class ElasticHashinator extends TheHashinator {
             throw new RuntimeException("Bad elastic hashinator config");
         }
         final int bytes = 8 * numEntries;
-        long tokens = unsafe.allocateMemory(bytes);
+        long tokens = Bits.unsafe.allocateMemory(bytes);
         trackAllocatedHashinatorBytes(bytes);
 
         int lastToken = Integer.MIN_VALUE;
@@ -504,9 +471,9 @@ public class ElasticHashinator extends TheHashinator {
             final int token = buf.getInt();
             Preconditions.checkArgument(token >= lastToken);
             lastToken = token;
-            unsafe.putInt(ptr, token);
+            Bits.unsafe.putInt(ptr, token);
             final int partitionId = buf.getInt();
-            unsafe.putInt(ptr + 4, partitionId);
+            Bits.unsafe.putInt(ptr + 4, partitionId);
         }
         return Pair.of(tokens, numEntries);
     }
@@ -518,7 +485,7 @@ public class ElasticHashinator extends TheHashinator {
         while (min <= max) {
             int mid = (min + max) >>> 1;
             final long midPtr = m_tokens + (8 * mid);
-            int midval = unsafe.getInt(midPtr);
+            int midval = Bits.unsafe.getInt(midPtr);
 
             if (midval < hash) {
                 min = mid + 1;
@@ -558,7 +525,7 @@ public class ElasticHashinator extends TheHashinator {
             throw new RuntimeException("Bad elastic hashinator cooked config size.");
         }
         final long bytes = 8 * numEntries;
-        long tokens = unsafe.allocateMemory(bytes);
+        long tokens = Bits.unsafe.allocateMemory(bytes);
         trackAllocatedHashinatorBytes(bytes);
         ByteBuffer tokenBuf = ByteBuffer.wrap(cookedBytes, 4, tokensSize);
         ByteBuffer partitionBuf = ByteBuffer.wrap(cookedBytes, 4 + tokensSize, partitionsSize);
@@ -577,9 +544,9 @@ public class ElasticHashinator extends TheHashinator {
             Preconditions.checkArgument(token >= lastToken);
             lastToken = token;
             long ptr = tokens + (ii * 8);
-            unsafe.putInt(ptr, token);
+            Bits.unsafe.putInt(ptr, token);
             final int partitionId = partitionBuf.getInt();
-            unsafe.putInt(ptr + 4, partitionId);
+            Bits.unsafe.putInt(ptr + 4, partitionId);
         }
         return Pair.of(tokens, numEntries);
     }
@@ -704,7 +671,7 @@ public class ElasticHashinator extends TheHashinator {
             if (address == 0) {
                 return;
             }
-            unsafe.freeMemory(address);
+            Bits.unsafe.freeMemory(address);
             address = 0;
             m_allocatedHashinatorBytes.addAndGet(-size);
         }

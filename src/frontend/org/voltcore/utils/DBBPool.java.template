@@ -43,7 +43,7 @@ public final class DBBPool {
     private static final VoltLogger TRACE = new VoltLogger("DBBPOOL");
     private static final VoltLogger HOST = new VoltLogger("DBBPOOL");
 #ifndef NO_MEMCHECK
-    
+
     static {
         HOST.info("Strict java memory checking is enabled");
     }
