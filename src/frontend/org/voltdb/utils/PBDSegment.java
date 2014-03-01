@@ -39,6 +39,47 @@ import org.xerial.snappy.Snappy;
  *
  */
 class PBDSegment {
+
+    private static final sun.misc.Unsafe unsafe;
+
+    private static sun.misc.Unsafe getUnsafe() {
+        try {
+            return sun.misc.Unsafe.getUnsafe();
+        } catch (SecurityException se) {
+            try {
+                return java.security.AccessController.doPrivileged
+                        (new java.security
+                                .PrivilegedExceptionAction<sun.misc.Unsafe>() {
+                            public sun.misc.Unsafe run() throws Exception {
+                                java.lang.reflect.Field f = sun.misc
+                                        .Unsafe.class.getDeclaredField("theUnsafe");
+                                f.setAccessible(true);
+                                return (sun.misc.Unsafe) f.get(null);
+                            }});
+            } catch (java.security.PrivilegedActionException e) {
+                throw new RuntimeException("Could not initialize intrinsics",
+                        e.getCause());
+            }
+        }
+    }
+
+    private static final int PAGE_SIZE;
+
+    static {
+        sun.misc.Unsafe unsafeTemp = null;
+        try {
+            unsafeTemp = getUnsafe();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        unsafe = unsafeTemp;
+        PAGE_SIZE = unsafe.pageSize();
+    }
+
+    private static int NUM_PAGES(int size) {
+        return (size + PAGE_SIZE  - 1) / PAGE_SIZE;
+    }
+
     private static final VoltLogger LOG = new VoltLogger("HOST");
 
     public static final int FLAG_COMPRESSED = 1;
@@ -203,6 +244,9 @@ class PBDSegment {
         return true;
     }
 
+    //Target for storing the checksum to prevent dead code elimination
+    private static byte unused;
+
     BBContainer poll(OutputContainerFactory factory) throws IOException {
         final long mBufAddr = m_buf.address();
         if (!m_haveMAdvised) {
@@ -255,7 +299,34 @@ class PBDSegment {
             ByteBuffer retbuf = m_readBuf.slice();
             m_readBuf.position(m_readBuf.limit());
             m_readBuf.limit(oldLimit);
-            return DBBPool.dummyWrapBB(retbuf);
+
+            /*
+             * For uncompressed data, touch all the pages to make 100% sure
+             * they are available since they will be accessed directly.
+             *
+             * This code mimics MappedByteBuffer.load, but without the expensive
+             * madvise call for data we are 99% sure was already madvised.
+             *
+             * This would only ever be an issue in the unlikely event that the page cache
+             * is trashed at the wrong moment or we are very low on memory
+             */
+            final BBContainer dummyCont = DBBPool.dummyWrapBB(retbuf);
+            long address = dummyCont.address();
+            //Make address page aligned
+            final int offset = (int)(address % PAGE_SIZE);
+            address -= offset;
+            final int numPages = NUM_PAGES(retbuf.remaining() + offset);
+            byte checksum = 0;
+            for (int ii = 0; ii < numPages; ii++) {
+                checksum ^= unsafe.getByte(address);
+                address |= checksum;
+            }
+            //This store will never actually occur, but the compiler doesn't care
+            //for the purposes of dead code elimination
+            if (unused != 0) {
+                unused = checksum;
+            }
+            return dummyCont;
         }
     }
 
